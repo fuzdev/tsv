@@ -480,7 +480,15 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// file is the ONLY mover, zero in real code, with the per-file error output identical line
 	// for line (950/950) and the formatted/unchanged counts unmoved. `unknown` and `partial`
 	// are exact pins and both hold, so the file can only have come from `known`.
-	typescript: 5178,
+	//
+	// 5178 → 5179: `prettier/tests/format/js/ignore/issue-11077.js` arrives from `unknown` — a
+	// directive inside a redundant paren shell ahead of a member chain's base, whose frozen
+	// operand's leading run now reaches the enclosing gap's own-line emitter, so the output is
+	// byte-identical to prettier's. Measured by a baseline-vs-tip byte A/B over the 32,668
+	// staged `../corpora/collections` + `../prettier/tests/format` + fixture-tree files: zero
+	// real-code movers, and a `--all --json` bucket set-diff between a baseline `--profile corpus`
+	// FFI build and the tip is file-for-file identical in every other cell of every language.
+	typescript: 5179,
 	// ⚠️ A short `svelte_styles` cache understates every css count at once and reads exactly
 	// like a regression: the harvest is a CORPUS INPUT, not a measurement of tsv, and a
 	// standalone `corpus:compare:format --all` is the one entry point that does not chain it
@@ -905,7 +913,16 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// `conditional/postfix-ternary-regressions.js`, `keyword-types/keyword-types-with-parens-comments.ts`,
 	// `union/5849.ts` and the two `mdz` files unmoved. The `--all` run confirms the scope:
 	// every `svelte` and `css` bucket is on its pin and SAFETY stays 0.
-	typescript: 69,
+	//
+	// 69 → 68: `prettier/tests/format/js/ignore/issue-11077.js` — one of the three
+	// whitespace-only `prettier-ignore` divergences named above — leaves for `match`: the
+	// directive the author wrote inside the grouping parens the parser erases ahead of a member
+	// chain's base now freezes that base and keeps its own line, which is prettier's placement
+	// there too. Nothing else moves: a `--all --json` bucket set-diff between a baseline
+	// `--profile corpus` FFI build and the tip is file-for-file identical in `unknown`, `partial`
+	// and `safety` for every language, and the byte A/B on the `match` pin above found zero
+	// real-code movers.
+	typescript: 68,
 	// 23 → 18: five files LEAVE for `match` (`match` 133 → 138), all of them one language
 	// question — which reader prettier hands an at-rule prelude to, and what that reader
 	// does with the text inside a feature expression.

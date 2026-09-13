@@ -290,7 +290,7 @@ frozen operand so its grouping survives.
 #### Required pairs a freeze re-synthesizes
 
 A frozen slice is the node's own bytes, so a paren the *printer* would have
-supplied has to be re-synthesized around it. Three such pairs are not clarity
+supplied has to be re-synthesized around it. Four such pairs are not clarity
 parens at all — without them the output does not reparse, or reparses as
 something else:
 
@@ -302,17 +302,63 @@ something else:
   routes through the paren rule already has it, and only a frozen site that
   bypasses that rule spells the wrap itself;
 - a **decorated class expression at an arrow body's leftmost position**, which a
-  concise body cannot start with (`() => (@dec class {}).k`);
+  concise body cannot start with — minted around a slice whose ROOT is the class
+  (`() =>⏎// format-ignore⏎@dec class {}` prints `(@dec class {})`) and around one
+  frozen from inside the erased parens (`() => (⏎// format-ignore⏎@dec class {}⏎).k`
+  prints `(@dec class {}).k`). A `=>`-gap freeze over the composite
+  `(@dec class {}).k` re-synthesizes nothing: the member span begins at the author's
+  `(`, so that pair is already inside the slice;
 - a **`new` callee the author wrote with no argument list of its own**
   (`new (new X)()`), where the printed `()` past the slice would otherwise bind
   to the inner `new` — the one pair required by the SLICE rather than by the
-  position, since the unfrozen form supplies the inner `()` itself.
+  position, since the unfrozen form supplies the inner `()` itself. The axis is
+  the JOIN between the slice's last token and the tail's first, not the
+  position's operator precedence. A bare `new X` ends in its callee's own token
+  and so joins only a LEFT-BINDING suffix: a frozen `new X` takes the pair at a
+  member base, a callee, a computed lookup, a `!` and a template tag
+  (`(⏎// format-ignore⏎new X⏎).k` prints `(new X).k`; bare, `new X.k` is
+  `new (X.k)`). Written with type arguments it ends in `>` instead, and those
+  same suffixes still take the pair — but no longer all for one reason: `.k` and
+  `!` are REJECTED outright by all three parsers (`An instantiation expression
+  cannot be followed by a property access` / `Expression expected`), `(1)` and
+  `` `t` `` rebind to the `new` as they do bare, and `[0]` rebinds through the
+  relational reading (`new X<T>[0]` is `((new X) < T) > [0]`). The operator tails
+  past that `>` are a rejection table of their own. `+` and `-` open the `>`'s
+  right-hand side, so `new X<T> + 1` reads as `((new X) < T) > +1` everywhere —
+  accepted by every parser and a different tree in every one.
+  `>` / `>>` / `>>>` are rejected by tsc, by acorn-typescript and by tsv alike;
+  `<` and `>=` are rejected by tsc alone, which is prettier's parser too, while
+  acorn-typescript and tsv read them back as the same tree; `<<` is the mirror,
+  accepted by tsc as the same tree and rejected by acorn-typescript, whose wire
+  tsv is a drop-in for. Every other operator lets all three backtrack to the
+  type arguments, so `new X<T> ** 2`, `new X<T> <= 1` and `new X<T> ? a : b` are
+  the same tree bare and take no pair;
+- the **operand's own precedence pair at a left-spine position** — a construct's
+  leftmost operand, frozen from inside the grouping parens the parser erased
+  ahead of it. The slice replaces the builder that asks `needs_parens` for that
+  position, so the freeze re-asks it: `(⏎// format-ignore⏎() => 1⏎) + 1` prints
+  `(() => 1) + 1`, and bare the arrow's body swallows the `+ 1`. This is the
+  silent one — the output usually parses and simply means something else.
 
-⚠️ The heading is the list, not an invariant over every position. One known gap
-remains: a frozen **composite** arrow body loses the pair its leftmost child
-needs (`() =>⏎// format-ignore⏎{a: 1}.k`, and the decorated-class twin), because
-a frozen body is emitted from the position rather than from the leftmost node
-that would have asked for the pair.
+  At most ONE pair is emitted per frozen operand: a parenthesized operand can no
+  longer open the statement's line with `{` / `function` / `class`, nor read as
+  an arrow's block body, so the precedence pair subsumes both leftmost targets
+  when it fires.
+
+⚠️ The heading is the list, not an invariant over every position. A frozen slice
+is emitted from the position rather than from the leftmost node that would have
+asked for the pair, so every position whose leftmost child needs one has to
+re-synthesize it around the slice itself: a frozen **composite** arrow body takes
+its leftmost child's pair through the same seam as the expression statement
+(`() => (⏎// format-ignore⏎{a: 1}⏎).k` prints `({a: 1}).k`, and the decorated-class
+twin `(@dec class {}).k`).
+
+A position that RE-SYNTHESIZES nothing because it already prints the pair keeps
+the slice INSIDE it: a chain base whose pair is required owns that pair's leading
+gap, so a directive written there is emitted from inside the parens the chain
+prints anyway (`(⏎// format-ignore⏎a   ?.b⏎).k`), where the reparse reads it in
+the same place. Skipping that emitter instead DROPPED the directive — the freeze
+arm prints only the base's own doc, so nothing ran the pair's gap lookup.
 
 ### On assignment-family value heads
 

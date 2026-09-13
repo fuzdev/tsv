@@ -1,0 +1,1763 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1154,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " `-` is accepted bare by every parser and REBINDS at every one: `new DD<T> - 1` reads as",
+			"start": 20,
+			"end": 110,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `((new DD) < T) > -1`, so the pair goes around the slice to keep the input's tree",
+			"start": 112,
+			"end": 196,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 211,
+			"end": 229,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `<` and `>=` continue the type arguments' `>` at the parser tsc and prettier hold to, so",
+			"start": 251,
+			"end": 342,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 92
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a bare `new DD<T> < 1` is `'>' expected` there and the pair goes around the slice",
+			"start": 344,
+			"end": 428,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 443,
+			"end": 461,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 2
+				},
+				"end": {
+					"line": 11,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 495,
+			"end": 513,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 2
+				},
+				"end": {
+					"line": 14,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `<<` is the mirror: tsc reads the bare form back as the same tree and acorn-typescript,",
+			"start": 536,
+			"end": 626,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " whose wire tsv is a drop-in for, rejects it",
+			"start": 628,
+			"end": 674,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 689,
+			"end": 707,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 2
+				},
+				"end": {
+					"line": 20,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `>`, `>>` and `>>>` are rejected bare by all three parsers",
+			"start": 730,
+			"end": 791,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 62
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 806,
+			"end": 824,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 2
+				},
+				"end": {
+					"line": 25,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 858,
+			"end": 876,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 2
+				},
+				"end": {
+					"line": 28,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 911,
+			"end": 929,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 2
+				},
+				"end": {
+					"line": 31,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `<=` opens no continuation at any parser, so the parse backtracks to the type arguments",
+			"start": 953,
+			"end": 1043,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 1
+				},
+				"end": {
+					"line": 34,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " and the bare form is the same tree — no pair",
+			"start": 1045,
+			"end": 1092,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 1
+				},
+				"end": {
+					"line": 35,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 1107,
+			"end": 1125,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 2
+				},
+				"end": {
+					"line": 37,
+					"column": 20
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1153,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1144,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 39,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 198,
+					"end": 248,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 18
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 204,
+							"end": 247,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 17
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 204,
+								"end": 206,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 9
+									}
+								},
+								"name": "dd"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 232,
+								"end": 247,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 17
+									}
+								},
+								"left": {
+									"type": "NewExpression",
+									"start": 233,
+									"end": 242,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 3
+										},
+										"end": {
+											"line": 6,
+											"column": 12
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 237,
+										"end": 239,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 7
+											},
+											"end": {
+												"line": 6,
+												"column": 9
+											}
+										},
+										"name": "DD"
+									},
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 239,
+										"end": 242,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 9
+											},
+											"end": {
+												"line": 6,
+												"column": 12
+											}
+										},
+										"params": [
+											{
+												"type": "TSTypeReference",
+												"start": 240,
+												"end": 241,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 10
+													},
+													"end": {
+														"line": 6,
+														"column": 11
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 240,
+													"end": 241,
+													"loc": {
+														"start": {
+															"line": 6,
+															"column": 10
+														},
+														"end": {
+															"line": 6,
+															"column": 11
+														}
+													},
+													"name": "T"
+												}
+											}
+										]
+									},
+									"arguments": []
+								},
+								"operator": "-",
+								"right": {
+									"type": "Literal",
+									"start": 246,
+									"end": 247,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 16
+										},
+										"end": {
+											"line": 6,
+											"column": 17
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 211,
+										"end": 229
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `-` is accepted bare by every parser and REBINDS at every one: `new DD<T> - 1` reads as",
+							"start": 20,
+							"end": 110
+						},
+						{
+							"type": "Line",
+							"value": " `((new DD) < T) > -1`, so the pair goes around the slice to keep the input's tree",
+							"start": 112,
+							"end": 196
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 430,
+					"end": 480,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 18
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 436,
+							"end": 479,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 17
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 436,
+								"end": 438,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 10,
+										"column": 9
+									}
+								},
+								"name": "ee"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 464,
+								"end": 479,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 17
+									}
+								},
+								"left": {
+									"type": "NewExpression",
+									"start": 465,
+									"end": 474,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 3
+										},
+										"end": {
+											"line": 12,
+											"column": 12
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 469,
+										"end": 471,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 7
+											},
+											"end": {
+												"line": 12,
+												"column": 9
+											}
+										},
+										"name": "DD"
+									},
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 471,
+										"end": 474,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 9
+											},
+											"end": {
+												"line": 12,
+												"column": 12
+											}
+										},
+										"params": [
+											{
+												"type": "TSTypeReference",
+												"start": 472,
+												"end": 473,
+												"loc": {
+													"start": {
+														"line": 12,
+														"column": 10
+													},
+													"end": {
+														"line": 12,
+														"column": 11
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 472,
+													"end": 473,
+													"loc": {
+														"start": {
+															"line": 12,
+															"column": 10
+														},
+														"end": {
+															"line": 12,
+															"column": 11
+														}
+													},
+													"name": "T"
+												}
+											}
+										]
+									},
+									"arguments": []
+								},
+								"operator": "<",
+								"right": {
+									"type": "Literal",
+									"start": 478,
+									"end": 479,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 16
+										},
+										"end": {
+											"line": 12,
+											"column": 17
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 443,
+										"end": 461
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `<` and `>=` continue the type arguments' `>` at the parser tsc and prettier hold to, so",
+							"start": 251,
+							"end": 342
+						},
+						{
+							"type": "Line",
+							"value": " a bare `new DD<T> < 1` is `'>' expected` there and the pair goes around the slice",
+							"start": 344,
+							"end": 428
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 482,
+					"end": 533,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 19
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 488,
+							"end": 532,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 18
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 488,
+								"end": 490,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 7
+									},
+									"end": {
+										"line": 13,
+										"column": 9
+									}
+								},
+								"name": "ff"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 516,
+								"end": 532,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 18
+									}
+								},
+								"left": {
+									"type": "NewExpression",
+									"start": 517,
+									"end": 526,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 3
+										},
+										"end": {
+											"line": 15,
+											"column": 12
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 521,
+										"end": 523,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 7
+											},
+											"end": {
+												"line": 15,
+												"column": 9
+											}
+										},
+										"name": "DD"
+									},
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 523,
+										"end": 526,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 9
+											},
+											"end": {
+												"line": 15,
+												"column": 12
+											}
+										},
+										"params": [
+											{
+												"type": "TSTypeReference",
+												"start": 524,
+												"end": 525,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 10
+													},
+													"end": {
+														"line": 15,
+														"column": 11
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 524,
+													"end": 525,
+													"loc": {
+														"start": {
+															"line": 15,
+															"column": 10
+														},
+														"end": {
+															"line": 15,
+															"column": 11
+														}
+													},
+													"name": "T"
+												}
+											}
+										]
+									},
+									"arguments": []
+								},
+								"operator": ">=",
+								"right": {
+									"type": "Literal",
+									"start": 531,
+									"end": 532,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 17
+										},
+										"end": {
+											"line": 15,
+											"column": 18
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 495,
+										"end": 513
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 676,
+					"end": 727,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 19
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 682,
+							"end": 726,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 7
+								},
+								"end": {
+									"line": 21,
+									"column": 18
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 682,
+								"end": 684,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 7
+									},
+									"end": {
+										"line": 19,
+										"column": 9
+									}
+								},
+								"name": "hh"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 710,
+								"end": 726,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 2
+									},
+									"end": {
+										"line": 21,
+										"column": 18
+									}
+								},
+								"left": {
+									"type": "NewExpression",
+									"start": 711,
+									"end": 720,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 3
+										},
+										"end": {
+											"line": 21,
+											"column": 12
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 715,
+										"end": 717,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 7
+											},
+											"end": {
+												"line": 21,
+												"column": 9
+											}
+										},
+										"name": "DD"
+									},
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 717,
+										"end": 720,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 9
+											},
+											"end": {
+												"line": 21,
+												"column": 12
+											}
+										},
+										"params": [
+											{
+												"type": "TSTypeReference",
+												"start": 718,
+												"end": 719,
+												"loc": {
+													"start": {
+														"line": 21,
+														"column": 10
+													},
+													"end": {
+														"line": 21,
+														"column": 11
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 718,
+													"end": 719,
+													"loc": {
+														"start": {
+															"line": 21,
+															"column": 10
+														},
+														"end": {
+															"line": 21,
+															"column": 11
+														}
+													},
+													"name": "T"
+												}
+											}
+										]
+									},
+									"arguments": []
+								},
+								"operator": "<<",
+								"right": {
+									"type": "Literal",
+									"start": 725,
+									"end": 726,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 17
+										},
+										"end": {
+											"line": 21,
+											"column": 18
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 689,
+										"end": 707
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `<<` is the mirror: tsc reads the bare form back as the same tree and acorn-typescript,",
+							"start": 536,
+							"end": 626
+						},
+						{
+							"type": "Line",
+							"value": " whose wire tsv is a drop-in for, rejects it",
+							"start": 628,
+							"end": 674
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 793,
+					"end": 843,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 18
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 799,
+							"end": 842,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 7
+								},
+								"end": {
+									"line": 26,
+									"column": 17
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 799,
+								"end": 801,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 7
+									},
+									"end": {
+										"line": 24,
+										"column": 9
+									}
+								},
+								"name": "ii"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 827,
+								"end": 842,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 2
+									},
+									"end": {
+										"line": 26,
+										"column": 17
+									}
+								},
+								"left": {
+									"type": "NewExpression",
+									"start": 828,
+									"end": 837,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 3
+										},
+										"end": {
+											"line": 26,
+											"column": 12
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 832,
+										"end": 834,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 7
+											},
+											"end": {
+												"line": 26,
+												"column": 9
+											}
+										},
+										"name": "DD"
+									},
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 834,
+										"end": 837,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 9
+											},
+											"end": {
+												"line": 26,
+												"column": 12
+											}
+										},
+										"params": [
+											{
+												"type": "TSTypeReference",
+												"start": 835,
+												"end": 836,
+												"loc": {
+													"start": {
+														"line": 26,
+														"column": 10
+													},
+													"end": {
+														"line": 26,
+														"column": 11
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 835,
+													"end": 836,
+													"loc": {
+														"start": {
+															"line": 26,
+															"column": 10
+														},
+														"end": {
+															"line": 26,
+															"column": 11
+														}
+													},
+													"name": "T"
+												}
+											}
+										]
+									},
+									"arguments": []
+								},
+								"operator": ">",
+								"right": {
+									"type": "Literal",
+									"start": 841,
+									"end": 842,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 16
+										},
+										"end": {
+											"line": 26,
+											"column": 17
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 806,
+										"end": 824
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `>`, `>>` and `>>>` are rejected bare by all three parsers",
+							"start": 730,
+							"end": 791
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 845,
+					"end": 896,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 19
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 851,
+							"end": 895,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 7
+								},
+								"end": {
+									"line": 29,
+									"column": 18
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 851,
+								"end": 853,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 7
+									},
+									"end": {
+										"line": 27,
+										"column": 9
+									}
+								},
+								"name": "jj"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 879,
+								"end": 895,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 18
+									}
+								},
+								"left": {
+									"type": "NewExpression",
+									"start": 880,
+									"end": 889,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 3
+										},
+										"end": {
+											"line": 29,
+											"column": 12
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 884,
+										"end": 886,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 7
+											},
+											"end": {
+												"line": 29,
+												"column": 9
+											}
+										},
+										"name": "DD"
+									},
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 886,
+										"end": 889,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 9
+											},
+											"end": {
+												"line": 29,
+												"column": 12
+											}
+										},
+										"params": [
+											{
+												"type": "TSTypeReference",
+												"start": 887,
+												"end": 888,
+												"loc": {
+													"start": {
+														"line": 29,
+														"column": 10
+													},
+													"end": {
+														"line": 29,
+														"column": 11
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 887,
+													"end": 888,
+													"loc": {
+														"start": {
+															"line": 29,
+															"column": 10
+														},
+														"end": {
+															"line": 29,
+															"column": 11
+														}
+													},
+													"name": "T"
+												}
+											}
+										]
+									},
+									"arguments": []
+								},
+								"operator": ">>",
+								"right": {
+									"type": "Literal",
+									"start": 894,
+									"end": 895,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 17
+										},
+										"end": {
+											"line": 29,
+											"column": 18
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 858,
+										"end": 876
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 898,
+					"end": 950,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 20
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 904,
+							"end": 949,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 7
+								},
+								"end": {
+									"line": 32,
+									"column": 19
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 904,
+								"end": 906,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 7
+									},
+									"end": {
+										"line": 30,
+										"column": 9
+									}
+								},
+								"name": "kk"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 932,
+								"end": 949,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 2
+									},
+									"end": {
+										"line": 32,
+										"column": 19
+									}
+								},
+								"left": {
+									"type": "NewExpression",
+									"start": 933,
+									"end": 942,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 3
+										},
+										"end": {
+											"line": 32,
+											"column": 12
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 937,
+										"end": 939,
+										"loc": {
+											"start": {
+												"line": 32,
+												"column": 7
+											},
+											"end": {
+												"line": 32,
+												"column": 9
+											}
+										},
+										"name": "DD"
+									},
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 939,
+										"end": 942,
+										"loc": {
+											"start": {
+												"line": 32,
+												"column": 9
+											},
+											"end": {
+												"line": 32,
+												"column": 12
+											}
+										},
+										"params": [
+											{
+												"type": "TSTypeReference",
+												"start": 940,
+												"end": 941,
+												"loc": {
+													"start": {
+														"line": 32,
+														"column": 10
+													},
+													"end": {
+														"line": 32,
+														"column": 11
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 940,
+													"end": 941,
+													"loc": {
+														"start": {
+															"line": 32,
+															"column": 10
+														},
+														"end": {
+															"line": 32,
+															"column": 11
+														}
+													},
+													"name": "T"
+												}
+											}
+										]
+									},
+									"arguments": []
+								},
+								"operator": ">>>",
+								"right": {
+									"type": "Literal",
+									"start": 948,
+									"end": 949,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 18
+										},
+										"end": {
+											"line": 32,
+											"column": 19
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 911,
+										"end": 929
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1094,
+					"end": 1143,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 1
+						},
+						"end": {
+							"line": 38,
+							"column": 17
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1100,
+							"end": 1142,
+							"loc": {
+								"start": {
+									"line": 36,
+									"column": 7
+								},
+								"end": {
+									"line": 38,
+									"column": 16
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1100,
+								"end": 1102,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 7
+									},
+									"end": {
+										"line": 36,
+										"column": 9
+									}
+								},
+								"name": "gg"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 1128,
+								"end": 1142,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 2
+									},
+									"end": {
+										"line": 38,
+										"column": 16
+									}
+								},
+								"left": {
+									"type": "NewExpression",
+									"start": 1128,
+									"end": 1137,
+									"loc": {
+										"start": {
+											"line": 38,
+											"column": 2
+										},
+										"end": {
+											"line": 38,
+											"column": 11
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 1132,
+										"end": 1134,
+										"loc": {
+											"start": {
+												"line": 38,
+												"column": 6
+											},
+											"end": {
+												"line": 38,
+												"column": 8
+											}
+										},
+										"name": "DD"
+									},
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 1134,
+										"end": 1137,
+										"loc": {
+											"start": {
+												"line": 38,
+												"column": 8
+											},
+											"end": {
+												"line": 38,
+												"column": 11
+											}
+										},
+										"params": [
+											{
+												"type": "TSTypeReference",
+												"start": 1135,
+												"end": 1136,
+												"loc": {
+													"start": {
+														"line": 38,
+														"column": 9
+													},
+													"end": {
+														"line": 38,
+														"column": 10
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 1135,
+													"end": 1136,
+													"loc": {
+														"start": {
+															"line": 38,
+															"column": 9
+														},
+														"end": {
+															"line": 38,
+															"column": 10
+														}
+													},
+													"name": "T"
+												}
+											}
+										]
+									},
+									"arguments": []
+								},
+								"operator": "<=",
+								"right": {
+									"type": "Literal",
+									"start": 1141,
+									"end": 1142,
+									"loc": {
+										"start": {
+											"line": 38,
+											"column": 15
+										},
+										"end": {
+											"line": 38,
+											"column": 16
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 1107,
+										"end": 1125
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `<=` opens no continuation at any parser, so the parse backtracks to the type arguments",
+							"start": 953,
+							"end": 1043
+						},
+						{
+							"type": "Line",
+							"value": " and the bare form is the same tree — no pair",
+							"start": 1045,
+							"end": 1092
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

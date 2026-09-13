@@ -405,10 +405,13 @@ impl<'a> Printer<'a> {
         // ordinary path renders a sequence bare here: the hanging parens ARE the grouping,
         // so re-synthesizing the sequence's own pair would double it.
         let paren_gap = open_paren.map_or(keyword_end, |p| p + 1);
-        let expr_doc = match self.value_head_frozen_span(paren_gap, arg.span()) {
+        let frozen = self.value_head_frozen_span(paren_gap, arg.span());
+        let expr_doc = match frozen {
             Some(frozen) => self.build_frozen_node_doc(frozen),
             None => match arg {
-                Expression::SequenceExpression(seq) => self.build_sequence_doc_bare(seq),
+                Expression::SequenceExpression(seq) => {
+                    self.build_sequence_doc_bare(seq, seq.span.end)
+                }
                 // A return/throw argument is `shouldNotIndent` (binaryish.js:97) whichever
                 // form it takes: these hanging parens supply the one level, exactly as the
                 // `if_break` pair does on the ordinary path
@@ -429,8 +432,17 @@ impl<'a> Printer<'a> {
         let boundary = self
             .retained_grouping_close(argument_end, span_end)
             .unwrap_or(argument_end);
-        if self.has_comments_to_emit_between(argument_end, boundary) {
-            self.append_trailing_paren_comments(&mut body, argument_end, boundary);
+        // The gap opens where the argument's doc stops printing, which for a BARE sequence
+        // is its last operand — the trailing-side twin of the `arg_start` above: the shell
+        // the parser erased from that operand closes inside these parens, so its comments
+        // are this gap's, and anchored at the node's end they reach no emitter at all and
+        // are DROPPED. One rule with the shell builder's
+        // ([`Printer::shell_trailing_gap_start`], which also carries the FROZEN answer);
+        // the hanging parens are the printer's own and always emitted, so this caller
+        // states that rather than scanning the gap for an author's `)`.
+        let trailing_start = self.shell_trailing_gap_start(arg, boundary, frozen, true);
+        if self.has_comments_to_emit_between(trailing_start, boundary) {
+            self.append_trailing_paren_comments(&mut body, trailing_start, boundary);
         }
 
         (

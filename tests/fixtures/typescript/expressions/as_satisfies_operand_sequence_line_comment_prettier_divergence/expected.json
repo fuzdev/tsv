@@ -1,0 +1,565 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 536,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A SEQUENCE operand rides the retained ASI shell BARE — that shell IS the sequence's",
+			"start": 20,
+			"end": 106,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " required pair — so both of the shell's gaps are the shell's to emit, the trailing one",
+			"start": 108,
+			"end": 196,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " included, and the operands stay on the line the layout gives them.",
+			"start": 198,
+			"end": 267,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 283,
+			"end": 288,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 296,
+			"end": 301,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 7
+				},
+				"end": {
+					"line": 7,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The trailing gap reaches inside the shell the parser erased from the LAST operand,",
+			"start": 313,
+			"end": 398,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " which closes inside the pair; a `satisfies` operand answers the same.",
+			"start": 400,
+			"end": 472,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 488,
+			"end": 493,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 13,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 501,
+			"end": 509,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 7
+				},
+				"end": {
+					"line": 14,
+					"column": 15
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 535,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 526,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 269,
+					"end": 310,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 8
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 275,
+							"end": 309,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 275,
+								"end": 276,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "TSAsExpression",
+								"start": 279,
+								"end": 309,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 11
+									},
+									"end": {
+										"line": 8,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "SequenceExpression",
+									"start": 291,
+									"end": 295,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 7,
+											"column": 6
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 291,
+											"end": 292,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 2
+												},
+												"end": {
+													"line": 7,
+													"column": 3
+												}
+											},
+											"name": "x"
+										},
+										{
+											"type": "Identifier",
+											"start": 294,
+											"end": 295,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 5
+												},
+												"end": {
+													"line": 7,
+													"column": 6
+												}
+											},
+											"name": "y"
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c1",
+											"start": 283,
+											"end": 288
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c2",
+											"start": 296,
+											"end": 301
+										}
+									]
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 308,
+									"end": 309,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 6
+										},
+										"end": {
+											"line": 8,
+											"column": 7
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 308,
+										"end": 309,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 6
+											},
+											"end": {
+												"line": 8,
+												"column": 7
+											}
+										},
+										"name": "A"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A SEQUENCE operand rides the retained ASI shell BARE — that shell IS the sequence's",
+							"start": 20,
+							"end": 106
+						},
+						{
+							"type": "Line",
+							"value": " required pair — so both of the shell's gaps are the shell's to emit, the trailing one",
+							"start": 108,
+							"end": 196
+						},
+						{
+							"type": "Line",
+							"value": " included, and the operands stay on the line the layout gives them.",
+							"start": 198,
+							"end": 267
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 474,
+					"end": 525,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 15
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 480,
+							"end": 524,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 14
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 480,
+								"end": 481,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "TSSatisfiesExpression",
+								"start": 484,
+								"end": 524,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 11
+									},
+									"end": {
+										"line": 15,
+										"column": 14
+									}
+								},
+								"expression": {
+									"type": "SequenceExpression",
+									"start": 496,
+									"end": 500,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 2
+										},
+										"end": {
+											"line": 14,
+											"column": 6
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 496,
+											"end": 497,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 2
+												},
+												"end": {
+													"line": 14,
+													"column": 3
+												}
+											},
+											"name": "x"
+										},
+										{
+											"type": "Identifier",
+											"start": 499,
+											"end": 500,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 5
+												},
+												"end": {
+													"line": 14,
+													"column": 6
+												}
+											},
+											"name": "y"
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c3",
+											"start": 488,
+											"end": 493
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c4 ",
+											"start": 501,
+											"end": 509
+										}
+									]
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 523,
+									"end": 524,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 13
+										},
+										"end": {
+											"line": 15,
+											"column": 14
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 523,
+										"end": 524,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 13
+											},
+											"end": {
+												"line": 15,
+												"column": 14
+											}
+										},
+										"name": "B"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The trailing gap reaches inside the shell the parser erased from the LAST operand,",
+							"start": 313,
+							"end": 398
+						},
+						{
+							"type": "Line",
+							"value": " which closes inside the pair; a `satisfies` operand answers the same.",
+							"start": 400,
+							"end": 472
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

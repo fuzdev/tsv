@@ -1,0 +1,21 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(output_prettier.<ext>).
+# This file exists when prettier is non-idempotent on output_prettier.* — it pins
+# the full chain so the audit recognizes the case and the validator catches drift.
+# See docs/fixture_overview.md (rule F4) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// A SEQUENCE operand rides the retained ASI shell BARE — that shell IS the sequence's
+	// required pair — so both of the shell's gaps are the shell's to emit, the trailing one
+	// included, and the operands stay on the line the layout gives them.
+	const a = // c1
+		(x, y) as A; // c2
+
+	// The trailing gap reaches inside the shell the parser erased from the LAST operand,
+	// which closes inside the pair; a `satisfies` operand answers the same.
+	const b = // c3
+		(x, y) /* c4 */ satisfies B;
+</script>

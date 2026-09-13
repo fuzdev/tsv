@@ -473,6 +473,25 @@ pub struct Printer<'a> {
     /// `needs_parens` check (assignment RHS, ternary branches/test).
     /// Uses Cell for interior mutability so doc builders (&self) can set this.
     pub(crate) in_for_init: Cell<bool>,
+    /// Where the `for` header CLAUSE now being built ENDS — the position its own `;`
+    /// separator (or, for the update clause, the header's `)`) follows.
+    ///
+    /// A value shell whose trailing gap closes exactly there is the clause-TERMINAL one, so
+    /// the `;` behind it separates clauses rather than terminating a statement and a
+    /// trailing block must not defer past it ([`Printer::shell_closes_for_clause`], which is
+    /// the one predicate this cell is read through).
+    ///
+    /// A position rather than a flag, because the ambient [`Printer::in_for_init`] cannot
+    /// answer this: it spans nested function and class bodies, where a real statement
+    /// terminator does exist and the deferral is correct
+    /// (`for (a = function () { x = (b /* c */); }; ;)`). Every node whose span ends at the
+    /// clause's end is on the clause's own right spine — a chain's inner `=`, an arrow's
+    /// concise body — which is exactly the set that meets the separator with no `;` of its
+    /// own in between; a nested statement's value always ends before its enclosing `}`.
+    ///
+    /// Save/restored around each clause, so a nested header's clause cannot answer for the
+    /// outer one.
+    pub(crate) for_clause_end: Cell<Option<u32>>,
     /// Whether the scoped argument share for member-chain building is active: an AST
     /// node's pointer **plus a build tag** ([`ShareTag`]) → the `DocId` already built
     /// for it. A member chain renders the same group **flat** (`print_group`) and
@@ -593,6 +612,7 @@ impl<'a> Printer<'a> {
             frozen_chain_base: Cell::new(None),
             arrow_chain_context: Cell::new(ArrowChainContext::None),
             in_for_init: Cell::new(false),
+            for_clause_end: Cell::new(None),
             chain_arg_share_active: Cell::new(false),
             arrow_body_inject: Cell::new(None),
             chain_has_comments: Cell::new(true),
@@ -667,6 +687,19 @@ impl<'a> Printer<'a> {
         let prev = self.inject_arrow_body(span, doc);
         let out = build();
         self.restore_arrow_body_inject(prev);
+        out
+    }
+
+    /// Build one `for` header clause with its END recorded, restoring the previous
+    /// clause's ([`Printer::for_clause_end`]).
+    ///
+    /// Scoped rather than set-and-forget: the header builds three clauses in a row and then
+    /// the loop BODY, and a stale end left behind would answer for whatever a nested
+    /// statement's value shell happens to close at.
+    pub(crate) fn with_for_clause_end<R>(&self, end: Option<u32>, build: impl FnOnce() -> R) -> R {
+        let saved = self.for_clause_end.replace(end);
+        let out = build();
+        self.for_clause_end.set(saved);
         out
     }
 

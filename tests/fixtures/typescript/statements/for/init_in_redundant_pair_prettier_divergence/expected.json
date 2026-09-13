@@ -1,0 +1,1075 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 836,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A unary operator's own comment-holder shell already parenthesizes the `in` that a `for`",
+			"start": 20,
+			"end": 110,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " header's ambient `[~In]` rule asks for, so the operand takes ONE pair — the shell's.",
+			"start": 112,
+			"end": 199,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 208,
+			"end": 215,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 8
+				},
+				"end": {
+					"line": 4,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 252,
+			"end": 259,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 14
+				},
+				"end": {
+					"line": 6,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 294,
+			"end": 301,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 12
+				},
+				"end": {
+					"line": 8,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A call argument is `[+In]` in its own right, so a sequence written inside one needs no",
+			"start": 325,
+			"end": 414,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 90
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " pair around either operand.",
+			"start": 416,
+			"end": 446,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Controls. Without the comment the unary operand needs no shell and both tools print the",
+			"start": 524,
+			"end": 614,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " one pair, and a clause that IS the `in` takes that pair at its own position — bare, the",
+			"start": 616,
+			"end": 706,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " header would read as a for-in head and not parse at all.",
+			"start": 708,
+			"end": 767,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 60
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 835,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 826,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 22,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ForStatement",
+					"start": 201,
+					"end": 236,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 36
+						}
+					},
+					"init": {
+						"type": "UnaryExpression",
+						"start": 206,
+						"end": 229,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 6
+							},
+							"end": {
+								"line": 4,
+								"column": 29
+							}
+						},
+						"operator": "!",
+						"prefix": true,
+						"argument": {
+							"type": "BinaryExpression",
+							"start": 216,
+							"end": 228,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 16
+								},
+								"end": {
+									"line": 4,
+									"column": 28
+								}
+							},
+							"left": {
+								"type": "Literal",
+								"start": 216,
+								"end": 221,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 16
+									},
+									"end": {
+										"line": 4,
+										"column": 21
+									}
+								},
+								"value": "aaa",
+								"raw": "'aaa'"
+							},
+							"operator": "in",
+							"right": {
+								"type": "Identifier",
+								"start": 225,
+								"end": 228,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 25
+									},
+									"end": {
+										"line": 4,
+										"column": 28
+									}
+								},
+								"name": "bbb"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 208,
+									"end": 215
+								}
+							]
+						}
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 234,
+						"end": 236,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 34
+							},
+							"end": {
+								"line": 4,
+								"column": 36
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A unary operator's own comment-holder shell already parenthesizes the `in` that a `for`",
+							"start": 20,
+							"end": 110
+						},
+						{
+							"type": "Line",
+							"value": " header's ambient `[~In]` rule asks for, so the operand takes ONE pair — the shell's.",
+							"start": 112,
+							"end": 199
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 239,
+					"end": 280,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 42
+						}
+					},
+					"init": {
+						"type": "UnaryExpression",
+						"start": 244,
+						"end": 273,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 6
+							},
+							"end": {
+								"line": 6,
+								"column": 35
+							}
+						},
+						"operator": "typeof",
+						"prefix": true,
+						"argument": {
+							"type": "BinaryExpression",
+							"start": 260,
+							"end": 272,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 22
+								},
+								"end": {
+									"line": 6,
+									"column": 34
+								}
+							},
+							"left": {
+								"type": "Literal",
+								"start": 260,
+								"end": 265,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 22
+									},
+									"end": {
+										"line": 6,
+										"column": 27
+									}
+								},
+								"value": "aaa",
+								"raw": "'aaa'"
+							},
+							"operator": "in",
+							"right": {
+								"type": "Identifier",
+								"start": 269,
+								"end": 272,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 31
+									},
+									"end": {
+										"line": 6,
+										"column": 34
+									}
+								},
+								"name": "bbb"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 252,
+									"end": 259
+								}
+							]
+						}
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 278,
+						"end": 280,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 40
+							},
+							"end": {
+								"line": 6,
+								"column": 42
+							}
+						},
+						"body": []
+					}
+				},
+				{
+					"type": "ForStatement",
+					"start": 283,
+					"end": 322,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 40
+						}
+					},
+					"init": {
+						"type": "UnaryExpression",
+						"start": 288,
+						"end": 315,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 6
+							},
+							"end": {
+								"line": 8,
+								"column": 33
+							}
+						},
+						"operator": "void",
+						"prefix": true,
+						"argument": {
+							"type": "BinaryExpression",
+							"start": 302,
+							"end": 314,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 20
+								},
+								"end": {
+									"line": 8,
+									"column": 32
+								}
+							},
+							"left": {
+								"type": "Literal",
+								"start": 302,
+								"end": 307,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 20
+									},
+									"end": {
+										"line": 8,
+										"column": 25
+									}
+								},
+								"value": "aaa",
+								"raw": "'aaa'"
+							},
+							"operator": "in",
+							"right": {
+								"type": "Identifier",
+								"start": 311,
+								"end": 314,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 29
+									},
+									"end": {
+										"line": 8,
+										"column": 32
+									}
+								},
+								"name": "bbb"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 294,
+									"end": 301
+								}
+							]
+						}
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 320,
+						"end": 322,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 38
+							},
+							"end": {
+								"line": 8,
+								"column": 40
+							}
+						},
+						"body": []
+					}
+				},
+				{
+					"type": "ForStatement",
+					"start": 448,
+					"end": 483,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 36
+						}
+					},
+					"init": {
+						"type": "CallExpression",
+						"start": 453,
+						"end": 476,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 6
+							},
+							"end": {
+								"line": 12,
+								"column": 29
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 453,
+							"end": 455,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 6
+								},
+								"end": {
+									"line": 12,
+									"column": 8
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "SequenceExpression",
+								"start": 457,
+								"end": 474,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 10
+									},
+									"end": {
+										"line": 12,
+										"column": 27
+									}
+								},
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 457,
+										"end": 460,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 10
+											},
+											"end": {
+												"line": 12,
+												"column": 13
+											}
+										},
+										"name": "lll"
+									},
+									{
+										"type": "BinaryExpression",
+										"start": 462,
+										"end": 474,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 15
+											},
+											"end": {
+												"line": 12,
+												"column": 27
+											}
+										},
+										"left": {
+											"type": "Literal",
+											"start": 462,
+											"end": 467,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 15
+												},
+												"end": {
+													"line": 12,
+													"column": 20
+												}
+											},
+											"value": "aaa",
+											"raw": "'aaa'"
+										},
+										"operator": "in",
+										"right": {
+											"type": "Identifier",
+											"start": 471,
+											"end": 474,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 24
+												},
+												"end": {
+													"line": 12,
+													"column": 27
+												}
+											},
+											"name": "bbb"
+										}
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 481,
+						"end": 483,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 34
+							},
+							"end": {
+								"line": 12,
+								"column": 36
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A call argument is `[+In]` in its own right, so a sequence written inside one needs no",
+							"start": 325,
+							"end": 414
+						},
+						{
+							"type": "Line",
+							"value": " pair around either operand.",
+							"start": 416,
+							"end": 446
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 486,
+					"end": 521,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 36
+						}
+					},
+					"init": {
+						"type": "CallExpression",
+						"start": 491,
+						"end": 514,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 6
+							},
+							"end": {
+								"line": 14,
+								"column": 29
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 491,
+							"end": 493,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 6
+								},
+								"end": {
+									"line": 14,
+									"column": 8
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "SequenceExpression",
+								"start": 495,
+								"end": 512,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 10
+									},
+									"end": {
+										"line": 14,
+										"column": 27
+									}
+								},
+								"expressions": [
+									{
+										"type": "BinaryExpression",
+										"start": 495,
+										"end": 507,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 10
+											},
+											"end": {
+												"line": 14,
+												"column": 22
+											}
+										},
+										"left": {
+											"type": "Literal",
+											"start": 495,
+											"end": 500,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 10
+												},
+												"end": {
+													"line": 14,
+													"column": 15
+												}
+											},
+											"value": "aaa",
+											"raw": "'aaa'"
+										},
+										"operator": "in",
+										"right": {
+											"type": "Identifier",
+											"start": 504,
+											"end": 507,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 19
+												},
+												"end": {
+													"line": 14,
+													"column": 22
+												}
+											},
+											"name": "bbb"
+										}
+									},
+									{
+										"type": "Identifier",
+										"start": 509,
+										"end": 512,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 24
+											},
+											"end": {
+												"line": 14,
+												"column": 27
+											}
+										},
+										"name": "lll"
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 519,
+						"end": 521,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 34
+							},
+							"end": {
+								"line": 14,
+								"column": 36
+							}
+						},
+						"body": []
+					}
+				},
+				{
+					"type": "ForStatement",
+					"start": 769,
+					"end": 796,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 28
+						}
+					},
+					"init": {
+						"type": "UnaryExpression",
+						"start": 774,
+						"end": 789,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 6
+							},
+							"end": {
+								"line": 19,
+								"column": 21
+							}
+						},
+						"operator": "!",
+						"prefix": true,
+						"argument": {
+							"type": "BinaryExpression",
+							"start": 776,
+							"end": 788,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 8
+								},
+								"end": {
+									"line": 19,
+									"column": 20
+								}
+							},
+							"left": {
+								"type": "Literal",
+								"start": 776,
+								"end": 781,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 8
+									},
+									"end": {
+										"line": 19,
+										"column": 13
+									}
+								},
+								"value": "aaa",
+								"raw": "'aaa'"
+							},
+							"operator": "in",
+							"right": {
+								"type": "Identifier",
+								"start": 785,
+								"end": 788,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 17
+									},
+									"end": {
+										"line": 19,
+										"column": 20
+									}
+								},
+								"name": "bbb"
+							}
+						}
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 794,
+						"end": 796,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 26
+							},
+							"end": {
+								"line": 19,
+								"column": 28
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Controls. Without the comment the unary operand needs no shell and both tools print the",
+							"start": 524,
+							"end": 614
+						},
+						{
+							"type": "Line",
+							"value": " one pair, and a clause that IS the `in` takes that pair at its own position — bare, the",
+							"start": 616,
+							"end": 706
+						},
+						{
+							"type": "Line",
+							"value": " header would read as a for-in head and not parse at all.",
+							"start": 708,
+							"end": 767
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 799,
+					"end": 825,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 27
+						}
+					},
+					"init": {
+						"type": "BinaryExpression",
+						"start": 805,
+						"end": 817,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 7
+							},
+							"end": {
+								"line": 21,
+								"column": 19
+							}
+						},
+						"left": {
+							"type": "Literal",
+							"start": 805,
+							"end": 810,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 7
+								},
+								"end": {
+									"line": 21,
+									"column": 12
+								}
+							},
+							"value": "aaa",
+							"raw": "'aaa'"
+						},
+						"operator": "in",
+						"right": {
+							"type": "Identifier",
+							"start": 814,
+							"end": 817,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 16
+								},
+								"end": {
+									"line": 21,
+									"column": 19
+								}
+							},
+							"name": "bbb"
+						}
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 823,
+						"end": 825,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 25
+							},
+							"end": {
+								"line": 21,
+								"column": 27
+							}
+						},
+						"body": []
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

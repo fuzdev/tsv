@@ -1,0 +1,1474 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1114,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An own-line directive inside the grouping shell the parser erases ahead of a for-header",
+			"start": 20,
+			"end": 110,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " sequence clause's FIRST operand freezes THAT operand; the `[~In]` pair the header needs",
+			"start": 112,
+			"end": 202,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " rides outside the slice.",
+			"start": 204,
+			"end": 231,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 241,
+			"end": 259,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An operand with no `in` under it takes no pair.",
+			"start": 305,
+			"end": 355,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 365,
+			"end": 383,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The update clause reads the same edge.",
+			"start": 424,
+			"end": 465,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 42
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 483,
+			"end": 501,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 2
+				},
+				"end": {
+					"line": 26,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A frozen LAST operand keeps its own shell gap: a block strips inline, outside the pair.",
+			"start": 537,
+			"end": 627,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 1
+				},
+				"end": {
+					"line": 32,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 645,
+			"end": 663,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 3
+				},
+				"end": {
+					"line": 35,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t1 ",
+			"start": 684,
+			"end": 692,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 20
+				},
+				"end": {
+					"line": 36,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A line comment in that gap retains the shell.",
+			"start": 716,
+			"end": 764,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 1
+				},
+				"end": {
+					"line": 42,
+					"column": 49
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 782,
+			"end": 800,
+			"loc": {
+				"start": {
+					"line": 45,
+					"column": 3
+				},
+				"end": {
+					"line": 45,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " t2",
+			"start": 822,
+			"end": 827,
+			"loc": {
+				"start": {
+					"line": 47,
+					"column": 16
+				},
+				"end": {
+					"line": 47,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A frozen operand that is itself a sequence carries the shell erased from ITS last",
+			"start": 856,
+			"end": 940,
+			"loc": {
+				"start": {
+					"line": 54,
+					"column": 1
+				},
+				"end": {
+					"line": 54,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " operand inside the slice, so the comment in it prints once, from the slice.",
+			"start": 942,
+			"end": 1020,
+			"loc": {
+				"start": {
+					"line": 55,
+					"column": 1
+				},
+				"end": {
+					"line": 55,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 1038,
+			"end": 1056,
+			"loc": {
+				"start": {
+					"line": 58,
+					"column": 3
+				},
+				"end": {
+					"line": 58,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t3 ",
+			"start": 1072,
+			"end": 1080,
+			"loc": {
+				"start": {
+					"line": 59,
+					"column": 15
+				},
+				"end": {
+					"line": 59,
+					"column": 23
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1113,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1104,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 64,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ForStatement",
+					"start": 233,
+					"end": 302,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 2
+						}
+					},
+					"init": {
+						"type": "SequenceExpression",
+						"start": 262,
+						"end": 281,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 2
+							},
+							"end": {
+								"line": 7,
+								"column": 21
+							}
+						},
+						"expressions": [
+							{
+								"type": "BinaryExpression",
+								"start": 263,
+								"end": 277,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 3
+									},
+									"end": {
+										"line": 7,
+										"column": 17
+									}
+								},
+								"left": {
+									"type": "Literal",
+									"start": 263,
+									"end": 268,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 3
+										},
+										"end": {
+											"line": 7,
+											"column": 8
+										}
+									},
+									"value": "aaa",
+									"raw": "'aaa'"
+								},
+								"operator": "in",
+								"right": {
+									"type": "Identifier",
+									"start": 274,
+									"end": 277,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 14
+										},
+										"end": {
+											"line": 7,
+											"column": 17
+										}
+									},
+									"name": "bbb"
+								}
+							},
+							{
+								"type": "Identifier",
+								"start": 280,
+								"end": 281,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 20
+									},
+									"end": {
+										"line": 7,
+										"column": 21
+									}
+								},
+								"name": "g"
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " prettier-ignore",
+								"start": 241,
+								"end": 259
+							}
+						]
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 290,
+						"end": 302,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 3
+							},
+							"end": {
+								"line": 11,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 294,
+								"end": 299,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 294,
+									"end": 298,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 2
+										},
+										"end": {
+											"line": 10,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 294,
+										"end": 296,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 2
+											},
+											"end": {
+												"line": 10,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An own-line directive inside the grouping shell the parser erases ahead of a for-header",
+							"start": 20,
+							"end": 110
+						},
+						{
+							"type": "Line",
+							"value": " sequence clause's FIRST operand freezes THAT operand; the `[~In]` pair the header needs",
+							"start": 112,
+							"end": 202
+						},
+						{
+							"type": "Line",
+							"value": " rides outside the slice.",
+							"start": 204,
+							"end": 231
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 357,
+					"end": 421,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 2
+						}
+					},
+					"init": {
+						"type": "SequenceExpression",
+						"start": 386,
+						"end": 400,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 2
+							},
+							"end": {
+								"line": 16,
+								"column": 16
+							}
+						},
+						"expressions": [
+							{
+								"type": "BinaryExpression",
+								"start": 386,
+								"end": 397,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 13
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 386,
+									"end": 389,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 2
+										},
+										"end": {
+											"line": 16,
+											"column": 5
+										}
+									},
+									"name": "aaa"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 394,
+									"end": 397,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 10
+										},
+										"end": {
+											"line": 16,
+											"column": 13
+										}
+									},
+									"name": "bbb"
+								}
+							},
+							{
+								"type": "Identifier",
+								"start": 399,
+								"end": 400,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 15
+									},
+									"end": {
+										"line": 16,
+										"column": 16
+									}
+								},
+								"name": "g"
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " prettier-ignore",
+								"start": 365,
+								"end": 383
+							}
+						]
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 409,
+						"end": 421,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 3
+							},
+							"end": {
+								"line": 20,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 413,
+								"end": 418,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2
+									},
+									"end": {
+										"line": 19,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 413,
+									"end": 417,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 2
+										},
+										"end": {
+											"line": 19,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 413,
+										"end": 415,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 2
+											},
+											"end": {
+												"line": 19,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An operand with no `in` under it takes no pair.",
+							"start": 305,
+							"end": 355
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 467,
+					"end": 534,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 2
+						}
+					},
+					"init": null,
+					"test": null,
+					"update": {
+						"type": "SequenceExpression",
+						"start": 504,
+						"end": 518,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 2
+							},
+							"end": {
+								"line": 27,
+								"column": 16
+							}
+						},
+						"expressions": [
+							{
+								"type": "BinaryExpression",
+								"start": 504,
+								"end": 515,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 2
+									},
+									"end": {
+										"line": 27,
+										"column": 13
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 504,
+									"end": 507,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 2
+										},
+										"end": {
+											"line": 27,
+											"column": 5
+										}
+									},
+									"name": "aaa"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 512,
+									"end": 515,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 10
+										},
+										"end": {
+											"line": 27,
+											"column": 13
+										}
+									},
+									"name": "bbb"
+								}
+							},
+							{
+								"type": "Identifier",
+								"start": 517,
+								"end": 518,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 15
+									},
+									"end": {
+										"line": 27,
+										"column": 16
+									}
+								},
+								"name": "g"
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " prettier-ignore",
+								"start": 483,
+								"end": 501
+							}
+						]
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 522,
+						"end": 534,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 3
+							},
+							"end": {
+								"line": 30,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 526,
+								"end": 531,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 526,
+									"end": 530,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 2
+										},
+										"end": {
+											"line": 29,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 526,
+										"end": 528,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 2
+											},
+											"end": {
+												"line": 29,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The update clause reads the same edge.",
+							"start": 424,
+							"end": 465
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 629,
+					"end": 713,
+					"loc": {
+						"start": {
+							"line": 33,
+							"column": 1
+						},
+						"end": {
+							"line": 40,
+							"column": 2
+						}
+					},
+					"init": {
+						"type": "SequenceExpression",
+						"start": 637,
+						"end": 683,
+						"loc": {
+							"start": {
+								"line": 34,
+								"column": 2
+							},
+							"end": {
+								"line": 36,
+								"column": 19
+							}
+						},
+						"expressions": [
+							{
+								"type": "Identifier",
+								"start": 637,
+								"end": 640,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 2
+									},
+									"end": {
+										"line": 34,
+										"column": 5
+									}
+								},
+								"name": "fff"
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 668,
+								"end": 682,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 4
+									},
+									"end": {
+										"line": 36,
+										"column": 18
+									}
+								},
+								"left": {
+									"type": "Literal",
+									"start": 668,
+									"end": 673,
+									"loc": {
+										"start": {
+											"line": 36,
+											"column": 4
+										},
+										"end": {
+											"line": 36,
+											"column": 9
+										}
+									},
+									"value": "aaa",
+									"raw": "'aaa'"
+								},
+								"operator": "in",
+								"right": {
+									"type": "Identifier",
+									"start": 679,
+									"end": 682,
+									"loc": {
+										"start": {
+											"line": 36,
+											"column": 15
+										},
+										"end": {
+											"line": 36,
+											"column": 18
+										}
+									},
+									"name": "bbb"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 645,
+										"end": 663
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " t1 ",
+										"start": 684,
+										"end": 692
+									}
+								]
+							}
+						]
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 701,
+						"end": 713,
+						"loc": {
+							"start": {
+								"line": 38,
+								"column": 3
+							},
+							"end": {
+								"line": 40,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 705,
+								"end": 710,
+								"loc": {
+									"start": {
+										"line": 39,
+										"column": 2
+									},
+									"end": {
+										"line": 39,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 705,
+									"end": 709,
+									"loc": {
+										"start": {
+											"line": 39,
+											"column": 2
+										},
+										"end": {
+											"line": 39,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 705,
+										"end": 707,
+										"loc": {
+											"start": {
+												"line": 39,
+												"column": 2
+											},
+											"end": {
+												"line": 39,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A frozen LAST operand keeps its own shell gap: a block strips inline, outside the pair.",
+							"start": 537,
+							"end": 627
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 766,
+					"end": 853,
+					"loc": {
+						"start": {
+							"line": 43,
+							"column": 1
+						},
+						"end": {
+							"line": 52,
+							"column": 2
+						}
+					},
+					"init": {
+						"type": "SequenceExpression",
+						"start": 774,
+						"end": 832,
+						"loc": {
+							"start": {
+								"line": 44,
+								"column": 2
+							},
+							"end": {
+								"line": 48,
+								"column": 4
+							}
+						},
+						"expressions": [
+							{
+								"type": "Identifier",
+								"start": 774,
+								"end": 777,
+								"loc": {
+									"start": {
+										"line": 44,
+										"column": 2
+									},
+									"end": {
+										"line": 44,
+										"column": 5
+									}
+								},
+								"name": "fff"
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 810,
+								"end": 821,
+								"loc": {
+									"start": {
+										"line": 47,
+										"column": 4
+									},
+									"end": {
+										"line": 47,
+										"column": 15
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 810,
+									"end": 813,
+									"loc": {
+										"start": {
+											"line": 47,
+											"column": 4
+										},
+										"end": {
+											"line": 47,
+											"column": 7
+										}
+									},
+									"name": "aaa"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 818,
+									"end": 821,
+									"loc": {
+										"start": {
+											"line": 47,
+											"column": 12
+										},
+										"end": {
+											"line": 47,
+											"column": 15
+										}
+									},
+									"name": "bbb"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 782,
+										"end": 800
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " t2",
+										"start": 822,
+										"end": 827
+									}
+								]
+							}
+						]
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 841,
+						"end": 853,
+						"loc": {
+							"start": {
+								"line": 50,
+								"column": 3
+							},
+							"end": {
+								"line": 52,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 845,
+								"end": 850,
+								"loc": {
+									"start": {
+										"line": 51,
+										"column": 2
+									},
+									"end": {
+										"line": 51,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 845,
+									"end": 849,
+									"loc": {
+										"start": {
+											"line": 51,
+											"column": 2
+										},
+										"end": {
+											"line": 51,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 845,
+										"end": 847,
+										"loc": {
+											"start": {
+												"line": 51,
+												"column": 2
+											},
+											"end": {
+												"line": 51,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment in that gap retains the shell.",
+							"start": 716,
+							"end": 764
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 1022,
+					"end": 1103,
+					"loc": {
+						"start": {
+							"line": 56,
+							"column": 1
+						},
+						"end": {
+							"line": 63,
+							"column": 2
+						}
+					},
+					"init": {
+						"type": "SequenceExpression",
+						"start": 1030,
+						"end": 1082,
+						"loc": {
+							"start": {
+								"line": 57,
+								"column": 2
+							},
+							"end": {
+								"line": 59,
+								"column": 25
+							}
+						},
+						"expressions": [
+							{
+								"type": "Identifier",
+								"start": 1030,
+								"end": 1033,
+								"loc": {
+									"start": {
+										"line": 57,
+										"column": 2
+									},
+									"end": {
+										"line": 57,
+										"column": 5
+									}
+								},
+								"name": "fff"
+							},
+							{
+								"type": "SequenceExpression",
+								"start": 1061,
+								"end": 1081,
+								"loc": {
+									"start": {
+										"line": 59,
+										"column": 4
+									},
+									"end": {
+										"line": 59,
+										"column": 24
+									}
+								},
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 1061,
+										"end": 1064,
+										"loc": {
+											"start": {
+												"line": 59,
+												"column": 4
+											},
+											"end": {
+												"line": 59,
+												"column": 7
+											}
+										},
+										"name": "bbb"
+									},
+									{
+										"type": "Identifier",
+										"start": 1068,
+										"end": 1071,
+										"loc": {
+											"start": {
+												"line": 59,
+												"column": 11
+											},
+											"end": {
+												"line": 59,
+												"column": 14
+											}
+										},
+										"name": "ccc",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " t3 ",
+												"start": 1072,
+												"end": 1080
+											}
+										]
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 1038,
+										"end": 1056
+									}
+								]
+							}
+						]
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 1091,
+						"end": 1103,
+						"loc": {
+							"start": {
+								"line": 61,
+								"column": 3
+							},
+							"end": {
+								"line": 63,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 1095,
+								"end": 1100,
+								"loc": {
+									"start": {
+										"line": 62,
+										"column": 2
+									},
+									"end": {
+										"line": 62,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 1095,
+									"end": 1099,
+									"loc": {
+										"start": {
+											"line": 62,
+											"column": 2
+										},
+										"end": {
+											"line": 62,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 1095,
+										"end": 1097,
+										"loc": {
+											"start": {
+												"line": 62,
+												"column": 2
+											},
+											"end": {
+												"line": 62,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A frozen operand that is itself a sequence carries the shell erased from ITS last",
+							"start": 856,
+							"end": 940
+						},
+						{
+							"type": "Line",
+							"value": " operand inside the slice, so the comment in it prints once, from the slice.",
+							"start": 942,
+							"end": 1020
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

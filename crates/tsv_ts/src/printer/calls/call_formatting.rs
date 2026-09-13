@@ -35,6 +35,7 @@ use crate::ast::internal;
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, function_signature_has_breaking_comments,
 };
+use crate::printer::ignore::FrozenOperandPair;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -152,6 +153,7 @@ fn build_call_head(printer: &Printer<'_>, call: &internal::CallExpression<'_>) -
         callee_freezes,
         call.span.start,
         call.callee,
+        FrozenOperandPair::position(ParenContext::Callee),
         || {
             test_call_flat
                 .then(|| build_test_callee_flat_doc(call.callee, printer))

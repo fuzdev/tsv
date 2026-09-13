@@ -531,16 +531,20 @@ rule parenthesizes every `in` binary lexically under the init (`for (('k' in o);
 bare the header reads as a for-in head and does not parse at all. Those parens are the
 printer's, so a freeze under the init keeps them around the slice — the clause itself, an
 assignment or compound RHS, a declarator initializer, a call argument, an array element, and
-a sequence's second-or-later operand. tsv and prettier agree at every one of them, so the
+any of a sequence's operands. tsv and prettier agree at every one of them, so the
 ordinary fixture `for/clauses_prettier_ignore_in_parens` **matches**. (A frozen ternary
 branch under the init takes the pair too; only the directive's placement parts there, per
-the branch-head entry.) The pair is asked exactly ONCE per position: every position that
-routes through the paren rule already has it, and only the frozen sites that bypass that
+the branch-head entry — save a `yield` branch, where prettier drops the pair as well and its
+bare form still parses, a conditional's consequent being `[+In]` in its own right.) The pair
+is asked exactly ONCE per position: every position that routes through the paren rule
+already has it, and only the frozen sites that bypass that
 rule — the header's own clause, the shell builder's `for`-clause tail, the assignment RHS,
 the sequence operands and the ternary branches — spell it themselves, each skipping the
 wrap where its own position, a retained author shell or a branch pair already supplies one.
-A sequence's FIRST operand is outside this claim: a directive in the clause's leading gap
-leads the sequence node, not that operand.
+A sequence's FIRST operand takes the pair from the one gap that can freeze it: the grouping
+shell the parser ERASED ahead of it, which lies inside the sequence's own span
+(`for ((⏎// prettier-ignore⏎'aaa'  in  bbb⏎), ggg; ;)`). A directive in the clause's leading
+gap — ahead of that shell — leads the sequence NODE instead and freezes the whole clause.
 
 ⚠️ **A frozen slice asks the pair question of the SLICE, not of the node.** The unfrozen
 rule asks "is this node an `in` binary?" at each position, because every deeper `in` reaches
@@ -559,12 +563,16 @@ template substitution, a braced body). Prettier's own rule covers the same `in`s
 (`isPathInForStatementInitializer` walks every ancestor to the root) but its ignore path
 emits the slice bare, giving a four-clause header no parser accepts —
 [init clause bare in](../tests/fixtures/typescript/statements/for/init_clause_prettier_ignore_bare_in_prettier_divergence/).
-One cell of the family is the exception to "no parser accepts": the frozen wrap is keyed on the
-ambient init flag, so a frozen ARROW BODY at a `[+In]` host under the init (a call argument, an
-object value, a template substitution) takes the pair too — matching its unfrozen twin, which
-prettier parenthesizes as well — while prettier's frozen output prints that one bare and still
-parses. The sibling frozen positions at those hosts (a frozen call argument, object value or
-substitution holding a descended `in`) print bare and match prettier.
+One cell of the family is the exception to "no parser accepts", and it splits on where the `in`
+sits. The frozen wrap is keyed on the ambient init flag, so a frozen ARROW BODY at a `[+In]`
+host under the init (a call argument, an object value, a template substitution) takes the pair
+even though the host needs none. Where the slice's ROOT is the `in`, prettier supplies that
+pair too and the cell is an ordinary match; where the `in` is DESCENDED
+(`ccc || 'aaa'  in  bbb`), tsv still pairs — keyed on the ambient flag, matching its own
+unfrozen twin `() => ccc || ('aaa' in bbb)`, which prettier parenthesizes as well — while
+prettier's frozen output prints that one bare and still parses. The sibling frozen positions
+at those hosts (a frozen call argument, object value or substitution holding a descended `in`)
+print bare and match prettier.
 
 ⚠️ Two `[+In]` positions carry a spec-vs-tsc split rather than a clean skip: an **array
 element** and a **parameter default**. The spec threads `[+In]` into both, so
@@ -585,7 +593,9 @@ pair in both tools); its unfrozen twin is the comment-bearing form
 (`for (!(/* c */ 'aaa' in bbb); ;)` → tsv one pair, prettier two), which diverges
 identically. And a sequence inside a call argument (`fn((lll, 'aaa' in bbb))` against
 prettier's `fn((lll, ('aaa' in bbb)))`), which needs no pair at all — a call argument is
-`[+In]` — where the bare authoring does diverge identically. Neither is a freeze question.
+`[+In]` — where the bare authoring does diverge identically. Neither is a freeze question, and
+both are pinned by the ordinary-paren fixture
+[init in redundant pair](../tests/fixtures/typescript/statements/for/init_in_redundant_pair_prettier_divergence/).
 
 A test position carries one more parent-owned fact: the **clarity parens the printer supplies**
 for a value that would otherwise read as a typo — an assignment prints `if ((a = b))`, and
@@ -597,7 +607,11 @@ Inside a sequence the classification is Rule A again, unchanged: an own-line dir
 **inter-operand** gap freezes only the **following** operand, and the operands on either side
 of it reformat. The two rules meet at a sequence's leading gap, where the directive leads the
 *sequence node* rather than its first operand — so the whole sequence rides inside one
-verbatim slice, in a `for` clause, a `return`/`throw` operand and a Svelte value alike
+verbatim slice, in a `for` clause, a `return`/`throw` operand and a Svelte value alike.
+That gap ends where the node begins: a directive written INSIDE the grouping shell the
+parser erased ahead of the first operand is inside the sequence's span, so it freezes that
+OPERAND (the leading-EDGE entry below), which in a `for` clause is also where the erased
+shell's ordinary comments are emitted from
 (`sequence/operands_prettier_ignore_member` covers the inter-operand half and matches
 prettier). Two node-level facts the slice carries are the same ones every value-side freeze
 carries: a block comment glued before the value is **owned** by it and rides inside the doc
@@ -685,7 +699,10 @@ tsv diverges at nine places:
   whole-construct slice is not a candidate: it would have to contain the `)` the strip removes.
   The run itself keeps the line the author gave it, hoisted ahead of the construct, which is
   where the reparse reads it — so this is the freeze catching up with a placement tsv already
-  had. Prettier relocates the directive to trail the head and freezes from there, a placement
+  had. What the erased parens do NOT take with them is the pair the OPERAND needs in its
+  position: that one is the printer's, so it is re-asked around the slice and rides outside it
+  (the *Three things ride OUTSIDE the slice* paragraph below). Prettier relocates the directive
+  to trail the head and freezes from there, a placement
   inert under tsv's floor, and its own second pass then reformats what it froze. The type
   side's *leading-EDGE shell* entry (under §On single-child type positions) is the same
   question where the paren survives as a node. Seven hosts diverge — the ternary test, the
@@ -696,24 +713,82 @@ tsv diverges at nine places:
   authorings are an ordinary match there —
   [left-spine paren interior converged](../tests/fixtures/typescript/expressions/left_spine_paren_prettier_ignore_interior/)
 
-  Two things ride OUTSIDE the slice, and both have to: the **position's paren target** — the
-  pair an expression statement puts around the node that would otherwise open its line with
+  A `for` header's sequence CLAUSE is the same host with no envelope around it: the clause
+  prints its operands bare, so the erased shell's run is emitted by the clause builder and
+  the `[~In]` pair the header needs rides outside the frozen operand (`('aaa'  in  bbb)`).
+  The last operand's own erased shell closes at the clause's end, and the freeze does not
+  take the operand out of it — the slice is the operand's node span, so the gap behind it is
+  still the shell's and answers exactly as the unfrozen form does. What the slice DOES cover
+  is everything inside that span, the shell erased from a nested sequence operand's own last
+  operand included, so a comment written there prints once, from the slice: the gap the shell
+  reads opens at the SLICE's end, never at a node position inside it, which is the same
+  anchor a frozen list element's trailing-comment seam takes. Prettier drops the
+  operands after the first onto their own lines and keeps that break —
+  [sequence clause paren shell](../tests/fixtures/typescript/statements/for/sequence_clause_prettier_ignore_paren_shell_prettier_divergence/)
+
+  Three things ride OUTSIDE the slice, and all three have to. The **position's paren target** —
+  the pair an expression statement puts around the node that would otherwise open its line with
   `{` / `function` / `class`, and the arrow body's leftmost-object pair — since the slice
   replaces the very builder that reads those targets, and without them the output does not
-  parse. And a position that RE-MINTS a required pair around the operand declines the freeze
-  outright (a callee that needs one, an IIFE's or a sealed chain's owned pair): that pair is
-  emitted around a doc the printer builds, so the directive is honored one level out instead:
-  the hoisted run leads the whole statement, and the statement's own freeze holds that form —
-  pair included — from the next pass on. A coarser claim, and one pass late, since this pass
-  normalizes the operand before the run reaches the statement gap, so the author's own bytes
-  normalize once (`UNHONORED CallExpression.callee` in the `ignore:audit` ratchet).
+  parse. The **position's own precedence pair**, the `needs_parens` verdict the unfrozen twin
+  takes at that same position: `(⏎// prettier-ignore⏎() => 1⏎) + 1` is `(() => 1) + 1`, and
+  bare the arrow's body swallows the `+ 1`. That one is the SILENT half — the output usually
+  parses and simply binds differently — and it reaches every host in the family: a binary or
+  `??` or `**` operand, a ternary's test, a template tag, a member base, a non-null operand and
+  a bare callee. And the pair the **SLICE** needs beyond the node's, which one operand
+  family asks for: an argument-less `new`, whose printed form gains the `()` a slice cannot, so
+  `.k` / `(1)` / `[0]` / `!` / `` `t` `` past a bare `new X` binds to the CALLEE instead
+  (`new X.k` is `new (X.k)`) — the same rule the `new` callee's own freeze applies one suffix
+  over. Written with type arguments the slice ends at `>` instead, and those same suffixes take
+  the pair for two different reasons: `.k` and `!` are REJECTED outright by all three parsers,
+  while `(1)` and `` `t` `` rebind to the `new` as they do bare and `[0]` rebinds through the
+  relational reading (`new X<T>[0]` is `((new X) < T) > [0]`). The operator tails past that `>`
+  are a rejection table of their own over the three parsers that grade the output. `+` and `-`
+  open the `>`'s right-hand side (`new X<T> + 1` reads as `((new X) < T) > +1` at tsc,
+  acorn-typescript and tsv alike, so the bare form is accepted everywhere and rebound
+  everywhere); `>` / `>>` / `>>>` are rejected by all three; `<` and `>=` are rejected by
+  **tsc**, and so by prettier, while acorn-typescript and tsv accept them as the same tree;
+  `<<` is the mirror, accepted by tsc and rejected by **acorn-typescript**, whose wire tsv is a
+  drop-in for. Every other operator — `*`, `**`, `<=`, `?:`, `??`, `||`, `instanceof`, `,`,
+  `=` — lets all three backtrack to the type arguments, so the bare spelling is the same tree
+  there and takes no pair (§Required pairs a freeze re-synthesizes in
+  [directives.md](./directives.md)). Three of those rejections are one parser's alone, so a
+  reparse of tsv's own output grades none of them —
+  [left-spine paren required pair, angle join](../tests/fixtures/typescript/expressions/left_spine_paren_prettier_ignore_required_pair_angle_prettier_divergence/)
+  is where the whole join table but `+` is pinned — `-`, `<`, `>=`, `<<`, `>`, `>>` and `>>>`,
+  beside a `<=` control — and prettier's own first pass there is a file prettier cannot re-read.
+  `<<` is the cell no gate anywhere can reach: tsc and tsv both read the bare form back as the
+  same tree, so nothing errors on either side of the comparison. At most ONE pair is emitted:
+  a parenthesized operand can no longer open the statement's line with `{`, nor read as an
+  arrow's block body, so the precedence pair subsumes both targets when it fires. Prettier keeps the precedence pair at every host but drops it for the argument-less
+  `new`, emitting the re-bound `new X.k`; on the rest it relocates the directive to trail the
+  head, as it does at every host in this entry —
+  [left-spine paren required pair](../tests/fixtures/typescript/expressions/left_spine_paren_prettier_ignore_required_pair_prettier_divergence/),
+  with the hosts prettier converges on in the ordinary
+  [left-spine paren required pair converged](../tests/fixtures/typescript/expressions/left_spine_paren_prettier_ignore_required_pair/).
+
+  A **bare callee** that RE-MINTS a required pair around the operand declines the freeze
+  outright: that pair is emitted around a doc the printer builds, so the directive is honored
+  one level out instead: the hoisted run leads the whole statement, and the statement's own
+  freeze holds that form — pair included — from the next pass on. A coarser claim, and one pass
+  late, since this pass normalizes the operand before the run reaches the statement gap, so the
+  author's own bytes normalize once (`UNHONORED CallExpression.callee` in the `ignore:audit`
+  ratchet). A **chain base** whose pair is required does not decline: it OWNS the pair's leading
+  gap, so the slice is the body of the very pair that emits the run, and both survive — the
+  retained-pair entry below.
 - Directive inside a pair the printer **RETAINS** ahead of that same operand —
   ◆comment_preservation ◆prettier_bug — the pair survives for a reason of its own rather than
   the directive's (the `as` · `satisfies` operand→keyword gap is ASI-sensitive, so a run that
-  ends a line holds the pair open; a non-null operand may need precedence parens), so the
-  directive keeps its own line INSIDE it and the reparse reads it in the very same place.
-  Prettier strips the pair and relocates the directive to trail the head, then reformats on
-  its second pass the operand it froze —
+  ends a line holds the pair open; a non-null operand may need precedence parens; a chain base
+  OWNS the pair's leading gap where the pair is required — a sealed optional chain, an IIFE
+  base), so the directive keeps its own line INSIDE it and the reparse reads it in the very
+  same place. Prettier strips the pair and relocates the directive to trail the head at the
+  first three, then reformats on its second pass the operand it froze; at a sealed chain base
+  it keeps the pair and GLUES the directive to the `(`, a placement likewise inert here. At an
+  arrow-BODY host the two pairs NEST: the retained shell stays outside the slice and the body
+  position's own leftmost pair goes around it inside
+  (`() => (⏎// prettier-ignore⏎(@dec class {})⏎) as T`, and the plain-object twin the same).
+  The IIFE base is the one host the two tools converge on —
   [left-spine retained paren interior](../tests/fixtures/typescript/expressions/left_spine_retained_paren_prettier_ignore_interior_prettier_divergence/)
 - Frozen **arrow body** that opens with `{` — ◆prettier_bug — the unfrozen path parenthesizes
   the leftmost OBJECT inside the body (`() => ({ x: 1 }) | M`); a verbatim slice cannot be
@@ -723,7 +798,13 @@ tsv diverges at nine places:
   [arrow body object leaf](../tests/fixtures/typescript/expressions/arrow/body_prettier_ignore_object_leaf_paren_prettier_divergence/)
 - A **BLOCK** arrow body freezes whole, braces included — the statement-shaped twin of the
   expression body's freeze, which the `=>`→body head did not ask for. Prettier freezes it too,
-  and self-stably, so `arrow/body_prettier_ignore_head`'s block cell is an ordinary match
+  and self-stably, so `arrow/body_prettier_ignore_head`'s block cell is an ordinary match (a
+  labeled statement opens a block body the same way — the `{` is the body's, not an object's)
+- A frozen body that is **itself an arrow** keeps no freeze in either tool: the chain is
+  reprinted arrow by arrow, so the directive stays on the line the author gave it and the body
+  normalizes around it. An agreement rather than a divergence, pinned by that same fixture's
+  chain cells, and the shape `ignore:audit` reports under its
+  `UNHONORED ArrowFunctionExpression.body` line
 
 `yield`'s hanging-paren layout carries its own pre-existing comment relocation (see
 [§Comment relocation](./conformance_prettier_ts_comments.md#comment-relocation)); the freeze rides on it rather than adding a
@@ -888,7 +969,8 @@ tsv diverges at six places:
   [init declarator redundant paren comment](../tests/fixtures/typescript/statements/for/init_declarator_prettier_ignore_redundant_paren_comment_prettier_divergence/).
   The header's **assignment** RHS is the same shape at the other host, and the retained
   shell there is also the `[~In]` pair the init owes, so exactly one pair prints on the
-  frozen and the unfrozen form alike —
+  frozen and the unfrozen form alike; it parts on the **line** spelling and on the block for
+  none, the clause `;` terminating no statement there either —
   [init assignment paren comment](../tests/fixtures/typescript/statements/for/init_assignment_prettier_ignore_paren_comment_prettier_divergence/)
 - **A frozen arrow body's shell** — ◆comment_preservation — tsv retains the author's pair and
   keeps the comment inside it, a block inline and a `//` with the pair opened around it, exactly

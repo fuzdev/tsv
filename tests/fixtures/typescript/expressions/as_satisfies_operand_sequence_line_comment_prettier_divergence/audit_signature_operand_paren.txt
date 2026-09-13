@@ -1,0 +1,37 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script lang="ts">
+	// A SEQUENCE operand rides the retained ASI shell BARE — that shell IS the sequence's
+	// required pair — so both of the shell's gaps are the shell's to emit, the trailing one
+	// included, and the operands stay on the line the layout gives them.
+	const a = // c1
+	(x,
+	y) as A; // c2
+
+	// The trailing gap reaches inside the shell the parser erased from the LAST operand,
+	// which closes inside the pair; a `satisfies` operand answers the same.
+	const b = // c3
+	(x, y /* c4 */) satisfies B;
+</script>
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// A SEQUENCE operand rides the retained ASI shell BARE — that shell IS the sequence's
+	// required pair — so both of the shell's gaps are the shell's to emit, the trailing one
+	// included, and the operands stay on the line the layout gives them.
+	const a = // c1
+		(x, y) as A; // c2
+
+	// The trailing gap reaches inside the shell the parser erased from the LAST operand,
+	// which closes inside the pair; a `satisfies` operand answers the same.
+	const b = // c3
+		(x, y) /* c4 */ satisfies B;
+</script>

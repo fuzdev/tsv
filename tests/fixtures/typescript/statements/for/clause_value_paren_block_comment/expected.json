@@ -1,0 +1,2021 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1453,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A block comment in the trailing gap of a for-header CLAUSE-TERMINAL value's redundant",
+			"start": 20,
+			"end": 108,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " grouping shell — here the init clause's assignment RHS. The shell strips and the",
+			"start": 110,
+			"end": 193,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment stays inline before the header's `;`, which SEPARATES clauses rather than",
+			"start": 195,
+			"end": 279,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " terminating a statement.",
+			"start": 281,
+			"end": 308,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 321,
+			"end": 329,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 12
+				},
+				"end": {
+					"line": 6,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A compound assignment is the same host.",
+			"start": 339,
+			"end": 381,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 43
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 395,
+			"end": 403,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 13
+				},
+				"end": {
+					"line": 9,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A chain: the innermost `=` owns the shell, and it ends where the clause does.",
+			"start": 413,
+			"end": 493,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 510,
+			"end": 518,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 16
+				},
+				"end": {
+					"line": 12,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A destructuring target changes nothing.",
+			"start": 528,
+			"end": 570,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 43
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 585,
+			"end": 593,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 14
+				},
+				"end": {
+					"line": 15,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The `[~In]` pair is the printer's own, so the comment lands outside it.",
+			"start": 603,
+			"end": 677,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 699,
+			"end": 707,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 21
+				},
+				"end": {
+					"line": 18,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A sequence clause's LAST operand is an assignment: the shell is that operand's RHS.",
+			"start": 717,
+			"end": 803,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c6 ",
+			"start": 821,
+			"end": 829,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 17
+				},
+				"end": {
+					"line": 21,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An earlier operand's shell has the comma gap behind it as its claimant.",
+			"start": 839,
+			"end": 913,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c7 ",
+			"start": 926,
+			"end": 934,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 12
+				},
+				"end": {
+					"line": 24,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The update clause runs to the header's `)`.",
+			"start": 947,
+			"end": 993,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c8 ",
+			"start": 1010,
+			"end": 1018,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 16
+				},
+				"end": {
+					"line": 27,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A ternary alternate ends at the clause too, the other value host.",
+			"start": 1025,
+			"end": 1093,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c9 ",
+			"start": 1110,
+			"end": 1118,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 16
+				},
+				"end": {
+					"line": 30,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " So does an arrow body's assignment; the body's clarity parens are the printer's and",
+			"start": 1128,
+			"end": 1214,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 1
+				},
+				"end": {
+					"line": 32,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the comment stays inside them.",
+			"start": 1216,
+			"end": 1249,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 1
+				},
+				"end": {
+					"line": 33,
+					"column": 34
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c10 ",
+			"start": 1273,
+			"end": 1282,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 23
+				},
+				"end": {
+					"line": 34,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A run of two blocks.",
+			"start": 1293,
+			"end": 1316,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 1
+				},
+				"end": {
+					"line": 36,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c11 ",
+			"start": 1329,
+			"end": 1338,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 12
+				},
+				"end": {
+					"line": 37,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c12 ",
+			"start": 1339,
+			"end": 1348,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 22
+				},
+				"end": {
+					"line": 37,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A populated header, not only empty clauses.",
+			"start": 1358,
+			"end": 1404,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 1
+				},
+				"end": {
+					"line": 39,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c13 ",
+			"start": 1417,
+			"end": 1426,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 12
+				},
+				"end": {
+					"line": 40,
+					"column": 21
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1452,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1443,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 41,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ForStatement",
+					"start": 310,
+					"end": 336,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 27
+						}
+					},
+					"init": {
+						"type": "AssignmentExpression",
+						"start": 315,
+						"end": 320,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 6
+							},
+							"end": {
+								"line": 6,
+								"column": 11
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 315,
+							"end": 316,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 6
+								},
+								"end": {
+									"line": 6,
+									"column": 7
+								}
+							},
+							"name": "a"
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 319,
+							"end": 320,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 10
+								},
+								"end": {
+									"line": 6,
+									"column": 11
+								}
+							},
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 321,
+								"end": 329
+							}
+						]
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 334,
+						"end": 336,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 25
+							},
+							"end": {
+								"line": 6,
+								"column": 27
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment in the trailing gap of a for-header CLAUSE-TERMINAL value's redundant",
+							"start": 20,
+							"end": 108
+						},
+						{
+							"type": "Line",
+							"value": " grouping shell — here the init clause's assignment RHS. The shell strips and the",
+							"start": 110,
+							"end": 193
+						},
+						{
+							"type": "Line",
+							"value": " comment stays inline before the header's `;`, which SEPARATES clauses rather than",
+							"start": 195,
+							"end": 279
+						},
+						{
+							"type": "Line",
+							"value": " terminating a statement.",
+							"start": 281,
+							"end": 308
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 383,
+					"end": 410,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 28
+						}
+					},
+					"init": {
+						"type": "AssignmentExpression",
+						"start": 388,
+						"end": 394,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 6
+							},
+							"end": {
+								"line": 9,
+								"column": 12
+							}
+						},
+						"operator": "+=",
+						"left": {
+							"type": "Identifier",
+							"start": 388,
+							"end": 389,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 6
+								},
+								"end": {
+									"line": 9,
+									"column": 7
+								}
+							},
+							"name": "a"
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 393,
+							"end": 394,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 11
+								},
+								"end": {
+									"line": 9,
+									"column": 12
+								}
+							},
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 395,
+								"end": 403
+							}
+						]
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 408,
+						"end": 410,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 26
+							},
+							"end": {
+								"line": 9,
+								"column": 28
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A compound assignment is the same host.",
+							"start": 339,
+							"end": 381
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 495,
+					"end": 525,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 31
+						}
+					},
+					"init": {
+						"type": "AssignmentExpression",
+						"start": 500,
+						"end": 509,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 6
+							},
+							"end": {
+								"line": 12,
+								"column": 15
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 500,
+							"end": 501,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 6
+								},
+								"end": {
+									"line": 12,
+									"column": 7
+								}
+							},
+							"name": "a"
+						},
+						"right": {
+							"type": "AssignmentExpression",
+							"start": 504,
+							"end": 509,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 10
+								},
+								"end": {
+									"line": 12,
+									"column": 15
+								}
+							},
+							"operator": "=",
+							"left": {
+								"type": "Identifier",
+								"start": 504,
+								"end": 505,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 10
+									},
+									"end": {
+										"line": 12,
+										"column": 11
+									}
+								},
+								"name": "b"
+							},
+							"right": {
+								"type": "Identifier",
+								"start": 508,
+								"end": 509,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 14
+									},
+									"end": {
+										"line": 12,
+										"column": 15
+									}
+								},
+								"name": "c"
+							}
+						},
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c3 ",
+								"start": 510,
+								"end": 518
+							}
+						]
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 523,
+						"end": 525,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 29
+							},
+							"end": {
+								"line": 12,
+								"column": 31
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A chain: the innermost `=` owns the shell, and it ends where the clause does.",
+							"start": 413,
+							"end": 493
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 572,
+					"end": 600,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 29
+						}
+					},
+					"init": {
+						"type": "AssignmentExpression",
+						"start": 577,
+						"end": 584,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 6
+							},
+							"end": {
+								"line": 15,
+								"column": 13
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "ArrayPattern",
+							"start": 577,
+							"end": 580,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 6
+								},
+								"end": {
+									"line": 15,
+									"column": 9
+								}
+							},
+							"elements": [
+								{
+									"type": "Identifier",
+									"start": 578,
+									"end": 579,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 7
+										},
+										"end": {
+											"line": 15,
+											"column": 8
+										}
+									},
+									"name": "a"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 583,
+							"end": 584,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 12
+								},
+								"end": {
+									"line": 15,
+									"column": 13
+								}
+							},
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c4 ",
+								"start": 585,
+								"end": 593
+							}
+						]
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 598,
+						"end": 600,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 27
+							},
+							"end": {
+								"line": 15,
+								"column": 29
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A destructuring target changes nothing.",
+							"start": 528,
+							"end": 570
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 679,
+					"end": 714,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 36
+						}
+					},
+					"init": {
+						"type": "AssignmentExpression",
+						"start": 684,
+						"end": 698,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 6
+							},
+							"end": {
+								"line": 18,
+								"column": 20
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 684,
+							"end": 685,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 6
+								},
+								"end": {
+									"line": 18,
+									"column": 7
+								}
+							},
+							"name": "a"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 689,
+							"end": 697,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 11
+								},
+								"end": {
+									"line": 18,
+									"column": 19
+								}
+							},
+							"left": {
+								"type": "Literal",
+								"start": 689,
+								"end": 692,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 11
+									},
+									"end": {
+										"line": 18,
+										"column": 14
+									}
+								},
+								"value": "k",
+								"raw": "'k'"
+							},
+							"operator": "in",
+							"right": {
+								"type": "Identifier",
+								"start": 696,
+								"end": 697,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 18
+									},
+									"end": {
+										"line": 18,
+										"column": 19
+									}
+								},
+								"name": "o"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c5 ",
+									"start": 699,
+									"end": 707
+								}
+							]
+						}
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 712,
+						"end": 714,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 34
+							},
+							"end": {
+								"line": 18,
+								"column": 36
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The `[~In]` pair is the printer's own, so the comment lands outside it.",
+							"start": 603,
+							"end": 677
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 805,
+					"end": 836,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 32
+						}
+					},
+					"init": {
+						"type": "SequenceExpression",
+						"start": 810,
+						"end": 820,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 6
+							},
+							"end": {
+								"line": 21,
+								"column": 16
+							}
+						},
+						"expressions": [
+							{
+								"type": "Identifier",
+								"start": 810,
+								"end": 813,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 6
+									},
+									"end": {
+										"line": 21,
+										"column": 9
+									}
+								},
+								"name": "fff"
+							},
+							{
+								"type": "AssignmentExpression",
+								"start": 815,
+								"end": 820,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 11
+									},
+									"end": {
+										"line": 21,
+										"column": 16
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 815,
+									"end": 816,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 11
+										},
+										"end": {
+											"line": 21,
+											"column": 12
+										}
+									},
+									"name": "a"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 819,
+									"end": 820,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 15
+										},
+										"end": {
+											"line": 21,
+											"column": 16
+										}
+									},
+									"name": "b"
+								}
+							}
+						],
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c6 ",
+								"start": 821,
+								"end": 829
+							}
+						]
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 834,
+						"end": 836,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 30
+							},
+							"end": {
+								"line": 21,
+								"column": 32
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A sequence clause's LAST operand is an assignment: the shell is that operand's RHS.",
+							"start": 717,
+							"end": 803
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 915,
+					"end": 944,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 30
+						}
+					},
+					"init": {
+						"type": "SequenceExpression",
+						"start": 920,
+						"end": 937,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 6
+							},
+							"end": {
+								"line": 24,
+								"column": 23
+							}
+						},
+						"expressions": [
+							{
+								"type": "AssignmentExpression",
+								"start": 920,
+								"end": 925,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 6
+									},
+									"end": {
+										"line": 24,
+										"column": 11
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 920,
+									"end": 921,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 6
+										},
+										"end": {
+											"line": 24,
+											"column": 7
+										}
+									},
+									"name": "a"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 924,
+									"end": 925,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 10
+										},
+										"end": {
+											"line": 24,
+											"column": 11
+										}
+									},
+									"name": "b"
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c7 ",
+										"start": 926,
+										"end": 934
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 936,
+								"end": 937,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 22
+									},
+									"end": {
+										"line": 24,
+										"column": 23
+									}
+								},
+								"name": "c"
+							}
+						]
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 942,
+						"end": 944,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 28
+							},
+							"end": {
+								"line": 24,
+								"column": 30
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An earlier operand's shell has the comma gap behind it as its claimant.",
+							"start": 839,
+							"end": 913
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 995,
+					"end": 1022,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 28
+						}
+					},
+					"init": null,
+					"test": null,
+					"update": {
+						"type": "AssignmentExpression",
+						"start": 1004,
+						"end": 1009,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 10
+							},
+							"end": {
+								"line": 27,
+								"column": 15
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1004,
+							"end": 1005,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 10
+								},
+								"end": {
+									"line": 27,
+									"column": 11
+								}
+							},
+							"name": "a"
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 1008,
+							"end": 1009,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 14
+								},
+								"end": {
+									"line": 27,
+									"column": 15
+								}
+							},
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c8 ",
+								"start": 1010,
+								"end": 1018
+							}
+						]
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 1020,
+						"end": 1022,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 26
+							},
+							"end": {
+								"line": 27,
+								"column": 28
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The update clause runs to the header's `)`.",
+							"start": 947,
+							"end": 993
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 1095,
+					"end": 1125,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 31
+						}
+					},
+					"init": {
+						"type": "ConditionalExpression",
+						"start": 1100,
+						"end": 1109,
+						"loc": {
+							"start": {
+								"line": 30,
+								"column": 6
+							},
+							"end": {
+								"line": 30,
+								"column": 15
+							}
+						},
+						"test": {
+							"type": "Identifier",
+							"start": 1100,
+							"end": 1101,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 6
+								},
+								"end": {
+									"line": 30,
+									"column": 7
+								}
+							},
+							"name": "a"
+						},
+						"consequent": {
+							"type": "Identifier",
+							"start": 1104,
+							"end": 1105,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 10
+								},
+								"end": {
+									"line": 30,
+									"column": 11
+								}
+							},
+							"name": "b"
+						},
+						"alternate": {
+							"type": "Identifier",
+							"start": 1108,
+							"end": 1109,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 14
+								},
+								"end": {
+									"line": 30,
+									"column": 15
+								}
+							},
+							"name": "c"
+						},
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c9 ",
+								"start": 1110,
+								"end": 1118
+							}
+						]
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 1123,
+						"end": 1125,
+						"loc": {
+							"start": {
+								"line": 30,
+								"column": 29
+							},
+							"end": {
+								"line": 30,
+								"column": 31
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A ternary alternate ends at the clause too, the other value host.",
+							"start": 1025,
+							"end": 1093
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 1251,
+					"end": 1290,
+					"loc": {
+						"start": {
+							"line": 34,
+							"column": 1
+						},
+						"end": {
+							"line": 34,
+							"column": 40
+						}
+					},
+					"init": {
+						"type": "AssignmentExpression",
+						"start": 1256,
+						"end": 1283,
+						"loc": {
+							"start": {
+								"line": 34,
+								"column": 6
+							},
+							"end": {
+								"line": 34,
+								"column": 33
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1256,
+							"end": 1257,
+							"loc": {
+								"start": {
+									"line": 34,
+									"column": 6
+								},
+								"end": {
+									"line": 34,
+									"column": 7
+								}
+							},
+							"name": "a"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 1260,
+							"end": 1283,
+							"loc": {
+								"start": {
+									"line": 34,
+									"column": 10
+								},
+								"end": {
+									"line": 34,
+									"column": 33
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [],
+							"body": {
+								"type": "AssignmentExpression",
+								"start": 1267,
+								"end": 1272,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 17
+									},
+									"end": {
+										"line": 34,
+										"column": 22
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 1267,
+									"end": 1268,
+									"loc": {
+										"start": {
+											"line": 34,
+											"column": 17
+										},
+										"end": {
+											"line": 34,
+											"column": 18
+										}
+									},
+									"name": "x"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 1271,
+									"end": 1272,
+									"loc": {
+										"start": {
+											"line": 34,
+											"column": 21
+										},
+										"end": {
+											"line": 34,
+											"column": 22
+										}
+									},
+									"name": "b"
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c10 ",
+										"start": 1273,
+										"end": 1282
+									}
+								]
+							}
+						}
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 1288,
+						"end": 1290,
+						"loc": {
+							"start": {
+								"line": 34,
+								"column": 38
+							},
+							"end": {
+								"line": 34,
+								"column": 40
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " So does an arrow body's assignment; the body's clarity parens are the printer's and",
+							"start": 1128,
+							"end": 1214
+						},
+						{
+							"type": "Line",
+							"value": " the comment stays inside them.",
+							"start": 1216,
+							"end": 1249
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 1318,
+					"end": 1355,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 1
+						},
+						"end": {
+							"line": 37,
+							"column": 38
+						}
+					},
+					"init": {
+						"type": "AssignmentExpression",
+						"start": 1323,
+						"end": 1328,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 6
+							},
+							"end": {
+								"line": 37,
+								"column": 11
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1323,
+							"end": 1324,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 6
+								},
+								"end": {
+									"line": 37,
+									"column": 7
+								}
+							},
+							"name": "a"
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 1327,
+							"end": 1328,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 10
+								},
+								"end": {
+									"line": 37,
+									"column": 11
+								}
+							},
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c11 ",
+								"start": 1329,
+								"end": 1338
+							}
+						]
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 1353,
+						"end": 1355,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 36
+							},
+							"end": {
+								"line": 37,
+								"column": 38
+							}
+						},
+						"body": [],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c12 ",
+								"start": 1339,
+								"end": 1348
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A run of two blocks.",
+							"start": 1293,
+							"end": 1316
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 1406,
+					"end": 1442,
+					"loc": {
+						"start": {
+							"line": 40,
+							"column": 1
+						},
+						"end": {
+							"line": 40,
+							"column": 37
+						}
+					},
+					"init": {
+						"type": "AssignmentExpression",
+						"start": 1411,
+						"end": 1416,
+						"loc": {
+							"start": {
+								"line": 40,
+								"column": 6
+							},
+							"end": {
+								"line": 40,
+								"column": 11
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 1411,
+							"end": 1412,
+							"loc": {
+								"start": {
+									"line": 40,
+									"column": 6
+								},
+								"end": {
+									"line": 40,
+									"column": 7
+								}
+							},
+							"name": "a"
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 1415,
+							"end": 1416,
+							"loc": {
+								"start": {
+									"line": 40,
+									"column": 10
+								},
+								"end": {
+									"line": 40,
+									"column": 11
+								}
+							},
+							"name": "b"
+						},
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c13 ",
+								"start": 1417,
+								"end": 1426
+							}
+						]
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 1428,
+						"end": 1433,
+						"loc": {
+							"start": {
+								"line": 40,
+								"column": 23
+							},
+							"end": {
+								"line": 40,
+								"column": 28
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 1428,
+							"end": 1429,
+							"loc": {
+								"start": {
+									"line": 40,
+									"column": 23
+								},
+								"end": {
+									"line": 40,
+									"column": 24
+								}
+							},
+							"name": "a"
+						},
+						"operator": "<",
+						"right": {
+							"type": "Identifier",
+							"start": 1432,
+							"end": 1433,
+							"loc": {
+								"start": {
+									"line": 40,
+									"column": 27
+								},
+								"end": {
+									"line": 40,
+									"column": 28
+								}
+							},
+							"name": "n"
+						}
+					},
+					"update": {
+						"type": "UpdateExpression",
+						"start": 1435,
+						"end": 1438,
+						"loc": {
+							"start": {
+								"line": 40,
+								"column": 30
+							},
+							"end": {
+								"line": 40,
+								"column": 33
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 1435,
+							"end": 1436,
+							"loc": {
+								"start": {
+									"line": 40,
+									"column": 30
+								},
+								"end": {
+									"line": 40,
+									"column": 31
+								}
+							},
+							"name": "a"
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 1440,
+						"end": 1442,
+						"loc": {
+							"start": {
+								"line": 40,
+								"column": 35
+							},
+							"end": {
+								"line": 40,
+								"column": 37
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A populated header, not only empty clauses.",
+							"start": 1358,
+							"end": 1404
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

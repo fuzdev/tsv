@@ -6,6 +6,7 @@
 
 use crate::ast::internal::{self, BinaryOperator, Expression};
 use crate::printer::comments::CommentSpacing;
+use crate::printer::ignore::FrozenOperandPair;
 use crate::printer::{CommentVec, ParenContext, Printer, RunLeadingBlank};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
@@ -1282,6 +1283,9 @@ impl<'a> Printer<'a> {
                     operands.is_empty(),
                     chain_start,
                     left,
+                    FrozenOperandPair::position(ParenContext::BinaryLeft {
+                        parent_op: expr.operator,
+                    }),
                     || self.build_binary_operand_doc(left, expr.operator, false),
                 );
                 operands.push(ChainOperand {
@@ -1618,11 +1622,21 @@ impl<'a> Printer<'a> {
     /// [`SeqLayout::Aligned`] is not a choice here: the enclosing construct has already
     /// emitted the hanging geometry (its `(`, indent and softlines), so the operands only
     /// have to join.
+    ///
+    /// `trailing_end` bounds the LINE-COMMENT gate alone — bare mode emits nothing past the
+    /// last operand, so it says how far the region this builder must break for reaches. A
+    /// caller that prints the trailing run BESIDE the operands (the hanging pair's, which
+    /// glues it to the last operand) hands `seq.span.end` and takes the break; one that
+    /// prints it BELOW them, on the shell's own line, hands the position its own gap opens
+    /// at, so a `//` it will print itself does not also split the run
+    /// ([`Printer::build_kept_paren_shell_doc`] — the operands settle flat on the second
+    /// pass either way, so counting it here costs the first pass its fixed point).
     pub(in crate::printer) fn build_sequence_doc_bare(
         &self,
         seq: &internal::SequenceExpression<'_>,
+        trailing_end: u32,
     ) -> DocId {
-        self.build_sequence_doc_inner(seq, seq.span.end, SeqParens::Bare, SeqLayout::Aligned)
+        self.build_sequence_doc_inner(seq, trailing_end, SeqParens::Bare, SeqLayout::Aligned)
     }
 
     /// Value-position variant: a trailing comment on the last operand stays

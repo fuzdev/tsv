@@ -15,16 +15,26 @@ const a = (
 
 Each cell retains its pair for a reason of its own, not the directive's: the `as` (resp.
 `satisfies`) operand→keyword gap is ASI-sensitive, so a run that ends a line holds the pair
-open, and the non-null operand needs precedence parens around `d ?? e`. The operand inside
-freezes either way.
+open; the non-null operand needs precedence parens around `d ?? e`; and a chain base OWNS its
+leading gap when the pair is required — a sealed optional chain (`(gg ?.hh).ii`, and the same
+at `[0]`, `()` and `!.ss`) or an IIFE base — so the run is emitted inside the pair rather than
+hoisted ahead of the chain. The operand inside freezes either way. A **bare** `!` is not one of
+them: with no lookup past it the base is not a sealed chain at all, so
+`(⏎// prettier-ignore⏎a   ?.b⏎)!` loses the pair *and* the freeze — a residual outside this
+fixture's cells.
 
 ## Why tsv differs
 
 Prettier strips the pair, relocates the directive to trail the `=` and freezes from there
 (`output_prettier.svelte`). That placement is **inert** under tsv's classification, and
 prettier's own second pass proves the point: it reformats the operand the directive froze on
-all three hosts (pinned by `audit_signature.txt`). Keeping the author's line inside the pair
-tsv was going to print anyway is the placement that holds the freeze across a second pass.
+all three of those hosts (pinned by `audit_signature.txt`). On the chain-base cells prettier
+keeps the pair and instead GLUES the directive to the `(` — likewise inert here, and likewise
+a form whose freeze tsv could not carry forward. Keeping the author's line inside the pair tsv
+was going to print anyway is the placement that holds the freeze across a second pass.
+
+The IIFE base is the one host the two tools converge on: prettier keeps both the pair and the
+author's own line there, so that cell is an ordinary match inside a divergent file.
 
 ## Reason
 

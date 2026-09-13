@@ -12,7 +12,12 @@ clause root need not be the `in`, only reach one through a position the grammar 
 The arrow-body cells freeze at the arrow's own `=>`→body head rather than at the clause's
 `(`, so they exercise the same slice question one seam over: the root case takes its pair
 from the ARROW-BODY position (through that position's own `needs_parens`, whose ambient `[~In]` rule fires there), a descended one
-takes it from the slice.
+takes it from the slice. That split is what the hosts at the end of the file isolate: at a
+host that is `[+In]` in its own right — a call argument, an object value, a template
+substitution — the root case is a **match** (prettier supplies the pair too; the ordinary
+[clauses_prettier_ignore_in_parens](../clauses_prettier_ignore_in_parens/)), and only the
+descended one parts, where prettier's bare form parses legally because the host needs no pair
+at all.
 
 ```ts
 // tsv                                   // prettier (does not reparse)
@@ -29,9 +34,10 @@ for (                                    for (
 (`isPathInForStatementInitializer` walks every ancestor to the root), but its ignore path
 emits the slice bare, giving a four-clause header no parser accepts — tsc reports
 `')' expected`, tsv's next pass rejects it, and so does prettier's own TypeScript parser.
-Prettier is nevertheless idempotent on that output at the `.svelte` level, because
-prettier-plugin-svelte catches that `SyntaxError` and passes the script block through
-verbatim, so the absent `audit_signature.txt` is the ordinary F4b fixed point.
+Prettier's second pass on that output does not run at all — the Svelte plugin re-parses the
+script block and throws — and F4b explicitly tolerates an erroring pass (no
+`audit_signature.txt` can represent a truncated chain), so the absent signature is
+sanctioned rather than an ordinary fixed point.
 
 ## Expected behavior
 

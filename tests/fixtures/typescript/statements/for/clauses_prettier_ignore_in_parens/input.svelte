@@ -59,4 +59,32 @@
 			ggg;
 		;
 	) {}
+
+	// A frozen ARROW BODY reads the same ambient flag, so the pair rides outside the slice at
+	// a host that is `[+In]` in its own right too — where a bare `in` would already be legal.
+	// The unfrozen twin parenthesizes it there as well, and so does prettier.
+	for (
+		fn(
+			() =>
+				// prettier-ignore
+				('aaa'  in  bbb)
+		);
+		;
+	) {}
+
+	for (
+		hhh = {
+			iii: () =>
+				// prettier-ignore
+				('aaa'  in  bbb)
+		};
+		;
+	) {}
+
+	for (
+		`${() =>
+			// prettier-ignore
+			('aaa'  in  bbb)}`;
+		;
+	) {}
 </script>

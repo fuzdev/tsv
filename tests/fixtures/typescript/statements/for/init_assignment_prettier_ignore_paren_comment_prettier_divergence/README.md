@@ -27,10 +27,13 @@ output — its second pass collapses the unfrozen declarator and assignment onto
 - **prettier**: strips the shell, re-adds its own pair, floats the comment past the `;`
   (`output_prettier.svelte`), then reflows on a second pass.
 
-The `/* … */` spelling is deliberately absent: a block comment in that gap defers past the
-clause `;` and is not a fixed point under either tool, an unrelated pre-existing gap tracked
-by a `// TODO:` on `ShellTail::StatementTerminator` (the for-header assignment RHS takes the
-statement-terminator tail, where the declarator takes the clause-separator one).
+The `/* … */` cells at the end are **not** a divergence and are here as the other half of
+the rule: a block strips inline and lands behind the `[~In]` pair on every host — frozen
+assignment, frozen compound, frozen declarator, and the unfrozen assignment — which is
+prettier's answer on each. They pin the clause-separator tail at the assignment host: the
+block stays inline before the header's `;` on the frozen and the unfrozen spelling alike,
+where a statement's `;` would have deferred it (`const ccc = ('aaa' in bbb) /* t */;` →
+`const ccc = 'aaa' in bbb; /* t */`).
 
 ## Reason
 

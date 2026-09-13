@@ -6,6 +6,7 @@
 use crate::ast::internal::Expression;
 use crate::printer::chain::tag_paren_leading_start;
 use crate::printer::comments::CommentSpacing;
+use crate::printer::ignore::FrozenOperandPair;
 use crate::printer::needs_parens::strip_non_null_wrappers;
 use crate::printer::{CommentVec, ParenContext, Printer};
 use smallvec::smallvec;
@@ -457,15 +458,20 @@ impl<'a> Printer<'a> {
             // The TAG's own erased-paren freeze — the region this arm's
             // `prepend_removed_paren_comments` below already emits
             // ([`Printer::build_left_spine_operand_doc`]).
-            let tag_doc = self.build_left_spine_operand_doc(tagged.span.start, tagged.tag, || {
-                if let Some(sealed) = self.build_sealed_non_null_paren_doc(tagged.tag) {
-                    sealed
-                } else if self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag) {
-                    d.parens(self.build_expression_doc(tagged.tag))
-                } else {
-                    self.build_expression_doc(tagged.tag)
-                }
-            });
+            let tag_doc = self.build_left_spine_operand_doc(
+                tagged.span.start,
+                tagged.tag,
+                FrozenOperandPair::position(ParenContext::TaggedTemplateTag),
+                || {
+                    if let Some(sealed) = self.build_sealed_non_null_paren_doc(tagged.tag) {
+                        sealed
+                    } else if self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag) {
+                        d.parens(self.build_expression_doc(tagged.tag))
+                    } else {
+                        self.build_expression_doc(tagged.tag)
+                    }
+                },
+            );
             // Check for comments between removed parentheses and tag
             // e.g., (/* comment */ tag)`template` has tagged.span.start at '(' and tag.span.start at 'tag'
             self.prepend_removed_paren_comments(tagged.span.start, tagged.tag.span().start, tag_doc)

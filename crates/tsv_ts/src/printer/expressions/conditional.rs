@@ -3,6 +3,7 @@
 // Handles: a ? b : c, nested ternaries, comments in ternaries
 
 use crate::ast::internal;
+use crate::printer::ignore::FrozenOperandPair;
 use crate::printer::{CommentVec, Printer, template_literal_has_newlines};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
@@ -34,12 +35,16 @@ fn ternary_branch_needs_parens(expr: &internal::Expression<'_>) -> bool {
     ) || is_nullish_coalescing(expr)
 }
 
-/// A ternary TEST that gets parens (prettier: needs-parentheses.js). For arrow/yield
-/// it is **semantic** — without parens the body absorbs the ternary (`() => 1 ? x : y`
-/// parses as `() => (1 ? x : y)`; `yield 1 ? x : y` as `yield (1 ? x : y)`); for
-/// `as`/`satisfies`/assignment/`??` it is clarity (same AST, they bind tighter than
-/// `?:`). Shared by the inline and line-comment layouts so both agree — the
-/// line-comment path must not drop the semantic arrow/yield parens.
+/// A ternary TEST that gets parens (prettier: needs-parentheses.js). For arrow/yield and a
+/// nested ternary it is **semantic** — without parens the body absorbs the ternary
+/// (`() => 1 ? x : y` parses as `() => (1 ? x : y)`; `yield 1 ? x : y` as
+/// `yield (1 ? x : y)`) and `?:` is right-associative, so a test-position ternary printed
+/// bare re-binds into the enclosing one's alternate (`(a ? b : c) ? d : e` would print
+/// `a ? b : c ? d : e`, which is `a ? b : (c ? d : e)`); for `as`/`satisfies`/assignment/`??`
+/// it is clarity (same AST, they bind tighter than `?:`). Shared by the inline and
+/// line-comment layouts so both agree — the line-comment path must not drop the semantic
+/// arrow/yield parens — and by the test's FROZEN form, which takes its pair here too
+/// ([`FrozenOperandPair::Emitted`] at the test's freeze seam).
 fn ternary_test_needs_parens(expr: &internal::Expression<'_>) -> bool {
     is_nullish_coalescing(expr)
         || matches!(
@@ -47,6 +52,7 @@ fn ternary_test_needs_parens(expr: &internal::Expression<'_>) -> bool {
             internal::Expression::AssignmentExpression(_)
                 | internal::Expression::AwaitExpression(_)
                 | internal::Expression::ArrowFunctionExpression(_)
+                | internal::Expression::ConditionalExpression(_)
                 | internal::Expression::YieldExpression(_)
                 | internal::Expression::TSAsExpression(_)
                 | internal::Expression::TSSatisfiesExpression(_)
@@ -339,12 +345,24 @@ impl<'a> Printer<'a> {
     /// Wrap a ternary test doc in parens when its `expr` needs them (arrow/yield are
     /// load-bearing — see `ternary_test_needs_parens`). The shared seam for both
     /// layouts, mirroring `parenthesize_ternary_branch`.
+    ///
+    /// A test that is itself a CONDITIONAL takes an **expanding** pair instead of a flat one
+    /// — `group(["(", indent([softline, test]), softline, ")"])`
+    /// ([`Printer::build_expanding_parens_doc`]) — so a test too wide for the line drops to
+    /// its own indented line inside the parens rather than breaking its `?` / `:` under
+    /// them. Prettier spells it from the other side, in the nested ternary's own printer
+    /// (`ternary-old.js`'s `isParentTest ? group([indent([softline, result]), softline])`,
+    /// with the pair supplied by `needs-parentheses.js`); the pair is tsv's own here, so the
+    /// group carries it. Every other test in `ternary_test_needs_parens` — a `??`, an `=`,
+    /// an `as` — hugs flat in both tools and keeps the plain pair.
     fn parenthesize_ternary_test(&self, expr: &internal::Expression<'_>, doc: DocId) -> DocId {
-        if ternary_test_needs_parens(expr) {
-            self.d().parens(doc)
-        } else {
-            doc
+        if !ternary_test_needs_parens(expr) {
+            return doc;
         }
+        if matches!(expr, internal::Expression::ConditionalExpression(_)) {
+            return self.build_expanding_parens_doc(doc);
+        }
+        self.d().parens(doc)
     }
 
     /// Give a nested ternary's TEST the geometry its position takes ([`TernaryNesting`]).
@@ -466,18 +484,23 @@ impl<'a> Printer<'a> {
         // position pairs its own builder would have) — a paren around the whole conditional
         // is a different authoring and lands in the enclosing head's gap instead, where it
         // freezes the value whole.
-        let test = self.build_left_spine_operand_doc(cond.span.start, cond.test, || {
-            if indent_binary_test {
-                // The term does not fire, so the ordinary dispatch's continuation-indent
-                // default is already the answer.
-                self.build_expression_doc(cond.test)
-            } else {
-                // shouldNotIndent = true (grandparent is assignment, variable, etc.) — an
-                // explicit opt-out, through the seam that owns the owned-comment prepend so
-                // the two arms cannot disagree about it.
-                self.build_flat_chain_expression_doc(cond.test)
-            }
-        });
+        let test = self.build_left_spine_operand_doc(
+            cond.span.start,
+            cond.test,
+            FrozenOperandPair::Emitted,
+            || {
+                if indent_binary_test {
+                    // The term does not fire, so the ordinary dispatch's continuation-indent
+                    // default is already the answer.
+                    self.build_expression_doc(cond.test)
+                } else {
+                    // shouldNotIndent = true (grandparent is assignment, variable, etc.) — an
+                    // explicit opt-out, through the seam that owns the owned-comment prepend
+                    // so the two arms cannot disagree about it.
+                    self.build_flat_chain_expression_doc(cond.test)
+                }
+            },
+        );
         // Several test-position expressions get parens (Prettier: needs-parentheses.js).
         // See `ternary_test_needs_parens` for the arrow/yield semantics vs the
         // `as`/`satisfies`/assignment/`??` clarity cases.
@@ -700,9 +723,12 @@ impl<'a> Printer<'a> {
         // non-breaking path, so the load-bearing arrow/yield parens (and the
         // `as`/`satisfies` clarity parens) are never dropped just because a branch
         // carries a line comment.
-        let test_doc = self.build_left_spine_operand_doc(cond.span.start, cond.test, || {
-            self.build_expression_doc(cond.test)
-        });
+        let test_doc = self.build_left_spine_operand_doc(
+            cond.span.start,
+            cond.test,
+            FrozenOperandPair::Emitted,
+            || self.build_expression_doc(cond.test),
+        );
         let test = self.parenthesize_ternary_test(cond.test, test_doc);
         // Parenthesize an `in` test inside a for-header init (`for (a = (b in c) ? …;…)`);
         // a no-op elsewhere. The test is `[~In]`, so the parens are load-bearing.
@@ -1074,6 +1100,13 @@ impl<'a> Printer<'a> {
         // Parenthesize an `in` consequent/alternate inside a for-header init
         // (`for (a = c ? (b in c) : 0;…)`); a no-op elsewhere. Prettier wraps every
         // `in` under the init; the alternate is `[~In]` so there it is load-bearing.
+        //
+        // Skipped where this branch's shell closes the header's own CLAUSE — an alternate is
+        // the branch a clause can end at — because the shell builder places that pair itself,
+        // inside its trailing comment ([`Printer::shell_closes_for_clause`]).
+        if self.shell_closes_for_clause(boundary_end) {
+            return doc;
+        }
         self.wrap_for_init_in(expr, doc)
     }
 }

@@ -1087,13 +1087,9 @@ impl<'a> Printer<'a> {
         // a no-op elsewhere. The assignment builder is the RHS's only build site and
         // never routes it through `needs_parens`, so the for-init rule is applied here.
         //
-        // Skipped where the shell builder RETAINED the author's pair, which already
-        // parenthesizes the `in` — the rule [`Printer::build_shell_value_doc`] states for
-        // its own two early returns, which this wrap sits outside of.
-        let right_doc = if rhs_info
-            .boundary
-            .is_some_and(|end| self.shell_value_keeps_own_parens(right_expr, end, false))
-        {
+        // Skipped where the shell builder already supplied the pair
+        // ([`Printer::shell_supplies_for_init_pair`]).
+        let right_doc = if self.shell_supplies_for_init_pair(right_expr, rhs_info.boundary) {
             right_doc
         } else {
             self.wrap_for_init_in(right_expr, right_doc)
@@ -1262,14 +1258,12 @@ impl<'a> Printer<'a> {
         // builder is the RHS's only build site and never routes it through `needs_parens`,
         // so the ambient rule is applied here. A no-op everywhere else.
         //
-        // Two things differ from the unfrozen twin, and both follow from the slice printing
+        // One thing differs from the unfrozen twin, and it follows from the slice printing
         // verbatim: the question is the SLICE's ([`Printer::wrap_frozen_for_init_in`]), since
-        // a frozen RHS has no inner positions to parenthesize a deeper `in` at; and a
-        // RETAINED author shell (the keep-paren early return of
-        // [`Printer::build_shell_value_doc`], which that builder's own doc names as the pair
-        // it must not wrap twice) already encloses the slice.
-        let shell_keeps_parens =
-            boundary.is_some_and(|end| self.shell_value_keeps_own_parens(right_expr, end, false));
+        // a frozen RHS has no inner positions to parenthesize a deeper `in` at. Whether the
+        // shell already supplied the pair is the same predicate as on the unfrozen path
+        // ([`Printer::shell_supplies_for_init_pair`]).
+        let shell_keeps_parens = self.shell_supplies_for_init_pair(right_expr, boundary);
         let frozen_doc =
             self.wrap_frozen_for_init_in(right_expr, frozen, shell_keeps_parens, frozen_doc);
         let rhs = match comments {

@@ -2089,6 +2089,13 @@ impl<'a> Printer<'a> {
         // (with the `return`/`throw` argument): the operands hang inside the parens the
         // sequence prints for itself, `)` dropping to its own line. Claimed here because
         // the expression dispatch below has no parent to read the layout from.
+        // TODO: an arrow body is a VALUE position, so a trailing comment belongs inside the
+        // parens the sequence prints (prettier #19263, the `return` argument's rule) — but
+        // this takes the float-out builder, so a comment in the shell the parser erased from
+        // the LAST OPERAND lands outside them (`() => (x, (y /* t */))` → `(x, y) /* t */`,
+        // and a `//` there rides past the `;` entirely). The fix is the `return` arm's:
+        // `build_sequence_doc_value` over the collapsed grouping close
+        // (`restricted_production.rs`), which needs this seam to locate that `)`.
         if let internal::Expression::SequenceExpression(seq) = expr {
             return prepend(self.build_sequence_doc(seq, SeqLayout::Hanging));
         }

@@ -71,6 +71,36 @@
 		;
 	) {}
 
+	// The same pair of cases at a host that is `[+In]` in its own right — a call argument, an
+	// object value and a template substitution. The ROOT case takes its pair from the
+	// arrow-body position at all three, prettier included; only the DESCENDED one, which
+	// takes it from the slice, parts — and there prettier's bare form parses, the host
+	// needing no pair.
+	for (
+		fn(
+			() =>
+				// prettier-ignore
+				(ccc || 'aaa'  in  bbb)
+		);
+		;
+	) {}
+
+	for (
+		yyy = {
+			zzz: () =>
+				// prettier-ignore
+				(ccc || 'aaa'  in  bbb)
+		};
+		;
+	) {}
+
+	for (
+		`${() =>
+			// prettier-ignore
+			(ccc || 'aaa'  in  bbb)}`;
+		;
+	) {}
+
 	// an `as` / `satisfies` operand — the cast is over the binary, so the `in` is not the root
 	for (
 		// prettier-ignore

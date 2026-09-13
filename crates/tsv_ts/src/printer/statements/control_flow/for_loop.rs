@@ -596,10 +596,18 @@ impl<'a> Printer<'a> {
             }
         }
         if let Some(init) = &stmt.init {
-            inner_parts.push(init_frozen.map_or_else(
-                || self.build_for_init_doc(init),
-                |frozen| self.build_frozen_init_clause_doc(init, frozen),
-            ));
+            // Each clause is built with its own END recorded, so a value shell that closes
+            // there knows the `;` behind it SEPARATES clauses
+            // ([`Printer::shell_closes_for_clause`]). The header is where the three ends are
+            // already resolved, and the one frame that holds all three; the clause builders
+            // below see only their own expression, whose span end is the same number but says
+            // nothing about which separator follows it.
+            inner_parts.push(self.with_for_clause_end(init_end, || {
+                init_frozen.map_or_else(
+                    || self.build_for_init_doc(init),
+                    |frozen| self.build_frozen_init_clause_doc(init, frozen),
+                )
+            }));
         }
         // The init clause→`;` gap comments bind to the `;` like a list separator.
         self.push_for_clause_semicolon(&mut inner_parts, init_end, first_semi);
@@ -635,14 +643,29 @@ impl<'a> Printer<'a> {
             // to evaluate fit against — matching how if/while use build_condition_group.
             // Without this, logical operators break with the for-header group (too wide)
             // instead of their own condition width.
-            inner_parts.push(test_frozen.map_or_else(
-                || d.group(self.build_condition_doc(test, HeadChainGrouping::ParenGroupDrives)),
-                // The clarity parens an assignment test prints (`for (; (a = b); )`) are
-                // the printer's, not the author's, so they wrap the frozen slice instead
-                // of riding inside it — the same `StatementTest` shell, and the same
-                // context, the unfrozen clause above applies.
-                |frozen| self.build_frozen_value_doc(test, frozen, ParenContext::StatementTest),
-            ));
+            // TODO: a test clause value that takes CLARITY PARENS costs a second pass on the
+            // authored shell (`for (; a = (b /* c */); )` prints `(a = b /* c */)`, whose
+            // reparse reads the comment in the clause's own gap and moves it behind the pair).
+            // Both forms converge on `(a = b) /* c */`, prettier included and in the same two
+            // passes, so this is a pass count rather than an end state — closing it means
+            // routing the clause's own value through a shell builder, the same routing
+            // [`Self::build_for_init_doc`]'s Expression arm wants (and it would print
+            // prettier's SECOND-pass form on pass 1, a pass-count divergence rather than
+            // parity). The same two-pass shape, prettier-identical pass for pass, shows at
+            // any clause-terminal value whose trailing block spans lines
+            // (`for (a = ('k' in o /*⏎⏎ t */); ;)` hangs the value under `=` on pass 1 and
+            // collapses it on pass 2) — a non-last declarator does the same, so it is the
+            // multi-line-block class, not this clause's.
+            inner_parts.push(self.with_for_clause_end(test_end, || {
+                test_frozen.map_or_else(
+                    || d.group(self.build_condition_doc(test, HeadChainGrouping::ParenGroupDrives)),
+                    // The clarity parens an assignment test prints (`for (; (a = b); )`) are
+                    // the printer's, not the author's, so they wrap the frozen slice instead
+                    // of riding inside it — the same `StatementTest` shell, and the same
+                    // context, the unfrozen clause above applies.
+                    |frozen| self.build_frozen_value_doc(test, frozen, ParenContext::StatementTest),
+                )
+            }));
         }
         // The test clause→`;` gap comments bind to the `;` like a list separator.
         self.push_for_clause_semicolon(&mut inner_parts, test_end, second_semi);
@@ -666,10 +689,20 @@ impl<'a> Printer<'a> {
         }
 
         if let Some(update) = &stmt.update {
-            inner_parts.push(update_frozen.map_or_else(
-                || self.build_for_update_doc(update),
-                |frozen| self.build_frozen_expression_doc(update, frozen),
-            ));
+            inner_parts.push(self.with_for_clause_end(update_end, || {
+                update_frozen.map_or_else(
+                    || self.build_for_update_doc(update),
+                    // The clause prints BARE, exactly as the init clause's frozen arm does
+                    // ([`Self::build_frozen_init_clause_doc`]) and for the same reason: a
+                    // `SequenceExpression` clause is the one position that wants no grouping
+                    // pair, where [`Printer::build_frozen_expression_doc`] re-synthesizes the
+                    // one every other position needs. The update clause is `[+In]` and heads
+                    // no statement, so nothing else can want a pair here either — and the
+                    // re-synthesized one printed a grouping pair the author never wrote and
+                    // prettier does not print.
+                    |frozen| self.build_frozen_node_doc(frozen),
+                )
+            }));
         }
         if let Some(start) = spans.update_trailing_start() {
             self.push_for_update_trailing_comments(
@@ -1011,6 +1044,39 @@ impl<'a> Printer<'a> {
             seq.span.start,
             seq.expressions.first(),
             || {
+                let d = self.d();
+                let last = seq.expressions.len() - 1;
+                let first_start = seq.expressions[0].span().start;
+                let mut parts = DocBuf::new();
+                // The LEADING EDGE: the grouping `(` the parser erased ahead of the first
+                // operand, and any comment inside it — a region that lies INSIDE the
+                // sequence's own span (which opens at that `(`), so the clause's leading
+                // section, which stops where the clause starts, cannot reach it. Nothing
+                // else emits it here: the general sequence printer hands this run to its
+                // paren ENVELOPE ([`Printer::append_floated_leading_comments`]) and a for
+                // header has no envelope at all, so unemitted it is DROPPED
+                // (`docs/comments.md` hazard 4).
+                //
+                // Emitted OUTSIDE the layout's group, like every other hoisted left-spine
+                // shell run (`docs/comments.md` §The left-spine shell run): a hardline
+                // inside it would break the operands apart for a comment the reparse reads
+                // ahead of the whole clause — where it leads the sequence node and leaves
+                // the operands flat — so the two passes would disagree.
+                //
+                // The canonical emitter ([`Printer::push_leading_comment_run`]) is called
+                // here rather than through the general left-spine seam
+                // ([`Printer::build_left_spine_operand_doc`]) because that seam applies
+                // [`Printer::wrap_frozen_position_pair`] to what it builds, and a `for`
+                // header's operand needs the header's own `[~In]` pair instead
+                // ([`Printer::wrap_frozen_for_init_in`]) — the run itself is the same one.
+                if first_start != seq.span.start {
+                    self.push_leading_comment_run(
+                        &mut parts,
+                        self.comments_to_emit_between(seq.span.start, first_start),
+                        first_start,
+                        LeadingGlue::Adjacent,
+                    );
+                }
                 let mut docs = DocBuf::new();
                 // Where the FIRST operand's docs end — `build_sequence_layout_doc`'s `first_end`,
                 // tracked rather than assumed to be 1 so the layout does not depend on how many
@@ -1030,19 +1096,40 @@ impl<'a> Printer<'a> {
                         // an operand, so `already_parenthesized` is false.
                         self.gap_frozen_span(prev_end, e.span())
                     } else {
-                        None
+                        // The leading edge's own freeze, the same rule the general sequence
+                        // printer applies to its first operand
+                        // ([`Printer::left_spine_operand_frozen_span`]): an own-line directive
+                        // inside the erased shell freezes THAT operand, Rule A's child scope.
+                        self.left_spine_operand_frozen_span(seq.span.start, e)
                     };
-                    docs.push(frozen.map_or_else(
-                        || build_elem(e),
-                        |frozen| {
-                            self.wrap_frozen_for_init_in(
-                                e,
-                                frozen,
-                                false,
-                                self.build_frozen_expression_doc(e, frozen),
-                            )
-                        },
-                    ));
+                    docs.push(if i == last {
+                        // The TRAILING EDGE: the last operand's own erased shell closes at the
+                        // sequence's span end, so `[operand.end, seq.span.end)` is its gap —
+                        // and, unlike every earlier operand's, no comma gap follows to claim
+                        // it. Handed to the header's own shell builder, which owns the
+                        // question at every other `for`-clause position: the block strips
+                        // inline before the clause's `;`, a `//` or an own-line comment
+                        // RETAINS the shell, and nothing defers past a separator that
+                        // terminates no statement ([`Printer::build_for_init_value_doc`]).
+                        // That builder also applies the `[~In]` wrap `build_elem` would —
+                        // keyed on the same ambient flag, so the init clause wraps and the
+                        // update clause does not — and places it INSIDE the trailing comment
+                        // (`(aaa in bbb) /* c */`), which is why the operand is built there
+                        // rather than wrapped here.
+                        self.build_for_clause_operand_doc(e, seq.span.end, frozen)
+                    } else {
+                        frozen.map_or_else(
+                            || build_elem(e),
+                            |frozen| {
+                                self.wrap_frozen_for_init_in(
+                                    e,
+                                    frozen,
+                                    false,
+                                    self.build_frozen_expression_doc(e, frozen),
+                                )
+                            },
+                        )
+                    });
                     if i == 0 {
                         first_end = docs.len();
                     }
@@ -1053,7 +1140,8 @@ impl<'a> Printer<'a> {
                 // breaks internally keeps its own lines at the clause's base column. Wrapping the
                 // whole run instead added a level to the FIRST operand's internals, visible on a
                 // plain call (`for (fn(⏎…⏎), cc; ;)`) as well as on a binary.
-                self.build_sequence_layout_doc(&docs, first_end, SeqLayout::Indented)
+                parts.push(self.build_sequence_layout_doc(&docs, first_end, SeqLayout::Indented));
+                d.concat(&parts)
             },
         )
     }
@@ -2049,6 +2137,15 @@ impl<'a> Printer<'a> {
                 // The init is a statement-head position for the `let [` lookahead
                 // restriction too (`for ((let)[0] = 1; ;)`), so a `let` heading it keeps
                 // its parens.
+                //
+                // TODO: the clause value is built with no shell builder, so a grouping
+                // shell the author wrote around the WHOLE clause has its trailing gap
+                // answered by the clause→`;` emitter instead — a `//` in it rides past the
+                // separator, and the next pass, reading it from the header's own gap, puts
+                // it on its own line (`for ((b // c⏎); ;)`, two fixed points for one
+                // source). A header DECLARATOR answers the same shell inside the construct
+                // ([`Printer::build_for_init_value_doc`]), as does a sequence clause's last
+                // operand; the bare clause and the update clause want that routing too.
                 self.with_expr_stmt_paren_target(self.let_bracket_head_target(expr), || {
                     self.build_for_expr_clause(expr, |e| {
                         self.wrap_for_init_in(e, self.build_expression_doc(e))

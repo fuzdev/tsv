@@ -65,10 +65,11 @@
 
 use super::ParenContext;
 use super::Printer;
+use super::comments::next_significant_byte;
 use super::types::TrailingBlock;
 use super::types::helpers::{TypeParenRule, outermost_paren, paren_shell_gaps};
 use super::unwrap_parenthesized;
-use crate::ast::internal::{self, Comment, TSType};
+use crate::ast::internal::{self, BinaryOperator, Comment, TSType};
 use crate::lexer::{is_es_line_terminator, is_es_whitespace};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
@@ -150,6 +151,85 @@ pub(in crate::printer) enum RoutedScope {
     /// the bare one does not have, so the branch keeps its own scope and the two authorings
     /// land on one form.
     Whole,
+}
+
+/// What [`Printer::wrap_frozen_position_pair`] owes a frozen LEFT-SPINE operand, on top of
+/// the leftmost-target pairs every position shares.
+///
+/// A frozen slice replaces the builder that would have asked `needs_parens` at this
+/// position, so the pair has to be re-asked around the slice — and asked exactly ONCE, which
+/// is what this names: a second pair is valid output but is neither prettier's nor the
+/// unfrozen twin's.
+#[derive(Clone, Copy)]
+pub(in crate::printer) enum FrozenOperandPair {
+    /// The position's whole question: the `needs_parens` verdict its unfrozen twin takes,
+    /// plus the pair the SLICE needs beyond it. For a position that emits no pair of its own
+    /// around the seam's doc — a binary chain's first operand, a tagged template's tag, a
+    /// bare non-null operand, a bare callee, a linearized chain's base.
+    ///
+    /// `required` is the verdict the position ALREADY HOLDS, where it holds one the free
+    /// function cannot reproduce. A linearized chain is that position: `ChainNode::Base`
+    /// carries `needs_parens: true` by construction at three sites the free function never
+    /// reaches from the node alone — a sealed optional chain, a paren base ahead of a `!`,
+    /// and a `TSInstantiationExpression` member object — so re-deriving the verdict here
+    /// dropped the pair and re-bound the output (`(a?.b).k` printed `a?.b.k`, which
+    /// short-circuits where the input throws). Every other position holds no verdict of its
+    /// own and passes `false`; the free function is still asked either way, so the two are
+    /// an OR, never a substitution.
+    Position { ctx: ParenContext, required: bool },
+    /// Nothing. The position emits a pair of its own around the seam's doc, and no tail it
+    /// prints JOINS a slice's last token
+    /// ([`Printer::frozen_slice_absorbs_left_binding_suffix`]) — a ternary's test
+    /// (`Printer::parenthesize_ternary_test`; `?` neither binds to a bare `new X` nor opens
+    /// an expression after a `new X<T>`'s `>`), a cast's operand (`as` / `satisfies`, whose
+    /// ASI-sensitive gap retains the author's shell whenever a freeze can fire there at all),
+    /// and the interior of a paren the printer RETAINS, whose own `(` … `)` IS the pair.
+    Emitted,
+}
+
+impl FrozenOperandPair {
+    /// [`Self::Position`] for a position that holds no verdict of its own — the common
+    /// case, where the free function is the whole answer.
+    pub(in crate::printer) const fn position(ctx: ParenContext) -> Self {
+        Self::Position {
+            ctx,
+            required: false,
+        }
+    }
+}
+
+/// Whether a binary operator's printed spelling JOINS a `>` the operand before it ended on
+/// — the tail half of [`Printer::frozen_slice_absorbs_left_binding_suffix`]'s join question.
+///
+/// The answer is a REJECTION table over the three parsers that grade the output — tsc,
+/// acorn-typescript and tsv itself — plus the one operator pair that rebinds silently. A tail
+/// joins when the bare spelling is not a form all three read as the input meant:
+///
+/// - `+` and `-` are the operators that also OPEN an expression, so the `>` takes the
+///   operator's own right-hand side and the whole thing reads as a relational chain
+///   (`new X<T> + 1` is `((new X) < T) > +1` at every parser, tsv included) — accepted
+///   everywhere and a different tree everywhere;
+/// - `>`, `>>` and `>>>` are rejected by all three;
+/// - `<` and `>=` are rejected by **tsc** (`'>' expected` / `Expression expected`), and so by
+///   prettier, which is a front end for it. acorn-typescript and tsv accept them as the same
+///   tree, which is exactly why no reparse of tsv's own output can see the loss;
+/// - `<<` is the mirror: tsc accepts it as the same tree, and **acorn-typescript** rejects it.
+///   tsv is acorn's drop-in, so the pair stays.
+///
+/// Every other operator lets all three backtrack to the type arguments, which is what makes
+/// the bare spelling AST-identical there.
+const fn joins_a_trailing_angle_bracket(op: BinaryOperator) -> bool {
+    matches!(
+        op,
+        BinaryOperator::Plus
+            | BinaryOperator::Minus
+            | BinaryOperator::LessThan
+            | BinaryOperator::GreaterThan
+            | BinaryOperator::GreaterThanEquals
+            | BinaryOperator::LeftShift
+            | BinaryOperator::RightShift
+            | BinaryOperator::UnsignedRightShift
+    )
 }
 
 pub(in crate::printer) fn is_freeze_target(child: &TSType<'_>) -> bool {
@@ -645,24 +725,37 @@ impl<'a> Printer<'a> {
         self.gap_frozen_span(node_start, operand.span())
     }
 
-    /// The pair a frozen LEFTMOST operand would have taken from a POSITION TARGET, had its
-    /// own builder run: the expression statement's
-    /// ([`Printer::maybe_wrap_expr_stmt_paren`] — the node that must not open the line with
-    /// `{` / `function` / `class`) and the arrow body's leftmost-object one
-    /// ([`Printer::arrow_body_leftmost_parens_target`], whose `{` would read as a block body).
+    /// The pair a frozen LEFTMOST operand takes from its POSITION, had its own builder run.
     ///
-    /// Both are cells the node's OWN builder reads, and a verbatim slice replaces that
-    /// builder — so a freeze that skipped them printed `{b:  1}.k;`, `class {}();` and
-    /// `() =>⏎{b:  1}.k`, none of which parse. The pairs go outside the slice, where the
-    /// unfrozen path puts them too.
+    /// Three questions, one answer, because a paren is a paren: **the position's own
+    /// precedence pair** ([`FrozenOperandPair`] — the `needs_parens` verdict the unfrozen
+    /// twin applies at this very position, plus the one the SLICE needs beyond it), the
+    /// expression statement's target ([`Printer::maybe_wrap_expr_stmt_paren`] — the node that
+    /// must not open the line with `{` / `function` / `class`) and the arrow body's
+    /// leftmost-object one ([`Printer::arrow_body_leftmost_parens_target`], whose `{` would
+    /// read as a block body).
     ///
-    /// Both are matched by span and neither is consumed, so re-running this across a
-    /// conditional group's candidates is sound.
+    /// All three are cells or verdicts the node's OWN builder reads, and a verbatim slice
+    /// replaces that builder — so a freeze that skips one drops a pair the position requires.
+    /// The leftmost-target pair is the unparseable half (`{b:  1}.k;`, `class {}();`,
+    /// `() =>⏎{b:  1}.k`); the precedence pair is the SILENT half, since the output usually
+    /// parses and simply binds differently (`(⏎// prettier-ignore⏎() => 1⏎) + 1` printed
+    /// `() => 1 + 1`, whose body has swallowed the `+ 1`). Every pair goes outside the slice,
+    /// where the unfrozen path puts it too.
+    ///
+    /// At most ONE pair is emitted: a parenthesized operand can no longer open the statement's
+    /// line with `{`, nor read as an arrow's block body, so the precedence pair subsumes both
+    /// targets when it fires. The targets are matched by span and neither is consumed, so
+    /// re-running this across a conditional group's candidates is sound.
     pub(in crate::printer) fn wrap_frozen_position_pair(
         &self,
         operand: &internal::Expression<'_>,
+        pair: FrozenOperandPair,
         doc: DocId,
     ) -> DocId {
+        if self.frozen_operand_pair_needed(operand, pair) {
+            return self.d().parens(doc);
+        }
         let span = operand.span();
         let doc = if self.arrow_body_leftmost_parens_target.get() == Some(span) {
             self.d().parens(doc)
@@ -672,6 +765,134 @@ impl<'a> Printer<'a> {
         self.maybe_wrap_expr_stmt_paren(span, doc)
     }
 
+    /// [`FrozenOperandPair`] resolved against the operand: whether THIS seam owes the pair.
+    ///
+    /// The position half is the verdict the position already holds
+    /// ([`FrozenOperandPair::Position`]'s `required`) OR the plain
+    /// [`Printer::needs_parens`], so the frozen and unfrozen forms cannot disagree about the
+    /// shell — the same discipline [`Self::build_frozen_value_doc`] keeps at the value-side
+    /// positions. The slice half is [`Self::frozen_slice_absorbs_left_binding_suffix`].
+    fn frozen_operand_pair_needed(
+        &self,
+        operand: &internal::Expression<'_>,
+        pair: FrozenOperandPair,
+    ) -> bool {
+        match pair {
+            FrozenOperandPair::Emitted => false,
+            FrozenOperandPair::Position { ctx, required } => {
+                required
+                    || self.needs_parens(operand, ctx)
+                    || self.frozen_slice_absorbs_left_binding_suffix(operand, ctx)
+            }
+        }
+    }
+
+    /// Whether a frozen operand's SLICE would absorb the tail its position prints just past
+    /// it — a pair the slice needs that the node does not.
+    ///
+    /// **The axis is the JOIN between the slice's LAST token and the tail's FIRST**, not the
+    /// position's operator precedence. One operand family reaches it — a **`new` expression
+    /// the author wrote with no argument list** — because the printed form always carries one
+    /// (the unfrozen printer emits `new X()` even where the author wrote none), so
+    /// `needs_parens` leaves it bare everywhere while a verbatim slice carries only the
+    /// author's bytes. Its two spellings end in two different tokens, and each joins with a
+    /// different set of tails:
+    ///
+    /// - `new X`, ending in the callee's own token, absorbs a LEFT-BINDING SUFFIX — `.k`,
+    ///   `[0]`, `(1)`, `!`, `` `t` `` — which binds to the CALLEE instead: `new X.k` is
+    ///   `new (X.k)`, a silent rebind, and `new X?.()` does not even typecheck. Every
+    ///   operator tail reads `new X` as a whole, so those positions need nothing.
+    /// - `new X<T>`, ending in `>`, needs the pair at the same suffixes for a mix of reasons
+    ///   — `(1)` and `` `t` `` rebind to the `new` as they do bare, `[0]` rebinds through the
+    ///   RELATIONAL reading (`((new X) < T) > [0]`), and `.k` / `!` are rejected outright by
+    ///   tsc, acorn-typescript and tsv alike — AND at the operator tails whose first token
+    ///   joins that `>` ([`joins_a_trailing_angle_bracket`], whose doc carries the
+    ///   per-operator table): `+` and `-` continue it as a relational chain
+    ///   (`new X<T> + 1` is `((new X) < T) > +1`, a silent rebind every parser agrees on), and
+    ///   `>` / `>>` / `>>>` / `<` / `>=` / `<<` leave a form at least one of tsc and
+    ///   acorn-typescript rejects. Every other operator — `*`, `**`, `<=`, `?:`, `??`, `||`,
+    ///   `instanceof`, `,`, `=` — cannot open an expression after the `>`, so all three
+    ///   parsers backtrack and read the type arguments; those spellings are AST-identical bare
+    ///   and take no pair.
+    ///
+    ///   ⚠️ Three of the rejections are one parser's alone, so no reparse of tsv's own output
+    ///   can grade them: tsv accepts `<`, `>=` (tsc rejects) and `<<` (acorn-typescript
+    ///   rejects) as the same tree. The table is measured against those two parsers directly,
+    ///   never against `tsv_debug ast_diff`, which is blind wherever tsv agrees with itself.
+    ///
+    /// The `new` callee's own seam ([`Printer::build_frozen_new_callee_doc`]) asks
+    /// [`Self::frozen_new_slice_absorbs_tail`] for the same reason, one suffix over — the
+    /// argument list it prints past the slice, which both spellings absorb. `NewCallee` is
+    /// absent from the context list because it never reaches this seam: the `new`→callee gap
+    /// has a freeze of its own.
+    ///
+    /// TODO: the sibling **instantiation** slice (`f<T>`) ends in `>` too and joins the same
+    /// tails (`f<T> + 1`, `` f<T>`t` ``, `f<T>()`, `f<T>.k`), but its UNFROZEN printer already
+    /// emits those bare and prettier matches tsv there — a shared pre-existing bug in the
+    /// paren rule rather than a freeze question, so it is not answered here.
+    fn frozen_slice_absorbs_left_binding_suffix(
+        &self,
+        operand: &internal::Expression<'_>,
+        ctx: ParenContext,
+    ) -> bool {
+        if !self.frozen_new_slice_absorbs_tail(operand) {
+            return false;
+        }
+        match ctx {
+            ParenContext::ChainBase
+            | ParenContext::Callee
+            | ParenContext::TaggedTemplateTag
+            | ParenContext::NonNull => true,
+            // The slice's last token is the `>` closing its TYPE ARGUMENTS exactly when it
+            // has them: the walk above proved no argument list follows the head, so with
+            // type arguments present the head ENDS at their `>` and only trivia follows.
+            ParenContext::BinaryLeft { parent_op } => {
+                joins_a_trailing_angle_bracket(parent_op)
+                    && matches!(
+                        operand,
+                        internal::Expression::NewExpression(new_expr)
+                            if new_expr.type_arguments.is_some()
+                    )
+            }
+            _ => false,
+        }
+    }
+
+    /// Whether a frozen slice of `expr` would ABSORB the left-binding tail printed after it —
+    /// true for a `new` expression the author wrote with no argument list of its own.
+    ///
+    /// Everything between the `new`'s callee (with its type arguments) and its own span end
+    /// is either that callee's closing shell parens, trivia, or the argument list, so the
+    /// list is present exactly when a `(` turns up in the walk. Reading the source rather
+    /// than `arguments.is_empty()` is what separates `new X` from `new X()`, which parse to
+    /// the same node.
+    ///
+    /// Two families ask: the `new` callee's own freeze
+    /// ([`Printer::build_frozen_new_callee_doc`]), whose tail is the argument list the
+    /// printer supplies and which both spellings absorb, and the left-spine positions
+    /// ([`Self::frozen_slice_absorbs_left_binding_suffix`]), which then split on which token
+    /// the slice ENDS in and which one the tail OPENS with.
+    pub(in crate::printer) fn frozen_new_slice_absorbs_tail(
+        &self,
+        expr: &internal::Expression<'_>,
+    ) -> bool {
+        let internal::Expression::NewExpression(new_expr) = expr else {
+            return false;
+        };
+        let head_end = new_expr
+            .type_arguments
+            .as_ref()
+            .map_or_else(|| new_expr.callee.span().end, |args| args.span.end);
+        let mut pos = head_end;
+        while let Some(i) = next_significant_byte(self.source, pos, new_expr.span.end) {
+            if self.source.as_bytes()[i] == b'(' {
+                return false;
+            }
+            pos = i as u32 + 1;
+        }
+        true
+    }
+
     /// [`Self::left_spine_operand_frozen_span`] resolved to the operand's doc: the verbatim
     /// slice when the freeze fires, else the construct's own build, taken lazily.
     #[inline]
@@ -679,9 +900,10 @@ impl<'a> Printer<'a> {
         &self,
         node_start: u32,
         operand: &internal::Expression<'_>,
+        pair: FrozenOperandPair,
         ordinary: impl FnOnce() -> DocId,
     ) -> DocId {
-        self.build_left_spine_operand_doc_if(true, node_start, operand, ordinary)
+        self.build_left_spine_operand_doc_if(true, node_start, operand, pair, ordinary)
     }
 
     /// [`Self::build_left_spine_operand_doc`] told whether the position can take the freeze
@@ -702,6 +924,7 @@ impl<'a> Printer<'a> {
         can_freeze: bool,
         node_start: u32,
         operand: &internal::Expression<'_>,
+        pair: FrozenOperandPair,
         ordinary: impl FnOnce() -> DocId,
     ) -> DocId {
         match can_freeze
@@ -710,6 +933,7 @@ impl<'a> Printer<'a> {
         {
             Some(frozen) => self.wrap_frozen_position_pair(
                 operand,
+                pair,
                 self.build_frozen_expression_doc(operand, frozen),
             ),
             None => ordinary(),

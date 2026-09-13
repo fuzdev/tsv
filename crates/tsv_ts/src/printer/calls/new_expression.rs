@@ -25,7 +25,6 @@ use super::arg_wrapping::{
 };
 use super::expand_last::{ArgOwner, try_expand_last_arg};
 use crate::ast::internal;
-use crate::printer::comments::next_significant_byte;
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, prepend_leading,
 };
@@ -93,45 +92,21 @@ impl<'a> Printer<'a> {
     /// HAS an argument list and appends a second pair, so the output has no fixed point.
     ///
     /// The pair is a property of the slice, not of the position, which is why it is
-    /// answered here rather than in [`fn@crate::printer::needs_parens`] — the unfrozen
-    /// callee must keep printing bare.
+    /// answered by [`Printer::frozen_new_slice_absorbs_tail`] rather than in
+    /// [`fn@crate::printer::needs_parens`] — the unfrozen callee must keep printing bare.
+    /// The left-spine positions ask that same predicate for the suffixes THEY print past a
+    /// frozen slice (`.k`, `[0]`, `(1)`, `!`, `` `t` ``).
     fn build_frozen_new_callee_doc(
         &self,
         callee: &internal::Expression<'_>,
         frozen: Span,
     ) -> DocId {
         let doc = self.build_frozen_value_doc(callee, frozen, ParenContext::NewCallee);
-        if self.frozen_new_callee_absorbs_arguments(callee) {
+        if self.frozen_new_slice_absorbs_tail(callee) {
             self.d().parens(doc)
         } else {
             doc
         }
-    }
-
-    /// Whether a frozen `new` callee's slice would ABSORB the argument list printed after
-    /// it — true for a `new` expression the author wrote with no argument list of its own.
-    ///
-    /// Everything between the inner `new`'s callee (with its type arguments) and its own
-    /// span end is either that callee's closing shell parens, trivia, or the argument list,
-    /// so the list is present exactly when a `(` turns up in the walk. Reading the source
-    /// rather than `arguments.is_empty()` is what separates `new X` from `new X()`, which
-    /// parse to the same node.
-    fn frozen_new_callee_absorbs_arguments(&self, callee: &internal::Expression<'_>) -> bool {
-        let internal::Expression::NewExpression(inner) = callee else {
-            return false;
-        };
-        let head_end = inner
-            .type_arguments
-            .as_ref()
-            .map_or_else(|| inner.callee.span().end, |args| args.span.end);
-        let mut pos = head_end;
-        while let Some(i) = next_significant_byte(self.source, pos, inner.span.end) {
-            if self.source.as_bytes()[i] == b'(' {
-                return false;
-            }
-            pos = i as u32 + 1;
-        }
-        true
     }
 
     /// [`Self::build_new_doc_with_wrapping`] past the keyword, which it emits as

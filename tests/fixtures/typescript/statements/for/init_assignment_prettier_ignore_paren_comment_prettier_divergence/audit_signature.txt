@@ -44,4 +44,31 @@
 		let eee = ('aaa' in bbb); // t
 		;
 	) {}
+
+	// The `/* … */` spelling in the same gap is not a divergence at all: the clause `;`
+	// terminates no statement, so the block strips inline and lands behind the `[~In]` pair,
+	// at the assignment host, its compound form and the declarator alike — prettier's own
+	// answer on every one of them.
+	for (
+		ccc =
+			// prettier-ignore
+			('aaa'  in  bbb) /* t */;
+		;
+	) {}
+
+	for (
+		ccc +=
+			// prettier-ignore
+			('aaa'  in  bbb) /* t */;
+		;
+	) {}
+
+	for (
+		let fff =
+			// prettier-ignore
+			('aaa'  in  bbb) /* t */;
+		;
+	) {}
+
+	for (ccc = ('aaa' in bbb) /* t */; ;) {}
 </script>
