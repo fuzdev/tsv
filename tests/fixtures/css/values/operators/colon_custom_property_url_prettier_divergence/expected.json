@@ -1,0 +1,94 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 299,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 290,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 148,
+							"end": 173,
+							"property": "--a",
+							"value": "https: //a.fuz.dev/b"
+						},
+						{
+							"type": "Declaration",
+							"start": 257,
+							"end": 286,
+							"property": "--b",
+							"value": "url(https://a.fuz.dev/b)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 290
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a URL-shaped custom-property value: its `://` is a top-level colon like any\n\t\tother, and the rest of the value is one word ",
+				"start": 17,
+				"end": 145
+			},
+			{
+				"type": "CSSComment",
+				"value": " the same URL inside a url(), whose content is opaque to both formatters ",
+				"start": 177,
+				"end": 254
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 291,
+			"styles": "\n\tdiv {\n\t\t/* a URL-shaped custom-property value: its `://` is a top-level colon like any\n\t\tother, and the rest of the value is one word */\n\t\t--a: https: //a.fuz.dev/b;\n\t\t/* the same URL inside a url(), whose content is opaque to both formatters */\n\t\t--b: url(https://a.fuz.dev/b);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 300,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

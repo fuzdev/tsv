@@ -14,6 +14,17 @@ postcss's own `value` string — and postcss's `raw()` strips a comment that has
 either side out of `value` (it survives only in `raws.value.raw`). A comment glued to its
 neighbours on both sides (`)/* c */progid`) stays in postcss's `value`, so that cell agrees.
 
+**The prefix's case, in a CUSTOM property.** A custom property is exempt from postcss's
+`checkMissedSemicolon`, so its value is parsed rather than rejected — which is where the
+lowercase-only trigger becomes visible as an *output* difference rather than a throw
+([progid_opaque_case](../progid_opaque_case_prettier_divergence/), whose plain property has no
+prettier output at all).
+tsv: reads the trigger ASCII-case-insensitively, so `PROGID:X.Y(a=1.50)` freezes exactly as
+`progid:X.Y(a=1.50)` does
+Prettier: the lowercase spelling reaches its own opaque arm and freezes too (an agreeing cell
+here), while any other case is an ordinary top-level colon to it, spaced like every other
+(`PROGID: X.Y(a=1.50)`)
+
 **A `progid:` that is not the value's first bytes.**
 tsv: an ordinary glued token, kept whole (`alpha(opacity=50) progid:X.Y(a=1.50)`); the numbers
 around it normalize as usual
@@ -25,7 +36,10 @@ reads the `:` as a separator and inserts a space after it (`progid: X.Y(a=1.50)`
 Content preservation. A comment the author wrote is not the formatter's to delete, and the
 opaque rule's whole point is to change nothing inside a value it does not understand — dropping
 a comment is exactly such a change. The mid-value cell is the same rule read at a different
-position: a token the formatter does not model is kept whole rather than split at a colon.
+position: a token the formatter does not model is kept whole rather than split at a colon. The
+case cell is that same sentence a third time: which case the author spelled the prefix in does not
+change what the value is, so a formatter that normalizes one spelling and freezes the other has
+put a cliff in the middle of one construct.
 See [conformance_prettier_css.md §CSS: Values](../../../../../docs/conformance_prettier_css.md#css-values)
 ("`progid:` opaque value").
 

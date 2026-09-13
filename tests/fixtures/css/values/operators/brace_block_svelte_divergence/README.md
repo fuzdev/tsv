@@ -21,8 +21,11 @@ The block's braces are members of the value like prettier's value parser reads t
 interior always and to the members outside it only as authored, and the words between
 the braces normalize: `a{1.50}c(2.50)` → `a{1.5}c(2.5)`, `a {1.50} c(2.50)` →
 `a {1.5} c(2.5)`. An operator beside a brace reads the brace as a word — glued to it as
-authored, spaced from its operand (`a{1.5}/ 2.5`, `a *{1.5}c`). Prettier prints every
-declaration here identically, so the fixture carries plain `unformatted_*` variants.
+authored, spaced from its operand (`a{1.5}/ 2.5`, `a *{1.5}c`). A top-level `:` between
+the braces is a token of its own there too — this is a custom property, so its value is
+parsed ([colon_custom_property](../colon_custom_property/)) — and takes no space before
+and one after (`a{b:1.50}c` → `a{b: 1.5}c`). Prettier prints every declaration here
+identically, so the fixture carries plain `unformatted_*` variants.
 
 Contrast a `[…]` block, whose interior is word text to both formatters and is kept as
 written (`a[1.50]c(2.5)`), and the **whole-value** block

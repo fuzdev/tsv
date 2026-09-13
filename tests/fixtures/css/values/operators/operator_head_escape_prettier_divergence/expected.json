@@ -1,0 +1,149 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 1011,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 1002,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 438,
+							"end": 446,
+							"property": "a",
+							"value": "+ \\61"
+						},
+						{
+							"type": "Declaration",
+							"start": 450,
+							"end": 459,
+							"property": "b",
+							"value": "+ a\\61"
+						},
+						{
+							"type": "Declaration",
+							"start": 463,
+							"end": 471,
+							"property": "c",
+							"value": "+ \\5a"
+						},
+						{
+							"type": "Declaration",
+							"start": 781,
+							"end": 789,
+							"property": "d",
+							"value": "+ \\e9"
+						},
+						{
+							"type": "Declaration",
+							"start": 793,
+							"end": 800,
+							"property": "e",
+							"value": "+ \\?"
+						},
+						{
+							"type": "Declaration",
+							"start": 804,
+							"end": 812,
+							"property": "f",
+							"value": "+ a\\z"
+						},
+						{
+							"type": "Declaration",
+							"start": 816,
+							"end": 822,
+							"property": "g",
+							"value": "+ a"
+						},
+						{
+							"type": "Declaration",
+							"start": 974,
+							"end": 982,
+							"property": "h",
+							"value": "a \\61"
+						},
+						{
+							"type": "Declaration",
+							"start": 986,
+							"end": 998,
+							"property": "i",
+							"value": "1.5 / \\61"
+						}
+					]
+				},
+				"start": 9,
+				"end": 1002
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a head `+` glues to the member after it only where that member is not word-shaped,\n\t\tand prettier decides word-shaped-ness from the escape's SPELLING rather than from the\n\t\ttoken the escape spells: `\\61` is the ident `a`, and only the escaped spelling loses\n\t\tits gap. The discriminator is a DECIMAL digit after the `\\`, wherever in the token it\n\t\tsits — `\\5a` spells `Z`, and it is the leading `5` that glues it ",
+				"start": 17,
+				"end": 435
+			},
+			{
+				"type": "CSSComment",
+				"value": " the cells that bound it: an escape whose `\\` is followed by no decimal digit stays\n\t\tword content to prettier's value parser and keeps its gap — `\\e9` is the cell that\n\t\ttells that rule apart from a HEX one, spelling `é` out of hex digits alone — and so\n\t\tdoes the plain word the first cell spells ",
+				"start": 475,
+				"end": 778
+			},
+			{
+				"type": "CSSComment",
+				"value": " the arm is a HEAD arm: with no operator at all, or with an operand on the\n\t\toperator's left, the escape is an ordinary member on both sides ",
+				"start": 826,
+				"end": 971
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 1003,
+			"styles": "\n\tdiv {\n\t\t/* a head `+` glues to the member after it only where that member is not word-shaped,\n\t\tand prettier decides word-shaped-ness from the escape's SPELLING rather than from the\n\t\ttoken the escape spells: `\\61` is the ident `a`, and only the escaped spelling loses\n\t\tits gap. The discriminator is a DECIMAL digit after the `\\`, wherever in the token it\n\t\tsits — `\\5a` spells `Z`, and it is the leading `5` that glues it */\n\t\ta: + \\61;\n\t\tb: + a\\61;\n\t\tc: + \\5a;\n\t\t/* the cells that bound it: an escape whose `\\` is followed by no decimal digit stays\n\t\tword content to prettier's value parser and keeps its gap — `\\e9` is the cell that\n\t\ttells that rule apart from a HEX one, spelling `é` out of hex digits alone — and so\n\t\tdoes the plain word the first cell spells */\n\t\td: + \\e9;\n\t\te: + \\?;\n\t\tf: + a\\z;\n\t\tg: + a;\n\t\t/* the arm is a HEAD arm: with no operator at all, or with an operand on the\n\t\toperator's left, the escape is an ordinary member on both sides */\n\t\th: a \\61;\n\t\ti: 1.5 / \\61;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 1012,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -16,6 +16,9 @@
 
 use super::{Printer, value_normalization};
 use crate::ast::internal::{Color, CssValue, StringCooked};
+use crate::keyword_set::ascii_keyword_set;
+use crate::lexer::hyphen_starts_own_token;
+use crate::number::sign_starts_number;
 use std::borrow::Cow;
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -113,16 +116,67 @@ pub(crate) struct ValueCtx {
     /// an invalid one, so a formatter must not invent or remove one. ⚠️ `calc()` only:
     /// `min()` / `max()` / `clamp()` take the ordinary rule, as they do in prettier.
     pub(crate) in_calc: bool,
+    /// The **immediately** enclosing function is one of prettier's colour adjusters
+    /// (`isColorAdjusterFuncNode`), which takes a head sign's rule out inside a group of
+    /// its own. ⚠️ Unlike [`Self::in_calc`] this is a PARENT test, not an ancestor
+    /// walk: prettier reads `path.grandparent` — the function whose paren group holds this
+    /// very comma group — so a nameless group nested inside an adjuster clears it.
+    pub(crate) in_color_adjuster: bool,
 }
 
 impl ValueCtx {
-    /// The context a function's arguments inherit: `calc()` is sticky once entered.
-    fn within_function(self, is_calc: bool) -> Self {
+    /// The context a function's arguments inherit: `calc()` is sticky once entered, where
+    /// the adjuster bit belongs to this function alone and is rewritten at every level.
+    fn within_function(self, is_calc: bool, is_color_adjuster: bool) -> Self {
         Self {
             in_calc: self.in_calc || is_calc,
+            in_color_adjuster: is_color_adjuster,
             ..self
         }
     }
+}
+
+ascii_keyword_set! {
+    /// prettier's `colorAdjusterFunctions` (`src/language-css/utilities/index.js`),
+    /// transcribed — the colour-component functions a head `+` / `-` is an ADJUSTMENT
+    /// inside of rather than an operator.
+    static COLOR_ADJUSTER_FUNCTIONS;
+
+    /// Is `name` one of prettier's colour-adjuster functions
+    /// (`isColorAdjusterFuncNode`, which lowercases the node's value before probing)?
+    ///
+    /// Asked of the function name **verbatim**, which is what prettier asks too: its
+    /// value parser hands back the author's own bytes, so an escape-spelled `\\72 gb(` is
+    /// no `rgb` on either side (measured). That is the one place this differs from
+    /// `Printer::function_name_is`, whose `url` / `calc` / `var` recognition resolves an
+    /// escape — there the name is a grammar keyword, here it is prettier's own table.
+    fn is_color_adjuster_function;
+
+    "red",
+    "green",
+    "blue",
+    "alpha",
+    "a",
+    "rgb",
+    "hue",
+    "h",
+    "saturation",
+    "s",
+    "lightness",
+    "l",
+    "whiteness",
+    "w",
+    "blackness",
+    "b",
+    "tint",
+    "shade",
+    "blend",
+    "blenda",
+    "contrast",
+    "hsl",
+    "hsla",
+    "hwb",
+    "hwba",
 }
 
 /// Is this member one of prettier's `value-word`s — the kind that makes an adjacent
@@ -137,6 +191,24 @@ fn is_word_member(value: &CssValue<'_>) -> bool {
         CssValue::Identifier { .. }
             | CssValue::Color {
                 color: Color::Named | Color::Hex,
+                ..
+            }
+    )
+}
+
+/// Is this member one of prettier's `value-number`s, or a hex colour — the two the
+/// colour-adjuster gate accepts after its head sign?
+///
+/// prettier asks `iNextNode.type === "value-number" || iNextNode.isHex`. A unit or a `%`
+/// rides the number node there (`20%`, `5px` are both `value-number`, measured), which is
+/// exactly what tsv's [`CssValue::Dimension`] is, and the `isHex` flag postcss puts on a
+/// word is the [`Color::Hex`] tsv folds into the node kind.
+fn is_number_or_hex_member(value: &CssValue<'_>) -> bool {
+    matches!(
+        value,
+        CssValue::Dimension { .. }
+            | CssValue::Color {
+                color: Color::Hex,
                 ..
             }
     )
@@ -180,6 +252,44 @@ fn is_possible_font_size(value: &CssValue<'_>, source: &str) -> bool {
 /// their text (`isLeftCurlyBraceNode`, `isRightCurlyBraceNode`, the empty `atword`)?
 fn is_word_spelled(value: &CssValue<'_>, source: &str, text: &str) -> bool {
     matches!(value, CssValue::Identifier { span } if span.extract(source) == text)
+}
+
+/// Would gluing a head operator to the member after it change what the pair LEXES AS —
+/// the refusal tsv puts on prettier's head rule?
+///
+/// The head rule is one sentence: an operator with nothing before it binds to the member
+/// after it. Prettier's version reads the *node* beside the operator and never asks what
+/// the two spell together, so it welds `- a` into `-a` and `+ 2.5` into `+2.5` — a
+/// different token stream, not a different spacing, and in a custom property's value the
+/// token sequence IS the value (css-variables-1 §"Custom Property Value Syntax"). tsv
+/// keeps the gap wherever this answers `true`, which is a deliberate, cataloged
+/// divergence (`css/values/operators/operator_head_weld_prettier_divergence`); where the
+/// glue is lossless tsv glues exactly as prettier does
+/// (`css/values/operators/operator_head_glue`).
+///
+/// A `*` is out of the head rule entirely, and a `/` is a `<delim-token>` beside
+/// everything **but a `*`** — the one lexical merge a `/` can make, and the sharpest of
+/// them all: css-syntax-3 §4.3.1 consumes comments (§4.3.2) ahead of every token, so the
+/// glued pair is not two tokens at all but the opener of a comment that never closes.
+/// Neither parser re-reads the result — Svelte's `parseCss` raises `Expected token */`
+/// and tsv's own `Unterminated comment` — which is prettier's answer for the same input
+/// and a divergence tsv takes rather than emit output it cannot itself parse
+/// (`css/values/operators/slash_before_star_prettier_divergence`). The question is
+/// asked of the member's own source text, the same document reading [`authored_glued`]
+/// takes.
+///
+/// The `-` is answered by the lexer's [`hyphen_starts_own_token`] — css-syntax-3 §4.3.9's
+/// ident and §4.3.10's number, the one reading the value-run splitter takes for the same
+/// `-` at an operand position, so the parser and the printer cannot part on it. A `+`
+/// opens no ident of its own, so only the number half can take it
+/// ([`sign_starts_number`]).
+fn operator_glue_merges(op: ValueOperator, next: &str) -> bool {
+    match op {
+        ValueOperator::Division => next.starts_with('*'),
+        ValueOperator::Addition => sign_starts_number(b'+', next),
+        ValueOperator::Subtraction => hyphen_starts_own_token(next),
+        _ => false,
+    }
 }
 
 /// Does the source hold nothing at all between these two members?
@@ -228,6 +338,7 @@ impl<'a> Printer<'a> {
         ValueCtx {
             scope: self.value_scope,
             in_calc: false,
+            in_color_adjuster: false,
         }
     }
 
@@ -422,7 +533,10 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // `calc()` is sticky down the whole subtree, which is prettier's
         // `insideValueFunctionNode(path, "calc")` — an ancestor walk, not a parent test.
-        let ctx = ctx.within_function(self.function_name_is(name_span, "calc"));
+        let ctx = ctx.within_function(
+            self.function_name_is(name_span, "calc"),
+            is_color_adjuster_function(name_span.extract(self.source)),
+        );
         // `url` is opaque whether or not its content was parsed, so it answers first and
         // in one place — the prelude path leaves `@import url(a.css)` unparsed (empty
         // args) while a declaration value parses them, and both want the same verbatim
@@ -694,11 +808,15 @@ impl<'a> Printer<'a> {
     /// exist here — as is the `url()` arm, whose interior tsv keeps opaque, and the
     /// `grid` arm, which tsv answers with its own row plan (`grid_multirow_plan`).
     ///
-    /// ⚠️ One deliberate divergence, and it is in [`authored_glued`]: prettier asks
+    /// ⚠️ Two deliberate divergences. One is in [`authored_glued`]: prettier asks
     /// `hasEmptyRawBefore`, a field its parser never sets on a synthesized
     /// `value-paren_group`, so an operator before a group can only ever read as
     /// un-glued there. tsv asks the document instead, so `1.5/(2.5)` keeps the glue
-    /// `(1.5)/2.5` already keeps. See `docs/conformance_prettier_css.md` §CSS: Values.
+    /// `(1.5)/2.5` already keeps. The other is [`operator_glue_merges`], the refusal on
+    /// the sign arm's head glue: prettier's arm reads the node beside the operator and
+    /// never asks what the two spell together, so it welds `- a` into the single
+    /// `<ident -a>`. Both are cataloged in `docs/conformance_prettier_css.md`
+    /// §CSS: Values.
     pub(super) fn value_gap_is_glued(
         &self,
         values: &[CssValue<'_>],
@@ -759,9 +877,22 @@ impl<'a> Printer<'a> {
             return true;
         }
 
+        // ⚠️ The would-merge refusal, read ahead of every arm that can GLUE: gluing the
+        // operator to the member after it must not rewrite the author's two tokens into
+        // one ([`operator_glue_merges`]) — a `<number-token>` or an `<ident-token>` at the
+        // sign arm below, and at a `/` the sharpest of them, the `/*` that opens a comment
+        // that never closes. It withholds only glue a rule would INTRODUCE: where the
+        // author glued the pair already, the merge is the source's and spelling the bytes
+        // back is what preserves it (`1.5+2.5`, `1.5-2.5`). Three arms ask it — the head
+        // `/` below, the sign arm, and the `font` carve-out at the end, which is a glue
+        // like any other and reached the same `/*` through its own door
+        // (`css/values/operators/slash_before_star_prettier_divergence`).
+        let introduces_merge = !authored_glued(current, next)
+            && current_op.is_some_and(|op| operator_glue_merges(op, next.span().extract(source)));
+
         // A `/` with nothing before it binds to what follows (prettier's
         // `!iPrevNode && isDivisionNode(iNode)`, written for `-fb-url(/abs/path/)`).
-        if previous.is_none() && current_op == Some(ValueOperator::Division) {
+        if previous.is_none() && current_op == Some(ValueOperator::Division) && !introduces_merge {
             return true;
         }
 
@@ -785,6 +916,28 @@ impl<'a> Printer<'a> {
 
         // "Formatting `/`, `+`, `-` sign". A `*` on either side takes the rule out, and so
         // does `calc()`, whose own arm follows.
+        //
+        // So does prettier's `isColorAdjusterNode`, the conjunct the arm opens on: a head
+        // `+` / `-` the author SPACED from a number or a hex, inside one of the colour
+        // ADJUSTER functions ([`is_color_adjuster_function`]), is an adjustment rather
+        // than an operator and keeps the author's gap
+        // (`prettier/tests/format/css/color/color-adjuster.css`,
+        // `css/values/functions/color_adjuster_sign`). ⚠️ Its three positional
+        // conjuncts are each a bound the fixture pins: the adjuster is the group's OWN
+        // function (`path.grandparent`, so a nameless group inside one clears the bit),
+        // `i === 0` is asked per COMMA GROUP — which is what a tsv function argument's
+        // member list already is — and `!hasEmptyRawBefore` leaves an authored glue
+        // glued. At a NUMBER the arm below reaches the same answer by a different road
+        // (the merge refusal), so only a hex ever showed the absence.
+        let is_color_adjuster_node = ctx.in_color_adjuster
+            && previous.is_none()
+            && matches!(
+                current_op,
+                Some(ValueOperator::Addition | ValueOperator::Subtraction)
+            )
+            && is_number_or_hex_member(next)
+            && !authored_glued(current, next);
+
         let beside_multiplication = current_op == Some(ValueOperator::Multiplication)
             || next_op == Some(ValueOperator::Multiplication);
         let sign_keeps_its_gap = (next_op == Some(ValueOperator::Division)
@@ -799,7 +952,15 @@ impl<'a> Printer<'a> {
         let glued = authored_glued(current, next)
             || (current_op.is_some()
                 && previous.is_none_or(|p| ValueOperator::of(p, source).is_some()));
-        if !beside_multiplication && !ctx.in_calc && sign_keeps_its_gap && glued {
+        // …unless the glue would MERGE the pair into one token (`introduces_merge` above)
+        // — the one place tsv does not follow the arm.
+        if !beside_multiplication
+            && !ctx.in_calc
+            && !is_color_adjuster_node
+            && sign_keeps_its_gap
+            && glued
+            && !introduces_merge
+        {
             return true;
         }
 
@@ -816,8 +977,11 @@ impl<'a> Printer<'a> {
 
         // The `font` shorthand and a custom property keep a glued `/` beside a font-size
         // operand (prettier's §"Formatting `font` property"). ⚠️ The second arm reads the
-        // gap on the operator's OWN left, not this gap.
-        if ctx.scope.font_shorthand {
+        // gap on the operator's OWN left, not this gap — so it is the one arm that carries
+        // a glue ACROSS a gap the author left open, and it takes `introduces_merge` for
+        // that reason: `font: 12px/ * 2` reached `12px/* 2`, output neither parser reads
+        // back, through a door the head rule's own refusal does not stand in.
+        if ctx.scope.font_shorthand && !introduces_merge {
             if next_op == Some(ValueOperator::Division)
                 && authored_glued(current, next)
                 && is_possible_font_size(current, source)
@@ -860,4 +1024,63 @@ fn function_paren_interior(raw: &str, name_span: Span, span: Span) -> Option<&st
         .strip_suffix(')')?
         .split_once('(')
         .map(|(_, i)| i)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ValueOperator, operator_glue_merges};
+
+    /// The would-merge refusal, cell by cell: gluing a head `-` or `+` to the member
+    /// after it must be refused exactly where css-syntax-3 reads the pair as one token.
+    #[test]
+    fn a_head_sign_merges_only_where_the_pair_is_one_token() {
+        let minus = |next| operator_glue_merges(ValueOperator::Subtraction, next);
+        let plus = |next| operator_glue_merges(ValueOperator::Addition, next);
+
+        // §4.3.9's first bullet: an ident-start code point — an ASCII letter, `_`, and
+        // every code point at U+00A0 and above (tsv's lexer's set, §4.2's two holes at
+        // U+00D7 / U+00F7 included)
+        assert!(minus("a"));
+        assert!(minus("f(2.5)"));
+        assert!(minus("_a"));
+        assert!(minus("é"));
+        assert!(minus("×a"));
+        assert!(minus("÷a"));
+        // …and its second and third: another `-`, and a valid escape whatever it spells
+        assert!(minus("-a"));
+        assert!(minus(r"\61"));
+        assert!(minus(r"\?"));
+        assert!(minus(r"\31"));
+        // §4.3.10: a number, which can open at a `.`
+        assert!(minus("2.5"));
+        assert!(minus(".5"));
+        assert!(plus("2.5"));
+        assert!(plus(".5"));
+
+        // the lossless glues, which tsv takes exactly as prettier does: none of these
+        // bytes can continue the operator's token
+        for next in ["@a", "(2.5)", "[a]", "'x'", "+a", "*", "/"] {
+            assert!(!minus(next), "{next:?} does not merge with a `-`");
+        }
+        // a `+` starts no ident, so only its number half ever refuses
+        for next in ["a", "_a", "é", "-a", r"\61", "@a", "(2.5)", "[a]", "'x'"] {
+            assert!(!plus(next), "{next:?} does not merge with a `+`");
+        }
+        // a `\` that starts no escape at all (§4.3.8) leaves the pair two tokens
+        assert!(!minus("\\\n"));
+        // a `/` merges with one thing only: a `*`, where the pair opens a comment
+        let slash = |next| operator_glue_merges(ValueOperator::Division, next);
+        assert!(slash("*"));
+        assert!(slash("*2.5"));
+        for next in [
+            "2.5", "a", "/2.5", "@a", "(2.5)", "[a]", "'x'", "-a", "+a", "",
+        ] {
+            assert!(!slash(next), "{next:?} does not merge with a `/`");
+        }
+        // and the operators the rule never asks about
+        assert!(!operator_glue_merges(ValueOperator::Multiplication, "2.5"));
+        assert!(!operator_glue_merges(ValueOperator::Colon, "2.5"));
+        // a member that is nothing at all merges with nothing
+        assert!(!minus(""));
+    }
 }

@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 916,
+		"end": 1380,
 		"attributes": [],
 		"children": [
 			{
@@ -38,7 +38,7 @@
 				"block": {
 					"type": "Block",
 					"start": 13,
-					"end": 907,
+					"end": 1371,
 					"children": [
 						{
 							"type": "Declaration",
@@ -179,11 +179,81 @@
 							"end": 903,
 							"property": "t",
 							"value": "calc(+a(2.5))"
+						},
+						{
+							"type": "Declaration",
+							"start": 1117,
+							"end": 1124,
+							"property": "u",
+							"value": "+--a"
+						},
+						{
+							"type": "Declaration",
+							"start": 1128,
+							"end": 1134,
+							"property": "v",
+							"value": "+--"
+						},
+						{
+							"type": "Declaration",
+							"start": 1138,
+							"end": 1147,
+							"property": "w",
+							"value": "+----a"
+						},
+						{
+							"type": "Declaration",
+							"start": 1151,
+							"end": 1160,
+							"property": "x",
+							"value": "+-- @a"
+						},
+						{
+							"type": "Declaration",
+							"start": 1164,
+							"end": 1171,
+							"property": "y",
+							"value": "+ -a"
+						},
+						{
+							"type": "Declaration",
+							"start": 1292,
+							"end": 1305,
+							"property": "z",
+							"value": "1.5 * +--a"
+						},
+						{
+							"type": "Declaration",
+							"start": 1309,
+							"end": 1319,
+							"property": "aa",
+							"value": "+ +--a"
+						},
+						{
+							"type": "Declaration",
+							"start": 1323,
+							"end": 1336,
+							"property": "ab",
+							"value": "1.5 + --a"
+						},
+						{
+							"type": "Declaration",
+							"start": 1340,
+							"end": 1352,
+							"property": "ac",
+							"value": "f(+ --a)"
+						},
+						{
+							"type": "Declaration",
+							"start": 1356,
+							"end": 1367,
+							"property": "ad",
+							"value": "(+ --a)"
 						}
 					]
 				},
 				"start": 9,
-				"end": 907
+				"end": 1371
 			}
 		],
 		"comments": [
@@ -222,18 +292,30 @@
 				"value": " calc() prints its authored gap either way ",
 				"start": 837,
 				"end": 884
+			},
+			{
+				"type": "CSSComment",
+				"value": " the word it welds onto can be the custom-property-shaped one, whose `--` opens an\n\t\tident rather than two subtractions — where a single `-` after the sign opens one\n\t\ttoo and leaves the `+` an operator ",
+				"start": 907,
+				"end": 1114
+			},
+			{
+				"type": "CSSComment",
+				"value": " the `--` word welds at every position an ordinary word does, and at none of the\n\t\tpositions no word welds at ",
+				"start": 1175,
+				"end": 1289
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 908,
-			"styles": "\n\tdiv {\n\t\t/* a `+` opening the value welds onto the word after it — the sign is the word's\n\t\town — and a function named that way still normalizes its arguments */\n\t\ta: +a(2.5);\n\t\tb: +a;\n\t\tc: +#FFF;\n\t\td: +a * 1.5;\n\t\te: +a, b;\n\t\t/* straight after an operator it welds too, across an authored gap or none */\n\t\tf: 1.5 / +a(2.5);\n\t\tg: 1.5 * +a;\n\t\th: 1.5 - +a;\n\t\ti: + +a;\n\t\tj: f(1.5 / +a(2.5));\n\t\t/* anywhere else the `+` is an operator and takes an operator's gaps: after a\n\t\tmember, at the head of a function's arguments or of a group, and after a comma */\n\t\tk: 1.5 + a(2.5);\n\t\tl: f(+ a(2.5));\n\t\tm: (+ a);\n\t\tn: f(a, + b);\n\t\t/* it welds onto a word only: a group, a string and an `@`-word keep it an operator */\n\t\to: +(2.5);\n\t\tp: +'x';\n\t\tq: + @a;\n\t\t/* a signed number is a number, whatever precedes it */\n\t\tr: +1.5;\n\t\ts: 1.5 / +2.5;\n\t\t/* calc() prints its authored gap either way */\n\t\tt: calc(+a(2.5));\n\t}\n",
+			"end": 1372,
+			"styles": "\n\tdiv {\n\t\t/* a `+` opening the value welds onto the word after it — the sign is the word's\n\t\town — and a function named that way still normalizes its arguments */\n\t\ta: +a(2.5);\n\t\tb: +a;\n\t\tc: +#FFF;\n\t\td: +a * 1.5;\n\t\te: +a, b;\n\t\t/* straight after an operator it welds too, across an authored gap or none */\n\t\tf: 1.5 / +a(2.5);\n\t\tg: 1.5 * +a;\n\t\th: 1.5 - +a;\n\t\ti: + +a;\n\t\tj: f(1.5 / +a(2.5));\n\t\t/* anywhere else the `+` is an operator and takes an operator's gaps: after a\n\t\tmember, at the head of a function's arguments or of a group, and after a comma */\n\t\tk: 1.5 + a(2.5);\n\t\tl: f(+ a(2.5));\n\t\tm: (+ a);\n\t\tn: f(a, + b);\n\t\t/* it welds onto a word only: a group, a string and an `@`-word keep it an operator */\n\t\to: +(2.5);\n\t\tp: +'x';\n\t\tq: + @a;\n\t\t/* a signed number is a number, whatever precedes it */\n\t\tr: +1.5;\n\t\ts: 1.5 / +2.5;\n\t\t/* calc() prints its authored gap either way */\n\t\tt: calc(+a(2.5));\n\t\t/* the word it welds onto can be the custom-property-shaped one, whose `--` opens an\n\t\tident rather than two subtractions — where a single `-` after the sign opens one\n\t\ttoo and leaves the `+` an operator */\n\t\tu: +--a;\n\t\tv: +--;\n\t\tw: +----a;\n\t\tx: +-- @a;\n\t\ty: + -a;\n\t\t/* the `--` word welds at every position an ordinary word does, and at none of the\n\t\tpositions no word welds at */\n\t\tz: 1.5 * +--a;\n\t\taa: + +--a;\n\t\tab: 1.5 + --a;\n\t\tac: f(+ --a);\n\t\tad: (+ --a);\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 917,
+	"end": 1381,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

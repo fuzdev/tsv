@@ -1,0 +1,155 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 749,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 740,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 166,
+							"end": 178,
+							"property": "a",
+							"value": "a\\@b(2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 182,
+							"end": 193,
+							"property": "b",
+							"value": "\\@b(2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 197,
+							"end": 212,
+							"property": "c",
+							"value": "f(a\\@b(2.5))"
+						},
+						{
+							"type": "Declaration",
+							"start": 377,
+							"end": 388,
+							"property": "d",
+							"value": "a\\@(2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 392,
+							"end": 399,
+							"property": "e",
+							"value": "a\\@b"
+						},
+						{
+							"type": "Declaration",
+							"start": 403,
+							"end": 416,
+							"property": "f",
+							"value": "a\\@b (2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 420,
+							"end": 434,
+							"property": "g",
+							"value": "a\\40 b(2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 518,
+							"end": 531,
+							"property": "h",
+							"value": "a @b (2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 717,
+							"end": 736,
+							"property": "i",
+							"value": "a\\@b(2.5) c(2.5)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 740
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " `\\@` is ident content like any other escape, so the name is one ident sequence\n\t\tand the `(` glued to it opens that function's argument list ",
+				"start": 17,
+				"end": 163
+			},
+			{
+				"type": "CSSComment",
+				"value": " the cells that bound it: an empty `@` after the escape, a name with no `(`, an\n\t\tauthored gap before the `(`, and the hex spelling of the same character ",
+				"start": 216,
+				"end": 374
+			},
+			{
+				"type": "CSSComment",
+				"value": " a raw `@` opens an at-word, which is a member of its own on either side ",
+				"start": 438,
+				"end": 515
+			},
+			{
+				"type": "CSSComment",
+				"value": " the name's extent, read against a second function beside it: tsv closes `a\\@b(2.5)`\n\t\tand starts a new member at `c(`, where prettier's split puts its gap one member earlier ",
+				"start": 535,
+				"end": 714
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 741,
+			"styles": "\n\tdiv {\n\t\t/* `\\@` is ident content like any other escape, so the name is one ident sequence\n\t\tand the `(` glued to it opens that function's argument list */\n\t\ta: a\\@b(2.5);\n\t\tb: \\@b(2.5);\n\t\tc: f(a\\@b(2.5));\n\t\t/* the cells that bound it: an empty `@` after the escape, a name with no `(`, an\n\t\tauthored gap before the `(`, and the hex spelling of the same character */\n\t\td: a\\@(2.5);\n\t\te: a\\@b;\n\t\tf: a\\@b (2.5);\n\t\tg: a\\40 b(2.5);\n\t\t/* a raw `@` opens an at-word, which is a member of its own on either side */\n\t\th: a @b (2.5);\n\t\t/* the name's extent, read against a second function beside it: tsv closes `a\\@b(2.5)`\n\t\tand starts a new member at `c(`, where prettier's split puts its gap one member earlier */\n\t\ti: a\\@b(2.5) c(2.5);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 750,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

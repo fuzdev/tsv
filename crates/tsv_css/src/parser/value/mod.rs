@@ -43,11 +43,15 @@ use strings::parse_string_literal;
 ///   already derived it (`crate::parser::decl_scan`), which lets `ValueParser` skip its own
 ///   classifying pass over the very same bytes. `None` means "not known", never "no
 ///   separator" — that is `Some(ValueSeparator::None)`.
+/// * `colon_is_operator` - whether a top-level `:` in this value is a value operator,
+///   which it is in a **custom property's** value and nowhere else at the top level (see
+///   `operators::split_value_run`). The caller knows it from the property name.
 pub fn parse_value_from_source<'arena>(
     source: &str,
     source_relative_span: Span,
     base_offset: u32,
     class: Option<ValueSeparator>,
+    colon_is_operator: bool,
     arena: &'arena Bump,
 ) -> CssValue<'arena> {
     let value_str = source_relative_span.extract(source);
@@ -84,7 +88,12 @@ pub fn parse_value_from_source<'arena>(
 
     // ValueParser re-parses the same source text, so nested value spans stay
     // accurate through its same-source recursion.
-    parser::ValueParser::new(trimmed, absolute_span).parse_classified(arena, class)
+    let parser = if colon_is_operator {
+        parser::ValueParser::new_custom_property(trimmed, absolute_span)
+    } else {
+        parser::ValueParser::new(trimmed, absolute_span)
+    };
+    parser.parse_classified(arena, class)
 }
 
 /// A value's text with its surrounding **CSS** whitespace removed, and how many
@@ -143,21 +152,17 @@ fn locate_value(value_str: &str) -> Option<(&str, usize)> {
 pub(crate) fn parse_single_value<'arena>(
     s: &str,
     span: Span,
-    in_group: bool,
+    colon_is_operator: bool,
     head_welds: bool,
     arena: &'arena Bump,
-) -> Option<CssValue<'arena>> {
-    if s.is_empty() {
-        return None;
-    }
-
+) -> CssValue<'arena> {
     // An operator run is several members, not a leaf — `12px/1.5` is a dimension, a `/`
     // and a dimension, and every classification below then runs on each of them. Asked
     // first because the run's own shape is what the rest of this function would otherwise
     // misread: `(1.5)(2.5)` ends in a `)` without being one function, and `1.5/2.5` starts
-    // with a number without being one dimension. It answers `None` for a single-token run,
-    // which is nearly every value, so the leaf path below is untouched.
-    if let Some(tokens) = operators::split_value_run(s, in_group, head_welds) {
+    // with a number without being one dimension. It answers `None` for a single-token
+    // OPERAND run, which is nearly every value, so the leaf path below is untouched.
+    if let Some(tokens) = operators::split_value_run(s, colon_is_operator, head_welds) {
         let mut values = bumpalo::collections::Vec::with_capacity_in(tokens.len(), arena);
         for token in tokens {
             let member = &s[token.start..token.end];
@@ -169,25 +174,35 @@ pub(crate) fn parse_single_value<'arena>(
                 CssValue::Operator { span: member_span }
             } else {
                 // Every operand is re-classified from scratch, which is what gets the
-                // number after the operator to its normalizer. The recursion terminates:
-                // a member is strictly shorter than the run unless the run was one token,
-                // and that case returned `None` above. A member's head always welds: an
-                // operand that opens with a `+` is either the weld the split just made
-                // (which must not be split again) or a signed number (which the number
-                // production claims ahead of the test).
-                parse_single_value(member, member_span, in_group, true, arena)
-                    .unwrap_or(CssValue::Identifier { span: member_span })
+                // number after the operator to its normalizer — but only its LEAF kind is
+                // still open: the splitter already said this member is one operand token,
+                // and asking it again over the member's own bytes would re-derive that
+                // verdict against a position the member no longer sits at (the `-` in
+                // `1.5*-` is a whole run of its own here, and a whole-run `-` IS an
+                // operator — see `operators::ValueToken::is_operator`).
+                parse_leaf_value(member, member_span, arena)
             });
         }
-        return Some(CssValue::List {
+        return CssValue::List {
             values: values.into_bump_slice(),
             span,
-        });
+        };
     }
 
+    parse_leaf_value(s, span, arena)
+}
+
+/// Classify one already-delimited value token — a string, a function or colour function,
+/// a colour, a dimension, or the opaque identifier everything else falls back to.
+///
+/// The half of [`parse_single_value`] that runs once the run's member boundaries are
+/// settled, so it asks nothing about position: a member reaches it straight from the
+/// splitter, and a single-token value reaches it as the whole run. Every classifier
+/// declines an empty `s`, so an empty value is the identifier over its (empty) span.
+fn parse_leaf_value<'arena>(s: &str, span: Span, arena: &'arena Bump) -> CssValue<'arena> {
     // String literal
     if let Some(val) = parse_string_literal(s, span, arena) {
-        return Some(val);
+        return val;
     }
 
     // Function call or color function.
@@ -223,7 +238,7 @@ pub(crate) fn parse_single_value<'arena>(
     {
         // Try color function first
         if let Some(color) = parse_color_function(name, args) {
-            return Some(CssValue::Color { color, span });
+            return CssValue::Color { color, span };
         }
         // Fall back to generic function
         // Calculate accurate span for arguments (inside parens)
@@ -262,25 +277,25 @@ pub(crate) fn parse_single_value<'arena>(
             start: span.start + name_start as u32,
             end: span.start + (name_start + name.len()) as u32,
         };
-        return Some(CssValue::Function {
+        return CssValue::Function {
             name_span,
             args: parse_function_arguments(args, args_span, arena),
             span,
-        });
+        };
     }
 
     // Hex or named color
     if let Some(color) = parse_color(s) {
-        return Some(CssValue::Color { color, span });
+        return CssValue::Color { color, span };
     }
 
     // Dimension (number with optional unit)
     if let Some(dim) = parse_dimension(s, span) {
-        return Some(dim);
+        return dim;
     }
 
     // Default to identifier (text recovered from `span` at print time)
-    Some(CssValue::Identifier { span })
+    CssValue::Identifier { span }
 }
 
 /// Extract function name and arguments, validating balanced parentheses.
@@ -662,7 +677,7 @@ mod value_span_tests {
     /// The span `parse_value_from_source` gives the value it parsed.
     fn value_span(source: &str, start: u32, end: u32) -> Span {
         let arena = Bump::new();
-        parse_value_from_source(source, Span { start, end }, 0, None, &arena).span()
+        parse_value_from_source(source, Span { start, end }, 0, None, false, &arena).span()
     }
 
     /// The already-trimmed fast path must agree with the trimming path on where

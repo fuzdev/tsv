@@ -1,0 +1,3 @@
+prettier never reaches a fixed point: its pass-1 output moves the URL out of the value as an
+inline comment, and its own parser rejects that output on the next pass (`Unknown word
+//a.fuz.dev/b`).

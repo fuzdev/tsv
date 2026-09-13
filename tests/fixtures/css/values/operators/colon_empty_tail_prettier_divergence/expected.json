@@ -1,0 +1,102 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 209,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 200,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 153,
+							"end": 161,
+							"property": "a",
+							"value": "f(a:)"
+						},
+						{
+							"type": "Declaration",
+							"start": 165,
+							"end": 172,
+							"property": "--b",
+							"value": "a:"
+						},
+						{
+							"type": "Declaration",
+							"start": 176,
+							"end": 182,
+							"property": "--c",
+							"value": ":"
+						},
+						{
+							"type": "Declaration",
+							"start": 186,
+							"end": 196,
+							"property": "--d",
+							"value": "a: b:"
+						}
+					]
+				},
+				"start": 9,
+				"end": 200
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a `:` with nothing after it — inside a group, and at the top level of a custom\n\t\tproperty's value — ends the value at the colon ",
+				"start": 17,
+				"end": 150
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 201,
+			"styles": "\n\tdiv {\n\t\t/* a `:` with nothing after it — inside a group, and at the top level of a custom\n\t\tproperty's value — ends the value at the colon */\n\t\ta: f(a:);\n\t\t--b: a:;\n\t\t--c: :;\n\t\t--d: a: b:;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 210,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

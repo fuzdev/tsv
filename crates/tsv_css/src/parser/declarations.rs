@@ -297,7 +297,8 @@ pub(crate) fn parse_declaration<'arena>(
     let raw_value = source_relative_span.extract(parser.source());
     let trimmed_value = raw_value.trim();
 
-    let value = if property.starts_with("--") && trimmed_value.starts_with(',') {
+    let is_custom_property = property.starts_with("--");
+    let value = if is_custom_property && trimmed_value.starts_with(',') {
         // Leading comma is unusual syntax - preserve as raw identifier
         // (text recovered verbatim from `span` at print time)
         CssValue::Identifier { span: value_span }
@@ -307,6 +308,11 @@ pub(crate) fn parse_declaration<'arena>(
             source_relative_span,
             base,
             value_class,
+            // A top-level `:` is a value operator in a custom property's value and
+            // nowhere else: css-syntax-3 admits whatever the text holds there, and
+            // prettier's parser throws on a plain property's (`a { b: c:d }`), so there
+            // is no oracle for splitting one. This is where the `--` is known.
+            is_custom_property,
             parser.arena,
         )
     };

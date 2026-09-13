@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 54,
+		"end": 78,
 		"attributes": [],
 		"children": [
 			{
@@ -39,7 +39,7 @@
 				"block": {
 					"type": "Block",
 					"start": 15,
-					"end": 45,
+					"end": 69,
 					"children": [
 						{
 							"type": "Declaration",
@@ -47,24 +47,31 @@
 							"end": 41,
 							"property": "--foo",
 							"value": "{ color: red; }"
+						},
+						{
+							"type": "Declaration",
+							"start": 45,
+							"end": 65,
+							"property": "--bar",
+							"value": "{color: red;}"
 						}
 					]
 				},
 				"start": 9,
-				"end": 45
+				"end": 69
 			}
 		],
 		"comments": [],
 		"content": {
 			"start": 7,
-			"end": 46,
-			"styles": "\n\t:root {\n\t\t--foo: { color: red; };\n\t}\n",
+			"end": 70,
+			"styles": "\n\t:root {\n\t\t--foo: { color: red; };\n\t\t--bar: {color: red;};\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 55,
+	"end": 79,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

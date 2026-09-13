@@ -1,0 +1,321 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 2185,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 2176,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 336,
+							"end": 343,
+							"property": "a",
+							"value": "/2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 347,
+							"end": 352,
+							"property": "b",
+							"value": "/a"
+						},
+						{
+							"type": "Declaration",
+							"start": 356,
+							"end": 365,
+							"property": "c",
+							"value": "/(2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 369,
+							"end": 375,
+							"property": "d",
+							"value": "-@a"
+						},
+						{
+							"type": "Declaration",
+							"start": 379,
+							"end": 388,
+							"property": "e",
+							"value": "-(2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 392,
+							"end": 399,
+							"property": "f",
+							"value": "-[a]"
+						},
+						{
+							"type": "Declaration",
+							"start": 403,
+							"end": 410,
+							"property": "g",
+							"value": "-'x'"
+						},
+						{
+							"type": "Declaration",
+							"start": 414,
+							"end": 420,
+							"property": "h",
+							"value": "-+a"
+						},
+						{
+							"type": "Declaration",
+							"start": 424,
+							"end": 433,
+							"property": "i",
+							"value": "+(2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 437,
+							"end": 444,
+							"property": "j",
+							"value": "+'x'"
+						},
+						{
+							"type": "Declaration",
+							"start": 978,
+							"end": 988,
+							"property": "k",
+							"value": "f(/2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 992,
+							"end": 1007,
+							"property": "l",
+							"value": "f(1.5, /2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 1011,
+							"end": 1027,
+							"property": "m",
+							"value": "a,\n\t\t\t/2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 1031,
+							"end": 1044,
+							"property": "n",
+							"value": "1.5 / /2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 1048,
+							"end": 1060,
+							"property": "o",
+							"value": "1.5 / / a"
+						},
+						{
+							"type": "Declaration",
+							"start": 1064,
+							"end": 1081,
+							"property": "p",
+							"value": "1.5 / / f(2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 1085,
+							"end": 1098,
+							"property": "q",
+							"value": "1.5 / / @a"
+						},
+						{
+							"type": "Declaration",
+							"start": 1102,
+							"end": 1116,
+							"property": "r",
+							"value": "1.5 / / [a]"
+						},
+						{
+							"type": "Declaration",
+							"start": 1190,
+							"end": 1198,
+							"property": "s",
+							"value": "* 2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 1581,
+							"end": 1587,
+							"property": "t",
+							"value": "+ a"
+						},
+						{
+							"type": "Declaration",
+							"start": 1591,
+							"end": 1598,
+							"property": "u",
+							"value": "+ @a"
+						},
+						{
+							"type": "Declaration",
+							"start": 1602,
+							"end": 1610,
+							"property": "v",
+							"value": "+ [a]"
+						},
+						{
+							"type": "Declaration",
+							"start": 1614,
+							"end": 1625,
+							"property": "w",
+							"value": "+ f(2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 1629,
+							"end": 1636,
+							"property": "x",
+							"value": "+ -a"
+						},
+						{
+							"type": "Declaration",
+							"start": 1719,
+							"end": 1731,
+							"property": "y",
+							"value": "1.5 / 2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 1735,
+							"end": 1747,
+							"property": "z",
+							"value": "1.5 * 2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 1751,
+							"end": 1763,
+							"property": "aa",
+							"value": "aa / 2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 2120,
+							"end": 2129,
+							"property": "ab",
+							"value": "+-'x'"
+						},
+						{
+							"type": "Declaration",
+							"start": 2133,
+							"end": 2144,
+							"property": "ac",
+							"value": "+-(2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 2148,
+							"end": 2158,
+							"property": "ad",
+							"value": "+-/2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 2162,
+							"end": 2172,
+							"property": "ae",
+							"value": "+- * a"
+						}
+					]
+				},
+				"start": 9,
+				"end": 2176
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " an operator with nothing before it binds to the member after it: at the head of\n\t\tthe value it takes no gap, whatever that member is — as long as the glue leaves the\n\t\ttwo tokens apart (where it would merge them into one, the gap stands instead, which\n\t\tis the `operator_head_weld_prettier_divergence` sibling) ",
+				"start": 17,
+				"end": 333
+			},
+			{
+				"type": "CSSComment",
+				"value": " the same head rule inside a function's arguments, after a comma and after\n\t\tanother operator — each a position with no operand on the operator's left. Its\n\t\treach is not the same at all three: at the value's head, inside a function and\n\t\tafter a comma a head `/` glues in front of every member kind, while after ANOTHER\n\t\toperator only a head `-` is unconditional — a `/` or a `+` there keeps its gap\n\t\tbefore a word (an `@`-word and a `[…]` block included) or a function, and glues\n\t\tonly before a member that is neither ",
+				"start": 448,
+				"end": 975
+			},
+			{
+				"type": "CSSComment",
+				"value": " `*` is the one operator that keeps its gap wherever it stands ",
+				"start": 1120,
+				"end": 1187
+			},
+			{
+				"type": "CSSComment",
+				"value": " a head `+` glues only where the member after it is not word-shaped: before a\n\t\tword, an `@`-word, a `[…]` block or a function it takes the ordinary member gap on\n\t\tboth formatters, where a head `-` glues in front of every one of them (a word\n\t\twhose escape opens on a DECIMAL digit is where that agreement ends — the\n\t\t`operator_head_escape_prettier_divergence` sibling) ",
+				"start": 1202,
+				"end": 1578
+			},
+			{
+				"type": "CSSComment",
+				"value": " an operator between two operands keeps the gaps its neighbours give it ",
+				"start": 1640,
+				"end": 1716
+			},
+			{
+				"type": "CSSComment",
+				"value": " a `-` straight after another operator is the operator itself wherever it opens\n\t\tneither an ident nor a number of its own — a string, a group, a `/`, a `*` — and\n\t\tthe head rule above then binds it to what follows (a `[…]` block takes that same\n\t\treading, where prettier's word does not — the `hyphen_word_extent_prettier_divergence`\n\t\tsibling) ",
+				"start": 1767,
+				"end": 2117
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 2177,
+			"styles": "\n\tdiv {\n\t\t/* an operator with nothing before it binds to the member after it: at the head of\n\t\tthe value it takes no gap, whatever that member is — as long as the glue leaves the\n\t\ttwo tokens apart (where it would merge them into one, the gap stands instead, which\n\t\tis the `operator_head_weld_prettier_divergence` sibling) */\n\t\ta: /2.5;\n\t\tb: /a;\n\t\tc: /(2.5);\n\t\td: -@a;\n\t\te: -(2.5);\n\t\tf: -[a];\n\t\tg: -'x';\n\t\th: -+a;\n\t\ti: +(2.5);\n\t\tj: +'x';\n\t\t/* the same head rule inside a function's arguments, after a comma and after\n\t\tanother operator — each a position with no operand on the operator's left. Its\n\t\treach is not the same at all three: at the value's head, inside a function and\n\t\tafter a comma a head `/` glues in front of every member kind, while after ANOTHER\n\t\toperator only a head `-` is unconditional — a `/` or a `+` there keeps its gap\n\t\tbefore a word (an `@`-word and a `[…]` block included) or a function, and glues\n\t\tonly before a member that is neither */\n\t\tk: f(/2.5);\n\t\tl: f(1.5, /2.5);\n\t\tm:\n\t\t\ta,\n\t\t\t/2.5;\n\t\tn: 1.5 / /2.5;\n\t\to: 1.5 / / a;\n\t\tp: 1.5 / / f(2.5);\n\t\tq: 1.5 / / @a;\n\t\tr: 1.5 / / [a];\n\t\t/* `*` is the one operator that keeps its gap wherever it stands */\n\t\ts: * 2.5;\n\t\t/* a head `+` glues only where the member after it is not word-shaped: before a\n\t\tword, an `@`-word, a `[…]` block or a function it takes the ordinary member gap on\n\t\tboth formatters, where a head `-` glues in front of every one of them (a word\n\t\twhose escape opens on a DECIMAL digit is where that agreement ends — the\n\t\t`operator_head_escape_prettier_divergence` sibling) */\n\t\tt: + a;\n\t\tu: + @a;\n\t\tv: + [a];\n\t\tw: + f(2.5);\n\t\tx: + -a;\n\t\t/* an operator between two operands keeps the gaps its neighbours give it */\n\t\ty: 1.5 / 2.5;\n\t\tz: 1.5 * 2.5;\n\t\taa: aa / 2.5;\n\t\t/* a `-` straight after another operator is the operator itself wherever it opens\n\t\tneither an ident nor a number of its own — a string, a group, a `/`, a `*` — and\n\t\tthe head rule above then binds it to what follows (a `[…]` block takes that same\n\t\treading, where prettier's word does not — the `hyphen_word_extent_prettier_divergence`\n\t\tsibling) */\n\t\tab: +-'x';\n\t\tac: +-(2.5);\n\t\tad: +-/2.5;\n\t\tae: +- * a;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 2186,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
