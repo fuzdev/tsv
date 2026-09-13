@@ -71,7 +71,7 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 use crate::printer::comments::TrailingBlank;
-use tsv_lang::source_scan::{find_char_skipping_comments, skip_comment};
+use tsv_lang::source_scan::{find_char_skipping_comments, skip_comment, whole_word_at};
 
 /// How [`Printer::with_stripped_paren_trailing`] emits a trailing **block**
 /// comment lifted from a stripped shell's gap (a trailing **line** comment
@@ -288,6 +288,19 @@ impl<'t> KeywordValueHead<'t> {
             routed: false,
         }
     }
+}
+
+/// What [`Printer::after_closers`] found past a position: the first significant byte's
+/// index, and the two facts about the walk that [`Printer::restricted_type_token_follows`]
+/// reads.
+struct AfterClosers {
+    /// The first significant byte's index — past trivia and past every `)` crossed.
+    index: usize,
+    /// Whether the walk stepped over at least one `)` to reach `index`.
+    crossed_closer: bool,
+    /// A line terminator between the last crossed `)` (or the start) and `index` — a
+    /// newline inside an enclosing pair is reset by the `)` that closes it.
+    newline_since_closer: bool,
 }
 
 impl<'a> Printer<'a> {
@@ -2310,8 +2323,10 @@ impl<'a> Printer<'a> {
     }
 
     /// Whether `ty` is a `TSParenthesizedType` that [`Self::build_parenthesized_type_unwrap_doc`]
-    /// **retains** for a trailing line comment — the shell keeps its parens and opens over
-    /// real hardlines, so the value owns its own break.
+    /// **retains** for a trailing comment that spans a line — a `//` anywhere but ahead of a
+    /// member separator, or a multiline block ahead of a `[no LineTerminator here]` token
+    /// ([`Self::paren_shell_retains_for_trailing_run`]) — the shell keeps its parens and
+    /// opens over real hardlines, so the value owns its own break.
     ///
     /// The retention is what keeps the comment inside the parens the author wrote it in
     /// rather than deferring it past the closer (see that function). An enclosing layout
@@ -2582,13 +2597,13 @@ impl<'a> Printer<'a> {
 
     /// The [`Self::paren_retains_for_trailing_run`] answer for an already-matched shell.
     fn paren_shell_retains_for_trailing_run(&self, p: &TSParenthesizedType<'_>) -> bool {
-        // A **line** comment is the only thing that retains the shell: a trailing run of
-        // blocks stays inline and the shell still strips. The question is asked as the
-        // line-comment one directly, not as a [`Self::paren_inner_comment_flags`] tuple —
-        // a line comment is never owned, so "has a trailing line comment" already implies
-        // "has a trailing comment to emit". The leading gap is deliberately NOT consulted:
-        // a leading comment takes its own real `hardline` either way, so it neither adds
-        // to nor cancels the retention.
+        // A **line** comment retains the shell wherever it sits (one carve-out below): a
+        // trailing run of single-line blocks stays inline and the shell still strips. The
+        // question is asked as the line-comment one directly, not as a
+        // [`Self::paren_inner_comment_flags`] tuple — a line comment is never owned, so
+        // "has a trailing line comment" already implies "has a trailing comment to emit".
+        // The leading gap is deliberately NOT consulted: a leading comment takes its own
+        // real `hardline` either way, so it neither adds to nor cancels the retention.
         //
         // The window is [`paren_shell_gaps`]'s DEEP trailing half, which is why that pair
         // is one function: asking only the outer layer's own trailing gap (empty, a `// t`
@@ -2596,8 +2611,121 @@ impl<'a> Printer<'a> {
         // retained and printed the leading run itself, beside the enclosing gap's copy —
         // a DOUBLE-PRINT.
         let (_, trailing) = paren_shell_gaps(p);
-        self.has_line_comments_between(trailing.start, trailing.end)
-            && !self.type_member_separator_follows(p.span.end)
+        if self.has_line_comments_between(trailing.start, trailing.end) {
+            return !self.type_member_separator_follows(p.span.end);
+        }
+        // A **multi-line** block retains it only where the token after the shell may not
+        // follow a line break ([`Self::restricted_type_token_follows`]): inlined there,
+        // the comment's own interior newline is the line terminator the grammar forbids,
+        // so the stripped form is dead (`(A /* a⏎b */) extends B ? C : D` →
+        // `A /* a⏎b */ extends …`, which no parser reads as a conditional — prettier
+        // emits exactly that, cataloged) or means something else (`(A /* a⏎b */)[]` at
+        // the top of a type alias reads as `type X = A;` plus an array expression
+        // statement). Everywhere else the block inlines and the shell strips, matching
+        // prettier: a `;`, a `|`, a `>` all follow it across a line. The multi-line term is
+        // asked LAST — the scan is a short source walk, and the block is rare. It is asked
+        // ON PAGE, the layout-gate axis, where the expression-side sites ask the emit one
+        // ([`Self::has_line_spanning_comments_to_emit_between`]); the two agree here by
+        // construction, since a comment in the trailing gap precedes only the `)` and
+        // ownership binds a glued block to a NODE's first token, so none of them is owned.
+        self.has_multiline_block_comments_on_page_between(trailing.start, trailing.end)
+            && self.restricted_type_token_follows(p.span.end)
+    }
+
+    /// Whether a token a type may not precede across a line break follows `pos` — past
+    /// trivia and past any `)` closers ([`Self::after_closers`]): the postfix `[` of an
+    /// array or indexed-access type, an optional tuple element's `?`, a conditional type's
+    /// `extends`, or the `=>` that follows an arrow's return type — every
+    /// `[no LineTerminator here]` position a parenthesized type can stand in (TypeScript's
+    /// `parsePostfixTypeOrHigher` and `parseType` stop at `scanner.hasPrecedingLineBreak()`;
+    /// acorn and tsv likewise). A tuple's `?` is told from a conditional's by what follows
+    /// it: only the element's is followed by `,` or `]`, and the conditional's `?` binds a
+    /// whole type ahead of it that may break.
+    ///
+    /// A crossed `)` is an enclosing layer that strips along with this one — the shell's
+    /// own outer layers, or the pair around a one-member composite whose sole member this
+    /// shell is (`(& (K /* a⏎b */)) extends L`), where the comment sits in the INNER shell
+    /// and the restricted token follows the OUTER closer. The `=>` is the one follower
+    /// read directly after the shell's own closer only: a `)` crossed ahead of it is a
+    /// function type's parameter list (`(a: (A /* c⏎d */)) => B`), whose surviving pair is
+    /// exactly what makes the stripped form legal again, while the arrow return-type shell
+    /// is the outermost layer at its position ([`outermost_paren`]) and needs no crossing.
+    ///
+    /// ⚠️ A line terminator between the last closer and the token says the token is NOT
+    /// the shell's follower — that is the restriction itself. `type Q = (A /* c⏎d */)⏎⏎[]`
+    /// is an alias and then an array expression statement, and reading its `[` here
+    /// retained a shell whose real follower is `;`; the reparse, seeing the `;` the
+    /// printer put there, then stripped it — two passes, two forms. A newline BEFORE a
+    /// crossed `)` is inside the enclosing pair and restricts nothing (`((A /* c⏎d */)⏎)
+    /// extends B` is a conditional); one inside a comment counts like any other.
+    fn restricted_type_token_follows(&self, pos: u32) -> bool {
+        let bytes = self.source.as_bytes();
+        let Some(after) = self.after_closers(pos) else {
+            return false;
+        };
+        if after.newline_since_closer {
+            return false;
+        }
+        let i = after.index;
+        match bytes[i] {
+            b'[' => true,
+            b'=' => !after.crossed_closer && bytes.get(i + 1) == Some(&b'>'),
+            // Only trivia can sit between a tuple element's `?` and its `,` / `]`, so the
+            // closer-crossing walk is reused here purely as the trivia skip.
+            b'?' => self
+                .byte_after_closers(i as u32 + 1)
+                .is_some_and(|b| matches!(b, b',' | b']')),
+            b'e' => whole_word_at(bytes, i, b"extends"),
+            _ => false,
+        }
+    }
+
+    /// The first significant source byte after `pos`, looking through trivia and through
+    /// any `)` closers — the shared scanner behind
+    /// [`Self::type_member_separator_follows`],
+    /// [`Self::conditional_branch_colon_follows`] and
+    /// [`Self::restricted_type_token_follows`]. A crossed `)` is an enclosing layer,
+    /// redundant or retained, and either way cannot separate this construct from the
+    /// break that follows it. `None` at end of source.
+    fn byte_after_closers(&self, pos: u32) -> Option<u8> {
+        self.after_closers(pos)
+            .map(|after| self.source.as_bytes()[after.index])
+    }
+
+    /// The walk behind [`Self::byte_after_closers`], with the two facts the restricted-token
+    /// reading also needs: whether a `)` was crossed, and whether a line terminator sits
+    /// between the last crossed `)` (or `pos`) and the byte found.
+    fn after_closers(&self, pos: u32) -> Option<AfterClosers> {
+        let bytes = self.source.as_bytes();
+        let end = bytes.len();
+        let mut i = pos as usize;
+        let mut crossed_closer = false;
+        let mut newline_since_closer = false;
+        while i < end {
+            let b = bytes[i];
+            if b.is_ascii_whitespace() {
+                newline_since_closer |= matches!(b, b'\n' | b'\r');
+                i += 1;
+                continue;
+            }
+            if let Some(next) = skip_comment(bytes, i, end) {
+                newline_since_closer |= bytes[i..next].iter().any(|b| matches!(b, b'\n' | b'\r'));
+                i = next;
+                continue;
+            }
+            if b == b')' {
+                crossed_closer = true;
+                newline_since_closer = false;
+                i += 1;
+                continue;
+            }
+            return Some(AfterClosers {
+                index: i,
+                crossed_closer,
+                newline_since_closer,
+            });
+        }
+        None
     }
 
     /// Whether a union / intersection member separator (`|` / `&`) immediately follows
@@ -2644,31 +2772,6 @@ impl<'a> Printer<'a> {
     /// `:` to flush against, and the `)`-crossing walk finds it.
     pub(in crate::printer) fn conditional_branch_colon_follows(&self, pos: u32) -> bool {
         matches!(self.byte_after_closers(pos), Some(b':'))
-    }
-
-    /// The first significant source byte after `pos`, looking through trivia and through
-    /// any `)` closers — the shared scanner behind
-    /// [`Self::type_member_separator_follows`] and
-    /// [`Self::conditional_branch_colon_follows`]. A crossed `)` is an enclosing layer,
-    /// redundant or retained, and either way cannot separate this construct from the
-    /// break that follows it. `None` at end of source.
-    fn byte_after_closers(&self, pos: u32) -> Option<u8> {
-        let bytes = self.source.as_bytes();
-        let end = bytes.len();
-        let mut i = pos as usize;
-        while i < end {
-            let b = bytes[i];
-            if b.is_ascii_whitespace() || b == b')' {
-                i += 1;
-                continue;
-            }
-            if let Some(next) = skip_comment(bytes, i, end) {
-                i = next;
-                continue;
-            }
-            return Some(b);
-        }
-        None
     }
 
     /// Unwrap redundant, comment-free `TSParenthesizedType` layers — and comment-free

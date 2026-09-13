@@ -1019,8 +1019,7 @@ impl<'a> Printer<'a> {
         let Some(close) = self.collapsed_grouping_close(expr_end, boundary_end) else {
             return false;
         };
-        self.comments_to_emit_between(expr_end, close)
-            .any(|c| !c.is_block || c.multiline)
+        self.has_line_spanning_comments_to_emit_between(expr_end, close)
     }
 
     /// The operand of an ASI-sensitive gap (an `as`/`satisfies` keyword, a postfix
@@ -2328,11 +2327,14 @@ impl<'a> Printer<'a> {
     /// render its own bare parens — which is what makes the retention the comment's
     /// doing: an empty gap still strips a redundant shell.
     ///
-    /// `broken_body` renders the line-comment layout — a `//` cannot trail inline
-    /// before the `)` (it would swallow it), so the operand goes multiline with the
-    /// comment inside; `flat_body` renders the inline block-comment one. `close` is
-    /// what follows the operand: `")"` where a separate node prints the `!` (or where
-    /// nothing does), `")!"` where this doc owns it.
+    /// `broken_body` renders the expanded layout — a `//` cannot trail inline before
+    /// the `)` (it would swallow it), and a multi-line block already makes the shell
+    /// span lines, where a shell that breaks expands rather than gluing its operand to
+    /// the `(` (the rule [`Self::trailing_paren_comment_parts`] states for the same
+    /// gap) — so the operand goes multiline with the comment inside; `flat_body`
+    /// renders the inline single-line-block one. `close` is what follows the operand: `")"` where a
+    /// separate node prints the `!` (or where nothing does), `")!"` where this doc owns
+    /// it.
     pub(crate) fn build_paren_operand_comment_doc(
         &self,
         start: u32,
@@ -2342,12 +2344,14 @@ impl<'a> Printer<'a> {
         close: &'static str,
     ) -> Option<DocId> {
         let d = self.d();
-        if self.has_line_comments_between(start, end) {
+        if self.has_line_spanning_comments_to_emit_between(start, end) {
             // Every comment in this gap was authored AFTER the operand — there is no
             // next node for one to lead — so the whole run trails, in authored order,
             // on the anchored emitter (the layout is vertical: the closer's hardline
             // below ends every line, and flushes the run's deferred `//`s; a boundary
             // instead would end the line first, landing a blank before the closer).
+            // A block-only run holding a multi-line block takes the same emitter: it
+            // trails inline on the operand's line, and the closer drops below it.
             // A chain-gap classification here is a category error: its `leading_*`
             // buckets would hoist an own-line comment above the operand.
             let mut body = DocBuf::with_capacity(3);

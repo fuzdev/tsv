@@ -1383,15 +1383,18 @@ impl<'a> Printer<'a> {
         non_null_expr: &crate::ast::internal::TSNonNullExpression<'_>,
     ) -> DocId {
         let d = self.d();
-        // A `//` in the operand→`!` gap RETAINS the shell, even where the parens are
-        // otherwise redundant. Deferring it instead carries it out of its own statement
-        // (`(x + y // c1⏎)!; // c2` → `(x + y)!; // c1 // c2`), where it MERGES with
-        // whatever already trails that line and the second comment stops existing — the
-        // information-losing relocation §Comment Position Philosophy names as its
-        // deciding test, and one the comment census measures directly. A block comment
-        // needs no shell: it trails inline without ending the line.
+        // A comment that SPANS A LINE in the operand→`!` gap RETAINS the shell, even where
+        // the parens are otherwise redundant. A `//` deferred instead is carried out of its
+        // own statement (`(x + y // c1⏎)!; // c2` → `(x + y)!; // c1 // c2`), where it
+        // MERGES with whatever already trails that line and the second comment stops
+        // existing — the information-losing relocation §Comment Position Philosophy names
+        // as its deciding test, and one the comment census measures directly. A
+        // multi-line block inlined puts a real line break before the `!`, which is
+        // `[no LineTerminator here]` (`(x /* a⏎b */)!` → `x /* a⏎b */!`, output that
+        // does not reparse — the same dead form prettier emits, cataloged). Only a
+        // single-line block needs no shell: it trails inline without ending the line.
         let needs_parens = self.needs_parens(non_null_expr.expression, ParenContext::NonNull)
-            || self.has_line_comments_between(
+            || self.has_line_spanning_comments_to_emit_between(
                 non_null_expr.expression.span().end,
                 non_null_expr.span.end,
             );
@@ -1476,10 +1479,11 @@ impl<'a> Printer<'a> {
             // non-null seal canonicalization (`(p?.q)!` → `p?.q!`); prettier keeps them
             // when the source had them.
             //
-            // Only a block comment reaches this branch — a `//` in the gap makes
-            // `needs_parens` true above. `ChainNode::NonNull` prints the same gap now,
-            // so a block comment would come out identically there; a `//` in a MID-chain
-            // spelling of this gap (`(x // c⏎)!.foo`) is the linearizer's to catch — it
+            // Only a single-line block comment reaches this branch — a `//` or a
+            // multi-line block in the gap makes `needs_parens` true above.
+            // `ChainNode::NonNull` prints the same gap now, so a block comment would come
+            // out identically there; a line-spanning comment in a MID-chain spelling of
+            // this gap (`(x // c⏎)!.foo`) is the linearizer's to catch — it
             // retains the shell as a parenthesized base (the same multiline operand
             // layout the required-paren case above uses) rather than flattening the
             // operand into a region whose emitter is block-only.

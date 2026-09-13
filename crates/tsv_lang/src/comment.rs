@@ -1091,6 +1091,41 @@ pub fn has_line_comments_from(comments: &[Comment], first_idx: usize, end: u32) 
     comments_in_source_from(comments, first_idx, end).any(|c| !c.is_block)
 }
 
+/// **to emit**: whether a comment in `[start, end)` occupies more than one output line —
+/// a `//`, which runs to end of line, or a multi-line block — [`Comment::owned_by_node`]
+/// comments **skipped**.
+///
+/// The question an ASI-sensitive gap asks: a comment that spans a line cannot be inlined
+/// before a `[no LineTerminator here]` token (a postfix `++`, a non-null `!`, a cast's
+/// `as`, a type's `[]` / tuple `?` / conditional `extends` / arrow `=>`), so the grouping
+/// shell that held it is load-bearing and must be kept. A single-line block inlines
+/// there like anywhere else. The `//` half is axis-free ([`has_line_comments_in_range`]);
+/// the block half is not — a glued multi-line block can be owned — so the pair carries
+/// the emit axis its callers are on.
+#[inline]
+pub fn has_line_spanning_comments_to_emit_in_range(
+    comments: &[Comment],
+    start: u32,
+    end: u32,
+) -> bool {
+    has_line_spanning_comments_to_emit_from(
+        comments,
+        first_index_in_range(comments, start, end),
+        end,
+    )
+}
+
+/// **to emit**, from an index the caller already found: the index form of
+/// [`has_line_spanning_comments_to_emit_in_range`].
+#[inline]
+pub fn has_line_spanning_comments_to_emit_from(
+    comments: &[Comment],
+    first_idx: usize,
+    end: u32,
+) -> bool {
+    comments_to_emit_from(comments, first_idx, end).any(|c| !c.is_block || c.multiline)
+}
+
 /// **in source**: every comment physically inside `[start, end)` —
 /// [`Comment::owned_by_node`] comments **counted**.
 ///
