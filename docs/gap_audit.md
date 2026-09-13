@@ -13,13 +13,15 @@ result.
 
 Pure Rust, no sidecar. Gated in `deno task check` as a **ratchet**, not a green gate.
 
-**Two detectors ride the one format.** The ledger answers "was a comment dropped or printed
+**Three detectors ride the one format.** The ledger answers "was a comment dropped or printed
 twice?"; the render-time [swallow check](audits.md#line-comment-swallow-audit-swallowaudit)
 answers "did a `//` comment eat following content on its output line?" — a class the ledger is
 **structurally blind** to, since a swallowing comment is printed exactly once and the
 print-once account balances. Arming both on the *same* format call is what makes the second
-detector affordable: no extra format, no extra parse. Both detectors' findings are ratcheted
-(see [The SWALLOW class](#the-swallow-class)).
+detector affordable: no extra format, no extra parse. The third asks the one question neither
+of those can: "does the output still **parse**?" — a bare reparse, no wire. All three
+detectors' findings are ratcheted (see [The SWALLOW class](#the-swallow-class) and
+[The UNREPARSEABLE class](#the-unreparseable-class)).
 
 **Design rationale lives next to the code** — why sites are byte offsets rather than tokens,
 why the ledger (and not an output diff) is the oracle, why the payload set is plural, and
@@ -136,6 +138,42 @@ the full `f1_check` battery per injection — was
 measured at **>40x** baseline CPU, because it pays `tsv_parse_to_value` twice per accepted
 injection and, unlike `blank_audit`, gap injection has no absorbed-input fast path (an
 injected comment must appear in the output, so it is never absorbed).
+
+### The UNREPARSEABLE class
+
+An `UNREPARSEABLE` shape is **pinned and graded exactly like a drop** — same file, same key,
+same two failure modes — and a holding run names its share on its own line, like the swallow's.
+It is the one kind where the whole **output** is dead rather than one comment lost: the
+injected comment is printed exactly once (the ledger balances) and eats nothing on its line
+(no swallow), yet what the formatter wrote no longer parses. The shapes it finds are a
+relocation family — a multi-line block moved across a stripped paren into a
+`[no LineTerminator here]` slot (`yield (/* a⏎b */x)` → `yield /* a⏎b */ x`, and the same
+before `=>`, a non-null `!`, a tuple `?`), two comments welded into one
+(`/* a /* t */⏎b */`, unterminated), a `;` placed where the enclosing grammar admits none
+(`{let a; /* c */}` in a Svelte declaration tag).
+
+Why it is graded here and not by `roundtrip:audit`: that audit formats every file **as
+authored**, and no fixture may format to invalid output (the protection rules), so an output
+made unreparseable by an *injected* comment is reachable by injection alone. The write path
+has no guard either — `tsv format` writes whatever the printer returns — so on a real file
+this class is silent corruption of the highest tier, which is why the detector was added
+rather than a write-time reparse in the CLI (a cost every changed file would pay, for a class
+that is rare on real code and reachable here for a parse per injection).
+
+The detector is a bare parse of the output through the same grammar a second format would run
+(`tsv_parses`, the parse-only twin of the wire reader; the TypeScript arm keeps the unnamed-goal
+fallback). It is **self-verified** by re-running that reparse on the re-spliced example — a
+directly observable property, so the verdict is exact — and it takes no `⚑ ANCHOR?` probe (the
+probe asks whether a leading space rescues a *drop*). It has no bystander axis: the property
+belongs to the whole output, so every finding keys at its injection site. Note the same
+detector is also the `OUTPUT-UNPARSEABLE` cause the verify pass already reported on a ledger
+shape's kept examples; that cause could only see an output dead *beside* a drop, where this
+kind sees every dead output.
+
+Cost: one bare parse per accepted injection, measured over `tests/fixtures` against a baseline
+binary built from the same tree without the detector (2026-09-13, 12-core box, quiet):
+32.0 s → 37.1 s wall, 336 s → 388 s user — about **+16%**. First run over the fixtures pinned
+48 shapes (309 findings), 46 of them carrying a newline-bearing payload — one family.
 
 ### A panic is never pinned
 

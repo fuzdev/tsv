@@ -26,7 +26,7 @@
 //! - **not honored** → the perturbation collapses → the slice is NOT a substring = an
 //!   [`IgnoreKind::Unhonored`] finding at that node's AST position.
 //!
-//! ## The four graded checks (per injected directive)
+//! ## The five graded checks (per injected directive)
 //!
 //! 1. **Honoring** ([`IgnoreKind::Unhonored`]) — the original check above: the perturbed slice
 //!    must survive the format verbatim.
@@ -44,6 +44,11 @@
 //!    (a directive freezes only when it is alone on its line, with no exceptions — a
 //!    directive trailing an opening `{`/`[`/`(`/`<` is inert like every other trailing
 //!    placement).
+//! 5. **Output reparse** ([`IgnoreKind::Unreparseable`]) — the accepted output must still
+//!    parse. A freeze that drops a paren pair the position requires, or welds the frozen
+//!    slice's `;` onto a trailing `//`, produces a dead document that no as-authored gate
+//!    can reach; a bare parse per accepted injection (no wire) is what grades it. Runs
+//!    per-candidate like honoring — the freeze's damage is the same at a narrower node.
 //!
 //! The companion checks (2–4) run only on the **span-maximal node beginning on each line**: the
 //! directive is inserted above the whole line, so it binds to the OUTERMOST construct beginning
@@ -52,7 +57,7 @@
 //! stays per-candidate.
 //!
 //! [`IgnoreKind::Panic`] (the injected directive crashed the formatter — production WASM is
-//! `panic = "abort"`, so a crash is a DoS) is NEVER pinnable and always fails the gate; the four
+//! `panic = "abort"`, so a crash is a DoS) is NEVER pinnable and always fails the gate; the five
 //! graded kinds are the ratcheted position ledger. The honoring check is a deliberately
 //! **cheaper single-format check** than `blank_audit`'s F1 battery (a full F1 battery over an
 //! injection sweep was measured at >40x the baseline CPU — disqualifying against the whole
@@ -67,8 +72,8 @@
 //! `TSUnionType.types`, `TSTupleType.elementTypes`, `Program.body`. Honoring is a per-*position*
 //! property (a position either has the printer opt-in or it doesn't), so the ledger is a ledger of
 //! **positions**, which is exactly what the plan's §1.3 wants. A position that honors (check 1)
-//! can still appear via a companion-check finding — `TRAILING_FROZEN` / `OVERFROZEN` / `UNSTABLE`
-//! at the same shape — so "covered" means passing all four graded checks; the ledger names every
+//! can still appear via a companion-check finding — `TRAILING_FROZEN` / `OVERFROZEN` / `UNSTABLE` /
+//! `UNREPARSEABLE` at the same shape — so "covered" means passing all five graded checks; the ledger names every
 //! `(kind, position)` pair that fails one.
 //!
 //! ## Design
@@ -132,6 +137,7 @@ use crate::audit::node_edge::is_non_structural_key;
 use crate::audit::parallel::{ArmedRun, run_pool};
 use crate::audit::properties::{
     Pristine, Utf16ToByte, pristine_format, source_has_ignore_directive, tsv_parse_to_value,
+    tsv_parses,
 };
 use crate::audit::ratchet::{
     GateDiff, Ratchet, SnapshotKey, print_ratchet_skipped, print_verdict, refuse_narrowed_update,
@@ -146,8 +152,9 @@ use crate::cli::CliError;
 
 use super::profile::{is_input_invalid_fixture, resolve_seed_files};
 
-/// Inject a `// prettier-ignore` directive before every JS node and grade four checks: honoring,
-/// second-pass stability, freeze scope, and trailing inertness (see the module docs).
+/// Inject a `// prettier-ignore` directive before every JS node and grade five checks: honoring,
+/// second-pass stability, freeze scope, trailing inertness, and output reparse (see the module
+/// docs).
 ///
 /// For each seed file, at each candidate node position (one at a time), prepends the directive on
 /// its own line with the node's interior structural spaces doubled, formats, and grades the four
@@ -200,7 +207,7 @@ const DIRECTIVE: &str = "// prettier-ignore\n";
 const LINE_LEAD_OPERATORS: [&str; 4] = ["|", "&", "?", ":"];
 
 /// Why an injected directive is a finding. `Panic` is the one absolute break (never pinnable);
-/// the other four are the ratcheted position ledger — one per graded check (see the module docs).
+/// the other five are the ratcheted position ledger — one per graded check (see the module docs).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 enum IgnoreKind {
     /// The formatter crashed on the injected directive — NEVER pinnable, always fails the gate.
@@ -217,6 +224,12 @@ enum IgnoreKind {
     /// The injection's accepted output is not a format fixed point — pass 2 changed it (the
     /// freeze-on-pass-1 / inert-on-pass-2 relocation-transient class).
     Unstable,
+    /// The injection's accepted output no longer PARSES — the freeze emitted a dead document
+    /// (a required paren pair dropped around the frozen slice, a `;` welded onto a trailing
+    /// `//`). Graded per-candidate by a bare reparse of the pass-1 output; the one class here
+    /// that is content corruption rather than a placement question, and the one no
+    /// as-authored gate sees (`roundtrip_audit` never injects a directive).
+    Unreparseable,
 }
 
 impl IgnoreKind {
@@ -227,6 +240,7 @@ impl IgnoreKind {
             Self::TrailingFrozen => "TRAILING_FROZEN",
             Self::Overfrozen => "OVERFROZEN",
             Self::Unstable => "UNSTABLE",
+            Self::Unreparseable => "UNREPARSEABLE",
         }
     }
 
@@ -237,6 +251,7 @@ impl IgnoreKind {
             Self::TrailingFrozen,
             Self::Overfrozen,
             Self::Unstable,
+            Self::Unreparseable,
         ]
         .into_iter()
         .find(|k| k.label() == s)
@@ -280,6 +295,9 @@ const SNAPSHOT_HEADER: &str = "# Generated by `deno task ignore:audit:update` �
      #                     as \"honored\").\n\
      #   UNSTABLE        — the injection's output is not a format fixed point: pass 2 changes\n\
      #                     it (the freeze-on-pass-1 / inert-on-pass-2 relocation class).\n\
+     #   UNREPARSEABLE   — the injection's output no longer PARSES: the freeze emitted a dead\n\
+     #                     document (a required paren pair dropped around the frozen slice, a\n\
+     #                     `;` welded onto a trailing `//`). Content corruption, not placement.\n\
      #\n\
      # The gate fails on a line that is NOT here (a newly-discovered finding), on a line here\n\
      # that no longer fires (a stale entry — delete it when you fix the position), and on any\n\
@@ -382,12 +400,15 @@ struct Tally {
     /// (only the UNHONORED-kind entries of `shapes` sum to this).
     unhonored: usize,
     /// Honoring/scope/trailing mutants that did not parse/format — the offset named no valid
-    /// directive position. (A stability-check rejection is graded UNSTABLE instead: the accepted
-    /// output failing to re-parse is definitionally not a fixed point.)
+    /// directive position. (An accepted output that fails to re-parse is graded UNREPARSEABLE,
+    /// never counted here.)
     rejected: usize,
-    /// Second-pass stability checks run (= span-maximal primary injections that formatted).
+    /// Second-pass stability checks run (= span-maximal primary injections that formatted AND
+    /// reparsed — a dead output is filed UNREPARSEABLE and takes no second pass).
     stability_checks: usize,
     unstable: usize,
+    /// Primary injections whose accepted output no longer parses (per candidate, like honoring).
+    unreparseable: usize,
     /// Scope (sibling-control) checks run — span-maximal primary-accepted injections with at
     /// least one doubleable structural space outside the node.
     sibling_checks: usize,
@@ -429,6 +450,7 @@ impl Tally {
             IgnoreKind::TrailingFrozen => self.trailing_frozen += 1,
             IgnoreKind::Overfrozen => self.overfrozen += 1,
             IgnoreKind::Unstable => self.unstable += 1,
+            IgnoreKind::Unreparseable => self.unreparseable += 1,
             // A panic has no paired counter — the shape map alone carries it (unpinnable class),
             // so recording is the whole bookkeeping. Call sites use `record` directly for it.
             IgnoreKind::Panic => {}
@@ -448,6 +470,7 @@ impl Tally {
         self.rejected += other.rejected;
         self.stability_checks += other.stability_checks;
         self.unstable += other.unstable;
+        self.unreparseable += other.unreparseable;
         self.sibling_checks += other.sibling_checks;
         self.overfrozen += other.overfrozen;
         self.trailing_injections += other.trailing_injections;
@@ -933,7 +956,14 @@ fn audit_file(path: &Path, tally: &mut Tally) {
                 } else {
                     tally.count_and_record(IgnoreKind::Unhonored, cand, &display, &source);
                 }
-                Some(output)
+                // Check 5 — output reparse, per candidate (a dead output is a dead output at
+                // any width of freeze). A bare parse, no wire; the one extra cost per
+                // accepted injection.
+                let reparses = tsv_parses(&output, parser);
+                if !reparses {
+                    tally.count_and_record(IgnoreKind::Unreparseable, cand, &display, &source);
+                }
+                Some((output, reparses))
             }
         };
 
@@ -941,14 +971,21 @@ fn audit_file(path: &Path, tally: &mut Tally) {
             continue;
         }
 
-        if let Some(primary_output) = &primary_output {
-            // Check 2 — second-pass stability: the accepted output must be a fixed point. A
-            // pass-2 rejection (the output no longer parses) is definitionally not one either.
-            tally.stability_checks += 1;
-            match format_checked(primary_output, parser) {
-                FormatOutcome::Panicked => tally.record(IgnoreKind::Panic, cand, &display, &source),
-                FormatOutcome::Output(ref second) if second == primary_output => {}
-                _ => tally.count_and_record(IgnoreKind::Unstable, cand, &display, &source),
+        if let Some((primary_output, primary_reparses)) = &primary_output {
+            // Check 2 — second-pass stability: the accepted output must be a fixed point. Asked
+            // only of an output that reparses: a dead one is already filed UNREPARSEABLE, and a
+            // second format of it could only re-file the same finding under a placement name.
+            if *primary_reparses {
+                tally.stability_checks += 1;
+                match format_checked(primary_output, parser) {
+                    FormatOutcome::Panicked => {
+                        tally.record(IgnoreKind::Panic, cand, &display, &source);
+                    }
+                    FormatOutcome::Output(ref second) if second == primary_output => {}
+                    // A differing second pass — or a rejection, which the reparse above
+                    // makes unreachable (same grammar) but is still not a fixed point.
+                    _ => tally.count_and_record(IgnoreKind::Unstable, cand, &display, &source),
+                }
             }
 
             // Check 3 — scope (sibling control): doubling OUTSIDE the node must all normalize.
@@ -1163,8 +1200,8 @@ impl IgnoreAuditCommand {
 /// Translate a run's [`Tally`] into the shared reporting envelope (the `audit::report` printers —
 /// worst-first ordering + a `--json` shape uniform with `gap_audit` / `blank_audit`). Every kind
 /// maps on: `PANIC` is `GateFailing` (absolute); every graded kind (`UNHONORED` /
-/// `TRAILING_FROZEN` / `OVERFROZEN` / `UNSTABLE`) is `Informational` (the ratchet decides
-/// fatality). There is no report-only class, so every finding is `gated`.
+/// `TRAILING_FROZEN` / `OVERFROZEN` / `UNSTABLE` / `UNREPARSEABLE`) is `Informational` (the
+/// ratchet decides fatality). There is no report-only class, so every finding is `gated`.
 fn build_report(total: &Tally) -> (RunSummary, Vec<Finding>) {
     let summary = RunSummary {
         audit: "ignore_audit",
@@ -1224,6 +1261,7 @@ fn companion_extras(total: &Tally) -> serde_json::Map<String, Value> {
     let mut extras = serde_json::Map::new();
     extras.insert("stability_checks".into(), total.stability_checks.into());
     extras.insert("unstable".into(), total.unstable.into());
+    extras.insert("unreparseable".into(), total.unreparseable.into());
     extras.insert("sibling_checks".into(), total.sibling_checks.into());
     extras.insert("overfrozen".into(), total.overfrozen.into());
     extras.insert(
@@ -1240,13 +1278,14 @@ fn companion_extras(total: &Tally) -> serde_json::Map<String, Value> {
 fn print_companions(total: &Tally) {
     println!(
         "○ companion checks — second-pass {}/{} unstable · scope {}/{} overfrozen · trailing \
-         {}/{} frozen",
+         {}/{} frozen · reparse {} unreparseable",
         total.unstable,
         total.stability_checks,
         total.overfrozen,
         total.sibling_checks,
         total.trailing_frozen,
-        total.trailing_injections
+        total.trailing_injections,
+        total.unreparseable
     );
 }
 

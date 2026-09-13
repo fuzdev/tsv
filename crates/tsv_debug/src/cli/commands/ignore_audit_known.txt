@@ -14,6 +14,9 @@
 #                     as "honored").
 #   UNSTABLE        — the injection's output is not a format fixed point: pass 2 changes
 #                     it (the freeze-on-pass-1 / inert-on-pass-2 relocation class).
+#   UNREPARSEABLE   — the injection's output no longer PARSES: the freeze emitted a dead
+#                     document (a required paren pair dropped around the frozen slice, a
+#                     `;` welded onto a trailing `//`). Content corruption, not placement.
 #
 # The gate fails on a line that is NOT here (a newly-discovered finding), on a line here
 # that no longer fires (a stale entry — delete it when you fix the position), and on any

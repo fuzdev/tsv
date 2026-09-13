@@ -4,7 +4,8 @@
 //! This is the shared home for the **input → property** layer that every audit
 //! in the [`audit`](crate::audit) substrate builds on:
 //!
-//! - **reparse** — [`tsv_parse_to_value`] (parse to the wire `Value`),
+//! - **reparse** — [`tsv_parse_to_value`] (parse to the wire `Value`), [`tsv_parses`] (the
+//!   parse-only twin — does the text parse at all, no wire built),
 //!   [`structurally_equivalent`] (the structural-skeleton compare), and
 //!   [`leaf_conservation_diff`] / [`leaf_value_multiset`] (the complementary
 //!   decode-invariant leaf-value check that the skeleton, erasing every scalar,
@@ -135,6 +136,23 @@ pub(crate) fn tsv_parse_to_value(source: &str, parser: ParserType) -> Option<Val
                 &ast, source,
             )))
         }
+    }
+}
+
+/// Does `source` parse at all — the parse-only twin of [`tsv_parse_to_value`], for the
+/// per-injection hot paths that ask nothing of the tree.
+///
+/// Same grammar as the format entry (`format_source` parses through the same three
+/// functions, the TypeScript arm with the same unnamed-goal fallback), so "the formatter's
+/// own output does not parse" is graded against exactly the parse a second format would
+/// run. Builds no wire: the JSON write + read is the cost that made a full [`f1_check`]
+/// per injection unaffordable for `gap_audit`, and a bare parse is ~a third of a format.
+pub(crate) fn tsv_parses(source: &str, parser: ParserType) -> bool {
+    let arena = bumpalo::Bump::new();
+    match parser {
+        ParserType::TypeScript => tsv_ts::parse_with_goal_or_fallback(source, None, &arena).is_ok(),
+        ParserType::Svelte => tsv_svelte::parse(source, &arena).is_ok(),
+        ParserType::Css => tsv_css::parse(source, &arena).is_ok(),
     }
 }
 

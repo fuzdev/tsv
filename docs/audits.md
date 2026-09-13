@@ -172,12 +172,16 @@ cargo run --profile corpus -p tsv_debug --features audits gap_audit ../corpora/c
 # snapshot of every shape tests/fixtures produces, every line a KNOWN BUG, the file
 # shrinking is the goal. A shape not on the list, one on it that no longer fires, or any
 # PANIC, FAILS. `--limit`/`--payload`/`--all-bytes`/a path narrow a run, so they skip the
-# ratchet and refuse `--update`. ~17 s.
+# ratchet and refuse `--update`. ~37 s wall over tests/fixtures (2026-09-13, 12-core box).
 #
-# Two detectors ride the one format, and BOTH are ratcheted: the ledger's DROPPED /
-# DOUBLE-PRINTED, and the render-time swallow check's SWALLOW — a `//` eating the content
+# Three detectors ride the one format, and ALL are ratcheted: the ledger's DROPPED /
+# DOUBLE-PRINTED; the render-time swallow check's SWALLOW — a `//` eating the content
 # after it, i.e. lost CODE, which the print-once ledger is structurally blind to (the
-# comment IS printed once). A holding run names the swallow share on its own line.
+# comment IS printed once); and a bare reparse of the output, UNREPARSEABLE — the
+# formatter's own output no longer parses (a multi-line comment relocated across a
+# stripped paren into a `[no LineTerminator here]` slot, a weld, a misplaced `;`), which
+# the ledger and the swallow check are both blind to and no as-authored gate can reach.
+# A holding run names the swallow and unreparseable shares on their own lines.
 ```
 
 `deno task gaps:audit:update` regenerates the snapshot after fixing a shape (or when a new fixture merely REACHES a pre-existing one); it refuses a narrowed run.
@@ -622,7 +626,7 @@ So the triage note in the snapshot header holds — a new `inner` shape is a **q
 The mechanized discovery of unhonored `// prettier-ignore` / `format-ignore` positions (Arm A of the systematic ignore-honoring gap). Recognition is centralized (`tsv_lang::is_format_ignore_directive`), but *consumption* is a per-node opt-in the printer makes at ~15 scattered sites — any position without one silently reformats an ignored construct, which prettier-authored code does not expect. This audit turns the guess-list of suspected positions into a computed ledger, the way `comments:audit` structurally guards the per-site `owned_by_node` model rather than trusting each site by inspection. Design rationale lives in the `ignore_audit` module docs.
 
 ```bash
-# ignore_audit - inject `// prettier-ignore` before every JS node and grade FOUR checks.
+# ignore_audit - inject `// prettier-ignore` before every JS node and grade FIVE checks.
 # Per candidate node that leads its line (inside a code_regions JS span), prepend the
 # directive on its own line and DOUBLE the node's interior structural spaces
 # (reformat-removable; string/template/comment/regex interiors excluded), format, and grade:
@@ -636,11 +640,15 @@ The mechanized discovery of unhonored `// prettier-ignore` / `format-ignore` pos
 #   4 trailing inert  — the directive appended to the END of the preceding line instead
 #                       freezes nothing (else TRAILING_FROZEN — the decided placement
 #                       floor: a directive freezes only when alone on its line, no
-#                       exceptions; trailing an opening `{`/`[`/`(`/`<` is inert too).
+#                       exceptions; trailing an opening `{`/`[`/`(`/`<` is inert too);
+#   5 output reparse  — the accepted output still PARSES (else UNREPARSEABLE — a freeze
+#                       that dropped a required paren pair or welded the frozen `;` onto a
+#                       trailing `//` emitted a dead document; per candidate, like honoring,
+#                       and a dead output takes no second pass).
 # Checks 2-4 run only on the span-maximal node beginning on each line — the directive
 # binds to the OUTERMOST construct beginning there, so a narrower same-line candidate
 # would grade that decided wider freeze as a finding. Honoring stays per-candidate.
-# A cheaper per-injection battery (<= 4 formats) than blank_audit's F1. Pure Rust, no sidecar.
+# A cheaper per-injection battery (<= 4 formats + one bare parse) than blank_audit's F1. Pure Rust, no sidecar.
 cargo run --profile corpus -p tsv_debug --features audits ignore_audit   # tests/fixtures
 cargo run --profile corpus -p tsv_debug --features audits ignore_audit ../corpora/collections/zzz/src
 # Also: --json, --report, --jobs N, --limit N, --update. Build with `--profile corpus`
@@ -687,9 +695,11 @@ the frozen slice AND re-claimed by the trailing-comma seam, so the run **grew by
 on every pass** — unbounded duplication, and non-idempotent. Both ratchets stayed green: an
 injected directive alone finds no interior comment to duplicate, and an injected comment
 alone never freezes. Closing it needs a seed that already carries the comment, which is what
-the fixture `expressions/objects/prettier_ignore_property` now does. Until the two
-injections compose, **treat a freeze site paired with a comment seam as ungated** and check
-it by hand — the anchor rule is `Printer::element_claim_anchor`.
+the fixture `expressions/objects/prettier_ignore_property` now does. The one standing
+instrument that composes the two is `fuzz:audit`, whose token dictionary carries
+`// prettier-ignore` — a fixed-seed SAMPLE, not a sweep. Until the two injections compose
+here, **treat a freeze site paired with a comment seam as ungated** and check it by hand —
+the anchor rule is `Printer::element_claim_anchor`.
 
 ## Build-Fanout Audit (`fanout:audit`)
 

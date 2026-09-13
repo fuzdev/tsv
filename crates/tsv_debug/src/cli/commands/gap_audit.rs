@@ -61,13 +61,17 @@
 //! the program via ASI (`return// c⏎ x`), cannot produce a false positive. That is why the
 //! oracle here is the ledger and not an output diff.
 //!
-//! **Two detectors ride the one format.** The ledger is the first; the render-time
+//! **Three detectors ride the one format.** The ledger is the first; the render-time
 //! [swallow check](tsv_lang::doc::swallow) is the second, and it answers a question the
 //! ledger is **structurally blind** to — "did a `//` eat the content after it on its output
 //! line?" A swallowing comment is printed exactly once, so the print-once account balances
 //! while a token is silently lost. Arming both on the *same* format call is what makes the
-//! second one affordable (no extra format, no extra parse), and both kinds are ratcheted
-//! alike; see [`Kind::Swallow`].
+//! second one affordable (no extra format, no extra parse). The third is a **reparse of the
+//! output** — "does what the formatter wrote still parse?" — the one question neither the
+//! ledger nor the swallow check can ask (a comment relocated into a slot where a line
+//! terminator is forbidden is printed exactly once and swallows nothing, and the output is
+//! syntactically dead). It costs a bare parse per accepted injection, no wire; see
+//! [`Kind::Unreparseable`]. All three kinds are ratcheted alike.
 //!
 //! ## Scope — what a green run does NOT prove
 //!
@@ -120,7 +124,7 @@ use argh::FromArgs;
 use std::collections::{BTreeMap, BTreeSet};
 
 use by_node::{by_node_json_sections, compute_by_node, report_by_node, report_rank, report_since};
-use snapshot::{KnownKey, count_panics, count_swallows, is_pinnable, ratchet, snapshot_keys};
+use snapshot::{KnownKey, count_kind, is_pinnable, ratchet, snapshot_keys};
 use verify::{AnchorProbe, anchor_probe, verify_example, victim_seed_offset};
 
 use crate::audit::examples::{ExampleOrd, ExampleSet};
@@ -128,7 +132,7 @@ use crate::audit::node_edge::{NodeEdgeKey, node_edge_key_with_map};
 use crate::audit::parallel::{ArmedRun, run_pool};
 use crate::audit::properties::{
     Formatted, Pristine, UnverifiedCause, Utf16ToByte, Verdict, VerifyOutcome, VerifySummary,
-    ledger_format, pristine_format, tsv_parse_to_value, unverified_cause_breakdown,
+    ledger_format, pristine_format, tsv_parse_to_value, tsv_parses, unverified_cause_breakdown,
 };
 use crate::audit::ratchet::{
     GateDiff, print_ratchet_skipped, print_verdict, refuse_narrowed_update, report_unpinned_panics,
@@ -315,6 +319,25 @@ enum Kind {
     /// verify oracle — the multiset of comment *contents* — answers the ledger's question, not
     /// this one, so every swallow shape would file a bogus `UNCONFIRMED`.
     Swallow,
+    /// The formatter's own output no longer parses — read straight off the output by a bare
+    /// reparse ([`tsv_parses`]), the same grammar a second format would run.
+    ///
+    /// The class the other two detectors are **structurally blind** to: the injected comment
+    /// is printed exactly once (the ledger balances) and eats nothing on its line (no
+    /// swallow), yet the document is dead — a multi-line block relocated across a stripped
+    /// paren into a `[no LineTerminator here]` slot (`yield (/* a⏎b */x)` → `yield /* a⏎b */ x`),
+    /// a comment welded into another (`/* a /* t */⏎b */`, unterminated), a `;` placed where
+    /// the enclosing grammar admits none. Every standing gate formats a document AS AUTHORED,
+    /// so an output made unreparseable by an *injected* comment is graded nowhere else — and
+    /// the write path has no guard (the CLI writes whatever the printer returns), so on a
+    /// real file this is silent content corruption of the highest tier.
+    ///
+    /// Pinned and graded like the ledger kinds. **Self-verified** by re-running the reparse on
+    /// the re-spliced example (a directly observable property, so the verdict is exact); no
+    /// anchor probe (the probe asks whether a leading space rescues a *drop*).
+    /// It has no bystander axis — the property belongs to the whole output, so every finding
+    /// keys at its injection site.
+    Unreparseable,
     Panic,
 }
 
@@ -324,6 +347,7 @@ impl Kind {
             Self::Dropped => "DROPPED",
             Self::DoublePrinted => "DOUBLE-PRINTED",
             Self::Swallow => "SWALLOW",
+            Self::Unreparseable => "UNREPARSEABLE",
             Self::Panic => "PANIC",
         }
     }
@@ -333,6 +357,7 @@ impl Kind {
             Self::Dropped,
             Self::DoublePrinted,
             Self::Swallow,
+            Self::Unreparseable,
             Self::Panic,
         ]
         .into_iter()
@@ -346,6 +371,7 @@ impl Kind {
             Self::Dropped => "drop",
             Self::DoublePrinted => "dbl",
             Self::Swallow => "swal",
+            Self::Unreparseable => "unrep",
             Self::Panic => "panic",
         }
     }
@@ -694,50 +720,45 @@ fn audit_file(
             injected_src.push_str(&source[offset..]);
             tally.injections += 1;
 
+            // A finding read off the OUTPUT (a panic, a dead output, a swallow) has no
+            // bystander axis — the property belongs to the whole result, not to a registered
+            // comment — so it keys at the injection site: injection == attribution.
+            let site_hit = |kind: Kind, text: String| Hit {
+                kind,
+                payload,
+                path: &display,
+                source: &source,
+                injection_offset: offset,
+                attribution_offset: offset,
+                text,
+                skip_sites: Vec::new(),
+                injected: true,
+                node_edge: key_node_edge(node_map.as_ref(), offset),
+            };
+
             let findings = match ledger_format(&injected_src, parser) {
                 Formatted::Panicked => {
-                    tally.record(
-                        Hit {
-                            kind: Kind::Panic,
-                            payload,
-                            path: &display,
-                            source: &source,
-                            injection_offset: offset,
-                            attribution_offset: offset,
-                            text: text.to_string(),
-                            skip_sites: Vec::new(),
-                            injected: true,
-                            node_edge: key_node_edge(node_map.as_ref(), offset),
-                        },
-                        key_by_node,
-                    );
+                    tally.record(site_hit(Kind::Panic, text.to_string()), key_by_node);
                     continue;
                 }
                 // The injection isn't a legal comment here — the offset names no gap.
                 Formatted::Rejected => continue,
                 Formatted::Ok {
-                    findings, swallows, ..
+                    findings,
+                    swallows,
+                    output,
+                    ..
                 } => {
-                    // A swallow is observed directly on the rendered output, so it is keyed at
-                    // the injection site — there is no bystander axis to map back (the ledger's
+                    // The output must still parse. A bare parse, no wire: the one extra cost
+                    // per accepted injection (see `Kind::Unreparseable`).
+                    if !tsv_parses(&output, parser) {
+                        tally.record(site_hit(Kind::Unreparseable, text.to_string()), key_by_node);
+                    }
+                    // A swallow is observed directly on the rendered output (the ledger's
                     // victim-span logic below has no analogue: the swallow tracker reports a
                     // property of an output line, not of a registered comment).
                     for report in swallows {
-                        tally.record(
-                            Hit {
-                                kind: Kind::Swallow,
-                                payload,
-                                path: &display,
-                                source: &source,
-                                injection_offset: offset,
-                                attribution_offset: offset,
-                                text: report.comment,
-                                skip_sites: Vec::new(),
-                                injected: true,
-                                node_edge: key_node_edge(node_map.as_ref(), offset),
-                            },
-                            key_by_node,
-                        );
+                        tally.record(site_hit(Kind::Swallow, report.comment), key_by_node);
                     }
                     findings
                 }
@@ -964,11 +985,19 @@ impl GapAuditCommand {
             // Break the total out by what it costs: SWALLOW is lost CODE where the two ledger
             // kinds are lost COMMENTS, and the write line above says only "shape(s)". Printed
             // at the pin because that is when the split is decided, not merely reported.
-            let swallows = count_swallows(&total.shapes);
+            let swallows = count_kind(&total.shapes, Kind::Swallow);
             if swallows > 0 {
                 println!(
                     "  of {} pinned, {swallows} are SWALLOW — a `//` eating the content after \
                      it, i.e. lost CODE",
+                    pinned.len()
+                );
+            }
+            let unreparseable = count_kind(&total.shapes, Kind::Unreparseable);
+            if unreparseable > 0 {
+                println!(
+                    "  of {} pinned, {unreparseable} are UNREPARSEABLE — the formatter's own \
+                     output no longer parses, i.e. a DEAD document",
                     pinned.len()
                 );
             }
@@ -998,7 +1027,7 @@ impl GapAuditCommand {
                 );
             }
             return report_unpinned_panics(
-                count_panics(&total.shapes),
+                count_kind(&total.shapes, Kind::Panic),
                 "shape",
                 "a comment in a gap",
             );
@@ -1045,13 +1074,24 @@ impl GapAuditCommand {
         // The swallow class gates like the rest, but it is the only CODE-loss kind here and the
         // summary line speaks of dropped comments — so name its share, or a `✓` over a snapshot
         // holding hundreds of them reads as "no swallows".
-        let swallows = count_swallows(&total.shapes);
+        let swallows = count_kind(&total.shapes, Kind::Swallow);
         if swallows > 0 {
             eprintln!(
                 "\n○ of those, {swallows} SWALLOW shape(s) — a `//` comment swallowing following \
                  content on its output line, i.e. lost CODE. The print-once ledger is blind to \
                  this class (the comment IS printed once), so these are invisible to \
                  `comments:audit`. See docs/gap_audit.md."
+            );
+        }
+        // Same for the reparse class: the only kind here where the whole OUTPUT is dead, and
+        // the one no as-authored gate can reach.
+        let unreparseable = count_kind(&total.shapes, Kind::Unreparseable);
+        if unreparseable > 0 {
+            eprintln!(
+                "\n○ of those, {unreparseable} UNREPARSEABLE shape(s) — the formatter's own output \
+                 no longer parses (a comment relocated into a slot the grammar forbids, a weld, \
+                 a misplaced `;`). Invisible to the ledger, the swallow check and every \
+                 as-authored gate; on a real file it is silent corruption. See docs/gap_audit.md."
             );
         }
 
@@ -1121,8 +1161,8 @@ impl GapAuditCommand {
         if !new.is_empty() {
             eprintln!(
                 "\n✗ {} NEW finding shape(s) — a comment in one of these gaps is dropped, \
-                 double-printed, or swallows the content after it, and the snapshot has never \
-                 seen it:",
+                 double-printed, swallows the content after it, or leaves an output that no \
+                 longer parses, and the snapshot has never seen it:",
                 new.len()
             );
             eprint_capped(new.iter(), shape_line);
@@ -1145,7 +1185,7 @@ impl GapAuditCommand {
             // makes it unparseable. Logs go to stderr (the `corpus:compare --json` contract).
             let msg = format!(
                 "\n✓ ratchet holds — every finding shape is a known bug ({} pinned); no new \
-                 gap drops a comment or swallows the content after one",
+                 gap drops a comment, swallows the content after one, or kills the output",
                 diff.known
             );
             print_verdict(self.json, &msg);
@@ -1182,7 +1222,9 @@ fn verify_shape(kind: Kind, agg: &ShapeAgg) -> VerifyOutcome {
         match verify_example(ex, kind, parser) {
             Verdict::Confirmed => {
                 outcome.confirmed += 1;
-                if kind != Kind::Panic {
+                // The probe asks whether a leading space rescues a DROP; a panic's crash and an
+                // unreparseable output are their own answers.
+                if !matches!(kind, Kind::Panic | Kind::Unreparseable) {
                     match anchor_probe(ex, parser) {
                         AnchorProbe::Rescued => {
                             outcome.anchor_probed += 1;
@@ -1286,12 +1328,14 @@ fn build_report(total: &Tally, payloads: &[Payload]) -> (RunSummary, Vec<Finding
 }
 
 /// A finding's [`Severity`]: a `PANIC` is an absolute break (gate-failing on its own); every
-/// other kind — drop, double-print, swallow — is informational, its fatality decided by the
-/// ratchet.
+/// other kind — drop, double-print, swallow, unreparseable — is informational, its fatality
+/// decided by the ratchet.
 fn severity_of(kind: Kind) -> Severity {
     match kind {
         Kind::Panic => Severity::GateFailing,
-        Kind::Dropped | Kind::DoublePrinted | Kind::Swallow => Severity::Informational,
+        Kind::Dropped | Kind::DoublePrinted | Kind::Swallow | Kind::Unreparseable => {
+            Severity::Informational
+        }
     }
 }
 

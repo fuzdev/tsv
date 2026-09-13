@@ -244,6 +244,10 @@ const INTERESTING_TOKENS: &[&str] = &[
     "//",
     "<!--",
     "-->",
+    // the format-ignore directive on its own line: a freeze composes with whatever the
+    // byte-level ops land beside it (a comment, a paren shell), which is the pairing no
+    // injection audit makes on its own — each injects one thing
+    "// prettier-ignore\n",
     "</script>",
     "<script>",
     "=>",
