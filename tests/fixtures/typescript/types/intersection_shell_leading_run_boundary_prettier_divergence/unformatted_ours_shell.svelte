@@ -39,18 +39,21 @@
 	// indents even where object-adjacency would otherwise hug — prettier's
 	// `hasLeadingOwnLineComment(node)`, asked over the shell region the between-members
 	// window cannot see
-	type F = z & (// c16
+	type F = z & (
+	// c16
 	{ x: X } // c17
 	// c18
 	) & c;
 
 	// the single-comment spelling of the same shell
-	type G = z & (// c19
+	type G = z & (
+	// c19
 	{ x: X } // c20
 	) & c;
 
 	// and with an object on both sides of the boundary
-	type H = { x: X } & (// c21
+	type H = { x: X } & (
+	// c21
 	{ y: Y } // c22
 	// c23
 	) & c;
@@ -75,7 +78,8 @@
 	d;
 
 	// and the leading-run disjunct, at a later member
-	type L = y & (// c30
+	type L = y & (
+	// c30
 	{ x: X } // c31
 	// c32
 	) & c &
