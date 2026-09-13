@@ -30,8 +30,11 @@ use tsv_lang::source_scan::{
 /// ASI bug, not a layout nit.
 #[derive(Clone, Copy)]
 enum GapStart {
-    /// A keyword, not a node (`return` / `throw`). Nothing here can own a trailing comment,
-    /// so every comment in the gap leads the node at the far end.
+    /// A keyword, not a node (`return` / `throw` / `yield`). Nothing here can own a trailing
+    /// comment, so every comment in the gap leads the node at the far end. This is also the
+    /// gap the restricted production's `[no LineTerminator here]` covers, so it is the one
+    /// reading that counts a comment's *own* line terminator — see
+    /// [`Printer::has_leading_own_line_comment_in_range`].
     Keyword(u32),
     /// A node ends here. A comment sharing its line trails *it*, not the node at the far end.
     Node(u32),
@@ -49,12 +52,20 @@ impl GapStart {
             Self::Keyword(p) | Self::Node(p) | Self::Shell(p) => p,
         }
     }
+
+    /// Whether a comment's **own** line terminator counts as one in this gap — true at
+    /// [`Self::Keyword`] alone, the gap a restricted production's `[no LineTerminator here]`
+    /// covers. The reading, and why the other two keep the narrow term, is
+    /// [`Printer::has_leading_own_line_comment_in_range`].
+    const fn counts_interior_line_terminator(self) -> bool {
+        matches!(self, Self::Keyword(_))
+    }
 }
 
 impl<'a> Printer<'a> {
     /// Shared dispatch for return/throw argument formatting.
     ///
-    /// Matches Prettier's `printReturnOrThrowArgument` (function.js:231-277):
+    /// Matches Prettier's `printReturnOrThrowArgument` (`print/return-statement.js`):
     /// 1. Assignment expressions → unconditional parens: `return (a = b);`
     /// 2. Own-line comments in chain → unconditional parens
     /// 3. Binaryish arguments → conditional parens (ifBreak)
@@ -251,7 +262,8 @@ impl<'a> Printer<'a> {
     /// Check if a return/throw argument has own-line comments that require
     /// unconditional paren wrapping.
     ///
-    /// Matches Prettier's `returnArgumentHasLeadingComment` (function.js:290-318).
+    /// Matches Prettier's `returnArgumentHasLeadingComment`
+    /// (`utilities/return-statement-has-leading-comment.js`).
     ///
     /// Shared with `build_yield_doc`: `yield`/`yield*` are restricted productions
     /// like `return`/`throw`, so they ask the same question and must not answer it
@@ -317,23 +329,43 @@ impl<'a> Printer<'a> {
         self.chain_has_own_line_comment(left)
     }
 
-    /// Whether a comment in the gap *leads* the node at `end` and is followed by a newline —
-    /// Prettier's `hasLeadingOwnLineComment` (`utils/index.js`). Two terms, and both are
+    /// Whether a comment in the gap *leads* the node at `end` and puts a line terminator
+    /// between itself and that node — Prettier's `hasLeadingOwnLineComment`
+    /// (`utilities/has-leading-own-line-comment.js`), plus, at the keyword gap, the second
+    /// disjunct of its `returnArgumentHasLeadingComment`. Two terms, and both are
     /// load-bearing:
     ///
     /// - **Leads.** Decided by `gap_start`: a comment sharing a preceding *node*'s line
     ///   trails that node rather than leading the next one (Prettier attaches it as a
     ///   trailing comment), so it never counts — `return foo() // c` + `.bar` keeps the
     ///   chain bare.
-    /// - **Followed by a newline.** This is what makes a break unavoidable: the node cannot
-    ///   share the comment's line, so the caller must emit the form that survives one. A
-    ///   block comment with code after it on the same line (`return /* c */ (x)`) fails this
-    ///   term and stays inline.
+    /// - **Carries a line terminator.** This is what makes a break unavoidable: the node
+    ///   cannot share the comment's last line, so the caller must emit the form that
+    ///   survives one. A block comment with code after it on the same line
+    ///   (`return /* c */ (x)`) fails this term and stays inline.
     ///
     /// For `return`/`throw` the second term is an ASI guard, not cosmetics. Both are
     /// restricted productions (`return [no LineTerminator here] Expression`), so putting the
     /// argument on a later line without parens *changes the program*: `return` silently
     /// becomes `return;` plus an unreachable statement, and `throw` becomes a syntax error.
+    ///
+    /// Which is why the term is a disjunction at [`GapStart::Keyword`]: a comment can carry
+    /// the terminator *inside* itself as well as after itself. A `MultiLineComment` holding
+    /// a `LineTerminator` **is** one for ASI (ecma262 sec-comments: it "is considered to be
+    /// a *LineTerminator* for purposes of parsing by the syntactic grammar"), so
+    /// `throw (/* a⏎b */ x)` is exactly as unprintable bare as `throw (/* c */⏎x)` —
+    /// `has_newline_after_position` alone reads the first as inline and emits a dead
+    /// document. Prettier says the same thing with its own second disjunct
+    /// (`hasNewlineInRange(locStart(comment), locEnd(comment))`, asked of the argument's
+    /// leading comments in `utilities/return-statement-has-leading-comment.js`).
+    ///
+    // TODO: the left-spine readings (`GapStart::Shell`, `GapStart::Node`) keep the narrow
+    // term. `Shell` hoists its run ahead of the whole argument too, so a line-spanning block
+    // there is the same ASI hazard — `throw (/* a⏎b */a).b` is dead, at nine left-side
+    // positions. Prettier's walk asks only `hasLeadingOwnLineComment` and is dead at them as
+    // well, so that class needs its own verdict and its own slice: widening it here would
+    // also re-layout the cast / postfix-update operands whose shell retention
+    // `operand_paren_leading_comment_kept_shell_prettier_divergence` pins.
     fn has_leading_own_line_comment_in_range(&self, gap_start: GapStart, end: u32) -> bool {
         self.comments_in_source_between(gap_start.position(), end)
             .any(|c| {
@@ -341,7 +373,10 @@ impl<'a> Printer<'a> {
                     GapStart::Keyword(_) | GapStart::Shell(_) => true,
                     GapStart::Node(prev_end) => !self.is_same_line(prev_end, c.span.start),
                 };
-                leads && has_newline_after_position(self.source, c.span.end)
+                let carries_line_terminator = (gap_start.counts_interior_line_terminator()
+                    && c.multiline)
+                    || has_newline_after_position(self.source, c.span.end);
+                leads && carries_line_terminator
             })
     }
 
@@ -417,7 +452,20 @@ impl<'a> Printer<'a> {
                 // `if_break` pair does on the ordinary path
                 // (`Self::build_binary_paren_doc`, which reaches the same layout through
                 // the ungrouped builder because there the group is the parent's).
-                _ => self.build_flat_chain_expression_doc(arg),
+                //
+                // A MULTI-LINE block the operand OWNS is claimed HERE rather than by the
+                // innermost node its token begins
+                // ([`Printer::build_value_with_outermost_owned_comment`]): the hanging pair
+                // is a required pair like every other on that seam's list, and left inside
+                // the operand's own doc the comment's reprinted body force-breaks a group
+                // prettier keeps flat (`return (⏎// c⏎/* a⏎b */ cond ? a : b⏎)` exploded the
+                // ternary). The position does not move — this is where the pair already
+                // prints the gap's un-owned run — only the group the comment sits in. The
+                // SEQUENCE arm above takes the same claim inside its own printer, keyed on
+                // the run rather than on an operand node, so it must not be wrapped twice.
+                _ => self.build_value_with_outermost_owned_comment(arg, || {
+                    self.build_flat_chain_expression_doc(arg)
+                }),
             },
         };
         let mut body = DocBuf::new();
@@ -589,7 +637,7 @@ impl<'a> Printer<'a> {
 
     /// Shared logic for return/throw with binaryish arguments.
     ///
-    /// Matches Prettier's `printReturnOrThrowArgument` (function.js:240-252):
+    /// Matches Prettier's `printReturnOrThrowArgument` (`print/return-statement.js`):
     /// when the argument is `isBinaryish`, wraps in `ifBreak("(")...ifBreak(")")`.
     ///
     /// When the expression contains hardlines (multi-line callbacks, block bodies,

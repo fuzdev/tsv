@@ -8,6 +8,16 @@ what makes the break legal; the comment then stays on the line the author gave
 it. A comment that does **not** force a break still collapses inline
 (`yield /* c */ x ?? y`) and the redundant parens are dropped as usual.
 
+Three spellings force it, and the third is the one worth naming: a `//`, a
+comment the author left on its own line, and a **block comment whose own text
+spans a line** — a `MultiLineComment` holding a `LineTerminator` *is* one for
+ASI (ECMA-262 §12.4 / sec-comments), so `yield (/* a⏎b */ x ?? y)` is as
+unprintable bare as `yield (/* c */⏎x ?? y)` even though the comment is glued to
+the operand. tsv reads all three through one predicate for all three restricted
+productions; prettier reads the third one too (`returnArgumentHasLeadingComment`
+asks `hasNewlineInRange(locStart(comment), locEnd(comment))`), just not at
+`yield`.
+
 This is the same rule tsv already applies to `return` and `throw`, the other
 two restricted productions — prettier applies it there too
 (`printReturnOrThrowArgument`), but its paren-retention check is scoped to
