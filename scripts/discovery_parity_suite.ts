@@ -88,11 +88,18 @@ export const register_discovery_parity_suite = (
 						const result = spawnSync(process.execPath, [cli_path, 'format', '--list', ...args], {
 							encoding: 'utf-8'
 						});
+						// A diagnostic names paths too — an argument's display path is echoed as
+						// given — so stderr takes the same normalization as the stdout listing
+						// below: a needle in the table is written `/`-joined, and on Windows an
+						// un-normalized diagnostic reads back `\`-joined and carries no needle
+						// at all. The native harness (`tests/discovery_parity.rs`) normalizes
+						// its warnings channel for the same reason.
+						const stderr = to_posix(result.stderr);
 						if (error !== undefined) {
 							assert.equal(result.status, 2, `${scenario.name} [target=${label}]: expected exit 2`);
 							assert.ok(
-								result.stderr.includes(error),
-								`${scenario.name} [target=${label}]: expected stderr to contain ${JSON.stringify(error)}, got ${JSON.stringify(result.stderr)}`
+								stderr.includes(error),
+								`${scenario.name} [target=${label}]: expected stderr to contain ${JSON.stringify(error)}, got ${JSON.stringify(stderr)}`
 							);
 							assert.equal(result.stdout.trim(), '', `${scenario.name} [target=${label}]`);
 							continue;
@@ -107,15 +114,15 @@ export const register_discovery_parity_suite = (
 						// `warns`: substrings each of which some `warning:` line must carry
 						for (const needle of warns ?? []) {
 							assert.ok(
-								result.stderr.includes(needle),
-								`${scenario.name} [target=${label}]: expected a warning containing ${JSON.stringify(needle)}, stderr: ${JSON.stringify(result.stderr)}`
+								stderr.includes(needle),
+								`${scenario.name} [target=${label}]: expected a warning containing ${JSON.stringify(needle)}, stderr: ${JSON.stringify(stderr)}`
 							);
 						}
 						// `no_warns`: substrings no warning may carry
 						for (const needle of no_warns ?? []) {
 							assert.ok(
-								!result.stderr.includes(needle),
-								`${scenario.name} [target=${label}]: expected no warning containing ${JSON.stringify(needle)}, stderr: ${JSON.stringify(result.stderr)}`
+								!stderr.includes(needle),
+								`${scenario.name} [target=${label}]: expected no warning containing ${JSON.stringify(needle)}, stderr: ${JSON.stringify(stderr)}`
 							);
 						}
 					}

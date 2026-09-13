@@ -143,7 +143,17 @@ fn discover_case(
             s.strip_prefix(&prefix).unwrap_or(&s).to_string()
         })
         .collect();
-    Ok((files, discovered.diagnostics.warnings))
+    // A warning names paths too — an argument's display path is echoed as given — so the
+    // warnings channel takes the same normalization as the file list above: a needle in
+    // the table is written `/`-joined, and on Windows an un-normalized warning reads back
+    // `\`-joined and carries no needle at all.
+    let warnings = discovered
+        .diagnostics
+        .warnings
+        .iter()
+        .map(|warning| warning.replace('\\', "/"))
+        .collect();
+    Ok((files, warnings))
 }
 
 /// The substrings a case lists under `key` (`warns` / `no_warns`) — none when absent.
