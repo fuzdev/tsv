@@ -36,4 +36,19 @@
 
 	// control: a block the author glued to the `(` stays inline
 	type R = S | ( /* c10 */ T);
+
+	// a block the author opened a line for and then glued to the member: the union's
+	// own-line test reads the newline BEFORE alone, so it hoists like the rest
+	type U = V | (
+	/* c11 */ W);
+
+	// the same, as a pair the author glued together on that line
+	type X = Y | (
+	/* c12 */ /* c13 */
+	Z);
+
+	// control: a FIRST member has no preceding member for the union's handler to bind to,
+	// so the same spelling takes the leading rule instead and stays inline
+	type AA = (
+	/* c14 */ BB) | CC;
 </script>

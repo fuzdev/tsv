@@ -3,11 +3,13 @@
 	// needs no pair, so a leading line comment inside it cannot stay "inside"; tsv leads
 	// the member with it on its own line (prettier lifts it onto the `&` line,
 	// divergent_variant_redundant_paren)
-	type Mid = a & (// c1
+	type Mid = a & (
+	// c1
 	| b) & d;
 
 	// nested redundant parens collapse the same way, comment still leading the member
-	type Nested = p & ((// c2
+	type Nested = p & ((
+	// c2
 	| q)) & r;
 
 	// a ONE-member intersection prints as just its member, so even a real 2-member union's

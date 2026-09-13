@@ -1966,11 +1966,15 @@ impl<'a> Printer<'a> {
     /// would then print nothing at all, and a suppression with no counterpart emitter is a
     /// DROP, not a de-duplication ([`comments.md`](../../../../docs/comments.md) hazard 1).
     /// Pairs with [`Self::shell_leading_run_claimed`], the read side.
-    pub(in crate::printer) fn with_claimed_shell_leading_run(
+    ///
+    /// Generic in what `build` yields, so a caller that must also hand something BACK out
+    /// of the claimed scope — an intersection member's lifted trailing run, which only the
+    /// NEXT boundary can place — does not have to smuggle it through a scratch buffer.
+    pub(in crate::printer) fn with_claimed_shell_leading_run<T>(
         &self,
         shell: Option<Span>,
-        build: impl FnOnce() -> DocId,
-    ) -> DocId {
+        build: impl FnOnce() -> T,
+    ) -> T {
         if shell.is_none() {
             return build();
         }

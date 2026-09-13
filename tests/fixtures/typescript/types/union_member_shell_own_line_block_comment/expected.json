@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 922,
+	"end": 1419,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -329,24 +329,168 @@
 					"column": 23
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " a block the author opened a line for and then glued to the member: the union's",
+			"start": 914,
+			"end": 995,
+			"loc": {
+				"start": {
+					"line": 48,
+					"column": 1
+				},
+				"end": {
+					"line": 48,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own-line test reads the newline BEFORE alone, so it hoists like the rest",
+			"start": 997,
+			"end": 1072,
+			"loc": {
+				"start": {
+					"line": 49,
+					"column": 1
+				},
+				"end": {
+					"line": 49,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c11 ",
+			"start": 1091,
+			"end": 1100,
+			"loc": {
+				"start": {
+					"line": 52,
+					"column": 2
+				},
+				"end": {
+					"line": 52,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the same, as a pair the author glued together on that line",
+			"start": 1110,
+			"end": 1171,
+			"loc": {
+				"start": {
+					"line": 55,
+					"column": 1
+				},
+				"end": {
+					"line": 55,
+					"column": 62
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c12 ",
+			"start": 1190,
+			"end": 1199,
+			"loc": {
+				"start": {
+					"line": 58,
+					"column": 2
+				},
+				"end": {
+					"line": 58,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c13 ",
+			"start": 1200,
+			"end": 1209,
+			"loc": {
+				"start": {
+					"line": 58,
+					"column": 12
+				},
+				"end": {
+					"line": 58,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " control: a FIRST member has no preceding member for the union's handler to bind to,",
+			"start": 1219,
+			"end": 1305,
+			"loc": {
+				"start": {
+					"line": 61,
+					"column": 1
+				},
+				"end": {
+					"line": 61,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " so the same spelling takes the leading rule instead and stays inline",
+			"start": 1307,
+			"end": 1378,
+			"loc": {
+				"start": {
+					"line": 62,
+					"column": 1
+				},
+				"end": {
+					"line": 62,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c14 ",
+			"start": 1390,
+			"end": 1399,
+			"loc": {
+				"start": {
+					"line": 63,
+					"column": 11
+				},
+				"end": {
+					"line": 63,
+					"column": 20
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 921,
+		"end": 1418,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 912,
+			"end": 1409,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 47,
+					"line": 64,
 					"column": 9
 				}
 			},
@@ -1331,6 +1475,402 @@
 							"value": " control: a block the author glued to the `(` stays inline",
 							"start": 824,
 							"end": 884
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1074,
+					"end": 1107,
+					"loc": {
+						"start": {
+							"line": 50,
+							"column": 1
+						},
+						"end": {
+							"line": 53,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1079,
+						"end": 1080,
+						"loc": {
+							"start": {
+								"line": 50,
+								"column": 6
+							},
+							"end": {
+								"line": 50,
+								"column": 7
+							}
+						},
+						"name": "U"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 1085,
+						"end": 1106,
+						"loc": {
+							"start": {
+								"line": 51,
+								"column": 2
+							},
+							"end": {
+								"line": 53,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 1087,
+								"end": 1088,
+								"loc": {
+									"start": {
+										"line": 51,
+										"column": 4
+									},
+									"end": {
+										"line": 51,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1087,
+									"end": 1088,
+									"loc": {
+										"start": {
+											"line": 51,
+											"column": 4
+										},
+										"end": {
+											"line": 51,
+											"column": 5
+										}
+									},
+									"name": "V"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1105,
+								"end": 1106,
+								"loc": {
+									"start": {
+										"line": 53,
+										"column": 4
+									},
+									"end": {
+										"line": 53,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1105,
+									"end": 1106,
+									"loc": {
+										"start": {
+											"line": 53,
+											"column": 4
+										},
+										"end": {
+											"line": 53,
+											"column": 5
+										}
+									},
+									"name": "W"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c11 ",
+										"start": 1091,
+										"end": 1100
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block the author opened a line for and then glued to the member: the union's",
+							"start": 914,
+							"end": 995
+						},
+						{
+							"type": "Line",
+							"value": " own-line test reads the newline BEFORE alone, so it hoists like the rest",
+							"start": 997,
+							"end": 1072
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1173,
+					"end": 1216,
+					"loc": {
+						"start": {
+							"line": 56,
+							"column": 1
+						},
+						"end": {
+							"line": 59,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1178,
+						"end": 1179,
+						"loc": {
+							"start": {
+								"line": 56,
+								"column": 6
+							},
+							"end": {
+								"line": 56,
+								"column": 7
+							}
+						},
+						"name": "X"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 1184,
+						"end": 1215,
+						"loc": {
+							"start": {
+								"line": 57,
+								"column": 2
+							},
+							"end": {
+								"line": 59,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 1186,
+								"end": 1187,
+								"loc": {
+									"start": {
+										"line": 57,
+										"column": 4
+									},
+									"end": {
+										"line": 57,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1186,
+									"end": 1187,
+									"loc": {
+										"start": {
+											"line": 57,
+											"column": 4
+										},
+										"end": {
+											"line": 57,
+											"column": 5
+										}
+									},
+									"name": "Y"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1214,
+								"end": 1215,
+								"loc": {
+									"start": {
+										"line": 59,
+										"column": 4
+									},
+									"end": {
+										"line": 59,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1214,
+									"end": 1215,
+									"loc": {
+										"start": {
+											"line": 59,
+											"column": 4
+										},
+										"end": {
+											"line": 59,
+											"column": 5
+										}
+									},
+									"name": "Z"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c12 ",
+										"start": 1190,
+										"end": 1199
+									},
+									{
+										"type": "Block",
+										"value": " c13 ",
+										"start": 1200,
+										"end": 1209
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same, as a pair the author glued together on that line",
+							"start": 1110,
+							"end": 1171
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1380,
+					"end": 1408,
+					"loc": {
+						"start": {
+							"line": 63,
+							"column": 1
+						},
+						"end": {
+							"line": 63,
+							"column": 29
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1385,
+						"end": 1387,
+						"loc": {
+							"start": {
+								"line": 63,
+								"column": 6
+							},
+							"end": {
+								"line": 63,
+								"column": 8
+							}
+						},
+						"name": "AA"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 1400,
+						"end": 1407,
+						"loc": {
+							"start": {
+								"line": 63,
+								"column": 21
+							},
+							"end": {
+								"line": 63,
+								"column": 28
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 1400,
+								"end": 1402,
+								"loc": {
+									"start": {
+										"line": 63,
+										"column": 21
+									},
+									"end": {
+										"line": 63,
+										"column": 23
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1400,
+									"end": 1402,
+									"loc": {
+										"start": {
+											"line": 63,
+											"column": 21
+										},
+										"end": {
+											"line": 63,
+											"column": 23
+										}
+									},
+									"name": "BB"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1405,
+								"end": 1407,
+								"loc": {
+									"start": {
+										"line": 63,
+										"column": 26
+									},
+									"end": {
+										"line": 63,
+										"column": 28
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1405,
+									"end": 1407,
+									"loc": {
+										"start": {
+											"line": 63,
+											"column": 26
+										},
+										"end": {
+											"line": 63,
+											"column": 28
+										}
+									},
+									"name": "CC"
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c14 ",
+								"start": 1390,
+								"end": 1399
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " control: a FIRST member has no preceding member for the union's handler to bind to,",
+							"start": 1219,
+							"end": 1305
+						},
+						{
+							"type": "Line",
+							"value": " so the same spelling takes the leading rule instead and stays inline",
+							"start": 1307,
+							"end": 1378
 						}
 					]
 				}

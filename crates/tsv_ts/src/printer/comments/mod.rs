@@ -191,6 +191,15 @@ pub(crate) enum ShellPair {
     /// it or lays the value out by its own rule — and several of those gaps deliberately
     /// COLLAPSE an isolated own-line block (the annotation `:` for a non-composite type,
     /// the prefix operators, a conditional's `extends`).
+    ///
+    /// ⚠️ **The MEMBER gaps are not among them, and that list is the whole of the set.** A
+    /// union or intersection member's stripped shell puts its run at the member gap, which
+    /// keeps the author's line — the seams `Printer::intersection_member_shell_run` and
+    /// `Printer::member_shell_own_line_run_region` own, both emitting through
+    /// [`Printer::push_leading_comment_run`]. So this arm is reached for a member only with
+    /// a run that does NOT keep a line of its own, where the collapse is the right answer
+    /// by construction. Read as the universal stripped answer, it collapsed an own-line
+    /// block after the `&` and a union's `| ` alike.
     Stripped,
 }
 
@@ -1611,7 +1620,9 @@ impl<'a> Printer<'a> {
     /// gaps deliberately COLLAPSE an isolated own-line block (the annotation `:`, the
     /// prefix operators, a conditional's `extends`). A hardline emitted here at the shell's
     /// own indent is neither answer: it is the placement the bare authoring never produces,
-    /// so the reparse re-laid it and the format stopped being idempotent.
+    /// so the reparse re-laid it and the format stopped being idempotent. The MEMBER gaps
+    /// left that set and claim instead — see the ⚠️ on [`ShellPair::Stripped`], which is
+    /// why this emitter now sees only runs the collapse is right for.
     ///
     /// `line_comments` names who owns them ([`ShellLeadingRun`]):
     /// [`ShellLeadingRun::Upstream`] where an emitter above already placed them (the
