@@ -66,10 +66,11 @@
 use super::ParenContext;
 use super::Printer;
 use super::comments::next_significant_byte;
+use super::needs_parens::joins_a_trailing_angle_bracket;
 use super::types::TrailingBlock;
 use super::types::helpers::{TypeParenRule, outermost_paren, paren_shell_gaps};
 use super::unwrap_parenthesized;
-use crate::ast::internal::{self, BinaryOperator, Comment, TSType};
+use crate::ast::internal::{self, Comment, TSType};
 use crate::lexer::{is_es_line_terminator, is_es_whitespace};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
@@ -169,9 +170,9 @@ pub(in crate::printer) enum FrozenOperandPair {
     ///
     /// `required` is the verdict the position ALREADY HOLDS, where it holds one the free
     /// function cannot reproduce. A linearized chain is that position: `ChainNode::Base`
-    /// carries `needs_parens: true` by construction at three sites the free function never
-    /// reaches from the node alone — a sealed optional chain, a paren base ahead of a `!`,
-    /// and a `TSInstantiationExpression` member object — so re-deriving the verdict here
+    /// carries `needs_parens: true` by construction at two sites the free function never
+    /// reaches from the node alone — a sealed optional chain and a paren base ahead of a
+    /// `!` — so re-deriving the verdict here
     /// dropped the pair and re-bound the output (`(a?.b).k` printed `a?.b.k`, which
     /// short-circuits where the input throws). Every other position holds no verdict of its
     /// own and passes `false`; the free function is still asked either way, so the two are
@@ -196,40 +197,6 @@ impl FrozenOperandPair {
             required: false,
         }
     }
-}
-
-/// Whether a binary operator's printed spelling JOINS a `>` the operand before it ended on
-/// — the tail half of [`Printer::frozen_slice_absorbs_left_binding_suffix`]'s join question.
-///
-/// The answer is a REJECTION table over the three parsers that grade the output — tsc,
-/// acorn-typescript and tsv itself — plus the one operator pair that rebinds silently. A tail
-/// joins when the bare spelling is not a form all three read as the input meant:
-///
-/// - `+` and `-` are the operators that also OPEN an expression, so the `>` takes the
-///   operator's own right-hand side and the whole thing reads as a relational chain
-///   (`new X<T> + 1` is `((new X) < T) > +1` at every parser, tsv included) — accepted
-///   everywhere and a different tree everywhere;
-/// - `>`, `>>` and `>>>` are rejected by all three;
-/// - `<` and `>=` are rejected by **tsc** (`'>' expected` / `Expression expected`), and so by
-///   prettier, which is a front end for it. acorn-typescript and tsv accept them as the same
-///   tree, which is exactly why no reparse of tsv's own output can see the loss;
-/// - `<<` is the mirror: tsc accepts it as the same tree, and **acorn-typescript** rejects it.
-///   tsv is acorn's drop-in, so the pair stays.
-///
-/// Every other operator lets all three backtrack to the type arguments, which is what makes
-/// the bare spelling AST-identical there.
-const fn joins_a_trailing_angle_bracket(op: BinaryOperator) -> bool {
-    matches!(
-        op,
-        BinaryOperator::Plus
-            | BinaryOperator::Minus
-            | BinaryOperator::LessThan
-            | BinaryOperator::GreaterThan
-            | BinaryOperator::GreaterThanEquals
-            | BinaryOperator::LeftShift
-            | BinaryOperator::RightShift
-            | BinaryOperator::UnsignedRightShift
-    )
 }
 
 pub(in crate::printer) fn is_freeze_target(child: &TSType<'_>) -> bool {
@@ -807,7 +774,8 @@ impl<'a> Printer<'a> {
     ///   RELATIONAL reading (`((new X) < T) > [0]`), and `.k` / `!` are rejected outright by
     ///   tsc, acorn-typescript and tsv alike — AND at the operator tails whose first token
     ///   joins that `>` ([`joins_a_trailing_angle_bracket`], whose doc carries the
-    ///   per-operator table): `+` and `-` continue it as a relational chain
+    ///   per-operator table, and which the unfrozen printer's instantiation-tail rule
+    ///   reads too): `+` and `-` continue it as a relational chain
     ///   (`new X<T> + 1` is `((new X) < T) > +1`, a silent rebind every parser agrees on), and
     ///   `>` / `>>` / `>>>` / `<` / `>=` / `<<` leave a form at least one of tsc and
     ///   acorn-typescript rejects. Every other operator — `*`, `**`, `<=`, `?:`, `??`, `||`,
@@ -826,10 +794,11 @@ impl<'a> Printer<'a> {
     /// absent from the context list because it never reaches this seam: the `new`→callee gap
     /// has a freeze of its own.
     ///
-    /// TODO: the sibling **instantiation** slice (`f<T>`) ends in `>` too and joins the same
-    /// tails (`f<T> + 1`, `` f<T>`t` ``, `f<T>()`, `f<T>.k`), but its UNFROZEN printer already
-    /// emits those bare and prettier matches tsv there — a shared pre-existing bug in the
-    /// paren rule rather than a freeze question, so it is not answered here.
+    /// The sibling **instantiation** slice (`f<T>`) ends in `>` too and joins the same
+    /// tails, but needs nothing here: its printed form carries the same bytes as the slice
+    /// (there is no argument list to add), so the unfrozen verdict this seam ORs with —
+    /// `ends_with_instantiation_close` at a binary left, `NonNull`, a postfix update, a
+    /// chain base — already keeps the pair at every joining tail, frozen or not.
     fn frozen_slice_absorbs_left_binding_suffix(
         &self,
         operand: &internal::Expression<'_>,
