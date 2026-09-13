@@ -12,11 +12,28 @@
 // space and which is glue — is `crate::printer::values`'s `ValueOperator` rule, which
 // reads the members this produces.
 //
+// A run that is **one operator token** is a member too, and that is not a special case
+// but the same rule read at a whitespace boundary: `1.5 / 2.5`, `1.5 * - 2.5` and
+// `--x: a : b` each put the operator in an element of its own, and it reaches the list as
+// a `CssValue::Operator` exactly as a glued one does. Only an operand run of one token
+// answers "no split".
+//
 // ⚠️ **The boundary set is not one class of byte.** `*` and `+` end a run wherever they
 // occur; `/` and `-` end a **number** (or a closed group / function) and are ordinary
 // content inside a word. That asymmetry is postcss's, and it is observable: `1.5/2.5` is
 // three nodes and normalizes on both sides, where `a/1.5` is a single word whose `1.5`
 // prettier leaves exactly as written.
+//
+// Where an OPERAND is expected — the run's head, or straight after another operator — the
+// question is a third one, and the two signs ask it of **different grammars**
+// ([`operator_at_operand_position`]). The `+` asks postcss's: does the next TOKEN come
+// back as a word, so that the sign is the word's own ([`starts_word`])? The `-` asks
+// css-syntax-3's, of itself: would the `-` and the byte after it start an identifier
+// (§4.3.9) or a number (§4.3.10) (the lexer's [`hyphen_starts_own_token`])? The two agree
+// on every byte that opens an ident or a number, and part at the bytes postcss's word scan
+// runs through but no token production does. That is the RULE; the fifteen bytes it picks
+// out of printable ASCII were measured, and the "Hyphen word extent at an operand
+// position" entry in `docs/conformance_prettier_css.md` enumerates them.
 //
 // Three more members are not operators but end every token they touch, each with its
 // own extent, each measured rather than reasoned from a class:
@@ -30,20 +47,25 @@
 //   property's value, where css-syntax-3 keeps the original text whatever it holds (a
 //   non-custom property refuses a top-level `{}`-block beside any other value; both
 //   parsers reject `b: a{1.5}c`). The word between the braces is a member of its own and
-//   normalizes (`a{1.50}c(2.50)` → `a{1.5}c(2.5)`), which is why the brace is not word
-//   content the way `[` is (`a[1.50]c` keeps its number: the oracle never descends into
-//   a `[…]` block);
+//   normalizes (`a{1.50}c(2.50)` → `a{1.5}c(2.5)`, and its own `:` splits there like any
+//   other), which is why the brace is not word content the way `[` is (`a[1.50]c` keeps
+//   its number: prettier's value *parser* does not descend into a `[…]` block, though its
+//   word tokenizer still ends a word at a `*` or `+` inside the brackets and its printer
+//   then spaces the pieces — a cataloged divergence,
+//   `css/values/operators/bracket_block_operator_prettier_divergence`);
 // - a **welded `+`**: postcss's `operator()` returns `this.word()` for a `+` that opens
 //   the value or follows an operator when the next token is a word, so the sign is the
 //   word's own — `+a(2.50)` is the function `+a` and normalizes to `+a(2.5)`, `1.50 / +a`
 //   → `1.5 / +a`. Anywhere else (after a member, at the head of a function's arguments
 //   or of a group — the `(` is a node there — and after a comma) the `+` is an operator
 //   and prints spaced (`f(+a(2.50))` → `f(+ a(2.5))`). Before a group, a string, an
-//   `@`-word or another operator nothing welds (`+(2.5)`, `+'x'`, `+ @a`, `+ +a`).
+//   `@`-word or another operator nothing welds (`+(2.5)`, `+'x'`, `+ @a`, `+ +a`), and
+//   nothing welds after a `:` either — a `colon` node is no operator for a sign to bind to
+//   (`--x: a:+b` → `a: + b`).
 
 use super::scan::{comment_end, is_comment_start, matching_close_paren};
 use crate::escapes::escape_len;
-use crate::lexer::string_end;
+use crate::lexer::{hyphen_starts_own_token, string_end};
 use crate::number::number_part_len;
 
 /// What the token just emitted was, which is what decides whether a following `/` or `-`
@@ -61,28 +83,50 @@ enum TokenKind {
     Closed,
 }
 
+/// What stands to the left of the position being read — the whole of what the operator
+/// question turns on, since a byte's reading is its position's.
+///
+/// [`Preceding::Head`] and [`Preceding::Operator`] share one arm of that question (an
+/// operand is what follows either), but they are not one state: at the head a `+` welds
+/// only where the caller says so ([`split_value_run`]'s `head_welds`), and after an
+/// operator it welds unless that operator was the `:` — which is no operator for a sign
+/// to bind to, the same exclusion the element-level rule makes
+/// (`super::parser::ValueParser::member_is_operator`). Read as one state the two rules
+/// disagreed, and `--x: a:+b` formatted to `a: +b` and then to `a: + b`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Preceding {
+    /// Nothing at all: the run's first byte.
+    Head,
+    /// An operator member, and whether that operator was the `:`.
+    Operator { colon: bool },
+    /// An operand token of this kind.
+    Token(TokenKind),
+}
+
 /// A byte that can open an operator after a [`TokenKind::Number`] or
-/// [`TokenKind::Closed`] token — every operator byte there is. `:` is one only inside a
-/// group; see [`split_value_run`]'s `in_group`.
-const fn releases_operator(b: u8, in_group: bool) -> bool {
-    matches!(b, b'*' | b'+' | b'/' | b'-') || (b == b':' && in_group)
+/// [`TokenKind::Closed`] token — every operator byte there is. The `:` is one only where
+/// a `:` can stand as an operator at all; see [`split_value_run`]'s `colon_is_operator`.
+const fn releases_operator(b: u8, colon_is_operator: bool) -> bool {
+    matches!(b, b'*' | b'+' | b'/' | b'-') || (b == b':' && colon_is_operator)
 }
 
 /// A byte that ends a [`TokenKind::Word`]. The strict subset of
 /// [`releases_operator`] that is never an ident code point *and* never glues into a
 /// postcss word: `/` and `-` are missing on purpose.
-const fn ends_word(b: u8, in_group: bool) -> bool {
-    matches!(b, b'*' | b'+') || (b == b':' && in_group)
+const fn ends_word(b: u8, colon_is_operator: bool) -> bool {
+    matches!(b, b'*' | b'+') || (b == b':' && colon_is_operator)
 }
 
 /// A byte that is an operator at a run's START, or straight after another operator.
 ///
-/// `-` is missing on purpose: there it opens an ident (`-webkit-box`) or signs a number,
-/// and a leaf that is nothing *but* a `-` needs no operator node — an ordinary member
-/// takes the same separator on both sides. `+` is in, since it can open neither (a signed
-/// number is claimed by `number_part_len` ahead of this test).
-const fn opens_run(b: u8, in_group: bool) -> bool {
-    matches!(b, b'*' | b'/' | b'+') || (b == b':' && in_group)
+/// `-` is missing on purpose: there it can be the head of the ident or the number after
+/// it (`-webkit-box`, `-1.5`), so whether it is an operator turns on what comes *after*
+/// it, which this one-byte test cannot see. [`operator_at_operand_position`] answers the
+/// `-` with [`hyphen_starts_own_token`]. `+` is in, since it can open neither an ident nor
+/// a number of its own (a signed number is claimed by `number_part_len` ahead of this
+/// test) — only WELD onto a word, which the same caller asks with [`starts_word`].
+const fn opens_run(b: u8, colon_is_operator: bool) -> bool {
+    matches!(b, b'*' | b'/' | b'+') || (b == b':' && colon_is_operator)
 }
 
 /// A byte that ends **every** token kind without being an operator: the `@` that opens an
@@ -104,27 +148,32 @@ const fn ends_atword(b: u8) -> bool {
     )
 }
 
-/// Could a `+` weld onto the byte after it? postcss's condition is "the next token is a
+/// Does the byte after a `+` open a WORD? postcss's condition is "the next token is a
 /// `word`": not a group, a string, an `@`-word, a brace, a comma, a colon, another
 /// operator, or the run's end. Everything else — a letter, `#`, `.`, `\`, `[`, `!`, a
-/// digit the number production did not claim — starts a word.
-const fn starts_word(b: Option<u8>) -> bool {
+/// digit the number production did not claim — starts a word, and the `+` WELDS onto it
+/// (postcss's `operator()` returning `this.word()`).
+///
+/// This is the `+`'s question alone. The `-`'s is [`hyphen_starts_own_token`], which asks
+/// css-syntax-3 of the `-` itself rather than postcss of the token after it: read this way
+/// a `-` before a `[…]` block or a `#` would be the word's first byte, and the same three
+/// bytes then had two readings in one document (see [`operator_at_operand_position`]'s
+/// ⚠️).
+///
+/// A `-` is the one byte the answer cannot be read off alone, which is why the byte
+/// **after** it is a parameter: a single `-` opens an ident or signs a number and the `+`
+/// stays an operator (`+-a` → `+ -a`, `+-1.5` → `+ -1.5`), but a **doubled** one opens the
+/// custom-property-shaped word ([`is_content_pair`]'s first pair), and that word the `+`
+/// welds onto exactly as it welds onto a letter — `+--a`, `+--`, `+----a` and `+-- @a` are
+/// prettier's own output at every position a word welds at (`1.5 * +--a`, `+ +--a`) and at
+/// none of the positions none does (`1.5 + --a`, `f(+ --a)`, `(+ --a)`).
+const fn starts_word(b: Option<u8>, after: Option<u8>) -> bool {
     match b {
         None => false,
+        Some(b'-') => matches!(after, Some(b'-')),
         Some(b) => !matches!(
             b,
-            b'(' | b')'
-                | b'\''
-                | b'"'
-                | b'@'
-                | b'{'
-                | b'}'
-                | b','
-                | b':'
-                | b'*'
-                | b'/'
-                | b'+'
-                | b'-'
+            b'(' | b')' | b'\'' | b'"' | b'@' | b'{' | b'}' | b',' | b':' | b'*' | b'/' | b'+'
         ),
     }
 }
@@ -211,24 +260,33 @@ fn unicode_range_len(bytes: &[u8], i: usize) -> usize {
 /// One member of a split run: its half-open byte range, and whether it is an operator.
 ///
 /// The flag is the splitter's own verdict, carried rather than re-derived. Read back off
-/// the bytes instead, a one-byte **operand** that happens to be an operator character
-/// (the `-` in `1.5*-`, which at that position opens an ident rather than a subtraction)
-/// would be minted as an operator and take a glue rule that is not its own.
+/// the bytes instead, an **operand** that merely opens on an operator character (the `-a`
+/// in `1.5*-a`, where the `-` opens the ident rather than a subtraction) would be minted
+/// as an operator and take a glue rule that is not its own.
+///
+/// It is also what a **one-token** run is split on: the same verdict says whether that
+/// run is the whitespace-delimited operator element (`1.5 / 2.5`) or an ordinary leaf,
+/// so neither the printer's `ValueOperator` nor the weld test
+/// (`super::parser::ValueParser::member_is_operator`) has to spell the bytes again.
 pub(crate) struct ValueToken {
     pub(crate) start: usize,
     pub(crate) end: usize,
     pub(crate) is_operator: bool,
 }
 
-/// The members `run` splits into, or `None` when it is a single token —
+/// The members `run` splits into, or `None` when it is a single **operand** token —
 /// the overwhelmingly common case, which allocates nothing and leaves the caller's
-/// existing leaf classification untouched.
+/// existing leaf classification untouched. A run that is a single token which IS an
+/// operator still splits, into that one member: a whitespace-delimited `/`, `:` or `-`
+/// element (`1.5 / 2.5`, `--x: a : b`) is an operator node to postcss like any other, and
+/// the separator rule reads its kind off the node rather than off its bytes.
 ///
-/// `in_group` says whether the run is inside a function's argument list or a
-/// parenthesized group, which is the only place a `:` can stand as an operator: at the top
-/// level of a declaration value a `:` is not a value token at all (prettier's parser
-/// rejects `a { b: c:d }` outright), so there is no oracle for splitting one and the run
-/// is left as the author wrote it.
+/// `colon_is_operator` says whether a `:` can stand as an operator here: inside a
+/// function's argument list or a parenthesized group, and at the top level of a **custom
+/// property's** value, whose text css-syntax-3 admits whatever it holds. On a plain
+/// property a top-level `:` is not a value token at all (prettier's parser rejects
+/// `a { b: c:d }` outright), so there is no oracle for splitting one and the run is left
+/// as the author wrote it.
 ///
 /// `head_welds` says whether a `+` opening the run welds onto the word after it (the
 /// module doc's third member): true for the first run of a declaration's whole value and
@@ -241,7 +299,7 @@ pub(crate) struct ValueToken {
 /// to that function's own run.
 pub(crate) fn split_value_run(
     run: &str,
-    in_group: bool,
+    colon_is_operator: bool,
     head_welds: bool,
 ) -> Option<Vec<ValueToken>> {
     let bytes = run.as_bytes();
@@ -254,23 +312,24 @@ pub(crate) fn split_value_run(
 
     let mut tokens: Vec<ValueToken> = Vec::new();
     let mut i = 0usize;
-    // What the token before this position was. `None` both at the run's start and right
-    // after an operator, since an operand is what follows either.
-    let mut previous: Option<TokenKind> = None;
+    // What stands to the left of `i` (see [`Preceding`]).
+    let mut previous = Preceding::Head;
 
     while i < len {
-        if operator_stands_here(run, i, previous, in_group, head_welds) {
+        if operator_stands_here(run, i, previous, colon_is_operator, head_welds) {
             tokens.push(ValueToken {
                 start: i,
                 end: i + 1,
                 is_operator: true,
             });
+            previous = Preceding::Operator {
+                colon: bytes[i] == b':',
+            };
             i += 1;
-            previous = None;
             continue;
         }
         let start = i;
-        previous = Some(scan_token(run, &mut i, in_group));
+        previous = Preceding::Token(scan_token(run, &mut i, colon_is_operator));
         debug_assert!(i > start, "a token consumed nothing: {run:?} at {start}");
         tokens.push(ValueToken {
             start,
@@ -279,7 +338,11 @@ pub(crate) fn split_value_run(
         });
     }
 
-    (tokens.len() > 1).then_some(tokens)
+    // A one-token run splits only when that token is an operator (the whitespace-delimited
+    // element above). The verdict is the splitter's own — read back off the bytes, the
+    // `-a` in `1.5*-a` would be minted as an operator it is not (see
+    // [`ValueToken::is_operator`]).
+    (tokens.len() > 1 || tokens.first().is_some_and(|t| t.is_operator)).then_some(tokens)
 }
 
 /// Is the byte at `i` an operator in its own right, given what came before it?
@@ -288,13 +351,13 @@ pub(crate) fn split_value_run(
 /// a number or a closed run releases every operator byte, a word releases only the two
 /// that are never ident content, and at a run's start (or straight after another
 /// operator) only a byte that cannot *begin* an operand can be one — and there a `+`
-/// that can weld (`head_welds` at the run's start, always after an operator) is the
+/// that can weld (`head_welds` at the run's start, after any operator but the `:`) is the
 /// head of the word that follows it, not an operator.
 fn operator_stands_here(
     run: &str,
     i: usize,
-    previous: Option<TokenKind>,
-    in_group: bool,
+    previous: Preceding,
+    colon_is_operator: bool,
     head_welds: bool,
 ) -> bool {
     let bytes = run.as_bytes();
@@ -307,26 +370,72 @@ fn operator_stands_here(
         return false;
     }
     match previous {
-        Some(TokenKind::Number | TokenKind::Closed) => releases_operator(b, in_group),
-        Some(TokenKind::Word) => ends_word(b, in_group),
-        None => {
-            // A `-` straight before an `@`-word is an operator here (postcss tokenizes it
-            // as one, since `@` cannot continue an ident), and the sign rule then glues it
-            // to the word: `-@a` → `-@a`, `f(-@a)`, `1.5 * -@a` — where the same `-` before
-            // a letter opens the ident (`-webkit-box`). Measured on prettier's own
-            // `css/prefix/prefix.css` (`margin-left: -@leftMargin`).
-            if b == b'-' && bytes.get(i + 1) == Some(&b'@') {
-                return true;
-            }
-            opens_run(b, in_group)
-                && number_part_len(&run[i..]) == 0
-                && !(b == b'+' && (i > 0 || head_welds) && starts_word(bytes.get(i + 1).copied()))
+        Preceding::Token(TokenKind::Number | TokenKind::Closed) => {
+            releases_operator(b, colon_is_operator)
+        }
+        Preceding::Token(TokenKind::Word) => ends_word(b, colon_is_operator),
+        // The two positions an OPERAND is expected at differ in exactly one input — whether
+        // a `+` here welds onto the word after it — so they are one reading with that input
+        // named: at the run's head the caller says, and after an operator every operator but
+        // the `:` welds.
+        Preceding::Head => operator_at_operand_position(run, i, colon_is_operator, head_welds),
+        Preceding::Operator { colon } => {
+            operator_at_operand_position(run, i, colon_is_operator, !colon)
         }
     }
 }
 
+/// [`operator_stands_here`] where an OPERAND is expected — at the run's head, or straight
+/// after another operator. Only a byte that cannot *begin* an operand is an operator there.
+///
+/// `plus_welds` says whether a `+` here is the head of the word after it rather than an
+/// operator (postcss's `operator()` returning `this.word()`): a `colon` node is no operator
+/// for a sign to bind to, which is the element-level rule's exclusion too
+/// (`super::parser::ValueParser::member_is_operator`), so `--x: a:+b` and `f(a:+b)` space the
+/// `+` on both sides in one pass where `--x: a: +1.5` keeps the number's own sign.
+///
+/// A `-` here is the operator wherever it opens neither an IDENT (css-syntax-3 §4.3.9)
+/// nor a NUMBER (§4.3.10) of its own, which is the lexer's [`hyphen_starts_own_token`] —
+/// the one reading the printer's glue refusal takes too, so the two cannot part. A
+/// doubled `-` never reaches it ([`operator_stands_here`] answers `--` as content ahead of
+/// this), but §4.3.9 names it and the reading admits it, so they agree by construction.
+///
+/// ⚠️ **Not [`starts_word`], which is the `+`'s question.** postcss's word runs on to the
+/// next byte in a *printer's* end set, so `#`, `.`, `!`, `%`, `[`, `]` and the rest of the
+/// fifteen bytes this module's header names are all word content to it, and a `-` in
+/// front of any of them would be the word's first byte. Read that way the same `-` had
+/// two readings in one document: run-final it is an operator on every reading (`+-` then
+/// ` [a]`), the head rule glued it onto the block, and the glued text `-[a]` then read
+/// back as one word — two passes, two forms. Asking the byte-level question also keeps it
+/// off the token this module would scan, which is a third answer again: a quote and a `[`
+/// are both word CONTENT to [`scan_token_body`], so `-'x'` and `-[a]` each scan whole. See
+/// `tests/fixtures/css/values/operators/hyphen_word_extent_prettier_divergence`.
+fn operator_at_operand_position(
+    run: &str,
+    i: usize,
+    colon_is_operator: bool,
+    plus_welds: bool,
+) -> bool {
+    let bytes = run.as_bytes();
+    let b = bytes[i];
+    let next = bytes.get(i + 1).copied();
+    let after = bytes.get(i + 2).copied();
+    // A `-` here is the operator wherever it does not open an IDENT or a NUMBER of its
+    // own — a quote, a `(`, a `,` / `:` / `{` / `}` / `@` / `*` / `/` / `+`, a `[…]`
+    // block, a `#`, a `!`, and the run's end (`+-'x'`, `+-(2.5)`, `+-/2.5`, `+-*a`,
+    // `--x: +-: a`, `1.5 /-`, `+-[a]`, `+-#a`). A letter, a digit, `_`, `é`, an escape
+    // and a second `-` are the bound, where the `-` is that token's own head and
+    // `-webkit-box`, `-1.5`, `-\61`, `--a` stay whole.
+    if b == b'-' {
+        return !hyphen_starts_own_token(&run[i + 1..]);
+    }
+    opens_run(b, colon_is_operator)
+        && number_part_len(&run[i..]) == 0
+        && !(b == b'+' && plus_welds && starts_word(next, after))
+}
+
 /// Consume one token starting at `*i`, returning what it was.
-fn scan_token(run: &str, i: &mut usize, in_group: bool) -> TokenKind {
+fn scan_token(run: &str, i: &mut usize, colon_is_operator: bool) -> TokenKind {
     let bytes = run.as_bytes();
 
     if bytes[*i] == b'(' {
@@ -337,7 +446,7 @@ fn scan_token(run: &str, i: &mut usize, in_group: bool) -> TokenKind {
     // `starts_word` guaranteed is there and is not a boundary byte.
     if bytes[*i] == b'+' {
         *i += 1;
-        return scan_token(run, i, in_group);
+        return scan_token(run, i, colon_is_operator);
     }
     if bytes[*i] == b'@' {
         return scan_atword(run, i);
@@ -362,16 +471,21 @@ fn scan_token(run: &str, i: &mut usize, in_group: bool) -> TokenKind {
         // The unit. It ends at every operator byte, `/` and `-` included — which is what
         // makes `12px/1.5` a dimension and an operator rather than a dimension whose unit
         // is `px/1.5`.
-        return scan_token_body(run, i, in_group, TokenKind::Number);
+        return scan_token_body(run, i, colon_is_operator, TokenKind::Number);
     }
 
-    scan_token_body(run, i, in_group, TokenKind::Word)
+    scan_token_body(run, i, colon_is_operator, TokenKind::Word)
 }
 
 /// The shared tail of both token shapes: walk content until a boundary this `kind`
 /// releases, stepping every opaque construct whole. A `(` turns the token into a
 /// [`TokenKind::Closed`] one (a function name meeting its argument list, or a bare group).
-fn scan_token_body(run: &str, i: &mut usize, in_group: bool, kind: TokenKind) -> TokenKind {
+fn scan_token_body(
+    run: &str,
+    i: &mut usize,
+    colon_is_operator: bool,
+    kind: TokenKind,
+) -> TokenKind {
     let bytes = run.as_bytes();
     let len = bytes.len();
 
@@ -417,8 +531,8 @@ fn scan_token_body(run: &str, i: &mut usize, in_group: bool, kind: TokenKind) ->
             continue;
         }
         let boundary = match kind {
-            TokenKind::Number | TokenKind::Closed => releases_operator(b, in_group),
-            TokenKind::Word => ends_word(b, in_group),
+            TokenKind::Number | TokenKind::Closed => releases_operator(b, colon_is_operator),
+            TokenKind::Word => ends_word(b, colon_is_operator),
         };
         if boundary {
             return kind;
@@ -523,13 +637,15 @@ mod tests {
 
     /// The members as text. Every member that is an operator is spelled with its own
     /// byte, so the `is_operator` tag is graded by the same assertion as the split. The
-    /// run is read as a declaration value's first (`head_welds`) unless `in_group`.
-    fn split(run: &str, in_group: bool) -> Option<Vec<String>> {
-        split_at(run, in_group, !in_group)
+    /// run is read as a group's interior when `in_group_interior` — where a `:` is an
+    /// operator and the head does not weld — and as a plain declaration value's first run
+    /// otherwise.
+    fn split(run: &str, in_group_interior: bool) -> Option<Vec<String>> {
+        split_at(run, in_group_interior, !in_group_interior)
     }
 
-    fn split_at(run: &str, in_group: bool, head_welds: bool) -> Option<Vec<String>> {
-        split_value_run(run, in_group, head_welds).map(|tokens| {
+    fn split_at(run: &str, colon_is_operator: bool, head_welds: bool) -> Option<Vec<String>> {
+        split_value_run(run, colon_is_operator, head_welds).map(|tokens| {
             tokens
                 .into_iter()
                 .map(|t| {
@@ -634,15 +750,115 @@ mod tests {
         assert_eq!(split("aa*bb/cc", false).unwrap(), ["aa", "op *", "bb/cc"]);
     }
 
-    /// A `:` is an operator only inside a group — at the top level of a declaration
-    /// value there is no oracle for splitting one. Inside an `@`-word it is content
-    /// anywhere.
+    /// A `:` is an operator only where `colon_is_operator` says it can stand as one —
+    /// inside a group, and at the top level of a custom property's value (where the head
+    /// still welds, unlike a group's). On a plain property there is no oracle for
+    /// splitting one. Inside an `@`-word it is content anywhere.
     #[test]
-    fn a_colon_splits_only_inside_a_group() {
+    fn a_colon_splits_only_where_it_is_an_operator() {
         assert_eq!(split("a:1.5", false), None);
         assert_eq!(split("a:1.5", true).unwrap(), ["a", "op :", "1.5"]);
         assert_eq!(split("1.5:2.5", true).unwrap(), ["1.5", "op :", "2.5"]);
         assert_eq!(split("@a:1.5", true), None);
+        // a custom property's value: the colon splits and the head still welds
+        assert_eq!(split_at("a:1.5", true, true).unwrap(), ["a", "op :", "1.5"]);
+        assert_eq!(split_at("+a(2.5)", true, true), None);
+        assert_eq!(split_at("a:1.5", false, true), None);
+        // a colon that opens the run, and two in a row, are members of their own
+        assert_eq!(split_at(":a", true, true).unwrap(), ["op :", "a"]);
+        assert_eq!(
+            split_at("a::1.5", true, true).unwrap(),
+            ["a", "op :", "op :", "1.5"]
+        );
+        // the sign the author glued to the digits after a colon is the number's own
+        assert_eq!(
+            split_at("a:+1.5", true, true).unwrap(),
+            ["a", "op :", "+1.5"]
+        );
+        // a `{…}` block's interior splits at its colon like any other run
+        assert_eq!(
+            split_at("a{--b:1.5}c", true, true).unwrap(),
+            ["a", "{", "--b", "op :", "1.5", "}", "c"]
+        );
+        // a doubled `/` is content, so a URL-shaped value is a word, a colon and a word
+        assert_eq!(
+            split_at("https://a.fuz.dev/b", true, true).unwrap(),
+            ["https", "op :", "//a.fuz.dev/b"]
+        );
+    }
+
+    /// A run that is one **operator** token is a member of its own — the
+    /// whitespace-delimited element (`1.5 / 2.5`, `--x: a : b`, `1.5 * - 2.5`), which
+    /// reaches the list as an operator node rather than as a word spelled with the
+    /// operator's byte.
+    #[test]
+    fn a_one_token_operator_run_is_a_member() {
+        assert_eq!(split("/", false).unwrap(), ["op /"]);
+        assert_eq!(split("*", false).unwrap(), ["op *"]);
+        assert_eq!(split("+", false).unwrap(), ["op +"]);
+        assert_eq!(split("-", false).unwrap(), ["op -"]);
+        // and the bytes postcss's word scan runs THROUGH but no token production opens on:
+        // a `[…]` block, a `#`, a `.` no digit follows, a `!`
+        assert_eq!(split("-[a]", false).unwrap(), ["op -", "[a]"]);
+        assert_eq!(split("-#a", false).unwrap(), ["op -", "#a"]);
+        assert_eq!(split("-.a", false).unwrap(), ["op -", ".a"]);
+        assert_eq!(split("-!a", false).unwrap(), ["op -", "!a"]);
+        assert_eq!(split(":", true).unwrap(), ["op :"]);
+        // …and only where the byte really is one: a plain property's `:` is content
+        assert_eq!(split(":", false), None);
+        // a one-token OPERAND run still answers `None`, which is nearly every value
+        assert_eq!(split("1.5", false), None);
+        assert_eq!(split("-a", false), None);
+        assert_eq!(split("-1.5", false), None);
+    }
+
+    /// A `-` where an OPERAND is expected is the operator wherever it opens neither an
+    /// IDENT (css-syntax-3 §4.3.9) nor a NUMBER (§4.3.10) of its own — a quote, a `(`, a
+    /// `)`, a `,`, a `:`, a brace, an `@`, a `*`, a `/`, a `+`, a `[…]` block, a `#`, a
+    /// `!`, or the run's end — and that token's own head wherever it does. The question is
+    /// the byte's, not the token this module would scan: `-'x'` and `-[a]` both scan whole
+    /// here, and both of them split.
+    #[test]
+    fn a_hyphen_is_the_operator_wherever_it_opens_no_token_of_its_own() {
+        assert_eq!(split("-'x'", false).unwrap(), ["op -", "'x'"]);
+        assert_eq!(split(r#"-"x""#, false).unwrap(), ["op -", r#""x""#]);
+        assert_eq!(split("-(2.5)", false).unwrap(), ["op -", "(2.5)"]);
+        assert_eq!(split("-,a", false).unwrap(), ["op -", ",a"]);
+        assert_eq!(split("-)", false).unwrap(), ["op -", ")"]);
+        assert_eq!(split_at("-:a", true, true).unwrap(), ["op -", "op :", "a"]);
+        assert_eq!(split("-{1.5}", false).unwrap(), ["op -", "{", "1.5", "}"]);
+        assert_eq!(split("-@a", false).unwrap(), ["op -", "@a"]);
+        assert_eq!(split("-*a", false).unwrap(), ["op -", "op *", "a"]);
+        assert_eq!(split("-/2.5", false).unwrap(), ["op -", "op /", "2.5"]);
+        assert_eq!(split("-+a", false).unwrap(), ["op -", "+a"]);
+        assert_eq!(split("-+1.5", false).unwrap(), ["op -", "+1.5"]);
+        assert_eq!(split("-", false).unwrap(), ["op -"]);
+        // and the same reading straight after another operator, where the head's `+` is
+        // an operator of its own because a `-` opens no word for it to weld onto
+        assert_eq!(split("+-'x'", false).unwrap(), ["op +", "op -", "'x'"]);
+        assert_eq!(split("+-(2.5)", false).unwrap(), ["op +", "op -", "(2.5)"]);
+        assert_eq!(
+            split("1.5*-+a", false).unwrap(),
+            ["1.5", "op *", "op -", "+a"]
+        );
+        // the bound: a byte that DOES open an ident or a number keeps the `-` inside it —
+        // an ident (`-webkit-box`), a number, a `.`-opened number, an escape, `_`, a
+        // non-ASCII ident code point, and the doubled `-` that opens a
+        // custom-property-shaped word
+        assert_eq!(split("-webkit-box", false), None);
+        assert_eq!(split("-1.5", false), None);
+        assert_eq!(split("-.5", false), None);
+        assert_eq!(split(r"-\61", false), None);
+        assert_eq!(split("-_a", false), None);
+        assert_eq!(split("-\u{e9}", false), None);
+        assert_eq!(split("--a", false), None);
+        // the `+` keeps postcss's word for its own weld, so the two signs part exactly at
+        // the bytes above: the `+` is an operator before a `-` that opens no word of its
+        // own, and the `-` behind it is one before a `[…]` block where it is not before a
+        // letter
+        assert_eq!(split("+-[a]", false).unwrap(), ["op +", "op -", "[a]"]);
+        assert_eq!(split("+-a", false).unwrap(), ["op +", "-a"]);
+        assert_eq!(split("+[a]", false), None);
     }
 
     /// An `@`-word ends every token before it and is ended by its own set: a quote, a
@@ -749,6 +965,26 @@ mod tests {
         assert_eq!(split_at("+1.5", true, false), None);
     }
 
+    /// The word a `+` welds onto can be the custom-property-shaped one: a DOUBLED `-`
+    /// opens it where a single one opens an ident or signs a number.
+    #[test]
+    fn a_plus_welds_onto_a_doubled_dash_word() {
+        assert_eq!(split("+--a", false), None);
+        assert_eq!(split("+--", false), None);
+        assert_eq!(split("+----a", false), None);
+        assert_eq!(split("+--@a", false).unwrap(), ["+--", "@a"]);
+        assert_eq!(split("1.5*+--a", false).unwrap(), ["1.5", "op *", "+--a"]);
+        assert_eq!(split("++--a", false).unwrap(), ["op +", "+--a"]);
+        // a single `-` after the sign is the ident's or the number's, and the `+` stays
+        // an operator
+        assert_eq!(split("+-a", false).unwrap(), ["op +", "-a"]);
+        assert_eq!(split("+-1.5", false).unwrap(), ["op +", "-1.5"]);
+        // and at the positions no word welds at, neither does this one
+        assert_eq!(split_at("+--a", true, false).unwrap(), ["op +", "--a"]);
+        assert_eq!(split_at("+--a", false, false).unwrap(), ["op +", "--a"]);
+        assert_eq!(split("1.5+--a", false).unwrap(), ["1.5", "op +", "--a"]);
+    }
+
     /// A single `/` still splits where the doubled one does not.
     #[test]
     fn a_lone_slash_still_splits() {
@@ -756,13 +992,51 @@ mod tests {
         assert_eq!(split("1.5/", false).unwrap(), ["1.5", "op /"]);
     }
 
-    /// A one-byte member is not an operator just because its byte is one: at a run's
-    /// start — or, as here, straight after another operator — a `-` opens an ident, so
-    /// the last member of `1.5*-` is an OPERAND. Re-deriving the tag from the byte is
-    /// what `ValueToken::is_operator` exists to avoid.
+    /// A member is not an operator just because it BEGINS with one's byte: at a run's
+    /// start — or, as here, straight after another operator — a `-` before an ident code
+    /// point opens the ident, so `-a` is an OPERAND however its first byte reads.
+    /// Re-deriving the tag from the bytes is what `ValueToken::is_operator` exists to
+    /// avoid.
     #[test]
-    fn a_one_byte_operand_is_not_tagged_as_an_operator() {
-        assert_eq!(split("1.5*-", false).unwrap(), ["1.5", "op *", "-"]);
+    fn an_operand_opening_on_an_operator_byte_is_not_tagged_as_one() {
+        assert_eq!(split("1.5*-a", false).unwrap(), ["1.5", "op *", "-a"]);
+        assert_eq!(split("1.5*-1.5", false).unwrap(), ["1.5", "op *", "-1.5"]);
+    }
+
+    /// …and a `-` with nothing after it in the run IS the operator, in both of its
+    /// positions: the whitespace-delimited element (`-`, the whole run) and a glued run's
+    /// tail (`+-`, `1.5/-`, `a:-`). Read the second as a word and the two spellings of one
+    /// value print each other forever (`+-` → `+ -` → `+-`).
+    #[test]
+    fn a_trailing_hyphen_is_the_operator_in_both_positions() {
+        assert_eq!(split("-", false).unwrap(), ["op -"]);
+        assert_eq!(split("+-", false).unwrap(), ["op +", "op -"]);
+        assert_eq!(split("1.5/-", false).unwrap(), ["1.5", "op /", "op -"]);
+        assert_eq!(split("1.5*-", false).unwrap(), ["1.5", "op *", "op -"]);
+        assert_eq!(split_at("a:-", true, true).unwrap(), ["a", "op :", "op -"]);
+    }
+
+    /// A `+` welds onto the word after it wherever the run's head or another operator
+    /// stands before it — but never after a `:`, which is no operator for a sign to bind
+    /// to. The element-level rule says the same (`ValueParser::member_is_operator`), and
+    /// the two must agree or one pass welds and the next splits.
+    #[test]
+    fn a_plus_does_not_weld_after_a_colon() {
+        assert_eq!(
+            split_at("a:+b", true, true).unwrap(),
+            ["a", "op :", "op +", "b"]
+        );
+        assert_eq!(split_at(":+a", true, true).unwrap(), ["op :", "op +", "a"]);
+        // …while the sign of a NUMBER is the number's own at every position
+        assert_eq!(
+            split_at("a:+1.5", true, true).unwrap(),
+            ["a", "op :", "+1.5"]
+        );
+        // and after any other operator the weld stands
+        assert_eq!(
+            split_at("1.5/+b", true, true).unwrap(),
+            ["1.5", "op /", "+b"]
+        );
     }
 
     /// A unicode range ends its member, so a number glued past it is its own.

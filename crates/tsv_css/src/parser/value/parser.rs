@@ -82,12 +82,12 @@ pub(crate) struct ValueParser<'a> {
     /// Base offset in full CSS document (for absolute span calculation)
     base_offset: u32,
 
-    /// Whether this range sits inside a function's argument list or a parenthesized
-    /// group — the only place a `:` is a value operator rather than content. Set by
-    /// [`super::functions::parse_function_arguments`] and inherited by every
-    /// [`Self::sub_parser`] beneath it. See
-    /// [`super::operators::split_value_run`]'s `in_group`.
-    in_group: bool,
+    /// Whether a `:` can stand as a value operator in this range —
+    /// [`super::operators::split_value_run`]'s `colon_is_operator`: inside a group, and at
+    /// the top level of a **custom property's** value. ⚠️ Not a synonym for the
+    /// constructor's `in_group`, which also decides the head weld: a custom property's
+    /// value welds its head `+` (`--x: +a(2.5)`) exactly as a plain property's does.
+    colon_is_operator: bool,
 
     /// Whether a `+` opening this range's first run welds onto the word after it —
     /// [`super::operators::split_value_run`]'s `head_welds`. True for a declaration's
@@ -137,15 +137,29 @@ impl<'a> ValueParser<'a> {
         Self::new_within(source, base_span, false)
     }
 
-    /// [`Self::new`], saying whether the range is inside a group (see [`Self::in_group`]).
+    /// [`Self::new`], saying whether the range is inside a function's argument list or a
+    /// parenthesized group — set by [`super::functions::parse_function_arguments`], the `(`
+    /// being a node to postcss. It is the source of both per-range flags and is not kept:
+    /// a group's interior is where a `:` stands as an operator, and is where a head `+`
+    /// does NOT weld.
     pub fn new_within(source: &'a str, base_span: Span, in_group: bool) -> Self {
         Self {
             source,
             start: 0,
             end: source.len(),
             base_offset: base_span.start,
-            in_group,
             head_welds: !in_group,
+            colon_is_operator: in_group,
+        }
+    }
+
+    /// [`Self::new`] for a **custom property's** whole value, the other range where a `:`
+    /// is a value operator (see [`Self::colon_is_operator`]). Its head welds and its `(`
+    /// is no node, so it is a top-level value in every other respect.
+    pub fn new_custom_property(source: &'a str, base_span: Span) -> Self {
+        Self {
+            colon_is_operator: true,
+            ..Self::new(source, base_span)
         }
     }
 
@@ -186,8 +200,9 @@ impl<'a> ValueParser<'a> {
             start: self.start + range_start, // Offset into same source
             end: self.start + range_end,
             base_offset: self.base_offset, // Same base offset
-            in_group: self.in_group,       // A group's interior stays a group's
+            // Both per-range flags are inherited: a group's interior stays a group's
             head_welds: self.head_welds,
+            colon_is_operator: self.colon_is_operator,
         }
     }
 
@@ -211,12 +226,9 @@ impl<'a> ValueParser<'a> {
     ///
     /// A [`CssValue::Operator`] is one unless it is the `:` (a `colon` node there:
     /// `f(a: +b)` → `f(a: + b)`). A whitespace-separated operator stands ALONE in its run,
-    /// which the splitter leaves a single token, so it reaches the list as an
-    /// [`CssValue::Identifier`] spelled with the operator's own byte — the same node to
-    /// postcss (`a - +b` → `a - +b`, `a / +b` → `a / +b`), so it is read here by its
-    /// text. ⚠️ Only the weld reads it this way; the separator rule still prints a lone
-    /// operator element as an ordinary member (`/ 2.5`, `+ 2.5` keep their gap where
-    /// prettier glues them), which is a residual of its own, not this predicate's.
+    /// and the splitter mints that one-token run as an operator member too
+    /// ([`super::operators::split_value_run`]), so the node kind answers here as well
+    /// (`a - +b` → `a - +b`, `a / +b` → `a / +b`) and nothing is read back off the bytes.
     fn member_is_operator(&self, value: &CssValue<'_>) -> bool {
         // Spans are absolute; the member is inside this range, so both offsets clear
         // `base_offset` (a debug underflow here would be a span from another document).
@@ -226,7 +238,6 @@ impl<'a> ValueParser<'a> {
         };
         match value {
             CssValue::Operator { span } => text(*span) != ":",
-            CssValue::Identifier { span } => matches!(text(*span), "/" | "*" | "+" | "-"),
             _ => false,
         }
     }
@@ -689,8 +700,7 @@ impl<'a> ValueParser<'a> {
     /// stores no copied string.
     fn build_leaf<'arena>(&self, text: &'a str, arena: &'arena Bump) -> CssValue<'arena> {
         let span = self.absolute_span();
-        super::parse_single_value(text, span, self.in_group, self.head_welds, arena)
-            .unwrap_or(CssValue::Identifier { span })
+        super::parse_single_value(text, span, self.colon_is_operator, self.head_welds, arena)
     }
 
     /// Parse single value (leaf node), trimming first.
@@ -981,8 +991,8 @@ mod tests {
             start: 5,
             end: 9,
             base_offset: 100,
-            in_group: false,
             head_welds: true,
+            colon_is_operator: false,
         };
 
         assert_eq!(parser.text(), "blue");
@@ -1010,8 +1020,8 @@ mod tests {
             start: 5, // "blue" starts at byte 5
             end: 9,   // "blue" ends at byte 9
             base_offset: 100,
-            in_group: false,
             head_welds: true,
+            colon_is_operator: false,
         };
 
         let abs_span = parser.absolute_span();
@@ -1085,8 +1095,8 @@ mod tests {
             start: 2,
             end: 2, // Empty range
             base_offset: 0,
-            in_group: false,
             head_welds: true,
+            colon_is_operator: false,
         };
 
         assert_eq!(parser.text(), "");

@@ -20,6 +20,11 @@ cliff keyed on letter case. The prettier verdict is a parser limitation of postc
 formatting opinion. See [conformance_prettier_css.md §CSS: Values](../../../../../docs/conformance_prettier_css.md#css-values)
 ("`progid:` opaque value").
 
+The rejection is a property of the **plain** property, not of the case: on a *custom* property
+postcss parses the value and prettier does have an output for the uppercase spelling — an
+ordinary top-level colon, `PROGID: X.Y(a=1.50)` — where tsv still freezes. That pair is pinned
+by [progid_opaque_prettier_divergence](../progid_opaque_prettier_divergence/).
+
 ## Related
 
 - [progid_opaque](../progid_opaque/) — the lowercase spelling, the agreeing cells

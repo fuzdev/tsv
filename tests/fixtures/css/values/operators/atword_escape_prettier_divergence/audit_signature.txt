@@ -1,0 +1,30 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(output_prettier.<ext>).
+# This file exists when prettier is non-idempotent on output_prettier.* — it pins
+# the full chain so the audit recognizes the case and the validator catches drift.
+# See docs/fixture_overview.md (rule F4) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=2 (fixed point)%%
+<style>
+	div {
+		/* an `@`-word carries its escapes whole — a hex escape's optional whitespace
+		terminator belongs to the escape — and the group after the word is a member of
+		its own, so the member gap stands */
+		a: @a\62c(2.5);
+		b: @a\62c;
+		c: @a\622c;
+		d: @a\62cd;
+		e: @\62c(2.5);
+		/* an escape with no terminator to carry: only the member gap is in question */
+		f: @a\41(2.5);
+		g: @a\g(2.5);
+		/* controls: a plain `@`-word takes the member gap on both sides */
+		h: @a (2.5);
+		i: @ab (2.5);
+		/* a `-` after the escape is at-word content, so the whole word is one member and the
+		escape's terminator still belongs to the escape */
+		j: @a\62c-d (2.5);
+	}
+</style>

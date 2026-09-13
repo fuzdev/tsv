@@ -1,5 +1,7 @@
 use super::lex_err;
 use super::token::{Token, TokenKind};
+use crate::escapes::escape_len;
+use crate::number::sign_starts_number;
 use tsv_lang::ParseError;
 
 /// Whether `ch` is a non-ASCII CSS identifier code point.
@@ -49,6 +51,39 @@ pub(crate) fn is_identifier_start(ch: char) -> bool {
         || ch == '-'
         || ch == '_'
         || ch == '\\'
+}
+
+/// Does a `-` followed by `after` open an IDENT or a NUMBER of its own — so that the two
+/// lex as one token, rather than as a `<delim-token>` and whatever follows it?
+///
+/// css-syntax-3 §4.3.9 "Would start an identifier", read at the `-`: its second bullet
+/// admits an ident-start code point, a second `-`, or a valid escape. §4.3.10's number is
+/// asked over the sign by [`sign_starts_number`] (`-1.5`, `-.5`; a lone `-.` is left
+/// alone).
+///
+/// ⚠️ The ident-start set is **this lexer's** — an ASCII letter, `_`, or any code point at
+/// U+00A0 and above ([`is_non_ascii_identifier_codepoint`]) — not §4.2's enumerated
+/// ranges, which leave holes at U+00D7 and U+00F7. The question is "would the glued text
+/// lex as one token", and the lexings that answer it are tsv's own and that of the parser
+/// tsv replaces (`parseCss` reads an identifier at `codePointAt(0) >= 160` too), so `-×a`
+/// is one ident here. The `\` bullet is the spec's rather than [`is_identifier_start`]'s:
+/// a `\` before a newline or at end of input is no escape at all (§4.3.8), which
+/// [`escape_len`] answers.
+///
+/// One reading for its two askers, which must agree or one pass splits what the next
+/// glues: the value-run splitter (`parser::value::operators`, deciding whether a `-` at
+/// an operand position is the operator) and the value printer (`printer::values`,
+/// refusing a head glue that would merge the operator and its member into one token).
+pub(crate) fn hyphen_starts_own_token(after: &str) -> bool {
+    if sign_starts_number(b'-', after) {
+        return true;
+    }
+    match after.chars().next() {
+        None => false,
+        Some('-') => true,
+        Some('\\') => escape_len(after, 0).is_some(),
+        Some(ch) => ch.is_ascii_alphabetic() || ch == '_' || is_non_ascii_identifier_codepoint(ch),
+    }
 }
 
 /// The ASCII byte form of `is_identifier_start`, for the lexer's byte-first dispatch.

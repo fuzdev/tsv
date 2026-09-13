@@ -10,5 +10,8 @@
 		right: f(a: 1.50, b: 2.50);
 		/* a url() argument is opaque, so its `:` is content */
 		bottom: url(a:1.50);
+		/* a `+` after the colon is an operator, never the sign of the member after it:
+		a colon is no operator for it to weld onto */
+		left: f(a: + b);
 	}
 </style>

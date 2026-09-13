@@ -18,8 +18,13 @@ lines (indented like a nested rule body, with the closing `}` on its own line
 followed by `;`).
 
 **tsv**: accepts (parser matches spec, not Svelte) and preserves the value
-as a single-line expression. The block contents are treated as opaque tokens
-in the value position; we do not re-indent them like a nested rule body.
+as a single-line expression. The block's two **faces** are kept as the author
+wrote them — `--foo: { color: red; };` and `--bar: {color: red;};` are each
+their own fixed point, where a brace *inside* a value is always glued to its
+interior — while the members between them normalize like any other brace
+block's, the interior `:` included (`{color:red;}` → `{color: red;}`, the
+`unformatted_ours_compact` variant). We do not re-indent the contents like a
+nested rule body.
 
 A future printer pass could match prettier's wrapped output. For now the
 single-line form is stable and idempotent under tsv; the prettier-wrapped
@@ -28,7 +33,8 @@ that same input.
 
 ## Fixture Structure
 
-- `input.svelte` — tsv canonical form (single-line block value)
+- `input.svelte` — tsv canonical form (single-line block value), one line per
+  authored face spacing
 - `output_prettier.svelte` — prettier's formatted form (multi-line)
 - `expected_ours.json` — tsv AST with the custom property's value spanning the
   raw `{ ... }` block source

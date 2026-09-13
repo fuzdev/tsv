@@ -1,0 +1,142 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 498,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 489,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 167,
+							"end": 177,
+							"property": "a",
+							"value": "--/2.50"
+						},
+						{
+							"type": "Declaration",
+							"start": 181,
+							"end": 191,
+							"property": "b",
+							"value": "---2.50"
+						},
+						{
+							"type": "Declaration",
+							"start": 269,
+							"end": 280,
+							"property": "c",
+							"value": "+--/2.50"
+						},
+						{
+							"type": "Declaration",
+							"start": 284,
+							"end": 295,
+							"property": "d",
+							"value": "+---2.50"
+						},
+						{
+							"type": "Declaration",
+							"start": 427,
+							"end": 438,
+							"property": "e",
+							"value": "--a/1.50"
+						},
+						{
+							"type": "Declaration",
+							"start": 442,
+							"end": 453,
+							"property": "f",
+							"value": "--a-2.50"
+						},
+						{
+							"type": "Declaration",
+							"start": 457,
+							"end": 469,
+							"property": "g",
+							"value": "+--a/1.50"
+						},
+						{
+							"type": "Declaration",
+							"start": 473,
+							"end": 485,
+							"property": "h",
+							"value": "+--a-2.50"
+						}
+					]
+				},
+				"start": 9,
+				"end": 489
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a `--` word with nothing after its two dashes ends at a `/`, and at a `-` that\n\t\tsigns a number, where every other word takes both as content ",
+				"start": 17,
+				"end": 164
+			},
+			{
+				"type": "CSSComment",
+				"value": " the `+` a value's head welds onto that word rides the same extent ",
+				"start": 195,
+				"end": 266
+			},
+			{
+				"type": "CSSComment",
+				"value": " one ident code point after the dashes and the word absorbs both again — the\n\t\tagreement cells on both sides of the weld ",
+				"start": 299,
+				"end": 424
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 490,
+			"styles": "\n\tdiv {\n\t\t/* a `--` word with nothing after its two dashes ends at a `/`, and at a `-` that\n\t\tsigns a number, where every other word takes both as content */\n\t\ta: --/2.50;\n\t\tb: ---2.50;\n\t\t/* the `+` a value's head welds onto that word rides the same extent */\n\t\tc: +--/2.50;\n\t\td: +---2.50;\n\t\t/* one ident code point after the dashes and the word absorbs both again — the\n\t\tagreement cells on both sides of the weld */\n\t\te: --a/1.50;\n\t\tf: --a-2.50;\n\t\tg: +--a/1.50;\n\t\th: +--a-2.50;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 499,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

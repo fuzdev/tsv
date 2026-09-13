@@ -33,6 +33,28 @@ pub(crate) fn exponent_len(s: &str) -> usize {
     i
 }
 
+/// css-syntax-3 §4.3.10 "Would start a number", asked of a `sign` and the text after it
+/// through [`number_part_len`] — this module's one number grammar, which takes a leading
+/// sign — rather than re-spelled.
+///
+/// The sign and `after`'s head are probed together because neither answers alone: `-.5`
+/// is a number where `.5`'s own reading says nothing about the pair. Two bytes past the
+/// sign are all §4.3.10 can read (a digit, or a `.` then a digit), and a non-ASCII byte
+/// can be neither, so the probe stops at one and stays valid UTF-8 by construction.
+pub(crate) fn sign_starts_number(sign: u8, after: &str) -> bool {
+    debug_assert!(matches!(sign, b'+' | b'-'), "a sign, not {sign:?}");
+    let mut probe = [sign, 0, 0];
+    let mut len = 1;
+    for b in after.bytes().take(2) {
+        if !b.is_ascii() {
+            break;
+        }
+        probe[len] = b;
+        len += 1;
+    }
+    str::from_utf8(&probe[..len]).is_ok_and(|probe| number_part_len(probe) != 0)
+}
+
 /// Byte length of the numeric prefix of `s`, or 0 if it doesn't start with a
 /// number. Mirrors prettier's `\d*\.\d+ | \d+\.?` plus a scientific-notation
 /// exponent (`[eE][+-]?\d+`) and an optional leading sign. A bare trailing `.`

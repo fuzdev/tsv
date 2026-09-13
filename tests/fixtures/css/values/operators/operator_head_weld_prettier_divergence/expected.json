@@ -1,0 +1,231 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 1355,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 1346,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 234,
+							"end": 242,
+							"property": "a",
+							"value": "+ 2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 246,
+							"end": 254,
+							"property": "b",
+							"value": "- 2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 258,
+							"end": 264,
+							"property": "c",
+							"value": "- a"
+						},
+						{
+							"type": "Declaration",
+							"start": 268,
+							"end": 275,
+							"property": "d",
+							"value": "- -a"
+						},
+						{
+							"type": "Declaration",
+							"start": 279,
+							"end": 290,
+							"property": "e",
+							"value": "- f(2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 419,
+							"end": 431,
+							"property": "f",
+							"value": "1.5 / - a"
+						},
+						{
+							"type": "Declaration",
+							"start": 435,
+							"end": 449,
+							"property": "g",
+							"value": "1.5 * - 2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 453,
+							"end": 464,
+							"property": "h",
+							"value": "f(- 2.5)"
+						},
+						{
+							"type": "Declaration",
+							"start": 468,
+							"end": 485,
+							"property": "i",
+							"value": "a,\n\t\t\t- 2.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 788,
+							"end": 796,
+							"property": "j",
+							"value": "- \\61"
+						},
+						{
+							"type": "Declaration",
+							"start": 800,
+							"end": 807,
+							"property": "k",
+							"value": "- \\?"
+						},
+						{
+							"type": "Declaration",
+							"start": 811,
+							"end": 819,
+							"property": "l",
+							"value": "- \\31"
+						},
+						{
+							"type": "Declaration",
+							"start": 823,
+							"end": 829,
+							"property": "m",
+							"value": "- é"
+						},
+						{
+							"type": "Declaration",
+							"start": 833,
+							"end": 840,
+							"property": "n",
+							"value": "- _a"
+						},
+						{
+							"type": "Declaration",
+							"start": 844,
+							"end": 852,
+							"property": "o",
+							"value": "- 0.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 856,
+							"end": 864,
+							"property": "p",
+							"value": "+ 0.5"
+						},
+						{
+							"type": "Declaration",
+							"start": 1132,
+							"end": 1139,
+							"property": "q",
+							"value": "- ×a"
+						},
+						{
+							"type": "Declaration",
+							"start": 1143,
+							"end": 1150,
+							"property": "r",
+							"value": "- ÷a"
+						},
+						{
+							"type": "Declaration",
+							"start": 1333,
+							"end": 1342,
+							"property": "s",
+							"value": "+- 2.5"
+						}
+					]
+				},
+				"start": 9,
+				"end": 1346
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " an operator with nothing before it glues to the member after it — but not where\n\t\tthe glue would MERGE the two into one token, which rewrites the author's tokens\n\t\trather than their spacing, so the gap stands ",
+				"start": 17,
+				"end": 231
+			},
+			{
+				"type": "CSSComment",
+				"value": " the same weld at the other head positions: after another operator, inside a\n\t\tfunction's arguments and after a comma ",
+				"start": 294,
+				"end": 416
+			},
+			{
+				"type": "CSSComment",
+				"value": " the same two merges at every other spelling of what they merge into: §4.3.9's\n\t\tident-start set is wider than the ASCII letters — an escape (whatever it spells),\n\t\ta non-ASCII code point, a `_` — and §4.3.10's number can open at a `.`, which the\n\t\t`unformatted_ours_numbers` variant authors ",
+				"start": 489,
+				"end": 785
+			},
+			{
+				"type": "CSSComment",
+				"value": " the ident-start set is tsv's own lexer's, not css-syntax-3 §4.2's enumerated\n\t\tranges: a code point at U+00A0 or above is ident content, which is the reading\n\t\tSvelte's `parseCss` takes too, so a `-` welds onto `×a` and `÷a` exactly as it welds\n\t\tonto `é` ",
+				"start": 868,
+				"end": 1129
+			},
+			{
+				"type": "CSSComment",
+				"value": " and after a GLUED pair of head operators, which is the `f` position again: the\n\t\tpair itself glues — a `-` merges into nothing — where the member after it keeps\n\t\tits gap ",
+				"start": 1154,
+				"end": 1330
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 1347,
+			"styles": "\n\tdiv {\n\t\t/* an operator with nothing before it glues to the member after it — but not where\n\t\tthe glue would MERGE the two into one token, which rewrites the author's tokens\n\t\trather than their spacing, so the gap stands */\n\t\ta: + 2.5;\n\t\tb: - 2.5;\n\t\tc: - a;\n\t\td: - -a;\n\t\te: - f(2.5);\n\t\t/* the same weld at the other head positions: after another operator, inside a\n\t\tfunction's arguments and after a comma */\n\t\tf: 1.5 / - a;\n\t\tg: 1.5 * - 2.5;\n\t\th: f(- 2.5);\n\t\ti:\n\t\t\ta,\n\t\t\t- 2.5;\n\t\t/* the same two merges at every other spelling of what they merge into: §4.3.9's\n\t\tident-start set is wider than the ASCII letters — an escape (whatever it spells),\n\t\ta non-ASCII code point, a `_` — and §4.3.10's number can open at a `.`, which the\n\t\t`unformatted_ours_numbers` variant authors */\n\t\tj: - \\61;\n\t\tk: - \\?;\n\t\tl: - \\31;\n\t\tm: - é;\n\t\tn: - _a;\n\t\to: - 0.5;\n\t\tp: + 0.5;\n\t\t/* the ident-start set is tsv's own lexer's, not css-syntax-3 §4.2's enumerated\n\t\tranges: a code point at U+00A0 or above is ident content, which is the reading\n\t\tSvelte's `parseCss` takes too, so a `-` welds onto `×a` and `÷a` exactly as it welds\n\t\tonto `é` */\n\t\tq: - ×a;\n\t\tr: - ÷a;\n\t\t/* and after a GLUED pair of head operators, which is the `f` position again: the\n\t\tpair itself glues — a `-` merges into nothing — where the member after it keeps\n\t\tits gap */\n\t\ts: +- 2.5;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 1356,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

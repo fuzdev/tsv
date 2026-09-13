@@ -28,5 +28,20 @@
 		s: 1.5 / +2.5;
 		/* calc() prints its authored gap either way */
 		t: calc(+a(2.5));
+		/* the word it welds onto can be the custom-property-shaped one, whose `--` opens an
+		ident rather than two subtractions — where a single `-` after the sign opens one
+		too and leaves the `+` an operator */
+		u: +--a;
+		v: +--;
+		w: +----a;
+		x: +-- @a;
+		y: + -a;
+		/* the `--` word welds at every position an ordinary word does, and at none of the
+		positions no word welds at */
+		z: 1.5 * +--a;
+		aa: + +--a;
+		ab: 1.5 + --a;
+		ac: f(+ --a);
+		ad: (+ --a);
 	}
 </style>

@@ -20,5 +20,8 @@
 		--m: a*{1.5}c;
 		/* control: a `[…]` block is word text and is kept as written */
 		--n: a[1.50]c(2.5);
+		/* a top-level `:` between the braces is a token of its own there too: no space
+		before it, one after */
+		--o: a{b:1.5}c;
 	}
 </style>

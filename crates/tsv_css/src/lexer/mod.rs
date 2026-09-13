@@ -43,7 +43,9 @@ mod strings;
 pub mod token;
 
 use comments::read_comment;
-pub(crate) use identifiers::{IDENT_CONTINUE_LUT, is_non_ascii_identifier_codepoint};
+pub(crate) use identifiers::{
+    IDENT_CONTINUE_LUT, hyphen_starts_own_token, is_non_ascii_identifier_codepoint,
+};
 use identifiers::{is_ascii_identifier_start, is_identifier_start, read_identifier};
 use numbers::read_number;
 use strings::read_string;
