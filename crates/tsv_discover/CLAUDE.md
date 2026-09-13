@@ -216,7 +216,8 @@ crates (the open-convention stance):
   every-depth sibling put above it, its files come back with `!/dist/sub/**` — since a
   second rule under the same pruned directory otherwise closed what the first had
   re-included, silently, with the warning gone (pinned as a property over every
-  combination of up to three rule shapes, not as transcripts). Anchored and relative
+  combination of up to three rule shapes — every target readmitted, nothing unnamed
+  admitted, no ladder line redundant — not as transcripts). Anchored and relative
   to the file's directory, because a root-relative line does nothing in a nested file,
   and outside a repo (format root = filesystem root) in any file, while an unanchored
   one-segment `!dist/` re-includes a `dist` at every depth. A tsv layer is read after

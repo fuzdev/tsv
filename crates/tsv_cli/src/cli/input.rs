@@ -133,8 +133,10 @@ impl FromStr for ParserType {
 /// Shared input arguments for commands that accept a file path, `--content`, or `--stdin`.
 ///
 /// Each command declares the four argh fields on its own struct and assembles an
-/// `InputArgs` to call [`InputArgs::resolve`]. argh has no struct-flattening
-/// attribute, so the field declarations are repeated per command.
+/// `InputArgs` to call [`InputArgs::resolve`] — or [`InputArgs::parser_type`] and then
+/// [`InputArgs::read`], when a flag must be graded against the parser before the read
+/// (`tsv parse`'s `--source-type`). argh has no struct-flattening attribute, so the
+/// field declarations are repeated per command.
 #[derive(Debug)]
 pub struct InputArgs {
     pub content: Option<String>,

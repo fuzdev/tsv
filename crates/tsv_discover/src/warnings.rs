@@ -1474,42 +1474,95 @@ mod tests {
     }
 
     /// The property the transcript tests above are instances of: applying the offered
-    /// lines puts every rule's own target back in scope — for every combination of rule
-    /// shapes under one pruned directory, not the hand-picked few. A directory-only
-    /// re-include is the shape that broke it: a second rule under the same directory
-    /// used to close what the first had re-included, self-silencingly.
+    /// lines puts every rule's own target back in scope and nothing no rule names — for
+    /// every combination of rule shapes under one pruned directory, not the hand-picked
+    /// few — and every ladder line is load-bearing: without it a target is lost, an
+    /// unnamed path admitted, or the directory left pruned. The shapes nest each way a
+    /// directory can be opened under another — a whole directory under an every-depth
+    /// one, an every-depth one under a whole one, a whole one under a whole one — so the
+    /// two properties together hold the ladder to what a second rule under the same
+    /// directory must not close and what the nearest opened ancestor makes redundant.
     #[test]
     fn shadow_warning_lines_readmit_every_rules_target_for_every_shape_combination() {
         // each shape with the paths it names, which must be in scope once the lines are
-        // applied; `dist/zzz/nope.ts` names nothing any shape covers and must stay out
-        let shapes: [(&str, &[&str]); 8] = [
-            ("!dist/keep.ts", &["dist/keep.ts"]),
+        // applied, and the probes it admits beside them (a whole directory admits
+        // everything under it); a probe no chosen shape admits must stay out
+        let shapes: [(&str, &[&str], &[&str]); 9] = [
+            ("!dist/keep.ts", &["dist/keep.ts"], &[]),
             (
                 "!dist/sub/",
                 &["dist/sub/inside.ts", "dist/sub/deep/inside.ts"],
+                &["dist/sub/nope.js", "dist/sub/deep/nope.js"],
             ),
-            ("!dist/sub/keep.ts", &["dist/sub/keep.ts"]),
-            ("!dist/*.ts", &["dist/any.ts"]),
+            ("!dist/sub/keep.ts", &["dist/sub/keep.ts"], &[]),
+            ("!dist/*.ts", &["dist/any.ts"], &[]),
+            // `zzz` is a directory no other shape opens, so these two name a target
+            // only their own every-directory line reaches
             (
                 "!dist/**/keep.ts",
-                &["dist/keep.ts", "dist/sub/keep.ts", "dist/sub/deep/keep.ts"],
+                &[
+                    "dist/keep.ts",
+                    "dist/sub/keep.ts",
+                    "dist/sub/deep/keep.ts",
+                    "dist/zzz/keep.ts",
+                ],
+                &[],
             ),
-            ("!dist/*/keep.ts", &["dist/sub/keep.ts"]),
-            ("!dist/sub/deep/", &["dist/sub/deep/inside.ts"]),
-            ("!dist/sub/deep/x.ts", &["dist/sub/deep/x.ts"]),
+            (
+                "!dist/*/keep.ts",
+                &["dist/sub/keep.ts", "dist/zzz/keep.ts"],
+                &[],
+            ),
+            (
+                "!dist/sub/deep/",
+                &["dist/sub/deep/inside.ts"],
+                &["dist/sub/deep/nope.js"],
+            ),
+            ("!dist/sub/deep/x.ts", &["dist/sub/deep/x.ts"], &[]),
+            // reaches below `sub`, the directory the second shape re-includes whole —
+            // into `sub/zzz` too, which only its own every-directory line opens
+            (
+                "!dist/sub/**/k3.ts",
+                &[
+                    "dist/sub/k3.ts",
+                    "dist/sub/deep/k3.ts",
+                    "dist/sub/zzz/k3.ts",
+                ],
+                &[],
+            ),
+        ];
+        let probes = [
+            "dist/nope.js",
+            "dist/sub/nope.js",
+            "dist/sub/deep/nope.js",
+            "dist/zzz/nope.js",
         ];
         let mut combinations = 0;
         for mask in 1u32..(1 << shapes.len()) {
             if mask.count_ones() > 3 {
                 continue;
             }
-            let chosen: Vec<&(&str, &[&str])> = shapes
+            let chosen: Vec<&(&str, &[&str], &[&str])> = shapes
                 .iter()
                 .enumerate()
                 .filter(|(i, _)| mask & (1 << i) != 0)
                 .map(|(_, shape)| shape)
                 .collect();
-            let rules: String = chosen.iter().flat_map(|(rule, _)| [*rule, "\n"]).collect();
+            let rules: String = chosen
+                .iter()
+                .flat_map(|(rule, _, _)| [*rule, "\n"])
+                .collect();
+            // the rules' own patterns, re-spelled after the ladder by design; every
+            // other line is the ladder's, and each of those must be load-bearing
+            let patterns: Vec<String> = chosen
+                .iter()
+                .map(|(rule, _, _)| format!("!/{}", &rule[1..]))
+                .collect();
+            let out: Vec<&str> = probes
+                .iter()
+                .copied()
+                .filter(|probe| !chosen.iter().any(|(_, _, admits)| admits.contains(probe)))
+                .collect();
             for gitignored in [false, true] {
                 let mut stack = IgnoreStack::new();
                 if gitignored {
@@ -1519,17 +1572,21 @@ mod tests {
                 let warning = shadow_warning("dist", None, &stack)
                     .unwrap_or_else(|| panic!("{rules:?}: no warning"));
                 let lines: Vec<&str> = warning.split('`').skip(1).step_by(2).collect();
-                let mut fixed = IgnoreStack::new();
-                if gitignored {
-                    fixed.push_gitignore("", "dist/\n");
-                }
-                fixed.push_formatignore("", &format!("{rules}{}\n", lines.join("\n")));
+                let apply = |lines: &[&str]| {
+                    let mut fixed = IgnoreStack::new();
+                    if gitignored {
+                        fixed.push_gitignore("", "dist/\n");
+                    }
+                    fixed.push_formatignore("", &format!("{rules}{}\n", lines.join("\n")));
+                    fixed
+                };
+                let fixed = apply(&lines);
                 assert_eq!(
                     classify_dir("dist", "dist", !gitignored, &fixed),
                     DirVerdict::Descend,
                     "{rules:?}: {lines:?}"
                 );
-                for (rule, targets) in &chosen {
+                for (rule, targets, _) in &chosen {
                     for target in *targets {
                         assert!(
                             !fixed.is_ignored(target, false),
@@ -1537,14 +1594,42 @@ mod tests {
                         );
                     }
                 }
-                assert!(
-                    fixed.is_ignored("dist/zzz/nope.ts", false),
-                    "{rules:?}: {lines:?} admit a path no rule names"
-                );
+                for probe in &out {
+                    assert!(
+                        fixed.is_ignored(probe, false),
+                        "{rules:?}: {lines:?} admit {probe}, which no rule names"
+                    );
+                }
+                // every ladder line is load-bearing: without it, the lines no longer
+                // do all three of the above
+                let readmits = |fixed: &IgnoreStack| {
+                    classify_dir("dist", "dist", !gitignored, fixed) == DirVerdict::Descend
+                        && chosen.iter().all(|(_, targets, _)| {
+                            targets
+                                .iter()
+                                .all(|target| !fixed.is_ignored(target, false))
+                        })
+                        && out.iter().all(|probe| fixed.is_ignored(probe, false))
+                };
+                for (i, line) in lines.iter().enumerate() {
+                    if patterns.iter().any(|pattern| pattern == line) {
+                        continue;
+                    }
+                    let without: Vec<&str> = lines
+                        .iter()
+                        .enumerate()
+                        .filter(|(j, _)| *j != i)
+                        .map(|(_, line)| *line)
+                        .collect();
+                    assert!(
+                        !readmits(&apply(&without)),
+                        "{rules:?}: `{line}` is redundant in {lines:?}"
+                    );
+                }
                 combinations += 1;
             }
         }
-        assert_eq!(combinations, 2 * (8 + 28 + 56));
+        assert_eq!(combinations, 2 * (9 + 36 + 84));
         // the two shapes that broke, pinned as text: a whole directory takes no close,
         // and re-includes its files past a `/**` an every-depth sibling put above it
         let stack = tsv_stack("!dist/sub/\n!dist/sub/keep.ts\n");
@@ -1557,6 +1642,15 @@ mod tests {
         assert!(
             shadow_warning("dist", None, &stack).unwrap().ends_with(
                 "re-include it by adding `!/dist/`, `/dist/**`, `!/dist/**/`, `!/dist/sub/**`, `!/dist/sub/` and `!/dist/**/k2.ts`, in that order, to the repo-root .formatignore"
+            )
+        );
+        // a whole directory under a whole one, both under the every-depth `/dist/**`:
+        // `deep` reads its NEAREST opened ancestor, `sub`, re-included whole already, so
+        // it spells no `!/dist/sub/deep/**` of its own
+        let stack = tsv_stack("!dist/sub/\n!dist/sub/deep/\n!dist/**/k2.ts\n");
+        assert!(
+            shadow_warning("dist", None, &stack).unwrap().ends_with(
+                "re-include it by adding `!/dist/`, `/dist/**`, `!/dist/**/`, `!/dist/sub/**`, `!/dist/sub/`, `!/dist/sub/deep/` and `!/dist/**/k2.ts`, in that order, to the repo-root .formatignore"
             )
         );
     }

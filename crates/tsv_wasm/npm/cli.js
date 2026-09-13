@@ -1182,8 +1182,7 @@ async function resolve_route(files, check, jobs) {
  *
  * Both forms clamp to the file count (a worker with no file to claim is pure
  * startup cost) and to a floor of 1, so `--jobs 0` means the same as `--jobs 1`
- * — matching the native clamp, which `--jobs 0` had escaped on its streaming
- * path (`format_streamed`).
+ * — the native clamp, on both its routes (`run_paths` in `commands/format.rs`).
  */
 function resolve_jobs(explicit, file_count) {
 	if (explicit === undefined) {
