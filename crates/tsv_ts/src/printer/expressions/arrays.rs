@@ -57,7 +57,7 @@ impl<'a> Printer<'a> {
     /// - ALL elements are arrays (or ALL are objects - no mixing)
     /// - EACH inner array/object has more than 1 item
     ///
-    /// This matches prettier's shouldBreak logic in array.js:89-106
+    /// This matches prettier's shouldBreak logic in `printArray` (`print/array.js`)
     fn should_break_nested_array(&self, arr: &internal::ArrayExpression<'_>) -> bool {
         if arr.elements.len() <= 1 {
             return false;

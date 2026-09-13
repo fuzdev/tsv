@@ -88,7 +88,7 @@ impl<'a> Printer<'a> {
                 // states for the heads that reach it through that helper).
                 // `build_flat_chain_expression_doc`: a template-literal interpolation is
                 // a `shouldNotIndent` position (`parent.type === "TemplateLiteral"`,
-                // binaryish.js:113), so a binary here keeps its continuation lines at the
+                // `shouldNotIndent` in `print/binaryish.js`), so a binary here keeps its continuation lines at the
                 // interpolation's own column.
                 let expr_inner = match frozen {
                     Some(frozen) => self.build_frozen_expression_doc(expr, frozen),
@@ -201,7 +201,7 @@ impl<'a> Printer<'a> {
                 };
 
                 // Apply alignment based on quasi indent (Prettier's addAlignmentToDoc).
-                // Three paths matching Prettier's template-literal.js:262-265:
+                // Three paths matching Prettier's `printTemplateExpression` (`print/template-literal.js`):
                 // 1. indent_size==0 && quasi ends with \n: expression starts at column 0
                 //    on a new line — reset indent to absolute 0 (align(-∞)).
                 // 2. indent_size>0: expression follows indented template content —
@@ -312,7 +312,7 @@ impl<'a> Printer<'a> {
 
     /// Whether this expression type qualifies for softline wrapping at
     /// `${`/`}` boundaries. Matches Prettier's qualifying type list
-    /// (template-literal.js:230-238).
+    /// (`printTemplateExpression`, `print/template-literal.js`).
     ///
     /// Qualifying types: simple expressions with no inherent block structure.
     /// Softline wrapping lets the `${}` group break when the line exceeds width.
@@ -329,7 +329,7 @@ impl<'a> Printer<'a> {
         if has_comment_on_page {
             return true;
         }
-        // Matches Prettier's qualifying types (template-literal.js:230-238):
+        // Matches Prettier's qualifying types (`printTemplateExpression`, `print/template-literal.js`):
         // Identifier, `isMemberExpression(stripChainElementWrappers(node))`,
         // ConditionalExpression, SequenceExpression, isBinaryCastExpression
         // (TSAsExpression, TSSatisfiesExpression), isBinaryish (BinaryExpression —

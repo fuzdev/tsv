@@ -395,7 +395,7 @@ impl<'a> Printer<'a> {
     ///
     /// That builder marks the value for itself; every other arm owes the same mark,
     /// because `isObjectProperty` is one of prettier's `shouldIndentIfInlining` parents
-    /// (binaryish.js:122) and the mark is the only way a binary value learns it
+    /// (`shouldNotIndent`, `print/binaryish.js`) and the mark is the only way a binary value learns it
     /// ([`Printer::mark_assignment_value`] — tsv has no parent pointer). An arm that
     /// skipped it printed the property's chain with the continuation indent of an
     /// UNEXEMPT position while its sibling arm printed the same property flush, which is
@@ -856,10 +856,10 @@ impl<'a> Printer<'a> {
     /// Complex expressions (calls, binary, etc.) are never short - they can't
     /// be reduced to a simple width, matching Prettier's `cleanDoc` behavior.
     ///
-    /// Prettier ref: `isObjectPropertyWithShortKey` in print/assignment.js:401
+    /// Prettier ref: `isObjectPropertyWithShortKey` in `print/assignment.js`
     /// Uses `getStringWidth(cleanDoc(keyDoc)) < tabWidth + MIN_OVERLAP_FOR_BREAK`
     fn is_short_property_key(&self, key: &Expression<'_>, computed: bool) -> bool {
-        // Prettier: MIN_OVERLAP_FOR_BREAK = 3 (assignment.js:409)
+        // Prettier: MIN_OVERLAP_FOR_BREAK = 3 (`isObjectPropertyWithShortKey`, `print/assignment.js`)
         let threshold = TAB_WIDTH + super::assignment::MIN_OVERLAP_FOR_BREAK;
 
         let base_width = match key {

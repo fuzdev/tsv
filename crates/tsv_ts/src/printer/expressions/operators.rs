@@ -28,7 +28,7 @@ pub(super) type OperatorBuf = SmallVec<[BinaryOperator; 8]>;
 /// Style for building binary expression chain docs.
 ///
 /// One variant per answer prettier's `printBinaryishExpression` can give
-/// (binaryish.js:96-134). **Every variant is named at a call site** — there is no
+/// (`shouldNotIndent`, `print/binaryish.js`). **Every variant is named at a call site** — there is no
 /// fall-through style, which is the whole point of the split: prettier's own rule is a
 /// fall-through *to indent*, so the only safe default is [`Self::ContinuationIndent`]
 /// (`Printer::build_binary_chain_doc`), and a position that wants anything else says so.
@@ -169,6 +169,7 @@ impl<'a> Printer<'a> {
                 update.span.start,
                 update.argument,
                 update.span.end - operator_len,
+                ParenContext::UpdateArgument,
             )
         {
             return d.concat(&[shell, operator_doc]);
@@ -350,7 +351,7 @@ impl<'a> Printer<'a> {
         let argument_doc = if has_leading_comments || has_trailing_comments {
             // Comments inside grouping parens — must wrap in parens to preserve them.
             // `build_flat_chain_expression_doc`: a unary argument is `shouldNotIndent`
-            // (`key === "argument" && parent.type === "UnaryExpression"`, binaryish.js:114
+            // (`key === "argument" && parent.type === "UnaryExpression"`, `shouldNotIndent`
             // — the term that covers the COMMENTED operand, the uncommented one taking the
             // early return the sibling arm below spells). The shell's own `indent` supplies
             // the one level, so the chain inside it stays flush.
@@ -453,7 +454,7 @@ impl<'a> Printer<'a> {
             if let Expression::BinaryExpression(binary) = unary.argument {
                 // Wrap any binaryish arg (logical or not) in a single paren group.
                 // Matches Prettier's `parent.type === "UnaryExpression"` path
-                // (binaryish.js:88-91): `group([indent([softline, ...parts]), softline])`,
+                // (`printBinaryishExpression`, `print/binaryish.js`): `group([indent([softline, ...parts]), softline])`,
                 // the same early return the call and `new` callees take — one seam for all
                 // three ([`Printer::build_expanding_parens_doc`]).
                 // The chain's shouldGroup is computed normally: 2-operand chains
@@ -488,7 +489,7 @@ impl<'a> Printer<'a> {
     /// `build_expression_doc` dispatch in every context that has not named a style.
     ///
     /// The default is prettier's: **continuation indent**. Prettier's rule
-    /// (binaryish.js:96-134) is a *fall-through* — a parent indents unless it is named
+    /// (`shouldNotIndent`, `print/binaryish.js`) is a *fall-through* — a parent indents unless it is named
     /// in `shouldNotIndent` or `shouldIndentIfInlining` — so a position nobody thought
     /// about must land on indent, or it is wrong by omission. It landed on flat here
     /// until the default was inverted, and eleven positions were silently wrong for
@@ -558,7 +559,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Record `expr` as sitting at one of prettier's `shouldNotIndent` positions
-    /// (binaryish.js:96-115), so a binary chain there takes [`BinaryChainStyle::Flat`].
+    /// (`shouldNotIndent`, `print/binaryish.js`), so a binary chain there takes [`BinaryChainStyle::Flat`].
     ///
     /// The `shouldNotIndent` twin of [`Printer::mark_assignment_value`], and reserved for
     /// the same shape of caller: a position that hands its value to a **generic value
@@ -611,7 +612,7 @@ impl<'a> Printer<'a> {
     ///
     /// Like ungrouped, but also suppresses shouldGroup for logical operators so that
     /// logical chain breaks are controlled by the parent condition group.
-    /// Matches Prettier's `isInsideParenthesis` behavior (binaryish.js:331).
+    /// Matches Prettier's `isInsideParenthesis` behavior (`printBinaryishExpressions`, `print/binaryish.js`).
     pub(in crate::printer) fn build_binary_chain_doc_ungrouped_condition(
         &self,
         binary: &internal::BinaryExpression<'_>,
@@ -680,7 +681,7 @@ impl<'a> Printer<'a> {
 
         // shouldInlineLogicalExpression: when the outermost logical has a non-empty
         // object/array on the right, keep operator and RHS on the same line.
-        // Prettier ref: binaryish.js:275, 361
+        // Prettier ref: `printBinaryishExpressions` + `shouldInlineLogicalExpression` (`print/binaryish.js`)
         let should_inline_last = super::assignment::should_inline_logical_expression(binary);
 
         // Resolve the assignment-value layout, the one style keyed on a *property of the
@@ -719,7 +720,7 @@ impl<'a> Printer<'a> {
         // In UngroupedCondition mode (if/while/for/do-while/switch conditions),
         // logical operators (&&, ||, ??) must NOT get a sub-group — the parent
         // condition group controls their breaking. This matches Prettier's
-        // `isInsideParenthesis` suppression (binaryish.js:331).
+        // `isInsideParenthesis` suppression (`printBinaryishExpressions`, `print/binaryish.js`).
         // Without this, `while (a < b && c === d)` keeps the chain flat when
         // the condition group breaks, because the sub-group evaluates fit
         // independently.
@@ -851,7 +852,8 @@ impl<'a> Printer<'a> {
     ///
     /// When `should_inline_last` is true (shouldInlineLogicalExpression), the last operand
     /// uses a space instead of `line()`, keeping operator and RHS on the same line so the
-    /// object/array can self-expand. Prettier ref: binaryish.js:275, 361
+    /// object/array can self-expand. Prettier ref: `printBinaryishExpressions` +
+    /// `shouldInlineLogicalExpression` (`print/binaryish.js`)
     fn build_binary_chain_parts(
         &self,
         operands: &[ChainOperand],

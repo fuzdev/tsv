@@ -154,12 +154,13 @@ pub(crate) fn is_string_literal(expr: &internal::Expression<'_>) -> bool {
 ///         : alternate;
 /// ```
 ///
-/// Prettier ref: shouldBreakAfterOperator (assignment.js:216-219)
+/// Prettier ref: `shouldBreakAfterOperator` (`print/assignment.js`)
 pub fn conditional_should_break_after_op(expr: &internal::Expression<'_>) -> bool {
     if let internal::Expression::ConditionalExpression(cond) = expr {
         // Check if test is binaryish (BinaryExpression includes logical operators like &&, ||),
         // but exclude logical expressions with inline-able RHS (non-empty object/array).
-        // Prettier ref: assignment.js:219 `isBinaryish(test) && !shouldInlineLogicalExpression(test)`
+        // Prettier ref: `shouldBreakAfterOperator` (`print/assignment.js`)
+        // `isBinaryish(test) && !shouldInlineLogicalExpression(test)`
         if let internal::Expression::BinaryExpression(binary) = cond.test {
             !super::expressions::assignment::should_inline_logical_expression(binary)
         } else {

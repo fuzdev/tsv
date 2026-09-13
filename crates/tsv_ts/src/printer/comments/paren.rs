@@ -10,6 +10,7 @@ use super::{CommentSpacing, CommentVec, LeadingGlue, Printer, RunLeadingBlank};
 use crate::ast::internal;
 use crate::printer::ParenContext;
 use crate::printer::chain::chain_paren_leading_gap;
+use crate::printer::expressions::conditional::ternary_test_needs_parens;
 use crate::printer::expressions::operators::SeqLayout;
 use crate::printer::ignore::FrozenOperandPair;
 use crate::printer::statements::TerminatorGap;
@@ -265,6 +266,85 @@ impl<'a> Printer<'a> {
             _ => false,
         };
         (!retains).then_some(child)
+    }
+
+    /// Whether the grouping shell the parser erased between `expr` and its left-spine
+    /// `child` is one the printer RE-EMITS — a pair `needs_parens` requires there.
+    ///
+    /// The two comment classes answer the enclosing "does this run reach the keyword's
+    /// line?" question differently, and this is the whole of the difference. A `//`, or any
+    /// comment on its own line, is emitted by the SHELL GAP and hoisted out in front of the
+    /// pair at a cast, a ternary test and their siblings — prettier does the same and tsv
+    /// matches — so a walk reading that class descends through an emitted pair. A comment
+    /// the leftmost leaf OWNS does not travel: ownership prints it from that leaf's own doc,
+    /// which is *inside* the pair, so a pair the printer emits holds it and it can never
+    /// reach the keyword at all. A walk reading THAT class stops here
+    /// ([`Self::stripped_left_side_child`]).
+    ///
+    /// Reading it the other way is what doubles a pair: the restricted production wraps a
+    /// hanging pair around a run that never needed holding
+    /// (`return (⏎ (/* a⏎b */ a as any).b⏎);` for `return (/* a⏎b */ a as any).b;`), pinned by
+    /// `statements/return_throw/operand_paren_required_inner_pair_multiline_block_prettier_divergence`.
+    pub(crate) fn left_shell_paren_is_emitted(
+        &self,
+        expr: &internal::Expression<'_>,
+        child: &internal::Expression<'_>,
+    ) -> bool {
+        use internal::Expression;
+        // No shell between them at all, so there is no pair to re-emit.
+        if expr.span().start == child.span().start {
+            return false;
+        }
+        let ctx = match expr {
+            Expression::MemberExpression(_) => ParenContext::ChainBase,
+            Expression::CallExpression(_) => ParenContext::Callee,
+            Expression::TaggedTemplateExpression(_) => ParenContext::TaggedTemplateTag,
+            Expression::TSNonNullExpression(_) => ParenContext::NonNull,
+            Expression::AssignmentExpression(_) => ParenContext::AssignmentTarget,
+            Expression::BinaryExpression(binary) => ParenContext::BinaryLeft {
+                parent_op: binary.operator,
+            },
+            // The ternary test's pair is its printer's own question, not `needs_parens`'
+            // ([`ternary_test_needs_parens`], which the inline, line-comment and frozen
+            // layouts all share).
+            Expression::ConditionalExpression(_) => return ternary_test_needs_parens(child),
+            // A sequence's operands ride the sequence's OWN envelope, so an operand's
+            // source shell is never re-emitted as a pair of its own.
+            _ => return false,
+        };
+        self.needs_parens(child, ctx)
+    }
+
+    /// [`Self::hoisted_left_side_child`] stopped at the first shell the printer re-emits —
+    /// the walk for a comment the leftmost leaf OWNS, which a pair holds rather than hoists
+    /// ([`Self::left_shell_paren_is_emitted`] states the difference).
+    pub(crate) fn stripped_left_side_child<'e>(
+        &self,
+        expr: &'e internal::Expression<'e>,
+    ) -> Option<&'e internal::Expression<'e>> {
+        let child = self.hoisted_left_side_child(expr)?;
+        (!self.left_shell_paren_is_emitted(expr, child)).then_some(child)
+    }
+
+    /// The leftmost node an expression's doc prints FIRST, for the OWNED-comment reading:
+    /// `expr` itself, or the leaf past every grouping shell the parser erased from its left
+    /// spine that the printer does not re-emit.
+    ///
+    /// The sibling of [`Self::left_spine_printed_start`], and deliberately not the same walk
+    /// — the two answer the same shape of question for the two comment classes, so they take
+    /// the two step functions. That one walks [`Self::hoisted_left_side_child`], because a
+    /// gap-emitted run is hoisted out in front of a pair the printer re-emits; this one walks
+    /// [`Self::stripped_left_side_child`], because an owned comment is printed from inside
+    /// that pair and never travels ([`Self::left_shell_paren_is_emitted`]).
+    pub(crate) fn stripped_left_spine_leaf<'e>(
+        &self,
+        expr: &'e internal::Expression<'e>,
+    ) -> &'e internal::Expression<'e> {
+        let mut node = expr;
+        while let Some(child) = self.stripped_left_side_child(node) {
+            node = child;
+        }
+        node
     }
 
     /// Whether a stripped shell on the expression's left spine holds a comment the hoist
@@ -1022,6 +1102,26 @@ impl<'a> Printer<'a> {
         self.has_line_spanning_comments_to_emit_between(expr_end, close)
     }
 
+    /// Whether a REDUNDANT shell's leading gap holds a comment the operand OWNS whose own
+    /// text spans a line — the second way that shell becomes load-bearing.
+    ///
+    /// The gap's ordinary trigger is a comment it EMITS, which stripping would drop
+    /// outright. An owned comment is never dropped — it travels inside the operand's doc —
+    /// so it needs no shell for its own sake. It needs one for ASI's: a `MultiLineComment`
+    /// holding a `LineTerminator` *is* one for the syntactic grammar (ecma262 sec-comments),
+    /// so stripping the shell puts a line terminator immediately before an `as` / `satisfies`
+    /// keyword or a postfix `++`, none of which may start a line — and where the cast sits in
+    /// a restricted production, before that keyword's argument as well
+    /// (`throw (/* a⏎b */ a) as B;` printed bare is a DEAD document). It is the same
+    /// question [`Self::asi_gap_needs_parens`] answers on the trailing side, asked on the
+    /// leading one, so the `//` spelling and this one keep one shell between them.
+    ///
+    /// ⚠️ **Only where the pair is REDUNDANT.** A pair the operand needs anyway already holds
+    /// the comment and prints flat around it (`const a = (/* c⏎d */ b + c + d) as T;`,
+    /// `typescript/syntax/comments/required_pair_multiline_leading_comment_prettier_divergence`);
+    /// retaining there would expand a pair that is not the ASI question at all. A SEQUENCE is
+    /// the case `needs_parens` cannot answer for us — it reports false because the sequence's
+    /// own printer emits the pair rather than because there is none — so it is named.
     /// The operand of an ASI-sensitive gap (an `as`/`satisfies` keyword, a postfix
     /// `++`/`--`) rendered inside the grouping-paren shell that holds its comments,
     /// emitting **both** of the shell's gaps — `(`→operand and operand→`)`.
@@ -1056,11 +1156,29 @@ impl<'a> Printer<'a> {
     /// operand takes its start from (`docs/comments.md` hazard 3). Emitting the window as
     /// one run instead would have carried the outside comment *into* the parens, and the
     /// all-or-nothing gate that preceded this dropped both runs outright.
+    fn redundant_shell_holds_line_spanning_owned_comment(
+        &self,
+        leading_start: u32,
+        expr: &internal::Expression<'_>,
+        operand_ctx: ParenContext,
+    ) -> bool {
+        // A SEQUENCE's own parens ARE the grouping — `needs_parens` says false because the
+        // sequence's printer emits them itself, not because the pair is redundant — so the
+        // comment is already inside a pair that prints flat around it and nothing is at risk
+        // (`const s1 = (/* c⏎d */ b, c) as T;`).
+        !matches!(expr, internal::Expression::SequenceExpression(_))
+            && !self.needs_parens(expr, operand_ctx)
+            && self
+                .comments_in_source_between(leading_start, expr.span().start)
+                .any(|c| c.multiline)
+    }
+
     pub(crate) fn build_asi_operand_shell_doc(
         &self,
         node_start: u32,
         expr: &internal::Expression<'_>,
         boundary_end: u32,
+        operand_ctx: ParenContext,
     ) -> Option<DocId> {
         let expr_start = expr.span().start;
         // The trailing gap opens where the operand's doc stops printing, which for a
@@ -1075,8 +1193,13 @@ impl<'a> Printer<'a> {
         .map(|p| p as u32);
 
         let leading_start = open.map_or(node_start, |p| p + 1);
-        let has_leading =
-            open.is_some() && self.has_comments_to_emit_between(leading_start, expr_start);
+        let has_leading = open.is_some()
+            && (self.has_comments_to_emit_between(leading_start, expr_start)
+                || self.redundant_shell_holds_line_spanning_owned_comment(
+                    leading_start,
+                    expr,
+                    operand_ctx,
+                ));
         if !has_leading && !self.asi_gap_needs_parens(expr_end, boundary_end) {
             return None;
         }

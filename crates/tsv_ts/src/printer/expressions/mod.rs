@@ -19,7 +19,7 @@
 mod arrays;
 pub(in crate::printer) mod assignment;
 pub(in crate::printer) mod blocks;
-mod conditional;
+pub(in crate::printer) mod conditional;
 pub(in crate::printer) mod functions;
 pub(crate) mod literals;
 mod objects;
@@ -109,7 +109,7 @@ impl<'a> Printer<'a> {
     /// shape through its svelte expression-root wrapper). Every NESTED binary inside the
     /// expression formats exactly as it would in a `<script>` — the parent position keys
     /// the style (assignment layouts flush, call args and array elements indent),
-    /// mirroring prettier's parent-keyed shouldNotIndent chain (binaryish.js:97) — which
+    /// mirroring prettier's parent-keyed `shouldNotIndent` chain (`print/binaryish.js`) — which
     /// is what keeps TS formatting context-free below the root. A Standalone-mode root
     /// (`{@const}`'s init, inheriting the host document's mode) takes the ordinary
     /// dispatch, where the host's assignment-value mark answers FLAT: that layout owns the
@@ -173,7 +173,7 @@ impl<'a> Printer<'a> {
 
     /// A pair of **expanding** parens whose own `(` / `)` are INSIDE the group —
     /// `group(["(", indent([softline, content]), softline, ")"])`, prettier's answer at the
-    /// binaryish early return (binaryish.js:84-89, `group([indent([softline, ...parts]),
+    /// binaryish early return (`printBinaryishExpression`, `print/binaryish.js`: `group([indent([softline, ...parts]),
     /// softline])` with the parens supplied by `needs-parens`).
     ///
     /// The sibling of [`Self::build_expanding_parens_body_doc`], which spells the same layout
@@ -204,7 +204,7 @@ impl<'a> Printer<'a> {
     }
 
     /// `build_expression_doc` for a position whose binary chain takes **no continuation
-    /// indent** — prettier's `shouldNotIndent` (binaryish.js:96-115), so the chain renders
+    /// indent** — prettier's `shouldNotIndent` (`print/binaryish.js`), so the chain renders
     /// as `group(parts)` and its continuation lines sit at the first operand's own column.
     ///
     /// With [`Printer::mark_flat_chain`], the only way to reach the flat layout, which is
@@ -749,7 +749,7 @@ impl<'a> Printer<'a> {
             Expression::ConditionalExpression(cond) => {
                 // Ternary in call/new args: binary expressions in branches use
                 // continuation indent. Matches Prettier's shouldNotIndent = false
-                // when grandparent is CallExpression/NewExpression (binaryish.js:112).
+                // when grandparent is CallExpression/NewExpression (`shouldNotIndent`, `print/binaryish.js`).
                 self.build_conditional_doc_with_binary_test_indent(cond)
             }
             // For other expressions, use normal doc building
@@ -1084,7 +1084,14 @@ impl<'a> Printer<'a> {
         let gap_has_comments =
             keyword_pos.is_some_and(|kw| self.has_comments_to_emit_between(expr_end, kw));
         let shell = if gap_has_comments || cast_start < expression.span().start {
-            keyword_pos.and_then(|kw| self.build_asi_operand_shell_doc(cast_start, expression, kw))
+            keyword_pos.and_then(|kw| {
+                self.build_asi_operand_shell_doc(
+                    cast_start,
+                    expression,
+                    kw,
+                    ParenContext::TypeAssertion,
+                )
+            })
         } else {
             None
         };
@@ -1650,7 +1657,7 @@ impl<'a> Printer<'a> {
         let should_group = Self::should_group_binary_continuation(binary);
         // shouldInlineLogicalExpression: when the outermost logical has a non-empty
         // object/array on the right, keep operator and RHS on the same line.
-        // Prettier ref: binaryish.js:275, 361
+        // Prettier ref: `printBinaryishExpressions` + `shouldInlineLogicalExpression` (`print/binaryish.js`)
         let should_inline_last = assignment::should_inline_logical_expression(binary);
         let mut parts = d.pooled_docbuf();
 
@@ -1665,7 +1672,7 @@ impl<'a> Printer<'a> {
                 //   (shouldInline && !samePrecedence → flat). We skip indent.
                 // For 3+ operand chains: prettier uses indent(rest) which applies to all
                 //   continuation operands. We need indent to match the level.
-                // Prettier ref: binaryish.js:275-280, 131, 169-178
+                // Prettier ref: `printBinaryishExpressions` + `printBinaryishExpression` (`print/binaryish.js`)
                 let is_chained = operands.len() > 2;
                 let op_and_operand = if is_chained {
                     // In a chain, use indent (matches other continuations' indent level)

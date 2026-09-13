@@ -178,7 +178,7 @@ fn build_chain_doc_impl<'a>(
         return build_peeled_tail_doc(groups, chain_end, &peeled, inline, printer);
     }
 
-    // Prettier's logic (member-chain.js:351-359):
+    // Prettier's logic (`printMemberChain`, `print/member-chain.js`):
     // If groups.length <= cutoff && !nodeHasComment:
     //   return group(oneLine)  // Simple group, NO fill()
     // Else:
@@ -257,9 +257,9 @@ fn build_chain_doc_impl<'a>(
     let first_doc = build_first_groups_doc(first_groups, printer);
 
     // Short chains: use group-based breaking
-    // Prettier (member-chain.js:351-359) only checks nodeHasComment for short chains.
+    // Prettier (`printMemberChain`, `print/member-chain.js`) only checks nodeHasComment for short chains.
     // Force expand conditions like "2+ callbacks with breaking body" and "3+ calls
-    // with complex args" only apply to long chains (member-chain.js:400-407).
+    // with complex args" only apply to long chains (`printMemberChain`).
     // Comments between chain segments DO block the short chain path (matching
     // Prettier's nodeHasComment check).
     if groups.len() <= cutoff
@@ -277,7 +277,7 @@ fn build_chain_doc_impl<'a>(
         );
     }
 
-    // Long chains: force expand conditions (Prettier member-chain.js:400-407)
+    // Long chains: force expand conditions (Prettier's `printMemberChain`, `print/member-chain.js`)
     let force_expand =
         has_calls && should_force_chain_expand(groups, chain_end, chain_has_comments, printer);
     build_long_chain_doc(
@@ -305,7 +305,7 @@ fn should_force_chain_expand<'a>(
             .filter(|n| n.is_call())
     };
 
-    // Prettier's chain expansion rules (member-chain.js:400-408):
+    // Prettier's chain expansion rules (`printMemberChain`, `print/member-chain.js`):
     // 1. Blank lines BETWEEN methods (not just before first) force expansion
     // 2. 3+ calls with complex args force expansion
     // 3. 2+ calls with callbacks, where any callback has a multiline body, force expansion
@@ -396,7 +396,7 @@ fn build_short_chain_doc<'a>(
         return d.concat(&[first_doc, member_lookup_group(d, lookup)]);
     }
 
-    // Prettier: group(printedGroups.flat()) for short chains (member-chain.js:351-359) —
+    // Prettier: group(printedGroups.flat()) for short chains (`printMemberChain`) —
     // the one layout every short chain takes, whether or not it holds a call and whatever
     // the first call's arity. group() lets hardlines in the first call (e.g., a
     // multiline array) render naturally while each call's inner args group handles its own
