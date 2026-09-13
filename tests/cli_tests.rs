@@ -1094,7 +1094,11 @@ fn test_format_quotes_a_path_holding_a_control_character_wherever_it_prints_it()
     let walk = tsv_in_dir(dir.path(), &["format", "--list", "."]);
     let stderr = String::from_utf8_lossy(&walk.stderr);
     assert_eq!(walk.status.code(), Some(2), "stderr: {stderr}");
-    let root = dir.path().to_str().unwrap();
+    // the walk canonicalizes its root before printing any path under it, so the
+    // expectation is canonicalized too: on macOS `$TMPDIR` sits under `/var`, a symlink
+    // to `/private/var`, and the unresolved spelling matches nothing in the output
+    let canonical = fs::canonicalize(&*dir).unwrap();
+    let root = canonical.display();
     assert!(
         stderr.contains(&format!("error: \"{root}/lo\\nck\": read_dir failed: ")),
         "stderr: {stderr}"
@@ -1491,7 +1495,10 @@ fn test_format_dedup_symlink_alias() {
     assert_eq!(stdout.lines().count(), 1, "stdout: {stdout}");
 }
 
-#[cfg(unix)]
+/// Linux-only, not `#[cfg(unix)]`: APFS and HFS+ enforce valid UTF-8 in a filename, so
+/// macOS refuses to CREATE the fixture (`EILSEQ`) and the case is unobservable there
+/// rather than merely untested. `cargo test --workspace` gates on ubuntu.
+#[cfg(target_os = "linux")]
 #[test]
 fn test_format_walks_non_utf8_names_by_their_own_bytes() {
     // a file or directory name that is not UTF-8 is joined onto the walk's paths as the
@@ -1797,7 +1804,10 @@ fn test_format_hard_links_are_two_names_in_scope() {
     );
 }
 
-#[cfg(unix)]
+/// Linux-only for the same reason as
+/// `test_format_walks_non_utf8_names_by_their_own_bytes`: the fixture name cannot exist
+/// on a macOS filesystem.
+#[cfg(target_os = "linux")]
 #[test]
 fn test_format_non_utf8_argument_is_refused_at_the_argv_boundary() {
     // a path ARGUMENT that is not UTF-8 is refused before any command runs — argh reads
