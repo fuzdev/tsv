@@ -5,7 +5,7 @@
 //
 // ## Architecture
 //
-// prettier's parenthesization (src/language-js/needs-parens.js) works by:
+// prettier's parenthesization (`parentheses/needs-parentheses.js`) works by:
 // - Switching on the node type (expression being printed)
 // - Each case examines the parent context and key (which child position)
 // - Returns true if parens needed, false otherwise
@@ -13,8 +13,9 @@
 // We model the "parent context + key" as a `ParenContext` enum.
 //
 // ## References
-// - prettier/src/language-js/needs-parens.js
-// - prettier/src/language-js/print/index.js (application layer)
+// - `needsParentheses` (`parentheses/needs-parentheses.js`) and its parent-side half
+//   `parentNeedsParentheses` (`parentheses/parent-needs-parentheses.js`)
+// - `printPathNoParens`'s caller (`print/index.js`, the application layer)
 
 use crate::ast::internal::{
     BinaryOperator, Expression, LiteralValue, UnaryOperator, UpdateOperator,
@@ -549,7 +550,7 @@ fn is_unary_or_update(expr: &Expression<'_>) -> bool {
 /// member/non-null chain. Prettier parenthesizes such a callee so the `new`
 /// arguments bind to the `new` rather than the inner call: `new (f())()`,
 /// `new (a.b())()`, `new (f().C)()`, `new (a?.b())()`. Mirrors prettier's
-/// `NewExpression` callee rule (needs-parens.js). Member access walks the
+/// `NewExpression` callee rule (`parentheses/needs-parentheses.js`). Member access walks the
 /// object (the call must be to the left of `new`'s argument list to be
 /// captured), so `new a[b]()` — no inner call — stays unparenthesized.
 fn new_callee_has_call(expr: &Expression<'_>) -> bool {

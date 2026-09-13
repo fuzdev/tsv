@@ -1,0 +1,10 @@
+Prettier never reaches a fixed point on this input: it strips the cast / update operand's
+shell and hoists the run onto the keyword's line, and the `throw` case that produces
+(`throw /* a⏎b */ a as B;`) is a DEAD document — a `MultiLineComment` holding a line
+terminator IS one for ASI (ECMA-262 §12.4), so `throw` is left with no argument and
+prettier cannot re-read its own pass-1 output ("A throw statement must throw an
+expression"). No prettier-anchored claim file (output_prettier.*, audit_signature.txt,
+variants) is expressible. The validator live-verifies this claim (rule F5). The `return`
+and `yield` cases are not dead but are the same relocation — prettier's own next pass
+would write the split out (`return;` / `yield;` with the operand below). tsv keeps the
+shell. See README.md and docs/conformance_prettier_ts_comments.md §Comment relocation.

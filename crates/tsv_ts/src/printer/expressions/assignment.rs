@@ -202,7 +202,7 @@ pub fn choose_layout(
     // with an inlinable RHS (non-empty object/array). In that case, the RHS
     // handles its own expansion: `x = foo || { a: 1 }` not `x =\n  foo || {a: 1}`
     //
-    // Prettier ref: shouldBreakAfterOperator (assignment.js:199)
+    // Prettier ref: `shouldBreakAfterOperator` (`print/assignment.js`)
     //   `isBinaryish(rightNode) && !shouldInlineLogicalExpression(rightNode)`
     if let Expression::BinaryExpression(binary) = right_expr
         && !should_inline_logical_expression(binary)
@@ -223,7 +223,7 @@ pub fn choose_layout(
     }
 
     // Conditional expressions with binary test → break after operator
-    // Prettier ref: shouldBreakAfterOperator (assignment.js:216-219)
+    // Prettier ref: `shouldBreakAfterOperator` (`print/assignment.js`)
     if conditional_should_break_after_op(right_expr) {
         return AssignmentLayout::BreakAfterOperator;
     }
@@ -272,7 +272,7 @@ pub fn choose_layout(
 /// Reading `binary.right` here is what made the paren-nested authoring diverge AND rewrite
 /// its own output on a second pass (`logical/inline_chain_paren_nested_long`).
 ///
-/// Prettier ref: `shouldInlineLogicalExpression` (binaryish.js:361)
+/// Prettier ref: `shouldInlineLogicalExpression` (`print/binaryish.js`)
 pub fn should_inline_logical_expression(binary: &internal::BinaryExpression<'_>) -> bool {
     if !binary.operator.is_logical() {
         return false;
@@ -421,7 +421,7 @@ fn unwrap_expression<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
 /// These cases are NOT poorly breakable — the type arguments themselves can break,
 /// so we should not break at the assignment operator.
 ///
-/// Matches Prettier's `isCallExpressionWithComplexTypeArguments` (assignment.js:422),
+/// Matches Prettier's `isCallExpressionWithComplexTypeArguments` (`print/assignment.js`),
 /// which lists object/union/intersection unconditionally, then falls back to
 /// `willBreak(print("typeArguments"))`. tsv covers the unconditional list directly;
 /// for a single mapped type-arg — which prettier treats as complex only via that
@@ -483,7 +483,7 @@ fn is_call_with_complex_type_arguments(
 /// - Member-only chains: `a.b.c.d` (no calls to break on)
 /// - Trivial call chains: `a.b().c()` (calls with no/simple args)
 ///
-/// Corresponds to prettier's `isPoorlyBreakableMemberOrCallChain` (assignment.js:359-400).
+/// Corresponds to prettier's `isPoorlyBreakableMemberOrCallChain` (`print/assignment.js`).
 ///
 /// ## Architectural difference from prettier
 ///
@@ -549,7 +549,8 @@ fn is_poorly_breakable_chain_recursive(
             // be allowed to break internally via the call's conditional_group states.
             //
             // Prettier's isLoneShortArgument returns false when the argument has any comment
-            // (hasComment check at utils/index.js:437). Arguments with comments are not
+            // (the `hasComment` guard in `utilities/is-lone-short-argument.js`). Arguments
+            // with comments are not
             // "short" because the comment changes formatting behavior — the call should be
             // allowed to expand args instead of breaking at the assignment operator.
             let is_trivial_call = call.arguments.is_empty()
@@ -564,7 +565,7 @@ fn is_poorly_breakable_chain_recursive(
             // Calls with complex type arguments (object/mapped/union/intersection types,
             // or multiple type args) are NOT poorly breakable - they have internal break
             // points via the type arguments.
-            // Matches Prettier's `isCallExpressionWithComplexTypeArguments` (assignment.js:422)
+            // Matches Prettier's `isCallExpressionWithComplexTypeArguments` (`print/assignment.js`)
             if is_call_with_complex_type_arguments(call, printer) {
                 return false;
             }
@@ -665,13 +666,14 @@ fn is_poorly_breakable_chain_recursive(
 
 /// Check if an argument is "short" (won't expand when formatted)
 ///
-/// Prettier ref: `isLoneShortArgument` in utils/index.js:434
+/// Prettier ref: `isLoneShortArgument` (`utilities/is-lone-short-argument.js`)
 /// Threshold: `printWidth * LONE_SHORT_ARGUMENT_THRESHOLD_RATE` (0.25)
 ///
 /// Note: Prettier uses JS `.length` (UTF-16 code units) for all measurements,
 /// we use `.len()` (UTF-8 bytes). These match for ASCII (the common case).
 fn is_short_arg(expr: &Expression<'_>, source: &str) -> bool {
-    // Prettier: LONE_SHORT_ARGUMENT_THRESHOLD_RATE = 0.25 (utils/index.js:433)
+    // Prettier: LONE_SHORT_ARGUMENT_THRESHOLD_RATE = 0.25
+    // (`utilities/is-lone-short-argument.js`)
     let threshold = PRINT_WIDTH / 4;
 
     match expr {
@@ -764,7 +766,8 @@ fn arg_is_multiline_string(expr: &Expression<'_>, source: &str) -> bool {
 
 /// Check if a call expression's arguments have any associated comments.
 ///
-/// Matches Prettier's `hasComment(node)` check inside `isLoneShortArgument` (utils/index.js:437).
+/// Matches Prettier's `hasComment(node)` check inside `isLoneShortArgument`
+/// (`utilities/is-lone-short-argument.js`).
 /// When an argument has comments, it should not be considered "short" because the comment
 /// changes the formatting behavior — the call should expand args instead of being treated
 /// as a poorly breakable chain.

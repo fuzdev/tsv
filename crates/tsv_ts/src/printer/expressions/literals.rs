@@ -625,7 +625,7 @@ pub(in crate::printer) fn is_valid_js_identifier(s: &str) -> bool {
 }
 
 /// Check if an identifier name matches Prettier's `isFactory`: `/^[A-Z]|^[$_]+$/u`
-/// (member-chain.js:273) — starts uppercase (`Object`, `React`) or is a pure
+/// (`isFactory`, `print/member-chain.js`) — starts uppercase (`Object`, `React`) or is a pure
 /// `$`/`_` name (`$`, `_`, `$__`). Drives chain factory-merge decisions; `$util`
 /// / `_helper` are NOT factories.
 pub(in crate::printer) fn is_factory_identifier_name(name: &str) -> bool {

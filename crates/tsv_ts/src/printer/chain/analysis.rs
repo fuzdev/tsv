@@ -914,7 +914,7 @@ fn should_not_wrap<'a>(
 /// Short names like `a`, `b`, `fn` get merged with their first call.
 /// Only applies in expression statement context (per Prettier's logic).
 ///
-/// Prettier ref: `isShort` in print/member-chain.js:284
+/// Prettier ref: `isShort` in `print/member-chain.js`
 /// Uses `name.length <= options.tabWidth` (JS .length, ASCII-only in practice)
 fn is_short_name(name: IdentName<'_>, name_start: u32, printer: &Printer<'_>) -> bool {
     printer.with_ident_name_at(name, name_start, |name| name.len() <= TAB_WIDTH)
@@ -923,7 +923,7 @@ fn is_short_name(name: IdentName<'_>, name_start: u32, printer: &Printer<'_>) ->
 /// Check if an identifier name is a factory pattern.
 ///
 /// Factory names get merged with their first call in chain formatting.
-/// Matches Prettier's `isFactory`: `/^[A-Z]|^[$_]+$/u` (member-chain.js:273)
+/// Matches Prettier's `isFactory`: `/^[A-Z]|^[$_]+$/u` (`print/member-chain.js`)
 /// - Starts with uppercase: `Object`, `React`, `Observable`
 /// - Pure `$`/`_` identifiers: `$`, `_`, `$_`, `$__` (lodash-style)
 fn is_factory_name(name: IdentName<'_>, name_start: u32, printer: &Printer<'_>) -> bool {

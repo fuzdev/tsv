@@ -417,7 +417,7 @@ pub(super) enum CalleeParens<'a> {
     /// whose `(` / `)` a different seam emits, so only a body is theirs to wrap.
     Cast(&'a internal::Expression<'a>),
     /// `(⏎\ta &&⏎\tb⏎)()` — prettier's binaryish EARLY RETURN, `key === "callee" &&
-    /// isCallOrNewExpression(parent)` (binaryish.js:84-89), taken ahead of `shouldNotIndent`
+    /// isCallOrNewExpression(parent)` (`printBinaryishExpression`, `print/binaryish.js`), taken ahead of `shouldNotIndent`
     /// and so ahead of every indent question: `group([indent([softline, ...parts]),
     /// softline])` over FLAT parts. The operand is therefore the ungrouped chain — the
     /// paren group alone decides whether to break after `(` — and not the

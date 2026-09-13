@@ -312,7 +312,7 @@ pub struct Printer<'a> {
     /// consumed, like the targets above.
     pub(crate) assignment_value_target: Cell<Option<Span>>,
     /// Span of a binary chain whose position is one of prettier's `shouldNotIndent`
-    /// parents (binaryish.js:96-115), so the chain takes the FLAT layout instead of the
+    /// parents (`shouldNotIndent`, `print/binaryish.js`), so the chain takes the FLAT layout instead of the
     /// continuation-indent default.
     ///
     /// The other half of the rule `assignment_value_target` carries, and recorded the same

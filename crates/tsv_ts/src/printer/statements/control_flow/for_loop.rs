@@ -1166,7 +1166,7 @@ impl<'a> Printer<'a> {
             return self.build_for_sequence_clause_doc(seq, build_elem);
         }
         // The clause itself is `shouldNotIndent`'s own `ForStatement` term (`node !==
-        // parent.body && parent.type === "ForStatement"`, binaryish.js:106), so a binary
+        // parent.body && parent.type === "ForStatement"`, `shouldNotIndent` in `print/binaryish.js`), so a binary
         // clause is FLAT. Marked rather than built directly because the builder is the
         // caller's — the init clause wraps each operand for `[~In]`, the update clause does
         // not (`Printer::mark_flat_chain`). `build_elem` runs immediately below, so nothing

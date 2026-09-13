@@ -360,7 +360,8 @@ impl<'a> Printer<'a> {
         // Excludes logical expressions with inline-able RHS (non-empty object/array).
         // Those use default layout so the RHS self-expands:
         //   `const x = foo || { a: 1 }` not `const x =\n  foo || {a: 1}`
-        // Prettier ref: assignment.js:199, binaryish.js:361
+        // Prettier ref: `shouldBreakAfterOperator` (`print/assignment.js`) +
+        // `shouldInlineLogicalExpression` (`print/binaryish.js`)
         let is_non_inline_binary = if let Expression::BinaryExpression(binary) = init {
             !should_inline_logical_expression(binary)
         } else {

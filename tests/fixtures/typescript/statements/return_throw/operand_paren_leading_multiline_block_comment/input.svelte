@@ -41,6 +41,23 @@ b */ a = b
 		);
 	}
 
+	// the remaining argument shapes, whose left-side siblings diverge only in how the shell is
+	// AUTHORED (see operand_paren_leading_multiline_block_left_side_prettier_divergence): on
+	// this form the two formatters agree at both (the non-null sibling is TS-only, so it
+	// rides the divergence fixture's lang="ts" script instead)
+	function fn2a() {
+		return (
+			/* a
+b */ a`t`
+		);
+	}
+	function fn2c() {
+		return (
+			/* a
+b */ a.b.c()
+		);
+	}
+
 	// a binary argument reaches the same form through its own conditional pair
 	function fn7() {
 		return (

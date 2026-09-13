@@ -1808,7 +1808,7 @@ pub(super) fn build_expand_first_arg_doc(
 
 /// Check if the last two arguments have the same outer AST type.
 /// Prettier disables expand-last-arg hug state when `penultimateArg.type === lastArg.type`
-/// (call-arguments.js:258). This covers both arrays, both objects, and also both TSAsExpression,
+/// (`couldExpandArg`, `print/call-arguments.js`). This covers both arrays, both objects, and also both TSAsExpression,
 /// both TSSatisfiesExpression, etc.
 pub(super) fn last_two_args_same_type(args: &[internal::Expression<'_>]) -> bool {
     let last = &args[args.len() - 1];

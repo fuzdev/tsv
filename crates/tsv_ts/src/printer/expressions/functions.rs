@@ -2104,7 +2104,7 @@ impl<'a> Printer<'a> {
         //
         // `build_flat_chain_expression_doc`, not `build_expression_doc`: an arrow body is
         // a `shouldNotIndent` position (`node === parent.body && parent.type ===
-        // "ArrowFunctionExpression"`, binaryish.js:105), so its binary chain's
+        // "ArrowFunctionExpression"`, `shouldNotIndent` in `print/binaryish.js`), so its binary chain's
         // continuation lines stay at the body's own column — the `=>` already put the body
         // one level in.
         if self.needs_parens(expr, ParenContext::ArrowBody) {

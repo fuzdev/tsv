@@ -45,7 +45,7 @@ fn ternary_branch_needs_parens(expr: &internal::Expression<'_>) -> bool {
 /// line-comment layouts so both agree — the line-comment path must not drop the semantic
 /// arrow/yield parens — and by the test's FROZEN form, which takes its pair here too
 /// ([`FrozenOperandPair::Emitted`] at the test's freeze seam).
-fn ternary_test_needs_parens(expr: &internal::Expression<'_>) -> bool {
+pub(in crate::printer) fn ternary_test_needs_parens(expr: &internal::Expression<'_>) -> bool {
     is_nullish_coalescing(expr)
         || matches!(
             expr,
@@ -399,7 +399,7 @@ impl<'a> Printer<'a> {
     ///
     /// When the ternary's parent is ReturnStatement, ThrowStatement, CallExpression,
     /// or NewExpression, binary expressions in the test position use continuation
-    /// indent. This matches Prettier's shouldNotIndent (binaryish.js:109-113) which
+    /// indent. This matches Prettier's `shouldNotIndent` (`print/binaryish.js`) which
     /// exempts binaries from indent only when the grandparent is NOT one of these types.
     pub(in crate::printer) fn build_conditional_doc_with_binary_test_indent(
         &self,
@@ -470,7 +470,7 @@ impl<'a> Printer<'a> {
             return self.build_conditional_doc_with_line_comments(cond, nesting);
         }
 
-        // Prettier's shouldNotIndent (binaryish.js:109-113) exempts binaries whose
+        // Prettier's `shouldNotIndent` (`print/binaryish.js`) exempts binaries whose
         // parent is ConditionalExpression from continuation indent, UNLESS the
         // grandparent is ReturnStatement, ThrowStatement, CallExpression, or
         // NewExpression. In those cases, shouldNotIndent = false and the binary
@@ -531,7 +531,7 @@ impl<'a> Printer<'a> {
             (test, shell_run)
         };
         let test = self.place_nested_ternary_test(nesting, test);
-        // Prettier's shouldNotIndent (binaryish.js:109-113) also applies to binaries
+        // Prettier's `shouldNotIndent` (`print/binaryish.js`) also applies to binaries
         // in consequent/alternate positions: when parent is ConditionalExpression and
         // grandparent is ReturnStatement/ThrowStatement/CallExpression/NewExpression,
         // shouldNotIndent = false → binary gets indent(rest) for continuation lines.
@@ -1073,7 +1073,7 @@ impl<'a> Printer<'a> {
         boundary_end: u32,
     ) -> DocId {
         // A branch is a `shouldNotIndent` position whenever the test is (both are
-        // `parent.type === "ConditionalExpression"`, binaryish.js:109-112), so a binary here
+        // `parent.type === "ConditionalExpression"`, `shouldNotIndent` in `print/binaryish.js`), so a binary here
         // takes the flat chain — except under `indent_binary`, where the term does not fire
         // and the ordinary dispatch's continuation-indent default is already the answer.
         //

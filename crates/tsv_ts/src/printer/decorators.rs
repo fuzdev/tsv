@@ -656,8 +656,8 @@ pub(in crate::printer) fn non_empty_decorators<'d, 'arena>(
 /// A decorated class expression breaks after the assignment operator (each
 /// decorator on its own line); an undecorated one stays on the operator's line
 /// and expands its body in place. Prettier ref: shouldBreakAfterOperator
-/// (assignment.js:228) `case "ClassExpression": isNonEmptyArray(decorators)`;
-/// the never-break ClassExpression case (assignment.js:189) only applies once
+/// (`shouldBreakAfterOperator`, `print/assignment.js`) `case "ClassExpression": isNonEmptyArray(decorators)`;
+/// the never-break ClassExpression case (`chooseLayout`, `print/assignment.js`) only applies once
 /// that has ruled out a decorated class. That assignment seam is one of six askers —
 /// `needs_parens`, the class-body, statement, variable-declarator and expression-dispatch
 /// paths ask it too — which is why it lives here rather than beside any one of them.

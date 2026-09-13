@@ -574,7 +574,7 @@ impl<'a> Printer<'a> {
         // through [`Printer::build_assignment_layout`], which marks the value itself — so
         // they owe the mark here. A class property is one of prettier's
         // `shouldIndentIfInlining` parents (`PropertyDefinition` /
-        // `ClassPrivateProperty`, binaryish.js:117-121), and the mark is the only way a
+        // `ClassPrivateProperty`, `shouldNotIndent` in `print/binaryish.js`), and the mark is the only way a
         // binary value learns it: without it the comment arms printed a chain indented
         // while the no-comment arm printed the same property flush.
         self.mark_assignment_value(value);

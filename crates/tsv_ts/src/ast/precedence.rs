@@ -4,8 +4,9 @@
 //! at the same precedence level may require parentheses for readability.
 //!
 //! Based on prettier's implementation:
-//! - ../prettier/src/language-js/utils/index.js (lines 792-813)
-//! - ../prettier/src/language-js/needs-parens.js
+//! - `getPrecedence` (`utilities/get-precedence.js`) and `shouldFlatten`
+//!   (`utilities/should-flatten.js`)
+//! - `needsParentheses` (`parentheses/needs-parentheses.js`)
 
 use super::internal::BinaryOperator;
 
@@ -70,8 +71,7 @@ pub fn is_right_associative(op: BinaryOperator) -> bool {
 
 /// Check if operators can be written together without parens
 ///
-/// Based on prettier's shouldFlatten logic from:
-/// ../prettier/src/language-js/utils/index.js (lines 750-790)
+/// Based on prettier's `shouldFlatten` (`utilities/should-flatten.js`).
 ///
 /// Returns false (need parens) when:
 /// - Operators have different precedence levels

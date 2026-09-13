@@ -5,7 +5,7 @@ use crate::printer::Printer;
 use crate::printer::needs_parens::strip_non_null_wrappers;
 use crate::printer::types::helpers::{is_simple_type, unwrap_parenthesized};
 
-/// Prettier's `isBooleanTypeCoercion` (`utils/is-boolean-type-coercion.js`): a plain
+/// Prettier's `isBooleanTypeCoercion` (`utilities/is-boolean-type-coercion.js`): a plain
 /// `Boolean(x)` call — the `!!x` coercion spelled as a call.
 ///
 /// A `shouldNotIndent` term (`key === "arguments" && isBooleanTypeCoercion(parent)`,
@@ -482,7 +482,7 @@ pub(super) fn is_hook_callback_with_deps(callback: &Expression<'_>, deps: &Expre
 /// Everything else is NOT simple — notably a TS cast, a meta property, and `typeof` / `void` /
 /// `delete`, each of which prettier leaves to its own closing `return false`.
 ///
-/// Reference: prettier/src/language-js/utils/index.js `isSimpleCallArgument`
+/// Reference: prettier's `isSimpleCallArgument` (`utilities/is-simple-call-argument.js`)
 pub(crate) fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bool {
     if depth == 0 {
         return false;

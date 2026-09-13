@@ -294,7 +294,7 @@ impl<'a> Printer<'a> {
         };
 
         // For 2-segment chains at top level (a = b = value), use unified assignment layout.
-        // Prettier only uses chain formatting for 3+ segments (assignment.js:113-125).
+        // Prettier only uses chain formatting for 3+ segments (`chooseLayout`, `print/assignment.js`).
         // A 2-segment chain has rhs_is_assignment=true but the inner RHS is NOT an assignment.
         if !matches!(context, AssignmentContext::Chain)
             && rhs_is_assignment

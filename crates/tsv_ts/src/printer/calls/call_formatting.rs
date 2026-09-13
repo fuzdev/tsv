@@ -265,7 +265,7 @@ fn build_call_args_doc(
     let paren_open = gap.paren_open(call);
 
     // A `Boolean()` coercion's argument is a `shouldNotIndent` position (`key === "arguments"
-    // && isBooleanTypeCoercion(parent)`, binaryish.js:115): its binary chain takes no
+    // && isBooleanTypeCoercion(parent)`, `shouldNotIndent` in `print/binaryish.js`): its binary chain takes no
     // continuation indent, the argument list already supplying the level, exactly as the
     // `!!()` coercion it mirrors. Marked ONCE here, ahead of every layout below, because they
     // all reach the argument through the shared `build_arg_expression_doc`, which reads the

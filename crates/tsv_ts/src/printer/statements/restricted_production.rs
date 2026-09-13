@@ -42,23 +42,37 @@ enum GapStart {
     /// grouping `(`s the parser stripped from that child (`(⏎// c⏎a as any).b` opens the
     /// member at the `(`, the `as` at `a`). Like [`Self::Keyword`], nothing here can own a
     /// trailing comment: a comment sharing the `(`'s line still leads the child.
-    Shell(u32),
+    ///
+    /// `pair_emitted` is whether the printer RE-EMITS a pair in that gap
+    /// ([`Printer::left_shell_paren_is_emitted`]). It does not change which comments LEAD
+    /// the child — every one of them does — only whether a comment's **own** interior line
+    /// terminator can reach the keyword: a run the gap emits is hoisted out in front of the
+    /// pair, but a comment the child OWNS is printed from inside it and never travels.
+    Shell { position: u32, pair_emitted: bool },
 }
 
 impl GapStart {
     /// Where the gap begins — the same position either way; only the reading differs.
     const fn position(self) -> u32 {
         match self {
-            Self::Keyword(p) | Self::Node(p) | Self::Shell(p) => p,
+            Self::Keyword(p) | Self::Node(p) | Self::Shell { position: p, .. } => p,
         }
     }
 
-    /// Whether a comment's **own** line terminator counts as one in this gap — true at
-    /// [`Self::Keyword`] alone, the gap a restricted production's `[no LineTerminator here]`
-    /// covers. The reading, and why the other two keep the narrow term, is
-    /// [`Printer::has_leading_own_line_comment_in_range`].
+    /// Whether a comment's **own** line terminator counts as one in this gap — at
+    /// [`Self::Keyword`], the gap a restricted production's `[no LineTerminator here]`
+    /// covers, and at a [`Self::Shell`] whose pair the printer does not re-emit, where the
+    /// strip puts the run in exactly that gap. The reading, and why [`Self::Node`] keeps
+    /// the narrow term, is [`Printer::has_leading_own_line_comment_in_range`].
     const fn counts_interior_line_terminator(self) -> bool {
-        matches!(self, Self::Keyword(_))
+        matches!(
+            self,
+            Self::Keyword(_)
+                | Self::Shell {
+                    pair_emitted: false,
+                    ..
+                }
+        )
     }
 }
 
@@ -222,7 +236,7 @@ impl<'a> Printer<'a> {
         }
 
         // Ternary in return/throw: binary test expressions need continuation indent.
-        // Matches Prettier's shouldNotIndent (binaryish.js:109-113) — when the binary's
+        // Matches Prettier's `shouldNotIndent` (`print/binaryish.js`) — when the binary's
         // grandparent is ReturnStatement/ThrowStatement, shouldNotIndent = false.
         let expr_doc = if let Expression::ConditionalExpression(cond) = arg {
             self.build_conditional_doc_with_binary_test_indent(cond)
@@ -322,7 +336,13 @@ impl<'a> Printer<'a> {
         let shell_start = expr.span().start;
         let left_start = left.span().start;
         if shell_start < left_start
-            && self.has_leading_own_line_comment_in_range(GapStart::Shell(shell_start), left_start)
+            && self.has_leading_own_line_comment_in_range(
+                GapStart::Shell {
+                    position: shell_start,
+                    pair_emitted: self.left_shell_paren_is_emitted(expr, left),
+                },
+                left_start,
+            )
         {
             return true;
         }
@@ -370,7 +390,7 @@ impl<'a> Printer<'a> {
         self.comments_in_source_between(gap_start.position(), end)
             .any(|c| {
                 let leads = match gap_start {
-                    GapStart::Keyword(_) | GapStart::Shell(_) => true,
+                    GapStart::Keyword(_) | GapStart::Shell { .. } => true,
                     GapStart::Node(prev_end) => !self.is_same_line(prev_end, c.span.start),
                 };
                 let carries_line_terminator = (gap_start.counts_interior_line_terminator()
@@ -447,7 +467,7 @@ impl<'a> Printer<'a> {
                 Expression::SequenceExpression(seq) => {
                     self.build_sequence_doc_bare(seq, seq.span.end)
                 }
-                // A return/throw argument is `shouldNotIndent` (binaryish.js:97) whichever
+                // A return/throw argument is `shouldNotIndent` (`print/binaryish.js`) whichever
                 // form it takes: these hanging parens supply the one level, exactly as the
                 // `if_break` pair does on the ordinary path
                 // (`Self::build_binary_paren_doc`, which reaches the same layout through
@@ -463,7 +483,14 @@ impl<'a> Printer<'a> {
                 // prints the gap's un-owned run — only the group the comment sits in. The
                 // SEQUENCE arm above takes the same claim inside its own printer, keyed on
                 // the run rather than on an operand node, so it must not be wrapped twice.
-                _ => self.build_value_with_outermost_owned_comment(arg, || {
+                //
+                // The claim is reached past every grouping shell the parser erased from the
+                // argument's LEFT SPINE ([`Printer::build_value_with_left_spine_owned_comment`]):
+                // a stripped shell prints no bytes, so the leaf behind it is what the hanging
+                // pair prints first, and keying on the argument's own span start declined
+                // there — `return (/* a⏎b */ a) ? b : c;` exploded the ternary across three
+                // lines where both formatters keep it flat.
+                _ => self.build_value_with_left_spine_owned_comment(arg, || {
                     self.build_flat_chain_expression_doc(arg)
                 }),
             },

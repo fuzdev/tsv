@@ -472,6 +472,34 @@ impl<'a> Printer<'a> {
         )
     }
 
+    /// [`Self::build_value_with_outermost_owned_comment`] reached PAST the grouping shells
+    /// the parser erased from the value's left spine — the form a **restricted production's
+    /// hanging pair** takes, because its pair is the outermost thing printed and the value's
+    /// own span start is not where its doc begins.
+    ///
+    /// The value form keys the claim on `value.span().start` and declines when the child
+    /// below starts later, which is exactly right when something the value prints sits ahead
+    /// of the child. Here nothing does: a shell the printer strips prints no bytes, so the
+    /// leaf past it IS the first thing on the page, and a multi-line comment it owns force-
+    /// breaks the whole value's group unless this seam claims it — the ternary in
+    /// `return (/* a⏎b */ a) ? b : c;` exploded across three lines where both formatters
+    /// keep it flat.
+    ///
+    /// The walk stops at a shell the printer RE-EMITS ([`Printer::stripped_left_side_child`]),
+    /// which is what keeps the claim off a comment a pair already holds: there the anchor
+    /// carries no owned comment and the claim declines on its own.
+    pub(in crate::printer) fn build_value_with_left_spine_owned_comment(
+        &self,
+        value: &Expression<'_>,
+        build: impl FnOnce() -> DocId,
+    ) -> DocId {
+        let anchor = self.stripped_left_spine_leaf(value);
+        if anchor.span().start == value.span().start {
+            return self.build_value_with_outermost_owned_comment(value, build);
+        }
+        self.build_doc_with_outermost_owned_comment_at(anchor.span().start, Some(anchor), build)
+    }
+
     /// [`Self::build_value_with_outermost_owned_comment`] over the plain
     /// [`Printer::build_expression_doc`] — the spelling of every seam that builds its value
     /// directly (a statement head's condition, a `case` test, a computed key or index, a
