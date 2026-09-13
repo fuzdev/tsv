@@ -30,6 +30,13 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
   native package has this CLI's exact contract, real `--jobs` parallelism
   included. When no binary is reachable the dispatcher falls back to the JS
   mirror below.
+- **`tsv` GitHub Release asset**: the same production binary, one per platform
+  package (`tsv-<triple>`, `tsv-win32-x64.exe`), attached to each
+  [GitHub Release](https://github.com/fuzdev/tsv/releases) beside a
+  `SHA256SUMS`, for use without npm (`curl` + `chmod +x`). Pulled back from the
+  npm registry at release time, so it is byte-identical to the binary the
+  platform package ships; every asset carries a build provenance attestation
+  (`gh attestation verify <file> -R fuzdev/tsv`).
 - **`tsv` npm bin, WASM (`@fuzdev/tsv_wasm`)**: `crates/tsv_wasm/npm/cli.js`
   — a hand-written Node mirror of this CLI's contract (subcommands, flags,
   exit codes, output streams, traversal rules). `--jobs` is real: path mode

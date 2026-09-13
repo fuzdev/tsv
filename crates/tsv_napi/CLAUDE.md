@@ -239,7 +239,8 @@ run and the native `tests/discovery_parity.rs`). Runs per OS in CI (the
 `scripts/publish.ts` pushes, by `workflow_dispatch` (dry-run by default — the
 pre-tag rehearsal; `dry_run=false` is the recovery path for a failed tag run,
 dispatched **on the tag** so the tag↔version assertion still applies — it keys
-on the ref, and a branch dispatch publishes without it and logs that it did),
+on the ref; a `dry_run=false` dispatch off a branch is refused before any
+target builds, so a branch dispatch can only rehearse),
 and by a weekly cron that builds and gates the whole matrix as a
 forced dry-run, so a container/runner breakage surfaces within a week.
 Per target: container-pinned builds of **both** shipped binaries — the addon
@@ -256,6 +257,11 @@ job gathers all five, stages the loader (`--loader-only`), and runs
 and version-lockstep checks, re-arming the CLI binaries' executable bit
 (artifact transport drops file modes — without it every posix `npx tsv`
 would EACCES), platforms-then-loader order, idempotent skip-if-published.
+A real publish then runs the `release` job, which creates the GitHub Release
+for the tag — CHANGELOG section as the body, each platform package's native
+`tsv` binary (re-fetched from npm, so the asset is what npm serves) plus a
+`SHA256SUMS` as the assets, every asset with a build provenance attestation
+(`gh attestation verify <file> -R fuzdev/tsv`).
 See the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
 
 ## Marshalling & errors

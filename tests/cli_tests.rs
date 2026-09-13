@@ -55,6 +55,31 @@ fn temp_dir(name: &str) -> TempTree {
     TempTree(dir)
 }
 
+/// Separators normalized to `/`, the spelling an expectation here is written in. The
+/// CLI emits **native** separators (`PathBuf::push` parity), so on Windows a listed path
+/// and a diagnostic's path both come back `\`-joined and an expectation spelled `/`-joined
+/// matches nothing. The discovery harnesses (`tests/discovery_parity.rs`,
+/// `scripts/discovery_parity_suite.ts`) normalize the same two sides for the same reason.
+/// Apply it per assertion, never blanket: `\` is a legal posix filename byte and the
+/// quoted-path tests below use one on purpose.
+fn to_posix(text: &str) -> String {
+    text.replace('\\', "/")
+}
+
+/// `fs::canonicalize`'s spelling **as the CLI prints it**, for an expectation built from
+/// the same resolution the walk does. Two host facts sit between the two otherwise: macOS
+/// resolves the `$TMPDIR` symlink (`/var` → `/private/var`), which is why an expectation
+/// canonicalizes at all, and Windows returns a verbatim path (`\\?\C:\…`) that the CLI
+/// strips before printing — through `tsv_cli::cli::discover::strip_verbatim_prefix`, the
+/// CLI's own rule rather than a copy of it, so the two cannot drift.
+/// Test helper; panicking on an unresolvable path is the desired behavior.
+#[allow(clippy::unwrap_used)]
+fn canonical_display(path: &Path) -> String {
+    tsv_cli::cli::discover::strip_verbatim_prefix(fs::canonicalize(path).unwrap())
+        .display()
+        .to_string()
+}
+
 static BUILD: Once = Once::new();
 
 /// Path to the built `tsv` binary, built once on first use. Spelled with
@@ -1094,7 +1119,9 @@ fn test_format_quotes_a_path_holding_a_control_character_wherever_it_prints_it()
     let walk = tsv_in_dir(dir.path(), &["format", "--list", "."]);
     let stderr = String::from_utf8_lossy(&walk.stderr);
     assert_eq!(walk.status.code(), Some(2), "stderr: {stderr}");
-    let root = dir.path().to_str().unwrap();
+    // the walk canonicalizes its root before printing any path under it, so the
+    // expectation resolves the same way (`canonical_display` carries the host facts)
+    let root = canonical_display(&dir);
     assert!(
         stderr.contains(&format!("error: \"{root}/lo\\nck\": read_dir failed: ")),
         "stderr: {stderr}"
@@ -1138,7 +1165,7 @@ fn test_format_lists_in_code_point_order() {
     let list = tsv_in_dir(dir.path(), &["format", "--list", "."]);
     assert_eq!(list.status.code(), Some(0));
     assert_eq!(
-        String::from_utf8_lossy(&list.stdout),
+        to_posix(&String::from_utf8_lossy(&list.stdout)),
         "./\u{ff10}.css\n./\u{1f600}.css\n"
     );
     // the diagnostics channel is sorted as whole strings, which agrees with the path
@@ -1491,7 +1518,10 @@ fn test_format_dedup_symlink_alias() {
     assert_eq!(stdout.lines().count(), 1, "stdout: {stdout}");
 }
 
-#[cfg(unix)]
+/// Linux-only, not `#[cfg(unix)]`: APFS and HFS+ enforce valid UTF-8 in a filename, so
+/// macOS refuses to CREATE the fixture (`EILSEQ`) and the case is unobservable there
+/// rather than merely untested. `cargo test --workspace` gates on ubuntu.
+#[cfg(target_os = "linux")]
 #[test]
 fn test_format_walks_non_utf8_names_by_their_own_bytes() {
     // a file or directory name that is not UTF-8 is joined onto the walk's paths as the
@@ -1797,7 +1827,10 @@ fn test_format_hard_links_are_two_names_in_scope() {
     );
 }
 
-#[cfg(unix)]
+/// Linux-only for the same reason as
+/// `test_format_walks_non_utf8_names_by_their_own_bytes`: the fixture name cannot exist
+/// on a macOS filesystem.
+#[cfg(target_os = "linux")]
 #[test]
 fn test_format_non_utf8_argument_is_refused_at_the_argv_boundary() {
     // a path ARGUMENT that is not UTF-8 is refused before any command runs — argh reads
@@ -1868,6 +1901,27 @@ fn test_format_grades_a_symlinked_directory_argument_as_a_link() {
     );
 }
 
+/// The listing's separators are the **host's**. Every other path assertion in this file
+/// runs the output through `to_posix` first, which is exactly what makes this pin
+/// necessary: normalizing both sides answers "are these the same path", never "is the
+/// spelling native", so a regression to `/` on Windows would pass the whole suite in
+/// silence. Windows-only because it is the one host where the two spellings differ.
+/// The contract itself is `cli::out::path_bytes`': a listed line must name the file on
+/// disk, for a script to hand straight back to the shell.
+#[cfg(windows)]
+#[test]
+fn test_format_lists_native_separators() {
+    let dir = temp_dir("native_separators");
+    fs::create_dir(dir.join("sub")).unwrap();
+    fs::write(dir.join("sub").join("a.ts"), UNFORMATTED_TS).unwrap();
+
+    let list = tsv_in_dir(dir.path(), &["format", "--list", "."]);
+    assert_eq!(list.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&list.stdout);
+    assert!(stdout.contains('\\'), "native separators: {stdout}");
+    assert!(!stdout.contains('/'), "no posix separators: {stdout}");
+}
+
 /// The case of an extension is not a different kind of file — prettier infers a parser
 /// from the lowercased name — so `A.TS` is walked, formats when named, dispatches to the
 /// right parser (`App.SVELTE` is Svelte, not TypeScript), and settles the module goal
@@ -1884,7 +1938,7 @@ fn test_extensions_are_read_without_regard_to_case() {
     let list = tsv_in_dir(dir.path(), &["format", "--list", "."]);
     assert_eq!(list.status.code(), Some(0));
     assert_eq!(
-        String::from_utf8_lossy(&list.stdout),
+        to_posix(&String::from_utf8_lossy(&list.stdout)),
         "./A.TS\n./App.SVELTE\n./legacy.MJS\n./styles.CSS\n"
     );
 
@@ -2259,7 +2313,7 @@ fn test_format_heuristic_shadow_warns_for_anchored_negation() {
         "stderr: {stderr}"
     );
     assert!(
-        stderr.contains(
+        to_posix(&stderr).contains(
             "/.formatignore does nothing; re-include it by adding `!/build/`, `/build/*` and `!/build/keep.ts`, in that order, to "
         ),
         "stderr: {stderr}"
@@ -2483,8 +2537,7 @@ fn test_format_overlapping_roots_name_a_shadowed_prettierignore_once() {
     fs::write(dir.join(".prettierignore"), "pf.ts\n").unwrap();
     fs::create_dir(dir.join("sub")).unwrap();
     fs::write(dir.join("sub/keep.ts"), FORMATTED_TS).unwrap();
-    let canonical = fs::canonicalize(&*dir).unwrap();
-    let expected = format!(".prettierignore in {} is shadowed", canonical.display());
+    let expected = format!(".prettierignore in {} is shadowed", canonical_display(&dir));
 
     for roots in [[".", "sub"], [".", "./"]] {
         let output = tsv_in_dir(&dir, &["format", "--list", roots[0], roots[1]]);

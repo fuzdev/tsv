@@ -156,8 +156,8 @@
 		"conformance:test262": "cargo run --release -p tsv_debug test262 --gate",
 		"conformance:all": "deno task conformance:test262 && deno task conformance",
 		"divergence:audit": "deno run --allow-read benches/js/divergence_audit.ts",
-		"//test:deno": "The node-modules-free half of the harness's own tests, so it can gate in `deno task check` (CI installs no node_modules). Named paths rather than `benches/js/lib/`, which would sweep in `canonical_test.ts` — that one loads prettier and needs the sidecar install, which is why it has its own task. A new pure test here has to be added by name; the alternative is a directory that silently stops being node-modules-free.",
-		"test:deno": "deno test --allow-read benches/js/lib/divergence/ benches/js/lib/format_config_probe_test.ts benches/js/lib/gate_counts_test.ts",
+		"//test:deno": "The node-modules-free deno tests, so they can gate in `deno task check` (CI installs no node_modules): the harness's own pure half plus `scripts/`'s (`changelog_test.ts`, the grammar publish.ts writes and release_notes.ts reads). Named paths rather than `benches/js/lib/`, which would sweep in `canonical_test.ts` — that one loads prettier and needs the sidecar install, which is why it has its own task. A new pure test here — a `scripts/*_test.ts` too — has to be added by name; the alternative is a directory that silently stops being node-modules-free.",
+		"test:deno": "deno test --allow-read benches/js/lib/divergence/ benches/js/lib/format_config_probe_test.ts benches/js/lib/gate_counts_test.ts scripts/changelog_test.ts",
 		"test:deno:canonical": "deno test --config benches/js/deno.json --allow-read --allow-env --allow-sys benches/js/lib/canonical_test.ts",
 
 		"test:npm": "deno task build:npm:format && deno task test:npm:run",
@@ -175,7 +175,11 @@
 		"engines:audit": "deno run --allow-read --allow-write --allow-env --allow-run scripts/engine_parity.ts",
 		"validate:artifacts": "deno run --allow-read --allow-env=BENCH_STALE_OK scripts/validate_artifacts.ts",
 
-		"publish": "deno run --allow-read --allow-write --allow-run --allow-env --allow-net scripts/publish.ts"
+		"publish": "deno run --allow-read --allow-write --allow-run --allow-env --allow-net scripts/publish.ts",
+		"//release:notes": "The GitHub Release body for a tag: CHANGELOG.md's stamped `## <version>` section, printed. What release_napi.yml's `release` job feeds to `gh release create`; run locally to preview what a tag would say. Fails on a missing or empty section — at a release tag it exists by construction (publish.ts refuses to stamp an empty `## Unreleased`).",
+		"release:notes": "deno run --allow-read scripts/release_notes.ts",
+		"//release:assets": "The GitHub Release assets for a PUBLISHED version — every platform package's native `tsv` CLI binary + SHA256SUMS — pulled back from the npm registry (not the build artifacts), so the asset is byte-identical to what npm serves, re-run or not. `--out <dir>` (no `--` separator). Run locally against any released version to re-derive a release's SHA256SUMS from npm. The registry reads retry for a bounded window (the constants at the top of the script — the workflow runs this seconds after the publish, and a just-published version can lag the registry's read path), so a typo'd version fails after that window, not before.",
+		"release:assets": "deno run --allow-read --allow-write --allow-run=npm,tar scripts/release_assets.ts"
 	},
 	"//exclude": "`scripts/doctor.ts` is here for the ROOT config only — it is the one scripts/ module that reaches the bench node_modules (its corpus probe imports benches/js/lib/corpus.ts), so a root-config walk cannot check it on a clean checkout. typecheck:js walks scripts/ under benches/js/deno.json, which has no exclude, so doctor.ts is still typechecked there. See the //typecheck:scripts note.",
 	"exclude": ["node_modules", "target", "tests/fixtures", ".claude", "scripts/doctor.ts"]

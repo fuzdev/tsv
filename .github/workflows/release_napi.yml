@@ -35,12 +35,23 @@
 # to OIDC, dropping the token. `id-token: write` is already scoped on the
 # publish job for `npm --provenance`.
 #
+# After a real publish, the `release` job creates the GitHub Release for the
+# tag: body = CHANGELOG.md's stamped `## <version>` section
+# (scripts/release_notes.ts); assets = each platform package's native `tsv`
+# CLI binary + SHA256SUMS, pulled back from the registry
+# (scripts/release_assets.ts) so an asset is byte-identical to what npm
+# serves, each with a Sigstore provenance attestation
+# (actions/attest-build-provenance; `gh attestation verify <file> -R fuzdev/tsv`).
+#
 # workflow_dispatch runs the whole matrix and gates with `npm publish
 # --dry-run` by default — the pre-tag rehearsal; set dry_run=false for a real
-# publish (the recovery path for a failed tag run). Dispatch that recovery on
-# the release TAG rather than a branch: the tag↔version assertion keys on the
-# ref, so a branch dispatch publishes whatever version that branch stages, from
-# source that may have moved past the release commit.
+# publish (the recovery path for a failed tag run). That recovery must be
+# dispatched on the release TAG: the tag is what ties the staged version to a
+# released commit (the tag↔version assertion keys on the ref) and what the
+# `release` job keys on, so a real publish off a branch — which would ship
+# whatever version that branch stages, from source that may have moved past
+# the release commit, and mint no Release — is REFUSED before any target
+# builds. A branch dispatch can only rehearse.
 
 name: release_napi
 
@@ -104,6 +115,17 @@ jobs:
     timeout-minutes: 60
 
     steps:
+      # A REAL publish must run on the release tag (see the trigger comment). A
+      # dispatch on a branch may only rehearse (dry_run=true, the default); one
+      # asking for a real publish is refused here, in seconds and before any
+      # target builds, rather than at the publish step 30+ minutes in. The
+      # publish step restates the rule as its own last line of defence.
+      - name: Refuse a real publish that is not on a tag
+        if: github.event_name == 'workflow_dispatch' && !inputs.dry_run && github.ref_type != 'tag'
+        run: |
+          echo "::error::a real publish (dry_run=false) must be dispatched on the release tag, not on '$GITHUB_REF_NAME' — dispatch it on the tag, or leave dry_run=true to rehearse"
+          exit 1
+
       # persist-credentials: false keeps the GITHUB_TOKEN out of .git/config (no step here pushes via git).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -304,9 +326,10 @@ jobs:
       # The two flags answer independent questions, so they key on different
       # things. `--expect-tag` follows the REF: any run whose ref is a tag must
       # agree with it, which covers the tag push AND a recovery dispatched on
-      # the release tag — the tagless dispatch (dispatch on a branch) is the
-      # only path with nothing tying the staged version to a released commit,
-      # so prefer dispatching on the tag. Dry-run-ness follows the EVENT.
+      # the release tag. Dry-run-ness follows the EVENT — and a REAL publish
+      # additionally requires the tag ref (the build job's guard refuses a
+      # tagless one up front; restated here so the step that can publish holds
+      # the rule itself), so the only tagless path is a rehearsal.
       - name: Publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -315,13 +338,100 @@ jobs:
           flags=()
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             flags+=(--expect-tag "$GITHUB_REF_NAME")
-          else
-            echo "note: ref '$GITHUB_REF_NAME' is not a tag — publishing without the tag↔version assertion"
           fi
           if [ "$GITHUB_EVENT_NAME" = "schedule" ] || [ "$DRY_RUN" = "true" ]; then
             # schedule is ALWAYS dry-run — see the trigger comment.
             flags+=(--dry-run)
+          elif [ "$GITHUB_REF_TYPE" != "tag" ]; then
+            echo "::error::refusing a real publish off the non-tag ref '$GITHUB_REF_NAME' — dispatch it on the release tag"
+            exit 1
           else
             flags+=(--provenance)
           fi
           deno run --allow-read --allow-write=crates/tsv_napi/pkg --allow-env --allow-run=npm scripts/publish_napi.ts "${flags[@]}"
+
+  # The GitHub Release for the tag: the CHANGELOG's stamped `## <version>`
+  # section as the body (scripts/release_notes.ts) and, as assets, the native
+  # `tsv` CLI binary of every platform package plus a SHA256SUMS — pulled back
+  # FROM THE REGISTRY (scripts/release_assets.ts), so an asset is byte-identical
+  # to what npm serves even on a recovery re-run, where the matrix rebuilds
+  # while the publish step skips the versions already live. Runs only after a
+  # REAL publish: the tag push, or a dry_run=false dispatch on the tag (the
+  # only real publish the workflow admits — a tagless one is refused before
+  # the matrix builds); the weekly schedule and dry-run dispatches never create
+  # a Release. The first create attaches the assets in the same call, so a
+  # Release is never public without them. Idempotent: an existing Release is
+  # kept and its assets re-uploaded with --clobber (same bytes, by the registry
+  # sourcing above). The job holds the only `contents: write` and
+  # `attestations: write` in the workflow, and no npm token.
+  release:
+    needs: publish
+    if: github.ref_type == 'tag' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write # gh release create + asset upload
+      id-token: write # attest-build-provenance (Sigstore cert)
+      attestations: write # attest-build-provenance (persist the attestation)
+
+    steps:
+      # persist-credentials: false keeps the GITHUB_TOKEN out of .git/config (gh reads GH_TOKEN, not git config).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: 2.9.5
+
+      - name: Install Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24.14.1'
+
+      - name: Release notes
+        run: |
+          deno run --allow-read scripts/release_notes.ts "$GITHUB_REF_NAME" > "$RUNNER_TEMP/release_notes.md"
+          cat "$RUNNER_TEMP/release_notes.md"
+
+      # The script's registry reads retry for a bounded window: this runs
+      # seconds after the publish job, and a just-published version can lag the
+      # registry's read path.
+      - name: Collect assets from the registry
+        run: |
+          deno run --allow-read --allow-write --allow-run=npm,tar \
+            scripts/release_assets.ts "$GITHUB_REF_NAME" --out "$RUNNER_TEMP/assets"
+          cat "$RUNNER_TEMP/assets/SHA256SUMS"
+
+      # Provenance attestation over EVERY asset — the binaries and the
+      # SHA256SUMS beside them, so a verifier who fetches only the checksum file
+      # has something to verify it against (Sigstore, stored on the repo;
+      # `gh attestation verify <file> -R fuzdev/tsv`). Ahead of the Release so a
+      # failed attestation fails before anything is public; a re-run attests
+      # again (several attestations for one digest are fine). The npm packages
+      # carry the same bytes under npm's own `--provenance`. No storage record:
+      # that needs the newer `artifact-metadata: write` permission, and the
+      # attestation alone is what `gh attestation verify` reads.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ runner.temp }}/assets/*
+          create-storage-record: false
+
+      # --verify-tag: refuse to mint a Release for a tag the remote doesn't
+      # hold (gh would otherwise create the tag itself at the checkout's SHA).
+      # The first create takes the assets as positional files, so the Release
+      # never appears without them; a re-run (Release already present) keeps
+      # its notes and only re-uploads.
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --json tagName >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists — re-uploading assets only"
+            gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP"/assets/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP"/assets/* --verify-tag \
+              --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release_notes.md"
+          fi

@@ -123,6 +123,11 @@ The native package is prebuilt
 for Linux (x64 gnu and musl, arm64 gnu), macOS arm64, and Windows x64.
 As with other wasm packages, browsers must call `await init()`.
 
+The same native `tsv` CLI binaries are attached to each
+[GitHub Release](https://github.com/fuzdev/tsv/releases) (one per platform above,
+with a `SHA256SUMS`) for use without npm; every asset carries a build provenance
+attestation (`gh attestation verify tsv-linux-x64-gnu -R fuzdev/tsv`).
+
 See the [website docs](https://tsv.fuz.dev/docs)
 and package READMEs for the full API and CLI flags:
 

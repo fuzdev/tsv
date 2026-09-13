@@ -10,7 +10,9 @@
  * Version source of truth: `Cargo.toml [workspace.package] version` (read
  * directly by wasm-pack). There is no root package.json and no changesets —
  * `--bump` edits Cargo.toml and converts CHANGELOG.md's `## Unreleased`
- * section into the new version's section.
+ * section into the new version's section (the grammar is `scripts/changelog.ts`;
+ * that stamped section is what the tag's GitHub Release reads back as its body,
+ * via `scripts/release_notes.ts` in the release workflow).
  *
  * Usage:
  *   deno task publish                        # dry-run (validate everything)
@@ -41,6 +43,13 @@
  */
 
 import { CORPORA_COLLECTIONS, CORPORA_ROOT } from '../benches/js/lib/corpora.ts';
+import {
+	type BumpLevel,
+	CHANGELOG_PATH,
+	changelog_declared_bump,
+	changelog_stamp,
+	changelog_unreleased_content
+} from './changelog.ts';
 import { format_size, gzip_size } from './size.ts';
 
 const KNOWN_FLAGS = new Set(['--wetrun', '--no-check', '--no-git', '--bump']);
@@ -67,27 +76,14 @@ if (bump !== null && bump !== 'patch' && bump !== 'minor' && bump !== 'major') {
 	Deno.exit(1);
 }
 
-type BumpLevel = 'patch' | 'minor' | 'major';
-
 const SENTINEL_PATH = '.publish-in-progress';
 const CARGO_PATH = 'Cargo.toml';
-const CHANGELOG_PATH = 'CHANGELOG.md';
 // Match version under [workspace.package] to avoid clobbering dependency versions.
 // `[^[]*?` bounds the scan to the section (stops at the next `[` heading), so a
 // missing `version` key can never make the rewrite land on a later section's line;
 // `^version` (multiline) skips a `rust-version = "..."` MSRV pin. Same grammar as
 // bench.ts's and build_napi_packages.ts's read-only forms.
 const workspace_pkg_re = /(\[workspace\.package\][^[]*?^version\s*=\s*)"([^"]*)"/m;
-
-/** The `<!-- bump: <level> -->` marker, recognized ONLY on the line directly
- * after the `## Unreleased` heading — the exact position `stamp_changelog`'s
- * `with_marker` rewrites. `unreleased_section` returns the body starting at the
- * newline after the heading, so the leading `\n` here anchors that placement.
- * A marker anywhere else in the section is ignored, so validation can't accept
- * a changelog whose marker the stamper would fail to strip. Kept in sync with
- * `with_marker`. Declared here (not beside the changelog helpers below) so it's
- * initialized before the top-level orchestration calls `changelog_declared_bump`. */
-const UNRELEASED_BUMP_MARKER = /^\n<!-- bump: (patch|minor|major) -->(?:\n|$)/;
 
 const dec = new TextDecoder();
 
@@ -253,7 +249,12 @@ if (wetrun) {
 		}
 		// A release must ship notes — require a non-empty `## Unreleased`
 		// section before mutating anything (the bump level can live there too).
-		const content = changelog_unreleased_content();
+		const changelog = read_changelog();
+		if (changelog === null) {
+			console.error(`  FAIL: no ${CHANGELOG_PATH} — add release notes before publishing`);
+			Deno.exit(1);
+		}
+		const content = changelog_unreleased_content(changelog);
 		if (content === null) {
 			console.error(
 				`  FAIL: no "## Unreleased" section in ${CHANGELOG_PATH} — add release notes before publishing`
@@ -266,7 +267,7 @@ if (wetrun) {
 			);
 			Deno.exit(1);
 		}
-		const level = resolve_bump(bump as BumpLevel | null, changelog_declared_bump());
+		const level = resolve_bump(bump as BumpLevel | null, changelog_declared_bump(changelog));
 		version = bump_version(version_before, level);
 		const cargo = Deno.readTextFileSync(CARGO_PATH);
 		Deno.writeTextFileSync(CARGO_PATH, cargo.replace(workspace_pkg_re, `$1"${version}"`));
@@ -286,7 +287,8 @@ if (wetrun) {
 	version = version_before;
 	console.log(`  Current version: v${version}`);
 	const would_retry = initial_sentinel === version;
-	const declared = changelog_declared_bump();
+	const changelog = read_changelog();
+	const declared = changelog === null ? null : changelog_declared_bump(changelog);
 	if (would_retry) {
 		// Mirrors wetrun precedence: retry wins over --bump
 		console.log(`  Sentinel found at v${version} — wetrun would retry from it`);
@@ -295,8 +297,10 @@ if (wetrun) {
 		}
 	} else {
 		// Mirror the wetrun's requirements without exiting — report what it would do.
-		const content = changelog_unreleased_content();
-		if (content === null) {
+		const content = changelog === null ? null : changelog_unreleased_content(changelog);
+		if (changelog === null) {
+			console.warn(`  WARN: no ${CHANGELOG_PATH} — a fresh wetrun would FAIL`);
+		} else if (content === null) {
 			console.warn(
 				`  WARN: no "## Unreleased" section in ${CHANGELOG_PATH} — a fresh wetrun would FAIL`
 			);
@@ -533,7 +537,7 @@ for (let i = 0; i < packages.length; i++) {
 		} else if (/cannot publish over|previously published version/i.test(res.stderr)) {
 			// Dry-run never bumps, so it dry-publishes the CURRENT (already-published)
 			// version. The real wetrun bumps first, so this isn't a real failure.
-			const preview = (bump as BumpLevel | null) ?? changelog_declared_bump();
+			const preview = (bump as BumpLevel | null) ?? read_declared_bump();
 			const target = preview ? `v${bump_version(version, preview)}` : 'the bumped version';
 			console.log(
 				`  PASS: ${label} packs cleanly (v${version} already published — a real run publishes ${target})`
@@ -712,87 +716,55 @@ function bump_version(current: string, level: 'patch' | 'minor' | 'major'): stri
 	return `${major}.${minor}.${patch + 1}`;
 }
 
-/** Stamp CHANGELOG.md's `## Unreleased` section into `## <version>` (dropping its
- * bump marker) and seed a fresh empty `## Unreleased` reset to `bump: patch` for
- * the next cycle. Idempotent: a no-op if `## <version>` is already present. */
+/** Stamp CHANGELOG.md's `## Unreleased` section into `## <version>` — the pure
+ * rewrite is `changelog_stamp`; this owns the file and the log line. Idempotent:
+ * a no-op if `## <version>` is already present (a retry after a failed wetrun,
+ * where the seeded fresh `## Unreleased` is expected). */
 function stamp_changelog(new_version: string): void {
-	let changelog: string;
-	try {
-		changelog = Deno.readTextFileSync(CHANGELOG_PATH);
-	} catch (error) {
-		if (!(error instanceof Deno.errors.NotFound)) throw error;
+	const changelog = read_changelog();
+	if (changelog === null) {
 		console.warn(`  WARN: no ${CHANGELOG_PATH} — skipping changelog stamp`);
 		return;
 	}
-	// Already stamped this version (retry after a failed wetrun) — the seeded
-	// fresh `## Unreleased` is expected; leave everything as-is.
-	if (version_heading_re(new_version).test(changelog)) {
-		console.log(`  ${CHANGELOG_PATH} already stamped with ## ${new_version}`);
-		return;
-	}
-	// Rename `## Unreleased` to the version (dropping its bump marker) and seed a
-	// fresh empty `## Unreleased` reset to `bump: patch` for the next cycle.
-	const fresh = '## Unreleased\n<!-- bump: patch -->\n\n';
-	const with_marker = /^## Unreleased\n<!-- bump: (?:patch|minor|major) -->\n/m;
-	if (with_marker.test(changelog)) {
-		const stamped = changelog.replace(with_marker, `${fresh}## ${new_version}\n`);
-		Deno.writeTextFileSync(CHANGELOG_PATH, stamped);
-		console.log(
-			`  Stamped ${CHANGELOG_PATH}: ## Unreleased -> ## ${new_version}; seeded fresh ## Unreleased (bump: patch)`
-		);
-	} else if (/^## Unreleased$/m.test(changelog)) {
-		// No marker (defensive — a wetrun would have failed earlier). Rename + seed.
-		const stamped = changelog.replace(/^## Unreleased$/m, `${fresh}## ${new_version}`);
-		Deno.writeTextFileSync(CHANGELOG_PATH, stamped);
-		console.log(
-			`  Stamped ${CHANGELOG_PATH}: ## Unreleased -> ## ${new_version}; seeded fresh ## Unreleased (bump: patch)`
-		);
-	} else {
-		console.warn(`  WARN: no "## Unreleased" section in ${CHANGELOG_PATH} — nothing to stamp`);
+	const stamp = changelog_stamp(changelog, new_version);
+	switch (stamp.outcome) {
+		case 'already_stamped':
+			console.log(`  ${CHANGELOG_PATH} already stamped with ## ${new_version}`);
+			return;
+		case 'stamped':
+		case 'stamped_without_marker':
+			Deno.writeTextFileSync(CHANGELOG_PATH, stamp.text);
+			console.log(
+				`  Stamped ${CHANGELOG_PATH}: ## Unreleased -> ## ${new_version}; seeded fresh ## Unreleased (bump: patch)`
+			);
+			return;
+		case 'no_unreleased':
+			console.warn(`  WARN: no "## Unreleased" section in ${CHANGELOG_PATH} — nothing to stamp`);
+			return;
+		default: {
+			const unhandled: never = stamp.outcome;
+			throw new Error(`unhandled changelog stamp outcome: ${String(unhandled)}`);
+		}
 	}
 }
 
-function version_heading_re(target_version: string): RegExp {
-	return new RegExp(`^## ${target_version.replaceAll('.', '\\.')}$`, 'm');
-}
-
-/** Body of the `## Unreleased` section (after the heading, up to the next `## `
- * heading or EOF), or null if there's no such heading. */
-function unreleased_section(changelog: string): string | null {
-	const heading = /^## Unreleased$/m.exec(changelog);
-	if (!heading) return null;
-	const after = changelog.slice(heading.index + heading[0].length);
-	const next = after.search(/^## /m);
-	return next === -1 ? after : after.slice(0, next);
-}
-
-/** Unreleased content with the bump marker + surrounding whitespace stripped.
- * `''` means an empty section; `null` means no section (or no CHANGELOG). */
-function changelog_unreleased_content(): string | null {
-	let changelog: string;
+/** The changelog text, or null when there is no CHANGELOG.md. Only a missing
+ * file reads as null — a permission error or the like is a real failure, not
+ * "no changelog", and rethrows. */
+function read_changelog(): string | null {
 	try {
-		changelog = Deno.readTextFileSync(CHANGELOG_PATH);
-	} catch {
-		return null;
+		return Deno.readTextFileSync(CHANGELOG_PATH);
+	} catch (error) {
+		if (error instanceof Deno.errors.NotFound) return null;
+		throw error;
 	}
-	const section = unreleased_section(changelog);
-	if (section === null) return null;
-	return section.replace(UNRELEASED_BUMP_MARKER, '').trim();
 }
 
 /** The `<!-- bump: <level> -->` marker declared directly after the `## Unreleased`
- * heading, or null. */
-function changelog_declared_bump(): BumpLevel | null {
-	let changelog: string;
-	try {
-		changelog = Deno.readTextFileSync(CHANGELOG_PATH);
-	} catch {
-		return null;
-	}
-	const section = unreleased_section(changelog);
-	if (section === null) return null;
-	const m = UNRELEASED_BUMP_MARKER.exec(section);
-	return m ? (m[1] as BumpLevel) : null;
+ * heading, or null (also when there is no CHANGELOG). */
+function read_declared_bump(): BumpLevel | null {
+	const changelog = read_changelog();
+	return changelog === null ? null : changelog_declared_bump(changelog);
 }
 
 /** The bump level — required on BOTH the --bump flag and the CHANGELOG marker,
