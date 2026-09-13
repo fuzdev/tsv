@@ -201,6 +201,25 @@
 			]
 		},
 		{
+			"name": "an_extension_is_read_without_regard_to_ascii_case",
+			"note": "every extension dispatch reads the extension as Path::extension reads it, without regard to ASCII case (prettier infers a parser from the lowercased name, and a tree that passed through a case-insensitive filesystem carries such names): a walk takes `A.TS`, `App.SVELTE`, `styles.CSS` and `legacy.MJS` as the files they are, a named `notes.MD` is the argument error `notes.md` is, and a bare dotfile like `.ts` is a stem with no extension on either walker",
+			"tree": {
+				".git/": null,
+				"src/A.TS": "x",
+				"src/App.SVELTE": "x",
+				"src/legacy.MJS": "x",
+				"src/styles.CSS": "x",
+				"src/notes.MD": "x",
+				"src/.ts": "x"
+			},
+			"cases": [
+				{"target": "", "expected": ["src/A.TS", "src/App.SVELTE", "src/legacy.MJS", "src/styles.CSS"]},
+				{"targets": ["src/A.TS", "src/styles.CSS"], "expected": ["src/A.TS", "src/styles.CSS"]},
+				{"target": "src/notes.MD", "error": "unsupported file extension"},
+				{"target": "src/.ts", "error": "unsupported file extension"}
+			]
+		},
+		{
 			"name": "list_in_scope_honors_ignores",
 			"note": "the in-scope set honors a dir prune (build/) and a glob (*.snap)",
 			"tree": {
@@ -530,10 +549,10 @@
 		},
 		{
 			"name": "a_symlinked_argument_is_graded_where_it_is_typed",
-			"note": "a path argument that is itself a symbolic link is bounded by the ignore files at the path typed, as git check-ignore and prettier read it — not where it points: a link a .gitignore names is skipped (warned, as any gitignore-only file exclusion is), a link into a gitignored build/ is not under build/, and a linked directory root is bounded by the rules of the repo it sits in even when it points outside that repo",
+			"note": "a path argument that is itself a symbolic link is bounded by the ignore files at the path typed, as git check-ignore and prettier read it — not where it points: a link a .gitignore names is skipped (warned, as any gitignore-only file exclusion is), a link into a gitignored build/ is not under build/, and a linked directory root is bounded by the rules of the repo it sits in even when it points outside that repo. The matcher grades the link as git grades it — a LINK, whatever it points at: a `linkdir` rule excludes the linked directory root (warned as a file exclusion is, with the re-include naming the link, `!/linkdir` not `!/linkdir/`, and the run exits 0 as a run of excluded file arguments does), while a directory-only `okdir/` rule does not match the link (git check-ignore okdir → not ignored), so that root is walked",
 			"tree": {
 				"repo/.git/": null,
-				"repo/.gitignore": "build/\nlink.ts\nlinkdir/\n",
+				"repo/.gitignore": "build/\nlink.ts\nlinkdir\nokdir/\n",
 				"repo/src/real.ts": "x",
 				"repo/build/gen.ts": "x",
 				"repo/link.ts": {"symlink": "src/real.ts"},
@@ -544,8 +563,8 @@
 			},
 			"cases": [
 				{"targets": ["repo/link.ts", "repo/loose.ts"], "expected": ["repo/loose.ts"], "warns": ["repo/link.ts is excluded by a rule in the repo-root .gitignore, so it is not formatted; re-include it by adding `!/link.ts` to the repo-root .formatignore"], "no_warns": ["loose.ts", "build"]},
-				{"target": "repo/linkdir", "expected": [], "warns": ["repo/linkdir is excluded by a rule in the repo-root .gitignore, so nothing under it is formatted; re-include it by adding `!/linkdir/` to the repo-root .formatignore"]},
-				{"target": "repo/okdir", "expected": ["repo/okdir/o.ts"]}
+				{"target": "repo/linkdir", "expected": [], "warns": ["repo/linkdir is excluded by a rule in the repo-root .gitignore, so it is not formatted; re-include it by adding `!/linkdir` to the repo-root .formatignore"]},
+				{"target": "repo/okdir", "expected": ["repo/okdir/o.ts"], "no_warns": ["excluded"]}
 			]
 		},
 		{

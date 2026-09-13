@@ -99,7 +99,13 @@ export function fmt_mtime(ms: number): string {
 
 const _mtime_cache = new Map<string, SourceMtime>();
 
-/** Newest mtime across `*.rs` files and `Cargo.toml` under the given crates. Memoized per crate set. */
+/**
+ * Newest mtime across every file under `src/`, the crate's `build.rs`, and its
+ * `Cargo.toml`, for the given crates. Memoized per crate set. Every file under `src/`,
+ * not `*.rs` alone: a build script's inputs sit there too (`tsv_html`'s
+ * `src/entities.json`, which `build.rs` compiles into the entity table), and a walk
+ * that saw only Rust let a codegen change stale nothing on any artifact.
+ */
 export async function newest_source_mtime(crates: readonly string[]): Promise<SourceMtime> {
 	const key = crates.join(',');
 	const cached = _mtime_cache.get(key);
@@ -112,16 +118,17 @@ export async function newest_source_mtime(crates: readonly string[]): Promise<So
 
 	for (const crate of crates) {
 		const root = `${CRATES_DIR}/${crate}`;
-		try {
-			const st = await stat(`${root}/Cargo.toml`);
-			consider(st.mtimeMs, `${crate}/Cargo.toml`);
-		} catch {
-			// crate may not have a Cargo.toml at this path — ignore
+		for (const manifest of ['Cargo.toml', 'build.rs']) {
+			try {
+				const st = await stat(`${root}/${manifest}`);
+				consider(st.mtimeMs, `${crate}/${manifest}`);
+			} catch {
+				// no such file for this crate — ignore
+			}
 		}
 		try {
 			const src = `${root}/src`;
 			for (const relative of await readdir(src, { recursive: true })) {
-				if (!relative.endsWith('.rs')) continue;
 				const full = `${src}/${relative}`;
 				const st = await stat(full);
 				if (!st.isFile()) continue;

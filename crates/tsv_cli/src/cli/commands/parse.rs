@@ -53,25 +53,24 @@ impl ParseCommand {
         let goal = parse_source_type_arg(self.source_type.as_deref())
             .unwrap_or_else(|e| exit_with_error(1, format_args!("Error: {e}")))
             .unwrap_or(tsv_ts::Goal::Module);
-        // refused before the input is read, so a `--stdin` this turns away never waits on
-        // its writer; the file arm, whose parser the extension picks, is checked after
-        if let Some(parser_type) = self.parser
-            && let Err(e) = check_source_type_language(self.source_type.as_deref(), parser_type)
-        {
-            exit_with_error(1, format_args!("Error: {e}"));
-        }
         let input_args = InputArgs {
             content: self.content,
             stdin: self.stdin,
             parser: self.parser,
             file: self.file,
         };
-        let (input, parser_type) = input_args
-            .resolve()
+        // the parser is settled — and `--source-type` graded against it — before the
+        // input is read, whichever arm picks it: a `--stdin` this turns away never waits
+        // on its writer, and a file arm's refusal does not turn on whether the file exists
+        let parser_type = input_args
+            .parser_type()
             .unwrap_or_else(|e| exit_with_error(1, format_args!("Error: {e}")));
         if let Err(e) = check_source_type_language(self.source_type.as_deref(), parser_type) {
             exit_with_error(1, format_args!("Error: {e}"));
         }
+        let input = input_args
+            .read()
+            .unwrap_or_else(|e| exit_with_error(1, format_args!("Error: {e}")));
 
         let json = parse_to_json(
             input.content(),

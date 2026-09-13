@@ -1141,7 +1141,9 @@ fn test_format_lists_in_code_point_order() {
         String::from_utf8_lossy(&list.stdout),
         "./\u{ff10}.css\n./\u{1f600}.css\n"
     );
-    // the diagnostics channel sorts the same way
+    // the diagnostics channel is sorted as whole strings, which agrees with the path
+    // order for names at one depth (across a separator boundary the two can differ:
+    // `a-b/x.ts` sorts before `a/y.ts` as text, after it as a path)
     let named = tsv_in_dir(
         dir.path(),
         &["format", "--list", "\u{1f600}.ts", "\u{ff10}.ts"],
@@ -1816,6 +1818,110 @@ fn test_format_non_utf8_argument_is_refused_at_the_argv_boundary() {
     assert!(stderr.starts_with("Invalid utf8: "), "stderr: {stderr}");
     assert!(!stderr.contains("panicked"), "stderr: {stderr}");
     assert_eq!(fs::read_to_string(&file).unwrap(), UNFORMATTED_TS);
+
+    // the one diagnostic whose name the caller could not have cleaned is quoted like
+    // every other printed path, so a line feed in it does not split the line
+    let output = Command::new(built_tsv())
+        .arg("format")
+        .arg(OsStr::from_bytes(b"bad\nname\xff.ts"))
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        "Invalid utf8: \"bad\\nname\u{fffd}.ts\"\n"
+    );
+}
+
+/// A named symbolic link to a directory is walked as a directory but graded by the
+/// matcher as git grades it — a link: `git check-ignore foo` with a `foo/` rule says not
+/// ignored, since a directory-only pattern matches no link, while a `foo` rule does match
+/// it. One a rule does exclude is then counted as an excluded *file* argument, so a run
+/// naming only such links exits 0 like one naming only excluded files.
+#[cfg(unix)]
+#[test]
+fn test_format_grades_a_symlinked_directory_argument_as_a_link() {
+    let dir = temp_dir("symlinked_dir_argument");
+    fs::create_dir_all(dir.join(".git")).unwrap();
+    fs::write(dir.join(".gitignore"), "foo/\nbar\n").unwrap();
+    fs::create_dir(dir.join("real")).unwrap();
+    fs::write(dir.join("real/a.ts"), UNFORMATTED_TS).unwrap();
+    std::os::unix::fs::symlink("real", dir.join("foo")).unwrap();
+    std::os::unix::fs::symlink("real", dir.join("bar")).unwrap();
+
+    // `foo/` does not match the link, so the argument is in scope and walked
+    let foo = tsv_in_dir(dir.path(), &["format", "--list", "foo"]);
+    assert_eq!(foo.status.code(), Some(0));
+    assert_eq!(String::from_utf8_lossy(&foo.stdout), "foo/a.ts\n");
+    assert_eq!(String::from_utf8_lossy(&foo.stderr), "");
+
+    // `bar` matches the link itself: excluded with the warning a `.gitignore` rule gets,
+    // whose re-include line names the link (`!/bar`, not `!/bar/`), and the run exits 0
+    // as it does when every argument is an excluded file
+    let bar = tsv_in_dir(dir.path(), &["format", "--check", "bar"]);
+    let stderr = String::from_utf8_lossy(&bar.stderr);
+    assert_eq!(bar.status.code(), Some(0), "stderr: {stderr}");
+    assert_eq!(String::from_utf8_lossy(&bar.stdout), "");
+    assert_eq!(
+        stderr,
+        "warning: bar is excluded by a rule in the repo-root .gitignore, so it is not formatted; re-include it by adding `!/bar` to the repo-root .formatignore\n0 would change, 0 unchanged\n"
+    );
+}
+
+/// The case of an extension is not a different kind of file — prettier infers a parser
+/// from the lowercased name — so `A.TS` is walked, formats when named, dispatches to the
+/// right parser (`App.SVELTE` is Svelte, not TypeScript), and settles the module goal
+/// (`legacy.MJS`) as its lowercase spelling does, on both commands.
+#[test]
+fn test_extensions_are_read_without_regard_to_case() {
+    let dir = temp_dir("extension_case");
+    fs::write(dir.join("A.TS"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("App.SVELTE"), "<div   >x</div>\n").unwrap();
+    fs::write(dir.join("styles.CSS"), "a{color:red}\n").unwrap();
+    fs::write(dir.join("legacy.MJS"), "with (a) {}\n").unwrap();
+    fs::write(dir.join("README.MD"), "# not code\n").unwrap();
+
+    let list = tsv_in_dir(dir.path(), &["format", "--list", "."]);
+    assert_eq!(list.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&list.stdout),
+        "./A.TS\n./App.SVELTE\n./legacy.MJS\n./styles.CSS\n"
+    );
+
+    let named = tsv_in_dir(dir.path(), &["format", "--check", "A.TS", "App.SVELTE"]);
+    assert_eq!(
+        named.status.code(),
+        Some(1),
+        "{}",
+        String::from_utf8_lossy(&named.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&named.stdout), "A.TS\nApp.SVELTE\n");
+
+    // a module by its own name takes no script retry, whatever its case
+    let module = tsv_in_dir(dir.path(), &["format", "--check", "legacy.MJS"]);
+    assert_eq!(module.status.code(), Some(2));
+    assert!(
+        String::from_utf8_lossy(&module.stderr).contains("error: legacy.MJS:"),
+        "{}",
+        String::from_utf8_lossy(&module.stderr)
+    );
+
+    let md = tsv_in_dir(dir.path(), &["format", "README.MD"]);
+    assert_eq!(md.status.code(), Some(2));
+    assert!(
+        String::from_utf8_lossy(&md.stderr).contains("unsupported file extension"),
+        "{}",
+        String::from_utf8_lossy(&md.stderr)
+    );
+
+    let parsed = tsv_in_dir(dir.path(), &["parse", "styles.CSS"]);
+    assert_eq!(
+        parsed.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&parsed.stderr)
+    );
+    assert!(String::from_utf8_lossy(&parsed.stdout).contains("\"type\":\"StyleSheetFile\""));
 }
 
 #[cfg(unix)]
@@ -2976,6 +3082,16 @@ fn test_source_type_refused_on_a_goalless_language() {
     assert!(
         stderr.contains("--source-type is only supported for typescript"),
         "format: should name the restriction: {stderr}"
+    );
+
+    // A path's extension settles the parser ahead of the read, so the refusal does not
+    // turn on whether the file exists: a missing `.css` names the flag, not the file.
+    let missing = tsv(&["parse", "definitely_missing.css", "--source-type", "script"]);
+    assert_eq!(missing.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&missing.stderr);
+    assert!(
+        stderr.contains("--source-type is only supported for typescript"),
+        "parse: the flag is graded before the read: {stderr}"
     );
 
     // The value is still validated first, whatever the language.

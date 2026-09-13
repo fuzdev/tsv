@@ -138,9 +138,13 @@ impl IgnoreRules {
         // One rule per `\n`-separated line, one trailing `\r` stripped from each — the
         // last line's too, which git reads as if the file ended in a newline. (`lines()`
         // strips a `\r` only ahead of a `\n`, so a final `rule\r` kept it and never matched.)
+        // A line then ends at its first NUL: git reads each pattern as a C string, so
+        // `b.ts<NUL>junk` is the rule `b.ts` — the `\r` is stripped first, as git strips it
+        // off the line before the pattern's own length is read.
         let rules = content
             .split('\n')
             .map(|line| line.strip_suffix('\r').unwrap_or(line))
+            .map(|line| line.split_once('\0').map_or(line, |(pattern, _)| pattern))
             .filter_map(parse_line)
             .collect();
         Self { rules }
@@ -464,14 +468,8 @@ impl IgnoreStack {
     /// ([`is_ignored`](Self::is_ignored) iterates prefixes,
     /// [`is_reincluded`](Self::is_reincluded) queries the leaf directly).
     fn last_match_at(&self, prefix: &[PathSeg<'_>], is_dir: bool) -> Option<bool> {
-        // the last layer to speak wins, read as the first from the end — the same answer,
-        // stopping at the deepest layer that matches (as `IgnoreRules::last_match` reads
-        // its rules)
-        self.gitignore
-            .iter()
-            .chain(&self.tsv)
-            .rev()
-            .find_map(|layer| layer.rules.last_match(layer.relativize(prefix)?, is_dir))
+        last_match_layer(self.gitignore.iter().chain(&self.tsv), prefix, is_dir)
+            .map(|(ignored, _)| ignored)
     }
 
     /// Where `path` is ignored, and which file's rule ignored it — the witness behind
@@ -694,9 +692,11 @@ fn first_exclusion<'a>(
 }
 
 /// The last of `layers` (pushed shallowest-first, each kind after the kind it overrides)
-/// to speak at `prefix`: its polarity and the layer, read as
-/// [`IgnoreStack::last_match_at`] reads the whole stack. Kept apart from that per-level
-/// primitive, which discovery asks per entry and which has no use for the layer.
+/// to speak at `prefix`: its polarity and the layer — the last layer to speak wins, read
+/// as the first from the end, stopping at the deepest layer that matches (as
+/// `IgnoreRules::last_match` reads its rules). The one reading of layer precedence:
+/// [`IgnoreStack::last_match_at`], the per-level primitive discovery asks per entry,
+/// is this over the whole stack with the layer dropped.
 fn last_match_layer<'a>(
     layers: impl DoubleEndedIterator<Item = &'a Layer>,
     prefix: &[PathSeg<'_>],
@@ -756,22 +756,56 @@ fn parse_line(raw: &str) -> Option<Rule> {
     // trailing `/` is stripped — is a pattern git can never match (no path has an
     // empty component), and a never-matching rule contributes nothing to
     // last-match-wins, so it is dropped like the trailing-backslash one above.
+    //
+    // A `/` inside a bracket class (`x[/a].ts`, `y[\/a].ts`) is a member of the class,
+    // not a separator: git reads the class whole (its `strchr` still anchors the pattern
+    // on that slash, as `anchored` does above), and a text `/` never reaches a class since
+    // no segment holds one, so the member is inert and the class's other members match.
+    // Splitting there instead cut the class open and dropped the whole rule. The class
+    // is read as `glob::parse_class` reads it: a `]` first in it — `[]]`, `[!]]` — is a member,
+    // so `class_members` counts what the class holds so far.
     let mut raw_segs: Vec<(String, bool)> = Vec::new(); // (text, ended by `\/`)
     let mut seg = String::new();
-    let mut chars = s.chars();
+    let mut chars = s.chars().peekable();
+    let mut class_members: Option<usize> = None;
     while let Some(c) = chars.next() {
         match c {
-            '/' => raw_segs.push((std::mem::take(&mut seg), false)),
+            '/' if class_members.is_none() => raw_segs.push((std::mem::take(&mut seg), false)),
             '\\' => match chars.next() {
-                Some('/') => raw_segs.push((std::mem::take(&mut seg), true)),
+                Some('/') if class_members.is_none() => {
+                    raw_segs.push((std::mem::take(&mut seg), true));
+                }
                 Some(next) => {
                     seg.push('\\');
                     seg.push(next);
+                    if let Some(members) = &mut class_members {
+                        *members += 1;
+                    }
                 }
                 // unreachable — a trailing unescaped backslash returned above
                 None => seg.push('\\'),
             },
-            c => seg.push(c),
+            '[' if class_members.is_none() => {
+                seg.push('[');
+                class_members = Some(0);
+                // a leading `!` or `^` negates the class and is no member
+                if let Some(&negation) = chars.peek()
+                    && (negation == '!' || negation == '^')
+                {
+                    seg.push(negation);
+                    chars.next();
+                }
+            }
+            ']' if class_members.is_some_and(|members| members > 0) => {
+                seg.push(']');
+                class_members = None;
+            }
+            c => {
+                seg.push(c);
+                if let Some(members) = &mut class_members {
+                    *members += 1;
+                }
+            }
         }
     }
     raw_segs.push((seg, false));
@@ -1378,6 +1412,34 @@ mod tests {
         let rules = ig("x[z-a].ts\n");
         assert!(rules.is_ignored("xz.ts", false));
         assert!(!rules.is_ignored("xa.ts", false));
+
+        // a `/` inside a class — bare or escaped — is a member, not a separator: the
+        // class's other members match, the pattern is anchored on the slash as git's
+        // `strchr` anchors it, and a leading `]` or `!` still reads as it does elsewhere
+        for (rule, hit, miss) in [
+            ("x[/a].ts\n", "xa.ts", "sub/xa.ts"),
+            ("y[\\/a].ts\n", "ya.ts", "yb.ts"),
+            ("z[!/a].ts\n", "zb.ts", "za.ts"),
+            ("w[]/a].ts\n", "w].ts", "wb.ts"),
+            ("v[/a]/k.ts\n", "va/k.ts", "va/sub/k.ts"),
+        ] {
+            let rules = ig(rule);
+            assert!(rules.is_ignored(hit, false), "{rule:?} should ignore {hit}");
+            assert!(
+                !rules.is_ignored(miss, false),
+                "{rule:?} should not ignore {miss}"
+            );
+        }
+        // an unterminated class holding a `/` is still one never-matching pattern
+        assert!(ig("q[/bc.ts\n").is_empty());
+
+        // a line ends at its first NUL, as a C string does for git; the `\r` ahead of
+        // the line ending comes off first
+        let rules = ig("a.ts\nb.ts\0junk.ts\nc.ts\0\r\n");
+        assert!(rules.is_ignored("b.ts", false));
+        assert!(!rules.is_ignored("b.ts\0junk.ts", false));
+        assert!(!rules.is_ignored("junk.ts", false));
+        assert!(rules.is_ignored("c.ts", false));
     }
 
     /// The class, star-run, escaped-`**` and trailing-`\r` rules `tests/git_oracle.rs`

@@ -69,6 +69,8 @@ export interface StagedStaleness {
  * is not fresh, without aborting — the seam for a caller that wants to SKIP
  * rather than fail, which is the right posture over a package the caller does
  * not itself build. `assert_staged_fresh` is this over a list, plus the abort.
+ * The one throw is a bug in the CHECK, not a verdict about the artifact: a
+ * `files` entry naming a path that does not exist.
  */
 export async function staged_staleness(check: StagedCheck): Promise<StagedStaleness | undefined> {
 	let staged_ms: number;
@@ -91,12 +93,15 @@ export async function staged_staleness(check: StagedCheck): Promise<StagedStalen
 		}
 	}
 	for (const file of check.files) {
+		let st;
 		try {
-			const st = await stat(`${ROOT}${file}`);
-			if (st.mtimeMs > newest.ms) newest = { ms: st.mtimeMs, path: file };
+			st = await stat(`${ROOT}${file}`);
 		} catch {
-			// a named source that doesn't exist can't out-date the staging
+			// a named source that does not exist is a typo in the check, and a typo'd
+			// path would otherwise degrade the check to no check at all
+			throw new Error(`${check.label}: named source ${file} does not exist — fix the check`);
 		}
+		if (st.mtimeMs > newest.ms) newest = { ms: st.mtimeMs, path: file };
 	}
 
 	// Strict `<` so an artifact staged in the same second as its source passes.

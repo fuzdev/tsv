@@ -102,7 +102,11 @@ await assert_staged_fresh([
 	{
 		label: 'staged N-API addon',
 		staged: `${pkg_root}/${triple}/tsv_napi.node`,
-		crates: [...CORE_CRATES, 'tsv_napi'],
+		// the addon links the discovery crates too (its `format` feature pulls
+		// `tsv_ignore` + `tsv_discover` for the `IgnoreStack` export), so an edit there
+		// must stale it — the parity rows over that class are exactly what would
+		// otherwise grade a stale addon green
+		crates: [...CORE_CRATES, 'tsv_napi', 'tsv_ignore', 'tsv_discover'],
 		files: ['scripts/build_napi_packages.ts'],
 		rebuild: 'deno task build:napi:packages'
 	},

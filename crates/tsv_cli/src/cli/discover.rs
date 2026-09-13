@@ -107,7 +107,10 @@ pub struct Discovered {
 /// parse. A **directory** argument is a scope, not a target, so the extension check
 /// doesn't apply to it — its contents are filtered by the walk. Directories recurse with
 /// the extension filter. Symlinks inside directories are not followed (cycle safety) —
-/// pass them explicitly to format their targets.
+/// pass them explicitly to format their targets. A named symlink to a directory is walked
+/// as a directory but graded by the matcher as what git grades it, a link: a
+/// directory-only rule (`foo/`) does not exclude it, and one a rule does exclude counts as
+/// an excluded *file* argument (`Diagnostics::all_arguments_excluded`).
 ///
 /// # Ignore semantics (two regimes, keyed on `.git`)
 ///
@@ -179,7 +182,7 @@ fn roots_can_overlap(args: &[Arg<'_>]) -> bool {
     }
     let mut roots = Vec::with_capacity(args.len());
     for &arg in args {
-        let Arg::Dir(path) = arg else {
+        let Arg::Dir { path, .. } = arg else {
             return true;
         };
         let Ok(canonical) = canonicalize(Path::new(path)) else {
@@ -218,9 +221,10 @@ pub fn discover_into(
     Ok(walk_args(&args, sink))
 }
 
-/// Classify each path argument with one `stat` apiece, kept for everything after —
-/// the walk's dispatch and [`roots_can_overlap`] read the same answer rather than a
-/// second query that could disagree with it.
+/// Classify each path argument with one `stat` apiece — and, for a directory, one
+/// `lstat`, since whether it is a symbolic link is what the matcher grades it by — kept
+/// for everything after: the walk's dispatch and [`roots_can_overlap`] read the same
+/// answer rather than a second query that could disagree with it.
 ///
 /// Both argument errors fail the run upfront, all reported, nothing written: a path
 /// that resolves to neither a file nor a directory, and a **file** argument tsv
@@ -234,7 +238,10 @@ fn classify_args(paths: &[String]) -> Result<Vec<Arg<'_>>, Vec<String>> {
     let mut bad = Vec::new();
     for p in paths {
         match fs::metadata(p) {
-            Ok(metadata) if metadata.is_dir() => args.push(Arg::Dir(p)),
+            Ok(metadata) if metadata.is_dir() => args.push(Arg::Dir {
+                path: p,
+                symlink: fs::symlink_metadata(p).is_ok_and(|meta| meta.file_type().is_symlink()),
+            }),
             Ok(metadata) if metadata.is_file() => match unsupported_extension_error(p) {
                 Some(error) => bad.push(error),
                 None => args.push(Arg::File(p)),
@@ -274,7 +281,13 @@ fn walk_args(args: &[Arg<'_>], sink: &mut dyn FileSink) -> Diagnostics {
                     excluded_files += 1;
                 }
             }
-            Arg::Dir(path) => collect_root(Path::new(path), cwd.as_deref(), &mut out),
+            // a symlinked directory a rule excludes counts as a file argument would: the
+            // matcher graded it as one
+            Arg::Dir { path, symlink } => {
+                if collect_root(Path::new(path), symlink, cwd.as_deref(), &mut out) {
+                    excluded_files += 1;
+                }
+            }
         }
     }
     out.files.flush();
@@ -297,7 +310,12 @@ fn walk_args(args: &[Arg<'_>], sink: &mut dyn FileSink) -> Diagnostics {
 #[derive(Clone, Copy)]
 enum Arg<'a> {
     File(&'a str),
-    Dir(&'a str),
+    Dir {
+        path: &'a str,
+        /// The argument is a symbolic link to the directory: walked as a directory, graded
+        /// by the matcher as a link ([`collect_root`]).
+        symlink: bool,
+    },
 }
 
 /// Set up the ignore evaluation for one directory `root`, then recurse into it.
@@ -312,29 +330,34 @@ enum Arg<'a> {
 /// seeded off once any `.gitignore` above `root` is in scope. `root`'s display
 /// spelling is preserved for the emitted paths; matching uses the
 /// format-root-relative path threaded down the walk.
-fn collect_root(root: &Path, cwd: Option<&Path>, out: &mut Walk<'_>) {
+///
+/// `symlink` says the argument is a symbolic link to the directory, which the matcher
+/// grades as git grades it — a link, never a directory: `git check-ignore foo` with a
+/// `foo/` rule says not ignored, since a directory-only pattern matches no link, and
+/// prettier reads its ignore files the same way. So the gate asks the matcher about a
+/// file at the link's path, and a warning's re-include lines name the link (`!/foo`,
+/// which a `!/foo/` would not reach). Returns whether a rule excluded such a link — the
+/// one directory argument counted as an excluded file argument, since it was graded as
+/// one.
+fn collect_root(root: &Path, symlink: bool, cwd: Option<&Path>, out: &mut Walk<'_>) -> bool {
     let Some(root_abs) = absolute_named_path(root, cwd) else {
         out.errors.push(tsv_discover::unresolvable_root_error(
             &root.to_string_lossy(),
         ));
-        return;
+        return false;
     };
-    let (format_root, in_repo) = format_root_of(&root_abs);
+    let format_root = FormatRoot::of(&root_abs);
 
     // `root` relative to the format root (an ancestor-or-self of `root_abs`, so
     // this never fails; `""` means `root` *is* the format root).
-    let base_rel = rel_to(&format_root, &root_abs);
+    let base_rel = rel_to(&format_root.path, &root_abs);
 
     // Preload the ancestors *above* `root` (format root → `root`'s parent). `root`
     // itself is excluded: `collect_recursive` reads its ignore files from the
     // listing it fetches anyway.
-    let chain = ancestor_chain(&format_root, &root_abs);
-    let (mut stack, heuristic_active) = preload_ancestors(
-        &chain[..chain.len() - 1],
-        &format_root,
-        in_repo,
-        &mut out.warnings,
-    );
+    let chain = ancestor_chain(&format_root.path, &root_abs);
+    let (mut stack, heuristic_active) =
+        preload_ancestors(&chain[..chain.len() - 1], &format_root, &mut out.warnings);
 
     // A named root is bounded by the ignore files alone, gated here once with the full,
     // ancestor-walking matcher: a root a rule excludes — through an ancestor (`tsv format
@@ -350,18 +373,19 @@ fn collect_root(root: &Path, cwd: Option<&Path>, out: &mut Walk<'_>) {
     // named this directory — so `tsv format node_modules/pkg` or `dist/sub` walks what
     // `tsv format node_modules` or `dist` walks there. Below the root they classify every
     // child as usual.
-    let loose_root = loose_root(&format_root, in_repo);
-    if stack.is_ignored(&base_rel, true) {
+    // the matcher's kind for the argument: a directory, unless it is a link to one
+    let matcher_dir = !symlink;
+    if stack.is_ignored(&base_rel, matcher_dir) {
         if let Some(warning) = tsv_discover::excluded_argument_warning(
             &root.to_string_lossy(),
             &base_rel,
-            true,
-            loose_root.as_deref(),
+            matcher_dir,
+            format_root.loose_root().as_deref(),
             &stack,
         ) {
             out.warnings.push(warning);
         }
-        return;
+        return symlink;
     }
 
     collect_recursive(
@@ -371,11 +395,12 @@ fn collect_root(root: &Path, cwd: Option<&Path>, out: &mut Walk<'_>) {
         },
         &base_rel,
         true,
-        loose_root.as_deref(),
+        &format_root,
         &mut stack,
         heuristic_active,
         out,
     );
+    false
 }
 
 /// A stack loaded with the ignore layers of `dirs` — a directory root's ancestors, from
@@ -384,14 +409,13 @@ fn collect_root(root: &Path, cwd: Option<&Path>, out: &mut Walk<'_>) {
 /// build-output heuristic is still on below them (no `.gitignore` among them was read).
 fn preload_ancestors(
     dirs: &[PathBuf],
-    format_root: &Path,
-    in_repo: bool,
+    format_root: &FormatRoot,
     warnings: &mut Vec<String>,
 ) -> (IgnoreStack, bool) {
     let mut stack = IgnoreStack::new();
     let mut heuristic_active = true;
     for dir in dirs {
-        if push_dir_layers(dir, format_root, in_repo, &mut stack, warnings)
+        if push_dir_layers(dir, format_root, &mut stack, warnings)
             .is_some_and(|pushed| pushed.gitignore)
         {
             heuristic_active = false;
@@ -418,20 +442,19 @@ fn preload_ancestors(
 /// the files a listing would have named.
 fn push_dir_layers(
     dir: &Path,
-    format_root: &Path,
-    in_repo: bool,
+    format_root: &FormatRoot,
     stack: &mut IgnoreStack,
     warnings: &mut Vec<String>,
 ) -> Option<PushedLayers> {
-    let anchor = rel_to(format_root, dir);
+    let anchor = rel_to(&format_root.path, dir);
     if stack.is_ignored(&anchor, true) {
         return None;
     }
     Some(push_layers(
         dir,
         &anchor,
-        in_repo,
-        IgnorePresence::probe(dir, in_repo),
+        format_root.in_repo,
+        IgnorePresence::probe(dir, format_root.in_repo),
         stack,
         warnings,
     ))
@@ -553,8 +576,7 @@ impl PushedLayers {
 #[derive(Default)]
 struct FileScope {
     /// Empty until the first file argument moves the scope.
-    format_root: PathBuf,
-    in_repo: bool,
+    format_root: FormatRoot,
     stack: IgnoreStack,
     /// The directories on the way to the latest file argument, format root first, with what
     /// each pushed onto `stack` — `None` for one a rule excludes and every one below it,
@@ -568,15 +590,14 @@ impl FileScope {
         if self.dirs.last().is_some_and(|(held, _)| held == dir) {
             return;
         }
-        let (format_root, in_repo) = format_root_of(dir);
-        if format_root != self.format_root || in_repo != self.in_repo {
+        let format_root = FormatRoot::of(dir);
+        if format_root != self.format_root {
             *self = Self {
                 format_root,
-                in_repo,
                 ..Self::default()
             };
         }
-        let chain = ancestor_chain(&self.format_root, dir);
+        let chain = ancestor_chain(&self.format_root.path, dir);
         let shared = self
             .dirs
             .iter()
@@ -589,13 +610,7 @@ impl FileScope {
             }
         }
         for level in chain.into_iter().skip(shared) {
-            let pushed = push_dir_layers(
-                &level,
-                &self.format_root,
-                self.in_repo,
-                &mut self.stack,
-                warnings,
-            );
+            let pushed = push_dir_layers(&level, &self.format_root, &mut self.stack, warnings);
             self.dirs.push((level, pushed));
         }
     }
@@ -627,7 +642,7 @@ fn collect_file(path: &str, cwd: Option<&Path>, scope: &mut FileScope, out: &mut
     // probe on a file is harmless: the ignore-file stats simply fail.
     let dir_abs = file_abs.parent().unwrap_or(&file_abs);
     scope.enter(dir_abs, &mut out.warnings);
-    let rel = rel_to(&scope.format_root, &file_abs);
+    let rel = rel_to(&scope.format_root.path, &file_abs);
     if !scope.stack.is_ignored(&rel, false) {
         out.files.push(PathBuf::from(path));
         return false;
@@ -636,7 +651,7 @@ fn collect_file(path: &str, cwd: Option<&Path>, scope: &mut FileScope, out: &mut
         path,
         &rel,
         false,
-        loose_root(&scope.format_root, scope.in_repo).as_deref(),
+        scope.format_root.loose_root().as_deref(),
         &scope.stack,
     ) {
         out.warnings.push(warning);
@@ -644,11 +659,42 @@ fn collect_file(path: &str, cwd: Option<&Path>, scope: &mut FileScope, out: &mut
     true
 }
 
-/// The format root's display path when it is the filesystem root — outside a git repo,
-/// where a warning names a path absolutely ([`tsv_discover::excluded_argument_warning`]) —
-/// and `None` inside one.
-fn loose_root(format_root: &Path, in_repo: bool) -> Option<Cow<'_, str>> {
-    (!in_repo).then(|| format_root.to_string_lossy())
+/// The boundary a walk is anchored on — the **format root** — and which regime that
+/// puts the walk in: inside a git repo the repo root (reproducible — nothing above it is
+/// read), where `.gitignore` is consulted and a warning names a path relative to it;
+/// outside one the filesystem root (so an ancestor `.formatignore` is honored — the
+/// filesystem is the API for loose files), where `.gitignore` is not consulted and a
+/// warning names a path absolutely. One value for the two facts, since the second is
+/// the first's: a caller reads `in_repo` or [`Self::loose_root`] off it rather than
+/// carrying the regime beside the path and keeping the two in step by hand.
+#[derive(Default, PartialEq, Eq)]
+struct FormatRoot {
+    path: PathBuf,
+    in_repo: bool,
+}
+
+impl FormatRoot {
+    /// The format root above `dir`.
+    fn of(dir: &Path) -> Self {
+        match find_repo_root(dir) {
+            Some(path) => Self {
+                path,
+                in_repo: true,
+            },
+            None => Self {
+                path: filesystem_root(dir),
+                in_repo: false,
+            },
+        }
+    }
+
+    /// The root's display path where a warning names a path absolutely — outside a git
+    /// repo, where the format root is the filesystem root
+    /// ([`tsv_discover::excluded_argument_warning`]'s `loose_root`) — and `None` inside
+    /// one, where a path reads relative to the repo root.
+    fn loose_root(&self) -> Option<Cow<'_, str>> {
+        (!self.in_repo).then(|| self.path.to_string_lossy())
+    }
 }
 
 /// A named path made absolute, **at the location it was typed**: its parent directory
@@ -713,17 +759,6 @@ fn strip_verbatim_prefix(path: PathBuf) -> PathBuf {
         PathBuf::from(rest)
     } else {
         path
-    }
-}
-
-/// The format root above `dir` and whether it is a repo root: inside a git repo the repo
-/// root is the boundary (reproducible — nothing above it is read); outside one, the
-/// filesystem root (so an ancestor `.formatignore` is honored — the filesystem is the API
-/// for loose files).
-fn format_root_of(dir: &Path) -> (PathBuf, bool) {
-    match find_repo_root(dir) {
-        Some(repo_root) => (repo_root, true),
-        None => (filesystem_root(dir), false),
     }
 }
 
@@ -817,10 +852,9 @@ fn collect_recursive(
     // false for every descendant — gates the target-root-only
     // `.prettierignore`-outside-a-repo warning.
     is_target_root: bool,
-    // the format root's display path outside a git repo, `None` inside one — what a
-    // warning names a path by, and so also whether the format root is a git repo
-    // (`.gitignore` is read only then)
-    loose_root: Option<&str>,
+    // the format root: whether it is a git repo (`.gitignore` is read only then) and
+    // what a warning names a path by
+    format_root: &FormatRoot,
     stack: &mut IgnoreStack,
     // whether the build-output heuristic is active at *this* dir's level (no
     // `.gitignore` governs `dir` or above). `dir`'s own `.gitignore`, read below,
@@ -828,7 +862,7 @@ fn collect_recursive(
     heuristic_active: bool,
     out: &mut Walk<'_>,
 ) {
-    let in_repo = loose_root.is_none();
+    let in_repo = format_root.in_repo;
     // Materialize the listing once: it's used twice — to read THIS dir's own
     // ignore files (opening one only when the listing actually contains it, so an
     // ignore-file-free dir costs zero speculative `open`s) before classifying its
@@ -957,8 +991,11 @@ fn collect_recursive(
             match classify_dir(&name, &child_rel, child_heuristic, stack) {
                 DirVerdict::Prune => continue,
                 DirVerdict::PruneWithWarning => {
-                    out.warnings
-                        .extend(tsv_discover::shadow_warning(&child_rel, loose_root, stack));
+                    out.warnings.extend(tsv_discover::shadow_warning(
+                        &child_rel,
+                        format_root.loose_root().as_deref(),
+                        stack,
+                    ));
                     continue;
                 }
                 DirVerdict::Descend => {}
@@ -975,7 +1012,7 @@ fn collect_recursive(
                 },
                 &child_rel,
                 false,
-                loose_root,
+                format_root,
                 stack,
                 child_heuristic,
                 out,

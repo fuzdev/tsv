@@ -15,7 +15,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, writeSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { constants } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -47,12 +47,26 @@ if (bin === undefined) {
 	if (result.error) {
 		// present-but-unrunnable binary (lost executable bit, torn install) —
 		// the JS mirror implements the same contract, so degrade to it loudly
-		// rather than failing a run the fallback can serve
-		process.stderr.write(
-			`warning: @fuzdev/tsv could not run its native CLI at ${bin} ` +
-				`(${result.error.message}); falling back to the JS CLI — reinstall ` +
-				`@fuzdev/tsv-${platform_triple()} (or restore the executable bit) to get the native one back\n`
-		);
+		// rather than failing a run the fallback can serve. A synchronous write, as
+		// every line `cli.js` prints: the stream API is asynchronous on a pipe, and the
+		// mirror this hands off to exits synchronously. Best-effort, as `cli.js`'s own
+		// stderr notice of a failed write is: the fd is still as inherited (nothing here
+		// touches `process.stderr` or spawns a pool, the two things that flip it
+		// non-blocking), but a closed stderr throws, and the run the fallback can serve
+		// matters more than the notice. `bin` is this package's own install path, not a
+		// name a user typed, and Node's error spells it raw beside it — so it prints as
+		// it is, where a path from the command line would be quoted (`cli.js`'s
+		// `quote_path`, which the dispatcher cannot reach without loading the engine)
+		try {
+			writeSync(
+				2,
+				`warning: @fuzdev/tsv could not run its native CLI at ${bin} ` +
+					`(${result.error.message}); falling back to the JS CLI — reinstall ` +
+					`@fuzdev/tsv-${platform_triple()} (or restore the executable bit) to get the native one back\n`
+			);
+		} catch {
+			// a closed or unwritable stderr: the fallback below is the run's answer
+		}
 		await import('./cli.js');
 	} else if (result.signal) {
 		// The child died by signal: re-raise it, so this process dies the same way. Not

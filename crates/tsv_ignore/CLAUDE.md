@@ -56,7 +56,8 @@ re-deriving it from these primitives.
 `IgnoreRules` — the single-file primitive behind each layer, `pub(crate)`:
 
 - `IgnoreRules::parse(content)` — compile one ignore file's text (a leading UTF-8
-  BOM is skipped, as git does).
+  BOM is skipped, a line's one trailing `\r` comes off with its ending, and a pattern
+  ends at its first NUL — a C string to git — as git reads each).
 - `IgnoreRules::is_empty()` — test-only, what the parse tests grade a dropped line by
   (an empty layer matches nothing; its presence alone still sets the regime).
 - `IgnoreRules::is_ignored(path, is_dir)` — `path` relative to the ignore-file
@@ -189,7 +190,8 @@ the file only so a diagnostic can name it.
   `tsv format --check` disagree across machines. The "byte-for-byte `git check-ignore`"
   parity is thus scoped to repos whose only ignore source is committed `.gitignore`
   files; the `git_oracle` runs with `core.excludesFile=/dev/null` on a fresh repo, so it
-  holds there.
+  holds there. That suite needs a `git` binary and FAILS without one rather than passing
+  empty — `TSV_GIT_ORACLE_SKIP=1` is the explicit opt-out for a host with no git.
 
 - **Multibyte granularity** — glob metacharacters (`?`, `*`, `[...]`) match per
   Unicode **code point** (a Rust `char`), whereas `git check-ignore` matches per
@@ -206,19 +208,18 @@ the file only so a diagnostic can name it.
   in practice — `?`/classes over multibyte names are unusual, and `*` is unaffected.
   The same edge covers a name that is **not** UTF-8: the CLIs hand the matcher its
   lossy spelling, where a maximal invalid sequence is one U+FFFD, so `?` matches a
-  truncated `\xf0\x9f` that git needs `??` for (probed 2026-09-12); `*` and literal
-  segments are unaffected, since no UTF-8 rule can spell the bytes.
+  truncated `\xf0\x9f` that git needs `??` for, and `*` is unaffected. A literal
+  segment is affected in one way: the lossy conversion is many-to-one, so a rule
+  spelling U+FFFD itself (`\xef\xbf\xbd.ts`, valid UTF-8) matches **every** non-UTF-8
+  name whose invalid run collapses to one replacement character — `\xff.ts` and
+  `\xfe.ts` alike, both of which git leaves alone — and two such names are
+  indistinguishable to the matcher, so neither can be named on its own.
 
 - **POSIX bracket classes** (`[[:alpha:]]`) are not supported — prettier's
   matcher doesn't rely on them either. They are read as ordinary class members, so
   `[[:alpha:]]` is the class `[[:alpha:]` — members `[`, `:`, `a`, `l`, `p`, `h` — followed
   by a literal `]` (git matches one ASCII letter), and a malformed `[[:bogus:]]`, which
   git never matches, matches here.
-
-- **A `/` inside a bracket class** (`a[/]b.ts`, `x[!/]y.ts`) — a pattern is split on
-  `/` before its classes are read, so the class is cut open and the rule never
-  matches, where git reads the class whole. Near-zero exposure: a path component
-  cannot hold the `/` such a class names.
 
 - **A `**` glued to a literal prefix** (`foo**/bar.ts`) is two stars within one
   segment by gitignore(5) — no directory crossing — and tsv follows that. git's

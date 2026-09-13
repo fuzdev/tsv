@@ -51,18 +51,46 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { CORE_CRATES, WASM_CRATES, wasm_bundle_dir } from '../benches/js/lib/tsv_artifacts.ts';
+import {
+	CORE_CRATES,
+	WASM_CRATES,
+	wasm_bundle_dir,
+	wasm_bundle_path
+} from '../benches/js/lib/tsv_artifacts.ts';
 import { assert_staged_fresh, type StagedCheck } from './check_staged_freshness.ts';
 import { host_triple } from './napi_host.ts';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const repo_rel = (absolute: string): string => relative(ROOT, absolute);
 
-/** The extensions `tsv format` claims — the JS/TS family, Svelte, CSS. */
-const EXTENSIONS = ['.ts', '.mts', '.cts', '.js', '.mjs', '.cjs', '.svelte', '.css'];
+/**
+ * The extensions `tsv format` claims, read off the native binary rather than kept by
+ * hand: a `format` over an empty directory refuses with the set rendered from
+ * `tsv_discover::FORMATTABLE_EXTENSIONS` (`No files to format — no unignored
+ * .ts/.mts/… files in scope`), so a ninth language reaches this script's file
+ * selection without anyone editing it. Read once the native binary is resolved (below).
+ */
+
+/** Read the extension set off `native_bin`'s empty-scope refusal. */
+async function formattable_extensions(native_bin: string): Promise<string[]> {
+	const empty = await mkdtemp(join(tmpdir(), 'tsv_engines_empty_'));
+	try {
+		const refusal = await run([native_bin], empty);
+		const listed = /no unignored (\S+) files in scope/.exec(refusal.stderr)?.[1];
+		if (refusal.status !== 2 || listed === undefined) {
+			console.error(
+				`✗ could not read the extension set off the native binary's empty-scope refusal:\n${refusal.stderr}`
+			);
+			Deno.exit(1);
+		}
+		return listed.split('/');
+	} finally {
+		rmSync(empty, { recursive: true, force: true });
+	}
+}
 
 const args = Deno.args.filter((a) => a !== '--json');
 const json = Deno.args.includes('--json');
@@ -132,8 +160,20 @@ const freshness: StagedCheck[] = [
 		label: 'native tsv_cli binary',
 		staged: repo_rel(native.path),
 		crates: [...CORE_CRATES, 'tsv_cli', 'tsv_ignore', 'tsv_discover'],
-		files: [],
+		// the staging script copies it into the platform package, so an edit there
+		// re-stages a STAGED binary (as `scripts/test_napi_npm.ts` names for the same
+		// artifact) — a `target/release` fallback it never touched is not aged by it
+		files: native.label === 'target/release' ? [] : ['scripts/build_napi_packages.ts'],
 		rebuild: 'deno task build:napi:packages'
+	},
+	{
+		// the engine bytes themselves: `cli.js` is re-copied on every patcher run, so a
+		// fresh `cli.js` over a stale `.wasm` would otherwise grade as fresh
+		label: 'wasm package engine',
+		staged: repo_rel(wasm_bundle_path('all', 'npm')),
+		crates: [...CORE_CRATES, ...WASM_CRATES],
+		files: ['deno.json'],
+		rebuild: 'deno task build:npm:all'
 	},
 	{
 		label: 'wasm package cli.js',
@@ -144,8 +184,13 @@ const freshness: StagedCheck[] = [
 	}
 ];
 await assert_staged_fresh(freshness);
+const extensions = await formattable_extensions(native.path);
 
-/** Every file under `dir` whose extension `tsv format` claims, repo-relative. */
+/**
+ * Every file under `dir` whose extension `tsv format` claims, repo-relative — the
+ * extension read as both CLIs read it, `Path::extension` without regard to ASCII case
+ * (`extname` lowercased: a bare dotfile has none, `A.TS` is a TypeScript file).
+ */
 function collect(dir: string, base = dir, out: string[] = []): string[] {
 	for (const entry of readdirSync(dir, { withFileTypes: true })) {
 		// `.git` alone: the safety nets are the CLIs' business, and the copies
@@ -153,7 +198,7 @@ function collect(dir: string, base = dir, out: string[] = []): string[] {
 		if (entry.name === '.git') continue;
 		const full = join(dir, entry.name);
 		if (entry.isDirectory()) collect(full, base, out);
-		else if (entry.isFile() && EXTENSIONS.some((e) => entry.name.endsWith(e))) {
+		else if (entry.isFile() && extensions.includes(extname(entry.name).toLowerCase())) {
 			out.push(relative(base, full));
 		}
 	}

@@ -4,7 +4,10 @@
 //! of band"); this suite instead builds the same nested-`.gitignore` trees on
 //! disk in a throwaway git repo and asserts our matcher agrees with git itself,
 //! candidate by candidate — so the git-faithfulness claim is checked, not
-//! asserted. Requires a `git` binary (skipped with a note if absent). git runs
+//! asserted. Requires a `git` binary: a host without one FAILS the suite rather
+//! than passing it empty (seven green tests that graded nothing, in no time, is
+//! how the one executable proof of parity evaporates unnoticed when a CI image
+//! changes) — `TSV_GIT_ORACLE_SKIP=1` is the explicit opt-out for such a host. git runs
 //! with `core.excludesFile=/dev/null` so no machine-global ignore interferes;
 //! parity holds on case-sensitive filesystems (see the crate's "Known edges").
 
@@ -19,13 +22,19 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tsv_ignore::IgnoreStack;
 
-/// Whether a `git` binary is callable — lets a git-less environment skip rather
-/// than hard-fail.
+/// Whether a `git` binary is callable.
 fn git_available() -> bool {
     Command::new("git")
         .arg("--version")
         .output()
         .is_ok_and(|o| o.status.success())
+}
+
+/// Whether the suite may skip on a host with no `git`: only when asked to, by
+/// `TSV_GIT_ORACLE_SKIP=1`. Absent that, a missing oracle fails the test — a pass that
+/// graded no candidate is indistinguishable from a real one in `cargo test`'s output.
+fn skip_without_git_allowed() -> bool {
+    std::env::var_os("TSV_GIT_ORACLE_SKIP").is_some_and(|v| v == "1")
 }
 
 /// `git check-ignore`: exit 0 => ignored, 1 => not ignored.
@@ -57,7 +66,11 @@ fn fresh_repo(tag: &str) -> std::path::PathBuf {
 /// repo root). `candidates`: `(path, is_dir)`.
 fn assert_matches_git(tag: &str, layers: &[(&str, &str)], candidates: &[(&str, bool)]) {
     if !git_available() {
-        eprintln!("git_oracle[{tag}]: `git` not found — skipping");
+        assert!(
+            skip_without_git_allowed(),
+            "git_oracle[{tag}]: `git` not found — the oracle suite cannot grade without it; set TSV_GIT_ORACLE_SKIP=1 to skip on a host with no git"
+        );
+        eprintln!("git_oracle[{tag}]: `git` not found — skipping (TSV_GIT_ORACLE_SKIP=1)");
         return;
     }
     let repo = fresh_repo(tag);
@@ -226,7 +239,7 @@ fn parse_level_rules_match_git() {
         "parse_rules",
         &[(
             "",
-            "\u{feff}bomfirst.ts\ncrlf.ts\r\nspaced.ts   \nesc\\ \nbar\\\n\\#hash.ts\n\\!bang.ts\na\\*b.ts\nsub\\/slash.ts\nfoo//\nq[bc.ts\nx[z-a].ts\n",
+            "\u{feff}bomfirst.ts\ncrlf.ts\r\nspaced.ts   \nesc\\ \nbar\\\n\\#hash.ts\n\\!bang.ts\na\\*b.ts\nsub\\/slash.ts\nfoo//\nq[bc.ts\nx[z-a].ts\ncs[/a].ts\nce[\\/a].ts\nnul.ts\0junk\n",
         )],
         &[
             ("bomfirst.ts", false), // the BOM is not part of the pattern
@@ -247,6 +260,12 @@ fn parse_level_rules_match_git() {
             ("xz.ts", false),   // the low end of `[z-a]` is a member
             ("xa.ts", false),
             ("xb.ts", false),
+            ("csa.ts", false), // a `/` in a class is a member, not a separator
+            ("cs/.ts", false),
+            ("sub/csa.ts", false), // and the slash anchors the pattern
+            ("cea.ts", false),     // an escaped one too
+            ("nul.ts", false),     // a pattern ends at its first NUL
+            ("nul.tsjunk", false),
         ],
     );
 }

@@ -1,5 +1,6 @@
 use std::fs;
 use std::io::{self, Read as _};
+use std::path::Path;
 use std::str::FromStr;
 
 /// Input source for parsing or formatting (just the content string)
@@ -89,15 +90,29 @@ impl ParserType {
         }
     }
 
+    /// The parser a path's extension picks, read without regard to ASCII case as
+    /// `tsv_discover::is_formattable` reads it (`App.SVELTE` is a Svelte file): `.svelte`,
+    /// `.css`, and TypeScript for everything else — the dispatch has no unknown arm, which
+    /// is why a named file is held to the extension check first.
     pub fn from_extension(path: &str) -> Self {
-        if path.ends_with(".svelte") {
+        if has_extension_ignoring_case(path, "svelte") {
             ParserType::Svelte
-        } else if path.ends_with(".css") {
+        } else if has_extension_ignoring_case(path, "css") {
             ParserType::Css
         } else {
             ParserType::TypeScript
         }
     }
+}
+
+/// Whether `path`'s extension is `ext`, ignoring ASCII case — read by `Path::extension`,
+/// the one reading every dispatch takes (`tsv_discover::is_formattable`,
+/// `tsv_ts::Goal::from_extension`), so a bare dotfile like `.svelte` is a stem with no
+/// extension here as it is there.
+fn has_extension_ignoring_case(path: &str, ext: &str) -> bool {
+    Path::new(path)
+        .extension()
+        .is_some_and(|found| found.eq_ignore_ascii_case(ext))
 }
 
 impl FromStr for ParserType {
@@ -128,8 +143,12 @@ pub struct InputArgs {
     pub file: Option<String>,
 }
 
+/// The refusal when no input arm is named — the same line from [`InputArgs::parser_type`]
+/// and [`InputArgs::read`], since both walk the arms.
+const NO_INPUT: &str = "No input provided. Use a file path, --content, or --stdin";
+
 impl InputArgs {
-    /// Resolve to an `Input` + `ParserType`.
+    /// Resolve to an `Input` + `ParserType`: [`Self::parser_type`], then [`Self::read`].
     ///
     /// Precedence: `--content` > `--stdin` > file positional. `--content` and
     /// `--stdin` require `--parser`. On a file path, `--parser` overrides the
@@ -141,39 +160,57 @@ impl InputArgs {
     /// `tsv format <file>` (`tsv_discover::unsupported_extension_error`), where it is an
     /// argument error for the same reason.
     pub fn resolve(self) -> Result<(Input, ParserType), String> {
-        if let Some(content) = self.content {
-            let parser_type = self
-                .parser
-                .ok_or("--content requires --parser <svelte|typescript|css>")?;
-            Ok((Input::from_content(content), parser_type))
+        let parser_type = self.parser_type()?;
+        Ok((self.read()?, parser_type))
+    }
+
+    /// The parser the arguments settle on, decided before anything is read — so a
+    /// command can grade a flag against it (`--source-type` on a goalless language) ahead
+    /// of a read that may wait on a `--stdin` writer or fail on a missing file, and the
+    /// refusal does not turn on whether the file happens to exist. Everything about the
+    /// arguments themselves is graded here: a missing `--parser` on `--content`/`--stdin`,
+    /// a directory named as the file, an extension tsv does not handle, no input at all.
+    pub fn parser_type(&self) -> Result<ParserType, String> {
+        if self.content.is_some() {
+            self.parser
+                .ok_or_else(|| "--content requires --parser <svelte|typescript|css>".to_string())
         } else if self.stdin {
-            let parser_type = self
-                .parser
-                .ok_or("--stdin requires --parser <svelte|typescript|css>")?;
-            Ok((Input::from_stdin()?, parser_type))
-        } else if let Some(path) = self.file {
+            self.parser
+                .ok_or_else(|| "--stdin requires --parser <svelte|typescript|css>".to_string())
+        } else if let Some(path) = &self.file {
             // a directory is refused by name ahead of the parser choice: every command
             // resolving through here reads one file (`tsv parse`, the `tsv_debug` commands),
-            // and the read below would report `Is a directory` under a message that calls
-            // it one. Neutral wording for that reason; `cli.js` mirrors it word for word
-            if fs::metadata(&path).is_ok_and(|metadata| metadata.is_dir()) {
+            // and the read would report `Is a directory` under a message that calls it
+            // one. Neutral wording for that reason; `cli.js` mirrors it word for word
+            if fs::metadata(path).is_ok_and(|metadata| metadata.is_dir()) {
                 return Err(format!(
                     "{}: is a directory (one file is expected)",
-                    tsv_discover::quote_path(&path)
+                    tsv_discover::quote_path(path)
                 ));
             }
-            let parser_type = match self.parser {
-                Some(parser_type) => parser_type,
-                None => {
-                    if let Some(error) = tsv_discover::unsupported_extension_error(&path) {
-                        return Err(error);
-                    }
-                    ParserType::from_extension(&path)
-                }
-            };
-            Ok((Input::from_file(&path)?, parser_type))
+            match self.parser {
+                Some(parser_type) => Ok(parser_type),
+                None => match tsv_discover::unsupported_extension_error(path) {
+                    Some(error) => Err(error),
+                    None => Ok(ParserType::from_extension(path)),
+                },
+            }
         } else {
-            Err("No input provided. Use a file path, --content, or --stdin".to_string())
+            Err(NO_INPUT.to_string())
+        }
+    }
+
+    /// The input itself, by the same precedence [`Self::parser_type`] graded the
+    /// arguments under — call that first, since this reads without re-grading them.
+    pub fn read(self) -> Result<Input, String> {
+        if let Some(content) = self.content {
+            Ok(Input::from_content(content))
+        } else if self.stdin {
+            Input::from_stdin()
+        } else if let Some(path) = self.file {
+            Input::from_file(&path)
+        } else {
+            Err(NO_INPUT.to_string())
         }
     }
 }

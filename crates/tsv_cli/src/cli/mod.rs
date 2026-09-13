@@ -3,6 +3,7 @@ pub mod discover;
 pub mod format_source;
 pub mod input;
 pub mod out;
+mod pool;
 pub mod stack;
 
 use crate::out_line;

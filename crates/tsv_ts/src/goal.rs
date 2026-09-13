@@ -90,12 +90,14 @@ impl Goal {
     ///
     /// `None` for every other extension (including a Svelte or CSS path, whose parser
     /// has no goal axis at all), leaving the caller's own default in force.
+    ///
+    /// The extension is `Path::extension`'s, read without regard to ASCII case
+    /// (`legacy.MJS`), as every extension dispatch in the CLIs reads one.
     pub fn from_extension(path: &str) -> Option<Goal> {
-        if path.ends_with(".mjs") || path.ends_with(".mts") {
-            Some(Goal::Module)
-        } else {
-            None
-        }
+        std::path::Path::new(path)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("mjs") || ext.eq_ignore_ascii_case("mts"))
+            .then_some(Goal::Module)
     }
 }
 
@@ -107,6 +109,18 @@ mod tests {
     fn source_type_round_trips() {
         for goal in [Goal::Module, Goal::Script] {
             assert_eq!(Goal::from_source_type(goal.source_type()), Some(goal));
+        }
+    }
+
+    #[test]
+    fn from_extension_settles_the_module_names_in_any_case() {
+        for module in ["a.mjs", "a.mts", "A.MJS", "dir/x.Mts", "a.svelte.mjs"] {
+            assert_eq!(Goal::from_extension(module), Some(Goal::Module), "{module}");
+        }
+        for unsettled in [
+            "a.js", "a.ts", "a.cjs", "a.cts", "mjs", ".mjs", "a.mjsx", "a.svelte",
+        ] {
+            assert_eq!(Goal::from_extension(unsettled), None, "{unsettled}");
         }
     }
 
