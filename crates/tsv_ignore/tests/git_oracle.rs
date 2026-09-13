@@ -51,6 +51,51 @@ fn git_ignored(repo: &Path, path: &str) -> bool {
     }
 }
 
+/// The Win32 device stems no file may be named after, whatever its extension
+/// (`nul.ts` opens the null device rather than creating a file).
+const WINDOWS_RESERVED_STEMS: [&str; 22] = [
+    "con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8",
+    "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+];
+
+/// Whether Win32 can hold a file under this `/`-separated name: no component may carry a
+/// `\` (a separator there, not a name byte), one of the reserved characters `<>:"|?*`, a
+/// control character, a trailing space or dot, or a [reserved device
+/// stem](WINDOWS_RESERVED_STEMS).
+fn windows_representable(path: &str) -> bool {
+    path.split('/').all(|component| {
+        !component.is_empty()
+            && !component.ends_with(' ')
+            && !component.ends_with('.')
+            && !component.contains(['\\', '<', '>', ':', '"', '|', '?', '*'])
+            && !component.chars().any(|c| (c as u32) < 0x20)
+            && !WINDOWS_RESERVED_STEMS.contains(
+                &component
+                    .split('.')
+                    .next()
+                    .unwrap_or(component)
+                    .to_ascii_lowercase()
+                    .as_str(),
+            )
+    })
+}
+
+/// Whether a candidate grades on the host running the suite — everywhere but Windows,
+/// every one does.
+///
+/// The oracle materializes each candidate so directory-ness is real and `git
+/// check-ignore` answers about the same path the matcher is asked about. A name Win32
+/// cannot represent breaks that pairing twice over: the file cannot be created at all
+/// (`bar\` is a directory path, `a*b.ts` an invalid name), and git-for-Windows reads the
+/// `\` in a name like `c5\.ts` as a separator, so it answers about `c5/.ts` while the
+/// matcher — pure `&str` logic over posix paths — answers about the one-component name.
+/// A mismatch there would report a platform fact, not a matcher bug. Eight of the
+/// suite's candidates are skipped this way; every one still grades on the linux and macOS
+/// legs, where the matcher's behavior is identical because nothing in it reads the host.
+fn grades_here(path: &str) -> bool {
+    !cfg!(windows) || windows_representable(path)
+}
+
 /// A unique temp repo path (no temp-dir dependency).
 fn fresh_repo(tag: &str) -> std::path::PathBuf {
     static SEQ: AtomicU32 = AtomicU32::new(0);
@@ -103,7 +148,7 @@ fn assert_matches_git(tag: &str, layers: &[(&str, &str)], candidates: &[(&str, b
         stack.push_gitignore(anchor, content);
     }
 
-    for (path, is_dir) in candidates {
+    for (path, is_dir) in candidates.iter().filter(|(p, _)| grades_here(p)) {
         let full = repo.join(path);
         if *is_dir {
             fs::create_dir_all(&full).unwrap();
@@ -114,7 +159,7 @@ fn assert_matches_git(tag: &str, layers: &[(&str, &str)], candidates: &[(&str, b
     }
 
     let mut mismatches = Vec::new();
-    for (path, is_dir) in candidates {
+    for (path, is_dir) in candidates.iter().filter(|(p, _)| grades_here(p)) {
         let ours = stack.is_ignored(path, *is_dir);
         let theirs = git_ignored(&repo, path);
         if ours != theirs {
@@ -350,4 +395,40 @@ fn bare_carriage_return_at_eof_matches_git() {
         &[("", "a.ts\ncr_eof.ts\r")],
         &[("cr_eof.ts", false), ("a.ts", false), ("other.ts", false)],
     );
+}
+
+/// The Windows skip rule, graded on every host: it decides which candidates the Windows
+/// leg drops, so a silent widening there would shrink that leg's coverage with nothing
+/// to show for it. The kept names are the ones whose punctuation only *looks* reserved.
+#[test]
+fn windows_representability_pins_the_skipped_names() {
+    for name in [
+        "esc ",       // a trailing space Win32 normalizes away
+        "bar\\",      // a separator there, not a name byte
+        "a*b.ts",     // a reserved character
+        "nul.ts",     // a device stem, whatever the extension
+        "nul.tsjunk", //
+        "c4\\.ts",    // git-for-Windows would read these as `c4/.ts`
+        "c5\\.ts",    //
+        "r1\\.ts",    //
+    ] {
+        assert!(
+            !windows_representable(name),
+            "{name:?} should be skipped on the windows leg"
+        );
+    }
+    for name in [
+        "q[bc.ts",
+        "d6].ts",
+        "d6^.ts",
+        "#hash.ts",
+        "!bang.ts",
+        "spaced.ts",
+        "cs/.ts",
+        "sub/x.ts",
+        "foo",
+        "esc",
+    ] {
+        assert!(windows_representable(name), "{name:?} should still grade");
+    }
 }
