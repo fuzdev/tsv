@@ -1710,14 +1710,20 @@ impl<'a> Printer<'a> {
         if let Some(kw_start) = keyword_start {
             let kw_end = kw_start + keyword.as_str().len() as u32;
             if self.comments_force_own_line_between(kw_end, items[0].span.start) {
-                // Items carrying their own line comments must join with the
-                // gap-aware separators — mirroring the group-mode line-comment join
-                // below. A plain `", "` join would let a per-item line comment swallow
-                // the next item (`// c1, B` — non-reparseable content loss).
+                // The items join through the gap-aware separators, as the group-mode
+                // joins below do — never a plain `", "`. Two gaps have already written
+                // part of their separator into an item doc: a `Baked` gap (a per-item
+                // line comment; a flat join would let it swallow the next item, `// c1, B`
+                // — non-reparseable content loss) and a `CommaBaked` gap (a stranded
+                // after-comma block trails its comma inside the item; a flat join printed
+                // the comma a second time, `A, /* c */, B` — dead output). Without a line
+                // comment the list is a width group: a fitting list collapses onto one
+                // line, where the stranded block hugs the next item; a wrapping list
+                // breaks per item and keeps the block on its comma line.
                 let value_doc = if has_any_item_line_comments {
                     self.join_heritage_items(&item_docs, &gaps, d.hardline())
                 } else {
-                    d.join(item_docs, ", ")
+                    d.group(self.join_heritage_items(&item_docs, &gaps, d.line()))
                 };
                 return self.build_keyword_hang_doc(
                     keyword.as_str(),

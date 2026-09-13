@@ -16,7 +16,7 @@
 # the gate rather than being pinned.
 #
 # Format: KIND<TAB>SHAPE<TAB>PAYLOADS
-# shapes: 33
+# shapes: 31
 UNREPARSEABLE	()⟨⟩␣	multiline
 UNREPARSEABLE	(⟨⟩(	multiline
 UNREPARSEABLE	(⟨⟩IDENT	multiline
@@ -40,8 +40,6 @@ UNREPARSEABLE	IDENT⟨⟩)['	multiline
 UNREPARSEABLE	IDENT⟨⟩)[]	multiline
 UNREPARSEABLE	IDENT⟨⟩;}	annotation,block,jsdoc_cast,multiline
 UNREPARSEABLE	IDENT⟨⟩␣	multiline
-UNREPARSEABLE	extends⟨⟩␣	line,multiline
-UNREPARSEABLE	implements⟨⟩␣	line,multiline
 UNREPARSEABLE	|⟨⟩␣	line
 UNREPARSEABLE	}⟨⟩)?]	multiline
 UNREPARSEABLE	}⟨⟩␣	multiline
@@ -49,4 +47,4 @@ UNREPARSEABLE	␣⟨⟩)	multiline
 UNREPARSEABLE	␣⟨⟩)[]	multiline
 UNREPARSEABLE	␣⟨⟩/*	multiline
 UNREPARSEABLE	␣⟨⟩IDENT	line
-UNREPARSEABLE	␣⟨⟩␣	line,multiline
+UNREPARSEABLE	␣⟨⟩␣	multiline
