@@ -320,6 +320,43 @@ pub(in crate::printer) enum TrailingBlank {
     Drop,
 }
 
+/// Where a **block** comment the author gave its own line lands in a trailing gap's run
+/// ([`Printer::push_trailing_comments_in_range_with`]) when no `//` ahead of it has
+/// already deferred the run — the one question the gap's DESTINATION decides, so the
+/// caller names it.
+///
+/// A `//` is deferred by construction and an own-line comment behind one keeps its line
+/// either way; this policy is asked only of the run a block OPENS.
+/// What [`Printer::push_trailing_comments_in_range_with`] emitted — the two facts a caller
+/// can need, read off the one walk that produced the run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::printer) struct TrailingRun {
+    /// The run held a `//`, so the caller must break: the answer every other spelling of
+    /// the emitter returns bare.
+    pub has_line_comment: bool,
+    /// The run DEFERRED with a break of its own — a `//`, or an own-line block under
+    /// [`OwnLineBlock::Defer`] — so it lands at the next line end the renderer takes, and a
+    /// construct that may otherwise stay flat and glue its closer must supply that end
+    /// INSIDE itself (the mapped shell's question).
+    pub deferred: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::printer) enum OwnLineBlock {
+    /// Inline, before the gap's closer — the single-line-block collapse
+    /// ([docs/conformance_prettier.md](../../../../docs/conformance_prettier.md)
+    /// §Comment Position Philosophy): the run stays inside the construct it was written
+    /// in (a shell's `)`, an index's `]`, a signature head's gap), where deferring would
+    /// carry it PAST that closer, and an unforced own-line break collapses.
+    Inline,
+    /// Deferred on its own line — prettier's `printTrailingComment` own-line arm. For a
+    /// gap that spans the construct's own TERMINATOR and closes inside its braces (the
+    /// mapped member's `V;`→`}`), where the block trails the member the way a type
+    /// literal's own-line comment after its last member does, and inlining it would pull
+    /// it across the `;` (`V;⏎/* c */` → `V /* c */;`).
+    Defer,
+}
+
 /// A trailing run's **line reference** — the last source position whose PRINTED image is
 /// still on the run's line — stepped one comment at a time.
 ///
@@ -1253,7 +1290,28 @@ impl<'a> Printer<'a> {
         end: u32,
         blank: TrailingBlank,
     ) -> bool {
+        self.push_trailing_comments_in_range_with(parts, start, end, blank, OwnLineBlock::Inline)
+            .has_line_comment
+    }
+
+    /// [`Self::push_trailing_comments_in_range_blank`] with the own-line BLOCK policy named
+    /// too — see [`OwnLineBlock`] for whose question it is — and both facts of the run
+    /// returned ([`TrailingRun`]). Every other spelling answers `Inline`, the collapse a
+    /// gap inside a construct wants; only the mapped member's terminator-spanning gap asks
+    /// for `Defer`.
+    pub(in crate::printer) fn push_trailing_comments_in_range_with(
+        &self,
+        parts: &mut DocBuf,
+        start: u32,
+        end: u32,
+        blank: TrailingBlank,
+        own_line_block: OwnLineBlock,
+    ) -> TrailingRun {
         let mut has_line_comment = false;
+        // Whether any comment of this run has been deferred yet — a `//`, or an own-line
+        // block under `Defer`. Distinct from `has_line_comment`, the caller's break
+        // question: a run a block opened under `Defer` holds no `//` and forces nothing.
+        let mut run_deferred = false;
         // Cursor over what physically precedes each comment — an **in-source** question
         // (docs/comments.md §the three axes), so it advances over every comment emitted
         // here, not just the ones that broke.
@@ -1265,12 +1323,17 @@ impl<'a> Printer<'a> {
             let own_line = self.comment_has_newline_between(prev_end, comment.span.start);
             let is_line = !comment.is_block;
             // A **line** comment is deferred by construction (it runs to EOL). A **block**
-            // one is deferred only to stay BEHIND a line comment already in this run:
+            // one is deferred to stay BEHIND a comment already deferred in this run —
             // deferring is what carries a comment out past the construct's closer, so a
             // block that could simply sit inline must, or it leaves the parens it was
-            // written inside. Once the run is deferred, though, an inline block would
-            // render *before* the deferred text and the pair would come out reordered.
-            let deferred = is_line || has_line_comment;
+            // written inside — or, under [`OwnLineBlock::Defer`], because the author gave
+            // it its own line. Once the run is deferred, every later comment rides the
+            // suffix too, own-line or glued (prettier's `printTrailingComment` threading
+            // `previousComment.hasLineSuffix`): an inline block would render *before* the
+            // deferred text and the pair would come out reordered (`V /* c7 */; // c5⏎/*
+            // c6 */` for `V; // c5⏎/* c6 */ /* c7 */`).
+            let deferred =
+                is_line || run_deferred || (own_line && own_line_block == OwnLineBlock::Defer);
             parts.push(if deferred && own_line {
                 // The author BLANK directly above the comment, where the caller's
                 // destination keeps it: `isPreviousLineEmpty(locStart(comment))`, the same
@@ -1283,13 +1346,21 @@ impl<'a> Printer<'a> {
                     self.previous_line_is_empty(floor, comment.span.start)
                 };
                 self.build_trailing_comment_doc_own_line_blank(comment, blank_above)
+            } else if deferred {
+                // The kind-agnostic deferred spelling: a `//` by construction, and a block
+                // glued behind an already-deferred run.
+                self.build_trailing_line_comment_doc(comment)
             } else {
                 self.build_trailing_comment_doc(comment)
             });
             has_line_comment |= is_line;
+            run_deferred |= deferred;
             prev_end = comment.span.end;
         }
-        has_line_comment
+        TrailingRun {
+            has_line_comment,
+            deferred: run_deferred,
+        }
     }
 
     /// The break a comment-bearing construct owes at a seam of its own: a `hardline` when a

@@ -1456,6 +1456,67 @@ mod arena_tests {
         assert_eq!(render_default(&a, doc), "a // c\nb");
     }
 
+    // --- a multi-line text: the pending suffix flushes AHEAD of it, never inside ---
+    //
+    // The text is ONE token (a block comment spanning lines), so its interior breaks
+    // are not line ends the buffer may drain at: a flush there lands inside the
+    // comment and welds the two (`/* a /* t */⏎b */`, unterminated — output that does
+    // not reparse). Both comment shapes take the same rule; only the interior break
+    // kind differs. See `docs/comments.md` §Trailing and dangling runs.
+
+    #[test]
+    fn test_multiline_text_flushes_pending_suffix_ahead_of_itself() {
+        let a = DocArena::new();
+        // `x;` + a deferred block + a trailing multi-line block: the deferred one
+        // lands BEHIND the text's own separator space, in source order.
+        let doc = a.concat(&[
+            a.text("x;"),
+            a.line_suffix(a.text(" /* t */")),
+            a.text(" "),
+            a.multiline_text_literal("/* a\nb */"),
+        ]);
+        assert_eq!(render_default(&a, doc), "x; /* t */ /* a\nb */");
+        // The indentable shape answers the same way, its interior breaks indented.
+        let doc = a.concat(&[
+            a.text("x;"),
+            a.line_suffix(a.text(" /* t */")),
+            a.text(" "),
+            a.indent(a.multiline_text("/**\n * a\n */")),
+        ]);
+        assert_eq!(render_default(&a, doc), "x; /* t */ /**\n\t * a\n\t */");
+    }
+
+    #[test]
+    fn test_multiline_text_breaks_after_a_flushed_line_comment() {
+        let a = DocArena::new();
+        // A flushed run ending in a `//` cannot be followed on its line — the text
+        // would become the comment's text — so the text opens the next line instead,
+        // and the separator space is dropped with the break. The suffix is spelled as
+        // the printer spells it (a separator text ahead of the comment's own node):
+        // the tail test is the comment node's identity, never the emitted bytes.
+        let doc = a.concat(&[
+            a.text("x;"),
+            a.line_suffix(a.concat(&[a.text(" "), a.text("// c")])),
+            a.text(" "),
+            a.multiline_text_literal("/* a\nb */"),
+        ]);
+        assert_eq!(render_default(&a, doc), "x; // c\n/* a\nb */");
+    }
+
+    #[test]
+    fn test_multiline_text_literal_interior_is_verbatim() {
+        let a = DocArena::new();
+        // A literal-break body keeps its interior bytes: no trailing-space trim before
+        // an interior newline, and no context indent after one — the non-indentable
+        // block comment's contract, even under an indent.
+        let doc =
+            a.indent(a.concat(&[a.hardline(), a.multiline_text_literal("/* a  \n   b\nc */")]));
+        assert_eq!(render_default(&a, doc), "\n\t/* a  \n   b\nc */");
+        // Without a pending suffix nothing is flushed and nothing else changes.
+        let doc = a.concat(&[a.text("x "), a.multiline_text_literal("/* a\nb */")]);
+        assert_eq!(render_default(&a, doc), "x /* a\nb */");
+    }
+
     #[test]
     fn test_line_suffix_boundary_without_pending_suffix_is_inert() {
         let a = DocArena::new();

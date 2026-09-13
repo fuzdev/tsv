@@ -8,7 +8,7 @@ use smallvec::SmallVec;
 use super::arena::{ArenaCommand, CmdStack, DocArena, DocId, DocNode, LineSuffixBuf, RenderIndent};
 use super::arena_fits::arena_fits_with_lookahead;
 use super::arena_render_fill::render_fill_iterative;
-use super::arena_render_suffix::flush_line_suffix;
+use super::arena_render_suffix::{flush_line_suffix, flush_line_suffix_tail_is_line_comment};
 use super::render_config::RenderConfig;
 #[cfg(feature = "comment_check")]
 use super::render_config::RenderPurpose;
@@ -355,10 +355,16 @@ fn render_line_node(
     render_line_break(kind, mode, indent, output, pos, ctx.render, ctx.embed);
 }
 
-/// Render one `MultilineText` body: `[text(line0), hardline, text(line1), hardline, …]`
+/// Render one `MultilineText` body: `[text(line0), <break>, text(line1), <break>, …]`
 /// from one pool-stored string — the first line at the current column, each subsequent line
-/// preceded by the hardline arm ([`render_line_node`] with `Hard`: remeasure arming, suffix
-/// flush, break). Byte- and position-identical to the per-line concat it replaces.
+/// preceded by the line arm ([`render_line_node`] with `Hard`, or `Literal` when the body is
+/// a verbatim one — remeasure arming, break; the kind is mapped here, off the hot arm). Byte- and
+/// position-identical to the per-line concat it replaces, with one deliberate exception: a
+/// pending suffix flushes AHEAD of the whole text
+/// ([`flush_suffix_ahead_of_multiline_text`]), so the interior breaks find nothing to
+/// flush. The concat's breaks drained the buffer INSIDE the text — a block comment
+/// spanning lines — welding the deferred comment into it (`/* a /* t */⏎b */`,
+/// unterminated), the one shape whose output is dead rather than merely moved.
 ///
 /// ⚠️ **`#[cold] #[inline(never)]` is the measured spelling, and pure CSS is what measures
 /// it.** This is a rare arm of a very hot switch — a few thousand visits against millions of
@@ -383,6 +389,7 @@ fn render_line_node(
 fn render_multiline_text<P: RenderPolicy>(
     ctx: &RenderCtx<'_>,
     body: &str,
+    literal: bool,
     mode: Mode,
     indent: RenderIndent,
     output: &mut String,
@@ -391,6 +398,22 @@ fn render_multiline_text<P: RenderPolicy>(
     line_suffix: &mut LineSuffixBuf,
     should_remeasure: &mut bool,
 ) {
+    if policy.tracking_suffix() && !line_suffix.is_empty() {
+        flush_suffix_ahead_of_multiline_text(
+            ctx,
+            mode,
+            indent,
+            output,
+            pos,
+            line_suffix,
+            should_remeasure,
+        );
+    }
+    let interior = if literal {
+        LineKind::Literal
+    } else {
+        LineKind::Hard
+    };
     let mut lines = split_lf(body);
     if let Some(first) = lines.next() {
         #[cfg(feature = "swallow_check")]
@@ -404,7 +427,7 @@ fn render_multiline_text<P: RenderPolicy>(
     for line in lines {
         render_line_node(
             ctx,
-            LineKind::Hard,
+            interior,
             mode,
             indent,
             output,
@@ -419,6 +442,59 @@ fn render_multiline_text<P: RenderPolicy>(
         }
         output.push_str(line);
         update_pos_for_text(pos, line);
+    }
+}
+
+/// Drain a pending suffix AHEAD of a multi-line text — behind the text's own separator,
+/// and never inside the text (the weld [`render_multiline_text`] names).
+///
+/// The separator is the problem this has to solve: a builder puts the text's spacing
+/// BEFORE it (`text(" ")`, the trailing block's `build_trailing_comment_doc`), so by the
+/// time the text arm runs that space is already out, and a suffix appended here would land
+/// behind it — `;  /* t *//* a⏎b */`, a doubled space and a glued pair. The trailing spaces
+/// step aside, the run flushes where the line's content actually ends, and they return
+/// behind it, so the suffix's own leading space and the text's separator each keep their
+/// job: `; /* t */ /* a⏎b */`, prettier's fixed point at the cast seam.
+///
+/// A run ending in a `//` cannot be followed on its line — the text would become the
+/// comment's text — so it takes the break [`render_line_node`] owes a hard line instead,
+/// at the text's own indent; the separator is then the break, and the spaces stay dropped
+/// (a break trims behind itself anyway).
+// The same unbundled render state as `render_line_node`, minus the policy.
+#[cold]
+#[inline(never)]
+fn flush_suffix_ahead_of_multiline_text(
+    ctx: &RenderCtx<'_>,
+    mode: Mode,
+    indent: RenderIndent,
+    output: &mut String,
+    pos: &mut usize,
+    line_suffix: &mut LineSuffixBuf,
+    should_remeasure: &mut bool,
+) {
+    let separator = output
+        .as_bytes()
+        .iter()
+        .rev()
+        .take_while(|&&b| b == b' ')
+        .count();
+    output.truncate(output.len() - separator);
+    *pos = pos.saturating_sub(separator);
+    if flush_line_suffix_tail_is_line_comment(ctx, line_suffix, output, pos, should_remeasure) {
+        render_line_node(
+            ctx,
+            LineKind::Hard,
+            mode,
+            indent,
+            output,
+            pos,
+            true,
+            line_suffix,
+            should_remeasure,
+        );
+    } else {
+        output.extend(std::iter::repeat_n(' ', separator));
+        *pos += separator;
     }
 }
 
@@ -951,10 +1027,11 @@ fn render_doc_core<P: RenderPolicy>(
                 debug_assert!(false, "text is answered by the probe above");
             }
 
-            DocNode::MultilineText { span, .. } => {
+            DocNode::MultilineText { span, literal, .. } => {
                 render_multiline_text(
                     ctx,
                     span.slice(pool),
+                    *literal,
                     cmd.mode(),
                     cmd.indent(),
                     output,

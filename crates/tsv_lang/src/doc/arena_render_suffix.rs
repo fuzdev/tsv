@@ -58,6 +58,15 @@ use super::types::{LineKind, Mode, resolve_text};
 /// already mirrors it. The hole is strictly ACROSS gaps, and only the renderer can see it:
 /// the same source welds or does not depending on print width (`foo(fn() // c⏎.bar, x); //
 /// c1` collapses and welds; widen the second argument and the call expands and it cannot).
+// ⚠️ **The split IS a lever, and the attribute is not.** The empty test — the whole cost on
+// the common break, where nothing is pending — must sit at the caller (`render_line_node`,
+// every hard and broken line), and it only does so when the function around it is small
+// enough to inline: with the run's loop in this body, LLVM declined and every line break paid
+// a call to reach the test. Moving the loop out (`flush_line_suffix_run`) reads
+// `instructions:u` **−0.70%** on a CSS corpus, **−0.44%** on TS+Svelte (denser breaks, bigger
+// share); the same split with this `#[inline]` deleted is instruction-identical, so the
+// attribute only pins the intent.
+#[inline]
 pub(super) fn flush_line_suffix(
     ctx: &RenderCtx<'_>,
     line_suffix: &mut LineSuffixBuf,
@@ -68,6 +77,46 @@ pub(super) fn flush_line_suffix(
     if line_suffix.is_empty() {
         return;
     }
+    flush_line_suffix_run(ctx, line_suffix, output, pos, should_remeasure);
+}
+
+/// [`flush_line_suffix`], reporting whether the run it drained ends in a `//` — the one
+/// thing the flush a **multi-line text** takes AHEAD of itself has to know, and what the
+/// ordinary flush never asks of its LAST suffix (a `//` at a line's end poses no separator
+/// question).
+///
+/// A multi-line text's interior newlines are not line ends of the document: they belong to
+/// one token (a block comment spanning lines), so a suffix flushed at one of them lands
+/// INSIDE the comment (`x as A; /* a /* t */⏎b */`, unterminated — the second `/*` is text
+/// of the first and its `*/` closes it early). The buffer is therefore drained before the
+/// text's first line instead, keeping source order (`x as A; /* t */ /* a⏎b */`), and the
+/// text's interior breaks then have nothing left to flush. A run ending in a `//` cannot be
+/// followed on its line at all, so the caller breaks after it
+/// (`arena_render::flush_suffix_ahead_of_multiline_text`).
+pub(super) fn flush_line_suffix_tail_is_line_comment(
+    ctx: &RenderCtx<'_>,
+    line_suffix: &mut LineSuffixBuf,
+    output: &mut String,
+    pos: &mut usize,
+    should_remeasure: &mut bool,
+) -> bool {
+    flush_line_suffix_run(ctx, line_suffix, output, pos, should_remeasure).is_some_and(|last| {
+        with_doc_store(ctx, |docs| docs.ends_in_line_comment(last.doc, last.mode()))
+    })
+}
+
+/// The flush loop both entry points share, returning the LAST suffix it rendered (`None`
+/// when nothing was pending) so [`flush_line_suffix_tail_is_line_comment`] can ask its tail.
+fn flush_line_suffix_run(
+    ctx: &RenderCtx<'_>,
+    line_suffix: &mut LineSuffixBuf,
+    output: &mut String,
+    pos: &mut usize,
+    should_remeasure: &mut bool,
+) -> Option<ArenaCommand> {
+    if line_suffix.is_empty() {
+        return None;
+    }
     // A flush of two or more suffixes is a comment RUN, and this loop is its only
     // separator: whatever the buffer holds lands back-to-back on one physical line. A
     // `//` runs to end-of-line, so a suffix behind one is welded into it
@@ -75,6 +124,7 @@ pub(super) fn flush_line_suffix(
     // suffix poses no separator question, and skips the walk (and these borrows) entirely.
     let queued = line_suffix.len();
     let mut pending_line_comment = false;
+    let mut last = None;
     for (i, suffix_cmd) in std::mem::take(line_suffix).into_iter().enumerate() {
         let separated = pending_line_comment && push_run_separator(ctx, suffix_cmd, output, pos);
         let content_start = output.len();
@@ -97,7 +147,9 @@ pub(super) fn flush_line_suffix(
             && with_doc_store(ctx, |docs| {
                 docs.ends_in_line_comment(suffix_cmd.doc, suffix_cmd.mode())
             });
+        last = Some(suffix_cmd);
     }
+    last
 }
 
 /// The run separator [`flush_line_suffix`] owes a suffix landing behind a `//`: a hard

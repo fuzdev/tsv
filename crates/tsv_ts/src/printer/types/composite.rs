@@ -21,6 +21,7 @@ use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
 use crate::printer::LeadingGlue;
+use crate::printer::comments::{OwnLineBlock, TrailingBlank};
 use crate::printer::ignore::RoutedScope;
 use crate::printer::layout::bracketed_list_body;
 use crate::printer::{CommentVec, ShellLeadingRun, ShellPair};
@@ -1496,6 +1497,11 @@ impl<'a> Printer<'a> {
         // canonicalizer; `format_canonical`'s docs record it as a contract hole.
         // Unreachable for the current consumer (compiled JS carries no TS types).
         let source_is_multiline = super::super::is_brace_block_multiline(self.source, m.span);
+        // The shell's own question — the source test above, OR a trailing run that deferred
+        // and so has to land inside the braces (`TrailingRun::deferred`, at the value
+        // branch's emission below). Only that branch can raise it; the source read stays
+        // what the assignment classifier pairs with.
+        let mut shell_is_multiline = source_is_multiline;
 
         // Find the start of the mapping content (after `{`)
         let content_start = m.span.start + 1; // after `{`
@@ -1808,16 +1814,40 @@ impl<'a> Printer<'a> {
             }
 
             // Trailing comments after the value type, via the shared trailing-gap
-            // emitter: a block trails inline before the `;` (`V /* c */;`), a line
-            // comment rides `line_suffix` so it floats to end-of-line *after* the `;`
-            // (`V; // c`) instead of swallowing it — the `;` is emitted separately by
-            // the multiline/one-line branch below. Open-coding the loop here dropped
-            // the emitter's separator and ordering rules, welding a run onto one line
-            // (`V; // c1 // c2`) and reordering an inline block ahead of a deferred
-            // line comment; see [docs/comments.md](../../../../../docs/comments.md)
-            // §Trailing and dangling runs.
+            // emitter: a block on the member's line trails inline before the `;`
+            // (`V /* c */;`), a line comment rides `line_suffix` so it floats to
+            // end-of-line *after* the `;` (`V; // c`) instead of swallowing it — the `;`
+            // is emitted separately by the multiline/one-line branch below. Open-coding
+            // the loop here dropped the emitter's separator and ordering rules, welding
+            // a run onto one line (`V; // c1 // c2`) and reordering an inline block
+            // ahead of a deferred line comment; see
+            // [docs/comments.md](../../../../../docs/comments.md) §Trailing and
+            // dangling runs.
+            //
+            // This gap SPANS the member's `;` and closes inside the braces, so a block
+            // the author gave its own line is the member's trailing comment the way a
+            // type literal's own-line comment after its last member is, and keeps that
+            // line (`OwnLineBlock::Defer`, landing after the `;` at the shell's closing
+            // hardline); the inline arm pulled it across the `;` (`V /* c */;`), and a
+            // multi-line one then welded with the run deferred ahead of it.
+            //
+            // A run that DEFERRED also decides the shell: the one-line group form can stay
+            // flat and glue `};` on the member's line, which flushed the run past the closer
+            // at its inner indent — a non-idempotent escape for the own-line block
+            // (`{[K in T]: V⏎/* c */}` → `{ [K in T]: V };⏎\t\t/* c */`), a STABLE one for
+            // the `//` spelling for as long as the shell existed. The multi-line shell's
+            // closing `hardline` is where the run belongs; prettier reaches the same shape
+            // by propagating the `breakParent` inside its `lineSuffix`, which tsv's suffix
+            // deliberately does not carry (the caller answers the break question).
             let body_end = m.span.end.saturating_sub(1); // before `}`
-            self.push_trailing_comments_in_range(&mut body_parts, type_end, body_end);
+            let run = self.push_trailing_comments_in_range_with(
+                &mut body_parts,
+                type_end,
+                body_end,
+                TrailingBlank::Drop,
+                OwnLineBlock::Defer,
+            );
+            shell_is_multiline |= run.deferred;
         } else {
             // No value type (`{ [K in T] }`): comments after the `]` (or the
             // optional modifier) still trail the member the same way — dropping
@@ -1830,7 +1860,7 @@ impl<'a> Printer<'a> {
         }
 
         self.build_mapped_type_shell(
-            source_is_multiline,
+            shell_is_multiline,
             &leading_comments[..leading_own_line_end],
             &body_parts,
         )

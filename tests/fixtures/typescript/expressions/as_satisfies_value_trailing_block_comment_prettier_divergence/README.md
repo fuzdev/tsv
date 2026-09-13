@@ -27,7 +27,21 @@ to the fixed point in a single pass, where prettier takes two.
 
 The `unformatted_ours_*` variants are the paren shells (tsv normalizes them to
 `input` in one pass; N6 confirms prettier's one pass does not); the
-`prettier_intermediate_*` siblings pin prettier's two-pass path to `input`. The
+`prettier_intermediate_*` siblings pin prettier's two-pass path to `input`.
+
+A **multi-line block** trailing the statement (`(E /* t */); /* a⏎b */`, on either
+side of the `;`) reaches the same fixed point with the deferred block landing
+AHEAD of it, in source order:
+
+```ts
+const e = x as E; /* t */ /* a
+b */
+```
+
+The renderer drains a pending `line_suffix` before a multi-line comment rather
+than at one of its interior breaks — a flush there landed inside the comment
+(`x as E; /* a /* t */⏎b */`, unterminated). Prettier's two passes agree on the
+fixed point (`E /* t */; /* a⏎b */`, then `E; /* t */ /* a⏎b */`). The
 other prefix / hang sites (`keyof`, mapped, `: T`, `is`, type-param, conditional
 `extends`) keep a trailing block **inline** at a type position, so they are already
 idempotent — only the two value-position casts need this.

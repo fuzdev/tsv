@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 535,
+	"end": 809,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -185,24 +185,136 @@
 					"column": 41
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " A multi-line block trailing the statement follows the deferred cast block on",
+			"start": 527,
+			"end": 606,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the `;` line, in source order: the deferred block lands ahead of the",
+			"start": 608,
+			"end": 679,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " multi-line one, never inside it.",
+			"start": 681,
+			"end": 716,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 36
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 736,
+			"end": 743,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 19
+				},
+				"end": {
+					"line": 18,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " a\nb ",
+			"start": 744,
+			"end": 753,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 27
+				},
+				"end": {
+					"line": 19,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 781,
+			"end": 788,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 26
+				},
+				"end": {
+					"line": 21,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " a\nb ",
+			"start": 789,
+			"end": 798,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 34
+				},
+				"end": {
+					"line": 22,
+					"column": 4
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 534,
+		"end": 808,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 525,
+			"end": 799,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 14,
+					"line": 23,
 					"column": 9
 				}
 			},
@@ -730,6 +842,278 @@
 							"value": " t ",
 							"start": 517,
 							"end": 524
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 718,
+					"end": 735,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 18
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 724,
+							"end": 734,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 7
+								},
+								"end": {
+									"line": 18,
+									"column": 17
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 724,
+								"end": 725,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 7
+									},
+									"end": {
+										"line": 18,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "TSAsExpression",
+								"start": 728,
+								"end": 734,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 11
+									},
+									"end": {
+										"line": 18,
+										"column": 17
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 728,
+									"end": 729,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 11
+										},
+										"end": {
+											"line": 18,
+											"column": 12
+										}
+									},
+									"name": "x"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 733,
+									"end": 734,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 16
+										},
+										"end": {
+											"line": 18,
+											"column": 17
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 733,
+										"end": 734,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 16
+											},
+											"end": {
+												"line": 18,
+												"column": 17
+											}
+										},
+										"name": "E"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A multi-line block trailing the statement follows the deferred cast block on",
+							"start": 527,
+							"end": 606
+						},
+						{
+							"type": "Line",
+							"value": " the `;` line, in source order: the deferred block lands ahead of the",
+							"start": 608,
+							"end": 679
+						},
+						{
+							"type": "Line",
+							"value": " multi-line one, never inside it.",
+							"start": 681,
+							"end": 716
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " t ",
+							"start": 736,
+							"end": 743
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 756,
+					"end": 780,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 25
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 762,
+							"end": 779,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 7
+								},
+								"end": {
+									"line": 21,
+									"column": 24
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 762,
+								"end": 763,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 7
+									},
+									"end": {
+										"line": 21,
+										"column": 8
+									}
+								},
+								"name": "f"
+							},
+							"init": {
+								"type": "TSSatisfiesExpression",
+								"start": 766,
+								"end": 779,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 11
+									},
+									"end": {
+										"line": 21,
+										"column": 24
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 766,
+									"end": 767,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 11
+										},
+										"end": {
+											"line": 21,
+											"column": 12
+										}
+									},
+									"name": "x"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 778,
+									"end": 779,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 23
+										},
+										"end": {
+											"line": 21,
+											"column": 24
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 778,
+										"end": 779,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 23
+											},
+											"end": {
+												"line": 21,
+												"column": 24
+											}
+										},
+										"name": "F"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " a\nb ",
+							"start": 744,
+							"end": 753
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " t ",
+							"start": 781,
+							"end": 788
+						},
+						{
+							"type": "Block",
+							"value": " a\nb ",
+							"start": 789,
+							"end": 798
 						}
 					]
 				}

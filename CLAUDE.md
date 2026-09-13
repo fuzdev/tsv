@@ -1036,8 +1036,13 @@ full in docs/comments.md; here is the seam to reach for:
   begins a new output line (`Printer::printed_tail`, stepped by `TrailingLineRef`, and a
   `//` the run takes closes that line); a trailing GAP inside a construct
   (`Printer::push_trailing_comments_in_range`) asks the source and carries the break **inside**
-  the `line_suffix`. The kind-keyed "a block needs no break" formulation welds
+  the `line_suffix`, every comment behind a deferred one riding the suffix too, and whether an
+  own-line BLOCK opens a deferred run is the caller's `OwnLineBlock` (`Defer` only at the mapped
+  member's `;`-spanning gap). The kind-keyed "a block needs no break" formulation welds
   `/* c1 *//* c2 */` — lossless and idempotent, so blind to every gate but a prettier `compare`.
+  At render time a pending suffix drains AHEAD of a multi-line block comment (one
+  `MultilineText` token), never at its interior breaks, where it welded the two into an
+  unterminated comment.
   [§Trailing and dangling runs](docs/comments.md#trailing-and-dangling-runs-the-separator-goes-before-each-comment-never-after).
 - **A deferred run must not leave the construct it was written in** — a `//` in a bracketed
   type region or a paren shell forces it **open**; the one sanctioned strip is a non-last

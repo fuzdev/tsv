@@ -7,7 +7,6 @@
 use super::Printer;
 use crate::ast::internal;
 use tsv_lang::Span;
-use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing;
 use tsv_lang::{trim_end_js_whitespace, trim_js_whitespace, trim_start_js_whitespace};
@@ -176,9 +175,14 @@ impl<'a> Printer<'a> {
     /// Build a multi-line *non-indentable* block comment (at least one line does
     /// not begin with `*`) — its interior layout preserved **verbatim**.
     ///
-    /// Every continuation line renders through `literalline` (a newline with **no**
-    /// context indent), so the comment's interior columns are kept exactly as
-    /// authored, matching prettier's non-indentable-block-comment handling. This is
+    /// Every continuation line renders through a `literalline` (a newline with **no**
+    /// context indent) — the whole comment one literal-break
+    /// [`tsv_lang::doc::arena::DocNode::MultilineText`], so the renderer reads it as a
+    /// single token and a pending `line_suffix` lands AHEAD of it rather than inside it
+    /// (the per-line `literalline` concat this replaced flushed the deferred comment
+    /// into the interior: `/* a /* t */⏎b */`, unterminated) — so the comment's
+    /// interior columns are kept exactly as authored, matching prettier's
+    /// non-indentable-block-comment handling. This is
     /// idempotent by construction: because no context indent is added, a comment
     /// whose source interior is indented never compounds that indentation one level
     /// per format pass. (The former behavior re-applied context indent via
@@ -203,9 +207,9 @@ impl<'a> Printer<'a> {
         debug_assert!(!rest.is_empty(), "multi-line comment has ≥2 lines");
         let line = |span: &(u32, u32)| line_slice(content, *span);
 
-        // Frame directly: the `/*<first>` opener, each continuation line preserved
-        // verbatim at its authored column via a `literalline` (no context indent),
-        // then the `*/` closer.
+        // Frame directly as one `\n`-separated body: the `/*<first>` opener, each
+        // continuation line preserved verbatim at its authored column (the `\n` renders
+        // as a `literalline`, no context indent), then the `*/` closer.
         //
         // ⚠️ **No trim anywhere** — verbatim means verbatim. prettier's non-indentable arm
         // is `["/*", replaceEndOfLine(comment.value), "*/"]`, which touches nothing, and its
@@ -216,17 +220,19 @@ impl<'a> Printer<'a> {
         // That is also why the LAST line needs no arm of its own: it is emitted exactly as
         // every other continuation line is. Its indentable twin above still splits three
         // ways, because there the three positions really do take three different trims.
-        let mut docs = DocBuf::with_capacity(rest.len() * 2 + 2);
-        let mut opener = d.pool_writer();
-        opener.push_str("/*");
-        opener.push_str(line(first));
-        docs.push(opener.finish_text());
+        //
+        // The reserve is an exact upper bound: `content` already holds every line's text
+        // and the interior `\n`s, and framing adds only `/*` + `*/`.
+        let mut body = d.pool_writer();
+        body.reserve(content.len() + 4);
+        body.push_str("/*");
+        body.push_str(line(first));
         for span in rest {
-            docs.push(d.literalline());
-            docs.push(d.text_pooled(line(span)));
+            body.push('\n');
+            body.push_str(line(span));
         }
-        docs.push(d.text("*/"));
-        d.concat(&docs)
+        body.push_str("*/");
+        body.finish_multiline_text_literal()
     }
 
     /// Build a line_suffix doc for a trailing line comment (space + comment)
