@@ -179,7 +179,8 @@ cargo run --profile corpus -p tsv_debug --features audits gap_audit ../corpora/c
 # after it, i.e. lost CODE, which the print-once ledger is structurally blind to (the
 # comment IS printed once); and a bare reparse of the output, UNREPARSEABLE — the
 # formatter's own output no longer parses (a multi-line comment relocated across a
-# stripped paren into a `[no LineTerminator here]` slot, a weld, a misplaced `;`), which
+# stripped paren into a `[no LineTerminator here]` slot, a weld, a misplaced `;` — or a
+# VALID output the parser over-rejects, the one shape prettier emits identically), which
 # the ledger and the swallow check are both blind to and no as-authored gate can reach.
 # A holding run names the swallow and unreparseable shares on their own lines.
 ```

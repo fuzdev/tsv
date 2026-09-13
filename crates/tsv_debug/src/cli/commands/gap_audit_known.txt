@@ -16,7 +16,7 @@
 # the gate rather than being pinned.
 #
 # Format: KIND<TAB>SHAPE<TAB>PAYLOADS
-# shapes: 48
+# shapes: 33
 UNREPARSEABLE	()⟨⟩␣	multiline
 UNREPARSEABLE	(⟨⟩(	multiline
 UNREPARSEABLE	(⟨⟩IDENT	multiline
@@ -28,7 +28,6 @@ UNREPARSEABLE	*/)⟨⟩;	multiline
 UNREPARSEABLE	*/⟨⟩)!.	multiline
 UNREPARSEABLE	*/⟨⟩)!;	multiline
 UNREPARSEABLE	*/⟨⟩␣	multiline
-UNREPARSEABLE	-⟨⟩NUM	line,multiline
 UNREPARSEABLE	.()⟨⟩)!;	multiline
 UNREPARSEABLE	/))⟨⟩;	multiline
 UNREPARSEABLE	/);⟨⟩␣	multiline
@@ -40,28 +39,14 @@ UNREPARSEABLE	IDENT⟨⟩))?	multiline
 UNREPARSEABLE	IDENT⟨⟩)['	multiline
 UNREPARSEABLE	IDENT⟨⟩)[]	multiline
 UNREPARSEABLE	IDENT⟨⟩;}	annotation,block,jsdoc_cast,multiline
-UNREPARSEABLE	IDENT⟨⟩[	line,multiline
-UNREPARSEABLE	IDENT⟨⟩|	line,multiline
-UNREPARSEABLE	IDENT⟨⟩␣	line,multiline
-UNREPARSEABLE	NUM⟨⟩|	line,multiline
-UNREPARSEABLE	NUM⟨⟩|-	line,multiline
-UNREPARSEABLE	NUM⟨⟩␣	line,multiline
-UNREPARSEABLE	async⟨⟩␣	line,multiline
+UNREPARSEABLE	IDENT⟨⟩␣	multiline
 UNREPARSEABLE	extends⟨⟩␣	line,multiline
 UNREPARSEABLE	implements⟨⟩␣	line,multiline
-UNREPARSEABLE	|-⟨⟩NUM	line,multiline
-UNREPARSEABLE	|⟨⟩-	line,multiline
-UNREPARSEABLE	|⟨⟩IDENT	line,multiline
-UNREPARSEABLE	|⟨⟩NUM	line,multiline
-UNREPARSEABLE	|⟨⟩␣	line,multiline
+UNREPARSEABLE	|⟨⟩␣	line
 UNREPARSEABLE	}⟨⟩)?]	multiline
 UNREPARSEABLE	}⟨⟩␣	multiline
 UNREPARSEABLE	␣⟨⟩)	multiline
 UNREPARSEABLE	␣⟨⟩)[]	multiline
-UNREPARSEABLE	␣⟨⟩-	line,multiline
 UNREPARSEABLE	␣⟨⟩/*	multiline
-UNREPARSEABLE	␣⟨⟩IDENT	line,multiline
-UNREPARSEABLE	␣⟨⟩NUM	line,multiline
-UNREPARSEABLE	␣⟨⟩function	line,multiline
-UNREPARSEABLE	␣⟨⟩|	line,multiline
+UNREPARSEABLE	␣⟨⟩IDENT	line
 UNREPARSEABLE	␣⟨⟩␣	line,multiline

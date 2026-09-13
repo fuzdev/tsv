@@ -145,12 +145,20 @@ An `UNREPARSEABLE` shape is **pinned and graded exactly like a drop** — same f
 same two failure modes — and a holding run names its share on its own line, like the swallow's.
 It is the one kind where the whole **output** is dead rather than one comment lost: the
 injected comment is printed exactly once (the ledger balances) and eats nothing on its line
-(no swallow), yet what the formatter wrote no longer parses. The shapes it finds are a
-relocation family — a multi-line block moved across a stripped paren into a
-`[no LineTerminator here]` slot (`yield (/* a⏎b */x)` → `yield /* a⏎b */ x`, and the same
-before `=>`, a non-null `!`, a tuple `?`), two comments welded into one
+(no swallow), yet what the formatter wrote no longer parses. The shapes it finds are of two
+kinds. A **printer** shape emits invalid text: a multi-line block moved across a stripped
+paren into a `[no LineTerminator here]` slot (`yield (/* a⏎b */x)` → `yield /* a⏎b */ x`,
+and the same before `=>`, a non-null `!`, a tuple `?`, a conditional type's `extends`), two
+comments welded into one by a line-suffix flush inside a multi-line block
 (`/* a /* t */⏎b */`, unterminated), a `;` placed where the enclosing grammar admits none
-(`{let a; /* c */}` in a Svelte declaration tag).
+(`{let a; /* c */}` in a Svelte declaration tag). A **parser** shape emits VALID text tsv's
+own parser over-rejects — the union printer's leading-pipe layout inside a type argument's
+index (`fn<⏎A[⏎| B // c⏎| C]⏎>()`), which the type-argument lookahead once refused — or
+mis-parses an input it should have refused (`new async⏎function f() {}` read as an async
+function expression, then printed in a paren shell the grammar rejects). Bucket a shape by
+its reparse ERROR before choosing the seam: the parse-side shapes are the only ones a
+prettier `compare` cannot distinguish from a correct output, since prettier emits the same
+bytes.
 
 Why it is graded here and not by `roundtrip:audit`: that audit formats every file **as
 authored**, and no fixture may format to invalid output (the protection rules), so an output
@@ -172,8 +180,7 @@ kind sees every dead output.
 
 Cost: one bare parse per accepted injection, measured over `tests/fixtures` against a baseline
 binary built from the same tree without the detector (2026-09-13, 12-core box, quiet):
-32.0 s → 37.1 s wall, 336 s → 388 s user — about **+16%**. First run over the fixtures pinned
-48 shapes (309 findings), 46 of them carrying a newline-bearing payload — one family.
+32.0 s → 37.1 s wall, 336 s → 388 s user — about **+16%**.
 
 ### A panic is never pinned
 

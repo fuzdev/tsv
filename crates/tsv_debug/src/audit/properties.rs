@@ -147,6 +147,10 @@ pub(crate) fn tsv_parse_to_value(source: &str, parser: ParserType) -> Option<Val
 /// own output does not parse" is graded against exactly the parse a second format would
 /// run. Builds no wire: the JSON write + read is the cost that made a full [`f1_check`]
 /// per injection unaffordable for `gap_audit`, and a bare parse is ~a third of a format.
+///
+/// Its two callers (`gap_audit`, `ignore_audit`) are `comment_check` modules, so it is
+/// gated the same way — a default-feature build would otherwise warn it unused.
+#[cfg(feature = "comment_check")]
 pub(crate) fn tsv_parses(source: &str, parser: ParserType) -> bool {
     let arena = bumpalo::Bump::new();
     match parser {

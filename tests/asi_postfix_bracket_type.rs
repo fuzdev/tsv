@@ -102,3 +102,61 @@ fn chained_bracket_newline_stops_per_bracket() {
         Some("ExpressionStatement")
     );
 }
+
+/// The type-argument LOOKAHEAD reads the same rule, or its verdict hands the type parser
+/// a list it cannot finish: `a <⏎B⏎[c] >⏎d` — the layout the formatter emits for a comment
+/// between the operand and its index — is the comparison chain `a < B[c] > d`, as the
+/// same bytes on one line are (tsc `parseTypeArgumentsInExpression` fails on the broken
+/// index and falls back; acorn's `tsParseArrayTypeOrHigher` gate says the same). Read as
+/// type arguments it was "Expected '>', found '['".
+#[test]
+fn type_args_lookahead_newline_bracket_stays_comparison() {
+    for source in [
+        "a <\nB\n[c] >\nd;",
+        "a < B // c\n[c] > d;",
+        "a < B\n[c] > d;",
+    ] {
+        let json = parse_json(source);
+        assert_eq!(
+            json.pointer("/body/0/expression/type")
+                .and_then(Value::as_str),
+            Some("BinaryExpression"),
+            "a `[` past a line terminator is no index, so the `<` is a comparison: {source:?} → {json}"
+        );
+        assert_eq!(
+            json.pointer("/body/0/expression/left/right/type")
+                .and_then(Value::as_str),
+            Some("MemberExpression"),
+            "`B[c]` is the comparison's member operand: {source:?} → {json}"
+        );
+    }
+}
+
+/// Control: the same index on the operand's line is an indexed-access type, and the
+/// call's type arguments — including an index that OPENS with `|`/`&` (the union
+/// printer's own leading-pipe layout), bare or in a paren shell, which no expression can.
+#[test]
+fn type_args_lookahead_same_line_and_leading_operator_index() {
+    for source in [
+        "fn<A[B]>()",
+        "fn<A[| B | C]>()",
+        "fn<A[& B & C]>()",
+        "fn<A[(| B | C)[]]>()",
+        "fn<A[(B)]>()",
+        "fn<A[\n| B // c\n| C]>()",
+    ] {
+        let json = parse_json(source);
+        assert_eq!(
+            json.pointer("/body/0/expression/type")
+                .and_then(Value::as_str),
+            Some("CallExpression"),
+            "{source:?} is an instantiation call: {json}"
+        );
+        assert!(
+            json.pointer("/body/0/expression/typeArguments/params/0/type")
+                .and_then(Value::as_str)
+                .is_some_and(|t| t == "TSIndexedAccessType"),
+            "the type argument is the indexed access: {source:?} → {json}"
+        );
+    }
+}

@@ -271,6 +271,7 @@ written in the flags position) is not a flags production at all and is rejected,
 - Named (`function name() {}`)
 - Generator (`function*() {}`)
 - Async (`async function() {}`)
+- `async [no LineTerminator here] function` — across a line break `async` is a plain identifier at every site that recognizes the shape (the primary expression, the `new` callee, a heritage atom): `new async⏎function f() {}` is `new async;` plus a declaration, `class A extends async⏎function () {} {}` a syntax error (acorn `canInsertSemicolon`)
 - Async generator (`async function*() {}`)
 
 ### Class Expressions
@@ -740,6 +741,7 @@ Note: An ambient (`declare class`) member parses decorators exactly like a concr
 - Modifiers in any ORDER (`<const in T>`, `<in const T>`, `<out in T>`) — tsc's parser collects them order-free and leaves the ordering rules ("'const' modifier must precede 'in' modifier", TS1029 for the variance pair) to its grammar checker, so tsv defers them alongside the context one; prettier formats every spelling. A **repeat** is the exception tsv rejects (`<out out T>` → `Duplicate modifier: 'out'`, matching acorn): a duplicate is invalid in every context and adjudicable from the construct alone — the unconditional-local bucket — where tsc again defers (TS1030) and prettier collapses it. The repeat check sits behind the name test, so a trailing repeat that IS the name is untouched (`<out out>`)
 - `out` as a type parameter NAME (`<out>`, `<out, T>`, `<out = string>`, `<in out>`, `<out out>`) — the variance keyword is contextual, so it is a modifier only when a name can still follow it (tsc's `nextTokenCanFollowModifier`); the test is the next token's shape, which is why `<out extends string>` keeps `out` a modifier and then rejects for want of a name, in tsc, prettier and acorn alike
 - Type instantiation expressions (`fn<T>`)
+- An indexed-access type argument whose index OPENS with `|` / `&` (`fn<A[| B | C]>()`, `fn<A[& B & C]>()`), bare or in a paren shell (`fn<A[(| B | C)[]]>()`, `fn<A[(B)]>()`) — a leading bar opens only a type, never an array index, and the union printer's own broken layout puts one there (`fn<⏎A[⏎| B // c⏎| C]⏎>()`), so the lookahead must read its output back as the instantiation it printed. A `[` past a line terminator is no index in the lookahead either (`a <⏎B // c⏎[c] >⏎d` stays the comparison `a < B[c] > d`): the type parser takes no postfix `[` across one, so committing would hand it a list it cannot finish
 - A numeric type argument may omit its integer part (`fn<.5>`, `fn<A[.5]>`, `fn<keyof .5>`) — the spec's `.`-led `DecimalLiteral` production is a literal type like any other, so acorn reads each as an instantiation. The `.` opens one only where a **digit** follows it: everywhere else it is a member tail on what precedes it, and after an operator keyword both readings are live — `p < keyof.a > (t, u)` is a comparison on the value `keyof.a` (prettier's tsc parser rejects that line outright, see [conformance_prettier_ts.md](./conformance_prettier_ts.md) §Prettier rejects valid input)
 
 ### Function TypeScript Features
