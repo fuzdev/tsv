@@ -5,7 +5,9 @@ The mixed / trailing extension of
 a redundant paren shell around a **later** union member holds a leading **line**
 comment together with a **leading block** (mixed, `A | (/* b */ // c\n B)`) or a
 **trailing block** after the member (trailing, `A | (// c\n B /* t */)`), and the
-double-nested forms.
+double-nested forms — plus the run of **blocks alone** (`A | (/* b2 */\n/* c2 */\n B)`),
+where no `//` is involved and what takes the run out of the shell is a block the author
+ISOLATED on its own line.
 
 **tsv** strips the parens (they don't survive, so the run cannot stay "inside")
 and renders it between the `| ` members — above the member's `| `, a trailing
@@ -22,15 +24,25 @@ type U2 =
 	| A
 	// c
 	| B /* t */;
+
+type U3 =
+	| A
+	/* b2 */
+	/* c2 */
+	| B;
 ```
 
 The run keeps the author's own **glue**: `/* b */` shares the line comment's line
-because that is where it was written. Only the run's POSITION is at issue below —
+because that is where it was written. `U3` is the same rule with no `//` at all — an
+own-line block is authoring signal exactly as a `//` is, and a shell that strips has no
+line of its own to keep it on, so the member gap does. Left inside the shell it came back
+glued after the `| `, which the reparse reads as an inline block: nothing forced the
+member break any more and the union printed flat on the next pass. Only the run's POSITION is at issue below —
 its interior is prettier's leading-comment rule, which both formatters apply the
 same way here.
 
 **Prettier** floats the leading run across the member boundary to **trail the
-previous member** (`| A /* b */ // c`), keeping the rest inline —
+previous member** (`| A /* b */ // c`, `| A /* b2 */`), keeping the rest inline —
 `variant_trailing.svelte`. Both forms are dual-stable (each formatter keeps its
 own), so this is a `variant_*` divergence, exactly as the pure-line sibling.
 
