@@ -30,7 +30,7 @@
 
 import { parseArgs } from 'node:util';
 
-import { host_triple } from './napi_host.ts';
+import { cli_binary_name, host_triple } from './napi_host.ts';
 import { NPM_SHARED_METADATA } from './npm_metadata.ts';
 import { format_size } from './size.ts';
 
@@ -78,7 +78,7 @@ const artifact = args.artifact ?? `target/napi/${native_library_filename()}`;
 // The staged NAME follows the target triple; the default SOURCE path follows
 // the host (every matrix leg builds natively or in a same-arch container, so
 // the two agree — a genuine cross-build names its binary via --cli-artifact).
-const cli_binary_name = triple.startsWith('win32-') ? 'tsv.exe' : 'tsv';
+const cli_binary = cli_binary_name(triple);
 const cli_artifact =
 	args['cli-artifact'] ?? `target/release/${Deno.build.os === 'windows' ? 'tsv.exe' : 'tsv'}`;
 
@@ -220,13 +220,13 @@ copy_built('the built cdylib', artifact, `${platform_dir}/tsv_napi.node`, 'deno 
 copy_built(
 	'the built CLI binary',
 	cli_artifact,
-	`${platform_dir}/${cli_binary_name}`,
+	`${platform_dir}/${cli_binary}`,
 	'cargo build -p tsv_cli --release'
 );
 if (Deno.build.os !== 'windows') {
 	// npm packs the on-disk mode into the tarball, and npm only chmods `bin`
 	// entries (the loader's bin.js) — this binary must carry its own x-bit
-	Deno.chmodSync(`${platform_dir}/${cli_binary_name}`, 0o755);
+	Deno.chmodSync(`${platform_dir}/${cli_binary}`, 0o755);
 }
 Deno.copyFileSync('LICENSE', `${platform_dir}/LICENSE`);
 Deno.writeTextFileSync(
@@ -240,12 +240,12 @@ write_pkg(platform_dir, {
 	version,
 	description: `prebuilt tsv N-API binding for ${triple}`,
 	main: 'tsv_napi.node',
-	files: ['tsv_napi.node', cli_binary_name, 'README.md', 'LICENSE'],
+	files: ['tsv_napi.node', cli_binary, 'README.md', 'LICENSE'],
 	...platform_fields(triple),
 	...NPM_SHARED_METADATA
 });
 const size = Deno.statSync(`${platform_dir}/tsv_napi.node`).size;
-const cli_size = Deno.statSync(`${platform_dir}/${cli_binary_name}`).size;
+const cli_size = Deno.statSync(`${platform_dir}/${cli_binary}`).size;
 console.log(
-	`Staged ${platform_dir}: @fuzdev/tsv-${triple} ${version} (tsv_napi.node ${format_size(size)}, ${cli_binary_name} ${format_size(cli_size)})`
+	`Staged ${platform_dir}: @fuzdev/tsv-${triple} ${version} (tsv_napi.node ${format_size(size)}, ${cli_binary} ${format_size(cli_size)})`
 );

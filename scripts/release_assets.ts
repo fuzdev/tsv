@@ -40,6 +40,7 @@
 import { parseArgs } from 'node:util';
 
 import { version_from_tag } from './changelog.ts';
+import { cli_binary_name } from './napi_host.ts';
 
 const { values: args, positionals } = parseArgs({
 	allowPositionals: true,
@@ -63,7 +64,8 @@ const out_dir = args.out;
 const LOADER = '@fuzdev/tsv';
 
 /** How long a registry read is given to see a just-published version:
- * `REGISTRY_ATTEMPTS` tries, `REGISTRY_RETRY_MS` apart (~2.5 min in total). */
+ * `REGISTRY_ATTEMPTS` tries, `REGISTRY_RETRY_MS` apart (a little over two minutes
+ * of waiting in total). */
 const REGISTRY_ATTEMPTS = 10;
 const REGISTRY_RETRY_MS = 15_000;
 
@@ -135,6 +137,11 @@ const collect = async (): Promise<void> => {
 	const asset_names: Array<string> = [];
 	try {
 		for (const pkg of platform_pkgs) {
+			if (!pkg.startsWith(`${LOADER}-`)) {
+				throw new Error(
+					`${LOADER}@${version} names ${pkg}, which is not a ${LOADER}-<triple> platform package`
+				);
+			}
 			const triple = pkg.slice(`${LOADER}-`.length);
 			const pinned = optional[pkg];
 			if (pinned !== version) {
@@ -142,9 +149,11 @@ const collect = async (): Promise<void> => {
 					`${LOADER}@${version} pins ${pkg}@${pinned} — versions must move in lockstep`
 				);
 			}
-			const is_windows = triple.startsWith('win32-');
-			const binary = is_windows ? 'tsv.exe' : 'tsv';
-			const asset = is_windows ? `tsv-${triple}.exe` : `tsv-${triple}`;
+			const binary = cli_binary_name(triple);
+			// the asset is the binary's own name with the triple spliced in, so the
+			// two keep one extension rule: `tsv` → `tsv-linux-x64-gnu`, `tsv.exe` →
+			// `tsv-win32-x64.exe`
+			const asset = binary.replace(/^tsv/, `tsv-${triple}`);
 
 			const packed = JSON.parse(
 				await capture_npm(['pack', `${pkg}@${version}`, '--pack-destination', pack_dir, '--json'])

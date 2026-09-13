@@ -158,7 +158,7 @@ deno task typecheck:bench-core # the bench modules that are DELIBERATELY node-mo
 #                          transitive imports) or `test:deno`. NOT the maximal checkable set: the impl
 #                          wrappers qualify only because their npm imports are dynamic. See deno.json's `//` note
 deno task test           # cargo test
-deno task test:deno      # deno test over the bench harness's node-modules-free core (divergence detectors, format-config probe, gate_counts); gates in `check`
+deno task test:deno      # deno test over the node-modules-free deno tests: the bench harness's core (divergence detectors, format-config probe, gate_counts) + scripts/'s (`changelog_test.ts`, the changelog grammar publish.ts writes and release_notes.ts reads); gates in `check`
 deno task test:audits    # cargo test -p tsv_lang --features audits — the `swallow_check` + `comment_check` seams' own tests (compiled out by default); gates in `check`
 deno task lint           # cargo clippy
 cargo fmt                # format Rust code
@@ -495,7 +495,7 @@ tsv/
 │   ├── tsv_ffi/     # C FFI bindings (Deno's native path)
 │   ├── tsv_wasm/    # WASM bindings (the 3 published npm packages; bundles types/tsv_ast.d.ts + npm/locations.js; npm/cli.js is the tsv bin)
 │   └── tsv_napi/    # N-API bindings (Node/Bun native path; npm/ is the @fuzdev/tsv loader source)
-├── scripts/         # Publish orchestrator, npm package patcher, Node artifact + N-API tests, AST type drift check
+├── scripts/         # Publish orchestrator + changelog grammar, GitHub Release notes/assets, npm package patcher, Node artifact + N-API tests, AST type drift check
 ├── benches/js/      # Cross-runtime benchmark + conformance harness (Deno/Node/Bun)
 ├── tests/           # Integration tests (parser, formatter, CLI)
 │   ├── fixtures/    # Test fixtures organized by language/feature

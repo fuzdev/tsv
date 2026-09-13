@@ -38,6 +38,8 @@
 
 import { parseArgs } from 'node:util';
 
+import { cli_binary_name } from './napi_host.ts';
+
 const { values: args } = parseArgs({
 	options: {
 		'dry-run': { type: 'boolean' },
@@ -89,7 +91,7 @@ const is_file = (path: string): boolean => {
 for (const [name, pin] of Object.entries(optional)) {
 	const triple = name.replace('@fuzdev/tsv-', '');
 	const dir = `${pkg_root}/${triple}`;
-	const cli_binary = triple.startsWith('win32-') ? 'tsv.exe' : 'tsv';
+	const cli_binary = cli_binary_name(triple);
 	let missing = false;
 	for (const file of ['tsv_napi.node', cli_binary]) {
 		if (!is_file(`${dir}/${file}`)) {

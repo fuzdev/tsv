@@ -1,10 +1,13 @@
 /**
  * The CHANGELOG.md grammar the release path reads — shared by `publish.ts`
  * (stamps `## Unreleased` into `## <version>`) and `release_notes.ts` (reads the
- * stamped section back as the GitHub Release body) — plus the one spelling of
- * the version a release tag names (`version_from_tag`), which every release
- * script parses the same way. Pure text helpers, no I/O, so both readers parse
- * one grammar and the section a stamp writes is the section a release reads.
+ * stamped section back as the GitHub Release body) — plus the one reading of
+ * the version a release tag names (`version_from_tag`), shared by the release
+ * scripts that take a tag (`release_notes.ts`, `release_assets.ts`;
+ * `publish_napi.ts` goes the other way, spelling `--expect-tag`'s expected
+ * value from the staged version). Pure text helpers, no I/O, so both readers
+ * parse one grammar and the section a stamp writes is the section a release
+ * reads.
  * The grammar is LF-only: `publish.ts` writes LF, and a CRLF heading matches
  * nothing (pinned by the tests).
  */
