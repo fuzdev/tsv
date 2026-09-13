@@ -724,30 +724,31 @@ impl<'a> Printer<'a> {
     ///
     /// Handles declare, definite assignment (!), type annotations, and multiple declarators.
     /// Follows prettier's rule: if any declarator has an initializer, break to multiple lines.
-    /// `emit_semicolon` is `false` only for embedders that supply their own
-    /// terminator — Svelte's `{const …}`/`{let …}` tags close with `}` and drop
-    /// the `;` (a bare `{let a}` is the lone exception, which passes `true`).
+    ///
+    /// `terminator` is `None` for an embedder that supplies its own — Svelte's
+    /// `{const …}` / `{let …}` tags, which close with `}` and own both the `;` and the
+    /// gap before it (`tsv_ts::build_variable_declaration_doc`). It is one argument rather
+    /// than a `bool` beside a [`TerminatorGap`] because the two were never independent:
+    /// with no `;` emitted the gap has no claimant here, and pairing them let the gap's
+    /// comments be dropped outright (`{let a /* c */;}`).
     /// [`Self::build_variable_declaration_doc`] for an EMBEDDED declaration — a Svelte
     /// `{const …}` / `{let …}` tag, reached through `tsv_ts::build_variable_declaration_doc`
     /// rather than from a statement list.
     ///
-    /// It exists so the public entry names its answer instead of passing one: there is no
-    /// enclosing list, so a comment in the content→`;` gap is this doc's to print
-    /// ([`TerminatorGap::NodeOwned`]). Handing it over on the list's answer dropped it
-    /// outright (`{let a /* c */;}`), and the axis stays inside the printer.
+    /// It exists so the public entry names the answer instead of passing one, which also
+    /// keeps [`TerminatorGap`] inside the printer: the host closes with `}` and owns both
+    /// the `;` and the gap before it, so there is no terminator here to hand a policy to.
     pub(crate) fn build_embedded_variable_declaration_doc(
         &self,
         decl: &internal::VariableDeclaration<'_>,
-        emit_semicolon: bool,
     ) -> DocId {
-        self.build_variable_declaration_doc(decl, emit_semicolon, TerminatorGap::NodeOwned)
+        self.build_variable_declaration_doc(decl, None)
     }
 
     pub(in crate::printer) fn build_variable_declaration_doc(
         &self,
         decl: &internal::VariableDeclaration<'_>,
-        emit_semicolon: bool,
-        gap: TerminatorGap,
+        terminator: Option<TerminatorGap>,
     ) -> DocId {
         let d = self.d();
 
@@ -1058,12 +1059,18 @@ impl<'a> Printer<'a> {
         // `const x = 1; /* c */`, prettier 3.9), a same-line line trails after it via
         // `line_suffix` (`const x = 1; // c`), an own-line comment drops to its own line
         // after it (`const x = 1;⏎// c`). See `push_semicolon_with_gap_comments`.
-        if emit_semicolon {
-            if let Some(last) = decl.declarations.last() {
-                self.push_statement_semicolon(&mut parts, last.span.end, decl.span.end, gap);
-            } else {
-                parts.push(d.text(";"));
-            }
+        //
+        // `None` emits neither, for a host that closes with a delimiter of its own — the
+        // three placements above all put the comment where such a host's closer cannot
+        // follow it ([`crate::build_variable_declaration_doc`]).
+        if let Some(gap) = terminator {
+            let terminator_gap = crate::declaration_terminator_gap(decl);
+            self.push_statement_semicolon(
+                &mut parts,
+                terminator_gap.start,
+                terminator_gap.end,
+                gap,
+            );
         }
 
         let continuation = if should_break {

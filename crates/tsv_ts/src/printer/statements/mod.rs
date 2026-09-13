@@ -92,10 +92,6 @@ pub(in crate::printer) enum TerminatorGap {
     /// a non-block CLAUSE body, whose tail line stays open to the enclosing construct, where
     /// a later gap's deferred `//` would otherwise flush onto real text and weld.
     ClauseTail(u8),
-    /// The statement itself, with real breaks — no enclosing list to hand to, and no open
-    /// tail. The embedded declaration entries (`{const …}` / `{let …}` in a Svelte template)
-    /// are the callers.
-    NodeOwned,
 }
 
 impl TerminatorGap {
@@ -103,7 +99,7 @@ impl TerminatorGap {
     pub(in crate::printer) const fn clause_tail(self) -> Option<u8> {
         match self {
             Self::ClauseTail(dedent) => Some(dedent),
-            Self::ListClaims | Self::NodeOwned => None,
+            Self::ListClaims => None,
         }
     }
 
@@ -172,9 +168,10 @@ impl StatementContext {
     }
 
     /// This container's [`TerminatorGap`]. A statement `build_statement_doc` reaches from a
-    /// list walk is always a list member — the embedded entry points do not go through a
-    /// `StatementContext` at all, which is what keeps [`TerminatorGap::NodeOwned`] out of
-    /// here by construction.
+    /// list walk is always a list member; the embedded entry points do not go through a
+    /// `StatementContext` at all, and pass no terminator at all — their host closes with a
+    /// delimiter of its own and owns both the `;` and the gap before it
+    /// (`Printer::build_embedded_variable_declaration_doc`).
     pub(in crate::printer) fn terminator_gap(self) -> TerminatorGap {
         match self.clause_tail_dedent {
             // A list member: the gap is the list's, as prettier's `__contentEnd` says.
@@ -211,7 +208,7 @@ impl<'a> Printer<'a> {
         match statement {
             Statement::ExpressionStatement(stmt) => self.build_expression_statement_doc(stmt, ctx),
             Statement::VariableDeclaration(decl) => {
-                self.build_variable_declaration_doc(decl, true, ctx.terminator_gap())
+                self.build_variable_declaration_doc(decl, Some(ctx.terminator_gap()))
             }
             Statement::TSTypeAliasDeclaration(decl) => {
                 self.build_type_alias_declaration_doc(decl, ctx.clause_tail())

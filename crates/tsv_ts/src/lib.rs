@@ -29,7 +29,7 @@ mod printer;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::is_format_ignore_directive;
 use tsv_lang::printing::{FoldedSource, LineBreaks, LineTable};
-use tsv_lang::{CommentFreeWindow, EmbedContext};
+use tsv_lang::{CommentFreeWindow, EmbedContext, Span};
 pub use tsv_lang::{ParseError, Result};
 
 pub use acorn_loc::AcornSeed;
@@ -860,20 +860,50 @@ pub fn parse_statement_with_comments<'arena>(
     })
 }
 
+/// A variable declaration's **terminator gap**: from the end of its last declarator to the
+/// end of the declaration itself — everything the declaration's own doc does not print.
+///
+/// One definition because two crates claim this range, and which of them does depends on
+/// where the declaration sits. In a statement list `tsv_ts` claims it, around the `;` it
+/// emits (`Printer::push_statement_semicolon`); in a Svelte `{const …}` / `{let …}` tag the
+/// HOST claims it, before a `;` of its own, because [`build_variable_declaration_doc`]
+/// emits no terminator there at all. An anchor the two spelled differently would drop a
+/// comment or print it twice, so neither spells it itself.
+///
+/// The `;` the span may reach past is deliberately **included**: no comment can start at a
+/// `;`, so the byte costs a reader nothing and the range needs no second look at the source
+/// to find the terminator.
+///
+/// A declaration with no declarators — which the grammar does not admit — yields the empty
+/// span at the declaration's end, so a caller emits its bare terminator through the same
+/// path rather than a defensive arm of its own.
+pub fn declaration_terminator_gap(decl: &VariableDeclaration<'_>) -> Span {
+    Span {
+        start: decl
+            .declarations
+            .last()
+            .map_or(decl.span.end, |last| last.span.end),
+        end: decl.span.end,
+    }
+}
+
 /// Build a DocId for a variable declaration in the caller's arena.
 ///
-/// `emit_semicolon` is `false` for embedders that supply their own terminator
-/// (Svelte declaration tags close with `}`). Set `inputs.comments` to `&[]` when
-/// no comments need to be preserved.
+/// The declaration alone — **no terminator and no terminator gap**. The embedder that
+/// calls this (Svelte's `{const …}` / `{let …}` tags) closes with `}`, and what may stand
+/// between the declaration and that `}` is its own grammar's question, not this crate's:
+/// a statement's `;` gap trails a same-line block *after* the `;` and defers a `//` past
+/// it, both of which put a comment where the host's closer cannot follow it. So the host
+/// owns the gap and the `;` together. Set `inputs.comments` to `&[]` when no comments
+/// need to be preserved.
 pub fn build_variable_declaration_doc(
     arena: &DocArena,
     decl: &VariableDeclaration<'_>,
     inputs: &PrinterInputs<'_>,
     embed: EmbedContext,
-    emit_semicolon: bool,
 ) -> DocId {
     with_doc_printer(arena, inputs, embed, |printer| {
-        printer.build_embedded_variable_declaration_doc(decl, emit_semicolon)
+        printer.build_embedded_variable_declaration_doc(decl)
     })
 }
 

@@ -1,7 +1,7 @@
 // Doc builders for Svelte template tags
 //
-// {@html}, {@const}, {@debug}, and {@render} — tag layout and the
-// {@const} initializer break rules.
+// {@html}, {@const}, {@debug}, {@render} and the {const}/{let} declaration tags — tag
+// layout, the {@const} initializer break rules, and the declaration tag's own terminator.
 
 use crate::ast::internal;
 use crate::printer::{HeadExpr, HeadLayout, Printer};
@@ -51,21 +51,47 @@ impl<'a> Printer<'a> {
 
     /// Build a doc for `{const …}` / `{let …}` — the body is a TS variable
     /// declaration, so the layout (declarator breaking, long-init break-after-`=`,
-    /// comments) is delegated to `tsv_ts`. The `}` terminates the tag, so the
+    /// interior comments) is delegated to `tsv_ts`. The `}` terminates the tag, so the
     /// trailing `;` is dropped — except for a bare single declarator (`{let a}` →
     /// `{let a;}`), which prettier keeps.
+    ///
+    /// **The tag owns the terminator gap**, the way every other tag owns its closer gap:
+    /// Svelte admits only whitespace and an optional `;` between the declaration and the
+    /// `}` (`parse_declaration_tag`), so a comment the author wrote after the last
+    /// declarator is INSIDE the declaration and the `;` is the only thing that can stand
+    /// between it and the `}`. `tsv_ts`'s own terminator emitter answers the STATEMENT
+    /// question — a same-line block trails *after* the `;`, a `//` rides a `line_suffix`
+    /// — and both of those are fatal here: the first prints a comment where Svelte's
+    /// parser (and prettier's own next pass) rejects it, the second floats the comment
+    /// past the `}` into rendered page text. So the gap is emitted here instead, through
+    /// the same [`Printer::trailing_comment_docs`] every sibling tag uses, and the `;`
+    /// goes after it. Cataloged as
+    /// [declaration_terminator_comment](../../../../../tests/fixtures/svelte/tags/declaration/declaration_terminator_comment_prettier_divergence/).
     pub(super) fn build_declaration_tag_doc(&self, tag: &internal::DeclarationTag<'_>) -> DocId {
         let d = self.d();
         let decl = &tag.declaration;
-        let emit_semicolon = decl.declarations.len() == 1 && decl.declarations[0].init.is_none();
-        let inner = tsv_ts::build_variable_declaration_doc(
-            d,
-            decl,
-            &self.ts_inputs(),
-            self.embed,
-            emit_semicolon,
-        );
-        d.concat(&[d.text("{"), inner, d.text("}")])
+        // The gap is named by `tsv_ts`, not spelled here: it is the same range the statement
+        // path claims, and the two claimants must agree on it exactly.
+        let gap = tsv_ts::declaration_terminator_gap(decl);
+        // `closer_owns_break` is false: this run is emitted at the tag's own level, outside
+        // whatever `indent(…)` the declarator list built, so a `//`'s own `hardline` is
+        // already the break the `;}` needs.
+        let (trailing_docs, _) = self.trailing_comment_docs(gap.start, gap.end, false);
+        // A lone declarator with no initializer keeps its `;` (prettier's rule). A comment
+        // in the gap forces one back on at every other shape — it is the comment's own
+        // terminator, and without it the comment abuts the `}`, which Svelte rejects.
+        let emit_semicolon = (decl.declarations.len() == 1 && decl.declarations[0].init.is_none())
+            || !trailing_docs.is_empty();
+        let inner = tsv_ts::build_variable_declaration_doc(d, decl, &self.ts_inputs(), self.embed);
+        let mut parts = DocBuf::new();
+        parts.push(d.text("{"));
+        parts.push(inner);
+        parts.extend(trailing_docs);
+        if emit_semicolon {
+            parts.push(d.text(";"));
+        }
+        parts.push(d.text("}"));
+        d.concat(&parts)
     }
 
     /// Shared assignment-tag layout for `{@const}` and `{const}`/`{let}` (with init).
