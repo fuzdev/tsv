@@ -169,7 +169,7 @@ impl<'a> Printer<'a> {
                 update.span.start,
                 update.argument,
                 update.span.end - operator_len,
-                ParenContext::UpdateArgument,
+                ParenContext::UpdateArgument { postfix: true },
             )
         {
             return d.concat(&[shell, operator_doc]);
@@ -177,8 +177,13 @@ impl<'a> Printer<'a> {
 
         let inner_doc = self.build_expression_doc(update.argument);
         // A type-assertion operand keeps its parens: `(a as T)++` (bare
-        // `a as T++` binds `++` to `T`).
-        let argument_doc = if self.needs_parens(update.argument, ParenContext::UpdateArgument) {
+        // `a as T++` binds `++` to `T`); so does a postfix instantiation operand.
+        let argument_doc = if self.needs_parens(
+            update.argument,
+            ParenContext::UpdateArgument {
+                postfix: !update.prefix,
+            },
+        ) {
             d.parens(inner_doc)
         } else {
             inner_doc
@@ -1269,13 +1274,12 @@ impl<'a> Printer<'a> {
         chain_start: u32,
     ) {
         // Recursively flatten left side if it can be chained with current operator
-        match expr.left {
-            Expression::BinaryExpression(left_binary)
-                if expr.operator.can_flatten_with(left_binary.operator) =>
-            {
+        match self.flattenable_left(expr) {
+            Some(left_binary) => {
                 self.collect_binary_chain_with_spans(left_binary, operands, operators, chain_start);
             }
-            left => {
+            None => {
+                let left = expr.left;
                 // The LEFTMOST operand — the first one the collector pushes — takes the
                 // erased-paren freeze over the chain's leading region, which the chain itself
                 // emits ([`Self::wrap_chain_with_paren_comments`]). A later operand's shell
@@ -1316,6 +1320,30 @@ impl<'a> Printer<'a> {
             doc: self.build_binary_operand_doc(expr.right, expr.operator, true),
             span: expr.right.span(),
         });
+    }
+
+    /// The left operand of `expr` as the binary this chain FLATTENS into, if it does:
+    /// its operator chains with `expr`'s (`can_flatten_with`) and it takes no pair of
+    /// its own in this position. The second condition is what keeps a flattened chain
+    /// honest about the instantiation-tail rule — `(1 + fn<T>) + 2` ends on a `>` the
+    /// `+` would re-lex, so the left stays a parenthesized operand rather than being
+    /// printed bare as three operands. Read by both chain collectors, so the two
+    /// spellings cannot drift.
+    pub(in crate::printer) fn flattenable_left<'e>(
+        &self,
+        expr: &'e internal::BinaryExpression<'e>,
+    ) -> Option<&'e internal::BinaryExpression<'e>> {
+        let Expression::BinaryExpression(left_binary) = expr.left else {
+            return None;
+        };
+        let flattens = expr.operator.can_flatten_with(left_binary.operator)
+            && !self.needs_parens(
+                expr.left,
+                ParenContext::BinaryLeft {
+                    parent_op: expr.operator,
+                },
+            );
+        flattens.then_some(left_binary)
     }
 
     /// Build operand with parens if needed for clarity

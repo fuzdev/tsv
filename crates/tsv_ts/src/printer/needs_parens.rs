@@ -91,8 +91,10 @@ pub enum ParenContext {
 
     /// Argument of an update operator: `<expr>++`, `++<expr>`.
     /// A type-assertion operand keeps its parens — bare `a as T++` binds `++`
-    /// to `T`.
-    UpdateArgument,
+    /// to `T`. `postfix` names which side the operator prints on: an instantiation
+    /// operand keeps its parens only ahead of a postfix operator (`(f<T>)++`), the
+    /// one placement where the operator would follow the type argument list.
+    UpdateArgument { postfix: bool },
 
     /// Argument of await: `await <expr>`
     AwaitArgument,
@@ -187,10 +189,10 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
 
         // Binary operand precedence
         ParenContext::BinaryLeft { parent_op } => {
-            needs_parens_binary_operand(expr, parent_op, false)
+            needs_parens_binary_operand(expr, parent_op, false, in_for_init)
         }
         ParenContext::BinaryRight { parent_op } => {
-            needs_parens_binary_operand(expr, parent_op, true)
+            needs_parens_binary_operand(expr, parent_op, true, in_for_init)
         }
 
         // Callee: `(a ? b : c)()`, `(a + b)()`, `(() => {})()`, `(x as T)()`, `(<T>x)()`, etc.
@@ -249,11 +251,23 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         // an arrow returning `1.p`). Function/class/object expressions do NOT need
         // them — their brace-delimited bodies make the parens redundant, and
         // prettier strips them (`(function () {}).p` → `function () {}.p`).
+        //
+        // An instantiation expression does: a `.`/`?.` after a type argument list is
+        // rejected outright (`A<T>.x`, tsc's "cannot be followed by a property access"),
+        // a `[` re-lexes it as a relational chain (`A<T>[0]` is `(A < T) > [0]`), and
+        // dropping the type args instead would be data loss — `(A<T>).x` keeps the pair
+        // (prettier agrees for a member object). The chain linearizer reads this
+        // verdict for its base node, so an instantiation reached as a member object or a
+        // `!` operand becomes a parenthesized base by the same rule.
         ParenContext::ChainBase => {
             is_lower_precedence(expr)
                 || is_numeric_literal(expr)
                 || is_unary_or_update(expr)
-                || matches!(expr, Expression::ArrowFunctionExpression(_))
+                || matches!(
+                    expr,
+                    Expression::ArrowFunctionExpression(_)
+                        | Expression::TSInstantiationExpression(_)
+                )
         }
 
         // Spread argument: `...(a || b)`, `...(a ? b : c)`, `...(await x)`, `...(x as T)`
@@ -265,11 +279,18 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         // needs parens as well (`((a) => a)!` — bare `(a) => a!` is `(a) => (a!)`, and
         // a block-body `(a) => {}!` can't postfix the arrow at all → unreparseable).
         // Function/class expressions don't: their brace-delimited bodies make the
-        // parens redundant, and prettier strips them.
+        // parens redundant, and prettier strips them. An instantiation expression
+        // does: a `!` starts an expression, so it cannot follow a type argument list
+        // (`f<T>!` does not parse — tsc's `canFollowTypeArgumentsInExpression`), and
+        // prettier's bare `f<T>!` is a cataloged ◆prettier_bug.
         ParenContext::NonNull => {
             is_lower_precedence(expr)
                 || is_unary_or_update(expr)
-                || matches!(expr, Expression::ArrowFunctionExpression(_))
+                || matches!(
+                    expr,
+                    Expression::ArrowFunctionExpression(_)
+                        | Expression::TSInstantiationExpression(_)
+                )
         }
 
         // Type assertion (as/satisfies): `(a + b) as T`, `(await x) as T`, `(<U>x) as T`
@@ -307,10 +328,16 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         }
 
         // Update argument: a type-assertion operand keeps its parens
-        // (`(a as T)++` — bare `a as T++` binds `++` to `T`). Other operands are
-        // either plain references (redundant parens stripped) or not valid update
-        // targets, so no further wrapping applies.
-        ParenContext::UpdateArgument => is_type_assertion(expr),
+        // (`(a as T)++` — bare `a as T++` binds `++` to `T`), and so does an
+        // instantiation operand ahead of a POSTFIX operator (`(f<T>)++` — a `++`
+        // starts an expression, so it cannot follow a type argument list and bare
+        // `f<T>++` does not parse; `++f<T>` is fine). Other operands are either plain
+        // references (redundant parens stripped) or not valid update targets, so no
+        // further wrapping applies.
+        ParenContext::UpdateArgument { postfix } => {
+            is_type_assertion(expr)
+                || (postfix && matches!(expr, Expression::TSInstantiationExpression(_)))
+        }
 
         // Instantiation: `(<T>() => {})<U>`, `(x as A)<T>`, `(<T>x)<U>`, `(await x)<T>`, `(a = b)<T>`
         // Ternary/binary/assignment need parens to preserve semantics:
@@ -546,6 +573,76 @@ fn is_unary_or_update(expr: &Expression<'_>) -> bool {
     )
 }
 
+/// Whether a binary operator's printed spelling JOINS a `>` the operand before it ended on
+/// — one table for two askers: the unfrozen binary-left rule
+/// ([`needs_parens_binary_operand`], via `ends_with_instantiation_close`) and the tail half
+/// of the frozen `new X<T>` slice's join question
+/// ([`super::Printer::frozen_slice_absorbs_left_binding_suffix`]).
+///
+/// The answer is a REJECTION table over the three parsers that grade the output — tsc,
+/// acorn-typescript and tsv itself — plus the one operator pair that rebinds silently. A tail
+/// joins when the bare spelling is not a form all three read as the input meant:
+///
+/// - `+` and `-` are the operators that also OPEN an expression, so the `>` takes the
+///   operator's own right-hand side and the whole thing reads as a relational chain
+///   (`new X<T> + 1` is `((new X) < T) > +1` at every parser, tsv included) — accepted
+///   everywhere and a different tree everywhere;
+/// - `>`, `>>` and `>>>` are rejected by all three;
+/// - `<` and `>=` are rejected by **tsc** (`'>' expected` / `Expression expected`), and so by
+///   prettier, which is a front end for it. acorn-typescript and tsv accept them as the same
+///   tree, which is exactly why no reparse of tsv's own output can see the loss;
+/// - `<<` is the mirror: tsc accepts it as the same tree, and **acorn-typescript** rejects it.
+///   tsv is acorn's drop-in, so the pair stays.
+///
+/// Every other operator lets all three backtrack to the type arguments, which is what makes
+/// the bare spelling AST-identical there.
+pub(in crate::printer) const fn joins_a_trailing_angle_bracket(op: BinaryOperator) -> bool {
+    matches!(
+        op,
+        BinaryOperator::Plus
+            | BinaryOperator::Minus
+            | BinaryOperator::LessThan
+            | BinaryOperator::GreaterThan
+            | BinaryOperator::GreaterThanEquals
+            | BinaryOperator::LeftShift
+            | BinaryOperator::RightShift
+            | BinaryOperator::UnsignedRightShift
+    )
+}
+
+/// Whether the LAST token `expr` prints is the closing `>` of an instantiation
+/// expression's type argument list — the instantiation itself, or a node whose
+/// rightmost child prints bare at its end (a binary's right operand, a prefix
+/// operator's argument). A child that takes its own pair in that position ends the
+/// operand on a `)` instead, so the walk stops there; every other node ends on a token
+/// of its own (`!`, `)`, `]`, a name, a literal). The `new X<T>` spelling ends on the
+/// `()` the printer always emits, so it is not in the class.
+fn ends_with_instantiation_close(expr: &Expression<'_>, in_for_init: bool) -> bool {
+    match expr {
+        Expression::TSInstantiationExpression(_) => true,
+        Expression::BinaryExpression(binary) => {
+            let ctx = ParenContext::BinaryRight {
+                parent_op: binary.operator,
+            };
+            !needs_parens(binary.right, ctx, in_for_init)
+                && ends_with_instantiation_close(binary.right, in_for_init)
+        }
+        Expression::UnaryExpression(unary) => {
+            let ctx = ParenContext::UnaryArgument {
+                parent_op: unary.operator,
+            };
+            !needs_parens(unary.argument, ctx, in_for_init)
+                && ends_with_instantiation_close(unary.argument, in_for_init)
+        }
+        Expression::UpdateExpression(update) if update.prefix => {
+            let ctx = ParenContext::UpdateArgument { postfix: false };
+            !needs_parens(update.argument, ctx, in_for_init)
+                && ends_with_instantiation_close(update.argument, in_for_init)
+        }
+        _ => false,
+    }
+}
+
 /// Whether a `new` callee contains a call expression in its leftmost
 /// member/non-null chain. Prettier parenthesizes such a callee so the `new`
 /// arguments bind to the `new` rather than the inner call: `new (f())()`,
@@ -753,11 +850,14 @@ fn export_default_leftmost<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
     }
 }
 
-/// Binary operand: `<expr> op y` or `x op <expr>`
+/// Binary operand: `<expr> op y` or `x op <expr>`. `in_for_init` is the ambient
+/// for-init flag, read only by the instantiation-tail walk below (it asks the
+/// printed shape of the operand's own children).
 fn needs_parens_binary_operand(
     expr: &Expression<'_>,
     parent_op: BinaryOperator,
     is_right: bool,
+    in_for_init: bool,
 ) -> bool {
     // These expressions need parens when used as operands of binary expressions.
     // Some have lower precedence, others are for clarity (await/yield).
@@ -797,6 +897,24 @@ fn needs_parens_binary_operand(
     if !is_right
         && matches!(parent_op, BinaryOperator::In | BinaryOperator::Instanceof)
         && matches!(expr, Expression::UnaryExpression(_))
+    {
+        return true;
+    }
+
+    // A left operand whose LAST printed token is an instantiation's closing `>` takes
+    // the pair ahead of an operator whose first token joins that `>`
+    // ([`joins_a_trailing_angle_bracket`], the per-operator table the frozen `new X<T>`
+    // slice reads too): `+` and `-` continue it as a relational chain (`f<T> + 1` re-lexes
+    // as `f < T > +1`, a different program) and the `<`/`>`-led operators leave a form
+    // tsc or acorn-typescript rejects (`f<T> >= 1` does not parse). The axis is the JOIN
+    // of the operand's last token and the operator's first, not the operand's node or
+    // precedence — `a * fn<T> + 1` and `-fn<T> + 1` rebind exactly as `fn<T> + 1` does,
+    // so the walk follows the rightmost printed child (`ends_with_instantiation_close`).
+    // Every other binary operator follows a bare instantiation (`f<T> * 1`, `f<T> <= 1`).
+    // Prettier strips the pair at every one of these, a cataloged ◆prettier_bug.
+    if !is_right
+        && joins_a_trailing_angle_bracket(parent_op)
+        && ends_with_instantiation_close(expr, in_for_init)
     {
         return true;
     }

@@ -1759,13 +1759,10 @@ impl<'a> Printer<'a> {
         operators: &mut OperatorBuf,
     ) {
         // Recursively flatten left side if it can be chained with current operator
-        if let Expression::BinaryExpression(left_binary) = expr.left {
-            if expr.operator.can_flatten_with(left_binary.operator) {
-                self.collect_binary_operands_for_indent(left_binary, operands, operators);
-            } else {
-                // Can't flatten - build operand with parens if needed
-                operands.push(self.build_binary_operand_doc(expr.left, expr.operator, false));
-            }
+        // (`flattenable_left`, shared with `collect_binary_chain_with_spans`); otherwise
+        // build the operand with parens if needed.
+        if let Some(left_binary) = self.flattenable_left(expr) {
+            self.collect_binary_operands_for_indent(left_binary, operands, operators);
         } else {
             operands.push(self.build_binary_operand_doc(expr.left, expr.operator, false));
         }

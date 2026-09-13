@@ -442,11 +442,6 @@ fn linearize_recursive<'a>(
         }
 
         // TSNonNullExpression: recurse into expression, then add NonNull node
-        // TODO: a TSInstantiationExpression operand here (`(A<T>)!.x`) is recursed
-        // transparently and loses its type args (no Call node recovers them, unlike
-        // the call-callee path). Same root cause as the member-object case fixed via
-        // linearize_member_object. Untested because prettier's parser rejects the
-        // syntax, so there's no canonical source for a fixture.
         Expression::TSNonNullExpression(non_null) => {
             // Two authorings keep the whole operand a parenthesized base + `!` instead
             // of flattening it into the chain:
@@ -493,16 +488,11 @@ fn linearize_recursive<'a>(
             }
         }
 
-        // TSInstantiationExpression as a call callee (`expr<T>(args)`): transparent.
-        // The Call node recovers the type args via get_call_type_arguments() in
-        // chain_args.rs, so the instantiation itself emits nothing here. Member
-        // objects (`(A<T>).x`) take the `linearize_member_object` path instead,
-        // which keeps the type args and parens.
-        Expression::TSInstantiationExpression(inst) => {
-            linearize_recursive(inst.expression, input, nodes, paren_gaps);
-        }
-
-        // Base case: expression that's not part of the chain structure
+        // Base case: expression that's not part of the chain structure. A
+        // `TSInstantiationExpression` lands here too — as a member object (`(A<T>).x`)
+        // or a `!` operand (`(A<T>)!.x`) it is a parenthesized base by the `ChainBase`
+        // rule, type args kept; only as a CALL callee is it transparent, and
+        // `linearize_call_callee` unwraps it before recursing.
         _ => {
             // ChainBase always parenthesizes a binary base for precedence, so
             // the for-init `in` rule never changes the verdict here — pass `false`.
@@ -514,18 +504,12 @@ fn linearize_recursive<'a>(
 
 /// Linearize a MemberExpression's object.
 ///
-/// Two objects must stay a parenthesized base node instead of recursing into the
-/// chain:
-/// - A parenthesized optional chain (`(a?.b).c`, `(a?.b!).c`) terminates the
-///   chain — see `child_stops_optional_chain`; the base is built via
-///   `push_sealed_chain_base` (which keeps the whole sealed child, `!` included,
-///   inside the parens, preserving the author's form).
-/// - A `TSInstantiationExpression` must keep its type args and be parenthesized:
-///   `(A<T>).x`, not `A.x` (data loss) or `A<T>.x` (ambiguous). Prettier
-///   parenthesizes an instantiation only when it is the object of a member
-///   access, and no Call node follows here to recover dropped type args.
-///
-/// All other objects recurse normally.
+/// A parenthesized optional chain (`(a?.b).c`, `(a?.b!).c`) terminates the chain —
+/// see `child_stops_optional_chain` — and stays a sealed base node built via
+/// `push_sealed_chain_base` (which keeps the whole sealed child, `!` included, inside
+/// the parens, preserving the author's form). Every other object recurses normally;
+/// an instantiation object (`(A<T>).x`) becomes a parenthesized base there by the
+/// `ChainBase` rule, its type args kept.
 fn linearize_member_object<'a>(
     member: &'a internal::MemberExpression<'_>,
     input: LinearizeInput<'_>,
@@ -535,8 +519,6 @@ fn linearize_member_object<'a>(
     let object: &Expression<'_> = member.object;
     if let Some(start) = member_object_paren_leading_start(member) {
         push_sealed_chain_base(object, start, nodes);
-    } else if matches!(object, Expression::TSInstantiationExpression(_)) {
-        nodes.push(ChainNode::base(object, true));
     } else {
         linearize_recursive(object, input, nodes, paren_gaps);
     }
@@ -557,7 +539,15 @@ fn linearize_call_callee<'a>(
         push_sealed_chain_base(call.callee, call.span.start, nodes);
         return;
     }
-    linearize_recursive(call.callee, input, nodes, paren_gaps);
+    // A `TSInstantiationExpression` callee (`expr<T>(args)`) is transparent: the Call
+    // node recovers the type args via `get_call_type_arguments` in `chain_args.rs`, so
+    // the instantiation itself emits nothing. This is the one position where it is —
+    // reached as a member object or a `!` operand it is a parenthesized base.
+    let callee = match call.callee {
+        Expression::TSInstantiationExpression(inst) => inst.expression,
+        callee => callee,
+    };
+    linearize_recursive(callee, input, nodes, paren_gaps);
     // An IIFE callee reached through the chain (`( // c⏎() => {})().p`) owns its own
     // leading gap, exactly as the bare-callee path does: the pair is required and
     // prettier keeps the run inside it. A function or arrow is never itself a chain,
