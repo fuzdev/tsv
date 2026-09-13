@@ -70,27 +70,14 @@ fn to_posix(text: &str) -> String {
 /// the same resolution the walk does. Two host facts sit between the two otherwise: macOS
 /// resolves the `$TMPDIR` symlink (`/var` → `/private/var`), which is why an expectation
 /// canonicalizes at all, and Windows returns a verbatim path (`\\?\C:\…`) that the CLI
-/// strips before printing (`cli::discover::strip_verbatim_prefix`), which is why the
-/// expectation strips it too.
+/// strips before printing — through `tsv_cli::cli::discover::strip_verbatim_prefix`, the
+/// CLI's own rule rather than a copy of it, so the two cannot drift.
 /// Test helper; panicking on an unresolvable path is the desired behavior.
 #[allow(clippy::unwrap_used)]
 fn canonical_display(path: &Path) -> String {
-    let canonical = fs::canonicalize(path).unwrap();
-    let text = canonical.display().to_string();
-    let Some(rest) = text.strip_prefix(r"\\?\") else {
-        return text;
-    };
-    // the CLI's own three arms: a UNC share, a drive letter, or — some other shape
-    // behind the prefix — the spelling that names it, kept whole
-    if let Some(unc) = rest.strip_prefix(r"UNC\") {
-        format!(r"\\{unc}")
-    } else if rest.as_bytes().first().is_some_and(u8::is_ascii_alphabetic)
-        && rest.as_bytes().get(1) == Some(&b':')
-    {
-        rest.to_owned()
-    } else {
-        text
-    }
+    tsv_cli::cli::discover::strip_verbatim_prefix(fs::canonicalize(path).unwrap())
+        .display()
+        .to_string()
 }
 
 static BUILD: Once = Once::new();
@@ -1912,6 +1899,27 @@ fn test_format_grades_a_symlinked_directory_argument_as_a_link() {
         stderr,
         "warning: bar is excluded by a rule in the repo-root .gitignore, so it is not formatted; re-include it by adding `!/bar` to the repo-root .formatignore\n0 would change, 0 unchanged\n"
     );
+}
+
+/// The listing's separators are the **host's**. Every other path assertion in this file
+/// runs the output through `to_posix` first, which is exactly what makes this pin
+/// necessary: normalizing both sides answers "are these the same path", never "is the
+/// spelling native", so a regression to `/` on Windows would pass the whole suite in
+/// silence. Windows-only because it is the one host where the two spellings differ.
+/// The contract itself is `cli::out::path_bytes`': a listed line must name the file on
+/// disk, for a script to hand straight back to the shell.
+#[cfg(windows)]
+#[test]
+fn test_format_lists_native_separators() {
+    let dir = temp_dir("native_separators");
+    fs::create_dir(dir.join("sub")).unwrap();
+    fs::write(dir.join("sub").join("a.ts"), UNFORMATTED_TS).unwrap();
+
+    let list = tsv_in_dir(dir.path(), &["format", "--list", "."]);
+    assert_eq!(list.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&list.stdout);
+    assert!(stdout.contains('\\'), "native separators: {stdout}");
+    assert!(!stdout.contains('/'), "no posix separators: {stdout}");
 }
 
 /// The case of an extension is not a different kind of file — prettier infers a parser

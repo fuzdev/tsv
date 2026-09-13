@@ -130,16 +130,14 @@ fn discover_case(
         })
         .collect();
     let discovered = discover_files(&args)?;
-    // Normalize separators on BOTH sides before stripping: discovery emits
-    // native separators, so on Windows the root prefix ends in `\` where this
-    // pattern expects `/` — stripping the un-normalized string never matches
-    // and every case reads back absolute.
-    let prefix = format!("{}/", root.to_string_lossy().replace('\\', "/"));
+    // BOTH sides normalize before the strip (see `to_posix`): an un-normalized prefix
+    // matches nothing and every case would read back absolute.
+    let prefix = format!("{}/", to_posix(&root.to_string_lossy()));
     let files = discovered
         .files
         .iter()
         .map(|p| {
-            let s = p.to_string_lossy().replace('\\', "/");
+            let s = to_posix(&p.to_string_lossy());
             s.strip_prefix(&prefix).unwrap_or(&s).to_string()
         })
         .collect();
@@ -151,9 +149,18 @@ fn discover_case(
         .diagnostics
         .warnings
         .iter()
-        .map(|warning| warning.replace('\\', "/"))
+        .map(|warning| to_posix(warning))
         .collect();
     Ok((files, warnings))
+}
+
+/// Separators normalized to `/`, the spelling the scenario table is written in.
+/// Discovery emits **native** separators (`PathBuf::push` parity), so on Windows every
+/// path this harness compares — the root prefix, a discovered file, a warning's display
+/// path — comes back `\`-joined. `scripts/discovery_parity_suite.ts` and
+/// `tests/cli_tests.rs` normalize for the same reason, under the same name.
+fn to_posix(text: &str) -> String {
+    text.replace('\\', "/")
 }
 
 /// The substrings a case lists under `key` (`warns` / `no_warns`) — none when absent.

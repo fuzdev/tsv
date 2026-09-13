@@ -744,7 +744,13 @@ fn canonicalize(path: &Path) -> std::io::Result<PathBuf> {
 /// [`canonicalize`]'s prefix strip, on the path's text: `\\?\C:\a` → `C:\a`,
 /// `\\?\UNC\s\v\a` → `\\s\v\a`, anything else as it is (a verbatim prefix over
 /// some other shape — a device path — keeps the spelling that names it).
-fn strip_verbatim_prefix(path: PathBuf) -> PathBuf {
+///
+/// `pub` for `tests/cli_tests.rs`, which builds an expectation from its own
+/// `fs::canonicalize` and must spell the result the way the CLI prints it. Reaching the
+/// rule beats re-stating it: a second spelling in the test is a second thing to keep
+/// right, and the one in `tsv_discover::FORMATTABLE_EXTENSIONS` is already gated there for
+/// that reason.
+pub fn strip_verbatim_prefix(path: PathBuf) -> PathBuf {
     let Some(text) = path.to_str() else {
         return path;
     };
