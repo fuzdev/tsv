@@ -971,7 +971,7 @@ fn starts_expression_after_type_args(bytes: &[u8], pos: usize) -> bool {
 
 /// Whether the byte range contains an ECMAScript line terminator (LF, CR,
 /// U+2028, U+2029 — the latter two as UTF-8 `e2 80 a8`/`a9`).
-fn has_line_terminator_between(bytes: &[u8], from: usize, to: usize) -> bool {
+pub(super) fn has_line_terminator_between(bytes: &[u8], from: usize, to: usize) -> bool {
     let mut pos = from;
     while pos < to && pos < bytes.len() {
         if is_es_line_terminator_at(bytes, pos) {

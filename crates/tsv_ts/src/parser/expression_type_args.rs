@@ -3,8 +3,8 @@
 
 use super::Parser;
 use super::expression_lookahead::{
-    is_construct_type_start, is_function_type_start, is_generic_function_type_start,
-    matching_delimiter_close, scan_for_closing_angle_bracket,
+    has_line_terminator_between, is_construct_type_start, is_function_type_start,
+    is_generic_function_type_start, matching_delimiter_close, scan_for_closing_angle_bracket,
 };
 use super::scan::{
     identifier_starts_at, is_word_at, skip_identifier, skip_numeric_literal,
@@ -316,8 +316,17 @@ fn type_operand_follow_commits(bytes: &[u8], after_operand: usize) -> bool {
         // member access on a comparison's right operand, so only the matching `>`
         // (and its follow token) tells them apart: `f(a < B[c], d)` and
         // `a < B[c] > d` stay comparisons, `f<A[B], C>(x)` is an instantiation.
+        //
+        // A `[` past a line terminator is no index at all: the type grammar takes its
+        // postfix operators on the operand's own line (tsc `parsePostfixTypeOrHigher`,
+        // acorn-typescript `tsParseArrayTypeOrHigher` — both gate on
+        // `hasPrecedingLineBreak`), and so does [`Parser::parse_type`]. Committing to
+        // type arguments here would hand that parser a `<B⏎[c]>` it stops reading at
+        // `B` — `a <⏎B // c⏎[c] >⏎d` is the comparison the same bytes on one line are.
         b'[' => {
-            check_indexed_type_pattern(bytes, pos) && scan_for_closing_angle_bracket(bytes, pos)
+            !has_line_terminator_between(bytes, after_operand, pos)
+                && check_indexed_type_pattern(bytes, pos)
+                && scan_for_closing_angle_bracket(bytes, pos)
         }
 
         // Type constraint: `T extends U`. Whole-word — an identifier that merely
@@ -335,21 +344,47 @@ fn type_operand_follow_commits(bytes: &[u8], after_operand: usize) -> bool {
 /// to the caller's closing-`>` scan, which arbitrates.
 ///
 /// - `T[]`, `T["key"]`, `T[keyof U]`, `T[typeof x]`: indexed type
+/// - `T[| A | B]`, `T[& A & B]`: a leading union/intersection bar opens only a type
 /// - `T[K]`, `T[0]`, `T[-1]` followed by `>`, `,`, or another `[`: indexed type
 /// - `T[A | B]`, `T[0 | 1]`, `T[A[B]]`, `T[A.B]`, `T[A<B>]`,
 ///   `T[A extends B ? C : D]`: the index is itself a type, so the scan decides
+/// - `T[(A | B)[]]`, `T[(A)]`: a paren shell around any of the above
 /// - `a[b - 1]`, `a[0 + 1]`, `a[c || d]`, `a[c <= d]`: arithmetic, or a
 ///   logical/shift/relational operator — an expression, never a type → array access
 /// - `a[-b]`: a unary negation, not a negative literal → array access
 fn check_indexed_type_pattern(bytes: &[u8], pos: usize) -> bool {
     let inside = skip_whitespace_and_comments(bytes, pos + 1);
+    // Empty brackets `T[]` — array type
+    if bytes.get(inside) == Some(&b']') {
+        return true;
+    }
+    index_operand_is_type(bytes, inside, b']')
+}
+
+/// Whether the operand at `inside` — the first byte of an index, or of a paren shell
+/// inside one — reads as a TYPE up to `closer` (`]` for the index itself, `)` for a
+/// shell), on the same rule at both depths so a shell cannot admit what its index
+/// refuses, or refuse what it admits.
+fn index_operand_is_type(bytes: &[u8], inside: usize, closer: u8) -> bool {
     let Some(&first) = bytes.get(inside) else {
         return false;
     };
 
     match first {
-        // Empty brackets `T[]` — array type
-        b']' => true,
+        // A leading `|` / `&` (single — `||` / `&&` are the logical operators) opens a
+        // union or intersection and nothing else: no expression begins with one. The
+        // union printer's own leading-pipe layout puts one here
+        // (`fn<⏎A[⏎| B // c⏎| C]⏎>()`), so its output has to read back as the
+        // instantiation it printed.
+        b'|' | b'&' => bytes.get(inside + 1) != Some(&first),
+
+        // A paren shell: its content is an index operand by the same rule, closed by `)`,
+        // and what follows the shell continues the type or does not (`T[(A | B)[]]`).
+        b'(' => matching_delimiter_close(bytes, inside).is_some_and(|close| {
+            let content = skip_whitespace_and_comments(bytes, inside + 1);
+            index_operand_is_type(bytes, content, b')')
+                && continues_as_type(bytes, close + 1, closer)
+        }),
 
         // Numeric literal index: `T[0]`, `T[-1]`, `T[.5]`, `T[0 | 1]`. A numeric
         // literal is as valid a type as it is an array index, so the literal alone
@@ -366,7 +401,7 @@ fn check_indexed_type_pattern(bytes: &[u8], pos: usize) -> bool {
             if after_number == inside {
                 return false;
             }
-            continues_as_type(bytes, skip_whitespace_and_comments(bytes, after_number))
+            continues_as_type(bytes, after_number, closer)
         }
 
         // String literal key: `T["key"]`, `T['key']` — indexed access type
@@ -382,7 +417,7 @@ fn check_indexed_type_pattern(bytes: &[u8], pos: usize) -> bool {
                 return true;
             }
 
-            continues_as_type(bytes, skip_whitespace_and_comments(bytes, after_id))
+            continues_as_type(bytes, after_id, closer)
         }
 
         // Unknown pattern — default to NOT type args (safer for JS expressions)
@@ -484,11 +519,13 @@ enum TypeOperator {
 }
 
 /// Skip the qualified tail of a name — the `.Seg` chain of `Ns.Type.Sub` — starting just
-/// past the head identifier, returning the position of the first significant byte after
-/// the last segment. The `typeof` and `readonly` operator arms walk their entity-name
-/// operands with the same steps.
+/// past the head identifier, returning the name's own end: the byte after its last
+/// segment, ahead of any trivia (every caller hands it to [`type_operand_follow_commits`],
+/// which skips the trivia itself and must see it to gate a `[` on the name's line). The
+/// `typeof` and `readonly` operator arms walk their entity-name operands with the same
+/// steps.
 ///
-/// `pos` advances only over a COMPLETE `.Ident` segment, so "just past a name" holds by
+/// `end` advances only over a COMPLETE `.Ident` segment, so "just past a name" holds by
 /// construction. A `.` with no identifier behind it ends no name — `TypeName` is
 /// `IdentifierReference | NamespaceName . IdentifierReference` — so it is left where it
 /// is, for the caller's follow check to read as the token it is. tsc consumes such a `.`
@@ -497,15 +534,20 @@ enum TypeOperator {
 /// EXPRESSION either (`MemberExpression . IdentifierName`), so every input that reaches
 /// this branch is rejected on both readings and the two spellings cannot disagree.
 fn skip_qualified_tail(bytes: &[u8], after_head: usize) -> usize {
-    let mut pos = skip_whitespace_and_comments(bytes, after_head);
-    while bytes.get(pos) == Some(&b'.') {
-        let after_dot = skip_whitespace_and_comments(bytes, pos + 1);
-        if !identifier_starts_at(bytes, after_dot) {
-            break;
+    // The name's own end — never the trivia past it, which the follow filter skips
+    // itself and reads for a line terminator ahead of a `[`.
+    let mut end = after_head;
+    loop {
+        let dot = skip_whitespace_and_comments(bytes, end);
+        if bytes.get(dot) != Some(&b'.') {
+            return end;
         }
-        pos = skip_whitespace_and_comments(bytes, skip_identifier(bytes, after_dot));
+        let after_dot = skip_whitespace_and_comments(bytes, dot + 1);
+        if !identifier_starts_at(bytes, after_dot) {
+            return end;
+        }
+        end = skip_identifier(bytes, after_dot);
     }
-    pos
 }
 
 /// Whether the token at `pos` can BEGIN a type — the same head classes
@@ -559,19 +601,34 @@ fn numeric_literal_starts_at(bytes: &[u8], pos: usize) -> bool {
     }
 }
 
-/// Whether the byte at `after_operand` — the first non-trivia byte past an index operand —
-/// continues a TYPE rather than an expression.
+/// Whether what follows an index operand ending at `operand_end` continues a TYPE
+/// rather than an expression, up to `closer` — the `]` of the index, or the `)` of a
+/// paren shell inside it.
 ///
 /// Shared by both operand kinds, and it must stay shared: `T[K | J]` and `T[0 | 1]` are
 /// the same question, and answering it in one place is what keeps a numeric index from
-/// being read more narrowly than a reference one.
-fn continues_as_type(bytes: &[u8], after_operand: usize) -> bool {
+/// being read more narrowly than a reference one. Takes the operand's own end rather than
+/// the next token, because a `[` continuation is legal only on the operand's line (see the
+/// `[` arm of [`type_operand_follow_commits`]); a `[` past a line terminator is where the
+/// index ends, so it is graded as the "anything else" arm.
+fn continues_as_type(bytes: &[u8], operand_end: usize, closer: u8) -> bool {
+    let after_operand = skip_whitespace_and_comments(bytes, operand_end);
     match bytes.get(after_operand) {
-        Some(b']') => {
+        Some(&c) if c == closer => {
             let after_close = skip_whitespace_and_comments(bytes, after_operand + 1);
+            if closer == b')' {
+                // The shell closed; what follows IT continues the index operand
+                // (`(A | B)[]`, `(A)`), graded from the `)` as the operand's end.
+                return continues_as_type(bytes, after_operand + 1, b']');
+            }
             // Type args end with `>`, continue with `,`, or chain another index group
-            // (`T[K][J]`) — the caller's closing-`>` scan arbitrates all three
-            matches!(bytes.get(after_close), Some(b'>' | b',' | b'['))
+            // (`T[K][J]`, on the same line) — the caller's closing-`>` scan arbitrates
+            // all three
+            match bytes.get(after_close) {
+                Some(b'>' | b',') => true,
+                Some(b'[') => !has_line_terminator_between(bytes, after_operand + 1, after_close),
+                _ => false,
+            }
         }
         // `||` and `&&` are logical operators, so the index is an expression — only the
         // single `|`/`&` are type operators (as in the caller's own arm). Likewise `<<` is
@@ -582,7 +639,8 @@ fn continues_as_type(bytes: &[u8], after_operand: usize) -> bool {
         // nested index (`T[A[B]]`), a qualified name (`T[A.B]`), a generic reference
         // (`T[A<B>]`), or a conditional (`T[A extends B ? C : D]`). None of these can be
         // arithmetic, so hand the decision to the caller's closing-`>` scan.
-        Some(b'|' | b'&' | b'[' | b'.' | b'<') => true,
+        Some(b'[') => !has_line_terminator_between(bytes, operand_end, after_operand),
+        Some(b'|' | b'&' | b'.' | b'<') => true,
         Some(b'e') if is_word_at(bytes, after_operand, b"extends") => true,
         // Anything else after the operand (e.g. `b - 1]`) is arithmetic — an expression,
         // never a type, and the one case the closing-`>` scan cannot arbitrate

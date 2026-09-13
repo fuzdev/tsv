@@ -1492,6 +1492,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(parsed.expr)
     }
 
+    /// Whether the current `async` heads an async function expression: `function` follows
+    /// on the same line. `async [no LineTerminator here] function` (ecma262), so across a
+    /// line break `async` is a plain identifier — `new async⏎function f() {}` is
+    /// `new async;` and a declaration, `class A extends async⏎function () {} {}` a syntax
+    /// error — as the primary path reads it, whose one gate ahead of every `async`
+    /// refinement this restates for the two callers that ask about the function shape
+    /// alone (the `new` callee, the heritage atom).
+    fn at_async_function_expression(&mut self) -> bool {
+        *self.current_kind() == TokenKind::Keyword(KeywordKind::Async)
+            && self.peek_kind() == TokenKind::Keyword(KeywordKind::Function)
+            && !self.peek_preceded_by_line_terminator()
+    }
+
     /// Parse the primary atom of an `extends` clause (acorn's `parseExprAtom` with
     /// `canBeArrow = false`). `parse_primary_expression` covers identifiers,
     /// literals, parens, arrays, objects, templates, `this`/`super`, and regex; the
@@ -1503,9 +1516,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // (or an `async`-arrow, which isn't a valid heritage atom) falls through to the
         // primary path, where `async` parses as a plain identifier. Peeking needs
         // `&mut self`, so this can't be a match guard over the borrowing `current_kind`.
-        if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Async))
-            && self.peek_kind() == TokenKind::Keyword(KeywordKind::Function)
-        {
+        if self.at_async_function_expression() {
             self.advance()?; // consume 'async'
             return self.parse_async_function_expression(start);
         }
@@ -2508,8 +2519,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse the callee - identifier, member expr, function/class expression, or nested `new`
         // Check async function first (peek borrows self, can't be inside match)
-        let is_async_function = *self.current_kind() == TokenKind::Keyword(KeywordKind::Async)
-            && self.peek_kind() == TokenKind::Keyword(KeywordKind::Function);
+        let is_async_function = self.at_async_function_expression();
 
         let callee_parsed = if is_async_function {
             // Async function expression: `new async function() {}`
