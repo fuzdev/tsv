@@ -1,0 +1,451 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 698,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 123,
+				"data": " terminator comment at print width: the run is emitted outside the declaration's\ngroup, but is still measured by it "
+			},
+			{
+				"type": "Text",
+				"start": 123,
+				"end": 124,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "DeclarationTag",
+				"start": 124,
+				"end": 224,
+				"declaration": {
+					"type": "VariableDeclaration",
+					"start": 125,
+					"end": 223,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 99
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 131,
+							"end": 214,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 90
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 131,
+								"end": 132,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 135,
+								"end": 214,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 90
+									}
+								},
+								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 215,
+									"end": 222
+								}
+							]
+						}
+					],
+					"kind": "const"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 224,
+				"end": 226,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 226,
+				"end": 311,
+				"data": " one column over: the group breaks at `=`, the comment rides the value's line "
+			},
+			{
+				"type": "Text",
+				"start": 311,
+				"end": 312,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "DeclarationTag",
+				"start": 312,
+				"end": 414,
+				"declaration": {
+					"type": "VariableDeclaration",
+					"start": 313,
+					"end": 413,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 90
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 319,
+							"end": 404,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 81
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 319,
+								"end": 320,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 324,
+								"end": 404,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 1
+									},
+									"end": {
+										"line": 7,
+										"column": 81
+									}
+								},
+								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 405,
+									"end": 412
+								}
+							]
+						}
+					],
+					"kind": "const"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 414,
+				"end": 416,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 416,
+				"end": 487,
+				"data": " the same boundary for a `//`, whose own break carries the `;}` "
+			},
+			{
+				"type": "Text",
+				"start": 487,
+				"end": 488,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "DeclarationTag",
+				"start": 488,
+				"end": 591,
+				"declaration": {
+					"type": "VariableDeclaration",
+					"start": 489,
+					"end": 590,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 1
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 495,
+							"end": 583,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 10,
+									"column": 95
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 495,
+								"end": 496,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 10,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 499,
+								"end": 583,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 11
+									},
+									"end": {
+										"line": 10,
+										"column": 95
+									}
+								},
+								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c",
+									"start": 584,
+									"end": 588
+								}
+							]
+						}
+					],
+					"kind": "const"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 591,
+				"end": 592,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "DeclarationTag",
+				"start": 592,
+				"end": 697,
+				"declaration": {
+					"type": "VariableDeclaration",
+					"start": 593,
+					"end": 696,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 1
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 599,
+							"end": 689,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 13,
+									"column": 86
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 599,
+								"end": 600,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 604,
+								"end": 689,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 1
+									},
+									"end": {
+										"line": 13,
+										"column": 86
+									}
+								},
+								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c",
+									"start": 690,
+									"end": 694
+								}
+							]
+						}
+					],
+					"kind": "const"
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 215,
+			"end": 222,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 91
+				},
+				"end": {
+					"line": 3,
+					"column": 98
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 405,
+			"end": 412,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 82
+				},
+				"end": {
+					"line": 7,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 584,
+			"end": 588,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 96
+				},
+				"end": {
+					"line": 10,
+					"column": 100
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 690,
+			"end": 694,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 87
+				},
+				"end": {
+					"line": 13,
+					"column": 91
+				}
+			}
+		}
+	]
+}
