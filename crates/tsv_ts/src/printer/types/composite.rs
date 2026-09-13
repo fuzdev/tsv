@@ -165,6 +165,18 @@ impl<'a> Printer<'a> {
     /// enclosing window to own. A [`BranchRoute::ShellInterior`] branch widens to the
     /// paren-stripped inner instead — the shell it would otherwise claim IS the branch, and
     /// the run inside it is the directive this route exists to keep in the operator gap.
+    ///
+    /// A redundant shell that IS the branch, holding a block run that FORCES a break
+    /// ([`Printer::block_run_forces_break`]) and no `//`, is claimed whole: the run is the
+    /// `?`/`:` gap's — the gate below routes on it (`comments_force_own_line_between`) and
+    /// the breaking layout's branch emitter hangs it at the branch's own indent, which is
+    /// where the reparse, the shell gone, lays it out. Left to the shell's emitter the run
+    /// printed at the shell's indent inside the flat layout, and pass 2 re-laid it: a
+    /// two-pass convergence at every such branch, measured. The leading-EDGE descent
+    /// deliberately does not reach a shell that is the value itself (that is the
+    /// keyword→value seam's first branch), and a `//` run has its own path here — the
+    /// relocation ([`Self::branch_relocatable_run`]) or the shell's own emitter where that
+    /// declines — so neither is claimed by this arm.
     fn branch_claim_and_start(
         &self,
         route: BranchRoute<'_>,
@@ -173,6 +185,21 @@ impl<'a> Printer<'a> {
         match route {
             BranchRoute::ShellInterior(inner) => (None, inner.span().start),
             BranchRoute::Gap | BranchRoute::None => {
+                if !route.routed()
+                    && let Some(shell) = outermost_paren(branch)
+                    && !self.paren_retains_for_trailing_run(branch)
+                {
+                    let (leading, _) = paren_shell_gaps(shell);
+                    if !self.has_line_comments_between(leading.start, leading.end)
+                        && self.block_run_forces_break(leading.start, leading.end)
+                    {
+                        let inner_start = unwrap_parenthesized(branch).span().start;
+                        return (
+                            Some(Span::new(branch.span().start, inner_start)),
+                            inner_start,
+                        );
+                    }
+                }
                 self.leading_edge_claim_and_start(route.routed(), branch)
             }
         }
@@ -1925,6 +1952,32 @@ impl<'a> Printer<'a> {
         if let TSType::Union(u) = value_type {
             return self.build_annotation_union_doc(colon_pos + 1, type_start, u, true);
         }
+        // A gap whose run FORCES a break — an own-line block, or a multi-line block the
+        // author broke after ([`Printer::block_run_forces_break`]) — takes the union arm's
+        // hang, the run riding INSIDE the hang group through the value-gap leading emitter,
+        // so the value drops below the block at the member's continuation indent as a
+        // union value does (`mapped_value_own_line_block_comment`). Emitted here with a
+        // kind-keyed space instead, the value stayed glued to the block's `*/` line. The
+        // window is the HEAD's (`head.value_start`, the hang seam's possibly widened start)
+        // and the value is built through the head, so a redundant shell holding such a run
+        // is this gap's too and stands down under the claim — read to the shell's `(`
+        // instead, the shell printed the run at its own indent and pass 2 hung it. Every
+        // other gap keeps the inline `: <run> <value>`: a glued block — a multi-line one
+        // included — and a single-line block the author broke after collapse onto the
+        // value in both formatters, and a shell holding a glued run prints it glued too, so
+        // hanging those would make the bare and the shelled authoring two fixed points.
+        // The comment-free gap keeps the plain concat for the same reason: the hang group
+        // would also break an over-width value after the `:`, a layout question this seam
+        // does not ask.
+        if self.block_run_forces_break(colon_pos + 1, head.value_start) {
+            let value_doc = self.build_keyword_value_doc(head, TrailingBlock::Inline);
+            return self.hang_annotation_union_doc(
+                colon_pos + 1,
+                head.value_start,
+                value_doc,
+                true,
+            );
+        }
         // One emission for both remaining kinds — they differ only in the value doc, and
         // spelling the `: <run> <value>` shape twice is how the two would drift.
         let value_doc = match value_type {
@@ -2190,7 +2243,7 @@ impl<'a> Printer<'a> {
                     elem.span().start,
                     LeadingGlue::Adjacent,
                 );
-            } else {
+            } else if handed.is_some() || frozen {
                 let leading = self.build_inline_comments_between_doc_trailing_space(
                     prev_end,
                     handed.unwrap_or_else(|| elem.span().start),
@@ -2206,7 +2259,17 @@ impl<'a> Printer<'a> {
             } else if let TSType::Union(u) = elem {
                 parts.push(self.build_union_value_doc(prev_end, u).doc);
             } else {
-                parts.push(self.build_tuple_element_doc(elem, multi_element));
+                // The array family's element: its leading run plus the element in one
+                // per-element group ([`Self::build_list_element_group_from_comments`]), so a
+                // block the author broke after takes prettier's soft `line` — collapsing onto
+                // the element while the element alone fits, and dropping it below a
+                // multi-line block, whose forced break opens the group. The kind-keyed space
+                // this replaced glued the element onto a multi-line block's closing line.
+                parts.push(self.build_list_element_group_from_comments(
+                    self.comments_to_emit_between(prev_end, elem.span().start),
+                    elem.span().start,
+                    self.build_tuple_element_doc(elem, multi_element),
+                ));
             }
 
             let elem_end = elem.span().end;

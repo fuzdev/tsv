@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1419,
+	"end": 1614,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -473,24 +473,72 @@
 					"column": 20
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " a FIRST member whose shell holds a multi-line block the author broke after: the",
+			"start": 1411,
+			"end": 1493,
+			"loc": {
+				"start": {
+					"line": 65,
+					"column": 1
+				},
+				"end": {
+					"line": 65,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " break after the `*/` is kept, the member at its offset below",
+			"start": 1495,
+			"end": 1558,
+			"loc": {
+				"start": {
+					"line": 66,
+					"column": 1
+				},
+				"end": {
+					"line": 66,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c15\n\td15 ",
+			"start": 1574,
+			"end": 1588,
+			"loc": {
+				"start": {
+					"line": 68,
+					"column": 4
+				},
+				"end": {
+					"line": 69,
+					"column": 7
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 1418,
+		"end": 1613,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 1409,
+			"end": 1604,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 64,
+					"line": 72,
 					"column": 9
 				}
 			},
@@ -1871,6 +1919,138 @@
 							"value": " so the same spelling takes the leading rule instead and stays inline",
 							"start": 1307,
 							"end": 1378
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1560,
+					"end": 1603,
+					"loc": {
+						"start": {
+							"line": 67,
+							"column": 1
+						},
+						"end": {
+							"line": 71,
+							"column": 7
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1565,
+						"end": 1567,
+						"loc": {
+							"start": {
+								"line": 67,
+								"column": 6
+							},
+							"end": {
+								"line": 67,
+								"column": 8
+							}
+						},
+						"name": "DD"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 1572,
+						"end": 1602,
+						"loc": {
+							"start": {
+								"line": 68,
+								"column": 2
+							},
+							"end": {
+								"line": 71,
+								"column": 6
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 1593,
+								"end": 1595,
+								"loc": {
+									"start": {
+										"line": 70,
+										"column": 4
+									},
+									"end": {
+										"line": 70,
+										"column": 6
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1593,
+									"end": 1595,
+									"loc": {
+										"start": {
+											"line": 70,
+											"column": 4
+										},
+										"end": {
+											"line": 70,
+											"column": 6
+										}
+									},
+									"name": "EE"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c15\n\td15 ",
+										"start": 1574,
+										"end": 1588
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1600,
+								"end": 1602,
+								"loc": {
+									"start": {
+										"line": 71,
+										"column": 4
+									},
+									"end": {
+										"line": 71,
+										"column": 6
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1600,
+									"end": 1602,
+									"loc": {
+										"start": {
+											"line": 71,
+											"column": 4
+										},
+										"end": {
+											"line": 71,
+											"column": 6
+										}
+									},
+									"name": "FF"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a FIRST member whose shell holds a multi-line block the author broke after: the",
+							"start": 1411,
+							"end": 1493
+						},
+						{
+							"type": "Line",
+							"value": " break after the `*/` is kept, the member at its offset below",
+							"start": 1495,
+							"end": 1558
 						}
 					]
 				}
