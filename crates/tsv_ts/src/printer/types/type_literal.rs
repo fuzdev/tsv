@@ -1336,7 +1336,18 @@ impl<'a> Printer<'a> {
                 }
                 for comment in &leading {
                     parts.push(self.build_comment_doc(comment));
-                    self.push_comment_kind_separator(&mut parts, comment);
+                    // A block the author broke after takes prettier's soft `line`, the
+                    // separator the LIST's own gap gives the same run written bare
+                    // (`push_leading_comment_run`, the params family): it collapses while
+                    // the `<…>` fits and breaks with it — under a multi-line block always,
+                    // since the block is a forced break. The kind separator spaced it, so
+                    // the shelled authoring inlined an argument the bare one dropped below
+                    // its comment, and a sole argument's hug flipped between the passes.
+                    if comment.is_block && !self.comment_hugs_next(comment) {
+                        parts.push(d.line());
+                    } else {
+                        self.push_comment_kind_separator(&mut parts, comment);
+                    }
                 }
                 parts.push(inner);
                 // The shared trailing-gap emitter, never an open-coded loop: it takes the

@@ -701,8 +701,11 @@ impl<'a> Printer<'a> {
         // it still breaks block-style when too wide. (This is the same layout the
         // type-reference type-argument path uses. Prettier instead breaks the
         // `<…>` onto its own lines for a comment-bearing mapped/empty type — a
-        // deliberate divergence; see docs/conformance_prettier_ts_comments.md.)
+        // deliberate divergence; see docs/conformance_prettier_ts_comments.md.) A run that
+        // breaks after its last block declines both hugs for the group below
+        // (`single_type_arg_run_breaks_after`), as the type-position builder does.
         if inst.params.len() == 1
+            && !self.single_type_arg_run_breaks_after(inst, has_comments)
             && let Some(type_doc) = self.try_build_hugging_curly_type_doc(&inst.params[0])
         {
             // The `<`→arg / arg→`>` gaps may hold inline block comments (a glued
@@ -728,6 +731,7 @@ impl<'a> Printer<'a> {
         if inst.params.len() == 1
             && (is_simple_type_arg(&inst.params[0])
                 || self.type_arg_union_prints_hugged(inst.span.start + 1, &inst.params[0]))
+            && !self.single_type_arg_run_breaks_after(inst, has_comments)
         {
             return self.build_single_type_arg_inline(inst, has_comments);
         }

@@ -11,6 +11,7 @@ use super::helpers::{
 };
 use super::{BlankRule, CommentSpacing, Printer, UnionValueDoc};
 use crate::ast::internal::{self, TSConstructorType, TSFunctionType, TSType};
+use crate::printer::comments::LeadingGlue;
 use crate::printer::layout::hang_after_operator;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
@@ -207,11 +208,23 @@ impl<'a> Printer<'a> {
                 let colon_end = type_ann.span.start + 1;
                 let type_start = type_literal.span.start;
                 let mut annotation: DocBuf = smallvec![d.text(": ")];
-                if window_has_comments
-                    && let Some(comments) = self
-                        .build_inline_comments_between_doc_trailing_space_opt(colon_end, type_start)
-                {
-                    annotation.push(comments);
+                if window_has_comments {
+                    // The shared leading emitter, not a kind-keyed space: a block the
+                    // author broke after takes prettier's soft `line`, which the signature
+                    // group — the literal has no group of its own here — collapses while
+                    // it fits and opens for a multi-line block, a forced break, so the
+                    // literal drops below the `*/` exactly as it does at every other
+                    // annotation (`param_annotation_object_broke_after_multiline_block_comment`).
+                    // `AdjacentAnchorLine`: the run's first comment is on the `:` line by
+                    // construction here, so its authored own-line-ness is not read (the
+                    // hardline it would force collapses on the next pass), while an author
+                    // blank after a comment survives as prettier keeps it.
+                    self.push_leading_comment_run(
+                        &mut annotation,
+                        self.comments_to_emit_between(colon_end, type_start),
+                        type_start,
+                        LeadingGlue::AdjacentAnchorLine,
+                    );
                 }
                 annotation.push(self.build_type_literal_doc_for_function_param(type_literal));
                 d.concat(&annotation)

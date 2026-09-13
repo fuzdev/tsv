@@ -61,4 +61,12 @@
 	// control: a FIRST member has no preceding member for the union's handler to bind to,
 	// so the same spelling takes the leading rule instead and stays inline
 	type AA = /* c14 */ BB | CC;
+
+	// a FIRST member whose shell holds a multi-line block the author broke after: the
+	// break after the `*/` is kept, the member at its offset below
+	type DD =
+		| /* c15
+	d15 */
+		  EE
+		| FF;
 </script>

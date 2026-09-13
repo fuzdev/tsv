@@ -84,6 +84,42 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
+    /// Whether a sole type argument's comment run ends with a block the author BROKE AFTER
+    /// — the last comment in the `<`→argument gap, or in the argument→`>` gap, has a
+    /// newline after it — which declines the atomic inline `<T>` for the width-decided
+    /// group, prettier's own `shouldInline` clause (`printTypeParameters`: a `Last` comment
+    /// with `hasNewline` after it). The inline emission has no break point, so it glued the
+    /// argument onto a multi-line block's `*/` line; in the group the run's soft `line`
+    /// collapses while the list fits (`Foo</* c */ T>`, the same text) and a multi-line
+    /// block — a forced break — opens the list with the argument on its own line.
+    ///
+    /// Line comments and a block the author isolated on a line never reach the callers
+    /// (`type_arguments_force_expansion` routes them first), so this reads only the runs
+    /// the hug arms would otherwise inline. `has_comments` is the caller's whole-`<…>`
+    /// window answer; `false` proves both gaps empty without a search.
+    pub(in crate::printer) fn single_type_arg_run_breaks_after(
+        &self,
+        args: &internal::TSTypeParameterInstantiation<'_>,
+        has_comments: bool,
+    ) -> bool {
+        if !has_comments {
+            return false;
+        }
+        let param = &args.params[0];
+        // Read past a redundant shell carrying only leading comments
+        // ([`Self::leading_paren_unwrapped`]): the shell strips, so its run is this gap's
+        // — and exactly where the reparse reads it. Asked of the shell's `(` instead, the
+        // inline path kept the hug on pass 1 and the group opened on pass 2.
+        let printed = self.leading_paren_unwrapped(param);
+        let breaks_after = |start: u32, end: u32| {
+            self.comments_to_emit_between(start, end)
+                .last()
+                .is_some_and(|c| c.is_block && !self.comment_hugs_next(c))
+        };
+        breaks_after(args.span.start + 1, printed.span().start)
+            || breaks_after(param.span().end, args.span.end - 1)
+    }
+
     /// Whether a **single type argument** hugs — i.e. whether `<T>` inlines atomically.
     /// Prettier's `shouldHugType` (`print/type-annotation.js`), and the whole answer, so no
     /// type-argument site re-derives it from parts. Three clauses:
@@ -224,8 +260,12 @@ impl<'a> Printer<'a> {
 
         // A single argument inlines only when it hugs; a non-hugging one (an intersection, a
         // function type, a conditional) falls through to the group below, which is what gives
-        // the `<…>` a break point of its own.
-        if args.params.len() == 1 && self.type_arg_hugs(args.span.start + 1, &args.params[0]) {
+        // the `<…>` a break point of its own — as does a hugging one whose comment run breaks
+        // after ([`Self::single_type_arg_run_breaks_after`]).
+        if args.params.len() == 1
+            && self.type_arg_hugs(args.span.start + 1, &args.params[0])
+            && !self.single_type_arg_run_breaks_after(args, has_comments)
+        {
             return self.build_single_type_arg_inline(args, has_comments);
         }
 

@@ -162,12 +162,19 @@ pub(in crate::printer) fn prefix_operator_shell_pair(
 /// differs, and naming the axis is what keeps the two from being read as one answer.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum EdgeRun {
-    /// A run that ENDS ITS OWN LINE — a `//`, or a block the author isolated on its own
-    /// line ([`Printer::block_comment_isolated_own_line_between`]) — the **ownership**
-    /// question ([`Printer::leading_edge_shell_claim`]). A gap can host a relocated run
-    /// only by opening over hardlines, so what it must take over is exactly the run that
-    /// forces one; a block the author glued renders inline where the shell prints it, and
-    /// no gap needs it.
+    /// A run that FORCES A BREAK — a `//`, a block the author isolated on its own line, or
+    /// a multi-line block they broke after ([`Printer::block_run_forces_break`])
+    /// — the **ownership** question ([`Printer::leading_edge_shell_claim`]). A gap can
+    /// host a relocated run only by opening over hardlines, so what it must take over is
+    /// exactly the run that forces one; a block the author glued renders inline where the
+    /// shell prints it, and no gap needs it.
+    ///
+    /// ⚠️ The multi-line block the author broke after joined the isolated block here for
+    /// the isolated block's own reason (below): its `*/`-line break is forced — the block
+    /// is a hard break, so the soft `line` the shell's emitter gives it always opens — and
+    /// a break the shell opens at its own indent is one the enclosing gap re-lays on the
+    /// next pass (a conditional's branch, a type parameter's bound, a sole type argument,
+    /// the mapped value: every one a two-pass convergence, measured). The gap owns the run.
     ///
     /// ⚠️ The isolated block was once outside this axis, on the reading that "a block run
     /// renders inline exactly where the shell would have printed it". That is false of the
@@ -1274,10 +1281,7 @@ impl<'a> Printer<'a> {
                 EdgeRun::Breaking => {
                     self.has_line_comments_between(leading.start, leading.end)
                         || (pair == ShellPair::Stripped
-                            && self.block_comment_isolated_own_line_between(
-                                leading.start,
-                                leading.end,
-                            ))
+                            && self.block_run_forces_break(leading.start, leading.end))
                 }
                 EdgeRun::LineOrBlock => {
                     self.has_comments_to_emit_between(leading.start, leading.end)

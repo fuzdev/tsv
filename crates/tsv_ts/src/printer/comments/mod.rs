@@ -190,7 +190,11 @@ pub(crate) enum ShellPair {
     /// The parens are dropped and the run lands in the enclosing gap, which either claims
     /// it or lays the value out by its own rule — and several of those gaps deliberately
     /// COLLAPSE an isolated own-line block (the annotation `:` for a non-composite type,
-    /// the prefix operators, a conditional's `extends`).
+    /// the prefix operators, a conditional's `extends`). A MULTI-LINE block the author
+    /// broke after is the one block this arm does not space: it takes the soft `line`
+    /// ([`Printer::multiline_block_broke_after`]), which its own forced break opens
+    /// in the enclosing gap's group, so the value drops below the `*/` as the shell-free
+    /// authoring's does.
     ///
     /// ⚠️ **The MEMBER gaps are not among them, and that list is the whole of the set.** A
     /// union or intersection member's stripped shell puts its run at the member gap, which
@@ -1599,6 +1603,40 @@ impl<'a> Printer<'a> {
         self.split_open_delimiter_glued_run(gap_start, value_start)
     }
 
+    /// Whether a block comment is a **multi-line** block the author BROKE AFTER — the one
+    /// block a stripped shell's leading run gives prettier's soft `line` rather than the
+    /// space. The one statement of that rule, read by the stripped-shell run emitter
+    /// ([`Self::push_paren_shell_leading_run`]) and, through
+    /// [`Self::block_run_forces_break`], by the gaps that decide whether to CLAIM such a
+    /// run — a second spelling is how the two would drift. (The type-argument shell's own
+    /// loop in `build_type_doc_for_type_arg` takes the wider list rule instead: every
+    /// block the author broke after, single-line included, since its gap is a list's.)
+    ///
+    /// Keyed on the gap AFTER the comment alone ([`Self::comment_hugs_next`]), so every
+    /// layout it produces reproduces its own trigger. A single-line block the author broke
+    /// after is deliberately NOT one: every value gap pulls that block up onto the
+    /// operator's line (`LeadingGlue::AdjacentGlued`), and the shell must land where the
+    /// bare authoring does.
+    pub(crate) fn multiline_block_broke_after(&self, comment: &Comment) -> bool {
+        comment.is_block && comment.multiline && !self.comment_hugs_next(comment)
+    }
+
+    /// Whether a block-comment run in `[start, end)` forces a break of its own — a block
+    /// the author isolated on its own line, or a multi-line block they broke after
+    /// ([`Self::multiline_block_broke_after`]). Two readers, one question: the
+    /// block half of the leading-edge **ownership** question (`EdgeRun::Breaking` in
+    /// `types/mod.rs` — such a run in a stripped shell is the ENCLOSING gap's to lay out,
+    /// at that gap's continuation indent, since a break the shell opens at its own indent
+    /// is one the reparse re-lays), and the mapped value's hang gate
+    /// (`build_mapped_value_tail_doc` — a run that forces no break keeps the inline
+    /// `: /* c */ V`). The `//` half is each caller's, where it is already asked.
+    pub(crate) fn block_run_forces_break(&self, start: u32, end: u32) -> bool {
+        self.block_comment_isolated_own_line_between(start, end)
+            || self
+                .comments_to_emit_between(start, end)
+                .any(|c| self.multiline_block_broke_after(c))
+    }
+
     /// Emit a paren SHELL's leading run — the comments in `[start, end)` between the
     /// shell's `(` and the type it wraps — each followed by its own separator: a
     /// `hardline` for a line comment, which must end its line or it would swallow the type
@@ -1612,8 +1650,9 @@ impl<'a> Printer<'a> {
     /// comment inside the parens too — so a shell that glued it was the one place an
     /// authored line went missing for standing inside parens.
     ///
-    /// ⚠️ A pair that is **stripped** takes the space at every block instead
-    /// ([`ShellPair::Stripped`]), and that is not a second opinion about the comment: with
+    /// ⚠️ A pair that is **stripped** takes the space at every single-line block instead
+    /// ([`ShellPair::Stripped`]; a multi-line block the author broke after takes the soft
+    /// `line`, [`Self::multiline_block_broke_after`]), and that is not a second opinion about the comment: with
     /// the parens gone the layout is the ENCLOSING gap's, which either claims the run
     /// ([`Printer::keyword_value_stripped_paren_hang`], the seam that also knows the
     /// continuation indent) or lays the value out by its own rule — and several of those
@@ -1663,7 +1702,22 @@ impl<'a> Printer<'a> {
             };
             parts.push(self.build_comment_doc(comment));
             if !ends_its_line {
-                parts.push(d.text(" "));
+                // A MULTI-LINE block the author BROKE AFTER, in a pair that strips, takes
+                // prettier's `printLeadingComment` soft `line` rather than a space: the block
+                // is a forced break, so the enclosing gap's group opens it and the value drops
+                // below the `*/` exactly as the shell-free authoring lays the same run out.
+                // The space stays for a block glued to what follows (the author's own line),
+                // for a SINGLE-line block the author broke after (every value gap pulls that
+                // one up onto the operator's line — `LeadingGlue::AdjacentGlued` — and the
+                // shell must land where the bare authoring does), and inside a pair that
+                // SURVIVES, where the delimiter owns the line ([`ShellPair`]). Keyed on the
+                // gap AFTER the comment alone, so every layout this emits reproduces its own
+                // trigger.
+                if shell == ShellPair::Stripped && self.multiline_block_broke_after(comment) {
+                    parts.push(d.line());
+                } else {
+                    parts.push(d.text(" "));
+                }
                 continue;
             }
             parts.push(d.hardline());

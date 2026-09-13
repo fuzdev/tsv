@@ -938,11 +938,15 @@ impl<'a> Printer<'a> {
     /// `|` is static text — so the caller gates on its whole-union window first and this
     /// runs only when a comment is actually in play.
     ///
-    /// Union-only, and the hardcoded space is why: the union's one-sided gate sends every
-    /// comment that starts a line to the multiline builder, so what reaches here is glued
-    /// after the `|` and takes a space either way. The intersection, whose gate leaves a
-    /// comment sharing the `&`'s line on this path, needs the source-keyed separator
-    /// instead ([`Self::build_member_leading_block_comments`]).
+    /// Union-only: the union's one-sided gate sends every comment that starts a line to
+    /// the multiline builder, so what reaches here is glued after the `|` — but glued
+    /// after the `|` is not glued to the MEMBER. The separator after each block is the
+    /// source-keyed one the first member and the intersection already take
+    /// ([`Self::build_member_leading_block_comments`]): a space where the author glued
+    /// the block to what follows, a soft `line` where they broke after it — which this
+    /// layout, already broken, renders as the member dropping to its offset below the
+    /// block, prettier's `printLeadingComment` read straight. A kind-keyed space glued a
+    /// multi-line block's `*/` line to the member the author had put beneath it.
     ///
     /// The run leads its member, so it wears the member's offset
     /// ([`Self::union_member_leading_run_offset_doc`] carries that rule).
@@ -954,13 +958,12 @@ impl<'a> Printer<'a> {
     ) {
         if let Some(sep_pos) =
             find_separator_position(self.source, prev_member_end, member_start, b'|')
-            && let Some(comments) = self.build_comments_between_filtered_opt(
-                sep_pos + 1,
-                member_start,
-                CommentSpacing::Trailing,
-                CommentFilter::BlockOnly,
-            )
+            && self
+                .comments_to_emit_between(sep_pos + 1, member_start)
+                .any(|c| c.is_block)
         {
+            let (comments, _breaks) =
+                self.build_member_leading_block_comments(sep_pos + 1, member_start, member_start);
             parts.push(self.union_member_leading_run_offset_doc(comments));
         }
     }

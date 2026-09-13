@@ -2116,22 +2116,33 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Append leading inline block comments (`/*content*/ ` format) between two positions.
+    /// Append the leading block-comment run between two positions — the sole type
+    /// argument's `<`→argument gap on its inline hug path.
     ///
-    /// Only emits block comments; line comments are skipped (they would have been
-    /// detected earlier and routed to the multiline path). Counterpart of
-    /// [`Self::append_trailing_inline_block_comments`].
+    /// Only block comments; line comments are skipped (they were detected earlier and
+    /// routed the list to its expansion path). Counterpart of
+    /// [`Self::append_trailing_inline_block_comments`], but the run itself goes through the
+    /// one leading emitter ([`Self::push_leading_comment_run`], `LeadingGlue::Adjacent`)
+    /// rather than an unconditional space: a block the author broke after — here only one
+    /// FOLLOWED by another comment, since a run whose last block breaks after declines the
+    /// hug outright (`single_type_arg_run_breaks_after`) — takes prettier's soft `line`,
+    /// which collapses while the enclosing group fits and breaks with it, always under a
+    /// multi-line block. The space re-glued a run the author had split, which a shelled
+    /// authoring of the same run — whose emitter keeps the split — then converged to only
+    /// on its second pass.
     pub(crate) fn append_leading_inline_block_comments(
         &self,
         parts: &mut DocBuf,
         start: u32,
         end: u32,
     ) {
-        for comment in self.comments_to_emit_between(start, end) {
-            if comment.is_block {
-                parts.push(self.inline_block_comment_doc(comment, InlineBlockSide::Leading));
-            }
-        }
+        self.push_leading_comment_run(
+            parts,
+            self.comments_to_emit_between(start, end)
+                .filter(|c| c.is_block),
+            end,
+            LeadingGlue::Adjacent,
+        );
     }
 
     /// One inline list-position block comment plus its separating space, as **one** part.

@@ -513,7 +513,11 @@ impl<'a> Printer<'a> {
     /// (`has_comments && !run_handed` — hazard 3's exactly-one-printer split with
     /// `build_union_value_doc`), so the comment-free common path carries no empty
     /// child.
-    fn hang_annotation_union_doc(
+    ///
+    /// Not union-specific: `type_doc` is any value — the mapped type's plain value takes
+    /// it for a gap that holds a run ([`Self::build_mapped_value_tail_doc`]), so a block
+    /// the author broke after answers the same way at both of that seam's arms.
+    pub(super) fn hang_annotation_union_doc(
         &self,
         colon_end: u32,
         type_start: u32,
