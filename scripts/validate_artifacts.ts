@@ -139,8 +139,8 @@ for (const target of TARGETS) {
 }
 await assert_staged_fresh(freshness_checks);
 
-// Center measured 2026-09-03 (deno target; npm == deno, identical `.wasm`):
-// format 2,305,452 B; parse 966,711 B; all 2,590,394 B. Bounds are ±8% of it.
+// Center measured 2026-09-13 (deno target; npm == deno, identical `.wasm`):
+// format 2,495,116 B; parse 993,740 B; all 2,782,628 B. Bounds are ±8% of it.
 //
 // Recenter (and re-measure the deltas below) whenever a measure has drifted to
 // within a few percent of a band edge through accumulated work — otherwise the
@@ -150,9 +150,9 @@ await assert_staged_fresh(freshness_checks);
 // named in the commit. The retired centers and what moved them are recorded
 // elsewhere, not here.
 const BOUNDS = {
-	format: { min: 2_121_000, max: 2_490_000 },
-	parse: { min: 889_000, max: 1_044_000 },
-	all: { min: 2_383_000, max: 2_798_000 }
+	format: { min: 2_296_000, max: 2_695_000 },
+	parse: { min: 914_000, max: 1_073_000 },
+	all: { min: 2_560_000, max: 3_005_000 }
 };
 
 // all = format + parse. `all − format` is what the parse feature adds (parser
@@ -166,10 +166,10 @@ const BOUNDS = {
 // bundles and leaves the deltas where they were; a delta that moves with the
 // bundles means a feature boundary shifted, not that code got smaller.
 //
-// At the current center: `all − format` 284,942 B; `all − parse` 1,623,683 B.
+// At the current center: `all − format` 287,512 B; `all − parse` 1,788,888 B.
 const DELTAS = {
-	format: { min: 262_000, max: 308_000 }, // all − format
-	parse: { min: 1_494_000, max: 1_754_000 } // all − parse
+	format: { min: 265_000, max: 311_000 }, // all − format
+	parse: { min: 1_646_000, max: 1_932_000 } // all − parse
 };
 
 console.log('=== WASM binary sizes ===');
@@ -300,24 +300,43 @@ for (const { label, entry, has_format, has_parse, is_npm } of smoke_targets) {
 						is_ignored(path: string, is_dir: boolean): boolean;
 						classify_dir(name: string, child_rel: string, heuristic_active: boolean): string;
 						should_format_file(name: string, child_rel: string): boolean;
+						shadow_warning(dir: string, loose_root: string | undefined): string | undefined;
 				  })
 				| undefined;
 			if (!ctor) return false;
 			const stack = new ctor();
 			stack.push_gitignore('', 'build/\nignored.ts\n');
 			stack.push_formatignore('', '!build/keep.ts\n'); // tsv layer can't re-include under an excluded dir
-			return (
+			// every `classify_dir` on THIS stack passes `heuristic_active: false`, because a
+			// `.gitignore` governs this level and `classify_dir` requires the two to agree
+			// — a pushed `.gitignore` layer with the heuristic on is a state it rejects
+			// (its `is_reincluded` override would read `.gitignore` negations). The safety
+			// nets are context-free, so `node_modules` prunes at either value; the
+			// heuristic gets its own gitignore-free stack below.
+			const gated =
 				stack.is_ignored('build/x.ts', false) &&
 				stack.is_ignored('build/keep.ts', false) &&
 				!stack.is_ignored('src/x.ts', false) &&
 				// the tsv_discover verdict methods (the format-only package's primary
 				// discovery exports)
-				stack.classify_dir('node_modules', 'node_modules', true) === 'prune' && // safety net
-				stack.classify_dir('build', 'build', false) === 'prune' && // gitignored dir
+				stack.classify_dir('node_modules', 'node_modules', false) === 'prune' && // safety net
+				// a rule prunes `build`, and the `!build/keep.ts` written under it is inert
+				// there (git's parent-directory rule), so the verdict carries a warning
+				// rather than being a plain prune — the caller then fetches the re-include
+				// ladder from `shadow_warning`
+				stack.classify_dir('build', 'build', false) === 'prune_warn' &&
+				!!stack.shadow_warning('build', undefined) &&
 				stack.classify_dir('src', 'src', false) === 'descend' &&
 				stack.should_format_file('app.ts', 'src/app.ts') === true &&
 				stack.should_format_file('ignored.ts', 'ignored.ts') === false && // leaf-matched ignore (should_format_file is leaf-only; build/ is kept out via classify_dir's dir prune above)
-				stack.should_format_file('notes.md', 'notes.md') === false // wrong extension
+				stack.should_format_file('notes.md', 'notes.md') === false; // wrong extension
+			// the build-output heuristic, which is active only where no `.gitignore`
+			// governs the level — so it needs a stack with none pushed
+			const loose = new ctor();
+			return (
+				gated &&
+				loose.classify_dir('dist', 'dist', true) === 'prune' &&
+				loose.classify_dir('src', 'src', true) === 'descend'
 			);
 		});
 	} else {

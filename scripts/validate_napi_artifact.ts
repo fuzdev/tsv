@@ -18,6 +18,7 @@
 
 import { parseArgs } from 'node:util';
 
+import { cli_binary_name } from './napi_host.ts';
 import { format_size } from './size.ts';
 
 const { values: args } = parseArgs({
@@ -69,7 +70,7 @@ if (!triple) {
 	triple = platform_dirs[0];
 }
 
-const cli_binary_name = triple!.startsWith('win32-') ? 'tsv.exe' : 'tsv';
+const cli_binary = cli_binary_name(triple!);
 
 const validate = (filename: string, bounds: [number, number] | undefined): void => {
 	if (!bounds) {
@@ -100,4 +101,4 @@ const validate = (filename: string, bounds: [number, number] | undefined): void 
 };
 
 validate('tsv_napi.node', BOUNDS[triple!]);
-validate(cli_binary_name, CLI_BOUNDS[triple!]);
+validate(cli_binary, CLI_BOUNDS[triple!]);

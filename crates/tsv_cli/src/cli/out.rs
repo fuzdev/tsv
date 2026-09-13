@@ -57,7 +57,9 @@ use std::borrow::Cow;
 use std::io::{self, Write};
 use std::path::Path;
 use std::time::Duration;
-use tsv_discover::{quote_path_bytes, quote_path_owned};
+#[cfg(unix)]
+use tsv_discover::quote_path_bytes;
+use tsv_discover::quote_path_owned;
 
 /// The first wait after a `WouldBlock` — about what a fast consumer takes to drain a
 /// pipe buffer — doubled on each one in a row, up to [`WOULD_BLOCK_MAX_WAIT`].
