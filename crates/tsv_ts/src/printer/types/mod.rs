@@ -194,10 +194,11 @@ enum EdgeRun {
 /// and opens EARLIER at a one-member union / intersection, whose leading `|` / `&` is
 /// dropped outright — that operator's own gap is the enclosing gap's too, exactly as it
 /// would be for the operator-less authoring.
-/// `region_end` is the fully-unwrapped inner's start where the shell's own run is the
-/// claim, and the member's OWN start where only a composite's head gap is
-/// ([`Printer::composite_head_gap_region`]): a member shell the descent declined —
-/// retained for its trailing run, or holding a run of its own — prints its interior
+/// `region_end` is where the interior actually starts PRINTING
+/// ([`Printer::shell_printed_head_start`]): the fully-unwrapped inner's start, or the sole
+/// member's where a transparent composite's dropped operator stands between them. A member
+/// shell the descent declined — retained for its trailing run, holding a run of its own, or
+/// bringing a run the composite composes with its own head gap — prints its interior
 /// itself, and a claim reaching into it printed that interior twice.
 #[derive(Clone, Copy)]
 struct HeadRegion {
@@ -206,15 +207,6 @@ struct HeadRegion {
 }
 
 impl HeadRegion {
-    /// A shell whose own leading run is the claim: the region runs from the shell's `(`
-    /// to its fully-unwrapped inner.
-    fn of_shell(shell: &TSType<'_>) -> Self {
-        Self {
-            region_start: shell.span().start,
-            region_end: unwrap_parenthesized(shell).span().start,
-        }
-    }
-
     /// Open the region at `start` — a transparent composite's own span start, which
     /// always precedes whatever the descent below it found.
     fn opened_at(self, start: u32) -> Self {
@@ -1388,7 +1380,23 @@ impl<'a> Printer<'a> {
         if !retains_for_trailing_run
             && self.stripped_paren_hang_has_breaking_leading_run_with_pair(value, pair)
         {
-            return StrippedParenHang::for_value(unwrap_parenthesized(value), false);
+            let inner = unwrap_parenthesized(value);
+            // The shell is substituted away, but a **transparent** composite inside it
+            // still prints as its member, so its dropped operator's gap is this seam's
+            // too: the window reaches the member and the composite's own head-gap emitter
+            // stands down under the claim ([`Self::composite_head_region_claimed`]).
+            // Without it the seam emitted its own half of the run and the composite laid
+            // out the rest by the union's leading-pipe rule, which after a `&` or a `|`
+            // does not reparse ([`Self::shell_printed_head_start`]).
+            if let Some(printed_head) = self.shell_head_past_operator(value) {
+                return StrippedParenHang {
+                    value_start: printed_head,
+                    value_type: inner,
+                    claimed_shell: Some(Span::new(inner.span().start, printed_head)),
+                    routed: false,
+                };
+            }
+            return StrippedParenHang::for_value(inner, false);
         }
         // `false`: a frozen head never reaches here — [`Self::keyword_value_head`] is the
         // freeze-aware resolver every such head goes through, and it substitutes its own
@@ -1419,6 +1427,12 @@ impl<'a> Printer<'a> {
     /// [`Self::keyword_value_stripped_paren_hang`]: each already has its own answer for a
     /// shell that IS the item (a union member hoists it, a retained one keeps its parens),
     /// so only the leading-EDGE half is theirs to claim.
+    ///
+    /// ⚠️ With **one** exception, which [`Self::head_stripped_paren_shell`]'s last arm
+    /// states: a shell that IS the item, holds a leading run, and wraps a **transparent**
+    /// composite whose head gap holds a comment. There the two halves are one
+    /// source-contiguous run and only this claim spans both, so the item's own emitter
+    /// stands down on containment instead ([`Self::shell_leading_run_claimed`]).
     pub(in crate::printer) fn leading_edge_shell_claim(&self, ty: &TSType<'_>) -> Option<Span> {
         self.leading_edge_region(ty, EdgeRun::Breaking)
     }
@@ -1700,6 +1714,24 @@ impl<'a> Printer<'a> {
             TSType::Parenthesized(p) if self.head_layer_peels(p) => self
                 .head_stripped_paren_shell(p.type_annotation, run)
                 .map(|head| head.opened_at(p.span.start)),
+            // The one shape where the region covers the shell of the node ASKED ABOUT
+            // rather than one inside it: a layer the peel above declines because it holds
+            // a leading run of its own, wrapping a transparent composite whose head gap
+            // holds a comment. The two halves are then ONE run in the enclosing gap — the
+            // shell's, and the dropped operator's — so a region over only the shell left
+            // the composite printing the second half by its own rules
+            // ([`Self::shell_printed_head_start`]), and a region over only the operator's
+            // gap split one run across two emitters at two indents. Whichever side would
+            // otherwise have printed the shell's half stands down on containment
+            // ([`Self::shell_leading_run_claimed`]), so widening here de-duplicates rather
+            // than doubling. A layer the trailing-run rule RETAINS is excluded for the
+            // reason [`Self::head_layer_peels`] gives: its `(` prints ahead of everything.
+            TSType::Parenthesized(p)
+                if !self.paren_shell_retains_for_trailing_run(p)
+                    && self.shell_head_past_operator(ty).is_some() =>
+            {
+                Some(self.shell_head_region(ty))
+            }
             _ => None,
         }
     }
@@ -1720,6 +1752,82 @@ impl<'a> Printer<'a> {
     /// the leading run went unseen at every reader of this seam.
     fn head_layer_peels(&self, p: &TSParenthesizedType<'_>) -> bool {
         !self.paren_inner_comment_flags(p).0 && !self.paren_shell_retains_for_trailing_run(p)
+    }
+
+    /// Where a stripped shell's interior actually starts PRINTING: its fully-unwrapped
+    /// inner, or — past a **transparent** one-member composite whose head gap holds a
+    /// comment — that composite's sole member.
+    ///
+    /// [`HeadRegion::region_end`]'s resolver, and the one statement of "a dropped operator
+    /// does not print" that every leading-edge reader needs. A one-member union /
+    /// intersection prints as its member with the `|` / `&` dropped outright, so the gap
+    /// between that operator and the member is the ENCLOSING gap's, exactly as it would be
+    /// for the operator-less authoring. A region that stopped at the operator left the
+    /// composite to lay that gap out by its own rules — the union's leading-pipe layout,
+    /// which after a `&` or a `|` **does not even reparse**, and the intersection's indent
+    /// shell, read back one level shallower
+    /// (`composite_head_line_comment_under_shell_run`).
+    ///
+    /// Only where the head gap actually holds a comment: with nothing in it the two
+    /// answers coincide, and widening anyway would hand a shell's own glued run to the
+    /// enclosing gap at every transparent composite for no gain. The loop is the honest
+    /// shape of "through every dropped operator" — a sole member that is itself a bare
+    /// composite needs no parens of its own only where the grammar allows it, and a
+    /// parenthesized one stops the walk, since that layer prints its own `(` ahead of
+    /// everything inside it ([`HeadRegion::region_end`]).
+    fn shell_printed_head_start(&self, shell: &TSType<'_>) -> u32 {
+        let mut cur = unwrap_parenthesized(shell);
+        let mut start = cur.span().start;
+        while let Some(sole) = self.transparent_sole_member(cur) {
+            if self
+                .composite_head_gap_region(cur.span().start, sole)
+                .is_none()
+            {
+                break;
+            }
+            // ⚠️ The sole member's OWN shell run is the COMPOSITE's to compose with its
+            // head gap and hoist as one run (`intersection_first_member_head_run`, whose
+            // two windows are contiguous in source). A region that took only the head half
+            // would split one source run across two emitters at two indents — the reverse
+            // of the defect this resolver exists for, and measured as one: `F | (&
+            // /* c */ (// d⏎G))` hoists all three comments together, and claiming the
+            // first two stranded `// d` after the `| `. Where the member brings a run, the
+            // composite keeps the whole region.
+            if self.stripped_paren_hang_has_leading_run(
+                sole,
+                EdgeRun::LineOrBlock,
+                ShellPair::Stripped,
+            ) {
+                break;
+            }
+            start = sole.span().start;
+            cur = sole;
+        }
+        start
+    }
+
+    /// [`Self::shell_printed_head_start`] as the question its three readers actually ask:
+    /// **did the interior's printed head reach PAST a dropped operator?** `Some(head)` when
+    /// it did — the shape where a claim must widen and the composite must stand down —
+    /// `None` for every ordinary shell, where the printed head and the unwrapped inner
+    /// coincide.
+    ///
+    /// Named because the comparison was spelled three times — the descent's last arm, the
+    /// keyword→value seam's breaking-run branch, and the union hoist's own narrowing — and
+    /// three spellings of "is this the widening shape?" are three chances to answer one
+    /// question two ways.
+    fn shell_head_past_operator(&self, shell: &TSType<'_>) -> Option<u32> {
+        let head = self.shell_printed_head_start(shell);
+        (head > unwrap_parenthesized(shell).span().start).then_some(head)
+    }
+
+    /// A shell whose own leading run is the claim: the region runs from the shell's `(` to
+    /// where its interior starts printing ([`Self::shell_printed_head_start`]).
+    fn shell_head_region(&self, shell: &TSType<'_>) -> HeadRegion {
+        HeadRegion {
+            region_start: shell.span().start,
+            region_end: self.shell_printed_head_start(shell),
+        }
     }
 
     /// A transparent one-member composite's OWN head gap — the authored `|` / `&` to its
@@ -1786,7 +1894,7 @@ impl<'a> Printer<'a> {
         if self.stripped_paren_hang_has_leading_run(head, run, ShellPair::Stripped)
             && !self.paren_retains_for_trailing_run(head)
         {
-            return Some(HeadRegion::of_shell(head));
+            return Some(self.shell_head_region(head));
         }
         self.head_stripped_paren_shell(head, run)
     }
