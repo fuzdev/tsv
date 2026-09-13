@@ -263,10 +263,11 @@ impl<'a> Printer<'a> {
     /// the trailing comment appended to the member via [`Self::with_stripped_paren_trailing`].
     /// Declines a **retained**-paren member (union / intersection / function / conditional —
     /// its comment stays inside, the arms further down) and a non-paren member. Requires a
-    /// **line** comment in the leading gap: a block-only (`(/* b */ b)`) or comment-free gap
-    /// keeps its block inline and is already idempotent, so it returns empty (the general
-    /// member arm). Peels every redundant nesting layer (`((// c⏎ b))` → `b`) to match the
-    /// detection window. The narrow shared [`Self::stripped_paren_leading_line_comments`]
+    /// comment that KEEPS ITS OWN LINE ([`Self::member_shell_run_keeps_its_line`]): a gap
+    /// whose every block is glued (`(/* b */ b)`), or a comment-free one, keeps its block
+    /// inline and is already idempotent, so it returns empty (the general member arm).
+    /// Peels every redundant nesting layer (`((// c⏎ b))` → `b`) to match the detection
+    /// window. The narrow shared [`Self::stripped_paren_leading_line_comments`]
     /// (line-only, no block/trailing) still serves the conditional-`extends` and
     /// intersection-first-member callers.
     ///
@@ -289,21 +290,99 @@ impl<'a> Printer<'a> {
         if self.paren_shell_retains_for_trailing_run(shell) {
             return smallvec![];
         }
+        let Some(region) = self.member_shell_own_line_run_region(t) else {
+            return smallvec![];
+        };
+        self.comments_to_emit_between(region.start, region.end)
+            .collect()
+    }
+
+    /// The member's own stripped shell's leading REGION, where its run holds a comment
+    /// that keeps a line of its own — **one span for the two things that must agree**: the
+    /// window the run is collected from, and the claim the shell then stands down under
+    /// ([`Printer::shell_leading_run_claimed`]).
+    ///
+    /// It opens at the shell's own `(` rather than one byte past it, because the claim is
+    /// matched by containment from that byte; no comment can begin there, so the collected
+    /// run is the same either way. It ends past a transparent composite's dropped operator
+    /// where [`Self::stripped_shell_hoist_composite_head`] says so — and that widening is
+    /// the whole reason this is one function: read as two, the window and the trigger drift
+    /// and one source-contiguous run splits across two emitters (the ⚠️ on that method).
+    ///
+    /// Both of the union's two answers for such a run are built from this one region: a
+    /// LATER member hoists the comments above its `| `
+    /// ([`Self::stripped_redundant_paren_member_leading_run`]), a FIRST member has no `| `
+    /// above it and claims the region instead, so the loop's own `first_leading` emitter
+    /// prints the run after the pipe at the member offset — which is where the shell-free
+    /// authoring of the same comment lands, and what prettier emits.
+    fn member_shell_own_line_run_region(&self, t: &TSType<'_>) -> Option<Span> {
+        let shell = redundant_member_shell(self, t)?;
+        if self.paren_shell_retains_for_trailing_run(shell) {
+            return None;
+        }
         let (leading_gap, _) = paren_shell_gaps(shell);
-        // Widened past a transparent composite's dropped operator when that head gap holds
-        // a `//` ([`Self::stripped_shell_hoist_composite_head`], the resolver the member
-        // build reads for the matching claim, so the window and the suppression cannot
-        // drift).
-        let run_end = self
+        let end = self
             .stripped_shell_hoist_composite_head(t)
             .unwrap_or(leading_gap.end);
-        let leading: CommentVec<'_> = self
-            .comments_to_emit_between(leading_gap.start, run_end)
+        let run: CommentVec<'_> = self
+            .comments_to_emit_between(shell.span.start, end)
             .collect();
-        if leading.iter().any(|c| !c.is_block) {
-            leading
-        } else {
-            smallvec![]
+        self.member_shell_run_keeps_its_line(&run, end)
+            .then(|| Span::new(shell.span.start, end))
+    }
+
+    /// Whether a run inside a member's STRIPPED shell holds a comment that must keep a
+    /// line of its own — a `//`, or a block the author ISOLATED on its own line.
+    ///
+    /// Both are the enclosing member gap's to place, for the same reason: the shell is
+    /// gone, so the line the author gave the comment is the member gap's line, and it is
+    /// exactly the line the shell-free authoring of that comment gets
+    /// (`B |⏎/* c */⏎C` — prettier agrees). Left to the shell's own
+    /// [`ShellPair::Stripped`] collapse, which spaces every block unconditionally, an
+    /// isolated block came back GLUED after the `| `; the reparse then reads it as an
+    /// inline block, nothing forces the member break any more, and the whole union
+    /// printed flat on pass 2. Own-line-ness is authoring signal
+    /// ([`conformance_prettier.md`](../../../../../docs/conformance_prettier.md)
+    /// §Comment Position Philosophy) and the one break-forcing property a layout can
+    /// destroy, so the emitter that can keep it has to.
+    ///
+    /// Asked per comment against its OWN next neighbour, the discipline
+    /// [`Printer::block_comment_isolated_own_line`] states: `/* c1 */ /* c2 */` written
+    /// together on one own line is a pair the author glued, and neither half is isolated.
+    /// The verdict is the RUN's, though — one isolated comment takes the whole run out of
+    /// the shell, because the run is one contiguous region and splitting it would leave
+    /// two emitters at two indents ([`comments.md`](../../../../../docs/comments.md): a
+    /// gap's claim is a partition).
+    fn member_shell_run_keeps_its_line(&self, run: &[&Comment], run_end: u32) -> bool {
+        run.iter().enumerate().any(|(i, comment)| {
+            let next = run.get(i + 1).map_or(run_end, |c| c.span.start);
+            !comment.is_block || self.block_comment_isolated_own_line(comment, next)
+        })
+    }
+
+    /// Who owns a union member's leading comment REGION, as the pair every gap takes: the
+    /// claim to silence the member's shell under, and the window end the gap's own run
+    /// emitter scans to ([`Printer::leading_edge_claim_and_start`]).
+    ///
+    /// The leading-EDGE descent answers first — where it claims, its region is the wider
+    /// one (it reaches past a transparent composite's dropped operator) and it is the
+    /// region the member's own emitters already stand down on. Only where it declines,
+    /// which for a shell that IS the member it always does (every list gap has its own
+    /// answer for that shape, [`Printer::leading_edge_shell_claim`]), does the FIRST
+    /// member's own shell get to claim
+    /// ([`Self::member_shell_own_line_run_region`]). A LATER member never needs it: its
+    /// run is hoisted above the `| ` instead, which is what `run_owned_above` says.
+    fn union_member_leading_claim(
+        &self,
+        run_owned_above: bool,
+        is_first: bool,
+        t: &TSType<'_>,
+    ) -> (Option<Span>, u32) {
+        match self.leading_edge_claim_and_start(run_owned_above, t) {
+            (None, end) if is_first && !run_owned_above => self
+                .member_shell_own_line_run_region(t)
+                .map_or((None, end), |claim| (Some(claim), claim.end)),
+            resolved => resolved,
         }
     }
 
@@ -320,16 +399,29 @@ impl<'a> Printer<'a> {
     /// operator-less authoring lands them
     /// (`composite_head_line_comment_under_shell_run`).
     ///
-    /// Two conditions narrow it, and both are load-bearing. A **block-only** head gap needs
-    /// no widening: the collapse prints it where this gap would, so the two answers already
-    /// coincide and widening would only move it. And the region itself stops where
-    /// [`Printer::shell_printed_head_start`] stops — in particular at a sole member
-    /// carrying a run of its OWN, which the composite composes with its head gap and hoists
-    /// as one run; taking half of that stranded the rest after the `| `.
+    /// Two conditions narrow it, and both are load-bearing. A head gap whose every comment
+    /// is GLUED needs no widening: the collapse prints such a comment where this gap would,
+    /// so the two answers already coincide and widening would only move it. And the region
+    /// itself stops where [`Printer::shell_printed_head_start`] stops — in particular at a
+    /// sole member carrying a run of its OWN, which the composite composes with its head
+    /// gap and hoists as one run; taking half of that stranded the rest after the `| `.
+    ///
+    /// ⚠️ **The narrowing asks the same question the hoist does**
+    /// ([`Self::member_shell_run_keeps_its_line`]), and it has to: the shell's run and the
+    /// head gap's are ONE run in source, so a window narrower than the hoist's trigger
+    /// splits that run across two emitters. Read as "a `//` in the head gap" while the
+    /// hoist itself only fired on a `//`, the two agreed by construction; once an ISOLATED
+    /// own-line block hoists too, the block spelling of the same authoring
+    /// (`B | (⏎/* c1 */⏎|⏎/* d1 */⏎C)`) hoisted `/* c1 */` alone and left `/* d1 */` to the
+    /// composite — two emitters, two indents, and a fixed point neither pass agreed on.
     fn stripped_shell_hoist_composite_head(&self, t: &TSType<'_>) -> Option<u32> {
         let inner = unwrap_parenthesized(t);
-        self.shell_head_past_operator(t)
-            .filter(|&end| self.has_line_comments_between(inner.span().start, end))
+        self.shell_head_past_operator(t).filter(|&end| {
+            let head: CommentVec<'_> = self
+                .comments_to_emit_between(inner.span().start, end)
+                .collect();
+            self.member_shell_run_keeps_its_line(&head, end)
+        })
     }
 
     /// Whether a union member's paren shell holds a `//` the multiline layout must own —
@@ -2017,7 +2109,7 @@ impl<'a> Printer<'a> {
             // shell) and for one whose redundant-paren run was hoisted above — either
             // way another emitter owns those bytes.
             let run_owned_above = frozen_member || !stripped_paren_leading.is_empty();
-            let (edge_claim, gap_end) = self.leading_edge_claim_and_start(run_owned_above, t);
+            let (edge_claim, gap_end) = self.union_member_leading_claim(run_owned_above, i == 0, t);
 
             // The **first** member's leading-comment run, built here rather than at the
             // `| ` prefix below so the arm that emits it decides whether it takes the
@@ -2225,18 +2317,30 @@ impl<'a> Printer<'a> {
                     inner,
                     TrailingBlock::Inline,
                 ));
-            } else if let TSType::Parenthesized(p) = t
-                // ⚠️ Both halves read THROUGH the author's extra layers, because the
-                // ROUTER above does ([`Self::union_member_paren_leading_line_comment`])
-                // and a member it routed here must find an emitter. A direct-child match
-                // plus the shallow one-paren window missed `X | ((// c⏎A | B))`: the run
-                // fell to the default arm, whose `ShellLeadingRun::Upstream` licence is
-                // granted on an upstream emitter EXISTING — this arm — so nothing printed
-                // it and the comment was DROPPED. The pair the shells collapse into is
-                // the outermost, and `build_parenthesized_union_doc`'s window already
-                // spans from it to the union, so any nesting depth emits the whole run.
-                && let TSType::Union(inner_union) = unwrap_parenthesized(t)
-                && self.stripped_paren_hang_has_breaking_leading_run(t)
+            } else if let Some((p, inner_union)) =
+                // Asked through [`Self::paren_union_line_comment_member`], the accessor the
+                // intersection's three readers ask — this is the fourth. Its first question
+                // is `member_parens`, which reads [`Printer::printed_operand`] and so sees
+                // THROUGH a transparent one-member composite: a pair around `| C` is not
+                // required, so it does not survive, and the keep-inside layout is not this
+                // member's. Spelled here as its own triple, the arm answered a shape
+                // `member_pair_layout` routes to `MemberPairLayout::None`, retaining a pair
+                // that strips and printing the shell's run INSIDE it — beside the copy the
+                // widened `edge_claim` had already given the gap emitter above. Every pass
+                // re-read the retained pair and added another copy, so a `//` in the
+                // composite's head gap grew the run WITHOUT BOUND.
+                //
+                // ⚠️ Both halves of the accessor read THROUGH the author's extra layers,
+                // because the ROUTER above does
+                // ([`Self::union_member_paren_leading_line_comment`]) and a member it routed
+                // here must find an emitter. A direct-child match plus the shallow one-paren
+                // window missed `X | ((// c⏎A | B))`: the run fell to the default arm, whose
+                // `ShellLeadingRun::Upstream` licence is granted on an upstream emitter
+                // EXISTING — this arm — so nothing printed it and the comment was DROPPED.
+                // The pair the shells collapse into is the outermost, and
+                // `build_parenthesized_union_doc`'s window already spans from it to the
+                // union, so any nesting depth emits the whole run.
+                self.paren_union_line_comment_member(t, member_parens)
             {
                 // `first_leading` is non-empty only for the first member (see its
                 // declaration); a later member's leading comments were emitted on their
@@ -2970,11 +3074,15 @@ impl<'a> Printer<'a> {
                 // `head.run` is non-empty exactly when the first member brings a shell run
                 // of its own, and that is the case [`Printer::shell_printed_head_start`]
                 // stops short of — so today no claim can span this gap. Probed: armed with a
-                // panic, it fired on none of the 4,725 fixtures nor on any of `gap_audit`'s
-                // 5.2M injections. It stays because the claim is matched by CONTAINMENT, so
-                // a wider claim from some other seam is the residue that argument does not
-                // cover, and because relaxing that stop (the filed union-FIRST-member
-                // double-print is the candidate) makes this the line that keeps it honest.
+                // panic, it fired on none of the 4,725 fixtures, on none of `gap_audit`'s
+                // 5.2M injections, and on none of a 7,488-cell composite-under-shell-run
+                // sweep. It stays because the claim is matched by CONTAINMENT, so a wider
+                // claim from some other seam is the residue that argument does not cover.
+                // ⚠️ The union-FIRST-member double-print this comment once named as the
+                // change that would make it fire is CLOSED, and it did not: that arm was
+                // routed through [`Self::paren_union_line_comment_member`] rather than by
+                // relaxing the resolver's stop, so the stop still holds and the belt is
+                // still a belt. Relaxing the stop itself remains the candidate.
                 let mut run: CommentVec<'_> = if head_region_claimed {
                     smallvec![]
                 } else {
