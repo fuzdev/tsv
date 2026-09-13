@@ -958,6 +958,14 @@ pub fn build_linearized_chain_doc(
     // a cell because the base's doc is built inside the layout selection below
     // ([`Printer::with_frozen_chain_base`]); the scope is that one operand, Rule A's child
     // scope, since a whole-chain slice would have to contain the `)` the strip removes.
+    //
+    // TODO: `nodes[0]` is the linearizer's LEAF, not the construct's immediate child, so an
+    // author who parenthesized more than one chain level freezes the wrong unit — the
+    // directive hoists out and the operand normalizes (`(⏎// prettier-ignore⏎a  .b⏎).k` prints
+    // `a.b.k`, prettier keeping `a  .b.k`). The non-null door reaches the same seam and drops
+    // the pair with it (`(⏎// prettier-ignore⏎a?.b⏎)!` prints an unindented `a?.b!` under a
+    // glued directive, which is not a fixed point). Both predate the freeze's pair work and
+    // want the shell the author wrote, not the leaf, as the freeze unit.
     let frozen_base = match nodes.first() {
         Some(ChainNode::Base { expr: base, .. }) => {
             printer.left_spine_operand_frozen_span(head_start, base)

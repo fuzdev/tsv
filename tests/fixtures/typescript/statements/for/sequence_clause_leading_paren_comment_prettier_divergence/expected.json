@@ -1,0 +1,690 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 443,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An own-line comment inside the grouping shell the parser erases ahead of a for-header",
+			"start": 20,
+			"end": 108,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " sequence clause's FIRST operand. The shell is gone, so the comment leads the clause.",
+			"start": 110,
+			"end": 197,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 207,
+			"end": 212,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A block comment answers the same way.",
+			"start": 250,
+			"end": 290,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 300,
+			"end": 308,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 2
+				},
+				"end": {
+					"line": 14,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The update clause reads the same gap.",
+			"start": 346,
+			"end": 386,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 404,
+			"end": 409,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 2
+				},
+				"end": {
+					"line": 25,
+					"column": 7
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 442,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 433,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 30,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ForStatement",
+					"start": 199,
+					"end": 247,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"init": {
+						"type": "SequenceExpression",
+						"start": 215,
+						"end": 226,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 2
+							},
+							"end": {
+								"line": 6,
+								"column": 13
+							}
+						},
+						"expressions": [
+							{
+								"type": "BinaryExpression",
+								"start": 216,
+								"end": 222,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 3
+									},
+									"end": {
+										"line": 6,
+										"column": 9
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 216,
+									"end": 217,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 3
+										},
+										"end": {
+											"line": 6,
+											"column": 4
+										}
+									},
+									"name": "a"
+								},
+								"operator": "in",
+								"right": {
+									"type": "Identifier",
+									"start": 221,
+									"end": 222,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 8
+										},
+										"end": {
+											"line": 6,
+											"column": 9
+										}
+									},
+									"name": "b"
+								}
+							},
+							{
+								"type": "Identifier",
+								"start": 225,
+								"end": 226,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 12
+									},
+									"end": {
+										"line": 6,
+										"column": 13
+									}
+								},
+								"name": "c"
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c1",
+								"start": 207,
+								"end": 212
+							}
+						]
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 235,
+						"end": 247,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 3
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 239,
+								"end": 244,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 239,
+									"end": 243,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 239,
+										"end": 241,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 2
+											},
+											"end": {
+												"line": 9,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An own-line comment inside the grouping shell the parser erases ahead of a for-header",
+							"start": 20,
+							"end": 108
+						},
+						{
+							"type": "Line",
+							"value": " sequence clause's FIRST operand. The shell is gone, so the comment leads the clause.",
+							"start": 110,
+							"end": 197
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 292,
+					"end": 343,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 2
+						}
+					},
+					"init": {
+						"type": "SequenceExpression",
+						"start": 311,
+						"end": 322,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 2
+							},
+							"end": {
+								"line": 15,
+								"column": 13
+							}
+						},
+						"expressions": [
+							{
+								"type": "BinaryExpression",
+								"start": 312,
+								"end": 318,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 3
+									},
+									"end": {
+										"line": 15,
+										"column": 9
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 312,
+									"end": 313,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 3
+										},
+										"end": {
+											"line": 15,
+											"column": 4
+										}
+									},
+									"name": "a"
+								},
+								"operator": "in",
+								"right": {
+									"type": "Identifier",
+									"start": 317,
+									"end": 318,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 8
+										},
+										"end": {
+											"line": 15,
+											"column": 9
+										}
+									},
+									"name": "b"
+								}
+							},
+							{
+								"type": "Identifier",
+								"start": 321,
+								"end": 322,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 12
+									},
+									"end": {
+										"line": 15,
+										"column": 13
+									}
+								},
+								"name": "c"
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 300,
+								"end": 308
+							}
+						]
+					},
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 331,
+						"end": 343,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 3
+							},
+							"end": {
+								"line": 19,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 335,
+								"end": 340,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 335,
+									"end": 339,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 2
+										},
+										"end": {
+											"line": 18,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 335,
+										"end": 337,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 2
+											},
+											"end": {
+												"line": 18,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment answers the same way.",
+							"start": 250,
+							"end": 290
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 388,
+					"end": 432,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 2
+						}
+					},
+					"init": null,
+					"test": null,
+					"update": {
+						"type": "SequenceExpression",
+						"start": 412,
+						"end": 416,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 2
+							},
+							"end": {
+								"line": 26,
+								"column": 6
+							}
+						},
+						"expressions": [
+							{
+								"type": "Identifier",
+								"start": 412,
+								"end": 413,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 2
+									},
+									"end": {
+										"line": 26,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "Identifier",
+								"start": 415,
+								"end": 416,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 5
+									},
+									"end": {
+										"line": 26,
+										"column": 6
+									}
+								},
+								"name": "c"
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c3",
+								"start": 404,
+								"end": 409
+							}
+						]
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 420,
+						"end": 432,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 3
+							},
+							"end": {
+								"line": 29,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 424,
+								"end": 429,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 2
+									},
+									"end": {
+										"line": 28,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 424,
+									"end": 428,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 2
+										},
+										"end": {
+											"line": 28,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 424,
+										"end": 426,
+										"loc": {
+											"start": {
+												"line": 28,
+												"column": 2
+											},
+											"end": {
+												"line": 28,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The update clause reads the same gap.",
+							"start": 346,
+							"end": 386
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

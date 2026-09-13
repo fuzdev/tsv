@@ -41,4 +41,14 @@
 			b  (  2  )
 		);
 	}
+
+	function fn6() {
+		// the shell the parser erased from that sequence's LAST operand is inside the slice
+		// too, so a comment written in it prints once, from the slice
+		return (
+			// prettier-ignore
+			a  (  1  ),
+			(  b  (  2  ) /* t */  )
+		);
+	}
 </script>

@@ -39,16 +39,23 @@ around the class alone, the answer a leftmost object literal already gets for it
 `leftmost_arrow_body_parens_span`). Prettier drops the pair at every shape that rule
 reaches — `() => (@dec class {}).bbb`, `…()`, `… ? a : b`, and the bare
 `() => (@dec class {})` — and the result parses under no parser: tsc reports
-`'{' expected`, and so does prettier's own TypeScript parser on its own output. Prettier is
-nevertheless idempotent on that output at the `.svelte` level, because
-prettier-plugin-svelte catches that `SyntaxError` and passes the script block through
-verbatim — so the fixture's missing `audit_signature.txt` is the ordinary F4b fixed point. An *undecorated* `class {}` opens a
-concise body fine and stays bare in both tools, and at **statement** position both already
-parenthesize (`(@dec class {}).nnn;`) — the fixture carries both as controls. A frozen body
-whose **root** is the class takes the same pair, outside the verbatim slice, like every
-other required pair at a value head; a frozen **composite** body still prints pair-less,
-since the slice is emitted from the arrow-body position and never reaches the leftmost
-node's target — the plain-object twin (`{a: 1}.k`) is the older half of that one gap.
+`'{' expected`, and so does prettier's own TypeScript parser on its own output. Prettier's
+second pass on that output does not run at all — the Svelte plugin re-parses the script
+block and throws — and F4b explicitly tolerates an erroring pass (no `audit_signature.txt`
+can represent a truncated chain), so the fixture's missing signature is sanctioned rather
+than an ordinary fixed point. An *undecorated* `class {}` opens a concise body fine and
+stays bare in both tools, and at **statement** position both already
+parenthesize (`(@dec class {}).nnn;`) — the fixture carries both as controls. At
+**`export default`** the pair goes around the whole expression instead
+(`export default (@dec class {}.nnn);`), which tsc accepts and prettier prints the same way.
+A frozen body whose **root** is the class takes the same pair, re-synthesized outside the
+verbatim slice, like every other required pair at a value head. A frozen **composite** body
+re-synthesizes nothing: acorn's member / call / binary span begins at the author's `(`, so a
+`=>`-gap freeze over `(@dec class {}).bbb` already carries that pair INSIDE the slice and
+prints it back byte for byte (the plain-object twin `({a: 1}).k` the same way). What produces
+that same form from the **shell** authoring — the directive written inside the parens the
+parser erased — is the position-pair seam that also serves the expression statement:
+`() => (⏎// prettier-ignore⏎@dec class {}⏎).bbb` prints `(@dec class {}).bbb`.
 
 **Constrained infer extends-operand parens**: An `infer X extends C` only ever appears in a conditional type's extends-type, so a trailing token always follows the constraint. When a _nested_ arrow's return abuts the enclosing `? :`, the parens TypeScript requires are the only thing keeping the parse unambiguous, and Prettier strips them, emitting output that **fails to re-parse** (acorn-typescript rejects it): `M extends (() => () => infer U extends string) ? …` → `M extends () => () => infer U extends string ? …` (Prettier's `needs-parentheses` rule only inspects the immediate return type). tsv keeps the parens, staying valid. Two related forms are preserved by both formatters: the _conditional-type_ infer constraint (`X extends infer U extends (A extends B ? C : D) ? …` — Prettier keeps these parens) and the single-arrow return (`M extends (() => infer U extends string) ? …` — Prettier's single-level rule covers it; see [constrained_extends_parens](../tests/fixtures/typescript/types/infer/constrained_extends_parens/), where tsv matches). A bare `<T extends (A extends B ? C : D)>` type-parameter declaration is unaffected: the `>` terminates it, so Prettier strips and tsv matches.
 

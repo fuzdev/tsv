@@ -7,6 +7,7 @@
 use super::types::{ChainGroup, ChainNode, NonNullGap, is_numeric_index};
 use crate::ast::internal::{self, Expression};
 use crate::printer::expressions::ChainBaseTernary;
+use crate::printer::ignore::FrozenOperandPair;
 use crate::printer::{LeadingGlue, ParenContext, Printer, needs_parens};
 use tsv_lang::Span;
 use tsv_lang::doc::{
@@ -105,22 +106,49 @@ pub(crate) fn print_node_inner<'a>(
             // (`chain::analysis::build_linearized_chain_doc`): the verbatim slice stands in
             // for the base's doc, and the pair this position may print closes around it
             // exactly as it does around a built one.
+            let base_start = expr.span().start;
+            let base_end = expr.span().end;
+            // The pair's trailing gap, one reading for both the frozen and the unfrozen
+            // arm; lazy, since only a base that prints a pair asks. The window it opens is
+            // documented at the unfrozen emitter call below, with the rest of the pair's
+            // gap reading.
+            let trailing_gap = || {
+                paren_comment_end.map(|end| (base_end, end)).or_else(|| {
+                    printer.owned_pair_trailing_gap(base_end, paren_leading_start.is_some())
+                })
+            };
             if let Some(frozen) = printer.frozen_chain_base_span(expr) {
+                let slice = printer.build_frozen_expression_doc(expr, frozen);
+                // A base that OWNS its leading gap prints a pair that SURVIVES, and the
+                // directive sits INSIDE it — the same emitter the unfrozen arm reaches
+                // below, so the author's own line is kept where the reparse reads it again.
+                // Routing past it instead DROPPED the run (`docs/comments.md` hazard 4:
+                // the freeze arm emits only the base's own doc, so nothing runs the pair's
+                // gap lookup) and the directive vanished from the output.
+                if let Some(paren_start) = *paren_leading_start {
+                    return printer.build_owned_required_pair_doc(
+                        (paren_start, base_start),
+                        trailing_gap(),
+                        slice,
+                        slice,
+                        ")",
+                    );
+                }
                 // The enclosing statement's own pair rides outside the slice, for the reason
                 // [`Printer::build_left_spine_operand_doc_if`] gives: a frozen base is exactly
                 // the node an expression statement wraps so its line does not open with `{` /
                 // `function` / `class`, and the slice replaces the builder that reads that
                 // target (`({b:  1}).k;` would otherwise print `{b:  1}.k;`, which does not
-                // parse).
-                let slice = printer.wrap_frozen_position_pair(
+                // parse). `required` carries the node's own verdict: a chain base holds one
+                // the free function cannot reproduce ([`FrozenOperandPair::Position`]).
+                return printer.wrap_frozen_position_pair(
                     expr,
-                    printer.build_frozen_expression_doc(expr, frozen),
+                    FrozenOperandPair::Position {
+                        ctx: ParenContext::ChainBase,
+                        required: *needs_parens,
+                    },
+                    slice,
                 );
-                return if *needs_parens {
-                    d.parens(slice)
-                } else {
-                    slice
-                };
             }
             if *needs_parens {
                 // Asked BEFORE any base doc is built — building one can re-mark the
@@ -136,14 +164,10 @@ pub(crate) fn print_node_inner<'a>(
                 let mut inner = || -> DocId {
                     *inner_memo.get_or_insert_with(|| printer.build_expression_doc(expr))
                 };
-                let base_start = expr.span().start;
-                let base_end = expr.span().end;
                 // Resolved BEFORE the bodies, because the claim below takes both and this is
                 // what says whether there are two. The window it opens is documented at the
                 // emitter call below, with the rest of the pair's gap reading.
-                let trailing_gap = paren_comment_end.map(|end| (base_end, end)).or_else(|| {
-                    printer.owned_pair_trailing_gap(base_end, paren_leading_start.is_some())
-                });
+                let trailing_gap = trailing_gap();
                 // A MULTI-LINE block the base OWNS prints just inside the pair's `(`,
                 // outside the base's own group
                 // ([`Printer::build_value_pair_with_outermost_owned_comment`]) — the pair's

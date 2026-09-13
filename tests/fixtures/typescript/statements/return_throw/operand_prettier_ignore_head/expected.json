@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 869,
+	"end": 1124,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -185,24 +185,88 @@
 					"column": 21
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " the shell the parser erased from that sequence's LAST operand is inside the slice",
+			"start": 880,
+			"end": 964,
+			"loc": {
+				"start": {
+					"line": 46,
+					"column": 2
+				},
+				"end": {
+					"line": 46,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " too, so a comment written in it prints once, from the slice",
+			"start": 967,
+			"end": 1029,
+			"loc": {
+				"start": {
+					"line": 47,
+					"column": 2
+				},
+				"end": {
+					"line": 47,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 1044,
+			"end": 1062,
+			"loc": {
+				"start": {
+					"line": 49,
+					"column": 3
+				},
+				"end": {
+					"line": 49,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 1095,
+			"end": 1102,
+			"loc": {
+				"start": {
+					"line": 51,
+					"column": 17
+				},
+				"end": {
+					"line": 51,
+					"column": 24
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 868,
+		"end": 1123,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 859,
+			"end": 1114,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 44,
+					"line": 54,
 					"column": 9
 				}
 			},
@@ -1004,6 +1068,222 @@
 										"value": " an inter-operand directive inside that sequence freezes only the following operand",
 										"start": 709,
 										"end": 794
+									}
+								]
+							}
+						]
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 861,
+					"end": 1113,
+					"loc": {
+						"start": {
+							"line": 45,
+							"column": 1
+						},
+						"end": {
+							"line": 53,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 870,
+						"end": 873,
+						"loc": {
+							"start": {
+								"line": 45,
+								"column": 10
+							},
+							"end": {
+								"line": 45,
+								"column": 13
+							}
+						},
+						"name": "fn6"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 876,
+						"end": 1113,
+						"loc": {
+							"start": {
+								"line": 45,
+								"column": 16
+							},
+							"end": {
+								"line": 53,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 1032,
+								"end": 1110,
+								"loc": {
+									"start": {
+										"line": 48,
+										"column": 2
+									},
+									"end": {
+										"line": 52,
+										"column": 4
+									}
+								},
+								"argument": {
+									"type": "SequenceExpression",
+									"start": 1066,
+									"end": 1105,
+									"loc": {
+										"start": {
+											"line": 50,
+											"column": 3
+										},
+										"end": {
+											"line": 51,
+											"column": 27
+										}
+									},
+									"expressions": [
+										{
+											"type": "CallExpression",
+											"start": 1066,
+											"end": 1076,
+											"loc": {
+												"start": {
+													"line": 50,
+													"column": 3
+												},
+												"end": {
+													"line": 50,
+													"column": 13
+												}
+											},
+											"callee": {
+												"type": "Identifier",
+												"start": 1066,
+												"end": 1067,
+												"loc": {
+													"start": {
+														"line": 50,
+														"column": 3
+													},
+													"end": {
+														"line": 50,
+														"column": 4
+													}
+												},
+												"name": "a"
+											},
+											"arguments": [
+												{
+													"type": "Literal",
+													"start": 1072,
+													"end": 1073,
+													"loc": {
+														"start": {
+															"line": 50,
+															"column": 9
+														},
+														"end": {
+															"line": 50,
+															"column": 10
+														}
+													},
+													"value": 1,
+													"raw": "1"
+												}
+											],
+											"optional": false
+										},
+										{
+											"type": "CallExpression",
+											"start": 1084,
+											"end": 1094,
+											"loc": {
+												"start": {
+													"line": 51,
+													"column": 6
+												},
+												"end": {
+													"line": 51,
+													"column": 16
+												}
+											},
+											"callee": {
+												"type": "Identifier",
+												"start": 1084,
+												"end": 1085,
+												"loc": {
+													"start": {
+														"line": 51,
+														"column": 6
+													},
+													"end": {
+														"line": 51,
+														"column": 7
+													}
+												},
+												"name": "b"
+											},
+											"arguments": [
+												{
+													"type": "Literal",
+													"start": 1090,
+													"end": 1091,
+													"loc": {
+														"start": {
+															"line": 51,
+															"column": 12
+														},
+														"end": {
+															"line": 51,
+															"column": 13
+														}
+													},
+													"value": 2,
+													"raw": "2",
+													"trailingComments": [
+														{
+															"type": "Block",
+															"value": " t ",
+															"start": 1095,
+															"end": 1102
+														}
+													]
+												}
+											],
+											"optional": false
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 1044,
+											"end": 1062
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " the shell the parser erased from that sequence's LAST operand is inside the slice",
+										"start": 880,
+										"end": 964
+									},
+									{
+										"type": "Line",
+										"value": " too, so a comment written in it prints once, from the slice",
+										"start": 967,
+										"end": 1029
 									}
 								]
 							}

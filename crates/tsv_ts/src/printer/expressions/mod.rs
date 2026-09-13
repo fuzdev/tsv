@@ -37,6 +37,7 @@ use self::operators::{OperatorBuf, SeqLayout};
 use crate::ast::internal::{BinaryExpression, Expression, TSType};
 use crate::printer::ShareTag;
 use crate::printer::comments::{CommentFilter, CommentSpacing};
+use crate::printer::ignore::FrozenOperandPair;
 use crate::printer::types::TrailingBlock;
 use crate::printer::types::helpers::unwrap_parenthesized;
 use crate::printer::{ParenContext, PatternContext, Printer, chain, class_expr_has_decorators};
@@ -1111,13 +1112,18 @@ impl<'a> Printer<'a> {
             // The cast's own erased-paren freeze: `cast_start` opens at the grouping `(`
             // the parser dropped, so an alone-on-line directive inside it is the cast's to
             // honor ([`Printer::build_left_spine_operand_doc`]).
-            let operand = self.build_left_spine_operand_doc(cast_start, expression, || {
-                if needs_parens {
-                    self.build_expression_doc_claiming_outermost(expression)
-                } else {
-                    self.build_expression_doc(expression)
-                }
-            });
+            let operand = self.build_left_spine_operand_doc(
+                cast_start,
+                expression,
+                FrozenOperandPair::Emitted,
+                || {
+                    if needs_parens {
+                        self.build_expression_doc_claiming_outermost(expression)
+                    } else {
+                        self.build_expression_doc(expression)
+                    }
+                },
+            );
             parts.push(if expands {
                 self.build_expanding_parens_body_doc(operand)
             } else {
@@ -1416,6 +1422,7 @@ impl<'a> Printer<'a> {
             let inner_doc = self.build_left_spine_operand_doc(
                 non_null_expr.span.start,
                 non_null_expr.expression,
+                FrozenOperandPair::Emitted,
                 || {
                     self.build_value_with_outermost_owned_comment(non_null_expr.expression, || {
                         self.build_expression_doc_with_indent_on_break(non_null_expr.expression)
@@ -1518,6 +1525,7 @@ impl<'a> Printer<'a> {
             let inner_doc = self.build_left_spine_operand_doc(
                 non_null_expr.span.start,
                 non_null_expr.expression,
+                FrozenOperandPair::position(ParenContext::NonNull),
                 || self.build_expression_doc(non_null_expr.expression),
             );
             d.concat(&[inner_doc, d.text("!")])

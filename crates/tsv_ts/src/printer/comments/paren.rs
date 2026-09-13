@@ -11,6 +11,7 @@ use crate::ast::internal;
 use crate::printer::ParenContext;
 use crate::printer::chain::chain_paren_leading_gap;
 use crate::printer::expressions::operators::SeqLayout;
+use crate::printer::ignore::FrozenOperandPair;
 use crate::printer::statements::TerminatorGap;
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -25,21 +26,24 @@ use tsv_lang::source_scan::{
 /// statement terminator to defer past.
 ///
 /// The distinction cannot be read off the source at the shell: both spellings put a `;`
-/// there, and only the caller knows whether it TERMINATES a statement or SEPARATES a
+/// there, and only the POSITION knows whether it TERMINATES a statement or SEPARATES a
 /// clause. Reading the byte alone sent a `for` header's init comment past the header's
 /// own separator, out of the declarator that owned it.
+///
+/// Two positions name the tail outright — the header's own declarator and sequence-operand
+/// builders ([`Printer::build_for_init_value_doc`]) — and every other value shell asks
+/// [`Printer::shell_closes_for_clause`], whose answer is a fact about the shell's own
+/// BOUNDARY rather than about the value's kind or the frame it was reached through.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ShellTail {
-    // TODO: an assignment RHS inside a `for` header takes this tail too — the header's
-    // declarator threads `ForClauseSeparator`, but `build_assignment_layout`'s shell does
-    // not — so `for (a = (b + c /* t */); ;)` defers the block past the clause `;` (frozen)
-    // or out of the statement entirely (unfrozen), neither of which is a fixed point. The
-    // tail belongs with the assignment's own caller, which is the only frame that knows.
     /// A statement value position — a declarator initializer, an assignment RHS, a
     /// `return` / `throw` argument, `export default`. A following `;` ends the statement,
     /// so a trailing block defers past it (see [`Printer::build_expression_doc_with_paren_comments`]).
     StatementTerminator,
-    /// A `for` header's init clause. A following `;` separates clauses, so nothing defers.
+    /// A `for` header CLAUSE's own value — the init declarator, the last operand of a
+    /// clause that is a sequence, and every value whose shell closes where the clause does
+    /// ([`Printer::shell_closes_for_clause`]). A following `;` separates clauses, so nothing
+    /// defers.
     ForClauseSeparator,
 }
 
@@ -102,6 +106,37 @@ fn left_side_child<'e>(expr: &'e internal::Expression<'e>) -> Option<&'e interna
         Expression::SequenceExpression(seq) => seq.expressions.first()?,
         _ => return None,
     })
+}
+
+/// Where a `SequenceExpression`'s OPERANDS stop — its last operand's end, which its span
+/// overshoots by the grouping shell the parser erased from that operand.
+///
+/// The trailing-side twin of the FIRST OPERAND's start, which the same emitters already
+/// take for the leading edge: both edges lie inside the sequence's own span, so no
+/// enclosing gap can see them and whoever prints the operands owes them.
+///
+/// ⚠️ **Not [`crate::ast::internal::Expression::printed_end`], and the two are not
+/// interchangeable.** That one answers the same shape of question — where does this node's
+/// doc stop printing — over a DISJOINT node set (an `AssignmentPattern`, whose span
+/// swallows the shell erased from its VALUE) and for a different consumer: it is the anchor
+/// every list element's trailing-comment seam takes, so widening it with this case would
+/// move that anchor at every one of them. The rule for choosing: ask `printed_end` where the
+/// question is "how far did this ELEMENT print?" and this where it is "where do the OPERANDS
+/// of a sequence end?" — the caller that then decides whether that region is the sequence's
+/// own to print, or the enclosing shell's ([`Printer::shell_trailing_gap_start`]).
+///
+/// Not widening `printed_end` has its own cost, paid at the list families: an array element,
+/// an object value or a call argument whose value is a sequence has no emitter for the shell
+/// erased from its LAST operand, so the comment written there floats out of the pair
+/// (`[(x, (y /* t */))]` → `[(x, y) /* t */]`).
+fn shell_content_end(expr: &internal::Expression<'_>) -> u32 {
+    match expr {
+        internal::Expression::SequenceExpression(seq) => seq
+            .expressions
+            .last()
+            .map_or_else(|| expr.span().end, |last| last.span().end),
+        _ => expr.span().end,
+    }
 }
 
 pub(crate) fn paren_pair_keeps_leading_run(expr: &internal::Expression<'_>) -> bool {
@@ -1029,7 +1064,9 @@ impl<'a> Printer<'a> {
         boundary_end: u32,
     ) -> Option<DocId> {
         let expr_start = expr.span().start;
-        let expr_end = expr.span().end;
+        // The trailing gap opens where the operand's doc stops printing, which for a
+        // sequence is its last operand ([`shell_content_end`]).
+        let expr_end = shell_content_end(expr);
         let open = find_char_skipping_comments(
             self.source.as_bytes(),
             node_start as usize,
@@ -1086,7 +1123,9 @@ impl<'a> Printer<'a> {
             // Bare: the shell composed below IS the sequence's required pair. Its own
             // printer takes the owned-comment claim ([`Self::build_sequence_doc_bare`] →
             // the run form), so this arm needs none.
-            internal::Expression::SequenceExpression(seq) => self.build_sequence_doc_bare(seq),
+            internal::Expression::SequenceExpression(seq) => {
+                self.build_sequence_doc_bare(seq, expr_end)
+            }
             // A MULTI-LINE block the operand OWNS prints just inside this shell's `(`,
             // outside the operand's own group
             // ([`Printer::build_value_with_outermost_owned_comment`]). This shell is the
@@ -1100,9 +1139,12 @@ impl<'a> Printer<'a> {
             // the directive keeps the line the author gave it inside it and the reparse
             // reads it in the very same place — a first pass that did not freeze would
             // normalize the author's bytes and then hold that form for good.
-            _ => self.build_left_spine_operand_doc(leading_start, expr, || {
-                self.build_expression_doc_claiming_outermost(expr)
-            }),
+            _ => self.build_left_spine_operand_doc(
+                leading_start,
+                expr,
+                FrozenOperandPair::Emitted,
+                || self.build_expression_doc_claiming_outermost(expr),
+            ),
         });
         if let Some((trailing, _needs_break)) =
             self.trailing_paren_comment_parts(expr_end, inner_end)
@@ -1507,7 +1549,9 @@ impl<'a> Printer<'a> {
     ///
     /// Used for variable init, assignment RHS, and ternary branches. A `for` header's
     /// init declarator takes [`Self::build_for_init_value_doc`] instead — same handling,
-    /// minus the statement-terminator deferral its `;` does not license.
+    /// minus the statement-terminator deferral its `;` does not license; a value of one of
+    /// these positions that IS a header clause's own gets that answer here, through
+    /// [`Self::shell_closes_for_clause`].
     pub(crate) fn build_expression_doc_with_paren_comments(
         &self,
         expr: &internal::Expression<'_>,
@@ -1517,10 +1561,57 @@ impl<'a> Printer<'a> {
         self.build_shell_value_doc(
             expr,
             boundary_end,
-            ShellTail::StatementTerminator,
+            self.shell_tail(boundary_end),
             position_parens,
             None,
         )
+    }
+
+    /// Which tail a value shell closing at `boundary_end` has, for the positions that do not
+    /// name one ([`ShellTail`]).
+    fn shell_tail(&self, boundary_end: u32) -> ShellTail {
+        if self.shell_closes_for_clause(boundary_end) {
+            ShellTail::ForClauseSeparator
+        } else {
+            ShellTail::StatementTerminator
+        }
+    }
+
+    /// Whether a value shell closing at `boundary_end` is the one a `for` header CLAUSE ends
+    /// at ([`Printer::for_clause_end`]).
+    ///
+    /// ⚠️ **One fact, two consequences, which is why the builder and its caller both ask
+    /// it.** For the builder it is the tail: the `;` behind this shell separates clauses, so
+    /// a trailing block stays inline instead of deferring out of the header (a `line_suffix`
+    /// there drains past the loop's whole BODY, and the form it leaves is its own fixed
+    /// point, so no gate sees it). For the caller it says the builder placed the header's
+    /// `[~In]` pair ITSELF — inside the trailing comment, where the pair belongs
+    /// (`a = ('k' in o) /* c */`) — so a position that wraps the shell's result again
+    /// ([`Printer::wrap_for_init_in`] at the assignment RHS and the ternary branch) doubles
+    /// it. Answering the two separately is how one site comes to print `((a in b))`.
+    pub(crate) fn shell_closes_for_clause(&self, boundary_end: u32) -> bool {
+        self.for_clause_end.get() == Some(boundary_end)
+    }
+
+    /// Whether the value shell closing at `boundary` has ALREADY supplied the `for` header's
+    /// `[~In]` pair, so the position must not add one through
+    /// [`Printer::wrap_for_init_in`] / [`Printer::wrap_frozen_for_init_in`].
+    ///
+    /// Two shapes, both stated by [`Printer::build_shell_value_doc`] and neither visible
+    /// from the doc it hands back: it RETAINED the author's pair, which parenthesizes the
+    /// `in` itself ([`Self::shell_value_keeps_own_parens`]), or the shell closes the header's
+    /// own CLAUSE, where the builder places the pair inside the trailing comment
+    /// ([`Self::shell_closes_for_clause`]) — a second pair outside it would read as the
+    /// author's. Asked by the assignment RHS on both its frozen and unfrozen paths; a
+    /// `boundary` of `None` is a position with no shell, which supplied nothing.
+    pub(crate) fn shell_supplies_for_init_pair(
+        &self,
+        expr: &internal::Expression<'_>,
+        boundary: Option<u32>,
+    ) -> bool {
+        boundary.is_some_and(|end| {
+            self.shell_closes_for_clause(end) || self.shell_value_keeps_own_parens(expr, end, false)
+        })
     }
 
     /// [`Self::build_expression_doc_with_paren_comments`] for a value the position froze
@@ -1547,7 +1638,7 @@ impl<'a> Printer<'a> {
         self.build_shell_value_doc(
             expr,
             boundary_end,
-            ShellTail::StatementTerminator,
+            self.shell_tail(boundary_end),
             position_parens,
             Some(frozen),
         )
@@ -1622,12 +1713,22 @@ impl<'a> Printer<'a> {
     ) -> bool {
         // The calling position parenthesizes this value anyway, so the pair is in the
         // output whatever this builder does — nothing may cross it.
-        position_parens
-            // A line comment would swallow the following `;`, and an own-line comment has
-            // no inline placement, so either needs the parens on its own account.
-            || self
-                .comments_on_page_between(expr_end, boundary_end)
-                .any(|c| !c.is_block || self.has_newline_between(expr_end, c.span.start))
+        position_parens || self.shell_gap_holds_unplaceable_comment(expr_end, boundary_end)
+    }
+
+    /// Whether the shell's trailing gap holds a comment with **no inline placement**: a
+    /// line comment, which would swallow whatever the output puts behind it on that line,
+    /// or a comment the author gave a line of its own.
+    ///
+    /// One cause, and the two things that follow from it are why both sides ask it. Read
+    /// with the position's own answer ([`Self::shell_gap_retains_parens`]) it says the pair
+    /// must SURVIVE the strip — a stripped shell has nowhere to put such a comment. Read
+    /// alone, where the pair is not in question but its SHAPE is, it says a
+    /// self-parenthesizing value may not print its own `Aligned` pair: only the expanded
+    /// shell has a line to spare above its `)`.
+    fn shell_gap_holds_unplaceable_comment(&self, expr_end: u32, boundary_end: u32) -> bool {
+        self.comments_on_page_between(expr_end, boundary_end)
+            .any(|c| !c.is_block || self.has_newline_between(expr_end, c.span.start))
     }
 
     /// The `for`-header init counterpart of
@@ -1653,7 +1754,10 @@ impl<'a> Printer<'a> {
     /// statement terminator does exist and the deferral is correct
     /// (`for (let i = (() => { const k = (a /* c */); })(); ;)` keeps `k`'s comment past
     /// its `;`) — so the distinction is threaded from the one builder that knows it
-    /// rather than read from that flag.
+    /// rather than read from that flag. A value the header reaches through some OTHER
+    /// position — a clause that is an assignment, whose RHS shell is the assignment's own —
+    /// draws the same line from its shell's boundary
+    /// ([`Self::shell_closes_for_clause`]), never from the flag either.
     ///
     /// `frozen` is the value-head freeze this position resolved, exactly as
     /// [`Self::build_frozen_value_shell_doc`] carries it for the statement-level twin: the
@@ -1676,6 +1780,28 @@ impl<'a> Printer<'a> {
         )
     }
 
+    /// [`Self::build_for_init_value_doc`] at a `for` header sequence clause's **last
+    /// operand**, whose erased grouping shell closes at the clause's own end.
+    ///
+    /// Every earlier operand's shell gap is claimed by the comma that follows it; the last
+    /// operand's has no claimant at all, so without this the comments in it are DROPPED
+    /// (`docs/comments.md` hazard 4). It is the clause's gap in every respect the shell
+    /// builder decides — the block strips inline, a `//` or an own-line comment retains the
+    /// shell, nothing defers past a separator that terminates no statement, and a
+    /// self-parenthesizing operand takes the gap inside the pair it prints for itself —
+    /// which is why it routes to the clause's own builder rather than growing an emitter or
+    /// a tail of its own. `position_parens` is always false: nothing parenthesizes a
+    /// sequence operand, so the `[~In]` wrap is the only pair the position adds, exactly
+    /// the one the clause's `build_elem` would.
+    pub(crate) fn build_for_clause_operand_doc(
+        &self,
+        expr: &internal::Expression<'_>,
+        boundary_end: u32,
+        frozen: Option<Span>,
+    ) -> DocId {
+        self.build_for_init_value_doc(expr, boundary_end, false, frozen)
+    }
+
     /// The value's own doc inside a shell arm that does NOT print the pair itself: the
     /// verbatim frozen slice where the position resolved a freeze, else the ordinary
     /// expression doc. Both spellings supply a self-parenthesizing value's own required
@@ -1692,6 +1818,59 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Where a grouping shell's TRAILING gap opens: the position past everything the
+    /// value's own doc will print, so the shell's claim and the value's PARTITION the
+    /// source between them (`docs/comments.md` §The element-comma seam — unclaimed is a
+    /// DROP, doubly-claimed a DOUBLE-PRINT).
+    ///
+    /// Three answers, each keyed on who prints the region behind the value:
+    ///
+    /// - a FROZEN value prints its source verbatim, shell interior and all, so the gap
+    ///   opens at the end of the SLICE ([`Self::element_claim_anchor`]). Anchored inside
+    ///   it, the shell re-emits bytes the slice already printed — and, since the emitted
+    ///   form still carries the directive and re-freezes, one more copy on every later
+    ///   pass;
+    /// - a `SequenceExpression` whose gap holds the shell's `)` hands its operands' own
+    ///   trailing region to the single pair it prints ([`shell_content_end`]): that pair
+    ///   stands in for the shell the strip removed, so the comment stays where the shell
+    ///   held it (`const x = (fff, (aaa /* c */));` → `(fff, aaa /* c */)`, prettier #19263).
+    ///   Anchored at `span.end` instead, the gap reads as empty, this builder hands back the
+    ///   plain doc, and the sequence's own float-out envelope carries the comment OUT of the
+    ///   pair, where the statement's terminator moves it again on the next pass;
+    /// - everything else stops at the span end, the sequence with no `)` in its gap
+    ///   included. That gap is the caller's whole window, and a caller that bounds it at the
+    ///   value's own span — a ternary CONSEQUENT, whose scan stops where the `:` gap's
+    ///   emitter starts — leaves no room for a shell `)`, which is the tell that the region
+    ///   is the sequence's own tail rather than a shell's. Reaching into it there hands the
+    ///   comment to the pair on pass 1 and to the consequent→`:` emitter on pass 2
+    ///   (`c ? (x, (y /* t */)) : z` → `(x, y /* t */)` → `(x, y) /* t */`).
+    ///
+    /// `printer_owns_grouping` is what the source `)` scan is a proxy for: the second answer
+    /// asks whether a pair will enclose this region in the OUTPUT, and a caller whose pair
+    /// is the printer's own — the restricted productions' hanging parens, emitted whatever
+    /// the author wrote ([`Self::build_restricted_production_paren_doc`]) — already knows it
+    /// will, so it says so instead of looking for a shell that may not be there.
+    pub(in crate::printer) fn shell_trailing_gap_start(
+        &self,
+        expr: &internal::Expression<'_>,
+        boundary_end: u32,
+        frozen: Option<Span>,
+        printer_owns_grouping: bool,
+    ) -> u32 {
+        let span_end = expr.span().end;
+        let unfrozen = if matches!(expr, internal::Expression::SequenceExpression(_))
+            && (printer_owns_grouping
+                || self
+                    .collapsed_grouping_close(span_end, boundary_end)
+                    .is_some())
+        {
+            shell_content_end(expr)
+        } else {
+            span_end
+        };
+        Self::element_claim_anchor(frozen, unfrozen)
+    }
+
     fn build_shell_value_doc(
         &self,
         expr: &internal::Expression<'_>,
@@ -1700,7 +1879,7 @@ impl<'a> Printer<'a> {
         position_parens: bool,
         frozen: Option<Span>,
     ) -> DocId {
-        let expr_end = expr.span().end;
+        let expr_end = self.shell_trailing_gap_start(expr, boundary_end, frozen, false);
         // The for-header's `[~In]` parens are applied HERE rather than by the caller,
         // because only the paths below know where they belong relative to the shell's
         // comment. They are tsv's parens, not the author's, so a comment written AFTER
@@ -1726,9 +1905,10 @@ impl<'a> Printer<'a> {
             return wrap_in(self.build_shell_inner_doc(expr, frozen));
         }
 
-        // Every position this serves — variable init, assignment RHS, ternary branch —
-        // is prettier's default layout arm; the two that hang (a `return`/`throw`
-        // argument, an arrow body) claim their sequence before reaching here.
+        // Every position this serves — variable init, assignment RHS, ternary branch, a
+        // `for` clause and its last operand — is prettier's default layout arm; the two
+        // that hang (a `return`/`throw` argument, an arrow body) claim their sequence
+        // before reaching here.
         if let internal::Expression::SequenceExpression(seq) = expr {
             // A FROZEN sequence prints verbatim, so the operand-per-line layout the
             // sequence builder chooses is not available to it — its required pair takes
@@ -1736,6 +1916,23 @@ impl<'a> Printer<'a> {
             // comment goes on either path.
             return match frozen {
                 Some(frozen) => self.build_frozen_kept_paren_doc(frozen, boundary_end),
+                // A comment that forces the pair OPEN cannot ride the sequence's own
+                // `Aligned` pair at a CLAUSE separator: that layout has no line left before
+                // its `)`, so a `//` takes the `line_suffix` out past the clause's `;` and
+                // leaves the construct it was written in — and the next pass, reading it
+                // from the header's clause gap, prints it somewhere else again. The pair is
+                // the EXPANDED shell instead, with the sequence riding it BARE, since that
+                // shell IS the required pair (the same one-shell-for-both-gaps layering the
+                // ASI-sensitive operands take, [`Self::build_asi_operand_shell_doc`]). A
+                // statement position keeps the `Aligned` pair: there the `;` is a terminator
+                // and the comment deferring past it is prettier's answer and tsv's own.
+                None if tail == ShellTail::ForClauseSeparator
+                    && self.shell_gap_holds_unplaceable_comment(expr_end, boundary_end) =>
+                {
+                    let inner = self.build_sequence_doc_bare(seq, expr_end);
+                    self.build_kept_paren_shell_doc(inner, expr_end, boundary_end)
+                        .unwrap_or_else(|| self.d().parens(inner))
+                }
                 None => {
                     self.build_shell_sequence_doc(seq, expr_end, boundary_end, SeqLayout::Aligned)
                 }

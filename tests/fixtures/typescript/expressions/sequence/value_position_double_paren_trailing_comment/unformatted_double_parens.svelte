@@ -6,6 +6,10 @@
 
 	b = ((x, y) /* t */);
 
+	// ⚠️ The two ARROW-BODY cells leave the LAST OPERAND's shell unwritten in
+	// `unformatted_operand_paren`: that position takes the float-out builder, so a comment
+	// inside the shell the parser erased from the operand does not normalize to this form
+	// there. The shells the other variants add around the whole sequence do.
 	const c = () => ((x, y) /* t */);
 
 	const d = (e = ((x, y) /* t */));

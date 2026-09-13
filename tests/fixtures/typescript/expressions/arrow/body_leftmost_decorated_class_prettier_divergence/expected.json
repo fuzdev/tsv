@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1141,
+	"end": 1583,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -76,9 +76,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " it rides outside the slice. A frozen COMPOSITE body is not this fixture's claim: the",
+			"value": " it rides outside the slice.",
 			"start": 597,
-			"end": 684,
+			"end": 627,
 			"loc": {
 				"start": {
 					"line": 32,
@@ -86,38 +86,134 @@
 				},
 				"end": {
 					"line": 32,
-					"column": 88
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " slice is emitted from the position, which never reaches the leftmost node.",
-			"start": 686,
-			"end": 763,
-			"loc": {
-				"start": {
-					"line": 33,
-					"column": 1
-				},
-				"end": {
-					"line": 33,
-					"column": 78
+					"column": 31
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
-			"start": 785,
-			"end": 803,
+			"start": 649,
+			"end": 667,
 			"loc": {
 				"start": {
-					"line": 35,
+					"line": 34,
 					"column": 2
 				},
 				"end": {
-					"line": 35,
+					"line": 34,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A frozen COMPOSITE body — one whose leftmost node is the class rather than the body's",
+			"start": 691,
+			"end": 779,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 1
+				},
+				"end": {
+					"line": 37,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " root — carries that pair INSIDE the slice: acorn's member and call spans begin at the",
+			"start": 781,
+			"end": 869,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 1
+				},
+				"end": {
+					"line": 38,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " author's `(`, so the freeze takes the pair along with the class and prints it back",
+			"start": 871,
+			"end": 956,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 1
+				},
+				"end": {
+					"line": 39,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " verbatim. The position-pair seam the expression statement also uses is what mints the",
+			"start": 958,
+			"end": 1046,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 1
+				},
+				"end": {
+					"line": 40,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " same form from the shell authoring, where the directive sits inside the erased parens.",
+			"start": 1048,
+			"end": 1137,
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 1
+				},
+				"end": {
+					"line": 41,
+					"column": 90
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 1159,
+			"end": 1177,
+			"loc": {
+				"start": {
+					"line": 43,
+					"column": 2
+				},
+				"end": {
+					"line": 43,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 1225,
+			"end": 1243,
+			"loc": {
+				"start": {
+					"line": 47,
+					"column": 2
+				},
+				"end": {
+					"line": 47,
 					"column": 20
 				}
 			}
@@ -125,15 +221,15 @@
 		{
 			"type": "Line",
 			"value": " An UNDECORATED class opens a concise body fine and stays bare, and a leftmost object",
-			"start": 827,
-			"end": 914,
+			"start": 1269,
+			"end": 1356,
 			"loc": {
 				"start": {
-					"line": 38,
+					"line": 50,
 					"column": 1
 				},
 				"end": {
-					"line": 38,
+					"line": 50,
 					"column": 88
 				}
 			}
@@ -141,15 +237,15 @@
 		{
 			"type": "Line",
 			"value": " keeps the pair it always had.",
-			"start": 916,
-			"end": 948,
+			"start": 1358,
+			"end": 1390,
 			"loc": {
 				"start": {
-					"line": 39,
+					"line": 51,
 					"column": 1
 				},
 				"end": {
-					"line": 39,
+					"line": 51,
 					"column": 33
 				}
 			}
@@ -157,15 +253,15 @@
 		{
 			"type": "Line",
 			"value": " At statement position the same leftmost rule already parenthesized the class.",
-			"start": 1021,
-			"end": 1101,
+			"start": 1463,
+			"end": 1543,
 			"loc": {
 				"start": {
-					"line": 43,
+					"line": 55,
 					"column": 1
 				},
 				"end": {
-					"line": 43,
+					"line": 55,
 					"column": 81
 				}
 			}
@@ -174,19 +270,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 1140,
+		"end": 1582,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 1131,
+			"end": 1573,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 48,
+					"line": 60,
 					"column": 9
 				}
 			},
@@ -850,44 +946,44 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 765,
-					"end": 824,
+					"start": 629,
+					"end": 688,
 					"loc": {
 						"start": {
-							"line": 34,
+							"line": 33,
 							"column": 1
 						},
 						"end": {
-							"line": 36,
+							"line": 35,
 							"column": 20
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 771,
-							"end": 823,
+							"start": 635,
+							"end": 687,
 							"loc": {
 								"start": {
-									"line": 34,
+									"line": 33,
 									"column": 7
 								},
 								"end": {
-									"line": 36,
+									"line": 35,
 									"column": 19
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 771,
-								"end": 774,
+								"start": 635,
+								"end": 638,
 								"loc": {
 									"start": {
-										"line": 34,
+										"line": 33,
 										"column": 7
 									},
 									"end": {
-										"line": 34,
+										"line": 33,
 										"column": 10
 									}
 								},
@@ -895,15 +991,15 @@
 							},
 							"init": {
 								"type": "ArrowFunctionExpression",
-								"start": 777,
-								"end": 823,
+								"start": 641,
+								"end": 687,
 								"loc": {
 									"start": {
-										"line": 34,
+										"line": 33,
 										"column": 13
 									},
 									"end": {
-										"line": 36,
+										"line": 35,
 										"column": 19
 									}
 								},
@@ -914,44 +1010,44 @@
 								"params": [],
 								"body": {
 									"type": "ClassExpression",
-									"start": 807,
-									"end": 822,
+									"start": 671,
+									"end": 686,
 									"loc": {
 										"start": {
-											"line": 36,
+											"line": 35,
 											"column": 3
 										},
 										"end": {
-											"line": 36,
+											"line": 35,
 											"column": 18
 										}
 									},
 									"decorators": [
 										{
 											"type": "Decorator",
-											"start": 807,
-											"end": 811,
+											"start": 671,
+											"end": 675,
 											"loc": {
 												"start": {
-													"line": 36,
+													"line": 35,
 													"column": 3
 												},
 												"end": {
-													"line": 36,
+													"line": 35,
 													"column": 7
 												}
 											},
 											"expression": {
 												"type": "Identifier",
-												"start": 808,
-												"end": 811,
+												"start": 672,
+												"end": 675,
 												"loc": {
 													"start": {
-														"line": 36,
+														"line": 35,
 														"column": 4
 													},
 													"end": {
-														"line": 36,
+														"line": 35,
 														"column": 7
 													}
 												},
@@ -963,15 +1059,15 @@
 									"superClass": null,
 									"body": {
 										"type": "ClassBody",
-										"start": 820,
-										"end": 822,
+										"start": 684,
+										"end": 686,
 										"loc": {
 											"start": {
-												"line": 36,
+												"line": 35,
 												"column": 16
 											},
 											"end": {
-												"line": 36,
+												"line": 35,
 												"column": 18
 											}
 										},
@@ -981,8 +1077,8 @@
 										{
 											"type": "Line",
 											"value": " prettier-ignore",
-											"start": 785,
-											"end": 803
+											"start": 649,
+											"end": 667
 										}
 									]
 								}
@@ -999,58 +1095,420 @@
 						},
 						{
 							"type": "Line",
-							"value": " it rides outside the slice. A frozen COMPOSITE body is not this fixture's claim: the",
+							"value": " it rides outside the slice.",
 							"start": 597,
-							"end": 684
-						},
-						{
-							"type": "Line",
-							"value": " slice is emitted from the position, which never reaches the leftmost node.",
-							"start": 686,
-							"end": 763
+							"end": 627
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 950,
-					"end": 981,
+					"start": 1139,
+					"end": 1202,
 					"loc": {
 						"start": {
-							"line": 40,
+							"line": 42,
 							"column": 1
 						},
 						"end": {
-							"line": 40,
+							"line": 44,
+							"column": 24
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1145,
+							"end": 1201,
+							"loc": {
+								"start": {
+									"line": 42,
+									"column": 7
+								},
+								"end": {
+									"line": 44,
+									"column": 23
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1145,
+								"end": 1148,
+								"loc": {
+									"start": {
+										"line": 42,
+										"column": 7
+									},
+									"end": {
+										"line": 42,
+										"column": 10
+									}
+								},
+								"name": "ooo"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 1151,
+								"end": 1201,
+								"loc": {
+									"start": {
+										"line": 42,
+										"column": 13
+									},
+									"end": {
+										"line": 44,
+										"column": 23
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "MemberExpression",
+									"start": 1180,
+									"end": 1201,
+									"loc": {
+										"start": {
+											"line": 44,
+											"column": 2
+										},
+										"end": {
+											"line": 44,
+											"column": 23
+										}
+									},
+									"object": {
+										"type": "ClassExpression",
+										"start": 1181,
+										"end": 1196,
+										"loc": {
+											"start": {
+												"line": 44,
+												"column": 3
+											},
+											"end": {
+												"line": 44,
+												"column": 18
+											}
+										},
+										"decorators": [
+											{
+												"type": "Decorator",
+												"start": 1181,
+												"end": 1185,
+												"loc": {
+													"start": {
+														"line": 44,
+														"column": 3
+													},
+													"end": {
+														"line": 44,
+														"column": 7
+													}
+												},
+												"expression": {
+													"type": "Identifier",
+													"start": 1182,
+													"end": 1185,
+													"loc": {
+														"start": {
+															"line": 44,
+															"column": 4
+														},
+														"end": {
+															"line": 44,
+															"column": 7
+														}
+													},
+													"name": "dec"
+												}
+											}
+										],
+										"id": null,
+										"superClass": null,
+										"body": {
+											"type": "ClassBody",
+											"start": 1194,
+											"end": 1196,
+											"loc": {
+												"start": {
+													"line": 44,
+													"column": 16
+												},
+												"end": {
+													"line": 44,
+													"column": 18
+												}
+											},
+											"body": []
+										}
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 1198,
+										"end": 1201,
+										"loc": {
+											"start": {
+												"line": 44,
+												"column": 20
+											},
+											"end": {
+												"line": 44,
+												"column": 23
+											}
+										},
+										"name": "ppp"
+									},
+									"computed": false,
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 1159,
+											"end": 1177
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A frozen COMPOSITE body — one whose leftmost node is the class rather than the body's",
+							"start": 691,
+							"end": 779
+						},
+						{
+							"type": "Line",
+							"value": " root — carries that pair INSIDE the slice: acorn's member and call spans begin at the",
+							"start": 781,
+							"end": 869
+						},
+						{
+							"type": "Line",
+							"value": " author's `(`, so the freeze takes the pair along with the class and prints it back",
+							"start": 871,
+							"end": 956
+						},
+						{
+							"type": "Line",
+							"value": " verbatim. The position-pair seam the expression statement also uses is what mints the",
+							"start": 958,
+							"end": 1046
+						},
+						{
+							"type": "Line",
+							"value": " same form from the shell authoring, where the directive sits inside the erased parens.",
+							"start": 1048,
+							"end": 1137
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1205,
+					"end": 1266,
+					"loc": {
+						"start": {
+							"line": 46,
+							"column": 1
+						},
+						"end": {
+							"line": 48,
+							"column": 22
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1211,
+							"end": 1265,
+							"loc": {
+								"start": {
+									"line": 46,
+									"column": 7
+								},
+								"end": {
+									"line": 48,
+									"column": 21
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1211,
+								"end": 1214,
+								"loc": {
+									"start": {
+										"line": 46,
+										"column": 7
+									},
+									"end": {
+										"line": 46,
+										"column": 10
+									}
+								},
+								"name": "qqq"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 1217,
+								"end": 1265,
+								"loc": {
+									"start": {
+										"line": 46,
+										"column": 13
+									},
+									"end": {
+										"line": 48,
+										"column": 21
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "CallExpression",
+									"start": 1246,
+									"end": 1265,
+									"loc": {
+										"start": {
+											"line": 48,
+											"column": 2
+										},
+										"end": {
+											"line": 48,
+											"column": 21
+										}
+									},
+									"callee": {
+										"type": "ClassExpression",
+										"start": 1247,
+										"end": 1262,
+										"loc": {
+											"start": {
+												"line": 48,
+												"column": 3
+											},
+											"end": {
+												"line": 48,
+												"column": 18
+											}
+										},
+										"decorators": [
+											{
+												"type": "Decorator",
+												"start": 1247,
+												"end": 1251,
+												"loc": {
+													"start": {
+														"line": 48,
+														"column": 3
+													},
+													"end": {
+														"line": 48,
+														"column": 7
+													}
+												},
+												"expression": {
+													"type": "Identifier",
+													"start": 1248,
+													"end": 1251,
+													"loc": {
+														"start": {
+															"line": 48,
+															"column": 4
+														},
+														"end": {
+															"line": 48,
+															"column": 7
+														}
+													},
+													"name": "dec"
+												}
+											}
+										],
+										"id": null,
+										"superClass": null,
+										"body": {
+											"type": "ClassBody",
+											"start": 1260,
+											"end": 1262,
+											"loc": {
+												"start": {
+													"line": 48,
+													"column": 16
+												},
+												"end": {
+													"line": 48,
+													"column": 18
+												}
+											},
+											"body": []
+										}
+									},
+									"arguments": [],
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 1225,
+											"end": 1243
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1392,
+					"end": 1423,
+					"loc": {
+						"start": {
+							"line": 52,
+							"column": 1
+						},
+						"end": {
+							"line": 52,
 							"column": 32
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 956,
-							"end": 980,
+							"start": 1398,
+							"end": 1422,
 							"loc": {
 								"start": {
-									"line": 40,
+									"line": 52,
 									"column": 7
 								},
 								"end": {
-									"line": 40,
+									"line": 52,
 									"column": 31
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 956,
-								"end": 959,
+								"start": 1398,
+								"end": 1401,
 								"loc": {
 									"start": {
-										"line": 40,
+										"line": 52,
 										"column": 7
 									},
 									"end": {
-										"line": 40,
+										"line": 52,
 										"column": 10
 									}
 								},
@@ -1058,15 +1516,15 @@
 							},
 							"init": {
 								"type": "ArrowFunctionExpression",
-								"start": 962,
-								"end": 980,
+								"start": 1404,
+								"end": 1422,
 								"loc": {
 									"start": {
-										"line": 40,
+										"line": 52,
 										"column": 13
 									},
 									"end": {
-										"line": 40,
+										"line": 52,
 										"column": 31
 									}
 								},
@@ -1077,29 +1535,29 @@
 								"params": [],
 								"body": {
 									"type": "MemberExpression",
-									"start": 968,
-									"end": 980,
+									"start": 1410,
+									"end": 1422,
 									"loc": {
 										"start": {
-											"line": 40,
+											"line": 52,
 											"column": 19
 										},
 										"end": {
-											"line": 40,
+											"line": 52,
 											"column": 31
 										}
 									},
 									"object": {
 										"type": "ClassExpression",
-										"start": 968,
-										"end": 976,
+										"start": 1410,
+										"end": 1418,
 										"loc": {
 											"start": {
-												"line": 40,
+												"line": 52,
 												"column": 19
 											},
 											"end": {
-												"line": 40,
+												"line": 52,
 												"column": 27
 											}
 										},
@@ -1107,15 +1565,15 @@
 										"superClass": null,
 										"body": {
 											"type": "ClassBody",
-											"start": 974,
-											"end": 976,
+											"start": 1416,
+											"end": 1418,
 											"loc": {
 												"start": {
-													"line": 40,
+													"line": 52,
 													"column": 25
 												},
 												"end": {
-													"line": 40,
+													"line": 52,
 													"column": 27
 												}
 											},
@@ -1124,15 +1582,15 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 977,
-										"end": 980,
+										"start": 1419,
+										"end": 1422,
 										"loc": {
 											"start": {
-												"line": 40,
+												"line": 52,
 												"column": 28
 											},
 											"end": {
-												"line": 40,
+												"line": 52,
 												"column": 31
 											}
 										},
@@ -1149,57 +1607,57 @@
 						{
 							"type": "Line",
 							"value": " An UNDECORATED class opens a concise body fine and stays bare, and a leftmost object",
-							"start": 827,
-							"end": 914
+							"start": 1269,
+							"end": 1356
 						},
 						{
 							"type": "Line",
 							"value": " keeps the pair it always had.",
-							"start": 916,
-							"end": 948
+							"start": 1358,
+							"end": 1390
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 983,
-					"end": 1018,
+					"start": 1425,
+					"end": 1460,
 					"loc": {
 						"start": {
-							"line": 41,
+							"line": 53,
 							"column": 1
 						},
 						"end": {
-							"line": 41,
+							"line": 53,
 							"column": 36
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 989,
-							"end": 1017,
+							"start": 1431,
+							"end": 1459,
 							"loc": {
 								"start": {
-									"line": 41,
+									"line": 53,
 									"column": 7
 								},
 								"end": {
-									"line": 41,
+									"line": 53,
 									"column": 35
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 989,
-								"end": 992,
+								"start": 1431,
+								"end": 1434,
 								"loc": {
 									"start": {
-										"line": 41,
+										"line": 53,
 										"column": 7
 									},
 									"end": {
-										"line": 41,
+										"line": 53,
 										"column": 10
 									}
 								},
@@ -1207,15 +1665,15 @@
 							},
 							"init": {
 								"type": "ArrowFunctionExpression",
-								"start": 995,
-								"end": 1017,
+								"start": 1437,
+								"end": 1459,
 								"loc": {
 									"start": {
-										"line": 41,
+										"line": 53,
 										"column": 13
 									},
 									"end": {
-										"line": 41,
+										"line": 53,
 										"column": 35
 									}
 								},
@@ -1226,44 +1684,44 @@
 								"params": [],
 								"body": {
 									"type": "MemberExpression",
-									"start": 1001,
-									"end": 1017,
+									"start": 1443,
+									"end": 1459,
 									"loc": {
 										"start": {
-											"line": 41,
+											"line": 53,
 											"column": 19
 										},
 										"end": {
-											"line": 41,
+											"line": 53,
 											"column": 35
 										}
 									},
 									"object": {
 										"type": "ObjectExpression",
-										"start": 1002,
-										"end": 1012,
+										"start": 1444,
+										"end": 1454,
 										"loc": {
 											"start": {
-												"line": 41,
+												"line": 53,
 												"column": 20
 											},
 											"end": {
-												"line": 41,
+												"line": 53,
 												"column": 30
 											}
 										},
 										"properties": [
 											{
 												"type": "Property",
-												"start": 1004,
-												"end": 1010,
+												"start": 1446,
+												"end": 1452,
 												"loc": {
 													"start": {
-														"line": 41,
+														"line": 53,
 														"column": 22
 													},
 													"end": {
-														"line": 41,
+														"line": 53,
 														"column": 28
 													}
 												},
@@ -1272,15 +1730,15 @@
 												"computed": false,
 												"key": {
 													"type": "Identifier",
-													"start": 1004,
-													"end": 1007,
+													"start": 1446,
+													"end": 1449,
 													"loc": {
 														"start": {
-															"line": 41,
+															"line": 53,
 															"column": 22
 														},
 														"end": {
-															"line": 41,
+															"line": 53,
 															"column": 25
 														}
 													},
@@ -1288,15 +1746,15 @@
 												},
 												"value": {
 													"type": "Literal",
-													"start": 1009,
-													"end": 1010,
+													"start": 1451,
+													"end": 1452,
 													"loc": {
 														"start": {
-															"line": 41,
+															"line": 53,
 															"column": 27
 														},
 														"end": {
-															"line": 41,
+															"line": 53,
 															"column": 28
 														}
 													},
@@ -1309,15 +1767,15 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 1014,
-										"end": 1017,
+										"start": 1456,
+										"end": 1459,
 										"loc": {
 											"start": {
-												"line": 41,
+												"line": 53,
 												"column": 32
 											},
 											"end": {
-												"line": 41,
+												"line": 53,
 												"column": 35
 											}
 										},
@@ -1333,72 +1791,72 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 1103,
-					"end": 1130,
+					"start": 1545,
+					"end": 1572,
 					"loc": {
 						"start": {
-							"line": 44,
+							"line": 56,
 							"column": 1
 						},
 						"end": {
-							"line": 47,
+							"line": 59,
 							"column": 7
 						}
 					},
 					"expression": {
 						"type": "MemberExpression",
-						"start": 1103,
-						"end": 1129,
+						"start": 1545,
+						"end": 1571,
 						"loc": {
 							"start": {
-								"line": 44,
+								"line": 56,
 								"column": 1
 							},
 							"end": {
-								"line": 47,
+								"line": 59,
 								"column": 6
 							}
 						},
 						"object": {
 							"type": "ClassExpression",
-							"start": 1107,
-							"end": 1122,
+							"start": 1549,
+							"end": 1564,
 							"loc": {
 								"start": {
-									"line": 45,
+									"line": 57,
 									"column": 2
 								},
 								"end": {
-									"line": 46,
+									"line": 58,
 									"column": 10
 								}
 							},
 							"decorators": [
 								{
 									"type": "Decorator",
-									"start": 1107,
-									"end": 1111,
+									"start": 1549,
+									"end": 1553,
 									"loc": {
 										"start": {
-											"line": 45,
+											"line": 57,
 											"column": 2
 										},
 										"end": {
-											"line": 45,
+											"line": 57,
 											"column": 6
 										}
 									},
 									"expression": {
 										"type": "Identifier",
-										"start": 1108,
-										"end": 1111,
+										"start": 1550,
+										"end": 1553,
 										"loc": {
 											"start": {
-												"line": 45,
+												"line": 57,
 												"column": 3
 											},
 											"end": {
-												"line": 45,
+												"line": 57,
 												"column": 6
 											}
 										},
@@ -1410,15 +1868,15 @@
 							"superClass": null,
 							"body": {
 								"type": "ClassBody",
-								"start": 1120,
-								"end": 1122,
+								"start": 1562,
+								"end": 1564,
 								"loc": {
 									"start": {
-										"line": 46,
+										"line": 58,
 										"column": 8
 									},
 									"end": {
-										"line": 46,
+										"line": 58,
 										"column": 10
 									}
 								},
@@ -1427,15 +1885,15 @@
 						},
 						"property": {
 							"type": "Identifier",
-							"start": 1126,
-							"end": 1129,
+							"start": 1568,
+							"end": 1571,
 							"loc": {
 								"start": {
-									"line": 47,
+									"line": 59,
 									"column": 3
 								},
 								"end": {
-									"line": 47,
+									"line": 59,
 									"column": 6
 								}
 							},
@@ -1448,8 +1906,8 @@
 						{
 							"type": "Line",
 							"value": " At statement position the same leftmost rule already parenthesized the class.",
-							"start": 1021,
-							"end": 1101
+							"start": 1463,
+							"end": 1543
 						}
 					]
 				}

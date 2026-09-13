@@ -7,6 +7,11 @@
 	const b = cond ? /* c */ (x ?? y) : q;
 	const c = cond ? p : /* c */ (x ?? y);
 
+	// a nested ternary TEST keeps the pair for its own reason — `?:` is right-associative, so
+	// bare the test re-binds into the enclosing ternary's alternate — and the comment stays
+	// inside it
+	const e = /* c */ (f ? g : h) ? p : q;
+
 	// every operand at once
 	const d = /* c1 */ (x ?? y) ? /* c2 */ (p ?? q) : /* c3 */ (r ?? s);
 </script>

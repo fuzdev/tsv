@@ -29,11 +29,23 @@
 			: ggg;
 
 	// A frozen body whose ROOT is the class takes the same pair — it is the position's, so
-	// it rides outside the slice. A frozen COMPOSITE body is not this fixture's claim: the
-	// slice is emitted from the position, which never reaches the leftmost node.
+	// it rides outside the slice.
 	const hhh = () =>
 		// prettier-ignore
 		(@dec  class  {});
+
+	// A frozen COMPOSITE body — one whose leftmost node is the class rather than the body's
+	// root — carries that pair INSIDE the slice: acorn's member and call spans begin at the
+	// author's `(`, so the freeze takes the pair along with the class and prints it back
+	// verbatim. The position-pair seam the expression statement also uses is what mints the
+	// same form from the shell authoring, where the directive sits inside the erased parens.
+	const ooo = () =>
+		// prettier-ignore
+		(@dec  class  {}).ppp;
+
+	const qqq = () =>
+		// prettier-ignore
+		(@dec  class  {})();
 
 	// An UNDECORATED class opens a concise body fine and stays bare, and a leftmost object
 	// keeps the pair it always had.
