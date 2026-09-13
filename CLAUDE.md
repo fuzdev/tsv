@@ -217,15 +217,15 @@ deno task paren:audit                # authoring-independence over redundant PAR
 #                          (`a ?? (b ?? c)`). Zero-tolerance, no ratchet — a redundant paren carries no authoring
 #                          signal, so every divergence is a bug. The class is invisible on every paren-free
 #                          authoring, which is every authoring a formatted corpus holds (bug539)
-deno task fuzz:audit                 # seeded mutational fuzzer (fixed seed/iterations): no-panic + idempotency + structural reparse
+deno task fuzz:audit                 # seeded mutational fuzzer (fixed seed/iterations): no-panic + idempotency + structural reparse; its token dictionary carries `// prettier-ignore`, the only standing instrument that composes a freeze with a comment or a paren shell
 deno task swallow:audit              # `//` line comment swallowing following output-line content (also over real code via audit:corpus)
 deno task comments:audit             # print-once comment ledger: DROPPED / DOUBLE-PRINTED comments
-deno task gaps:audit                 # gap-injection RATCHET, ~17 s (./docs/gap_audit.md; also :update and :rank for triage)
+deno task gaps:audit                 # gap-injection RATCHET, ~37 s: ledger DROPPED/DOUBLE-PRINTED + SWALLOW + a bare reparse of every output (UNREPARSEABLE — a comment relocated into a slot the grammar forbids; the class no as-authored gate reaches) (./docs/gap_audit.md; also :update and :rank for triage)
 deno task blanks:audit               # blank-line injection RATCHET + the blank-DROP absorb pin (a new kind of silently-eaten blank fails), ~30 s (./docs/blank_audit.md; also :update)
 deno task fabrication:audit          # blank-FABRICATION on pristine seeds — the F1-blind counterpart to blanks (ratchet born EMPTY; also :update)
 deno task census:audit               # comment CENSUS: raw input-vs-output trivia multisets per language bucket (own scanners, never parse().comments) — catches parse-time drops/merges/rewrites the ledger can't see (also :update)
 deno task width:audit                # print-width RATCHET: a new KIND of over-width output line — the ONLY gate that measures a column. ⚠️ NOT a debt list (sanctioned overruns are real); also :update
-deno task ignore:audit               # `prettier-ignore` honoring RATCHET: honoring, second-pass stability, freeze scope, trailing inertness (also :update)
+deno task ignore:audit               # `prettier-ignore` honoring RATCHET: honoring, second-pass stability, freeze scope, trailing inertness, output reparse (a freeze that emits a dead document) (also :update)
 deno task razor:audit                # print-width RAZOR SWEEP: pads a text word to walk each Svelte seed across column 100, grading F1 + the stray line-head boundary space at every width — the ONLY instrument that varies WIDTH, and the only one that can see a mangled form that is its own fixed point (pure Rust; ./docs/audits.md)
 deno task engines:audit              # ENGINE PARITY: the wasm32 build and the native build must format every
 #                          file to the SAME BYTES — exit code, changed-path list, diagnostics and all ~18k

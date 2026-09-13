@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 
 use crate::audit::properties::{
-    Formatted, UnverifiedCause, Verdict, ledger_format, ledger_format_with_comments,
+    Formatted, UnverifiedCause, Verdict, ledger_format, ledger_format_with_comments, tsv_parses,
 };
 use tsv_cli::cli::input::ParserType;
 
@@ -60,6 +60,18 @@ pub(super) fn verify_example(example: &Example, kind: Kind, parser: ParserType) 
         Ok(s) => s,
         Err(cause) => return Verdict::Unconfirmed(cause),
     };
+
+    // An unreparseable output is directly observable: re-run the same reparse the record pass
+    // ran. The ledger's content oracle below answers a different question (a dead output
+    // still conserves every comment), so this kind never reaches it.
+    if kind == Kind::Unreparseable {
+        return match ledger_format(&injected, parser) {
+            Formatted::Ok { output, .. } if !tsv_parses(&output, parser) => Verdict::Confirmed,
+            Formatted::Ok { .. } => Verdict::Unconfirmed(UnverifiedCause::NoLongerFires),
+            Formatted::Rejected => Verdict::Unconfirmed(UnverifiedCause::InjectionRejected),
+            Formatted::Panicked => Verdict::Unconfirmed(UnverifiedCause::InjectionPanicked),
+        };
+    }
 
     let (findings, input_comments, output) = match ledger_format_with_comments(&injected, parser) {
         Formatted::Ok {
