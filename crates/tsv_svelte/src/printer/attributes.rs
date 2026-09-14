@@ -202,15 +202,41 @@ impl<'a> Printer<'a> {
     /// follows — see [`Self::leading_js_comment_separator`], which owns that rule. A `//`
     /// always takes the hardline: it runs to end of line, so the glued answer is never
     /// available to it.
+    ///
+    /// The no-blank form of [`Self::build_leading_js_comment_doc_before`], for a caller
+    /// that emits one comment with nothing of the run's own behind it.
     pub(super) fn build_leading_js_comment_doc(&self, comment: &Comment) -> DocId {
+        self.build_leading_js_comment_doc_before(comment, comment.span.end)
+    }
+
+    /// [`Self::build_leading_js_comment_doc`] with what follows the comment in hand —
+    /// `next_start`, the next comment of the run or the value — so an author **blank line**
+    /// after a `//` survives as a `literalline` ahead of the comment's hardline. The `//`
+    /// forces that break, so the blank it separates is the author's and not a layout the
+    /// head could collapse; every keyword→value gap keeps it the same way (`tsv_ts`'s
+    /// `Printer::append_keyword_value_line_comments`), and prettier keeps it at every braced
+    /// head. A blank ABOVE the run sits against the delimiter and is erased, as everywhere,
+    /// and a block's separator is untouched. The scan is the strict one: a stripped paren's
+    /// `)` between the newlines is content, not a blank.
+    pub(super) fn build_leading_js_comment_doc_before(
+        &self,
+        comment: &Comment,
+        next_start: u32,
+    ) -> DocId {
         let d = self.d();
         let doc = tsv_ts::build_comment_doc(d, comment, &self.ts_inputs());
-        let separator = if comment.is_block {
-            self.leading_js_comment_separator(comment)
+        if comment.is_block {
+            return d.concat(&[doc, self.leading_js_comment_separator(comment)]);
+        }
+        if tsv_lang::printing::has_blank_line_between_strict(
+            self.source,
+            comment.span.end,
+            next_start,
+        ) {
+            d.concat(&[doc, d.literalline(), d.hardline()])
         } else {
-            d.hardline()
-        };
-        d.concat(&[doc, separator])
+            d.concat(&[doc, d.hardline()])
+        }
     }
 
     /// What separates a **block** leading comment from the construct it leads: a space when

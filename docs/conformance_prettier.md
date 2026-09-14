@@ -341,7 +341,11 @@ its tail:
   value hanging together (`{@html⏎\t// c⏎\texpr⏎}`), where prettier pulls it up onto the
   head's line at every one of them
   ([expr_leading_own_line](../tests/fixtures/svelte/syntax/comments/expr_leading_own_line_prettier_divergence/),
-  the same sweep). That shape is not new — it is the one an honored `prettier-ignore` in
+  the same sweep). An author **blank** after the comment survives in either authoring, as at
+  every forced continuation — both formatters keep it, and only the placement and indent
+  diverge
+  ([expr_leading_blank](../tests/fixtures/svelte/syntax/comments/expr_leading_blank_prettier_divergence/)).
+  That shape is not new — it is the one an honored `prettier-ignore` in
   this gap already took, because a directive flush against the prefix is inert under the
   placement floor; one resolver answers both (`Printer::head_layout`), so the freeze
   is a special case of the ordinary own-line form rather than a rule beside it. And the

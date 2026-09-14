@@ -33,13 +33,19 @@ What the cases pin:
 - **c5/c6** — a nested conditional's check type and an intersection head hang as a simple
   type does.
 - **c7** — a chained conditional's gap, one level deeper.
+- **c9** — a hugging object-type branch hangs the same way.
+- **c10 / c11** — a block glued to the branch rides below the own-line comment with it.
 - **c8** — the control: a comment authored **on** the operator's line trails it in both
   formatters. Both authorings are stable under tsv.
 
 `unformatted_ours_compact` authors every case flush and unspaced;
-`unformatted_ours_paren_shell` puts the `c5` and `c6` runs inside a redundant paren shell
-around the branch's leading edge, which strips to the same fixed point (prettier's chain
-from it is pinned by `audit_signature_paren_shell.txt`).
+`unformatted_ours_paren_shell` puts every run inside a redundant paren shell — around the
+whole branch at `c1`, `c2`, `c3`/`c4`, `c7`, `c9` and `c10`/`c11`, and around the branch's leading edge (a
+nested conditional's check type, an intersection's first member) at `c5` and `c6`; each strips
+to the same fixed point, the run staying in the gap it was written in (prettier's chain from
+it is pinned by `audit_signature_paren_shell.txt`). `unformatted_ours_paren_shell_nested`
+shells the whole nested conditional at `c5` instead, which strips to the same form as the
+check-type shell.
 
 See [conformance_prettier.md §Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy)
 and [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

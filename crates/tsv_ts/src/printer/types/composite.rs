@@ -166,17 +166,22 @@ impl<'a> Printer<'a> {
     /// paren-stripped inner instead — the shell it would otherwise claim IS the branch, and
     /// the run inside it is the directive this route exists to keep in the operator gap.
     ///
-    /// A redundant shell that IS the branch, holding a block run that FORCES a break
-    /// ([`Printer::block_run_forces_break`]) and no `//`, is claimed whole: the run is the
+    /// A redundant shell that IS the branch, holding a run that FORCES a break — a `//`
+    /// the author started on its OWN line inside the shell
+    /// ([`Self::branch_shell_own_line_run`]), or a block run that does
+    /// ([`Printer::block_run_forces_break`]) with no `//` — is claimed whole: the run is the
     /// `?`/`:` gap's — the gate below routes on it (`comments_force_own_line_between`) and
-    /// the breaking layout's branch emitter hangs it at the branch's own indent, which is
-    /// where the reparse, the shell gone, lays it out. Left to the shell's emitter the run
-    /// printed at the shell's indent inside the flat layout, and pass 2 re-laid it: a
-    /// two-pass convergence at every such branch, measured. The leading-EDGE descent
-    /// deliberately does not reach a shell that is the value itself (that is the
-    /// keyword→value seam's first branch), and a `//` run has its own path here — the
-    /// relocation ([`Self::branch_relocatable_run`]) or the shell's own emitter where that
-    /// declines — so neither is claimed by this arm.
+    /// the breaking layout's branch emitter ([`Self::push_conditional_branch_gap_run`]) lays
+    /// it out by the gap's own rule at the branch's own indent, which is where the reparse,
+    /// the shell gone, finds it — the same answer the paren-free authoring gets. Left to the
+    /// shell's emitter the run printed at the shell's indent inside the flat layout, and
+    /// pass 2 re-laid it: a two-pass convergence at every such branch, measured; and an
+    /// own-line `//` relocated to trail the node BEFORE the operator, a comment the author
+    /// wrote leading the branch moved across the `?`/`:`. A `//` GLUED to the `(` is not
+    /// claimed: it sits on the operator's line and takes the relocation
+    /// ([`Self::branch_relocatable_run`]) or the shell's own emitter where that declines.
+    /// The leading-EDGE descent deliberately does not reach a shell that is the value itself
+    /// (that is the keyword→value seam's first branch), so this arm claims it.
     fn branch_claim_and_start(
         &self,
         route: BranchRoute<'_>,
@@ -190,8 +195,9 @@ impl<'a> Printer<'a> {
                     && !self.paren_retains_for_trailing_run(branch)
                 {
                     let (leading, _) = paren_shell_gaps(shell);
-                    if !self.has_line_comments_between(leading.start, leading.end)
-                        && self.block_run_forces_break(leading.start, leading.end)
+                    if self.branch_shell_own_line_run(shell)
+                        || (!self.has_line_comments_between(leading.start, leading.end)
+                            && self.block_run_forces_break(leading.start, leading.end))
                     {
                         let inner_start = unwrap_parenthesized(branch).span().start;
                         return (
@@ -464,8 +470,12 @@ impl<'a> Printer<'a> {
     /// `shell_leading_run` is the breaking layout's relocation: at
     /// [`ShellLeadingRun::Upstream`] a pure leading line-comment run has already been
     /// emitted above the operator ([`Self::stripped_paren_leading_line_comments`]), so
-    /// claiming it again would double-print it (hazard 3). The trailing gap is this
-    /// seam's in every layout.
+    /// claiming it again would double-print it (hazard 3). A shell the `?`/`:` gap CLAIMED
+    /// whole ([`Self::branch_claim_and_start`], read back through
+    /// [`Printer::shell_leading_run_claimed`] like every other branch) has no leading run
+    /// left for this seam at all — the gap printed the blocks along with the `//`, so an
+    /// `Upstream` mark, which skips only the line comments, would double-print the blocks.
+    /// The trailing gap is this seam's in every layout.
     fn build_nested_conditional_branch_doc(
         &self,
         branch: &TSType<'_>,
@@ -494,14 +504,16 @@ impl<'a> Printer<'a> {
         // the emitter to owe — and stating it as the shared axis rather than as a skipped
         // call keeps that reading checkable at the emitter rather than here.
         // `Stripped`: this branch's shell is gone (the retained one returned above), so
-        // the run's layout is the branch gap's.
-        self.push_paren_shell_leading_run(
-            &mut parts,
-            leading.start,
-            leading.end,
-            shell_leading_run,
-            ShellPair::Stripped,
-        );
+        // the run's layout is the branch gap's. A shell the gap claimed whole owes nothing.
+        if !self.shell_leading_run_claimed(branch.span().start, leading.end) {
+            self.push_paren_shell_leading_run(
+                &mut parts,
+                leading.start,
+                leading.end,
+                shell_leading_run,
+                ShellPair::Stripped,
+            );
+        }
         parts.push(self.build_conditional_type_doc_inner(inner));
         self.push_trailing_comments_in_range(&mut parts, trailing.start, trailing.end);
         d.concat(&parts)
@@ -802,9 +814,11 @@ impl<'a> Printer<'a> {
     ///   ([`Printer::build_own_line_preserving_run`], the seam that splits this very gap),
     ///   so it can never share the destination — reading the whole gap declined a
     ///   relocation both formatters perform losslessly;
-    /// - the TRUE branch's own shell run, which the breaking builder relocates onto this
-    ///   same line right behind the extends run (`T extends (// c1⏎U) ? (// c2⏎V) : W`) —
-    ///   a contributor no window over this conditional's own gaps can see.
+    /// - the TRUE branch's own GLUED shell run, which the breaking builder relocates onto
+    ///   this same line right behind the extends run (`T extends (// c1⏎U) ? (// c2⏎V) : W`)
+    ///   — a contributor no window over this conditional's own gaps can see. An own-line
+    ///   run in that shell stays in the `?` gap ([`Self::branch_shell_own_line_run`]) and
+    ///   contributes nothing.
     ///
     /// The cheap `matches!` + line-comment scan fail-fast
     /// ([`Printer::stripped_paren_has_leading_line_comment`]) gates the collector, so a
@@ -823,7 +837,7 @@ impl<'a> Printer<'a> {
             .any(|cm| !cm.is_block && self.is_same_line(extends_end, cm.span.start));
         if gap_welds
             || !self
-                .stripped_paren_leading_line_comments(c.true_type)
+                .branch_relocatable_run(c.true_type, extends_end, c.true_type.span().start)
                 .is_empty()
         {
             return None;
@@ -831,9 +845,27 @@ impl<'a> Printer<'a> {
         Some(run)
     }
 
+    /// Whether a conditional branch's redundant shell holds a `//` run the author started on
+    /// its OWN line inside the shell (`? (⏎// c⏎V)`), as against one glued to the `(`
+    /// (`? (// c⏎V)`). The two spellings part: a glued run sits on the operator's line and
+    /// takes the relocation below (or the shell's own emitter), while an own-line run is
+    /// the `?`/`:` gap's to claim ([`Self::branch_claim_and_start`]) and lays out by the
+    /// gap's rule — the line the author gave it, the branch below — the same answer the
+    /// paren-free authoring gets and the one prettier gives the shelled one too.
+    fn branch_shell_own_line_run(&self, shell: &internal::TSParenthesizedType<'_>) -> bool {
+        let (leading, _) = paren_shell_gaps(shell);
+        let mut run = self
+            .comments_to_emit_between(leading.start, leading.end)
+            .peekable();
+        run.peek()
+            .is_some_and(|first| !self.is_same_line(leading.start, first.span.start))
+            && run.any(|c| !c.is_block)
+    }
+
     /// A conditional BRANCH shell's leading line-comment run, when relocating it to trail
     /// the node before the operator is LICENSED — **empty** where it is not, leaving the
-    /// run to print inside the shell the author wrote it in.
+    /// run to print inside the shell the author wrote it in. An own-line run
+    /// ([`Self::branch_shell_own_line_run`]) is never relocated: the gap claims it.
     ///
     /// The branch-position twin of [`Self::extends_relocatable_run`], carrying the same
     /// licence: the destination line must end up holding exactly one `//`. `anchor` is the
@@ -854,7 +886,9 @@ impl<'a> Printer<'a> {
         anchor: u32,
         gap_end: u32,
     ) -> CommentVec<'_> {
-        if !self.stripped_paren_has_leading_line_comment(branch) {
+        if !self.stripped_paren_has_leading_line_comment(branch)
+            || outermost_paren(branch).is_some_and(|shell| self.branch_shell_own_line_run(shell))
+        {
             return CommentVec::new();
         }
         let run = self.stripped_paren_leading_line_comments(branch);
@@ -1364,7 +1398,10 @@ impl<'a> Printer<'a> {
     /// by the `?` and `:` arms (same nested-conditional logic as the non-breaking path).
     /// When leading line comments were relocated out of a parenthesized wrapper (any
     /// nesting depth, `paren_leading` non-empty), the doc is built from the
-    /// fully-unwrapped inner so those comments aren't emitted twice.
+    /// fully-unwrapped inner so those comments aren't emitted twice. A shell the `?`/`:`
+    /// gap CLAIMED ([`Self::branch_claim_and_start`]) is read back by the branch's own
+    /// builder — [`Self::build_nested_conditional_branch_doc`] and
+    /// `build_parenthesized_type_unwrap_doc` alike ask `shell_leading_run_claimed`.
     ///
     /// Built lazily by [`Self::build_conditional_branch_tail_doc`], whose union /
     /// intersection arms rebuild the branch from parts and would discard it.

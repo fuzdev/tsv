@@ -46,8 +46,7 @@
 
 	// a line comment ahead of a block glued to the value
 	type Z = AA extends BB
-		? (
-		// c10
+		? (// c10
 		/* c11 */ CC)
 		: DD;
 

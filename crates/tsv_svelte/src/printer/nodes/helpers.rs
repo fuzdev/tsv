@@ -166,10 +166,18 @@ impl<'a> Printer<'a> {
     /// leading-comment site (directive/tag values, block heads, `{@const}` init,
     /// braced attribute expressions, destructure patterns) flows through the one
     /// emitter that reindents+breaks a multi-line block. Empty when the range holds
-    /// none. Callers concat it, or `extend` an in-progress buffer with it.
+    /// none. Callers concat it, or `extend` an in-progress buffer with it. Each comment is
+    /// built with what follows it in hand — the next comment, or the value at `to` — so an
+    /// author blank after a `//` survives
+    /// ([`build_leading_js_comment_doc_before`](Self::build_leading_js_comment_doc_before)).
     pub(in crate::printer) fn leading_comment_docs(&self, from: u32, to: u32) -> DocBuf {
-        self.comments_to_emit_between(from, to)
-            .map(|c| self.build_leading_js_comment_doc(c))
+        let run: SmallVec<[&Comment; 4]> = self.comments_to_emit_between(from, to).collect();
+        run.iter()
+            .enumerate()
+            .map(|(i, comment)| {
+                let next_start = run.get(i + 1).map_or(to, |next| next.span.start);
+                self.build_leading_js_comment_doc_before(comment, next_start)
+            })
             .collect()
     }
 

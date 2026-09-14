@@ -46,6 +46,20 @@ type K = B extends C
 F
 : G;
 
+// A hugging object-type branch hangs the same way.
+type M = B extends C
+?
+// c9
+{x:1}
+: E;
+
+// A block glued to the branch rides below the own-line comment with it.
+type N = B extends C
+?
+// c10
+/* c11 */ D
+: E;
+
 // Control: a comment the author put ON the operator's line trails it, as before.
 type L = B extends C
 ?// c8

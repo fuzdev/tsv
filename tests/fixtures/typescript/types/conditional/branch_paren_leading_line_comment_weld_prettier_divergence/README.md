@@ -3,9 +3,11 @@
 The branch-position twin of
 [extends_paren_line_comment_weld](../extends_paren_line_comment_weld_prettier_divergence/).
 A redundant paren shell around a conditional **branch** whose leading gap holds a line
-comment relocates to trail the node before the operator — the extends-type for the `?` arm,
-the true branch for the `:` arm. That is lossless only while the destination line ends up
-holding one `//`.
+comment the author **glued to the `(`** relocates to trail the node before the operator —
+the extends-type for the `?` arm, the true branch for the `:` arm. That is lossless only
+while the destination line ends up holding one `//`. (A comment the author put on its own
+line inside the shell is the branch gap's and keeps that line —
+[branch_own_line_line_comment](../branch_own_line_line_comment_prettier_divergence/).)
 
 `unformatted_ours_shell.svelte` is the authoring under test (the comments written *inside*
 the shells); `input.svelte` is where tsv takes it, and `variant_shell.svelte` is where
