@@ -219,6 +219,16 @@ const BEYOND_ACORN_SANCTIONS: BeyondAcornSanction[] = [
 		category: 'grammar',
 		reason: '`for (v++ of …)` — an UpdateExpression is not a LeftHandSideExpression'
 	},
+	// The WHOLE head may not convert to an `AssignmentPattern` either: that node exists
+	// only as a pattern child, so `for (a = 1 in b)` has no wire shape (acorn: "Assigning
+	// to rvalue"), and tsc's checker reads the `a = 1` as a typed EXPRESSION (TS2405,
+	// the number type) rather than as a target — its parser is lenient here.
+	{
+		pattern: 'parserForStatement4.ts',
+		category: 'grammar',
+		reason:
+			'`for (a = 1 in b)` — an AssignmentExpression is not a LeftHandSideExpression, and an AssignmentPattern is never a whole head'
+	},
 	{
 		pattern: 'ES5For-of12.ts',
 		category: 'grammar',

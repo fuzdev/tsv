@@ -223,10 +223,15 @@ export const TS_FIXTURES_PINS: GatePins = { scanned: 226, both_accept: 202, over
  * `elementAccessChain.3.ts` left it, their optional-chain for-heads (TS2780 / TS2781)
  * now rejected and sanctioned under `grammar` — conformance_svelte.md §TypeScript
  * Corrections, the cast_target_for_head entry.
+ *
+ * 12283 → 12282 `accept_parity`: `parserForStatement4.ts` (`for (a = 1 in b)`) left it
+ * for the `grammar` sanctions when the whole target of an `=` / for-head stopped
+ * converting to an `AssignmentPattern` — a node that exists only as a pattern child,
+ * so the head had no wire shape (acorn rejects it too); every other bucket unmoved.
  */
 export const TS_REPO_PINS = {
 	scanned: 13708,
-	accept_parity: 12283,
+	accept_parity: 12282,
 	over_acceptance_parser: 20,
 	over_acceptance_checker: 467,
 	units_scanned: 7874,

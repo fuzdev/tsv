@@ -3,8 +3,8 @@
 // rewriting — no token consumption.
 
 use crate::ast::internal::{
-    ArrayPattern, AssignmentPattern, Expression, ObjectPattern, ObjectPatternProperty,
-    ObjectProperty, Property, RestElement, SpreadElement,
+    ArrayPattern, AssignmentOperator, AssignmentPattern, Expression, ObjectPattern,
+    ObjectPatternProperty, ObjectProperty, Property, RestElement, SpreadElement,
 };
 use tsv_lang::ParseError;
 
@@ -48,7 +48,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - ObjectExpression → ObjectPattern
     /// - ArrayExpression → ArrayPattern
     /// - SpreadElement → RestElement
-    /// - BinaryExpression with = (shorthand default) → AssignmentPattern
+    /// - AssignmentExpression with a plain `=` (a default) → AssignmentPattern; a
+    ///   compound operator is a syntax error (it names no default, and the pattern
+    ///   node has no slot for it), and the WHOLE target of an `=` / for-head may not
+    ///   convert to one at all (`to_whole_assignable`)
     /// - Identifier, MemberExpression → unchanged (valid assignment targets)
     ///
     /// `AssignableContext` selects which simple-target wrappers are legal and what a
@@ -192,7 +195,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // cataloged as `cast_target_destructure_default_for_head_svelte_divergence`.
             // Binding stays Binding: params reject the cast ("unexpected type cast in
             // parameter position").
+            //
+            // Only a plain `=` covers an `Initializer` (ecma262 §13.15.5,
+            // `AssignmentExpression : LeftHandSideExpression = AssignmentExpression` is
+            // the one production `AssignmentPattern` / `BindingElement` cover): a
+            // compound `[a += b] = xs` names no default, and converting it anyway would
+            // DELETE the operator (the pattern node has no slot for it) — the output
+            // `[a = b] = xs` is a different program, so this is the faithful-reprint
+            // floor, not a deferrable early error. Rejected in every context; acorn
+            // spells it the same way.
             Expression::AssignmentExpression(assign) => {
+                if assign.operator != AssignmentOperator::Assign {
+                    return Err(self.error_msg_at(
+                        "Only '=' operator can be used for specifying default value",
+                        assign.span.start_usize(),
+                    ));
+                }
                 let left_context = match context {
                     AssignableContext::ForHead => AssignableContext::Assignment,
                     c => c,
@@ -270,6 +288,33 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Invalid assignment target (binding / for-head position)
             _ => Err(self.error_msg_at("Invalid assignment target", expr.span().start_usize())),
         }
+    }
+
+    /// Convert the WHOLE target of an `=` or of a no-declaration for-in/of head —
+    /// the one place a converted target may not be an `AssignmentPattern`.
+    ///
+    /// An `AssignmentPattern` exists only as a pattern CHILD (an array element, a
+    /// property value, a parameter): `AssignmentExpression.left` and the for-head's
+    /// `left` derive `LeftHandSideExpression` / `AssignmentPattern`-proper, and neither
+    /// covers an `Initializer` of its own. So a parenthesized assignment there —
+    /// `(a = b) = 1`, `for ((a = b) of xs)` — has no wire shape: acorn never emits an
+    /// `AssignmentPattern` at either position and rejects ("Assigning to rvalue"), and
+    /// the bare reprint `a = b = 1` re-parses as a different, valid program. The
+    /// representability and faithful-reprint floors both say reject, ahead of the
+    /// non-simple-target deferral. Only the parenthesized spelling reaches this: an
+    /// unparenthesized `a = b = 1` parses right-associative, so its left is never an
+    /// assignment.
+    pub(super) fn to_whole_assignable(
+        &self,
+        expr: Expression<'arena>,
+        context: AssignableContext,
+    ) -> Result<Expression<'arena>, ParseError> {
+        let start = expr.span().start_usize();
+        let target = self.to_assignable(expr, context)?;
+        if matches!(target, Expression::AssignmentPattern(_)) {
+            return Err(self.error_msg_at("Invalid assignment target", start));
+        }
+        Ok(target)
     }
 
     /// Build the "trailing comma after a rest element" syntax error (`[...a,]` /

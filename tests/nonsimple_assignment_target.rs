@@ -337,3 +337,57 @@ fn nested_parenthesized_cast_target_parses_and_formats() {
     );
     assert_eq!(format(canonical), canonical, "idempotent");
 }
+
+/// The deferral stops at the two shapes that have no faithful reprint. A compound
+/// operator cannot cover a default (`[a += b] = xs`): the pattern node has no slot
+/// for the operator, so converting would DELETE it — rejected in every assignable
+/// context (acorn: "Only '=' operator can be used for specifying default value").
+#[test]
+fn compound_default_rejected_in_every_context() {
+    for source in [
+        "[a += b] = xs;",
+        "({ x: a += b } = o);",
+        "(a += b) = 1;",
+        "for ([a += b] of xs) {}",
+        "function fn([a += b]) {}",
+        "([a += b]) => 1;",
+    ] {
+        assert!(
+            rejects(source),
+            "a compound default is a syntax error: {source:?}"
+        );
+    }
+    // The plain `=` default and a compound assignment as a VALUE are untouched.
+    for canonical in ["[a = b] = xs;\n", "x = a += b;\n", "([a = b]) => 1;\n"] {
+        assert_eq!(format(canonical), canonical, "idempotent: {canonical:?}");
+    }
+}
+
+/// A parenthesized assignment as the WHOLE target — `(a = b) = 1`,
+/// `for ((a = b) of xs)` — would put an `AssignmentPattern` where acorn's grammar has
+/// none (`AssignmentExpression.left`, the for-head's `left`), and its bare reprint
+/// `a = b = 1` re-parses as a different, valid program. Rejected ahead of the
+/// deferral; the unparenthesized `a = b = 1` is right-associative and unaffected.
+#[test]
+fn whole_target_default_pattern_rejected() {
+    for source in [
+        "(a = b) = 1;",
+        "(a = b) += 1;",
+        "for ((a = b) of xs) {}",
+        "for ((a = b) in obj) {}",
+    ] {
+        assert!(
+            rejects(source),
+            "an assignment pattern as the whole target is a syntax error: {source:?}"
+        );
+    }
+    let canonical = "a = b = 1;\n";
+    assert_eq!(format(canonical), canonical, "idempotent");
+    assert_eq!(
+        parse_json(canonical)
+            .pointer("/body/0/expression/right/type")
+            .and_then(Value::as_str),
+        Some("AssignmentExpression"),
+        "the unparenthesized chain nests on the RIGHT",
+    );
+}

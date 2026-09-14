@@ -862,6 +862,16 @@ Early errors that still parse (not yet enforced):
   on both sides, pinned at Script goal by
   [script_goal/nonsimple_params_directive](../tests/fixtures/typescript/script_goal/nonsimple_params_directive_svelte_prettier_divergence/)
 - Duplicate parameter names (`function f(a, a) {}`)
+- A non-simple `=` target (`foo() = bar`, `1 >>= 2`, `this = x`, `(a => a) = 1`) — the
+  `AssignmentTargetType` early error of §13.15.1; the target is kept as written (a
+  parenthesized non-`LeftHandSideExpression` reprints bare, so its shell is not preserved).
+  The no-declaration for-in/of head is NOT an assignment context and rejects the same
+  targets, and two spellings with no faithful reprint reject in every position: a compound
+  operator as a default (`[a += b] = xs` — the pattern node has no slot for the operator)
+  and a parenthesized assignment as the whole target (`(a = b) = 1`, `for ((a = b) of xs)`
+  — an `AssignmentPattern` where the grammar has none). See
+  [conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections),
+  the non-simple-target entry
 - Reserved words as identifiers — the strict-mode-reserved list of ecma262 §sec-identifiers-static-semantics-early-errors (`var public = 1`, `var let = 1`, `function f(yield) {}`)
 - `let` as an `IdentifierReference` (`let = 1`, `for (let in o)`, `L: let ⏎ x = 1;`) — the same bullet; the lookahead that separates it from a `LexicalDeclaration` is a grammar rule and is enforced (`let[0] = 1`, `for (let of x)` reject)
 - `let` as a lexically bound name (`let let = 1`, `const let = 1`) — a rule of its own and *not* the strict-mode bullet above: §sec-let-and-const-declarations makes it a Syntax Error for a `LexicalDeclaration`'s `BoundNames` to contain `let`, unconditionally, so acorn rejects it at either goal — at `sourceType: 'script'` naming this rule (`let is disallowed as a lexically bound name`), at `'module'` the strict-mode bullet firing first — while `var let = 1` is only the strict-mode error

@@ -11,6 +11,12 @@ d = /** @type {A} */ expr;
 /** @type {A} */ g.h = expr;
 /** @type {A} */ g.h += expr;
 
+// assignment target in a no-declaration for-in/of head
+for (/** @type {A} */ a of items) {
+}
+for (/** @type {A} */ g.h in obj) {
+}
+
 // return
 function fn1() {
 	return /** @type {A} */ expr;
