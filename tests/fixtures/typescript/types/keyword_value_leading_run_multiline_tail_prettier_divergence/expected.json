@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 920,
+	"end": 1607,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -409,24 +409,264 @@
 					"column": 7
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " the run the author GLUED the other way round — a multi-line block ahead of a single-line",
+			"start": 912,
+			"end": 1003,
+			"loc": {
+				"start": {
+					"line": 50,
+					"column": 1
+				},
+				"end": {
+					"line": 50,
+					"column": 92
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " one, broken after that — keeps the glue, and the type hangs one level under the keyword",
+			"start": 1005,
+			"end": 1095,
+			"loc": {
+				"start": {
+					"line": 51,
+					"column": 1
+				},
+				"end": {
+					"line": 51,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x\ny ",
+			"start": 1113,
+			"end": 1122,
+			"loc": {
+				"start": {
+					"line": 52,
+					"column": 17
+				},
+				"end": {
+					"line": 53,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " z ",
+			"start": 1123,
+			"end": 1130,
+			"loc": {
+				"start": {
+					"line": 53,
+					"column": 5
+				},
+				"end": {
+					"line": 53,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the same glued run with an author blank after it: both are kept",
+			"start": 1138,
+			"end": 1204,
+			"loc": {
+				"start": {
+					"line": 56,
+					"column": 1
+				},
+				"end": {
+					"line": 56,
+					"column": 67
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x\ny ",
+			"start": 1223,
+			"end": 1232,
+			"loc": {
+				"start": {
+					"line": 57,
+					"column": 18
+				},
+				"end": {
+					"line": 58,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " z ",
+			"start": 1233,
+			"end": 1240,
+			"loc": {
+				"start": {
+					"line": 58,
+					"column": 5
+				},
+				"end": {
+					"line": 58,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the same glued run with a `//` as its tail: the line comment keeps the block's closing",
+			"start": 1249,
+			"end": 1338,
+			"loc": {
+				"start": {
+					"line": 62,
+					"column": 1
+				},
+				"end": {
+					"line": 62,
+					"column": 90
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line, and the type hangs below the whole run",
+			"start": 1340,
+			"end": 1387,
+			"loc": {
+				"start": {
+					"line": 63,
+					"column": 1
+				},
+				"end": {
+					"line": 63,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x\ny ",
+			"start": 1406,
+			"end": 1415,
+			"loc": {
+				"start": {
+					"line": 64,
+					"column": 18
+				},
+				"end": {
+					"line": 65,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " z",
+			"start": 1416,
+			"end": 1420,
+			"loc": {
+				"start": {
+					"line": 65,
+					"column": 5
+				},
+				"end": {
+					"line": 65,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the same glued run at the function type's `=>`: the run stays intact and the return type",
+			"start": 1428,
+			"end": 1519,
+			"loc": {
+				"start": {
+					"line": 68,
+					"column": 1
+				},
+				"end": {
+					"line": 68,
+					"column": 92
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " hangs one level under the arrow",
+			"start": 1521,
+			"end": 1555,
+			"loc": {
+				"start": {
+					"line": 69,
+					"column": 1
+				},
+				"end": {
+					"line": 69,
+					"column": 35
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x\ny ",
+			"start": 1574,
+			"end": 1583,
+			"loc": {
+				"start": {
+					"line": 70,
+					"column": 18
+				},
+				"end": {
+					"line": 71,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " z ",
+			"start": 1584,
+			"end": 1591,
+			"loc": {
+				"start": {
+					"line": 71,
+					"column": 5
+				},
+				"end": {
+					"line": 71,
+					"column": 12
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 919,
+		"end": 1606,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 910,
+			"end": 1597,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 49,
+					"line": 73,
 					"column": 9
 				}
 			},
@@ -1454,6 +1694,439 @@
 							"value": " `keyof` as a union member: the union breaks, and the hang sits under the member",
 							"start": 772,
 							"end": 854
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1097,
+					"end": 1135,
+					"loc": {
+						"start": {
+							"line": 52,
+							"column": 1
+						},
+						"end": {
+							"line": 54,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1102,
+						"end": 1104,
+						"loc": {
+							"start": {
+								"line": 52,
+								"column": 6
+							},
+							"end": {
+								"line": 52,
+								"column": 8
+							}
+						},
+						"name": "T9"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeOperator",
+						"start": 1107,
+						"end": 1134,
+						"loc": {
+							"start": {
+								"line": 52,
+								"column": 11
+							},
+							"end": {
+								"line": 54,
+								"column": 3
+							}
+						},
+						"operator": "keyof",
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 1133,
+							"end": 1134,
+							"loc": {
+								"start": {
+									"line": 54,
+									"column": 2
+								},
+								"end": {
+									"line": 54,
+									"column": 3
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 1133,
+								"end": 1134,
+								"loc": {
+									"start": {
+										"line": 54,
+										"column": 2
+									},
+									"end": {
+										"line": 54,
+										"column": 3
+									}
+								},
+								"name": "B"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " x\ny ",
+									"start": 1113,
+									"end": 1122
+								},
+								{
+									"type": "Block",
+									"value": " z ",
+									"start": 1123,
+									"end": 1130
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the run the author GLUED the other way round — a multi-line block ahead of a single-line",
+							"start": 912,
+							"end": 1003
+						},
+						{
+							"type": "Line",
+							"value": " one, broken after that — keeps the glue, and the type hangs one level under the keyword",
+							"start": 1005,
+							"end": 1095
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1206,
+					"end": 1246,
+					"loc": {
+						"start": {
+							"line": 57,
+							"column": 1
+						},
+						"end": {
+							"line": 60,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1211,
+						"end": 1214,
+						"loc": {
+							"start": {
+								"line": 57,
+								"column": 6
+							},
+							"end": {
+								"line": 57,
+								"column": 9
+							}
+						},
+						"name": "T10"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeOperator",
+						"start": 1217,
+						"end": 1245,
+						"loc": {
+							"start": {
+								"line": 57,
+								"column": 12
+							},
+							"end": {
+								"line": 60,
+								"column": 3
+							}
+						},
+						"operator": "keyof",
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 1244,
+							"end": 1245,
+							"loc": {
+								"start": {
+									"line": 60,
+									"column": 2
+								},
+								"end": {
+									"line": 60,
+									"column": 3
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 1244,
+								"end": 1245,
+								"loc": {
+									"start": {
+										"line": 60,
+										"column": 2
+									},
+									"end": {
+										"line": 60,
+										"column": 3
+									}
+								},
+								"name": "B"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " x\ny ",
+									"start": 1223,
+									"end": 1232
+								},
+								{
+									"type": "Block",
+									"value": " z ",
+									"start": 1233,
+									"end": 1240
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same glued run with an author blank after it: both are kept",
+							"start": 1138,
+							"end": 1204
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1389,
+					"end": 1425,
+					"loc": {
+						"start": {
+							"line": 64,
+							"column": 1
+						},
+						"end": {
+							"line": 66,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1394,
+						"end": 1397,
+						"loc": {
+							"start": {
+								"line": 64,
+								"column": 6
+							},
+							"end": {
+								"line": 64,
+								"column": 9
+							}
+						},
+						"name": "T11"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeOperator",
+						"start": 1400,
+						"end": 1424,
+						"loc": {
+							"start": {
+								"line": 64,
+								"column": 12
+							},
+							"end": {
+								"line": 66,
+								"column": 3
+							}
+						},
+						"operator": "keyof",
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 1423,
+							"end": 1424,
+							"loc": {
+								"start": {
+									"line": 66,
+									"column": 2
+								},
+								"end": {
+									"line": 66,
+									"column": 3
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 1423,
+								"end": 1424,
+								"loc": {
+									"start": {
+										"line": 66,
+										"column": 2
+									},
+									"end": {
+										"line": 66,
+										"column": 3
+									}
+								},
+								"name": "B"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " x\ny ",
+									"start": 1406,
+									"end": 1415
+								},
+								{
+									"type": "Line",
+									"value": " z",
+									"start": 1416,
+									"end": 1420
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same glued run with a `//` as its tail: the line comment keeps the block's closing",
+							"start": 1249,
+							"end": 1338
+						},
+						{
+							"type": "Line",
+							"value": " line, and the type hangs below the whole run",
+							"start": 1340,
+							"end": 1387
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1557,
+					"end": 1596,
+					"loc": {
+						"start": {
+							"line": 70,
+							"column": 1
+						},
+						"end": {
+							"line": 72,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1562,
+						"end": 1565,
+						"loc": {
+							"start": {
+								"line": 70,
+								"column": 6
+							},
+							"end": {
+								"line": 70,
+								"column": 9
+							}
+						},
+						"name": "T12"
+					},
+					"typeAnnotation": {
+						"type": "TSFunctionType",
+						"start": 1568,
+						"end": 1595,
+						"loc": {
+							"start": {
+								"line": 70,
+								"column": 12
+							},
+							"end": {
+								"line": 72,
+								"column": 3
+							}
+						},
+						"parameters": [],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 1571,
+							"end": 1595,
+							"loc": {
+								"start": {
+									"line": 70,
+									"column": 15
+								},
+								"end": {
+									"line": 72,
+									"column": 3
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 1594,
+								"end": 1595,
+								"loc": {
+									"start": {
+										"line": 72,
+										"column": 2
+									},
+									"end": {
+										"line": 72,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1594,
+									"end": 1595,
+									"loc": {
+										"start": {
+											"line": 72,
+											"column": 2
+										},
+										"end": {
+											"line": 72,
+											"column": 3
+										}
+									},
+									"name": "B"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " x\ny ",
+										"start": 1574,
+										"end": 1583
+									},
+									{
+										"type": "Block",
+										"value": " z ",
+										"start": 1584,
+										"end": 1591
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same glued run at the function type's `=>`: the run stays intact and the return type",
+							"start": 1428,
+							"end": 1519
+						},
+						{
+							"type": "Line",
+							"value": " hangs one level under the arrow",
+							"start": 1521,
+							"end": 1555
 						}
 					]
 				}

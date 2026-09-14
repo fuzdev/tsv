@@ -1,0 +1,1060 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 866,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A run the author GLUED — a multi-line block ahead of a single-line one — and then",
+			"start": 20,
+			"end": 104,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " broke after, at an `as`/`satisfies` cast: the run and the type hang one level under",
+			"start": 106,
+			"end": 192,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the keyword, the type dropping below the run's closing `*/`. Prettier relocates the",
+			"start": 194,
+			"end": 280,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " run's tail before the keyword (`x /* c2 */ as /* c1⏎d1 */ B`).",
+			"start": 282,
+			"end": 347,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `as`",
+			"start": 350,
+			"end": 357,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1\nd1 ",
+			"start": 374,
+			"end": 386,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 16
+				},
+				"end": {
+					"line": 9,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 387,
+			"end": 395,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 7
+				},
+				"end": {
+					"line": 9,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `satisfies`",
+			"start": 403,
+			"end": 417,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3\nd3 ",
+			"start": 441,
+			"end": 453,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 23
+				},
+				"end": {
+					"line": 14,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 454,
+			"end": 462,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 7
+				},
+				"end": {
+					"line": 14,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " control: a lone multi-line block the author broke after hangs the type the same way",
+			"start": 470,
+			"end": 556,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c5\nd5 ",
+			"start": 573,
+			"end": 585,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 16
+				},
+				"end": {
+					"line": 19,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a `//` TAIL after the multi-line block: prettier welds it into the block's first line",
+			"start": 593,
+			"end": 681,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c6\nd6 ",
+			"start": 698,
+			"end": 710,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 16
+				},
+				"end": {
+					"line": 24,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 711,
+			"end": 716,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 7
+				},
+				"end": {
+					"line": 24,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the same with a block between: prettier relocates the block and welds the `//`",
+			"start": 724,
+			"end": 805,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c8\nd8 ",
+			"start": 822,
+			"end": 834,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 16
+				},
+				"end": {
+					"line": 29,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c9 ",
+			"start": 835,
+			"end": 843,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 7
+				},
+				"end": {
+					"line": 29,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c10",
+			"start": 844,
+			"end": 850,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 16
+				},
+				"end": {
+					"line": 29,
+					"column": 22
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 865,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 856,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 31,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 359,
+					"end": 400,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 4
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 365,
+							"end": 399,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 7
+								},
+								"end": {
+									"line": 10,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 365,
+								"end": 366,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "TSAsExpression",
+								"start": 369,
+								"end": 399,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 11
+									},
+									"end": {
+										"line": 10,
+										"column": 3
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 369,
+									"end": 370,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 11
+										},
+										"end": {
+											"line": 8,
+											"column": 12
+										}
+									},
+									"name": "x"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 398,
+									"end": 399,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 2
+										},
+										"end": {
+											"line": 10,
+											"column": 3
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 398,
+										"end": 399,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 2
+											},
+											"end": {
+												"line": 10,
+												"column": 3
+											}
+										},
+										"name": "B"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c1\nd1 ",
+											"start": 374,
+											"end": 386
+										},
+										{
+											"type": "Block",
+											"value": " c2 ",
+											"start": 387,
+											"end": 395
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A run the author GLUED — a multi-line block ahead of a single-line one — and then",
+							"start": 20,
+							"end": 104
+						},
+						{
+							"type": "Line",
+							"value": " broke after, at an `as`/`satisfies` cast: the run and the type hang one level under",
+							"start": 106,
+							"end": 192
+						},
+						{
+							"type": "Line",
+							"value": " the keyword, the type dropping below the run's closing `*/`. Prettier relocates the",
+							"start": 194,
+							"end": 280
+						},
+						{
+							"type": "Line",
+							"value": " run's tail before the keyword (`x /* c2 */ as /* c1⏎d1 */ B`).",
+							"start": 282,
+							"end": 347
+						},
+						{
+							"type": "Line",
+							"value": " `as`",
+							"start": 350,
+							"end": 357
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 419,
+					"end": 467,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 4
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 425,
+							"end": 466,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 425,
+								"end": 426,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 7
+									},
+									"end": {
+										"line": 13,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "TSSatisfiesExpression",
+								"start": 429,
+								"end": 466,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 11
+									},
+									"end": {
+										"line": 15,
+										"column": 3
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 429,
+									"end": 430,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 11
+										},
+										"end": {
+											"line": 13,
+											"column": 12
+										}
+									},
+									"name": "x"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 465,
+									"end": 466,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 2
+										},
+										"end": {
+											"line": 15,
+											"column": 3
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 465,
+										"end": 466,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 2
+											},
+											"end": {
+												"line": 15,
+												"column": 3
+											}
+										},
+										"name": "D"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c3\nd3 ",
+											"start": 441,
+											"end": 453
+										},
+										{
+											"type": "Block",
+											"value": " c4 ",
+											"start": 454,
+											"end": 462
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `satisfies`",
+							"start": 403,
+							"end": 417
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 558,
+					"end": 590,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 4
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 564,
+							"end": 589,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 7
+								},
+								"end": {
+									"line": 20,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 564,
+								"end": 565,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 7
+									},
+									"end": {
+										"line": 18,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "TSAsExpression",
+								"start": 568,
+								"end": 589,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 11
+									},
+									"end": {
+										"line": 20,
+										"column": 3
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 568,
+									"end": 569,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 11
+										},
+										"end": {
+											"line": 18,
+											"column": 12
+										}
+									},
+									"name": "x"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 588,
+									"end": 589,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 2
+										},
+										"end": {
+											"line": 20,
+											"column": 3
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 588,
+										"end": 589,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 2
+											},
+											"end": {
+												"line": 20,
+												"column": 3
+											}
+										},
+										"name": "F"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c5\nd5 ",
+											"start": 573,
+											"end": 585
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " control: a lone multi-line block the author broke after hangs the type the same way",
+							"start": 470,
+							"end": 556
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 683,
+					"end": 721,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 4
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 689,
+							"end": 720,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 7
+								},
+								"end": {
+									"line": 25,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 689,
+								"end": 690,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 7
+									},
+									"end": {
+										"line": 23,
+										"column": 8
+									}
+								},
+								"name": "g"
+							},
+							"init": {
+								"type": "TSAsExpression",
+								"start": 693,
+								"end": 720,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 11
+									},
+									"end": {
+										"line": 25,
+										"column": 3
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 693,
+									"end": 694,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 11
+										},
+										"end": {
+											"line": 23,
+											"column": 12
+										}
+									},
+									"name": "x"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 719,
+									"end": 720,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 2
+										},
+										"end": {
+											"line": 25,
+											"column": 3
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 719,
+										"end": 720,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 2
+											},
+											"end": {
+												"line": 25,
+												"column": 3
+											}
+										},
+										"name": "H"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c6\nd6 ",
+											"start": 698,
+											"end": 710
+										},
+										{
+											"type": "Line",
+											"value": " c7",
+											"start": 711,
+											"end": 716
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a `//` TAIL after the multi-line block: prettier welds it into the block's first line",
+							"start": 593,
+							"end": 681
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 807,
+					"end": 855,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 4
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 813,
+							"end": 854,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 7
+								},
+								"end": {
+									"line": 30,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 813,
+								"end": 814,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 7
+									},
+									"end": {
+										"line": 28,
+										"column": 8
+									}
+								},
+								"name": "i"
+							},
+							"init": {
+								"type": "TSAsExpression",
+								"start": 817,
+								"end": 854,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 11
+									},
+									"end": {
+										"line": 30,
+										"column": 3
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 817,
+									"end": 818,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 11
+										},
+										"end": {
+											"line": 28,
+											"column": 12
+										}
+									},
+									"name": "x"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 853,
+									"end": 854,
+									"loc": {
+										"start": {
+											"line": 30,
+											"column": 2
+										},
+										"end": {
+											"line": 30,
+											"column": 3
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 853,
+										"end": 854,
+										"loc": {
+											"start": {
+												"line": 30,
+												"column": 2
+											},
+											"end": {
+												"line": 30,
+												"column": 3
+											}
+										},
+										"name": "J"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c8\nd8 ",
+											"start": 822,
+											"end": 834
+										},
+										{
+											"type": "Block",
+											"value": " c9 ",
+											"start": 835,
+											"end": 843
+										},
+										{
+											"type": "Line",
+											"value": " c10",
+											"start": 844,
+											"end": 850
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same with a block between: prettier relocates the block and welds the `//`",
+							"start": 724,
+							"end": 805
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

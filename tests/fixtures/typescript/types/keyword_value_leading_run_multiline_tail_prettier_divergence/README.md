@@ -24,6 +24,8 @@ type T3 = keyof /* x */
  */ B;
 ```
 
+The last four cases invert the run's own order — a **multi-line** block the author GLUED ahead of a single-line one and broke after THAT (`keyof /* x⏎y */ /* z */⏎B`), bare and with an author blank below it: the break belongs to the run, not to one comment, so the glue and the blank are both kept and the type hangs under the keyword as above. The third spells the run's tail as a `//` (`keyof /* x⏎y */ // z⏎B`) — the line comment keeps the block's closing line, where relocating it to a line of its own would move it off the block it was written against. The fourth carries the same glued run to the function type's `=>`→return-type gap (`() => /* x⏎y */ /* z */⏎B`), where the run stays intact and the return type hangs one level under the arrow — the keyword seams' answer, at the gap the arrow opens.
+
 The cases cover the function-type and constructor-type `=>`, `keyof` (with a preserved multi-line
 comment and an author blank, kept in both formatters), `readonly`, the `typeof` type query,
 `infer`, and `keyof` as a union member, whose hang sits under the member — tsv's tab indent where

@@ -37,6 +37,32 @@ order.
 moves before `extends` (`A /* b */ extends B // c`), and the trailing case reorders
 to `A extends B /* t */ // c` — the `output_prettier.svelte`.
 
+The third case is the same seam at a run with no `//` in it at all: a **multi-line**
+block the author GLUED ahead of a single-line one and then broke after
+(`extends /* a⏎b */ /* c */⏎B`). The multi-line body cannot print flat, so the run's
+break is forced — but it is the RUN's break, not either comment's, and the per-comment
+own-line rule answers no for both halves (the first is glued, the second single-line).
+The gate reads the run-level question beside it
+(`Printer::broke_after_run_holds_multiline_block`), which is the same question the
+shelled spelling's ownership claim reads, so both authorings hang:
+
+```ts
+type T3 = A extends /* a
+b */ /* c */
+	B
+	? X
+	: Y;
+```
+
+Without it the two disagreed across passes — the shell's claim took the run, the gap
+declined to lay it out, and the type welded back onto the `*/` line on the reparse.
+
+**Prettier has no usable answer at that case**: it relocates the multi-line block across
+`extends` (`A /* a⏎b */ extends /* c */⏎B`), which puts a line break in the conditional
+type's `[no LineTerminator here]` gap before `extends` — **output no parser accepts**, so
+prettier throws on its own pass-1 result. That truncated chain is what rule F4b tolerates;
+see [conformance_prettier.md §Prettier bug index](../../../../../../docs/conformance_prettier.md#prettier-bug-index).
+
 The `unformatted_ours_*` variants are the paren shells; tsv normalizes them to
 `input` in one pass, prettier does not (N6). The pure-line shell keeps its own
 trail-on-inner canonical (`extends_paren_leading_line_comment`) — only the

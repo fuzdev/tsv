@@ -33,6 +33,19 @@ z */ C2();
 			/* y
 			 */ (aaa ? bbb : ccc);
 
+		// the run the author GLUED the other way round — a multi-line block ahead of a
+		// single-line one, broken after that — keeps the glue, and the operand hangs one
+		// level under the keyword
+		await /* x
+y */ /* z */
+			fn(aaa, bbb);
+
+		// the same glued run with an author blank after it: both are kept
+		new /* x
+y */ /* z */
+
+			C5();
+
 		// as a call argument, the run and the callee hang inside the argument list
 		fn(
 			new /* x */

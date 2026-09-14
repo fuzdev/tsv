@@ -1,0 +1,22 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(output_prettier.<ext>).
+# This file exists when prettier is non-idempotent on output_prettier.* — it pins
+# the full chain so the audit recognizes the case and the validator catches drift.
+# See docs/fixture_overview.md (rule F4) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// Line comment in an indexed access's `[`→index gap, kept where written with
+	// the index type on the next line.
+	type I = A[K]; // c
+
+	// A run the author GLUED — a multi-line block ahead of a single-line one — and then broke
+	// after. The run's break is forced by the multi-line block, so the index drops below the
+	// whole run, inside the brackets that own the break — the `=` keeps its hug, as it does
+	// for every indexed access that breaks inside its own brackets.
+	type J = A;
+	/* a
+b */ /* c */ [K];
+</script>

@@ -25,6 +25,8 @@ new /* x */
  */ C1();
 ```
 
+Two cases invert the run's own order — a **multi-line** block the author GLUED ahead of a single-line one and broke after THAT (`await /* x⏎y */ /* z */⏎fn(aaa, bbb)`), bare and with an author blank below it: the break belongs to the run, not to one comment, so the glue and the blank are both kept and the operand hangs under the keyword as above.
+
 The cases cover an indentable and a preserved multi-line comment, an author blank between the two
 comments (kept in both formatters), an `await` argument both bare and in the parens its
 precedence needs, the run staying outside them, and a `new` expression as a call argument, whose

@@ -11,5 +11,12 @@
 		{
 			aaa: 1
 		}:
+		// the run the author GLUED the other way round — a multi-line block ahead of a
+		// single-line one, broken after that — keeps the glue, and the test hangs one level
+		// under `case`
+		case /* x
+y */ /* z */
+		(
+		ddd ? eee : fff):
 	}
 </script>

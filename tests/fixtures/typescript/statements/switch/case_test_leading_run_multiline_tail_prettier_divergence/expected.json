@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 355,
+	"end": 587,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -105,24 +105,104 @@
 					"column": 14
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " the run the author GLUED the other way round — a multi-line block ahead of a",
+			"start": 344,
+			"end": 423,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 13,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " single-line one, broken after that — keeps the glue, and the test hangs one level",
+			"start": 426,
+			"end": 510,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 2
+				},
+				"end": {
+					"line": 14,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " under `case`",
+			"start": 513,
+			"end": 528,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x\ny ",
+			"start": 536,
+			"end": 545,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 7
+				},
+				"end": {
+					"line": 17,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " z ",
+			"start": 546,
+			"end": 553,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 5
+				},
+				"end": {
+					"line": 17,
+					"column": 12
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 354,
+		"end": 586,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 345,
+			"end": 577,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 14,
+					"line": 20,
 					"column": 9
 				}
 			},
@@ -130,14 +210,14 @@
 				{
 					"type": "SwitchStatement",
 					"start": 20,
-					"end": 344,
+					"end": 576,
 					"loc": {
 						"start": {
 							"line": 2,
 							"column": 1
 						},
 						"end": {
-							"line": 13,
+							"line": 19,
 							"column": 2
 						}
 					},
@@ -363,6 +443,119 @@
 									"value": " a test that breaks on its own forces the break too",
 									"start": 251,
 									"end": 304
+								}
+							]
+						},
+						{
+							"type": "SwitchCase",
+							"start": 531,
+							"end": 573,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 2
+								},
+								"end": {
+									"line": 18,
+									"column": 19
+								}
+							},
+							"consequent": [],
+							"test": {
+								"type": "ConditionalExpression",
+								"start": 557,
+								"end": 572,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 3
+									},
+									"end": {
+										"line": 18,
+										"column": 18
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 557,
+									"end": 560,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 3
+										},
+										"end": {
+											"line": 18,
+											"column": 6
+										}
+									},
+									"name": "ddd"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 563,
+									"end": 566,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 9
+										},
+										"end": {
+											"line": 18,
+											"column": 12
+										}
+									},
+									"name": "eee"
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 569,
+									"end": 572,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 15
+										},
+										"end": {
+											"line": 18,
+											"column": 18
+										}
+									},
+									"name": "fff"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " x\ny ",
+										"start": 536,
+										"end": 545
+									},
+									{
+										"type": "Block",
+										"value": " z ",
+										"start": 546,
+										"end": 553
+									}
+								]
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " the run the author GLUED the other way round — a multi-line block ahead of a",
+									"start": 344,
+									"end": 423
+								},
+								{
+									"type": "Line",
+									"value": " single-line one, broken after that — keeps the glue, and the test hangs one level",
+									"start": 426,
+									"end": 510
+								},
+								{
+									"type": "Line",
+									"value": " under `case`",
+									"start": 513,
+									"end": 528
 								}
 							]
 						}

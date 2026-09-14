@@ -190,11 +190,15 @@ pub(crate) enum ShellPair {
     /// The parens are dropped and the run lands in the enclosing gap, which either claims
     /// it or lays the value out by its own rule — and several of those gaps deliberately
     /// COLLAPSE an isolated own-line block (the annotation `:` for a non-composite type,
-    /// the prefix operators, a conditional's `extends`). A MULTI-LINE block the author
-    /// broke after is the one block this arm does not space: it takes the soft `line`
-    /// ([`Printer::multiline_block_broke_after`]), which its own forced break opens
-    /// in the enclosing gap's group, so the value drops below the `*/` as the shell-free
-    /// authoring's does.
+    /// the prefix operators, a conditional's `extends`), so this arm takes the space at
+    /// every single-line block. A broke-after run holding a MULTI-LINE block — glued tail
+    /// and all — is the one run it does not space: every separator the author broke takes
+    /// the soft `line` ([`Printer::broke_after_run_holds_multiline_block`]), which the
+    /// multi-line body's own break opens in the enclosing gap's group, so the value drops
+    /// below the run as the shell-free authoring's does. Only that half of
+    /// [`Printer::block_run_forces_break`]: the whole function is the CLAIM's reading, and
+    /// an isolated own-line block is claimed precisely so the gap that collapses it does
+    /// the collapsing.
     ///
     /// ⚠️ **The MEMBER gaps are not among them, and that list is the whole of the set.** A
     /// union or intersection member's stripped shell puts its run at the member gap, which
@@ -1688,38 +1692,99 @@ impl<'a> Printer<'a> {
         self.split_open_delimiter_glued_run(gap_start, value_start)
     }
 
-    /// Whether a block comment is a **multi-line** block the author BROKE AFTER — the one
-    /// block a stripped shell's leading run gives prettier's soft `line` rather than the
-    /// space. The one statement of that rule, read by the stripped-shell run emitter
-    /// ([`Self::push_paren_shell_leading_run`]) and, through
-    /// [`Self::block_run_forces_break`], by the gaps that decide whether to CLAIM such a
-    /// run — a second spelling is how the two would drift. (The type-argument shell's own
-    /// loop in `build_type_doc_for_type_arg` takes the wider list rule instead: every
-    /// block the author broke after, single-line included, since its gap is a list's.)
-    ///
-    /// Keyed on the gap AFTER the comment alone ([`Self::comment_hugs_next`]), so every
-    /// layout it produces reproduces its own trigger. A single-line block the author broke
-    /// after is deliberately NOT one: every value gap pulls that block up onto the
-    /// operator's line (`LeadingGlue::AdjacentGlued`), and the shell must land where the
-    /// bare authoring does.
-    pub(crate) fn multiline_block_broke_after(&self, comment: &Comment) -> bool {
-        comment.is_block && comment.multiline && !self.comment_hugs_next(comment)
-    }
-
     /// Whether a block-comment run in `[start, end)` forces a break of its own — a block
-    /// the author isolated on its own line, or a multi-line block they broke after
-    /// ([`Self::multiline_block_broke_after`]). Two readers, one question: the
-    /// block half of the leading-edge **ownership** question (`EdgeRun::Breaking` in
-    /// `types/mod.rs` — such a run in a stripped shell is the ENCLOSING gap's to lay out,
-    /// at that gap's continuation indent, since a break the shell opens at its own indent
-    /// is one the reparse re-lays), and the mapped value's hang gate
-    /// (`build_mapped_value_tail_doc` — a run that forces no break keeps the inline
-    /// `: /* c */ V`). The `//` half is each caller's, where it is already asked.
+    /// the author isolated on its own line, or a run the author BROKE AFTER
+    /// ([`Self::broke_after_value_leading_run`]) holding a multi-line block
+    /// ([`Self::run_holds_multiline_block`]). The second half is prettier's
+    /// `propagateBreaks` reading: the multi-line body cannot print flat, so every
+    /// separator in the run it belongs to opens, whichever comment carries the break.
+    /// It is the pair [`Self::breaking_value_leading_run`] takes, minus that pair's
+    /// `will_break` half — which needs a value doc, and no shell site has one.
+    ///
+    /// ⚠️ **The break is the RUN's, not one comment's.** A per-comment reading
+    /// (`multi-line && !hugs_next`) answered no for `/* a⏎b */ /* c */⏎Y` — the author
+    /// glued the multi-line block ahead of a single-line one and broke after THAT — and
+    /// the run then welded onto the value's line at every seam it reaches
+    /// (`head_paren_shell_glued_run_broke_after_multiline_block_comment`).
+    ///
+    /// ⚠️ **Three call sites take the WHOLE function, and everyone else takes the
+    /// broke-after HALF** ([`Self::broke_after_run_holds_multiline_block`]) — the split is
+    /// not incidental, it is the two sides of one seam. The whole function answers the
+    /// block half of the leading-edge **ownership** question (`EdgeRun::Breaking`, read by
+    /// `stripped_paren_hang_has_leading_run` in `types/mod.rs` — such a run in a stripped
+    /// shell is the ENCLOSING gap's to lay out, at that gap's continuation indent, since a
+    /// break the shell opens at its own indent is one the reparse re-lays), the conditional
+    /// BRANCH's twin of that claim (`branch_claim_and_start` in `types/composite.rs` — a
+    /// redundant shell that IS the `?`/`:` branch, holding such a run and no `//`, is
+    /// claimed whole so the branch gap hangs it at the branch's own indent) and the mapped
+    /// value's hang gate (`build_mapped_value_tail_doc`, also in `types/composite.rs` — a
+    /// run that forces no break keeps the inline `: /* c */ V`). The CLAIM must take the
+    /// isolated own-line block precisely because the enclosing gap COLLAPSES it: the
+    /// collapse has to be the gap's own, or the shell
+    /// prints a line the gap never asked for. The `//` half is each caller's, where it is
+    /// already asked; a run holding one declines the broke-after HALF, which takes blocks
+    /// alone — the isolated arm is per-comment, so a `//` beside an own-line block still
+    /// fires, and the mapped gate, which reads the whole with no `//` guard of its own,
+    /// hangs such a run as its own `//` arm would.
+    ///
+    /// The stripped-shell run **emitter** ([`Self::push_paren_shell_leading_run`]) and the
+    /// keyword→value **HANG GATES** read the half instead, and for one reason between
+    /// them: neither may open a line the enclosing gap would close. The emitter prints
+    /// what no gap claims, so a soft `line` it opens for an isolated own-line block is one
+    /// pass 2 — reading the bare bytes, the shell gone — collapses. The gates answer
+    /// whether the gap hangs the value at all, a question each seam asks for itself, and
+    /// several ask it with [`Self::comments_force_own_line_between`] ALONE — which answers
+    /// no for exactly the run the broke-after half answers yes for, so a seam where the
+    /// claim fires and the gate does not prints the shell's soft `line` on pass 1 and
+    /// re-lays it on pass 2: the F1 shape docs/comments.md names. A seam whose gate reads
+    /// `comments_force_own_line_between` must therefore read a disjunct of the half over
+    /// the same window — the conditional `extends` at BOTH its arms
+    /// (`build_conditional_type_extends_doc`), the predicate `is`, the indexed access's
+    /// index (which needed a stripped-shell window built for it first, its gap having
+    /// none), and a type parameter's `extends` / `=` at both of that seam's gates
+    /// (`push_hang_or_inline_value` and `append_keyword_value` in `types/type_params.rs`).
+    /// The angle-bracket type ASSERTION's `<`→type gap
+    /// (`build_ts_type_assertion_doc` in `expressions/mod.rs`) reads the half as a ROUTER
+    /// rather than a disjunct: its `//` is already answered above it, so the half alone
+    /// decides whether that gap hands its run to
+    /// [`Self::build_trailing_comments_hang_next`] or to the per-comment
+    /// [`CommentSpacing::Trailing`] spacing, which welded the type onto the run's closing
+    /// line. `hang_annotation_union_doc` (`types/type_annotation.rs`) spells the half
+    /// inline rather than calling it, because it needs the RUN itself to hand the forced
+    /// emitter, not the boolean.
+    ///
+    /// `single_type_arg_run_breaks_after` (`types/type_arguments.rs`) is deliberately NOT a
+    /// reader: its gap is a LIST's, so it takes the wider rule — every block the author
+    /// broke after, single-line included — and the two must not be unified.
     pub(crate) fn block_run_forces_break(&self, start: u32, end: u32) -> bool {
         self.block_comment_isolated_own_line_between(start, end)
-            || self
-                .comments_to_emit_between(start, end)
-                .any(|c| self.multiline_block_broke_after(c))
+            || self.broke_after_run_holds_multiline_block(start, end)
+    }
+
+    /// The **broke-after** half of [`Self::block_run_forces_break`], alone: a block run in
+    /// `[start, end)` the author BROKE AFTER ([`Self::broke_after_value_leading_run`])
+    /// holding a multi-line block ([`Self::run_holds_multiline_block`]). Prettier's
+    /// `propagateBreaks` reading — the multi-line body cannot print flat, so every
+    /// separator in the run opens, whichever comment carries it.
+    ///
+    /// This is the half a keyword→value **hang gate** adds to
+    /// [`Self::comments_force_own_line_between`], the half the stripped-shell run emitter
+    /// ([`Self::push_paren_shell_leading_run`]) opens its soft `line` for, and the half the
+    /// type-construct gap emitter ([`Self::build_trailing_comments_hang_next`]) reads
+    /// beside its own per-comment [`Self::comment_hangs_next`], so every gap that emitter
+    /// serves drops the following token below a run whose break the run itself forces.
+    /// The sole type argument's own shell loop (`build_type_doc_for_type_arg`'s
+    /// `Parenthesized` arm) reads it for one narrower thing: whether an author BLANK below
+    /// a comment survives, which it does only where the `line` under it is always open. This
+    /// half is deliberately NOT the whole function: the isolated own-line block is one those gaps
+    /// DELIBERATELY COLLAPSE (`x is⏎/* a */⏎T` prints `x is /* a */ T`, pinned by
+    /// `predicate_is_own_line_block_comment`), so a gate that hung it — or an emitter that
+    /// opened a line for it — would print what the gap's own rule then takes back on the
+    /// next pass. The broke-after run is the half where the two disagreed: the shell's
+    /// claim takes it, so the gap must lay it out or pass 2 re-lays what pass 1 printed.
+    pub(crate) fn broke_after_run_holds_multiline_block(&self, start: u32, end: u32) -> bool {
+        self.broke_after_value_leading_run(start, end)
+            .is_some_and(|run| self.run_holds_multiline_block(&run))
     }
 
     /// Emit a paren SHELL's leading run — the comments in `[start, end)` between the
@@ -1736,8 +1801,9 @@ impl<'a> Printer<'a> {
     /// authored line went missing for standing inside parens.
     ///
     /// ⚠️ A pair that is **stripped** takes the space at every single-line block instead
-    /// ([`ShellPair::Stripped`]; a multi-line block the author broke after takes the soft
-    /// `line`, [`Self::multiline_block_broke_after`]), and that is not a second opinion about the comment: with
+    /// ([`ShellPair::Stripped`]); only a broke-after run holding a MULTI-LINE block
+    /// ([`Self::broke_after_run_holds_multiline_block`]) takes prettier's soft `line`, at
+    /// every separator the author broke — and that is not a second opinion about the comment: with
     /// the parens gone the layout is the ENCLOSING gap's, which either claims the run
     /// ([`Printer::keyword_value_stripped_paren_hang`], the seam that also knows the
     /// continuation indent) or lays the value out by its own rule — and several of those
@@ -1774,6 +1840,17 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut forced_line = false;
         let run: CommentVec<'_> = self.comments_to_emit_between(start, end).collect();
+        // Asked ONCE, of the whole run, and of the broke-after HALF alone
+        // ([`Self::broke_after_run_holds_multiline_block`]) — not of
+        // [`Self::block_run_forces_break`], whose other half, the isolated own-line block,
+        // is one the enclosing gaps deliberately COLLAPSE. Opening a line here for a run
+        // the gap will close is the F1 shape from the other side: pass 1 prints the
+        // shell's soft `line`, pass 2 reads the bare bytes and collapses it. The CLAIM
+        // reads the whole function on purpose — it must own an isolated block so the gap
+        // that collapses it is the one doing the collapsing — while this emitter must
+        // never open a line the gap would not.
+        let run_forces_break =
+            shell == ShellPair::Stripped && self.broke_after_run_holds_multiline_block(start, end);
         for (i, comment) in run.iter().enumerate() {
             // What follows this comment: the next one, or the type the shell wraps.
             let next_start = run.get(i + 1).map_or(end, |c| c.span.start);
@@ -1787,19 +1864,37 @@ impl<'a> Printer<'a> {
             };
             parts.push(self.build_comment_doc(comment));
             if !ends_its_line {
-                // A MULTI-LINE block the author BROKE AFTER, in a pair that strips, takes
-                // prettier's `printLeadingComment` soft `line` rather than a space: the block
-                // is a forced break, so the enclosing gap's group opens it and the value drops
-                // below the `*/` exactly as the shell-free authoring lays the same run out.
-                // The space stays for a block glued to what follows (the author's own line),
-                // for a SINGLE-line block the author broke after (every value gap pulls that
-                // one up onto the operator's line — `LeadingGlue::AdjacentGlued` — and the
-                // shell must land where the bare authoring does), and inside a pair that
-                // SURVIVES, where the delimiter owns the line ([`ShellPair`]). Keyed on the
-                // gap AFTER the comment alone, so every layout this emits reproduces its own
-                // trigger.
-                if shell == ShellPair::Stripped && self.multiline_block_broke_after(comment) {
+                // A broke-after run holding a MULTI-LINE block, in a pair that strips,
+                // takes prettier's `printLeadingComment` soft `line` at every separator
+                // the AUTHOR broke ([`Self::comment_hugs_next`]) rather than a space: the
+                // multi-line body cannot print flat, so the enclosing gap's group opens
+                // the run and the value drops below it exactly as the shell-free authoring
+                // lays it out. The break belongs to the run, not to one comment — a
+                // multi-line block the author glued ahead of a single-line one they broke
+                // after (`/* a⏎b */ /* c */⏎Y`) forces the break from `c`'s separator,
+                // which a per-comment reading answered with a space and welded.
+                //
+                // The space stays inside the run wherever the author glued (their own
+                // line), at every SINGLE-line block — every value gap pulls one the author
+                // merely broke after up onto the operator's line
+                // (`LeadingGlue::AdjacentGlued`), and an isolated own-line block is one
+                // those gaps COLLAPSE, so the shell must land where the bare authoring
+                // does — and inside a pair that SURVIVES, where the delimiter owns the
+                // line ([`ShellPair`]). Keyed on the gaps the author wrote, so every
+                // layout this emits reproduces its own trigger.
+                if run_forces_break && !self.comment_hugs_next(comment) {
                     parts.push(d.line());
+                    // The author BLANK below the comment survives here too, exactly as it
+                    // does at the own-line arm below and at every other opening delimiter.
+                    // `printLeadingComment` pushes its blank `hardline` after whichever
+                    // separator it chose — the soft `line` included — and the run's break
+                    // is forced, so the `line` this blank sits on always opens. Dropping
+                    // it made the shelled authoring of a blanked run disagree with the
+                    // bare twin, which keeps it (tuple element, union first member, sole
+                    // type argument, intersection later member, tuple rest).
+                    if self.has_blank_line_between(comment.span.end, next_start) {
+                        parts.push(d.hardline());
+                    }
                 } else {
                     parts.push(d.text(" "));
                 }
@@ -2084,6 +2179,16 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_trailing_comments_hang_next(&self, start: u32, end: u32) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
+        // Asked ONCE, of the whole run, through the same function the widened hang GATES
+        // read ([`Self::broke_after_run_holds_multiline_block`]): a run holding a
+        // multi-line block the author broke after cannot print flat, so every separator
+        // the AUTHOR broke opens, whichever comment of the run carries the block. The
+        // per-comment `comment_hangs_next` below answers no for both halves of
+        // `/* a⏎b */ /* c */⏎v` — the first is glued, the second single-line — so without
+        // this the gate selected the hang and the emitter welded the run back onto one
+        // line (docs/comments.md §Own-line-ness is a SOURCE question; the stripped-shell
+        // emitter states the same rule for its own run).
+        let run_forces_break = self.broke_after_run_holds_multiline_block(start, end);
         let mut comments = self.comments_to_emit_between(start, end).peekable();
         while let Some(comment) = comments.next() {
             parts.push(self.build_comment_doc(comment));
@@ -2104,7 +2209,10 @@ impl<'a> Printer<'a> {
             let next_is_directive = comments
                 .peek()
                 .is_some_and(|n| self.is_honored_directive(n));
-            if next_is_directive || self.comment_hangs_next(comment, next) {
+            if next_is_directive
+                || self.comment_hangs_next(comment, next)
+                || (run_forces_break && !self.comment_hugs_next(comment))
+            {
                 // An authored blank line survives wherever the break it separates
                 // survives. Here the break is FORCED — a `//` runs to end-of-line, an
                 // own-line multiline block would reflow — so the blank is authoring

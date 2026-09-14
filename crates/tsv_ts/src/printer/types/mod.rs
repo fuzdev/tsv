@@ -163,15 +163,17 @@ pub(in crate::printer) fn prefix_operator_shell_pair(
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum EdgeRun {
     /// A run that FORCES A BREAK — a `//`, a block the author isolated on its own line, or
-    /// a multi-line block they broke after ([`Printer::block_run_forces_break`])
+    /// a run they broke after holding a multi-line block
+    /// ([`Printer::block_run_forces_break`])
     /// — the **ownership** question ([`Printer::leading_edge_shell_claim`]). A gap can
     /// host a relocated run only by opening over hardlines, so what it must take over is
     /// exactly the run that forces one; a block the author glued renders inline where the
     /// shell prints it, and no gap needs it.
     ///
-    /// ⚠️ The multi-line block the author broke after joined the isolated block here for
-    /// the isolated block's own reason (below): its `*/`-line break is forced — the block
-    /// is a hard break, so the soft `line` the shell's emitter gives it always opens — and
+    /// ⚠️ The broke-after run holding a multi-line block joined the isolated block here for
+    /// the isolated block's own reason (below): the run's break is forced — the block
+    /// is a hard break, so the soft `line` the shell's emitter gives every separator the
+    /// author broke always opens, whichever comment of the run carries the block — and
     /// a break the shell opens at its own indent is one the enclosing gap re-lays on the
     /// next pass (a conditional's branch, a type parameter's bound, a sole type argument,
     /// the mapped value: every one a two-pass convergence, measured). The gap owns the run.
@@ -418,9 +420,23 @@ impl<'a> Printer<'a> {
                     // trailing, or glued) collapses inline (the else branch). Prettier
                     // relocates the collapsed comment before `is`. See
                     // predicate_is_line_comment / predicate_is_own_line_block_comment.
+                    //
+                    // The hang gate is the keyword→value one, both halves: a comment that
+                    // forces its own line, OR a block run the author BROKE AFTER holding
+                    // a multi-line block ([`Self::broke_after_run_holds_multiline_block`] —
+                    // the half of the function the shell's ownership claim reads that this
+                    // gap does not already answer; the other half, an isolated own-line
+                    // block, this gap deliberately COLLAPSES (`x is⏎/* a */⏎T`), at both
+                    // authorings alike). Asking only the first left the run the author
+                    // GLUED — a multi-line block ahead of a single-line one, broken after
+                    // that — to the flat arms below while the claim still took it, so pass 1
+                    // printed the shell's soft `line` at the enclosing group's own indent
+                    // and pass 2, reading the bare bytes, welded the type back onto the `*/`
+                    // line: the F1 shape docs/comments.md names.
                     if let Some((is_end, head)) = is_end.zip(head.as_ref())
                         && (head.frozen
-                            || self.comments_force_own_line_between(is_end, head.value_start))
+                            || self.comments_force_own_line_between(is_end, head.value_start)
+                            || self.broke_after_run_holds_multiline_block(is_end, head.value_start))
                     {
                         // Type position: a trailing block lifted from the shell trails
                         // the type inline before the body `{`.
@@ -816,10 +832,36 @@ impl<'a> Printer<'a> {
                 // indexed_access_own_line_block_comment.
                 // Built lazily: the expanding-union arm below carries the gap inside the
                 // union's hang and never emits it here.
+                //
+                // The window is the shared keyword→value one
+                // ([`Self::keyword_value_stripped_paren_hang`]), not the index's own span
+                // start: a redundant paren SHELL around the index puts its `(` there, so a
+                // window ending at it is EMPTY and the gate saw nothing at all. The shell
+                // then laid its own run out — at its own indent, which the reparse, finding
+                // the comment in this gap with the shell gone, re-lays. Reading the hang's
+                // `value_start` gives the gate the run either authoring wrote, and the value
+                // is built from the substituted inner under the shell's claim + lift
+                // ([`Self::with_stripped_shell_value`]) so the run is emitted once and the
+                // shell's trailing gap travels out past the index. Both are no-ops where
+                // nothing stripped, which is every bare authoring.
+                //
+                // The gate itself is the keyword→value pair: a comment that forces its own
+                // line, OR a block run the author BROKE AFTER holding a multi-line block
+                // ([`Self::broke_after_run_holds_multiline_block`]) — the half
+                // `comments_force_own_line_between`, reading each comment against its own
+                // neighbour, answers no for (`[/* a⏎b */ /* c */⏎K]`). A **routed** head (an
+                // alone-on-line directive inside the shell) keeps the existing paths: the
+                // freeze is `member_gap_frozen`'s above, and this seam owes it nothing.
+                let hang = self.keyword_value_stripped_paren_hang(index_type);
+                let index_hangs = !hang.routed
+                    && bracket_open.is_some_and(|bp| {
+                        self.comments_force_own_line_between(bp + 1, hang.value_start)
+                            || self.broke_after_run_holds_multiline_block(bp + 1, hang.value_start)
+                    });
                 let index_comments = || {
                     bracket_open.map(|bp| {
-                        if self.comments_force_own_line_between(bp + 1, index_type_start) {
-                            self.build_trailing_comments_hang_next(bp + 1, index_type_start)
+                        if index_hangs {
+                            self.build_trailing_comments_hang_next(bp + 1, hang.value_start)
                         } else {
                             self.build_comments_between(
                                 bp + 1,
@@ -866,7 +908,25 @@ impl<'a> Printer<'a> {
                         };
                         (d.group(d.indent(d.concat(&[d.softline(), hung]))), None)
                     }
-                    _ => (self.build_type_doc(index_type), index_comments()),
+                    _ => {
+                        // Under the hang, the claim + lift pair the stripped shell owes
+                        // (a no-op on every bare authoring — `value_type` is then the index
+                        // itself and `claimed_shell` is `None`). Type position, so a
+                        // trailing block lifted out of the shell trails the index inline
+                        // inside the brackets.
+                        let doc = if index_hangs {
+                            self.with_stripped_shell_value(
+                                hang.claimed_shell,
+                                index_type,
+                                hang.value_type,
+                                TrailingBlock::Inline,
+                                || self.build_type_doc(hang.value_type),
+                            )
+                        } else {
+                            self.build_type_doc(index_type)
+                        };
+                        (doc, index_comments())
+                    }
                 };
                 let mut parts: DocBuf = smallvec![object_doc];
                 if let Some(c) = object_comments {

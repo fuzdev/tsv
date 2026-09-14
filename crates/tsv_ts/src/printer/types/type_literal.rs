@@ -1334,7 +1334,17 @@ impl<'a> Printer<'a> {
                 if needs_break {
                     parts.push(d.break_parent());
                 }
-                for comment in &leading {
+                // Whether the run's break is FORCED — a broke-after run holding a
+                // multi-line block ([`Printer::broke_after_run_holds_multiline_block`]),
+                // the same half the stripped-shell run emitter asks. Only under it does
+                // an author BLANK below a comment survive here: the `line` it sits on is
+                // then always open, so the blank is the authoring prettier keeps
+                // (`printLeadingComment` pushes its blank `hardline` after the soft `line`
+                // too) and the bare twin of this run prints.
+                let run_forces_break =
+                    self.broke_after_run_holds_multiline_block(p.span.start, inner_start);
+                for (i, comment) in leading.iter().enumerate() {
+                    let next_start = leading.get(i + 1).map_or(inner_start, |c| c.span.start);
                     parts.push(self.build_comment_doc(comment));
                     // A block the author broke after takes prettier's soft `line`, the
                     // separator the LIST's own gap gives the same run written bare
@@ -1345,6 +1355,11 @@ impl<'a> Printer<'a> {
                     // its comment, and a sole argument's hug flipped between the passes.
                     if comment.is_block && !self.comment_hugs_next(comment) {
                         parts.push(d.line());
+                        if run_forces_break
+                            && self.has_blank_line_between(comment.span.end, next_start)
+                        {
+                            parts.push(d.hardline());
+                        }
                     } else {
                         self.push_comment_kind_separator(&mut parts, comment);
                     }

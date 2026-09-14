@@ -35,6 +35,14 @@
 			G;
 	};
 
+	// a run: the multi-line block glued ahead of a single-line one the author broke after
+	type M = {
+		[K in string]:
+			/* c8
+	d8 */ /* c9 */
+			N;
+	};
+
 	// control: a multi-line block glued to the value keeps its line
 	type H = {
 		[K in string]: /* c6

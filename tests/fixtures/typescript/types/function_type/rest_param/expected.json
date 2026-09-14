@@ -2,30 +2,95 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 106,
+	"end": 340,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
 		"nodes": []
 	},
 	"options": null,
-	"comments": [],
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A run the author GLUED — a multi-line block ahead of a single-line one — and broke",
+			"start": 98,
+			"end": 183,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " after, in the `...`→param gap: both formatters drop the parameter below the run",
+			"start": 185,
+			"end": 267,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1\n\td1 ",
+			"start": 285,
+			"end": 297,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 5
+				},
+				"end": {
+					"line": 9,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 298,
+			"end": 306,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 7
+				},
+				"end": {
+					"line": 9,
+					"column": 15
+				}
+			}
+		}
+	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 105,
+		"end": 339,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 96,
+			"end": 330,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 4,
+					"line": 12,
 					"column": 9
 				}
 			},
@@ -383,6 +448,188 @@
 							}
 						}
 					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 269,
+					"end": 329,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 11
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 274,
+						"end": 275,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 6
+							},
+							"end": {
+								"line": 7,
+								"column": 7
+							}
+						},
+						"name": "H"
+					},
+					"typeAnnotation": {
+						"type": "TSFunctionType",
+						"start": 278,
+						"end": 328,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 10
+							},
+							"end": {
+								"line": 11,
+								"column": 10
+							}
+						},
+						"parameters": [
+							{
+								"type": "RestElement",
+								"start": 282,
+								"end": 317,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 10
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 309,
+									"end": 310,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 2
+										},
+										"end": {
+											"line": 10,
+											"column": 3
+										}
+									},
+									"name": "c",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c1\n\td1 ",
+											"start": 285,
+											"end": 297
+										},
+										{
+											"type": "Block",
+											"value": " c2 ",
+											"start": 298,
+											"end": 306
+										}
+									]
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 310,
+									"end": 317,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 3
+										},
+										"end": {
+											"line": 10,
+											"column": 10
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSArrayType",
+										"start": 312,
+										"end": 317,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 5
+											},
+											"end": {
+												"line": 10,
+												"column": 10
+											}
+										},
+										"elementType": {
+											"type": "TSAnyKeyword",
+											"start": 312,
+											"end": 315,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 5
+												},
+												"end": {
+													"line": 10,
+													"column": 8
+												}
+											}
+										}
+									}
+								}
+							}
+						],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 321,
+							"end": 328,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 3
+								},
+								"end": {
+									"line": 11,
+									"column": 10
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSVoidKeyword",
+								"start": 324,
+								"end": 328,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 6
+									},
+									"end": {
+										"line": 11,
+										"column": 10
+									}
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A run the author GLUED — a multi-line block ahead of a single-line one — and broke",
+							"start": 98,
+							"end": 183
+						},
+						{
+							"type": "Line",
+							"value": " after, in the `...`→param gap: both formatters drop the parameter below the run",
+							"start": 185,
+							"end": 267
+						}
+					]
 				}
 			],
 			"sourceType": "module"

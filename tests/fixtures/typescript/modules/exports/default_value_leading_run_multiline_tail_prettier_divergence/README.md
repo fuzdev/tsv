@@ -22,6 +22,8 @@ export default /* x */
  */ aaa ? bbb : ccc;
 ```
 
+The second case inverts the run's own order — a **multi-line** block the author GLUED ahead of a single-line one and broke after THAT (`export default /* x⏎y */ /* z */⏎ddd ? eee : fff`): the break belongs to the run, not to one comment, so the glue is kept and the value hangs under the keyword as above.
+
 `unformatted_ours_paren_break.svelte` is the same run before a parenthesized value with a break
 inside its parens (`/* y⏎*/ (⏎aaa ? bbb : ccc)`), which tsv lands on the same fixed point.
 

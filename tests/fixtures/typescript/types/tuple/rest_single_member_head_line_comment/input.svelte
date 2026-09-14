@@ -19,4 +19,12 @@
 		G[],
 		H
 	];
+
+	// The block-run face of the same gap: a run the author GLUED — a multi-line block ahead
+	// of a single-line one — and broke after. Both formatters drop the type below the run
+	type I = [
+		.../* c4
+	d4 */ /* c5 */
+		J[]
+	];
 </script>

@@ -19,7 +19,9 @@ the key's brackets. The break after the `*/` is prettier's own `printLeadingComm
 rule — a block with a newline after it takes a soft `line`, which a multi-line
 block forces open. A multi-line block glued to the value keeps that line, and a
 single-line block the author broke after collapses onto the value, in both
-formatters. The line-comment spelling is
+formatters. The break belongs to the RUN rather than to one comment, so a
+multi-line block the author glued *ahead* of a single-line one they broke after
+(`type M`) hangs exactly as the lone block does. The line-comment spelling is
 [mapped_value_line_comment](../mapped_value_line_comment_prettier_divergence/).
 
 See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

@@ -408,7 +408,16 @@ impl<'a> Printer<'a> {
         value_doc: DocId,
     ) {
         let d = self.d();
-        if self.comments_force_own_line_between(keyword_end, value_start) {
+        // The gate is the keyword→value pair: a comment that forces its own line, OR a
+        // block run the author BROKE AFTER holding a multi-line block
+        // ([`Printer::broke_after_run_holds_multiline_block`] — the half
+        // `comments_force_own_line_between`, reading each comment against its own
+        // neighbour, answers no for `extends /* a⏎b */ /* c */⏎Y`). The multi-line body
+        // cannot print flat, so the run's break is forced whichever comment carries it,
+        // and the value hangs exactly as it does behind the `//` twin.
+        if self.comments_force_own_line_between(keyword_end, value_start)
+            || self.broke_after_run_holds_multiline_block(keyword_end, value_start)
+        {
             self.append_keyword_value_line_comments(parts, keyword_end, value_start, value_doc);
             return;
         }
@@ -579,7 +588,9 @@ impl<'a> Printer<'a> {
             return;
         }
         if let Some(keyword_end) = head.gap_start {
-            if self.comments_force_own_line_between(keyword_end, head.value_start) {
+            if self.comments_force_own_line_between(keyword_end, head.value_start)
+                || self.broke_after_run_holds_multiline_block(keyword_end, head.value_start)
+            {
                 // A line comment or multiline block after the keyword hangs the bound type
                 // on its own line (and expands the `<…>` via the gate in
                 // `has_expanding_comments_in_type_param_declaration`). A
@@ -588,6 +599,14 @@ impl<'a> Printer<'a> {
                 // union, which takes the hanging tail with the run inside. Type position: a
                 // trailing block lifted from a stripped shell trails the value inline
                 // before the `,`/`>`.
+                //
+                // The second disjunct is the run the author GLUED — a multi-line block
+                // ahead of a single-line one — and then BROKE AFTER
+                // ([`Printer::broke_after_run_holds_multiline_block`]): the multi-line body
+                // cannot print flat, so the break is the RUN's whichever comment carries
+                // it, and `comments_force_own_line_between`, which reads each comment
+                // against its own neighbour, answers no. Without it the bound welded onto
+                // the run's closing line at both authorings, where the `//` twin hangs.
                 let value_doc = self.with_stripped_shell_value(
                     head.claimed_shell,
                     head.child,

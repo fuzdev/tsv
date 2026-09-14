@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 453,
+	"end": 755,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -137,24 +137,104 @@
 					"column": 11
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " A run the author GLUED — a multi-line block ahead of a single-line one — and then broke",
+			"start": 445,
+			"end": 535,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " after. The run's break is forced by the multi-line block, so the extends-type hangs",
+			"start": 537,
+			"end": 623,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " below the whole run exactly as it does under the `//` above.",
+			"start": 625,
+			"end": 688,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " a\nb ",
+			"start": 710,
+			"end": 719,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 21
+				},
+				"end": {
+					"line": 20,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 720,
+			"end": 727,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 5
+				},
+				"end": {
+					"line": 20,
+					"column": 12
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 452,
+		"end": 754,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 443,
+			"end": 745,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 15,
+					"line": 24,
 					"column": 9
 				}
 			},
@@ -554,6 +634,210 @@
 							"value": " hangs the type; the trailing block stays inline at this type position.",
 							"start": 318,
 							"end": 391
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 690,
+					"end": 744,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 695,
+						"end": 697,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 6
+							},
+							"end": {
+								"line": 19,
+								"column": 8
+							}
+						},
+						"name": "T3"
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 700,
+						"end": 743,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 11
+							},
+							"end": {
+								"line": 23,
+								"column": 5
+							}
+						},
+						"checkType": {
+							"type": "TSTypeReference",
+							"start": 700,
+							"end": 701,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 11
+								},
+								"end": {
+									"line": 19,
+									"column": 12
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 700,
+								"end": 701,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 11
+									},
+									"end": {
+										"line": 19,
+										"column": 12
+									}
+								},
+								"name": "A"
+							}
+						},
+						"extendsType": {
+							"type": "TSTypeReference",
+							"start": 730,
+							"end": 731,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 2
+								},
+								"end": {
+									"line": 21,
+									"column": 3
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 730,
+								"end": 731,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 2
+									},
+									"end": {
+										"line": 21,
+										"column": 3
+									}
+								},
+								"name": "B"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " a\nb ",
+									"start": 710,
+									"end": 719
+								},
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 720,
+									"end": 727
+								}
+							]
+						},
+						"trueType": {
+							"type": "TSTypeReference",
+							"start": 736,
+							"end": 737,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 4
+								},
+								"end": {
+									"line": 22,
+									"column": 5
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 736,
+								"end": 737,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 4
+									},
+									"end": {
+										"line": 22,
+										"column": 5
+									}
+								},
+								"name": "X"
+							}
+						},
+						"falseType": {
+							"type": "TSTypeReference",
+							"start": 742,
+							"end": 743,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 4
+								},
+								"end": {
+									"line": 23,
+									"column": 5
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 742,
+								"end": 743,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 4
+									},
+									"end": {
+										"line": 23,
+										"column": 5
+									}
+								},
+								"name": "Y"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A run the author GLUED — a multi-line block ahead of a single-line one — and then broke",
+							"start": 445,
+							"end": 535
+						},
+						{
+							"type": "Line",
+							"value": " after. The run's break is forced by the multi-line block, so the extends-type hangs",
+							"start": 537,
+							"end": 623
+						},
+						{
+							"type": "Line",
+							"value": " below the whole run exactly as it does under the `//` above.",
+							"start": 625,
+							"end": 688
 						}
 					]
 				}

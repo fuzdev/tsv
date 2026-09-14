@@ -21,6 +21,8 @@ case /* x */
  */ aaa ? bbb : ccc:
 ```
 
+The third case inverts the run's own order — a **multi-line** block the author GLUED ahead of a single-line one and broke after THAT (`case /* x⏎y */ /* z */⏎ddd ? eee : fff:`): the break belongs to the run, not to one comment, so the glue is kept and the test hangs under `case` as above.
+
 `unformatted_ours_paren_break.svelte` spells the first test in parens with a break inside them,
 and the second glued to the comment — tsv lands both on `input.svelte`.
 

@@ -572,7 +572,16 @@ impl<'a> Printer<'a> {
             // as the bare form instead of hanging inline. The doc is built from the
             // unwrapped type — safe, since we only unwrap when no comments are inside
             // the parens (commented parens stay on the preserve-in-place path).
-            let value_type = self.unwrap_redundant_parens(&decl.type_annotation);
+            //
+            // ⚠️ Unwrapped from the HEAD's value, never from `decl.type_annotation`: the
+            // head has already SUBSTITUTED a claimed shell away
+            // ([`StrippedParenHang::for_value`]), and this arm is reached with the run in
+            // the shell's own leading gap ([`Printer::block_run_forces_break`] claims it
+            // without forcing the branch above). Re-unwrapping the original declines the
+            // COMMENTED shell, so the value doc re-printed the very run this gap emits
+            // (`head_paren_shell_glued_run_broke_after_multiline_block_comment`). The same
+            // seam the annotation `:` takes ([`Printer::build_type_annotation_doc`]).
+            let value_type = self.unwrap_redundant_parens(head.value_type);
             // A frozen RHS never reaches this branch: an alone-on-line directive —
             // line or block spelling — always trips `force_break` over the same
             // window (`comments_force_own_line_between` catches every line comment;
@@ -584,21 +593,34 @@ impl<'a> Printer<'a> {
                 !head.frozen && !head.routed,
                 "an alone-on-line directive always takes the force-break branch"
             );
-            // Under the head's claim: a transparent one-member composite at the value's
-            // leading edge (`(| /* c */ a) & b`, `(& /* c */ {…})[]`) widened the window
-            // above so this gap's emitters print its head run, and the composite's own
-            // emitter must stand down for the build (docs/comments.md hazard 3).
+            // Under the head's claim + lift ([`Printer::with_stripped_shell_value`]): a
+            // transparent one-member composite at the value's leading edge
+            // (`(| /* c */ a) & b`, `(& /* c */ {…})[]`) widened the window above so this
+            // gap's emitters print its head run, and the composite's own emitter must
+            // stand down for the build (docs/comments.md hazard 3); a shell the head
+            // SUBSTITUTED away leaves its trailing gap to travel out past the value, which
+            // is the other half of the pair every stripped shell owes. Type position, so a
+            // trailing block trails the value inline before the `;`. No-ops on every RHS
+            // that stripped nothing.
             let build_value = || -> DocId {
-                self.with_claimed_shell_leading_run(head.claimed_shell, || {
-                    self.build_type_doc(value_type)
-                })
+                self.with_stripped_shell_value(
+                    head.claimed_shell,
+                    &decl.type_annotation,
+                    head.value_type,
+                    TrailingBlock::Inline,
+                    || self.build_type_doc(value_type),
+                )
             };
-            // The intersection arms build their own hanging doc — under the same claim,
+            // The intersection arms build their own hanging doc — under the same pair,
             // since the intersection's first member is a descent link of that seam.
             let build_intersection = |i: &internal::TSIntersectionType<'_>| -> DocId {
-                self.with_claimed_shell_leading_run(head.claimed_shell, || {
-                    self.intersection_hanging_with_indent(i)
-                })
+                self.with_stripped_shell_value(
+                    head.claimed_shell,
+                    &decl.type_annotation,
+                    head.value_type,
+                    TrailingBlock::Inline,
+                    || self.intersection_hanging_with_indent(i),
+                )
             };
             // The value, for an arm that does NOT own the intersection layout itself (the
             // fourth-disjunct hang and the complex-params `break-lhs`): an intersection
