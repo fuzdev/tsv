@@ -613,6 +613,18 @@ and ECMAScript normalizes `<CR>` and `<CR><LF>` to `<LF>` in both TV and TRV. `<
 `<PS>` are deliberately untouched — ECMAScript keeps each as itself, and HTML and CSS read
 them as ordinary characters.
 
+**A leading byte-order mark is never rewritten either — but its *position* is read the way
+each oracle reads it.** Every lexer skips a U+FEFF at byte 0 and keeps its spans file-true;
+what moves is the emitted offset, per `tsv_lang::LeadingBom`, which every map constructor
+takes by name. Svelte's `parse` and `parseCss` call `remove_bom` before parsing, so their
+offsets index the BOM-less string — the Svelte and CSS writers build their `ByteToCharMap`
+`Elided`, resolving the BOM's three bytes to position 0 and every later byte one UTF-16 unit
+lower (a line-1 column one lower too; the acorn islands follow, since Svelte hands acorn the
+stripped string). acorn treats the BOM as whitespace, so the TypeScript writer builds
+`Counted`: `Program.start` stays 0 and the first token sits at offset 1, column 1. The
+`no-locations` reconstruction helper (`crates/tsv_wasm/npm/locations.js`) strips the BOM
+ahead of its Svelte and CSS line tables for the same reason, and keeps it for TypeScript.
+
 ### `loc` lines: two classes, one per acorn parse
 
 The fold above is about the bytes tsv *writes*. The counting question is separate, and the

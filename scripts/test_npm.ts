@@ -697,6 +697,32 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 		assert.ok(recon.loc, 'reconstruct added loc to the Root (template node)');
 	});
 
+	it('a leading BOM is elided for Svelte (as its wire is) and counted for TypeScript', () => {
+		// Svelte's `parse` strips the BOM before parsing, so the wire's first element
+		// starts at 0 and its `name_loc` is column 1; the helper must index the same
+		// BOM-less string, or every line-1 column and name span reads one off.
+		const sv = '\uFEFF<div class="a">x</div>\n<span>y</span>';
+		const full = node_entry.parse_svelte(sv);
+		const div = full.fragment.nodes[0];
+		assert.equal(div.start, 0);
+		assert.equal(div.name_loc.start.column, 1);
+		const recon = node_entry.reconstruct_locations(
+			node_entry.parse_svelte(sv, { locations: false }),
+			sv
+		);
+		assert.deepEqual(recon.fragment.nodes[0].name_loc, div.name_loc);
+		assert.deepEqual(recon.fragment.nodes[2].name_loc, full.fragment.nodes[2].name_loc);
+		// acorn counts the BOM as whitespace: the first statement sits at offset 1, column 1,
+		// and the reconstruction over the caller's string reproduces that exactly.
+		const ts = '\uFEFFconst x = 1;';
+		const ts_full = node_entry.parse_typescript(ts);
+		assert.equal(ts_full.body[0].start, 1);
+		assert.deepEqual(
+			node_entry.reconstruct_locations(node_entry.parse_typescript(ts, { locations: false }), ts),
+			ts_full
+		);
+	});
+
 	// The hand-written case above pins the shapes a reader can follow; this one drives
 	// the SAME helper over every `.svelte` fixture in the repo, so the tables it carries
 	// (`NAME_LOC_KINDS`, the character-bearing shapes) are graded against what the writer

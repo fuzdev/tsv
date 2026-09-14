@@ -582,7 +582,9 @@ See [Development Philosophy](#development-philosophy-test-driven-development-wit
 
 **Fixture File Structure:** `input.*` + `expected.json` at minimum. Every optional
 sibling makes a precise, validated claim — `expected_ours.json` / `expected_svelte.json`
-(parser divergence), `output_prettier.*` / `prettier_variant_*` / `variant_*` /
+(parser divergence), `expected_<stem>.json` (a sibling variant `<stem>.*`'s parse pin: the
+canonical AST of a form no `input.*` can hold under F1 — the leading BOM),
+`output_prettier.*` / `prettier_variant_*` / `variant_*` /
 `divergent_variant_*` / `prettier_intermediate_*` / `prettier_intermediate_to_variant_*` /
 `prettier_intermediate_to_divergent_variant_*` /
 `audit_signature.txt` / `audit_signature_<suffix>.txt` (formatter divergence + prettier
@@ -616,6 +618,7 @@ and validation rules (F/S/R/D): ./docs/fixture_overview.md.
 - **Prettier never converges (no oracle)**: Add `prettier_nonconvergent.txt` + README (requires `_prettier_divergence` suffix; excludes all prettier-claim files)
 - **Prettier rejects/throws on input (no oracle)**: Add `prettier_rejects.txt` (trimmed content = expected-error substring) + README (requires `_prettier_divergence` suffix; excludes all prettier-claim files; mutually exclusive with `prettier_nonconvergent.txt`)
 - **tsv over-rejects but canonical accepts**: Add `tsv_rejects.txt` (trimmed content = expected tsv-error substring) + `expected_svelte.json` + README (requires `_svelte_divergence` suffix; no `expected.json`/`expected_ours.json`; excludes all format-claim files, `input_invalid_*`, and the prettier no-oracle markers)
+- **The parse fact lives only in a form `input.*` can't hold** (a leading BOM — the format side strips it, so F1 forbids it): pin a variant instead — an empty `expected_<stem>.json` beside the variant `<stem>.*`, filled by `fixtures:update:parsed` (P4/S24; the in-tree case is each `bom_prettier_divergence`'s `expected_prettier_variant_bom.json`)
 - **Both differ**: Use `_svelte_prettier_divergence` suffix
 
 ## Debug Tooling
@@ -872,6 +875,19 @@ that answers it once: the printers ask "where are the lines?" in several places 
 on `'\n'` alone, and folding the finished string instead leaves those disagreeing with the
 output — the same document then formats two ways on two passes. `<LS>` / `<PS>` are
 deliberately NOT folded.
+
+**A leading byte-order mark is the one input `parse` reads two ways, because the oracles
+do.** No parser rewrites the source — every lexer skips a BOM at byte 0 and its spans stay
+file-true — but the *emitted* position follows each wire's canonical parser
+(`tsv_lang::LeadingBom`, named at every map constructor): Svelte's `parse` and `parseCss`
+strip the BOM before parsing (`remove_bom`), so the Svelte and CSS writers build their map
+`Elided` and every offset indexes the BOM-less string (one UTF-16 unit below the file's, a
+line-1 column one lower, the acorn islands included — Svelte hands acorn the stripped
+string); acorn counts it as whitespace, so the TypeScript writer builds `Counted` and keeps
+file coordinates. The `no-locations` JS helper makes the same split. Pinned by the three
+`bom_prettier_divergence` fixtures' `expected_prettier_variant_bom.json`, the variant pin
+(no `input.*` can carry a BOM: the format side strips it, so it is never its own fixed
+point).
 
 **Counting lines is a separate question, and the Svelte wire answers it TWO ways** — because
 Svelte's parser does: Svelte's own positions open a line at `\n` alone, everything acorn parses

@@ -68,14 +68,6 @@ the `DOCUMENTED_MATCHERS` named below. What bytes cannot pin, a Rust test can:
 _relation_ between parses (the two spellings agree for tsv and disagree for
 `parseCss`), which is also the live gate on the oracle claims below.
 
-- **BOM offset shift** (matcher `bom_offset`; corpus oracle
-  `prettier/tests/format/css/bom/bom.css`). Svelte's `parseCss` and `parse` call
-  `remove_bom` before parsing, so in a BOM-prefixed file every canonical offset
-  is 1 UTF-16 unit lower than the true file position. tsv deliberately keeps
-  file-true offsets: its lexers skip the BOM but never shift positions, so
-  consumers can index the string they actually passed in (acorn behaves the
-  same way on the TS side, so tsv is also uniform across languages where Svelte
-  is not).
 - **Declaration tokenization garbage** (matcher `css_declaration_tokenization`;
   corpus oracles `prettier/tests/format/css/empty/empty.css`,
   `prettier/tests/format/css/comments/declaration.css`). Svelte's

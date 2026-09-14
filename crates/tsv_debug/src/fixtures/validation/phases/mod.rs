@@ -9,8 +9,9 @@ mod parser;
 mod render_equivalence;
 
 pub(super) use parser::{
-    validate_invalid_syntax, validate_parser_external, validate_parser_ours,
+    read_variant_pins, validate_invalid_syntax, validate_parser_external, validate_parser_ours,
     validate_parser_ours_matches_expected, validate_tsv_rejects, validate_tsv_rejects_canonical,
+    validate_variant_parse_pins_canonical, validate_variant_parse_pins_ours,
 };
 
 pub(super) use formatter::{

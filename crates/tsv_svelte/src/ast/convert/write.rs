@@ -84,8 +84,8 @@ use crate::ast::internal;
 use crate::whitespace::is_svelte_ws;
 use tsv_css::ast::convert::{write_css_children, write_css_comments};
 use tsv_lang::{
-    Comment, JsonWriter, LocationMapper, LocationTracker, Position, Span, estimated_json_capacity,
-    write_array, write_or_null,
+    Comment, JsonWriter, LeadingBom, LocationMapper, LocationTracker, Position, Span,
+    estimated_json_capacity, write_array, write_or_null,
 };
 use tsv_ts::AcornSeed;
 use tsv_ts::ast::convert::{
@@ -123,10 +123,16 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
     // `no-locations` path emits no line/column at all (loc, name_loc, and
     // root-comment loc are all gated off), so it skips the LF line scan entirely
     // (`new_map_only` builds just the byte→char map) — once per file, no per-node cost.
+    //
+    // A leading BOM is ELIDED: Svelte's `parse` strips it (`remove_bom`) before the
+    // parser sees the source, so every canonical offset — the template spine, `name_loc`,
+    // the `<style>` sheet, and every acorn island, which Svelte hands the BOM-less string
+    // too — indexes one UTF-16 unit below the author's file, and a line-1 column one
+    // lower. The parser's spans stay file-true; only the emitted position moves.
     let (tracker, map, ecmascript_lines_differ) = if emit_loc {
-        LocationTracker::new_with_map(source)
+        LocationTracker::new_with_map(source, LeadingBom::Elided)
     } else {
-        let (tracker, map) = LocationTracker::new_map_only(source);
+        let (tracker, map) = LocationTracker::new_map_only(source, LeadingBom::Elided);
         // NOT a claim that the two classes agree — this path emits no `loc` at
         // all, so the question is never asked and acorn's table would have no
         // reader. A source with a lone CR reaches here reporting `false`, which

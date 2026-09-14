@@ -17,8 +17,8 @@ pub use model::{
     has_prettier_divergence_suffix, has_svelte_divergence_suffix, read_goal_marker,
 };
 pub use variants::{
-    FixtureFiles, StableFormMarker, classify_stable_form, unformatted_ours_filename,
-    unformatted_ours_suffix,
+    ExpectedVariantPin, FixtureFiles, StableFormMarker, classify_stable_form,
+    unformatted_ours_filename, unformatted_ours_suffix,
 };
 
 use crate::deno::{DenoError, parse_by_type_with_goal};

@@ -40,11 +40,12 @@ use structure::{STRUCTURE_RULE_COUNT, validate_divergence_readme, validate_fixtu
 use crate::fixtures::{Fixture, FixtureFiles, read_file};
 
 use phases::{
-    validate_formatter_idempotent, validate_formatter_prettier, validate_invalid_syntax,
-    validate_normalization_ours, validate_normalization_prettier, validate_parser_external,
-    validate_parser_ours, validate_parser_ours_matches_expected, validate_prettier_nonconvergent,
-    validate_prettier_rejects, validate_render_equivalence, validate_tsv_rejects,
-    validate_tsv_rejects_canonical,
+    read_variant_pins, validate_formatter_idempotent, validate_formatter_prettier,
+    validate_invalid_syntax, validate_normalization_ours, validate_normalization_prettier,
+    validate_parser_external, validate_parser_ours, validate_parser_ours_matches_expected,
+    validate_prettier_nonconvergent, validate_prettier_rejects, validate_render_equivalence,
+    validate_tsv_rejects, validate_tsv_rejects_canonical, validate_variant_parse_pins_canonical,
+    validate_variant_parse_pins_ours,
 };
 
 /// Result of validating a single fixture
@@ -65,6 +66,7 @@ pub struct FixtureValidation {
     pub prettier_intermediate_to_variant_count: usize,
     pub prettier_intermediate_to_divergent_variant_count: usize,
     pub audit_signature_variant_count: usize,
+    pub expected_variant_count: usize,
     pub invalid_syntax_count: usize,
     /// Input content for cross-fixture duplicate detection (populated during validation)
     pub input_content: Option<String>,
@@ -126,6 +128,7 @@ impl FixtureValidation {
             prettier_intermediate_to_variant_count: 0,
             prettier_intermediate_to_divergent_variant_count: 0,
             audit_signature_variant_count: 0,
+            expected_variant_count: 0,
             invalid_syntax_count: 0,
             input_content: None,
             input_file_name: None,
@@ -207,6 +210,7 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
     result.prettier_intermediate_to_divergent_variant_count =
         files.prettier_intermediate_to_divergent_variant.len();
     result.audit_signature_variant_count = files.audit_signature_variant.len();
+    result.expected_variant_count = files.expected_variant.len();
     result.invalid_syntax_count = files.input_invalid.len();
 
     // Read input file
@@ -242,6 +246,9 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
         return result;
     }
 
+    // P4's pins, read once for both its halves (phase 2c, tsv side; phase 5, canonical)
+    let variant_pins = read_variant_pins(&mut result, fixture, &files);
+
     // Phases 2-4: Our parser/formatter validation (skip in prettier_only mode)
     if !prettier_only {
         // Phases 2/2b share one parse of the input (and one wire emission).
@@ -270,6 +277,11 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
             }
         }
 
+        // Phase 2c: P4, tsv side — our parse of each pinned variant reproduces its
+        // `expected_<stem>.json` (pure Rust). Its own parses: a variant is a different
+        // document from the input, and the pin is what makes it a parse claim.
+        validate_variant_parse_pins_ours(&mut result, fixture, input_type, &variant_pins);
+
         // Phase 3: Our Formatter validation - F1 (pure Rust)
         let format_ok = validate_formatter_idempotent(&mut result, fixture, &input);
 
@@ -284,6 +296,9 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
     // Phase 5: Deno sidecar validations (prettier + the canonical parsers)
     // P1, P3: Parser freshness
     validate_parser_external(&mut result, fixture, &input, input_type).await;
+    // P4, canonical side: each variant parse pin still holds what the canonical
+    // parser emits for its variant
+    validate_variant_parse_pins_canonical(&mut result, fixture, input_type, &variant_pins).await;
 
     // F2, F3, F4: Prettier freshness and baseline. All input types validate —
     // `prettier_parser()` routes Svelte/SvelteTs through prettier-plugin-svelte

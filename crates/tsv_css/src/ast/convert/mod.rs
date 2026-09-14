@@ -13,8 +13,9 @@
 // - Declaration `end` — the `;`/`}` terminator scan position
 // - Selector names — half-decoded like `read_identifier` (hex escapes decode,
 //   identity escapes keep the backslash)
-// Spans always index the real file; Svelte's `remove_bom` shift is a
-// documented divergence (docs/conformance_svelte.md), not replicated.
+// Spans always index the real file; a leading BOM is elided at EMISSION
+// (`LeadingBom::Elided` in `write_stylesheet_file_bytes`), since `parseCss`
+// strips it before parsing and its offsets index the BOM-less string.
 //
 // The writer (`write.rs`) emits the wire JSON directly from the internal AST
 // in one walk and **reuses the raw-source reconstruction helpers below**

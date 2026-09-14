@@ -53,15 +53,43 @@ enum Deltas {
     Wide(Vec<u32>),
 }
 
+/// Whether a byte-order mark at byte 0 occupies a wire position — the one place the
+/// canonical parsers disagree about what string their offsets index.
+///
+/// acorn **counts** it: U+FEFF is whitespace to its tokenizer, so a BOM-led `.ts` file's
+/// first statement starts at offset 1, column 1, and `Program.start` stays 0. Svelte's
+/// `parse` and `parseCss` **strip** it before parsing (`remove_bom` in the compiler's
+/// entry points), so every offset they emit indexes the BOM-less string — one UTF-16 unit
+/// lower than the author's file, and one column lower on line 1. Each wire follows its own
+/// oracle, so the writer names which reading its map takes; a map built `Elided` resolves
+/// the BOM's three bytes to position 0 and every later byte one unit lower than `Counted`
+/// would. A U+FEFF anywhere but byte 0 is an ordinary character under both.
+///
+/// A parameter rather than a default because a silent choice is the failure mode in both
+/// directions: the TS wire *must* count it to stay a drop-in for acorn, and the Svelte
+/// and CSS wires *must not*, and nothing in a fixture without a BOM can tell the two apart.
+/// The parsers themselves are untouched — their spans index the author's bytes, and only
+/// the emitted position moves.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LeadingBom {
+    /// The BOM is one UTF-16 unit at position 0 (acorn).
+    Counted,
+    /// The BOM occupies no position; offsets index the BOM-less string (Svelte, `parseCss`).
+    Elided,
+}
+
+/// The UTF-8 encoding of U+FEFF, the byte-order mark.
+const BOM_BYTES: [u8; 3] = [0xEF, 0xBB, 0xBF];
+
 impl ByteToCharMap {
     /// Build a byte-to-UTF-16-code-unit offset map from source text
     ///
     /// For ASCII-only sources, returns an empty map (fast path).
-    pub fn new(source: &str) -> Self {
+    pub fn new(source: &str, bom: LeadingBom) -> Self {
         if source.is_ascii() {
             return Self::identity();
         }
-        build_map(source, &mut LineScan::map_only(), LineRule::None)
+        build_map(source, &mut LineScan::map_only(), LineRule::None, bom)
     }
 
     /// The identity map: every byte offset translates to itself.
@@ -340,9 +368,26 @@ fn utf8_len(lead: u8) -> usize {
 /// multibyte characters are sparse. `lines` must match `line_rule`:
 /// [`LineScan::lines`] for the two collecting rules, [`LineScan::map_only`] for
 /// [`LineRule::None`].
-fn build_map(source: &str, lines: &mut LineScan, line_rule: LineRule) -> ByteToCharMap {
+///
+/// An elided leading BOM is the one character whose deltas the scan does not derive from
+/// its width: its three bytes resolve to position 0 and it leaves a running delta of 3
+/// (`byte − utf16` with the unit it would have counted for gone), so every later byte
+/// reads one unit lower. It holds no line terminator, so the line scan can start behind it.
+fn build_map(
+    source: &str,
+    lines: &mut LineScan,
+    line_rule: LineRule,
+    bom: LeadingBom,
+) -> ByteToCharMap {
     let mut narrow: Vec<u8> = Vec::with_capacity(source.len() + 1);
-    let Err(outgrown) = build_deltas::<u8>(source, &mut narrow, lines, 0, 0, line_rule) else {
+    let (from, delta) = if bom == LeadingBom::Elided && source.as_bytes().starts_with(&BOM_BYTES) {
+        narrow.extend_from_slice(&[0, 1, 2]);
+        (BOM_BYTES.len(), BOM_BYTES.len() as u32)
+    } else {
+        (0, 0)
+    };
+    let Err(outgrown) = build_deltas::<u8>(source, &mut narrow, lines, from, delta, line_rule)
+    else {
         return ByteToCharMap {
             deltas: u8::into_deltas(narrow),
         };
@@ -376,7 +421,7 @@ fn build_map(source: &str, lines: &mut LineScan, line_rule: LineRule) -> ByteToC
 /// The wire-JSON writers thread this instead of a bare tracker so position
 /// emission and byte→UTF-16 translation fuse into one pass:
 ///
-/// - with a real map (`ByteToCharMap::new(source)`), `pos` and
+/// - with a real map (`ByteToCharMap::new(source, bom)`), `pos` and
 ///   `pos_and_position` emit final UTF-16 code-unit offsets and char-based
 ///   columns directly — no post-conversion translation walk;
 /// - with `ByteToCharMap::identity()`, both are exact byte-space passthrough —
@@ -592,8 +637,8 @@ impl LocationTracker {
     /// they cost two full `char_indices` passes over the source; fused they
     /// cost one (plus the shared `is_ascii` pre-check, which selects a
     /// byte-level line scan + identity map on the common all-ASCII path).
-    /// Byte-identical to `new_ecmascript(source)` + `ByteToCharMap::new(source)`.
-    pub fn new_ecmascript_with_map(source: &str) -> (Self, ByteToCharMap) {
+    /// Byte-identical to `new_ecmascript(source)` + `ByteToCharMap::new(source, bom)`.
+    pub fn new_ecmascript_with_map(source: &str, bom: LeadingBom) -> (Self, ByteToCharMap) {
         if source.is_ascii() {
             return (
                 Self::with_line_starts(ascii_ecmascript_line_starts(source.as_bytes())),
@@ -602,7 +647,7 @@ impl LocationTracker {
         }
 
         let mut lines = LineScan::lines();
-        let map = build_map(source, &mut lines, LineRule::Ecmascript);
+        let map = build_map(source, &mut lines, LineRule::Ecmascript, bom);
         (Self::with_line_starts(lines.starts), map)
     }
 
@@ -610,7 +655,7 @@ impl LocationTracker {
     /// `\n` starts a line; CR/U+2028/U+2029 do not) and the byte→UTF-16 map in
     /// one source scan. The Svelte sibling of `new_ecmascript_with_map`, for the
     /// wire-JSON writer's fused char-space emission over the Svelte spine.
-    /// Byte-identical to `new(source)` + `ByteToCharMap::new(source)`.
+    /// Byte-identical to `new(source)` + `ByteToCharMap::new(source, bom)`.
     ///
     /// The third return is `ecmascript_lines_differ`: whether the source holds a
     /// terminator the **ECMAScript** class counts and this one does not — a lone
@@ -625,13 +670,13 @@ impl LocationTracker {
     /// (an acorn parse entered behind where it starts lexing counts lines the
     /// author wrote and acorn never saw). A caller gating the whole re-seeding
     /// route on this alone has drawn the boundary too tight.
-    pub fn new_with_map(source: &str) -> (Self, ByteToCharMap, bool) {
+    pub fn new_with_map(source: &str, bom: LeadingBom) -> (Self, ByteToCharMap, bool) {
         let mut lines = LineScan::lines();
         let map = if source.is_ascii() {
             ascii_lf_line_starts_into(source.as_bytes(), 0, &mut lines);
             ByteToCharMap::identity()
         } else {
-            build_map(source, &mut lines, LineRule::Lf)
+            build_map(source, &mut lines, LineRule::Lf, bom)
         };
         (
             Self::with_line_starts(lines.starts),
@@ -652,8 +697,11 @@ impl LocationTracker {
     /// keeps `get_line_column` non-panicking if ever reached; the `map` is
     /// byte-identical to the fused constructors' map — line rules only affect
     /// `line_starts`, which this skips — so `start`/`end` offsets are unchanged.
-    pub fn new_map_only(source: &str) -> (Self, ByteToCharMap) {
-        (Self::with_line_starts(vec![0]), ByteToCharMap::new(source))
+    pub fn new_map_only(source: &str, bom: LeadingBom) -> (Self, ByteToCharMap) {
+        (
+            Self::with_line_starts(vec![0]),
+            ByteToCharMap::new(source, bom),
+        )
     }
 
     /// Resolve `offset` to `(line_idx, line_start)`, consulting the 1-entry
@@ -952,9 +1000,11 @@ mod tests {
                 .unwrap_or(byte_offset)
         };
 
-        let plain = ByteToCharMap::new(source);
-        let (ecma_tracker, ecma_map) = LocationTracker::new_ecmascript_with_map(source);
-        let (lf_tracker, lf_map, ecmascript_lines_differ) = LocationTracker::new_with_map(source);
+        let plain = ByteToCharMap::new(source, LeadingBom::Counted);
+        let (ecma_tracker, ecma_map) =
+            LocationTracker::new_ecmascript_with_map(source, LeadingBom::Counted);
+        let (lf_tracker, lf_map, ecmascript_lines_differ) =
+            LocationTracker::new_with_map(source, LeadingBom::Counted);
         // The probe's meaning, stated as the identity it exists to predict: the
         // two rules disagree on this source exactly when their tables do.
         assert_eq!(
@@ -962,7 +1012,7 @@ mod tests {
             ecma_tracker.line_starts != lf_tracker.line_starts,
             "ecmascript_lines_differ must equal `the two line tables differ`"
         );
-        let (_, map_only) = LocationTracker::new_map_only(source);
+        let (_, map_only) = LocationTracker::new_map_only(source, LeadingBom::Counted);
 
         let maps = [
             (&plain, "new"),
@@ -1037,13 +1087,74 @@ mod tests {
         }
     }
 
+    /// An elided leading BOM resolves its three bytes to position 0 and every later byte
+    /// one unit below the counted reading — on every constructor, in both element
+    /// widths, and with a line-1 column that starts at 0. Counted stays the reference.
+    /// No fixture can grade the column arithmetic on its own: the Svelte pin sees it only
+    /// through one `name_loc`, so the map states it here.
+    #[test]
+    fn test_elided_leading_bom_shifts_every_later_position_by_one() {
+        let bom = '\u{feff}';
+        for tail in ["<div>x</div>", "a\né\n中", &"é".repeat(300)] {
+            let source = format!("{bom}{tail}");
+            let counted = ByteToCharMap::new(&source, LeadingBom::Counted);
+            let (lf_tracker, lf_map, _) =
+                LocationTracker::new_with_map(&source, LeadingBom::Elided);
+            let (_, ecma_map) =
+                LocationTracker::new_ecmascript_with_map(&source, LeadingBom::Elided);
+            let (_, map_only) = LocationTracker::new_map_only(&source, LeadingBom::Elided);
+            let plain = ByteToCharMap::new(&source, LeadingBom::Elided);
+            for (map, which) in [
+                (&plain, "new"),
+                (&lf_map, "new_with_map"),
+                (&ecma_map, "new_ecmascript_with_map"),
+                (&map_only, "new_map_only"),
+            ] {
+                for b in 0..3u32 {
+                    assert_eq!(map.byte_to_char(b), 0, "{which}: BOM byte {b} on {tail:?}");
+                }
+                // Up to the end-of-source sentinel; a position past it translates to
+                // itself under both readings (a missing entry is a zero delta).
+                for b in 3..=(source.len() as u32) {
+                    assert_eq!(
+                        map.byte_to_char(b) + 1,
+                        counted.byte_to_char(b),
+                        "{which}: byte {b} on {tail:?}"
+                    );
+                }
+            }
+            // The column on line 1 reads through the same map, so it starts at 0 where
+            // Counted puts the first character at column 1.
+            let mapper = LocationMapper {
+                tracker: &lf_tracker,
+                map: &lf_map,
+            };
+            let (pos, position) = mapper.pos_and_position(3);
+            assert_eq!((pos, position.line, position.column), (0, 1, 0), "{tail:?}");
+        }
+
+        // A U+FEFF anywhere but byte 0 is an ordinary character under both readings,
+        // and a BOM-less source builds the same table either way.
+        for source in ["a\u{feff}b", "é", "abc"] {
+            let counted = ByteToCharMap::new(source, LeadingBom::Counted);
+            let elided = ByteToCharMap::new(source, LeadingBom::Elided);
+            for b in 0..=(source.len() as u32 + 1) {
+                assert_eq!(
+                    counted.byte_to_char(b),
+                    elided.byte_to_char(b),
+                    "{source:?}@{b}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn test_delta_map_widens_at_the_u8_boundary() {
         // Each 'é' grows the delta by exactly 1, so the source length in chars
         // *is* the final delta — the narrow/wide boundary lands exactly at 255.
         for (chars, expect_wide) in [(254, false), (255, false), (256, true), (700, true)] {
             let source = "é".repeat(chars);
-            let map = ByteToCharMap::new(&source);
+            let map = ByteToCharMap::new(&source, LeadingBom::Counted);
             assert_eq!(
                 matches!(map.deltas, Deltas::Wide(_)),
                 expect_wide,
@@ -1060,7 +1171,7 @@ mod tests {
         // still contains every arm (a 3-byte char grows the delta by 2, an
         // astral char by 2).
         let source = "中a\r\n😀\u{2028}é\u{2029}x\r".repeat(60);
-        let map = ByteToCharMap::new(&source);
+        let map = ByteToCharMap::new(&source, LeadingBom::Counted);
         assert!(matches!(map.deltas, Deltas::Wide(_)), "expected wide table");
         assert_map_matches_reference(&source, "wide, all arms");
     }
@@ -1088,7 +1199,10 @@ mod tests {
                 }
             }
             assert_eq!(
-                matches!(ByteToCharMap::new(&source).deltas, Deltas::Wide(_)),
+                matches!(
+                    ByteToCharMap::new(&source, LeadingBom::Counted).deltas,
+                    Deltas::Wide(_)
+                ),
                 expect_wide,
                 "wrong element width at 1-in-{multibyte_in} density"
             );
@@ -1336,7 +1450,7 @@ mod tests {
 
     #[test]
     fn test_byte_to_char_ascii_identity() {
-        let m = ByteToCharMap::new("abc");
+        let m = ByteToCharMap::new("abc", LeadingBom::Counted);
         assert!(!m.has_multibyte());
         assert_eq!(m.byte_to_char(0), 0);
         assert_eq!(m.byte_to_char(2), 2);
@@ -1347,7 +1461,7 @@ mod tests {
     #[test]
     fn test_byte_to_char_bmp_multibyte() {
         // "é=x": é is 2 UTF-8 bytes but 1 UTF-16 code unit, so '=' is unit 1, 'x' unit 2.
-        let m = ByteToCharMap::new("é=x");
+        let m = ByteToCharMap::new("é=x", LeadingBom::Counted);
         assert!(m.has_multibyte());
         assert_eq!(m.byte_to_char(0), 0);
         assert_eq!(m.byte_to_char(2), 1); // '=' at byte 2
@@ -1358,7 +1472,7 @@ mod tests {
     fn test_byte_to_char_astral_surrogate_pair() {
         // "😀x": the emoji is 4 UTF-8 bytes and 2 UTF-16 code units (surrogate pair),
         // so 'x' at byte 4 is UTF-16 unit 2.
-        let m = ByteToCharMap::new("😀x");
+        let m = ByteToCharMap::new("😀x", LeadingBom::Counted);
         assert!(m.has_multibyte());
         assert_eq!(m.byte_to_char(0), 0);
         assert_eq!(m.byte_to_char(4), 2); // 'x'
@@ -1368,7 +1482,7 @@ mod tests {
     #[test]
     fn test_byte_to_char_adjacent_multibyte() {
         // "日本x": 日 = bytes 0..3 / unit 0, 本 = bytes 3..6 / unit 1, x = byte 6 / unit 2.
-        let m = ByteToCharMap::new("日本x");
+        let m = ByteToCharMap::new("日本x", LeadingBom::Counted);
         assert_eq!(m.byte_to_char(0), 0);
         assert_eq!(m.byte_to_char(3), 1); // second char's start, no ASCII gap
         assert_eq!(m.byte_to_char(4), 1); // interior of 本
@@ -1379,7 +1493,7 @@ mod tests {
     #[test]
     fn test_byte_to_char_past_end_is_identity() {
         // Offsets past the end translate to themselves, even on a multibyte map.
-        let m = ByteToCharMap::new("é");
+        let m = ByteToCharMap::new("é", LeadingBom::Counted);
         assert_eq!(m.byte_to_char(2), 1); // end sentinel: 1 UTF-16 unit
         assert_eq!(m.byte_to_char(3), 3); // past the end
         assert_eq!(m.byte_to_char(99), 99);
@@ -1419,7 +1533,7 @@ mod tests {
     fn test_location_mapper_fused_char_columns() {
         let source = "aé\nbé c";
         let tracker = LocationTracker::new_ecmascript(source);
-        let map = ByteToCharMap::new(source);
+        let map = ByteToCharMap::new(source, LeadingBom::Counted);
         let m = LocationMapper {
             tracker: &tracker,
             map: &map,
@@ -1436,7 +1550,7 @@ mod tests {
         // "a😀b": 'a'=unit 0, emoji=units 1-2 (bytes 1-4), 'b'=unit 3 (byte 5).
         // A byte offset *inside* the emoji fills to that char's UTF-16 start (1),
         // exercising the gap-fill loop's `last > 0` branch.
-        let m = ByteToCharMap::new("a😀b");
+        let m = ByteToCharMap::new("a😀b", LeadingBom::Counted);
         assert_eq!(m.byte_to_char(0), 0); // 'a'
         assert_eq!(m.byte_to_char(1), 1); // emoji start
         assert_eq!(m.byte_to_char(2), 1); // interior byte → emoji start
@@ -1492,7 +1606,7 @@ mod tests {
             "\n\n\n",
         ] {
             let tracker = LocationTracker::new_ecmascript(source);
-            let map = ByteToCharMap::new(source);
+            let map = ByteToCharMap::new(source, LeadingBom::Counted);
             for m in [
                 LocationMapper {
                     tracker: &tracker,

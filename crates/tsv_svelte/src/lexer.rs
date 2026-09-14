@@ -203,7 +203,9 @@ impl<'a> Lexer<'a> {
     pub fn at_offset(source: &'a str, base_offset: usize) -> Self {
         // Skip UTF-8 BOM (U+FEFF) at start of file if present.
         // BOM is a legacy artifact; we strip it (like deno fmt, VS Code).
-        // Position starts after BOM so token spans reflect actual file bytes.
+        // Position starts after BOM so token spans reflect actual file bytes; the WIRE
+        // elides it at emission (`LeadingBom::Elided` in the writer), since Svelte's
+        // `parse` strips it before parsing and its offsets index the BOM-less string.
         let position = if source.starts_with('\u{feff}') {
             '\u{feff}'.len_utf8()
         } else {

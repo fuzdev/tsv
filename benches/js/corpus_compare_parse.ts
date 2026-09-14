@@ -386,20 +386,6 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 			/(^|\.)(leadingComments|trailingComments)$/.test(entry.path)
 	},
 	{
-		// Svelte's parseCss/parse call remove_bom before parsing, so every canonical
-		// offset in a BOM-prefixed file is 1 (UTF-16 unit) lower than the real file
-		// position; tsv deliberately keeps file-true offsets (its lexer skips the BOM
-		// but never shifts positions — acorn agrees on the TS side).
-		name: 'bom_offset',
-		conformance_section: 'CSS Parser Corrections (corpus-enforced) — BOM offset shift',
-		matches: (entry, _canonical_parent, ctx) =>
-			ctx.source.charCodeAt(0) === 0xfeff &&
-			entry.kind === 'value_mismatch' &&
-			typeof entry.ours === 'number' &&
-			typeof entry.canonical === 'number' &&
-			entry.ours === entry.canonical + 1
-	},
-	{
 		// Under lang="ts", Svelte parses `{#each expr as binding}` by letting the TS
 		// parser read `expr as binding` as an as-expression, then unwraps it — patching
 		// the expression's `end` OFFSET back to the real expression but leaving

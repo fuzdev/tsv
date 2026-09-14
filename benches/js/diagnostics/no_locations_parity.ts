@@ -300,6 +300,13 @@ for (const language of ['typescript', 'svelte'] as Language[]) {
 			t.two_line_classes++;
 			continue;
 		}
+		// The string the wire's offsets index: Svelte's `parse` and `parseCss` strip a
+		// leading BOM before parsing (acorn counts it), so a BOM-led Svelte or CSS file is
+		// reconstructed over its BOM-less text — the same split the shipped helper makes.
+		const text =
+			language !== 'typescript' && f.content.charCodeAt(0) === 0xfeff
+				? f.content.slice(1)
+				: f.content;
 		let full: unknown;
 		try {
 			full = native.parse(f.content, language);
@@ -316,11 +323,11 @@ for (const language of ['typescript', 'svelte'] as Language[]) {
 		}
 		// The second refusal, which needs the TREE rather than the source — so unlike the one
 		// above it can only be asked here, after the parse.
-		if (is_svelte && has_seeded_annotation(full, f.content)) {
+		if (is_svelte && has_seeded_annotation(full, text)) {
 			t.seeded_annotation++;
 			continue;
 		}
-		walk(full, build_line_starts(f.content, rule), is_svelte, f.content, t);
+		walk(full, build_line_starts(text, rule), is_svelte, text, t);
 		checked++;
 	}
 	const loc_total = t.exact + t.pattern_quirk + t.script_override + t.mismatch;

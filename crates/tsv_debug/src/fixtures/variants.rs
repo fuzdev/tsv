@@ -32,6 +32,43 @@ pub fn unformatted_ours_suffix<'a>(filename: &'a str, input_ext: &str) -> Option
         .strip_suffix(input_ext)
 }
 
+/// Filename prefix of a variant's parse pin — `expected_<stem>.json`, where `<stem>` is a
+/// sibling variant file's name without the input extension
+/// (`prettier_variant_bom.svelte` → `expected_prettier_variant_bom.json`).
+///
+/// The pin makes the non-divergence parse claim (P4) about THAT variant: the canonical
+/// parser's AST of the variant, which tsv's parse must reproduce byte-strict. It exists
+/// for a parse fact only a non-fixed-point authoring can carry — a leading BOM, which the
+/// format side strips, so no `input.*` can hold one under F1 — and is opt-in per variant:
+/// nothing grades a variant's parse until its pin is present.
+const EXPECTED_VARIANT_PREFIX: &str = "expected_";
+
+/// The variant stem an `expected_<stem>.json` pin names, or `None` when the name is not a
+/// pin. The two fixed `expected_*.json` files — `expected_ours.json` /
+/// `expected_svelte.json` — are not pins and answer `None` here; `scan` asks
+/// `is_static_fixture_file` first, so they never reach this, but the exclusion is stated
+/// here too so the reader is total on its own.
+fn expected_variant_stem(filename: &str) -> Option<&str> {
+    let stem = filename
+        .strip_prefix(EXPECTED_VARIANT_PREFIX)?
+        .strip_suffix(".json")?;
+    if stem.is_empty() || matches!(stem, "ours" | "svelte") {
+        return None;
+    }
+    Some(stem)
+}
+
+/// A variant parse pin as `scan` found it: the `expected_<stem>.json` file and the sibling
+/// variant `<stem><ext>` it names. The pair is resolved once here, so S24, both P4 phases
+/// and the updater read a pin's anchor rather than re-deriving it from the pin's name.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ExpectedVariantPin {
+    /// `expected_<stem>.json`.
+    pub pin: String,
+    /// `<stem><ext>` — the variant whose canonical AST the pin holds.
+    pub variant: String,
+}
+
 /// Which single-form variant marker can express a prettier-**stable** form `V`, judged by
 /// what our formatter does with it.
 ///
@@ -161,6 +198,10 @@ pub struct FixtureFiles {
     /// extension rather than the input's, so it is bucketed by name in `scan`
     /// rather than by `variant_bucket`'s extension-gated prefix chain.
     pub audit_signature_variant: Vec<String>,
+    /// `expected_<stem>.json`: a sibling variant's parse pin — the canonical parser's AST
+    /// of `<stem><ext>`, which tsv's parse must reproduce (P4; S24 requires the variant).
+    /// Bucketed by name like the signature above, for the same reason.
+    pub expected_variant: Vec<ExpectedVariantPin>,
     /// `prettier_nonconvergent.txt` marker present: prettier has no fixed
     /// point on this input, so F2/F3/F4 and the prettier-side N rules are
     /// replaced by the live non-convergence check (F5).
@@ -236,6 +277,13 @@ impl FixtureFiles {
                 files.audit_signature_variant.push(filename.to_string());
                 continue;
             }
+            if let Some(stem) = expected_variant_stem(filename) {
+                files.expected_variant.push(ExpectedVariantPin {
+                    pin: filename.to_string(),
+                    variant: format!("{stem}{ext}"),
+                });
+                continue;
+            }
             if let Some(bucket) = files.variant_bucket(filename, ext) {
                 bucket.push(filename.to_string());
             } else if entry.path().is_file() {
@@ -254,6 +302,7 @@ impl FixtureFiles {
         files.prettier_intermediate_to_divergent_variant.sort();
         files.input_invalid.sort();
         files.audit_signature_variant.sort();
+        files.expected_variant.sort();
         files.unknown.sort();
         files
     }
@@ -409,5 +458,21 @@ mod tests {
         // The per-variant signature is NOT static — it's bucketed, and the bare
         // signature must not absorb it.
         assert!(!is_static_fixture_file("audit_signature_own_line.txt"));
+    }
+
+    /// A variant pin is named by its variant's stem; the two fixed `expected_*.json`
+    /// files, the bare `expected.json`, and a non-`.json` name are not pins.
+    #[test]
+    fn expected_variant_stem_names_the_variant() {
+        assert_eq!(
+            expected_variant_stem("expected_prettier_variant_bom.json"),
+            Some("prettier_variant_bom")
+        );
+        assert_eq!(expected_variant_stem("expected_ours.json"), None);
+        assert_eq!(expected_variant_stem("expected_svelte.json"), None);
+        assert_eq!(expected_variant_stem("expected.json"), None);
+        assert_eq!(expected_variant_stem("expected_.json"), None);
+        assert_eq!(expected_variant_stem("expected_x.txt"), None);
+        assert_eq!(expected_variant_stem("unformatted_x.svelte"), None);
     }
 }

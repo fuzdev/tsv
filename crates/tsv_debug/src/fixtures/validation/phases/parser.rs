@@ -5,7 +5,7 @@ use crate::fixtures::{self, CanonicalParseError, Fixture, FixtureFiles, InputTyp
 
 use super::super::FixtureValidation;
 use super::super::errors::{ValidationError, ValidationSuccess};
-use super::super::parsed_input::{InputAstPaths, parse_input};
+use super::super::parsed_input::{InputAstPaths, input_ast_paths, parse_input};
 
 /// P2: Validate expected_ours.json matches our parser output
 pub(in crate::fixtures::validation) fn validate_parser_ours(
@@ -68,25 +68,37 @@ pub(in crate::fixtures::validation) fn validate_parser_ours_matches_expected(
         }
     };
 
-    if paths.ast_json_tabs == expected_str {
-        result.add_success(ValidationSuccess::ParserOursMatchesExpected);
-        return;
+    match compare_wire(paths, &expected_str) {
+        WireMatch::Exact => result.add_success(ValidationSuccess::ParserOursMatchesExpected),
+        WireMatch::FieldOrderOnly => result.add_error(ValidationError::ParserOursFieldOrderDiffers),
+        WireMatch::Differs => result.add_error(ValidationError::ParserOursDiffersFromExpected),
+        WireMatch::Unreadable(e) => result.add_error(ValidationError::ParserError(format!(
+            "Failed to parse expected.json: {e}"
+        ))),
     }
+}
 
-    let expected_json: serde_json::Value = match crate::json::from_str(&expected_str) {
-        Ok(v) => v,
-        Err(e) => {
-            result.add_error(ValidationError::ParserError(format!(
-                "Failed to parse expected.json: {e}"
-            )));
-            return;
-        }
-    };
+/// How the writer's wire stands against an `expected*.json` the canonical parser produced —
+/// the triage P2b and P4 share, so a field-order divergence reads the same at both.
+enum WireMatch {
+    /// The tabbed serialization is byte-identical to the file.
+    Exact,
+    /// Semantically equal as a key-order-insensitive `Value`; only the field order differs.
+    FieldOrderOnly,
+    /// A real AST difference.
+    Differs,
+    /// The expected file is not readable JSON; carries the reader's message.
+    Unreadable(String),
+}
 
-    if paths.wire_value() == expected_json {
-        result.add_error(ValidationError::ParserOursFieldOrderDiffers);
-    } else {
-        result.add_error(ValidationError::ParserOursDiffersFromExpected);
+fn compare_wire(paths: &InputAstPaths, expected: &str) -> WireMatch {
+    if paths.ast_json_tabs == expected {
+        return WireMatch::Exact;
+    }
+    match crate::json::from_str::<serde_json::Value>(expected) {
+        Ok(expected_json) if paths.wire_value() == expected_json => WireMatch::FieldOrderOnly,
+        Ok(_) => WireMatch::Differs,
+        Err(e) => WireMatch::Unreadable(e.to_string()),
     }
 }
 
@@ -186,6 +198,145 @@ pub(in crate::fixtures::validation) async fn validate_parser_external(
         } else {
             result.add_error(ValidationError::ParserExpectedSvelteOutdated);
         }
+    }
+}
+
+/// One variant parse pin, read off disk.
+pub(in crate::fixtures::validation) struct VariantPin {
+    /// The pin file (`expected_<stem>.json`).
+    pin_name: String,
+    /// The variant file the pin names (`<stem><ext>`).
+    variant_name: String,
+    /// That variant's source.
+    variant: String,
+    /// The pin's own bytes — the canonical AST, as `fixtures:update:parsed` wrote it.
+    expected: String,
+}
+
+/// Read every pin and its variant, once for both halves of P4 — the two phases grade the
+/// same two files, so the reading and its error path are stated here alone. A pin whose
+/// file or variant cannot be read records the error and is left out; it grades nothing.
+pub(in crate::fixtures::validation) fn read_variant_pins(
+    result: &mut FixtureValidation,
+    fixture: &Fixture,
+    files: &FixtureFiles,
+) -> Vec<VariantPin> {
+    let mut read = |name: &str| match read_file(&fixture.path.join(name)) {
+        Ok(content) => Some(content),
+        Err(e) => {
+            result.add_error(ValidationError::FileReadError(e));
+            None
+        }
+    };
+    files
+        .expected_variant
+        .iter()
+        .filter_map(|entry| {
+            let variant = read(&entry.variant)?;
+            let expected = read(&entry.pin)?;
+            Some(VariantPin {
+                pin_name: entry.pin.clone(),
+                variant_name: entry.variant.clone(),
+                variant,
+                expected,
+            })
+        })
+        .collect()
+}
+
+/// P4 (tsv side): our parse of a pinned variant reproduces its `expected_<stem>.json`
+/// byte-strict — the P2b claim, made about the variant instead of the input.
+///
+/// The pin exists for a parse fact no `input.*` can carry: a leading BOM, which the format
+/// side strips, so a BOM-led input is never its own fixed point (F1). Pure Rust, like P2b;
+/// a semantically-equal mismatch is reported as the field-order kind, like P2b's.
+pub(in crate::fixtures::validation) fn validate_variant_parse_pins_ours(
+    result: &mut FixtureValidation,
+    fixture: &Fixture,
+    input_type: InputType,
+    pins: &[VariantPin],
+) {
+    let mut matched = 0;
+    for pin in pins {
+        let arena = bumpalo::Bump::new();
+        let parsed = match parse_input(&pin.variant, input_type, fixture.goal(), &arena) {
+            Ok(parsed) => parsed,
+            Err(message) => {
+                result.add_error(ValidationError::ParserVariantError {
+                    variant: pin.variant_name.clone(),
+                    message,
+                });
+                continue;
+            }
+        };
+        let paths = input_ast_paths(&parsed, &pin.variant);
+        match compare_wire(&paths, &pin.expected) {
+            WireMatch::Exact => matched += 1,
+            WireMatch::FieldOrderOnly => {
+                result.add_error(ValidationError::ParserVariantOursFieldOrderDiffers {
+                    variant: pin.variant_name.clone(),
+                    pin: pin.pin_name.clone(),
+                });
+            }
+            WireMatch::Differs => {
+                result.add_error(ValidationError::ParserVariantOursDiffers {
+                    variant: pin.variant_name.clone(),
+                    pin: pin.pin_name.clone(),
+                });
+            }
+            WireMatch::Unreadable(e) => {
+                result.add_error(ValidationError::ParserError(format!(
+                    "Failed to parse {}: {e}",
+                    pin.pin_name
+                )));
+            }
+        }
+    }
+    if matched > 0 {
+        result.add_success(ValidationSuccess::VariantParsePinsOurs(matched));
+    }
+}
+
+/// P4 (canonical side): each `expected_<stem>.json` still holds what the canonical
+/// parser emits for its variant — the P1 freshness claim, made about the variant. A
+/// rejection fails the pin outright (it holds an AST); a sidecar fault is reported once
+/// and grades nothing, as everywhere.
+pub(in crate::fixtures::validation) async fn validate_variant_parse_pins_canonical(
+    result: &mut FixtureValidation,
+    fixture: &Fixture,
+    input_type: InputType,
+    pins: &[VariantPin],
+) {
+    let mut matched = 0;
+    for pin in pins {
+        match fixtures::canonical_expected_json(&pin.variant, input_type, fixture.goal()).await {
+            Ok(json) if json == pin.expected => matched += 1,
+            Ok(_) => result.add_error(ValidationError::ParserVariantPinOutdated(
+                pin.pin_name.clone(),
+            )),
+            Err(CanonicalParseError::Rejected(message)) => {
+                result.add_error(ValidationError::ParserVariantError {
+                    variant: pin.variant_name.clone(),
+                    message: format!(
+                        "canonical parser ({}) rejected the pinned variant: {message}",
+                        input_type.canonical_parser_name()
+                    ),
+                });
+            }
+            Err(CanonicalParseError::Sidecar(e)) => {
+                result.add_error(ValidationError::CanonicalParserSidecarFailure(format!(
+                    "{}: {}",
+                    pin.variant_name,
+                    fixtures::canonical_sidecar_failure(input_type, &e)
+                )));
+            }
+            Err(CanonicalParseError::Unserializable(message)) => {
+                result.add_error(ValidationError::ParserError(message));
+            }
+        }
+    }
+    if matched > 0 {
+        result.add_success(ValidationSuccess::VariantParsePinsCanonical(matched));
     }
 }
 

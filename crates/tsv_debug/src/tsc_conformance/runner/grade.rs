@@ -1,5 +1,6 @@
 use super::*;
 use crate::audit::panic_hook::{SuppressedPanicHook, panic_message};
+use tsv_lang::LeadingBom;
 
 /// The merge-path family codes — a *missing* of one of these is classified as a
 /// merge-phase gap, not a same-table cascade bug.
@@ -309,7 +310,8 @@ fn grade_test(
     let parsed = matches!(parse, ParseReport::Parsed(_));
 
     // The unit's line map — reused across the test's variants for the parsed case.
-    let line_map = parsed.then(|| LocationTracker::new_ecmascript_with_map(&unit.content));
+    let line_map = parsed
+        .then(|| LocationTracker::new_ecmascript_with_map(&unit.content, LeadingBom::Counted));
 
     for variant in in_scope {
         let name = config_name(&test.basename, &variant.description);
