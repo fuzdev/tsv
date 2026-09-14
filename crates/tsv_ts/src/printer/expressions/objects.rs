@@ -723,8 +723,11 @@ impl<'a> Printer<'a> {
                     // own group ([`Printer::hoist_owned_value_gap_run`]). This arm builds
                     // its own hang, so it takes the run-only form and owes the paired
                     // suppression below — exactly the debt that function's ⚠️ names.
-                    let hoisted_run =
-                        self.hoisted_owned_value_gap_run_opt(colon_pos + 1, prop.value);
+                    let hoisted_run = self.hoisted_owned_value_gap_run_opt(
+                        colon_pos + 1,
+                        prop.value,
+                        needs_parens,
+                    );
                     // A LINE comment forces the break, and the declarator `=`'s partition
                     // places it ([`Printer::build_operator_line_comment_hang`]): a comment on
                     // the `:` line stays there, trailing the `:`, and an own-line one keeps

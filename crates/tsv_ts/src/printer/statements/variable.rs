@@ -188,8 +188,17 @@ impl<'a> Printer<'a> {
         // comment at all, `equals_pos` is the sentinel `init_start` and this range is
         // inverted, which the comment lookups read as empty — the same invariant every
         // other gated call site here rides.
-        let hoisted_run = self.hoisted_owned_value_gap_run_opt(rhs_comments_start, init);
-        let build_value = &|| self.build_gap_value_doc(hoisted_run, init, value);
+        // The position's own pair (`const x = (a = b)`) holds the run
+        // ([`Printer::hoisted_owned_value_gap_run_opt`]); the same verdict
+        // `build_init_value_doc` wraps by.
+        let position_parens = self.needs_parens(init, ParenContext::VariableInit);
+        let hoisted_run =
+            self.hoisted_owned_value_gap_run_opt(rhs_comments_start, init, position_parens);
+        // Under the hoist the value's claim is suppressed; where the hoist declines the
+        // value claims its owned multi-line comment ITSELF, beneath the pair this position
+        // adds (`build_init_value_doc`) — `build_gap_value_doc` would prepend it outside
+        // the pair, and a `@type` block outside a `(` is a cast.
+        let build_value = &|| self.build_value_under_hoist(hoisted_run, init, value);
         let value: &dyn Fn() -> DocId = build_value;
 
         // Helper: build init doc with optional inline block comments prepended.
@@ -607,10 +616,12 @@ impl<'a> Printer<'a> {
     /// trailing comment (`const y = (a = b // c)` stays single, not `((a = b // c))`).
     /// The single paren then matches the assignment-RHS rendering.
     ///
-    /// `position_parens` is asked ONCE and answers two questions that must agree — the
+    /// `position_parens` is asked ONCE here and answers two questions that must agree — the
     /// wrap below, and whether the shell builder holds the comment inside the pair
     /// ([`Printer::shell_value_keeps_own_parens`]). Asking it separately on each side is
-    /// how the pair gets doubled or dropped.
+    /// how the pair gets doubled or dropped. (The value-gap hoist asks the same pure
+    /// question of the same inputs ahead of this call, to decline at the pair it wraps —
+    /// one verdict, read twice, not two verdicts.)
     ///
     /// The paren decision carries the for-header rule via `self.in_for_init`: a
     /// statement-level `const x = b in c` lexically under a for-header init (e.g. in a
@@ -651,14 +662,19 @@ impl<'a> Printer<'a> {
         self.mark_assignment_value(init);
         let position_parens =
             needs_parens(init, ParenContext::VariableInit, self.in_for_init.get());
-        let inner = match frozen {
+        // A multi-line comment the value OWNS is claimed HERE, beneath the position's pair,
+        // so it prints outside the operand's own group but inside the `(`…`)` the author
+        // wrote it in (`const x = (/* c⏎d */ a = b)`); claimed by the gap seam above the
+        // wrap, it would land in front of the pair. The claim declines on its own under a
+        // hoist, and for a sequence, which claims inside its own envelope.
+        let inner = self.build_value_with_outermost_owned_comment(init, || match frozen {
             Some(frozen) => {
                 self.build_frozen_value_shell_doc(init, frozen, boundary_end, position_parens)
             }
             None => {
                 self.build_expression_doc_with_paren_comments(init, boundary_end, position_parens)
             }
-        };
+        });
         self.wrap_value_position_parens(init, boundary_end, position_parens, inner)
     }
 

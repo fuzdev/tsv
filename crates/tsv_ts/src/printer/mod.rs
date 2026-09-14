@@ -711,11 +711,20 @@ impl<'a> Printer<'a> {
     /// args, object values, binary operands, …) get the same wrap via that path.
     #[inline]
     pub(crate) fn wrap_for_init_in(&self, expr: &internal::Expression<'_>, doc: DocId) -> DocId {
-        if self.in_for_init.get() && is_in_binary(expr) {
+        if self.for_init_in_needs_parens(expr) {
             self.arena.parens(doc)
         } else {
             doc
         }
+    }
+
+    /// The ambient for-header rule alone — an `in` binary lexically under a `for` init
+    /// takes a pair whatever its position — for a seam that asks no [`ParenContext`] of
+    /// its own (the assignment RHS): the verdict [`Self::wrap_for_init_in`] wraps by, and
+    /// what such a seam hands the value-gap hoist as its pair
+    /// ([`Self::hoisted_owned_value_gap_run_opt`]).
+    pub(crate) fn for_init_in_needs_parens(&self, expr: &internal::Expression<'_>) -> bool {
+        self.in_for_init.get() && is_in_binary(expr)
     }
 
     /// [`Self::wrap_for_init_in`] for a value the position FROZE.

@@ -1458,7 +1458,8 @@ impl<'a> Printer<'a> {
             // whole gap run is glued through, so it can never collide with an emit-axis arm
             // below — `build_eq_comment_break_rhs` returns `None` for exactly that gap, and
             // a value-head freeze needs an own-line directive, which never glues.
-            let hoisted_run = self.hoisted_owned_value_gap_run_opt(eq_pos + 1, init);
+            // An enum member prints no pair of its own around its value.
+            let hoisted_run = self.hoisted_owned_value_gap_run_opt(eq_pos + 1, init, false);
             let init_doc = self.build_value_head_doc(eq_pos + 1, init, || {
                 self.build_gap_value_doc(hoisted_run, init, || self.build_expression_doc(init))
             });
