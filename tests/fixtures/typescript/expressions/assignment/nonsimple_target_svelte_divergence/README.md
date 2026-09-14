@@ -32,6 +32,18 @@ validity the oracle is tsc. See
 - **prettier**: formats all four, and to exactly this input — so the fixture also pins
   formatting agreement, which is the claim a Rust test cannot make against a live oracle
 
+**Two shapes the deferral stops at — the `input_invalid_*` siblings.** A compound
+operator cannot cover a default (`[a += b] = xs`, in a pattern, a parameter, a for-head
+or a parenthesized target alike): the pattern node has no slot for the operator, so
+converting would silently delete it — the faithful-reprint floor, not an early error.
+And a parenthesized assignment as the *whole* target (`(a = b) = 1`,
+`for ((a = b) of xs)`) would put an `AssignmentPattern` where acorn's grammar has none,
+and its bare reprint `a = b = 1` re-parses as a different, valid program — the
+representability floor. Both reject, as acorn does (`Only '=' operator can be used for
+specifying default value` / `Assigning to rvalue`); tsc's parser accepts both and its
+checker rejects them (TS2364). The unparenthesized `a = b = 1` is right-associative and
+untouched.
+
 **Contrast — the deferral does not reach a `for`-in/of head.** A no-declaration head is a
 `LeftHandSideExpression` position that is *not* an assignment context, so a non-simple
 target there stays a parse error in tsv, as it is in prettier. Those cases, and the

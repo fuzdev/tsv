@@ -21,8 +21,10 @@ See [conformance_prettier_ts_comments.md §JSDoc / paren semantics](../../../../
 
 - Assignment RHS, reassignment, **assignment target** (the cast wraps the place
   being assigned, including compound `op=` — e.g. `/** @type {A} */ (g.h) += expr`),
-  return, call argument, new-expression args, default parameter values,
-  destructuring defaults — each wrapping a JSDoc cast.
+  **no-declaration for-in/of head target** (`for (/** @type {A} */ (a) of items)` —
+  the same strip at the same kind of position; the JS-context match for this head is
+  `cast_target_jsdoc`), return, call argument, new-expression args, default parameter
+  values, destructuring defaults — each wrapping a JSDoc cast.
 
 ## Related fixtures
 

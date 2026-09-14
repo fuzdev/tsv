@@ -659,11 +659,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let right = self.parse_expression_bp(BP_ASSIGNMENT)?;
 
             // Convert left side to pattern if needed (cover grammar). Assignment is the
-            // one context that accepts a type-assertion target (`(x as T) = …`).
+            // one context that accepts a type-assertion target (`(x as T) = …`); as the
+            // WHOLE target it may not be an `AssignmentPattern` (`(a = b) = 1`).
             // `to_assignable` consumes by value; clone the arena ref (shallow — children
             // are refs) on this cold assignment-target path.
             let left_pattern =
-                self.to_assignable(left.expr.clone(), AssignableContext::Assignment)?;
+                self.to_whole_assignable(left.expr.clone(), AssignableContext::Assignment)?;
 
             let span = Span::new(expr_start as u32, right.actual_end);
             left = ParsedExpr {

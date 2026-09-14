@@ -223,10 +223,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // an `ObjectLiteral`/`ArrayLiteral` LHS must cover an `AssignmentPattern`
         // (enforcing the rest constraints + producing the deep internal pattern,
         // `ArrayExpression` → `ArrayPattern`), and any other LHS must have a
-        // valid (non-`invalid`) assignment-target type.
+        // valid (non-`invalid`) assignment-target type — and, as the WHOLE head, never
+        // an `AssignmentPattern` (`for ((a = b) of xs)`).
         if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::In)) {
             self.advance()?;
-            let left = self.to_assignable(expr, AssignableContext::ForHead)?;
+            let left = self.to_whole_assignable(expr, AssignableContext::ForHead)?;
             return self.parse_for_in(
                 start,
                 await_at,
@@ -250,7 +251,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 );
             }
             self.advance()?;
-            let left = self.to_assignable(expr, AssignableContext::ForHead)?;
+            let left = self.to_whole_assignable(expr, AssignableContext::ForHead)?;
             return self.parse_for_of(
                 start,
                 self.arena.alloc(ForInOfLeft::Pattern(left)),
