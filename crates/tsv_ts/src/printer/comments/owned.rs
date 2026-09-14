@@ -59,7 +59,9 @@ fn left_spine_child<'x>(expr: &'x Expression<'x>) -> Option<&'x Expression<'x>> 
 /// and claims inside it ([`Printer::build_doc_with_outermost_owned_comment_at`]). Taken from
 /// outside, the comment would leave that required pair (`(/* c⏎d */ b, c)` →
 /// `/* c⏎d */ (b, c)`), the relocation the required-pair catalog entry refuses — and a
-/// multi-line `@type` block hoisted in front of a `(` becomes a JSDoc cast.
+/// multi-line `@type` block hoisted in front of a `(` becomes a JSDoc cast. The value-gap
+/// hoist declines at the same pair ([`Printer::hoisted_owned_value_gap_run_opt`]), so the
+/// two readings of one seam agree.
 fn outermost_claim_child<'x>(value: &'x Expression<'x>) -> Option<&'x Expression<'x>> {
     match value {
         Expression::SequenceExpression(_) => None,
@@ -279,13 +281,17 @@ impl<'a> Printer<'a> {
     /// token. The paren-less arrow reached the same place first and by the same means
     /// (`build_arrow_params_doc_ungrouped`), which is why it is the one shape in this
     /// family that was already flat.
+    ///
+    /// `seam_prints_pair` is the seam's own paren verdict, and a pair declines the hoist —
+    /// the ⚠️ on [`Self::hoisted_owned_value_gap_run_opt`], the run half this wraps.
     pub(in crate::printer) fn hoist_owned_value_gap_run(
         &self,
         gap_start: u32,
         value: &Expression<'_>,
+        seam_prints_pair: bool,
         build_value: impl FnOnce() -> DocId,
     ) -> (Option<DocId>, DocId) {
-        let run = self.hoisted_owned_value_gap_run_opt(gap_start, value);
+        let run = self.hoisted_owned_value_gap_run_opt(gap_start, value, seam_prints_pair);
         (run, self.build_gap_value_doc(run, value, build_value))
     }
 
@@ -303,7 +309,11 @@ impl<'a> Printer<'a> {
     /// ⚠️ **Only for a closure that builds the value alone.** The claim prepends after
     /// `build_value` returns, so a closure that also prepends the gap's leading run prints the
     /// owned comment AHEAD of that run — the arrow's `build_body` closures carry it, which is
-    /// why the arrow claims beneath the run instead (`Printer::build_arrow_body_doc_with_leading`).
+    /// why the arrow claims beneath the run instead (`Printer::build_arrow_body_doc_with_leading`)
+    /// — and a closure that also wraps the position's PAIR prints it in front of the `(`,
+    /// where a `@type` block is a cast; the declarator's closure wraps, so it claims beneath
+    /// the wrap itself and takes [`Self::build_value_under_hoist`] alone
+    /// (`build_init_value_doc`).
     pub(in crate::printer) fn build_gap_value_doc(
         &self,
         run: Option<DocId>,
@@ -350,10 +360,27 @@ impl<'a> Printer<'a> {
     /// same gap's leading run and this is the wider (on-page) reading of it, so a caller
     /// takes `hoisted.or(its_own)` — concatenating the two prints every un-owned comment in
     /// the gap twice.
+    ///
+    /// ⚠️ **The run never crosses a pair the printer re-emits.** `seam_prints_pair` is the
+    /// seam's own `needs_parens` verdict — the pair it wraps around the value (`(a = b)`
+    /// at a declarator, `({ … })` at an arrow body, `(a in b)` under a `for` header) —
+    /// and a sequence prints a pair of its own at every value position. The comment is
+    /// glued to the value's first token, so wherever such a pair is printed the author
+    /// wrote the comment INSIDE it, and hoisting carries it out in front of the `(`: the
+    /// relocation the required-pair catalog entry refuses, and under `checkJs` a
+    /// `/** @type {T} */` block moved in front of a `(` becomes a JSDoc cast the author
+    /// never wrote. Prettier hoists there; tsv declines and the value's fallback claim
+    /// ([`Self::build_gap_value_doc`]) prints the comment outside the operand's group but
+    /// inside the pair — the same boundary the owned-comment walk stops at
+    /// ([`Printer::left_shell_paren_is_emitted`]). Pinned by
+    /// `expressions/sequence/own_pair_multiline_leading_comment_prettier_divergence` and
+    /// the value-seam cases of
+    /// `syntax/comments/required_pair_multiline_leading_comment_prettier_divergence`.
     pub(in crate::printer) fn hoisted_owned_value_gap_run_opt(
         &self,
         gap_start: u32,
         value: &Expression<'_>,
+        seam_prints_pair: bool,
     ) -> Option<DocId> {
         // ⚠️ **The licence is the CAUSE — a multi-line block on the page — not prettier's
         // fourth disjunct.** The disjunct (an INDENTABLE block, which hangs the value) was
@@ -403,6 +430,11 @@ impl<'a> Printer<'a> {
         // `indentable_block_leads_value` is a gap question rather than a node one, and the
         // same walk every other cast reading in this file goes through.
         if self.leading_jsdoc_cast(value).is_some() {
+            return None;
+        }
+        // A pair between the run and the value — the seam's, or the sequence's own — holds
+        // the comment where the author wrote it (the ⚠️ above).
+        if seam_prints_pair || matches!(value, Expression::SequenceExpression(_)) {
             return None;
         }
         self.build_hoisted_value_gap_comments_opt(gap_start, value.span().start)

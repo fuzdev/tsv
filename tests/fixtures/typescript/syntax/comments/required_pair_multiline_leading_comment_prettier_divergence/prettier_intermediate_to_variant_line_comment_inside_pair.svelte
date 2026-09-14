@@ -74,9 +74,32 @@
 	d */ (b, c) as // t
 	T;
 
+	// an assignment value's pair at the value seams — the declarator, the arrow body, the
+	// binding default, the object property and a `for` header's `in`: the position keeps
+	// the pair, so the comment stays inside it
+	const a8 = /* c
+	d */ (b = c);
+	const fn3 = () =>
+		/* c
+		d */ (b = c);
+	function fn2(
+		p = /* c
+		d */ (b = c)
+	) {}
+	const o = {
+		p: /* c
+		d */ (b = c)
+	};
+	for (
+		let i =
+			/* c
+		d */ (b in c);
+		;
+	) {}
+
 	// null control: written outside the pair, both formatters keep it there
 	const a7 = /* c
 	d */ (b + c + d) as T;
 
-	export { a1, a2, a3, a4, a5, a6, a7, r1, s1, s2, s3, fn1 };
+	export { a1, a2, a3, a4, a5, a6, a7, a8, r1, s1, s2, s3, fn1, fn2, fn3, o };
 </script>

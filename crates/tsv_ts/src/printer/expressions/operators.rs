@@ -124,7 +124,7 @@ pub(in crate::printer) enum SeqLayout {
 ///
 /// Both ends were re-derived at three sites apiece, in two parallel builders and their shared
 /// envelope. That is the shape such a pair drifts through, so the ends are named here once.
-fn sequence_operand_run(seq: &internal::SequenceExpression<'_>) -> (u32, u32) {
+pub(super) fn sequence_operand_run(seq: &internal::SequenceExpression<'_>) -> (u32, u32) {
     let operands = &seq.expressions;
     (
         operands[0].span().start,

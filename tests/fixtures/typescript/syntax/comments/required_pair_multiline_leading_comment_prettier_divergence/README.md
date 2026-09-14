@@ -22,6 +22,13 @@ position question in the way: `typeof`, `!` and a sequence's own operand run put
 comment in the same place in both formatters, and there the two outputs agree byte for
 byte.
 
+**The position's own pair holds the comment too** (`a8`, `fn2`, `fn3`, `o`, the `for`
+header's `i`): a declarator, a binding default, an object property and an arrow body each
+wrap an assignment value in a pair of their own, and a `for` header wraps an `in`. Those
+seams hoist a multi-line run out of the value's group so the value stays flat, and the hoist
+declines at any pair the printer re-emits — the comment is claimed inside the pair instead,
+outside the operand's group. Prettier hoists it in front of the `(` at all of them.
+
 Both positions are dual-stable in our formatter — prettier's output is a fixed point of
 tsv too, pinned by `variant_hoisted.svelte`.
 

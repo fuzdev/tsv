@@ -1082,8 +1082,14 @@ impl<'a> Printer<'a> {
                 }
             })
         };
+        // The only pair this seam prints around its RHS is the for-header `[~In]` one
+        // (`wrap_for_init_in` below); a class field and an object property wrap their
+        // position's pair outside this layout and hoist at their own seams.
+        let seam_prints_pair = self.for_init_in_needs_parens(right_expr);
         let (hoisted_run, right_doc) = match rhs_info.gap {
-            Some(gap) => self.hoist_owned_value_gap_run(gap.start, right_expr, build_right),
+            Some(gap) => {
+                self.hoist_owned_value_gap_run(gap.start, right_expr, seam_prints_pair, build_right)
+            }
             None => (None, build_right()),
         };
         // Parenthesize an `in` RHS inside a for-header init (`for (a = (b in c);…)`);

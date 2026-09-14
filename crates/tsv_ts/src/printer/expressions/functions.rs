@@ -849,7 +849,13 @@ impl<'a> Printer<'a> {
             .arrow_body_inject
             .get()
             .is_none_or(|(span, _)| span != body_start)
-            .then(|| self.hoisted_owned_value_gap_run_opt(arrow_end, expr))
+            .then(|| {
+                self.hoisted_owned_value_gap_run_opt(
+                    arrow_end,
+                    expr,
+                    self.needs_parens(expr, ParenContext::ArrowBody),
+                )
+            })
             .flatten();
         let build_body = |build: &dyn Fn() -> DocId| -> DocId {
             self.build_value_under_hoist(hoisted_run, expr, build)

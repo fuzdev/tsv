@@ -571,7 +571,6 @@ impl<'a> Printer<'a> {
     fn build_jsdoc_cast_doc(&self, cast: &crate::ast::internal::JsdocCast<'_>) -> DocId {
         let d = self.d();
         let open = cast.span.start; // the `(`
-        let inner_start = cast.inner.span().start;
         // Built BEFORE the inner, and that ordering is the reason it is a call and not a
         // block down where its doc is used: the gap marks it reads name ONE node, and the
         // inner may hold value gaps of its own (an object property, an arrow body) whose
@@ -587,8 +586,32 @@ impl<'a> Printer<'a> {
         // with the shell's emitters below. Prettier agrees on both the scope and the
         // preserved parens here.
         let frozen_inner = self.gap_frozen_span(open + 1, cast.inner.span());
+        // A sequence inner rides this pair BARE (below), and the bare builder scans neither
+        // edge of its operand run: the leading edge — the `(` the parser stripped from the
+        // first operand and any comment inside it — and the gap past the last operand are
+        // this cast's to emit, exactly as the restricted production's hanging pair emits
+        // them (`build_restricted_production_paren_doc`). Scanned to the inner's own span
+        // instead, a comment in either operand shell reached no emitter (`gaps:audit`).
+        // ⚠️ Only for the UNFROZEN sequence: a frozen slice is the inner's whole span,
+        // shells and their comments included, so the edges there are the span's own —
+        // scanned from the operand run, a shell comment printed twice.
+        let (lead_end, trail_start) = match (cast.inner, frozen_inner) {
+            (Expression::SequenceExpression(seq), None) => operators::sequence_operand_run(seq),
+            _ => (cast.inner.span().start, cast.inner.span().end),
+        };
         let inner_doc = frozen_inner.map_or_else(
-            || self.build_expression_doc(cast.inner),
+            || match cast.inner {
+                // A sequence self-parenthesizes at every other position; here the cast's
+                // pair IS its required pair, so it rides that one bare — the same rule the
+                // restricted productions' hanging pair takes (`build_sequence_doc_bare`).
+                // Built with its own pair it printed `/** @type {A} */ ((b, c))`, and the
+                // reparse then read a cast around a redundant shell
+                // (`jsdoc_type_cast_sequence`).
+                Expression::SequenceExpression(seq) => {
+                    self.build_sequence_doc_bare(seq, trail_start)
+                }
+                _ => self.build_expression_doc(cast.inner),
+            },
             // Built bare, like the ordinary arm: the cast's parens already group it. The
             // owned-comment claim still applies — a block glued before the inner rides
             // inside its doc, which the slice replaces.
@@ -602,7 +625,7 @@ impl<'a> Printer<'a> {
         // parens. Left unemitted, every comment there was silently DROPPED. Shares the
         // emitter with the stripped-paren restorer (`trailing_paren_comment_parts`).
         let (trailing_parts, trailing_needs_break) = self
-            .trailing_paren_comment_parts(cast.inner.span().end, cast.span.end)
+            .trailing_paren_comment_parts(trail_start, cast.span.end)
             .unwrap_or_else(|| (DocBuf::new(), false));
 
         // A line comment on either side of the inner must force a hardline layout —
@@ -612,12 +635,12 @@ impl<'a> Printer<'a> {
         // honored directive would otherwise collapse onto the frozen value's line, which
         // is a glued — hence inert — placement, so the freeze would be lost on the second
         // pass. (The line spelling already lands here via the scan above.)
-        if self.has_line_comments_between(open + 1, inner_start)
+        if self.has_line_comments_between(open + 1, lead_end)
             || trailing_needs_break
             || frozen_inner.is_some()
         {
             let mut parts: DocBuf = smallvec![d.hardline()];
-            for comment in self.comments_to_emit_between(open + 1, inner_start) {
+            for comment in self.comments_to_emit_between(open + 1, lead_end) {
                 parts.push(self.build_comment_doc(comment));
                 // A line comment runs to end-of-line, so it must break; a block
                 // comment hugs the next token inline (`/** @type {B} */ (x)`) — unless
@@ -642,7 +665,7 @@ impl<'a> Printer<'a> {
         // Ordinary comments between this cast's `(` and the inner expression — all
         // block comments here, so they hug inline. A nested cast's own `@type` comment
         // is NOT among them: that cast owns it and prints it itself.
-        let interior = self.build_comments_between(open + 1, inner_start, CommentSpacing::Trailing);
+        let interior = self.build_comments_between(open + 1, lead_end, CommentSpacing::Trailing);
         let mut body_parts: DocBuf = smallvec![interior, inner_doc];
         body_parts.extend(trailing_parts);
         let body = d.concat(&body_parts);
