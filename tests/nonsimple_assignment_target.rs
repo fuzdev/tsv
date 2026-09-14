@@ -26,7 +26,14 @@
 //! Contrast: a no-declaration `for`-in/of head is an
 //! `AssignmentTargetType`/`LeftHandSideExpression` position that is NOT an
 //! assignment context, so a non-simple head there stays a parse error (prettier
-//! rejects it too — `for_head_*` guards below).
+//! rejects it too — `for_head_*` guards below). What the for-head shares with the
+//! `=` left is the *simple* target under its wrappers — an assertion or a JSDoc cast
+//! over an identifier or member is a target in both (tsc's `checkReferenceExpression`
+//! reads the two positions with one rule; the fixture
+//! `typescript/expressions/assignment/cast_target_for_head_svelte_divergence` pins
+//! the family against prettier) — and the two for-head shapes no fixture can hold sit
+//! below: the JSDoc cast over a nested assertion, whose parens prettier's TypeScript
+//! parser strips in a for head, and the sealed optional chain.
 
 use serde_json::Value;
 
@@ -184,6 +191,74 @@ fn for_head_new_target_still_rejected() {
         rejects("for (new C() of xs) {}"),
         "a non-simple for-of head stays a parse error"
     );
+}
+
+/// A no-declaration for-head reads its target through a JSDoc cast the way an `=`
+/// left does — the cast's parens are transparent grouping, and the assertion under
+/// them still wraps a simple target — as a pattern child too. acorn rejects the
+/// nested form ("Unexpected type cast in parameter position"), and prettier's
+/// TypeScript parser strips a JSDoc cast's parens in a for head, so no `input.*` can
+/// hold this as a fixed point: pinned here, to tsv's own reprint, which keeps the cast.
+#[test]
+fn for_head_nested_jsdoc_cast_over_assertion_parses() {
+    let json = parse_json("for ([/** @type {T} */ (a as U)] of xs) {}");
+    assert_eq!(
+        json.pointer("/body/0/left/elements/0/type")
+            .and_then(Value::as_str),
+        Some("TSAsExpression"),
+        "the JSDoc cast unwraps at convert; the assertion is the element: {json}"
+    );
+    let canonical = "for ([/** @type {T} */ (a as U)] of xs) {\n}\n";
+    assert_eq!(format(canonical), canonical, "idempotent");
+}
+
+/// `for await` reads its head through the same conversion.
+#[test]
+fn for_await_head_assertion_target_parses() {
+    assert_eq!(
+        parse_json("async function f() { for await (a! of xs) {} }")
+            .pointer("/body/0/body/body/0/left/type")
+            .and_then(Value::as_str),
+        Some("TSNonNullExpression"),
+    );
+}
+
+/// An optional chain is no for-head target, however it is wrapped: ecma262 gives an
+/// `OptionalExpression` the invalid `AssignmentTargetType`, tsc's checker rejects it
+/// (TS2780 / TS2781) and acorn has no `left` that could carry its `ChainExpression`. The
+/// non-null and JSDoc-cast spellings are the same chain one node up, and a pattern
+/// child is graded the same way.
+#[test]
+fn for_head_optional_chain_target_rejected() {
+    for source in [
+        "for (a?.b of xs) {}",
+        "for (a?.b in o) {}",
+        "for (a?.b! of xs) {}",
+        "for (a?.[i].c of xs) {}",
+        "for (/** @type {T} */ (a?.b) of xs) {}",
+        "for ([a?.b] of xs) {}",
+        "for ({ k: a?.b! } of xs) {}",
+    ] {
+        assert!(
+            rejects(source),
+            "an optional-chain for-head target rejects: {source}"
+        );
+    }
+}
+
+/// Parens seal a chain: `(a?.b).c` is an ordinary member target, in a for-head as
+/// everywhere (tsc: no `OptionalChain` flag on the outer access; acorn: no
+/// `ChainExpression` around it).
+#[test]
+fn for_head_sealed_optional_chain_target_parses() {
+    let json = parse_json("for ((a?.b).c of xs) {}");
+    assert_eq!(
+        json.pointer("/body/0/left/type").and_then(Value::as_str),
+        Some("MemberExpression"),
+        "the sealed chain's outer access is the target: {json}"
+    );
+    let canonical = "for ((a?.b).c of xs) {\n}\n";
+    assert_eq!(format(canonical), canonical, "idempotent");
 }
 
 /// Regression guard: the Binding-adjacent cover-grammar transforms are unaffected —

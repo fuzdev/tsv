@@ -27,9 +27,9 @@ inside a for-head, and the assertion survives. acorn-typescript is tsv's AST-**s
 target, not its correctness oracle. See
 [conformance_svelte.md §TypeScript Corrections](../../../../../../docs/conformance_svelte.md#typescript-corrections).
 
-The **bare** (default-less) cast target in a for-head is a different case and is *not*
-here: `for ((x as T) of arr)` is rejected by tsv too, pinned by
-[cast_target](../cast_target/)'s `input_invalid_cast_for_of.svelte`.
+The **bare** (default-less) cast target in a for-head is the sibling divergence
+[cast_target_for_head](../cast_target_for_head_svelte_divergence/): tsv accepts it as
+tsc does, and prettier prints it paren-free (`for (a as T of arr)`).
 
 ## Expected behavior
 

@@ -216,10 +216,17 @@ export const TS_FIXTURES_PINS: GatePins = { scanned: 226, both_accept: 202, over
  * parenthesized arrow's return type in a conditional's consequent (`a ? (b) : c => d`
  * is `a ? b : (c => d)`; the annotation is kept only when a second `:` follows the
  * arrow) — conformance_svelte.md §TypeScript Corrections.
+ *
+ * 12284 → 12283 `accept_parity`: a net of one from the for-head target rule moving to
+ * tsc's checker line — `referenceSatisfiesExpression.ts` (a bare cast target in a
+ * for-of head) joined parity, while `propertyAccessChain.3.ts` and
+ * `elementAccessChain.3.ts` left it, their optional-chain for-heads (TS2780 / TS2781)
+ * now rejected and sanctioned under `grammar` — conformance_svelte.md §TypeScript
+ * Corrections, the cast_target_for_head entry.
  */
 export const TS_REPO_PINS = {
 	scanned: 13708,
-	accept_parity: 12284,
+	accept_parity: 12283,
 	over_acceptance_parser: 20,
 	over_acceptance_checker: 467,
 	units_scanned: 7874,

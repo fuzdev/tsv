@@ -1,4 +1,4 @@
 <script lang="ts">
-	for ((x as T) of y) {
+	for (a!() of arr) {
 	}
 </script>

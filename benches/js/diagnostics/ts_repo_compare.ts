@@ -201,10 +201,12 @@ interface BeyondAcornKnownGap extends KnownGap {
 const BEYOND_ACORN_SANCTIONS: BeyondAcornSanction[] = [
 	// --- grammar ---------------------------------------------------------------
 	// A no-declaration for-in/of head is a LeftHandSideExpression position, NOT an
-	// assignment context: a call / `new` / `this` / update expression / literal /
-	// bare cast there stays a parse error (conformance_svelte.md §TypeScript
-	// Corrections, the nonsimple_target + cast_target entries). tsc's parser takes
-	// any expression and reports TS2405/TS2406 from the checker.
+	// assignment context: a call / `new` / `this` / update expression / literal
+	// there stays a parse error (conformance_svelte.md §TypeScript Corrections, the
+	// nonsimple_target entry). tsc's parser takes any expression and reports
+	// TS2405/TS2406 from the checker — and that checker line is tsv's: an assertion
+	// or a JSDoc cast over a simple target IS a for-head target (the
+	// cast_target_for_head entry), so `referenceSatisfiesExpression.ts` parses.
 	...['parserForStatement6.ts', 'parserForStatement7.ts', 'parserForStatement8.ts'].map(
 		(pattern) => ({
 			pattern,
@@ -222,12 +224,18 @@ const BEYOND_ACORN_SANCTIONS: BeyondAcornSanction[] = [
 		category: 'grammar',
 		reason: '`for ([""] of …)` — a string literal is not a DestructuringAssignmentTarget'
 	},
-	{
-		pattern: 'referenceSatisfiesExpression.ts',
-		category: 'grammar',
+	// An optional chain is no for-head target: an OptionalExpression's
+	// AssignmentTargetType is invalid, acorn has no `left` that could carry its
+	// ChainExpression, and tsc's checker refuses it too (TS2780 / TS2781, the
+	// `OptionalChain` flag on the reference `checkReferenceExpression` skipped to).
+	// The same files' `=` / update / pattern spellings (TS2779 / TS2778) parse — the
+	// assignment side defers the whole non-simple-target class.
+	...['propertyAccessChain.3.ts', 'elementAccessChain.3.ts'].map((pattern) => ({
+		pattern,
+		category: 'grammar' as const,
 		reason:
-			'`for ((g satisfies T) of …)` — a bare cast target in a for-of head (the assignment / pattern spellings in the same file parse)'
-	},
+			'`for (obj?.a of …)` / `for (obj?.["a"] in …)` — an optional chain is no for-head target'
+	})),
 	{
 		pattern: 'topLevelVarHoistingCommonJS.ts',
 		category: 'grammar',
