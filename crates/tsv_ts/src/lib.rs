@@ -496,9 +496,9 @@ fn convert_ast_json_bytes_variant(program: &Program<'_>, source: &str, locations
     // so it skips the line-start scan entirely (`new_map_only` builds just the
     // byte→char map) — a once-per-file entry branch, no per-node cost.
     let (tracker, map) = if locations {
-        tsv_lang::LocationTracker::new_ecmascript_with_map(source)
+        tsv_lang::LocationTracker::new_ecmascript_with_map(source, tsv_lang::LeadingBom::Counted)
     } else {
-        tsv_lang::LocationTracker::new_map_only(source)
+        tsv_lang::LocationTracker::new_map_only(source, tsv_lang::LeadingBom::Counted)
     };
     ast::convert::write_program_json(
         program,

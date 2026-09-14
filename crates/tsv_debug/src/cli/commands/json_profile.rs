@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use tsv_cli::cli::input::ParserType;
-use tsv_lang::{ByteToCharMap, estimated_ast_arena_capacity};
+use tsv_lang::estimated_ast_arena_capacity;
 
 use super::profile::{format_duration, format_size, lang_token, median_us, resolve_profile_files};
 use crate::cli::CliError;
@@ -177,7 +177,9 @@ fn profile_once(
 
     if meta.is_none() {
         *meta = Some(IterMeta {
-            multibyte: ByteToCharMap::new(source).has_multibyte(),
+            // `ByteToCharMap::has_multibyte` is exactly this — a table is built only for a
+            // non-ASCII source — so ask the byte scan rather than building one to read a flag.
+            multibyte: !source.is_ascii(),
             wire_bytes: wire.len(),
         });
     }

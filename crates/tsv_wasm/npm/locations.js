@@ -98,6 +98,13 @@
  * **CSS is a no-op** — `parse_css` emits no `loc` (nothing to reconstruct), so
  * `reconstruct_locations` returns a CSS tree unchanged.
  *
+ * **A leading byte-order mark is read the way each wire reads it.** Svelte's `parse` and
+ * `parseCss` strip a U+FEFF at index 0 before parsing, so the Svelte and CSS wires index
+ * the BOM-less string; acorn counts it as whitespace, so the TypeScript wire indexes the
+ * caller's string as given. The line table and every name span are built over the string
+ * the wire's offsets index — `source` with its BOM dropped for Svelte and CSS, `source`
+ * itself for TypeScript — so a consumer hands over the source it parsed, BOM and all.
+ *
  * The one-shot and `reconstruct` forms **mutate the ast in place** (adding a `loc`
  * key to each node) and return it, for efficiency on large trees. Callers that
  * need the input untouched should `structuredClone(ast)` first.
@@ -109,6 +116,21 @@ const LF = 0x0a;
 const CR = 0x0d;
 const LINE_SEPARATOR = 0x2028;
 const PARAGRAPH_SEPARATOR = 0x2029;
+const BOM = 0xfeff;
+
+/**
+ * The string a language's wire offsets index: `source` itself for TypeScript (acorn counts
+ * a leading BOM as whitespace), `source` without a leading U+FEFF for Svelte and CSS
+ * (Svelte's `parse` and `parseCss` strip it before parsing — `remove_bom` — so their
+ * offsets are one unit lower than the file's from the first character on).
+ * @param {string} source
+ * @param {'typescript' | 'svelte' | 'css'} language
+ * @returns {string}
+ */
+function indexed_text(source, language) {
+	if (language !== 'typescript' && source.charCodeAt(0) === BOM) return source.slice(1);
+	return source;
+}
 
 /**
  * The line-terminator rule for a language. TypeScript/JS follow ECMAScript
@@ -624,13 +646,16 @@ function reconstruct_in(ast, starts, source, language) {
  */
 export function create_locator(source, opts) {
 	const language = opts?.language ?? 'typescript';
-	if (language === 'svelte' && ECMASCRIPT_ONLY_TERMINATOR.test(source)) {
+	// Everything below reads the string the wire's offsets index (see `indexed_text`),
+	// never the caller's `source` directly — a Svelte BOM is not in the wire's coordinates.
+	const text = indexed_text(source, language);
+	if (language === 'svelte' && ECMASCRIPT_ONLY_TERMINATOR.test(text)) {
 		refuse(
 			'the source contains a lone CR, U+2028, or U+2029, so its acorn-parsed nodes carry ' +
 				'a different line count from the rest of the document'
 		);
 	}
-	const starts = build_line_starts(source, rule_for(language));
+	const starts = build_line_starts(text, rule_for(language));
 	const is_svelte = language === 'svelte';
 	return {
 		loc_of(node) {
@@ -640,11 +665,11 @@ export function create_locator(source, opts) {
 			// The second refusal, asked per node because this entry point has no tree to
 			// scan. Without it the two entry points disagree about one document: `reconstruct`
 			// throws and `loc_of` returns a line that is quietly off by one.
-			if (is_svelte) refuse_if_seeded_annotation(node, source);
+			if (is_svelte) refuse_if_seeded_annotation(node, text);
 			return { start: loc_at(node.start, starts), end: loc_at(node.end, starts) };
 		},
 		reconstruct(ast) {
-			return reconstruct_in(ast, starts, source, language);
+			return reconstruct_in(ast, starts, text, language);
 		}
 	};
 }

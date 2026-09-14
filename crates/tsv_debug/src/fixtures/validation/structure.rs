@@ -2,16 +2,16 @@
 //! expected-JSON patterns, and divergence-suffix naming.
 
 use crate::fixtures::{
-    AUDIT_SIGNATURE_FILENAME, EXPECTED_SVELTE_ERROR_JSON, Fixture, FixtureFiles, GOAL_FILENAME,
-    InputType, PRETTIER_NONCONVERGENT_FILENAME, PRETTIER_REJECTS_FILENAME, TSV_REJECTS_FILENAME,
-    audit_signature_variant_suffix, determine_required_suffix, goal_marker_path,
-    has_prettier_divergence_suffix, has_svelte_divergence_suffix, read_file,
-    unformatted_ours_filename,
+    AUDIT_SIGNATURE_FILENAME, EXPECTED_SVELTE_ERROR_JSON, ExpectedVariantPin, Fixture,
+    FixtureFiles, GOAL_FILENAME, InputType, PRETTIER_NONCONVERGENT_FILENAME,
+    PRETTIER_REJECTS_FILENAME, TSV_REJECTS_FILENAME, audit_signature_variant_suffix,
+    determine_required_suffix, goal_marker_path, has_prettier_divergence_suffix,
+    has_svelte_divergence_suffix, read_file, unformatted_ours_filename,
 };
 
-/// The number of S-rules [`validate_fixture_structure`] checks (S1–S23), reported on
+/// The number of S-rules [`validate_fixture_structure`] checks (S1–S24), reported on
 /// success.
-pub const STRUCTURE_RULE_COUNT: usize = 23;
+pub const STRUCTURE_RULE_COUNT: usize = 24;
 
 /// Validate fixture structure and conventions
 ///
@@ -59,6 +59,9 @@ pub const STRUCTURE_RULE_COUNT: usize = 23;
 ///      nothing and silently claims a goal the fixture is not graded at; and its
 ///      content must be `script` or `module`, since the lenient reader grades any
 ///      other spelling at Module
+/// S24: an `expected_<stem>.json` variant parse pin requires its sibling `<stem><ext>`
+///      variant — the file whose canonical AST it holds (P4) — and that sibling cannot
+///      be an `input_invalid_*` file, whose claim is that neither parser produces one
 ///
 /// The count of rules above is `STRUCTURE_RULE_COUNT`, reported on success.
 /// D1 — README.md required for divergences — is deliberately **not** here: it is the
@@ -265,6 +268,23 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
                 unformatted_ours_* source; without it the file pins nothing. Either:\n\
                 - Add {source}, or\n\
                 - Delete {signature_name} (run: deno task fixtures:update:formatted)."
+            ));
+        }
+    }
+
+    // S24: a variant parse pin names the sibling variant it holds the canonical AST of.
+    // Without that file it pins nothing, and P4 would silently skip it. An
+    // `input_invalid_*` sibling is no anchor either: the pin claims an AST both parsers
+    // produce, and that file's claim is that neither does.
+    for ExpectedVariantPin { pin, variant } in &files.expected_variant {
+        if variant.starts_with("input_invalid_") || !fixture_dir.join(variant).exists() {
+            return Err(format!(
+                "{pin} has no {variant} to pin.\n\
+                A variant parse pin holds the canonical parser's AST of the same-stem variant\n\
+                file (P4); without a parseable one it pins nothing. Either:\n\
+                - Add {variant} (a variant both parsers accept), then run:\n\
+                  deno task fixtures:update:parsed, or\n\
+                - Delete {pin}."
             ));
         }
     }

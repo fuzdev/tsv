@@ -851,6 +851,15 @@ than repeating three times.
 - CSS — [bom](../tests/fixtures/css/tokens/whitespace/bom_prettier_divergence/)
 - TypeScript — [bom](../tests/fixtures/typescript/syntax/whitespace/bom_prettier_divergence/)
 
+Format-side only. The **parse** wire is no divergence: each language's offsets follow its
+canonical parser's reading of the BOM — Svelte's `parse` and `parseCss` strip it before
+parsing, so the Svelte and CSS wires index the BOM-less string (every offset one UTF-16 unit
+below the file's, a line-1 column one lower); acorn counts it as whitespace, so the
+TypeScript wire keeps file coordinates (`Program.start` 0, the first statement at 1). Each
+fixture above pins that through its BOM-led `prettier_variant_bom.*` and the
+`expected_prettier_variant_bom.json` beside it — the input itself carries no BOM, since the
+format side strips one and the input must be its own fixed point.
+
 ---
 
 ## Tooling

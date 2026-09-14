@@ -55,6 +55,7 @@ pub struct ValidationSummary {
     pub total_prettier_intermediate_to_variant: usize,
     pub total_prettier_intermediate_to_divergent_variant: usize,
     pub total_audit_signature_variant: usize,
+    pub total_expected_variant: usize,
     pub total_invalid_syntax: usize,
     pub results: Vec<FixtureValidation>,
     pub cross_fixture_duplicates: Vec<Vec<String>>,
@@ -92,6 +93,7 @@ impl ValidationSummary {
         self.total_prettier_intermediate_to_divergent_variant +=
             result.prettier_intermediate_to_divergent_variant_count;
         self.total_audit_signature_variant += result.audit_signature_variant_count;
+        self.total_expected_variant += result.expected_variant_count;
         self.total_invalid_syntax += result.invalid_syntax_count;
         self.total_undocumented_prettier += result.undocumented_prettier_outputs.len();
         self.total_render_equiv_compile += result.render_equiv_verified_compile;
@@ -341,6 +343,12 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
             variant_parts.push(format!(
                 "{} audit_signature_<suffix>.txt",
                 summary.total_audit_signature_variant
+            ));
+        }
+        if summary.total_expected_variant > 0 {
+            variant_parts.push(format!(
+                "{} expected_<stem>.json",
+                summary.total_expected_variant
             ));
         }
         if summary.total_invalid_syntax > 0 {

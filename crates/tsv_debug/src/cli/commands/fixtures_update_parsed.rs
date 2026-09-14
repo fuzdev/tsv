@@ -1,10 +1,11 @@
 use crate::cli::CliError;
 use crate::fixtures::validation::parsed_input::{input_ast_paths, parse_input};
-use crate::fixtures::{self, CanonicalParseError, WriteOutcome};
+use crate::fixtures::{self, CanonicalParseError, ExpectedVariantPin, FixtureFiles, WriteOutcome};
 use argh::FromArgs;
 use futures_util::StreamExt;
 
-/// Regenerate expected.json (or expected_ours.json + expected_svelte.json) files.
+/// Regenerate expected.json (or expected_ours.json + expected_svelte.json) files, plus
+/// every variant parse pin (`expected_<stem>.json`) a fixture holds.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "fixtures_update_parsed")]
 pub struct FixturesUpdateParsedCommand {
@@ -52,28 +53,16 @@ pub(super) async fn run(filters: &[String]) -> Result<(), CliError> {
     while let Some(joined) = results.next().await {
         let (fixture, result) = super::task_result(joined, "fixture update")?;
         match result {
-            Ok(WriteOutcome::Created) => {
-                println!(
-                    "✓ Created {}/{}",
-                    fixture.relative_path,
-                    expected_files_desc(&fixture)
-                );
+            Ok((WriteOutcome::Created, files)) => {
+                println!("✓ Created {}/{files}", fixture.relative_path);
                 created += 1;
             }
-            Ok(WriteOutcome::Updated) => {
-                println!(
-                    "✓ Updated {}/{}",
-                    fixture.relative_path,
-                    expected_files_desc(&fixture)
-                );
+            Ok((WriteOutcome::Updated, files)) => {
+                println!("✓ Updated {}/{files}", fixture.relative_path);
                 updated += 1;
             }
-            Ok(WriteOutcome::Unchanged) => {
-                println!(
-                    "- {}/{} up to date",
-                    fixture.relative_path,
-                    expected_files_desc(&fixture)
-                );
+            Ok((WriteOutcome::Unchanged, files)) => {
+                println!("- {}/{files} up to date", fixture.relative_path);
                 unchanged += 1;
             }
             Err(err) => {
@@ -105,14 +94,59 @@ pub(super) async fn run(filters: &[String]) -> Result<(), CliError> {
 }
 
 /// Which expected-JSON file(s) this fixture regenerates, for progress output.
-fn expected_files_desc(fixture: &fixtures::Fixture) -> &'static str {
-    if fixture.tsv_rejects_path().exists() {
+fn expected_files_desc(fixture: &fixtures::Fixture, files: &FixtureFiles) -> String {
+    let main = if fixture.tsv_rejects_path().exists() {
         "expected_svelte.json"
     } else if uses_divergence_pattern(fixture) {
         "expected_ours.json + expected_svelte.json"
     } else {
         "expected.json"
+    };
+    files
+        .expected_variant
+        .iter()
+        .fold(main.to_string(), |desc, entry| {
+            format!("{desc} + {}", entry.pin)
+        })
+}
+
+/// The outcome of two writes read as one: created if either file is new, unchanged only
+/// when neither moved.
+fn combine_outcomes(a: WriteOutcome, b: WriteOutcome) -> WriteOutcome {
+    match (a, b) {
+        (WriteOutcome::Unchanged, WriteOutcome::Unchanged) => WriteOutcome::Unchanged,
+        (WriteOutcome::Created, _) | (_, WriteOutcome::Created) => WriteOutcome::Created,
+        _ => WriteOutcome::Updated,
     }
+}
+
+/// Regenerate every variant parse pin (`expected_<stem>.json`) the fixture holds from the
+/// canonical parser's AST of its `<stem><ext>` sibling — the P4 oracle, the same derivation
+/// `expected.json` takes. A pin whose variant is missing is S24's error, restated here so
+/// the updater never writes a file the validator would then refuse; a canonical rejection
+/// is an error too (the pin holds an AST, never the rejection marker).
+///
+/// To create a pin, add an empty `expected_<stem>.json` beside the variant and run this
+/// command — the empty file is "outdated", and this fills it.
+async fn generate_variant_pins(
+    fixture: &fixtures::Fixture,
+    files: &FixtureFiles,
+) -> Result<WriteOutcome, String> {
+    let mut outcome = WriteOutcome::Unchanged;
+    for ExpectedVariantPin { pin, variant } in &files.expected_variant {
+        let variant_path = fixture.path.join(variant);
+        if !variant_path.exists() {
+            return Err(format!(
+                "{pin} has no {variant} to pin (S24) — add the variant or delete the pin"
+            ));
+        }
+        let source = fixtures::read_file(&variant_path)?;
+        let json = canonical_json_or_error(fixture, &source, &format!("{variant}: ")).await?;
+        let written = fixtures::write_if_changed(&fixture.path.join(pin), &json)
+            .map_err(|e| format!("Failed to write {pin}: {e}"))?;
+        outcome = combine_outcomes(outcome, written);
+    }
+    Ok(outcome)
 }
 
 /// Whether this fixture regenerates the `expected_ours.json` + `expected_svelte.json`
@@ -137,7 +171,24 @@ fn our_json(fixture: &fixtures::Fixture, source: &str) -> Result<String, String>
     Ok(input_ast_paths(&parsed, source).ast_json_tabs)
 }
 
-async fn generate_expected_fixture(fixture: &fixtures::Fixture) -> Result<WriteOutcome, String> {
+/// Regenerate a fixture's expected files — the input's own, then every variant pin — and
+/// name them for the progress line, off one directory scan.
+async fn generate_expected_fixture(
+    fixture: &fixtures::Fixture,
+) -> Result<(WriteOutcome, String), String> {
+    let files = FixtureFiles::scan(fixture);
+    let input = generate_input_expected(fixture).await?;
+    let pins = generate_variant_pins(fixture, &files).await?;
+    Ok((
+        combine_outcomes(input, pins),
+        expected_files_desc(fixture, &files),
+    ))
+}
+
+/// The input's own expected file(s): `expected_svelte.json` alone for a `tsv_rejects.txt`
+/// fixture, the `expected_ours.json` + `expected_svelte.json` pair for a divergence
+/// fixture, `expected.json` otherwise.
+async fn generate_input_expected(fixture: &fixtures::Fixture) -> Result<WriteOutcome, String> {
     // Read input file
     let source = match fixtures::read_file(&fixture.input_path()) {
         Ok(s) => s,
@@ -158,22 +209,31 @@ async fn generate_expected_fixture(fixture: &fixtures::Fixture) -> Result<WriteO
     }
 
     // Generate expected.json from the input type's canonical parser
-    let input_type = fixture.input_type();
-    let json = match fixtures::canonical_expected_json(&source, input_type, fixture.goal()).await {
-        Ok(json) => json,
-        Err(CanonicalParseError::Rejected(message)) => {
-            return Err(format!(
-                "{} parse error: {message}",
-                input_type.language_name()
-            ));
-        }
-        Err(CanonicalParseError::Sidecar(e)) => {
-            return Err(fixtures::canonical_sidecar_failure(input_type, &e));
-        }
-        Err(CanonicalParseError::Unserializable(message)) => return Err(message),
-    };
-
+    let json = canonical_json_or_error(fixture, &source, "").await?;
     fixtures::write_if_changed(&fixture.expected_path(), &json)
+}
+
+/// The canonical parser's AST of `source` in `expected*.json` bytes, or the message the
+/// updater fails with: a rejection (the parser named by language — an AST file is never
+/// written from one), a sidecar fault, or an unserializable AST. `subject` prefixes the
+/// rejection so a variant's names itself; the input passes `""`.
+async fn canonical_json_or_error(
+    fixture: &fixtures::Fixture,
+    source: &str,
+    subject: &str,
+) -> Result<String, String> {
+    let input_type = fixture.input_type();
+    match fixtures::canonical_expected_json(source, input_type, fixture.goal()).await {
+        Ok(json) => Ok(json),
+        Err(CanonicalParseError::Rejected(message)) => Err(format!(
+            "{subject}{} parse error: {message}",
+            input_type.language_name()
+        )),
+        Err(CanonicalParseError::Sidecar(e)) => {
+            Err(fixtures::canonical_sidecar_failure(input_type, &e))
+        }
+        Err(CanonicalParseError::Unserializable(message)) => Err(message),
+    }
 }
 
 /// Generate `expected_svelte.json` for a `tsv_rejects.txt` fixture from the
@@ -245,10 +305,5 @@ async fn generate_divergence_fixture(
         }
     };
 
-    // Created when either file is new; Unchanged only when neither moved.
-    match (ours, svelte) {
-        (WriteOutcome::Unchanged, WriteOutcome::Unchanged) => Ok(WriteOutcome::Unchanged),
-        (WriteOutcome::Created, _) | (_, WriteOutcome::Created) => Ok(WriteOutcome::Created),
-        _ => Ok(WriteOutcome::Updated),
-    }
+    Ok(combine_outcomes(ours, svelte))
 }

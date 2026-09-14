@@ -159,6 +159,17 @@ pub enum ValidationError {
     )]
     TsvRejectsCanonicalRejects(String),
 
+    // Variant parse pins (P4): `expected_<stem>.json` holds the canonical AST of the
+    // sibling variant `<stem><ext>`, and tsv's parse of that variant must reproduce it
+    #[error("{0} is outdated (the canonical parser's AST of its variant moved)")]
+    ParserVariantPinOutdated(String),
+    #[error("our parser output for {variant} differs from {pin}")]
+    ParserVariantOursDiffers { variant: String, pin: String },
+    #[error("our parser output for {variant} matches {pin} semantically but field order differs")]
+    ParserVariantOursFieldOrderDiffers { variant: String, pin: String },
+    #[error("{variant}: {message}")]
+    ParserVariantError { variant: String, message: String },
+
     // Normalization
     #[error("{0} not preserved by prettier")]
     NormalizationPrettierVariantNotPreserved(String),
@@ -377,6 +388,16 @@ impl ValidationError {
             }
             Self::CanonicalParserSidecarFailure(_) => {
                 "Re-run; if it persists, check the sidecar: cargo run -p tsv_debug check"
+            }
+            Self::ParserVariantPinOutdated(_) => "Run: deno task fixtures:update:parsed <pattern>",
+            Self::ParserVariantOursDiffers { .. } => {
+                "Fix the parser to match the pin (the canonical parser's AST of that variant)"
+            }
+            Self::ParserVariantOursFieldOrderDiffers { .. } => {
+                "Match the canonical field order at the writer site"
+            }
+            Self::ParserVariantError { .. } => {
+                "Verify the pinned variant is valid syntax for BOTH parsers; if valid, fix the parser"
             }
             Self::FormatterInputNotIdempotent(input_file) => {
                 // Return static str - the dynamic path is shown in the error message itself
@@ -636,7 +657,11 @@ impl ValidationError {
             | Self::TsvRejectsMarkerButTsvAccepts(_)
             | Self::TsvRejectsMarkerWrongMessage { .. }
             | Self::TsvRejectsMarkerEmpty(_)
-            | Self::TsvRejectsCanonicalRejects(_) => "Parser",
+            | Self::TsvRejectsCanonicalRejects(_)
+            | Self::ParserVariantPinOutdated(_)
+            | Self::ParserVariantOursDiffers { .. }
+            | Self::ParserVariantOursFieldOrderDiffers { .. }
+            | Self::ParserVariantError { .. } => "Parser",
 
             Self::FormatterInputNotIdempotent(_)
             | Self::FormatterOutputPrettierOutdated
@@ -721,6 +746,8 @@ pub enum ValidationSuccess {
     ParserExpectedOursMatches,
     ParserOursMatchesExpected,
     ParserExpectedSvelteMatches,
+    VariantParsePinsOurs(usize), // P4, tsv side: pins our parse of the variant reproduces
+    VariantParsePinsCanonical(usize), // P4, canonical side: pins the canonical parser still emits
     FormatterInputIdempotent,
     FormatterMatchesPrettier,
     NormalizationVariantsOk(usize), // number of variants checked
@@ -759,6 +786,12 @@ impl fmt::Display for ValidationSuccess {
             }
             Self::ParserExpectedSvelteMatches => {
                 write!(f, "expected_svelte.json matches the canonical parser")
+            }
+            Self::VariantParsePinsOurs(n) => {
+                write!(f, "{n} variant parse pins reproduced by our parser (P4)")
+            }
+            Self::VariantParsePinsCanonical(n) => {
+                write!(f, "{n} variant parse pins match the canonical parser (P4)")
             }
             Self::FormatterInputIdempotent => write!(f, "input file is idempotent"),
             Self::FormatterMatchesPrettier => write!(f, "input file matches prettier"),

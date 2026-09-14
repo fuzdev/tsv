@@ -70,7 +70,7 @@ use super::{
     split_declaration_svelte_compat, strip_css_comments_collecting, trim_wire_end, trim_wire_start,
 };
 use std::borrow::Cow;
-use tsv_lang::{ByteToCharMap, JsonWriter, Span, write_array, write_or_null};
+use tsv_lang::{ByteToCharMap, JsonWriter, LeadingBom, Span, write_array, write_or_null};
 
 /// `parseCss()` constant metadata payloads — always the `Default` (all-`false`,
 /// `null` unit) shapes, emitted only on standalone CSS (`Ctx::has_metadata`).
@@ -101,11 +101,16 @@ impl Ctx<'_> {
 
 /// Convert the internal CSS nodes straight to standalone-`StyleSheetFile` wire
 /// bytes — one AST walk, with byte→char offset translation fused in.
+///
+/// A leading BOM is ELIDED: `parseCss` strips it (`remove_bom`) before parsing, so every
+/// canonical offset indexes the BOM-less string — one UTF-16 unit below the author's
+/// file. The lexer's spans stay file-true; only the emitted position moves. (An embedded
+/// `<style>` takes the Svelte writer's map, built the same way.)
 pub(crate) fn write_stylesheet_file_bytes(
     stylesheet: &internal::CssStyleSheet<'_>,
     source: &str,
 ) -> Vec<u8> {
-    let map = ByteToCharMap::new(source);
+    let map = ByteToCharMap::new(source, LeadingBom::Elided);
     let ctx = Ctx {
         source,
         map: &map,

@@ -261,7 +261,10 @@ identifiers, snippet names, and simple-identifier block patterns, and the
 between an element's attributes, i.e. inside its opening tag at brace depth 0 —
 including the `<svelte:options>` head, whose wire node carries no `type` and is
 pushed into the host-element pass explicitly);
-**a no-op for CSS**. The exception is not an approximation but a **refusal**: a Svelte
+**a no-op for CSS**. A leading BOM is stripped ahead of the Svelte and CSS line tables and
+kept for the TypeScript one, because that is what each wire indexes: Svelte's `parse` and
+`parseCss` strip it before parsing, acorn counts it as whitespace (`tsv_lang::LeadingBom`
+on the Rust side). The exception is not an approximation but a **refusal**: a Svelte
 source holding a lone CR, U+2028 or U+2029 carries two line counts — acorn's on the nodes
 it parsed, `locate-character`'s on the rest — and which one a node takes is not a function
 of its offsets, so every entry point throws rather than returning quietly-wrong lines
