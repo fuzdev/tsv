@@ -1,0 +1,128 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script>
+	// inline block comment — parens preserved for comment
+	const a = () => x /* c */;
+
+	// curried arrow — outer parens preserved for comment
+	const b = (a) => (b) => z /* c */;
+
+	// multiple levels — each level preserves parens
+	const c = (a) => (b) => (c) => w /* c1 */ /* c2 */;
+
+	// line comment — forces multiline parens
+	const d = () =>
+		x; // c
+
+	// own-line block comment — forces multiline parens
+	const e = () =>
+		x;
+		/* c */
+
+	// stacked line comments — each kept on its own line (no swallow)
+	const g = () =>
+		x; // c1
+		// c2
+
+	// leading + trailing — leading hugs `=>`, trailing keeps parens
+	const h = () => /* lead */ x /* trail */;
+
+	// ternary body, leading + trailing — the retained parens keep the leading comment outside
+	const k = () => (/* lead */ cond ? a : b /* trail */);
+
+	// leading line comment — the run drops to its own line, the retained parens below it
+	const l = () =>
+		// lead
+		x /* trail */;
+
+	// leading block then line — the run stays together above the body
+	const m = () =>
+		/* lead1 */ // lead2
+		x /* trail */;
+
+	// same-line comment group after a body break — block + line stay together
+	const i = () =>
+		x;
+		/* i1 */ // i2
+
+	// sequence body — the pair the sequence prints for ITSELF stands in for the erased
+	// shell, so the comment stays on the last operand inside it from every authoring
+	const n = () => (x, y);
+	// t
+
+	// the block spelling of the same, collapsed inline in that pair
+	const o = () => (x, y);
+	/* t */
+
+	// object-literal body — parens are required, comment kept inside (not after `)`)
+	const j = () => ({ k: 1 }) /* c */;
+
+	// inside call arg — parens preserved
+	f(() => x /* c */);
+</script>
+
+%%PASS=2 (fixed point)%%
+<script>
+	// inline block comment — parens preserved for comment
+	const a = () => x; /* c */
+
+	// curried arrow — outer parens preserved for comment
+	const b = (a) => (b) => z; /* c */
+
+	// multiple levels — each level preserves parens
+	const c = (a) => (b) => (c) => w; /* c1 */ /* c2 */
+
+	// line comment — forces multiline parens
+	const d = () => x; // c
+
+	// own-line block comment — forces multiline parens
+	const e = () => x;
+	/* c */
+
+	// stacked line comments — each kept on its own line (no swallow)
+	const g = () => x; // c1
+	// c2
+
+	// leading + trailing — leading hugs `=>`, trailing keeps parens
+	const h = () => /* lead */ x; /* trail */
+
+	// ternary body, leading + trailing — the retained parens keep the leading comment outside
+	const k = () => (/* lead */ cond ? a : b /* trail */);
+
+	// leading line comment — the run drops to its own line, the retained parens below it
+	const l = () =>
+		// lead
+		x; /* trail */
+
+	// leading block then line — the run stays together above the body
+	const m = () =>
+		/* lead1 */ // lead2
+		x; /* trail */
+
+	// same-line comment group after a body break — block + line stay together
+	const i = () => x;
+	/* i1 */ // i2
+
+	// sequence body — the pair the sequence prints for ITSELF stands in for the erased
+	// shell, so the comment stays on the last operand inside it from every authoring
+	const n = () => (x, y);
+	// t
+
+	// the block spelling of the same, collapsed inline in that pair
+	const o = () => (x, y);
+	/* t */
+
+	// object-literal body — parens are required, comment kept inside (not after `)`)
+	const j = () => ({ k: 1 }); /* c */
+
+	// inside call arg — parens preserved
+	f(() => x /* c */);
+</script>

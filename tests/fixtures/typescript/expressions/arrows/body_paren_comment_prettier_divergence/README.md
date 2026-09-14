@@ -8,7 +8,7 @@ a same-line line comment past the body's `;`, detaching it from the body
 entirely. That past-`;` relocation, not just the paren strip, is the strongest
 reason for the divergence: tsv keeps every comment attached to the body where the
 author wrote it. The fixture covers a simple body, a call argument, curried
-arrows, and own-line and stacked line comments.
+arrows, a sequence body, and own-line and stacked line comments.
 
 A few cases go further:
 
@@ -37,6 +37,12 @@ A few cases go further:
   reassembles the body around the retained parens; answering it inline for
   every kind is what once swallowed the whole body into a `//`
   (`() => // c (x /* trail */);`).
+- A **sequence** body makes the retention a claim about *authoring independence*: a `//`
+  or an own-line block written behind the last operand reaches one tsv fixed point from
+  every authoring, where prettier reaches two. The two `unformatted_ours_sequence_*`
+  variants are the authorings, and they are load-bearing — prettier's float-out form is a
+  fixed point of tsv's too, so a printer that let the comment escape would have one fixed
+  point per authoring with every gate green over it.
 - For an object-literal body the parens are **required** (object/block
   disambiguation), not redundant grouping parens. tsv keeps the comment inside
   (`({ k: 1 } /* c */)`); prettier moves it outside the required paren

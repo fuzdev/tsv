@@ -635,6 +635,44 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
+    /// Whether the grouping shell the parser stripped from an arrow BODY holds a comment —
+    /// the gate on the retained-paren arm of [`Self::build_arrow_expression_body`].
+    ///
+    /// Not `has_trailing_paren_comments(body.span().end, …)`, and the difference is one node
+    /// kind: a SEQUENCE's span overshoots its operands by the shell the parser erased from
+    /// the LAST one, so a comment written there sits *behind* that start and the gate reads
+    /// the gap as empty. [`Printer::shell_trailing_gap_start`] is the one statement of where
+    /// a shell's trailing gap opens, and an arrow body is a value position exactly like the
+    /// declarator's and the `return` argument's: the comment belongs inside the pair the
+    /// sequence prints (prettier #19263), not floated out past it by the statement default
+    /// (`() => (x, (y /* t */))`, whose float landed the comment after the `)` and, for a
+    /// `//`, past the statement's `;` as well).
+    ///
+    /// ⚠️ **Two askers, one predicate — and the second asker cannot currently reach the
+    /// widened reading.** The body arm asks it to take the retained-paren route; the hug
+    /// arm's geometry probe asks it as a *precondition* — "this body took that route, so
+    /// the hug ladder is not in play" ([`Self::arrow_gap_broke_after_run`]). A sequence
+    /// body does HUG (`arrow_body_always_hugs`), so the probe's own hug test admits it,
+    /// but no sequence body with a comment in that shell survives to be asked: the in-file
+    /// caller sits BELOW the retained-paren early return, which asks this same predicate
+    /// and has already returned when it is true, and the call-side caller is reached only
+    /// past `could_expand_arrow_arg`, which is false for a sequence body (prettier expands
+    /// only an object / array / block terminal, a call through a trailing `!`, or a
+    /// ternary). Reverting just this call site to the narrow reading formats the whole
+    /// fixture suite and the whole gates corpus to the same bytes. It is spelled this way
+    /// anyway because the two askers must not be able to drift: if `could_expand_arrow_arg`
+    /// or the retained-paren arm ever widens, a second copy of the rule left here would be
+    /// one state the two report differently.
+    fn arrow_body_shell_holds_comments(
+        &self,
+        expr: &internal::Expression<'_>,
+        arrow_span_end: u32,
+        frozen: Option<Span>,
+    ) -> bool {
+        let gap_start = self.shell_trailing_gap_start(expr, arrow_span_end, frozen, false);
+        self.has_trailing_paren_comments(gap_start, arrow_span_end)
+    }
+
     /// Emit the body of an arrow with an expression body (the `=>` already pushed)
     /// into `parts`. Branches on whether the body hugs `=>` (object/array/template),
     /// hangs on the next line, joins a curried chain, or carries comments — mirroring
@@ -648,21 +686,21 @@ impl<'a> Printer<'a> {
     ) {
         let d = self.d();
 
-        // Check for trailing comments from stripped grouping parens.
-        // When the parser strips parens from `() => (x /* c */)`, comments
-        // between body expr end and arrow span end are lost. Re-add parens
-        // to preserve them, matching the unary expression approach.
-        let body_end = expr.span().end;
-        let has_trailing_paren_comments =
-            self.has_trailing_paren_comments(body_end, arrow.span.end);
-
         // The `=>`→body value head ([`Printer::value_head_frozen_span`]): an own-line
         // directive in the gap freezes the whole body, the assignment family's rule with
         // `=>` as the delimiter. Resolved ONCE, above the cascade, because the two arms
         // that can hold such a directive sit on opposite sides of the early return below —
         // the retained-paren arm here and arm 1 of the cascade, and no other (asserted
-        // where `has_own_line_comment` is computed).
+        // where `has_own_line_comment` is computed). Resolved above the gate too, since the
+        // gap the gate measures opens at the FROZEN slice's end where there is one.
         let frozen = self.value_head_frozen_span(arrow_end, expr.span());
+
+        // Check for trailing comments from stripped grouping parens.
+        // When the parser strips parens from `() => (x /* c */)`, comments
+        // between the body's printed end and the arrow's span end are lost. Re-add parens
+        // to preserve them, matching the unary expression approach.
+        let has_trailing_paren_comments =
+            self.arrow_body_shell_holds_comments(expr, arrow.span.end, frozen);
 
         if has_trailing_paren_comments {
             let body_start = expr.span().start;
@@ -1215,7 +1253,21 @@ impl<'a> Printer<'a> {
             }
         });
         let body = terminal.span();
-        emitted.push((body.start, body.end));
+        // ⚠️ The terminal body's emitted region stops where its DOC stops printing, which is
+        // not its span end for a SEQUENCE: the span overshoots the operands by the grouping
+        // shell the parser erased from the LAST one, and the chain's `build_arrow_body_doc`
+        // takes the float-out builder, which carries a comment there OUT of the pair
+        // (`(a) => (b) => (x, (y /* t */))` → `(x, y) /* t */`, and a `//` past the `;`).
+        // That region is the retained-paren form's, which only the DEFAULT arrow layout
+        // owns ([`Printer::arrow_body_shell_holds_comments`]) — the same reason the
+        // body→chain-end region above it is unemitted, one node's span inward.
+        let printed_end = match terminal {
+            internal::ArrowFunctionBody::Expression(expr) => {
+                self.shell_trailing_gap_start(expr, head.span.end, None, false)
+            }
+            internal::ArrowFunctionBody::BlockStatement(_) => body.end,
+        };
+        emitted.push((body.start, printed_end));
 
         self.comments_to_emit_between(head.span.start, head.span.end)
             .any(|comment| {
@@ -2089,13 +2141,22 @@ impl<'a> Printer<'a> {
         // (with the `return`/`throw` argument): the operands hang inside the parens the
         // sequence prints for itself, `)` dropping to its own line. Claimed here because
         // the expression dispatch below has no parent to read the layout from.
-        // TODO: an arrow body is a VALUE position, so a trailing comment belongs inside the
-        // parens the sequence prints (prettier #19263, the `return` argument's rule) — but
-        // this takes the float-out builder, so a comment in the shell the parser erased from
-        // the LAST OPERAND lands outside them (`() => (x, (y /* t */))` → `(x, y) /* t */`,
-        // and a `//` there rides past the `;` entirely). The fix is the `return` arm's:
-        // `build_sequence_doc_value` over the collapsed grouping close
-        // (`restricted_production.rs`), which needs this seam to locate that `)`.
+        //
+        // ⚠️ **The float-out builder, and that is only safe because a comment in the
+        // shell never reaches here.** An arrow body is a VALUE position, so a comment the
+        // author wrote between the last operand and a grouping `)` belongs INSIDE the
+        // parens the sequence prints (prettier #19263, the `return` argument's rule) —
+        // floated out it lands past the pair (`() => (x, (y /* t */))` → `(x, y) /* t */`)
+        // and a `//` rides past the statement's `;`. Two gates keep such a body off this
+        // arm, and both read the region through one seam
+        // ([`Printer::shell_trailing_gap_start`], which is where the LAST OPERAND's own
+        // erased shell is accounted for): the default layout's retained-paren arm
+        // ([`Self::arrow_body_shell_holds_comments`], which routes it to
+        // `build_expression_doc_keep_paren_comments` → the value-position sequence
+        // printer), and the chain layout's legality test
+        // ([`Self::chain_comment_outside_emitted_regions`], which calls the region
+        // unemitted and falls the whole chain through to that same default layout). A
+        // third route into this builder would owe the same gate.
         if let internal::Expression::SequenceExpression(seq) = expr {
             return prepend(self.build_sequence_doc(seq, SeqLayout::Hanging));
         }
@@ -2228,9 +2289,16 @@ impl<'a> Printer<'a> {
         let internal::ArrowFunctionBody::Expression(body) = &arrow.body else {
             return None;
         };
-        if !self.arrow_body_hugs(body)
-            || self.has_trailing_paren_comments(body.span().end, arrow.span.end)
-        {
+        if !self.arrow_body_hugs(body) {
+            return None;
+        }
+        // The retained-paren arm's own gate, asked through the shared predicate so the two
+        // askers cannot drift ([`Self::arrow_body_shell_holds_comments`], whose ⚠️ states why
+        // the widened reading is currently unreachable from here). The freeze is resolved the
+        // same way the body arm resolves it, over the same `=>`→body gap; asked behind the hug
+        // so the scan is paid only where an arm could still be taken.
+        let frozen = self.value_head_frozen_span(sig_end, body.span());
+        if self.arrow_body_shell_holds_comments(body, arrow.span.end, frozen) {
             return None;
         }
         self.broke_after_value_leading_run(sig_end, body_start)

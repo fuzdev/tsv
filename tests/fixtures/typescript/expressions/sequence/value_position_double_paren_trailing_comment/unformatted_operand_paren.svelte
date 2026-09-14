@@ -6,11 +6,13 @@
 
 	b = (x, (y /* t */));
 
-	// ⚠️ The two ARROW-BODY cells leave the LAST OPERAND's shell unwritten in
-	// `unformatted_operand_paren`: that position takes the float-out builder, so a comment
-	// inside the shell the parser erased from the operand does not normalize to this form
-	// there. The shells the other variants add around the whole sequence do.
-	const c = () => (x, y /* t */);
+	// An arrow body is a value position too, so its sequence keeps the comment inside the
+	// pair it prints — at every shell depth, the LAST OPERAND's own included. A curried
+	// chain answers alike: that shell region is the default arrow layout's to print, so
+	// the chain layout declines it.
+	const c = () => (x, (y /* t */));
+
+	const k = (a) => (b) => (x, (y /* t */));
 
 	const d = (e = (x, (y /* t */)));
 
@@ -26,7 +28,8 @@
 	// A line comment breaks the sequence and stays on the last operand.
 	const g = () => (
 		x,
-		y // t
+		(y // t
+		)
 	);
 
 	// A `return` argument is a value position too, and hangs its operands.

@@ -43,6 +43,14 @@
 /* i1 */// i2
 	);
 
+	// sequence body — the pair the sequence prints for ITSELF stands in for the erased
+	// shell, so the comment stays on the last operand inside it from every authoring
+	const n=()=>(x,y// t
+	);
+
+	// the block spelling of the same, collapsed inline in that pair
+	const o=()=>(x,y/* t */);
+
 	// object-literal body — parens are required, comment kept inside (not after `)`)
 	const j=()=>({k:1}/* c */);
 

@@ -176,8 +176,10 @@ impl<'a> Printer<'a> {
         }
 
         let inner_doc = self.build_expression_doc(update.argument);
-        // A type-assertion operand keeps its parens: `(a as T)++` (bare
-        // `a as T++` binds `++` to `T`); so does a postfix instantiation operand.
+        // One `needs_parens` call for both spellings — the rule is
+        // `ParenContext::UpdateArgument`'s: every operand looser than a member access
+        // keeps its pair, and `postfix` decides the instantiation case alone (the ASI
+        // shell above takes the ctx on its postfix-only branch).
         let argument_doc = if self.needs_parens(
             update.argument,
             ParenContext::UpdateArgument {
@@ -1655,8 +1657,8 @@ impl<'a> Printer<'a> {
     /// the comma-gap path below and match prettier — see operand_comments.
     ///
     /// This is the statement/throw/call-argument default (the comment floats out).
-    /// Value positions (return / variable init / assignment RHS) instead keep the
-    /// last operand's trailing comment INSIDE the parens — see
+    /// Value positions (return / variable init / assignment RHS / arrow body)
+    /// instead keep the last operand's trailing comment INSIDE the parens — see
     /// [`Self::build_sequence_doc_value`].
     ///
     /// `layout` is the orthogonal [`SeqLayout`] axis — the caller's position decides it,

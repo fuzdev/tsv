@@ -90,10 +90,11 @@ pub enum ParenContext {
     UnaryArgument { parent_op: UnaryOperator },
 
     /// Argument of an update operator: `<expr>++`, `++<expr>`.
-    /// A type-assertion operand keeps its parens — bare `a as T++` binds `++`
-    /// to `T`. `postfix` names which side the operator prints on: an instantiation
-    /// operand keeps its parens only ahead of a postfix operator (`(f<T>)++`), the
-    /// one placement where the operator would follow the type argument list.
+    /// An operand looser than a member access keeps its parens — bare `a as T++`
+    /// binds `++` to `T`, `a * b++` binds it to `b`. `postfix` names which side the
+    /// operator prints on: an instantiation operand keeps its parens only ahead of
+    /// a postfix operator (`(f<T>)++`), the one placement where the operator would
+    /// follow the type argument list.
     UpdateArgument { postfix: bool },
 
     /// Argument of await: `await <expr>`
@@ -327,15 +328,34 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
             needs_parens_unary_arg_common(expr) || needs_parens_unary_same_sign(expr, parent_op)
         }
 
-        // Update argument: a type-assertion operand keeps its parens
-        // (`(a as T)++` — bare `a as T++` binds `++` to `T`), and so does an
-        // instantiation operand ahead of a POSTFIX operator (`(f<T>)++` — a `++`
-        // starts an expression, so it cannot follow a type argument list and bare
-        // `f<T>++` does not parse; `++f<T>` is fine). Other operands are either plain
-        // references (redundant parens stripped) or not valid update targets, so no
-        // further wrapping applies.
+        // Update argument: `(a * b)++`, `(-b)++`, `(a = b)++`, `(a as T)++`, `(f<T>)++`.
+        //
+        // The same shape as `NonNull` above, for the same reason: an update operator
+        // binds on its operand exactly as `!` does, so every operand looser than a
+        // member access takes the pair (bar a sequence, looser still — `build_sequence_doc`
+        // prints its own). Bare, the operator captures the wrong operand
+        // (`a * b++` is `a * (b++)`, `-b++` is `-(b++)`, `(a) => a++` is an arrow whose
+        // body is the update) — a different tree, and at the postfix spelling one the
+        // author could not have written, since the operand's grammar there is a
+        // `LeftHandSideExpression`. The parser ACCEPTS these: an invalid update target
+        // is a deferred early error (the "Assigning to rvalue" acorn reports), so the
+        // printer has to print the tree it was handed. The prefix operand's grammar is
+        // the wider `UnaryExpression`, which admits a unary, another update and an
+        // `await` bare — but none of those is a valid target either, so the one rule
+        // costs only a redundant pair on code no program can run.
+        //
+        // The instantiation half is postfix-only: a `++` starts an expression, so it
+        // cannot follow a type argument list (tsc's `canFollowTypeArgumentsInExpression`)
+        // and bare `f<T>++` does not parse at all, while a prefix `++f<T>` leaves nothing
+        // after the `>` — so `++(f<T>)` still strips. A BARE instantiation is the only
+        // operand this clause can ever see: the precedence clauses ahead of it already
+        // parenthesize every composite operand, so the join axis — the operand's
+        // rightmost printed token, `ends_with_instantiation_close` — is stated once at
+        // the binary rule, the one place it is live.
         ParenContext::UpdateArgument { postfix } => {
-            is_type_assertion(expr)
+            is_lower_precedence(expr)
+                || is_unary_or_update(expr)
+                || matches!(expr, Expression::ArrowFunctionExpression(_))
                 || (postfix && matches!(expr, Expression::TSInstantiationExpression(_)))
         }
 
@@ -613,10 +633,15 @@ pub(in crate::printer) const fn joins_a_trailing_angle_bracket(op: BinaryOperato
 /// Whether the LAST token `expr` prints is the closing `>` of an instantiation
 /// expression's type argument list — the instantiation itself, or a node whose
 /// rightmost child prints bare at its end (a binary's right operand, a prefix
-/// operator's argument). A child that takes its own pair in that position ends the
-/// operand on a `)` instead, so the walk stops there; every other node ends on a token
-/// of its own (`!`, `)`, `]`, a name, a literal). The `new X<T>` spelling ends on the
-/// `()` the printer always emits, so it is not in the class.
+/// operator's argument, an angle-bracket assertion's operand). A child that takes its
+/// own pair BY PRECEDENCE in that position ends the operand on a `)` instead, so the
+/// walk stops there; every other node ends on a token of its own (`!`, `)`, `]`, a
+/// name, a literal). A shell the PRINTER retains for a comment is invisible here —
+/// the walk asks `needs_parens`, which does not see that decision — so such an
+/// operand takes a redundant outer pair, at this arm and at every other alike. The
+/// `new X<T>` spelling ends on the `()` the printer always emits, so it is not in
+/// the class, and `as` / `satisfies` end on a TYPE rather than on an expression, so
+/// nothing can re-lex their tail.
 fn ends_with_instantiation_close(expr: &Expression<'_>, in_for_init: bool) -> bool {
     match expr {
         Expression::TSInstantiationExpression(_) => true,
@@ -638,6 +663,11 @@ fn ends_with_instantiation_close(expr: &Expression<'_>, in_for_init: bool) -> bo
             let ctx = ParenContext::UpdateArgument { postfix: false };
             !needs_parens(update.argument, ctx, in_for_init)
                 && ends_with_instantiation_close(update.argument, in_for_init)
+        }
+        Expression::TSTypeAssertion(assertion) => {
+            let ctx = ParenContext::AngleBracketAssertion;
+            !needs_parens(assertion.expression, ctx, in_for_init)
+                && ends_with_instantiation_close(assertion.expression, in_for_init)
         }
         _ => false,
     }
@@ -905,8 +935,8 @@ fn needs_parens_binary_operand(
     // the pair ahead of an operator whose first token joins that `>`
     // ([`joins_a_trailing_angle_bracket`], the per-operator table the frozen `new X<T>`
     // slice reads too): `+` and `-` continue it as a relational chain (`f<T> + 1` re-lexes
-    // as `f < T > +1`, a different program) and the `<`/`>`-led operators leave a form
-    // tsc or acorn-typescript rejects (`f<T> >= 1` does not parse). The axis is the JOIN
+    // as `f < T > +1`, a different program) and `<`, `>`, `>=`, `<<`, `>>` and `>>>` leave a
+    // form tsc or acorn-typescript rejects (`f<T> >= 1` does not parse). The axis is the JOIN
     // of the operand's last token and the operator's first, not the operand's node or
     // precedence — `a * fn<T> + 1` and `-fn<T> + 1` rebind exactly as `fn<T> + 1` does,
     // so the walk follows the rightmost printed child (`ends_with_instantiation_close`).
