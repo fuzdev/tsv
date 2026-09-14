@@ -2,25 +2,28 @@
 	// An own-line `//` in a conditional type's `?`→true-branch gap keeps the line the author
 	// gave it; the branch hangs one level in below it.
 	type A = B extends C
-		?
-			// c1
-			D
+		? (
+				// c1
+				D
+			)
 		: E;
 
 	// ...and in the `:`→false-branch gap.
 	type F = B extends C
 		? D
-		:
-			// c2
-			E;
+		: (
+				// c2
+				E
+			);
 
 	// A run keeps one comment per line, in order.
 	type G = B extends C
 		? D
-		:
-			// c3
-			// c4
-			E;
+		: (
+				// c3
+				// c4
+				E
+			);
 
 	// A nested conditional's check type and an intersection head hang the same way.
 	type H = B extends C
@@ -41,10 +44,27 @@
 	type K = B extends C
 		? D
 		: B extends E
-			?
-				// c7
-				F
+			? (
+					// c7
+					F
+				)
 			: G;
+
+	// A hugging object-type branch hangs the same way.
+	type M = B extends C
+		? (
+				// c9
+				{ x: 1 }
+			)
+		: E;
+
+	// A block glued to the branch rides below the own-line comment with it.
+	type N = B extends C
+		? (
+				// c10
+				/* c11 */ D
+			)
+		: E;
 
 	// Control: a comment the author put ON the operator's line trails it, as before.
 	type L = B extends C
