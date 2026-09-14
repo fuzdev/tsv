@@ -788,21 +788,27 @@ wrapper for a newly-added impl is included without anyone remembering to list it
 
 ⚠ **The oxc wasm binding is not a regular dep.** It's pure-wasm but its metadata
 declares `cpu: wasm32`, so it lives in neither `dependencies` nor
-`optionalDependencies` (both break or get pruned). `install_deps.ts` force-fetches
-it at the `oxc-parser` version (oxc ships all bindings in lockstep), so bumping
-`oxc-parser` carries it automatically. `binary_sizes.ts` reads it from
-`node_modules` (flat, no version dir).
+`optionalDependencies` (both break or get pruned). It is pinned in `package.json`'s
+`force_installed` map instead, which `install_deps.ts` force-fetches with
+`--no-save` and `check_node_modules.ts` grades like any exact pin (a range there is
+refused at the read). `binary_sizes.ts` reads it from `node_modules` (flat, no
+version dir). One thing the exact pin does NOT buy: because `--no-save` keeps the
+entry out of the lockfile, the binding's own dependency closure (`@napi-rs/wasm-runtime`
+and what it pulls) resolves live on every `bench:install` — `package.json`'s
+`//force_installed` note says why that is left as is.
 
-⚠ **That lockstep also CAPS the `oxc-parser` pin.** The binding is a separate
-artifact with its own load path, and an upstream version whose binding fails to
-load takes the `oxc-parser-wasm` row off both surfaces — an unloadable impl is
-ABSENT, not fatal, so nothing fails and the published TABLES carry no trace: the
-row is simply gone. Only the report's `unavailable` list records the cause, in
-JSON, which nobody reads unless they already suspect a loss. The
-break is real, not hypothetical: `benches/js/package.json`'s `//oxc-wasi` note
-names the version it starts at, the `@emnapi/core` hoisting mismatch behind it, and
-the workaround that was deliberately declined. So an `oxc-parser` bump is the one
-routine bump with a re-probe attached.
+⚠ **It is pinned APART from `oxc-parser`.** oxc ships every binding at one version,
+but the binding is a separate artifact with its own load path, and upstream versions
+past the one `benches/js/package.json`'s `//oxc-wasi` note names fail to load (that
+note also carries the `@emnapi/core` hoisting mismatch behind it, and the workaround
+that was deliberately declined). A separate pin keeps that break from capping the
+native `oxc-parser` row. An unloadable impl is ABSENT, not fatal, so a bad pin fails
+nothing and the published TABLES carry no trace: the row is simply gone. Only the
+report's `unavailable` list records the cause, in JSON, which nobody reads unless
+they already suspect a loss. So a bump of the binding's pin is the one routine bump
+with a re-probe attached. While the two pins differ, the report prints both
+versions, and the `oxc-parser`↔`oxc-parser-wasm` variant-parity warning compares two
+oxc versions, not just two bindings.
 
 **Probe the CANDIDATE, not the installed binding.** A bare
 `import('@oxc-parser/binding-wasm32-wasi')` resolves whatever is in `node_modules`
@@ -818,7 +824,7 @@ node -e "import('@oxc-parser/binding-wasm32-wasi').then(() => console.log('wasi 
 
 The rejection handler is the point: without it a load failure surfaces as an
 unhandled rejection rather than the one line naming the cause. Raise the
-`oxc-parser` pin only once that exits 0, then `deno task bench:install` to put the
+`force_installed` pin only once that exits 0, then `deno task bench:install` to put the
 tree back in agreement with `package.json`.
 
 The `deno task smoke` step above is the backstop: it names every impl that failed

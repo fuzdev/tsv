@@ -167,12 +167,15 @@ labels. The comparison is against the installed **versions**, not against
 `package.json`'s mtime: a mtime proxy tripped on any edit to the file (a comment, a
 branch switch restamping it) and missed an install that ran without taking. Range
 pins (`^4.4.3`) are skipped — a range constrains rather than fixes, so any
-satisfying version is legitimate. One package is graded off-list, because
-`dependencies` is not where it lives: the wasi binding above, whose installed
-version must equal the `oxc-parser` pin it was force-fetched at (the reports label
-its row with that pin, so a version skew there is exactly the mislabeling this check
-prevents). Its **absence** is not graded — nothing is measured then, so nothing is
-mislabeled, and the report's `unavailable` carries the missing row's cause.
+satisfying version is legitimate. The `force_installed` pins are graded too,
+because `dependencies` is not where they live: today that is the wasi binding above,
+whose installed version must equal its own pin (the reports label its row with that
+pin, so a version skew there is exactly the mislabeling this check prevents); a range
+in that map is refused at the read, so every entry is gradable. Its **absence** is not
+graded — nothing is measured then, so nothing is mislabeled, and the report's
+`unavailable` carries the missing row's cause. The pin covers the named package only:
+`--no-save` keeps it out of the lockfile, so its transitive closure resolves live
+(`package.json` `//force_installed`).
 
 **Per-runtime impl availability.** `oxc-parser-wasm` runs under all three, but the
 two entries its binding ships split them 2–1 rather than by runtime family: the
@@ -1227,7 +1230,7 @@ benches/js/
     ├── biome.ts           # Biome WASM wrapper (Svelte, TypeScript, CSS)
     ├── canonical.ts       # Prettier + Svelte parser wrappers
     ├── check_artifact_freshness.ts # Native/WASM artifact staleness guard (§Artifact Freshness Guard)
-    ├── check_node_modules.ts # node_modules preflight: exists + every exact pin (and the oxc wasi binding) matches installed
+    ├── check_node_modules.ts # node_modules preflight: exists + every exact pin (and every `force_installed` pin) matches installed
     ├── compare_cli.ts     # Shared scaffolding for the corpus_compare_* entry points
     ├── corpus.ts          # CorpusLoader + DirectoryLoader (load/stream; node: builtins) + the
     │                      # missing-entry policy every caller picks (`MissingEntryPolicy`) and the
@@ -1412,19 +1415,21 @@ internal state), the coverage report and skip counts make it visible without
   output and a byte divergence over the files both accepted exits non-zero. Under Node
   and Bun the native row IS the N-API addon on the `napi` profile, which makes this
   the standing correctness check on the artifact the native npm packages ship.
-- **The oxc WASI binding also CAPS the `oxc-parser` pin.** It is force-fetched in
-  lockstep with `oxc-parser` (§Cross-Runtime), so the pin decides which binding
-  installs — and past the version named in `package.json`'s `//oxc-wasi` note the
-  binding fails to load under both Deno and Node (`this.bridge.setLastError is not a
-  function`: it declares an alpha `@emnapi/core` that npm installs NESTED, while the
-  hoisted `@napi-rs/wasm-runtime` it also imports resolves the hoisted 1.x, so the
-  two halves disagree). Same shape as the two per-runtime load failures above but on
-  the VERSION axis, and equally silent in the TABLES: an unloadable impl is absent,
-  not fatal, so the row simply leaves both surfaces — only `unavailable` records the
-  cause. Probe the CANDIDATE binding before raising the pin
-  (../../docs/benchmarks.md §Updating dependencies carries the commands — a bare
-  import resolves the INSTALLED binding and so always passes); hoisting
-  the alpha to the tree root works and was deliberately declined.
+- **The oxc WASI binding is pinned APART from `oxc-parser`.** It is force-fetched
+  at its own `force_installed` pin (§Cross-Runtime), because past the version named
+  in `package.json`'s `//oxc-wasi` note the binding fails to load under both Deno
+  and Node (`this.bridge.setLastError is not a function`: it declares an alpha
+  `@emnapi/core` that npm installs NESTED, while the hoisted `@napi-rs/wasm-runtime`
+  it also imports resolves the hoisted 1.x, so the two halves disagree). Same shape
+  as the two per-runtime load failures above but on the VERSION axis, and equally
+  silent in the TABLES: an unloadable impl is absent, not fatal, so the row simply
+  leaves both surfaces — only `unavailable` records the cause. Probe the CANDIDATE
+  binding before raising that pin (../../docs/benchmarks.md §Updating dependencies
+  carries the commands — a bare import resolves the INSTALLED binding and so always
+  passes); hoisting the alpha to the tree root works and was deliberately declined.
+  While the two pins differ, the `oxc-parser`↔`oxc-parser-wasm` parity pair spans
+  two oxc versions, so its accept-set warning can be an engine change rather than a
+  binding bug.
 - **TypeScript canonical parser**: acorn-typescript fails on some modern syntax
   (files skipped) — and the reverse, files tsv fails that acorn accepts, is a known
   parse gap.

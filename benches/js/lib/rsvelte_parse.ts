@@ -24,9 +24,18 @@
  * **Mechanism-matched to `tsv-json`.** `parse()` returns the AST as a JSON string
  * that the caller `JSON.parse`s — exactly what tsv's FFI/WASM parse rows do — so
  * this is an apples-to-apples comparison rather than a disclosed approximation.
- * Its root keys are identical to `svelte/compiler`'s (`comments, css, end,
- * fragment, instance, js, options, start, type`) and its `VERSION` reports the
- * upstream Svelte it targets, which currently matches the harness's pin.
+ * With `modern: true` its root keys are identical to `svelte/compiler`'s modern
+ * `Root` (`comments, css, end, fragment, instance, js, options, start, type`) and
+ * its `VERSION` reports the upstream Svelte it targets — which need not be the
+ * harness's `svelte` pin: `init_implementations` warns on a drift and the report
+ * renders both (`rsvelte_parse_svelte_target`), so the caveat is disclosed rather
+ * than assumed away.
+ *
+ * ⚠ **`modern: true` is load-bearing.** Like `svelte/compiler`'s `parse()`, the
+ * addon defaults to the LEGACY AST (`{ html, instance, css }`); a call without the
+ * option would time a different product than tsv's modern wire. `init()` asserts
+ * the option lands (`type === 'Root'`), so a rename fails the run rather than
+ * silently re-pointing both rows at the legacy shape.
  *
  * **It parses the whole conformance Svelte corpus without a host fault** — stated
  * because that is precisely where yuku's N-API binding segfaults (`lib/yuku.ts`),
@@ -54,9 +63,15 @@ import type { RsvelteParseVersions } from './versions.ts';
 
 /** The subset of the addon's surface this row drives. */
 interface RsvelteNative {
-	parse: (source: string, options?: { skipExpressionLoc?: boolean }) => string;
+	parse: (source: string, options?: { modern?: boolean; skipExpressionLoc?: boolean }) => string;
 	VERSION: string;
 }
+
+/** The modern `Root` AST — the addon, like `svelte/compiler`, defaults to legacy. */
+const PARSE_OPTIONS = { modern: true } as const;
+
+/** The reduced row's options: the modern AST minus nested expression `loc`. */
+const PARSE_OPTIONS_SKIP_EXPRESSION_LOC = { modern: true, skipExpressionLoc: true } as const;
 
 /**
  * rsvelte's Svelte parser, via its N-API addon.
@@ -103,6 +118,19 @@ export class RsvelteParseImplementation extends BaseImplementation {
 			throw new Error('@rsvelte/vite-plugin-svelte-native exposes no parse()');
 		}
 
+		// Assert `modern` LANDS. The addon defaults to the legacy AST, so an option that
+		// went inert (a rename) would re-point both rows at a different product while
+		// every file kept parsing at a plausible speed.
+		const probe = '<script lang="ts">let n: number = 1;</script><p>{n + 1}</p>';
+		const full = native.parse(probe, PARSE_OPTIONS);
+		const root_type = (JSON.parse(full) as { type?: unknown }).type;
+		if (root_type !== 'Root') {
+			throw new Error(
+				`rsvelte's parse() ignored \`modern: true\` (root type ${JSON.stringify(root_type)}) — ` +
+					`the rows would measure the legacy AST, not tsv's modern wire`
+			);
+		}
+
 		// Assert `skipExpressionLoc` still REDUCES. This addon's documented option
 		// surface has already been caught disagreeing with the binding once
 		// (`skipCssAst` is documented on `parse()` and rejected by it — see the module
@@ -112,9 +140,7 @@ export class RsvelteParseImplementation extends BaseImplementation {
 		// report would publish two rows as if they measured different wires. The probe
 		// needs an embedded expression with a type annotation, since that is the only
 		// thing the option drops.
-		const probe = '<script lang="ts">let n: number = 1;</script><p>{n + 1}</p>';
-		const full = native.parse(probe);
-		const reduced = native.parse(probe, { skipExpressionLoc: true });
+		const reduced = native.parse(probe, PARSE_OPTIONS_SKIP_EXPRESSION_LOC);
 		if (reduced.length >= full.length) {
 			throw new Error(
 				`rsvelte's skipExpressionLoc no longer reduces the payload (${full.length} → ` +
@@ -134,7 +160,7 @@ export class RsvelteParseImplementation extends BaseImplementation {
 		// `parse()` hands back JSON; the `JSON.parse` is the caller's cost in the
 		// real consumer too, and including it is what makes this mechanism-matched
 		// to `tsv-json` (which pays the identical boundary + parse cost).
-		return JSON.parse(this._native.parse(source));
+		return JSON.parse(this._native.parse(source, PARSE_OPTIONS));
 	}
 
 	/**
@@ -149,7 +175,7 @@ export class RsvelteParseImplementation extends BaseImplementation {
 		if (!this.supports_parse_language(language)) {
 			throw new Error(`rsvelte parse does not support ${language}`);
 		}
-		return JSON.parse(this._native.parse(source, { skipExpressionLoc: true }));
+		return JSON.parse(this._native.parse(source, PARSE_OPTIONS_SKIP_EXPRESSION_LOC));
 	}
 
 	dispose(): void {

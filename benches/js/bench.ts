@@ -1015,6 +1015,25 @@ const same_engine_sibling_name = (name: string): string | null => {
 };
 
 /**
+ * The engine versions behind a native↔wasm pair, as the report labels them —
+ * `[base, sibling]` — or `null` for a pair that has no second version to differ
+ * (rsvelte's option pair, tsv's own rows: one package each).
+ *
+ * Read by the accept-set warning alone: its "same engine" claim holds only while
+ * the two sides are installed at ONE version, and oxc's pair is pinned apart on
+ * purpose (`package.json` `//oxc-wasi`), so the warning has to say which case it is
+ * in rather than assert a binding bug over what may be an engine change.
+ */
+const same_engine_pair_versions = (
+	name: string
+): [string | undefined, string | undefined] | null => {
+	const alt = get_alternative_versions(impls);
+	if (name === 'oxc-parser') return [alt.oxc_parser, alt.oxc_parser_wasm];
+	if (name === 'yuku-parser') return [alt.yuku_parser, alt.yuku_parser_wasm];
+	return null;
+};
+
+/**
  * Whether `name`'s same-engine sibling must produce byte-identical OUTPUT, not
  * merely accept the same files — the stronger half of the pair invariant, and the
  * only half graded FATALLY (`check_variant_parity`).
@@ -1032,7 +1051,10 @@ const same_engine_sibling_name = (name: string): string | null => {
  * - **oxc's and yuku's native↔wasm pairs** should agree, but a divergence is a
  *   third-party binding's defect rather than something tsv's bench should hard-fail
  *   on — and oxc's WASI binding has a known one (lib/oxc_wasm.ts). They keep the
- *   accept-set warning, which is what surfaced that bug in the first place.
+ *   accept-set warning, which is what surfaced that bug in the first place. oxc's
+ *   pair is also pinned APART (the WASI binding is held back — `package.json`
+ *   `//oxc-wasi`), so while the two pins differ a warning there can be an
+ *   engine-version difference rather than a binding one.
  *
  * The `-internal` rows are excluded because they parse without serializing and
  * return nothing — there is no output to grade, and pretending otherwise would put
@@ -1274,11 +1296,19 @@ function check_variant_parity(): void {
 				output_mismatch_examples
 			});
 			if (impl_only > 0 || sibling_only > 0) {
+				// The diagnosis depends on whether the pair really is ONE engine version.
+				const pair = same_engine_pair_versions(name);
+				const split =
+					pair !== null && pair[0] !== undefined && pair[1] !== undefined && pair[0] !== pair[1];
 				console.error(
 					`⚠ variant parity (${group_name}): ${name} and ${sibling_name} accept different files ` +
-						`(${impl_only} ${name}-only, ${sibling_only} ${sibling_name}-only). Same engine — a ` +
-						`divergence means a broken binding or an option doing more than it claims, not an ` +
-						`engine difference.`
+						`(${impl_only} ${name}-only, ${sibling_only} ${sibling_name}-only). ` +
+						(split
+							? `The two sides are installed at DIFFERENT engine versions (${pair[0]} vs ` +
+								`${pair[1]}), so this may be an engine change rather than a binding bug — ` +
+								`re-read once the pins rejoin.`
+							: `Same engine — a divergence means a broken binding or an option doing more ` +
+								`than it claims, not an engine difference.`)
 				);
 			}
 			if (output_mismatch > 0) {
