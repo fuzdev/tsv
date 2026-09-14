@@ -30,10 +30,20 @@ exactly as it does for a glued run
 *did* give a line of its own still breaks the chain in both
 ([operand_own_line_block_comment](../operand_own_line_block_comment/)).
 
+A run holding a **multi-line** block (the `third` case) is the one shape whose break
+is not reflowed. The block cannot print flat, so the run carries a hard break of its
+own and every break the author wrote inside the run survives: tsv drops the run onto
+the continuation line and the operand onto the line below the closing `*/`, which is
+exactly how the own-line authoring of the same run lays out
+([operand_run_broke_after_multiline_block_comment](../operand_run_broke_after_multiline_block_comment/)).
+Prettier relocates the whole run back across the operator and keeps it on the
+operand's line. So the two formatters differ in the comment's *position* here as they
+do above, and additionally in whether the run takes a line of its own.
+
 ## Cases
 
 An arithmetic operator (`+`) and a logical one (`&&`) — one binary-chain printer,
-so the rule is uniform.
+so the rule is uniform — plus a run whose second comment is a multi-line block.
 
 - `unformatted_ours_authored.svelte` — the authored form: tsv normalizes it to
   input, prettier to the variant.

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 250,
+	"end": 475,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -73,24 +73,88 @@
 					"column": 36
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " A run holding a multi-line block: the run's own forced break keeps the author's",
+			"start": 242,
+			"end": 324,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " break after it, so the run takes the `?` line and the value the one below.",
+			"start": 326,
+			"end": 403,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3\nd3 ",
+			"start": 430,
+			"end": 443,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 4
+				},
+				"end": {
+					"line": 12,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 447,
+			"end": 455,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 3
+				},
+				"end": {
+					"line": 13,
+					"column": 11
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 249,
+		"end": 474,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 240,
+			"end": 465,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 7,
+					"line": 15,
 					"column": 9
 				}
 			},
@@ -464,6 +528,204 @@
 							"value": " Block comment after `:`: same rule, the other slot.",
 							"start": 145,
 							"end": 199
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 405,
+					"end": 464,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 410,
+						"end": 411,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 6
+							},
+							"end": {
+								"line": 10,
+								"column": 7
+							}
+						},
+						"name": "G"
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 414,
+						"end": 463,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 10
+							},
+							"end": {
+								"line": 14,
+								"column": 5
+							}
+						},
+						"checkType": {
+							"type": "TSTypeReference",
+							"start": 414,
+							"end": 415,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 10
+								},
+								"end": {
+									"line": 10,
+									"column": 11
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 414,
+								"end": 415,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 10
+									},
+									"end": {
+										"line": 10,
+										"column": 11
+									}
+								},
+								"name": "B"
+							}
+						},
+						"extendsType": {
+							"type": "TSTypeReference",
+							"start": 424,
+							"end": 425,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 20
+								},
+								"end": {
+									"line": 10,
+									"column": 21
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 424,
+								"end": 425,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 20
+									},
+									"end": {
+										"line": 10,
+										"column": 21
+									}
+								},
+								"name": "C"
+							}
+						},
+						"trueType": {
+							"type": "TSTypeReference",
+							"start": 456,
+							"end": 457,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 12
+								},
+								"end": {
+									"line": 13,
+									"column": 13
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 456,
+								"end": 457,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 12
+									},
+									"end": {
+										"line": 13,
+										"column": 13
+									}
+								},
+								"name": "D"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c3\nd3 ",
+									"start": 430,
+									"end": 443
+								},
+								{
+									"type": "Block",
+									"value": " c4 ",
+									"start": 447,
+									"end": 455
+								}
+							]
+						},
+						"falseType": {
+							"type": "TSTypeReference",
+							"start": 462,
+							"end": 463,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 4
+								},
+								"end": {
+									"line": 14,
+									"column": 5
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 462,
+								"end": 463,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 4
+									},
+									"end": {
+										"line": 14,
+										"column": 5
+									}
+								},
+								"name": "E"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A run holding a multi-line block: the run's own forced break keeps the author's",
+							"start": 242,
+							"end": 324
+						},
+						{
+							"type": "Line",
+							"value": " break after it, so the run takes the `?` line and the value the one below.",
+							"start": 326,
+							"end": 403
 						}
 					]
 				}

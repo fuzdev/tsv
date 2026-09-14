@@ -1139,6 +1139,17 @@ impl<'a> Printer<'a> {
     ///
     /// Handles multiple consecutive comments by preserving their line structure:
     /// - `a && // comment1\n// comment2\nb` keeps each comment on its own line
+    ///
+    /// The inline arm's separators are the leading-run rule read FORWARD, per comment,
+    /// from the source around that comment alone ([`Printer::comment_hugs_next`],
+    /// prettier's `printLeadingComment`): the author's glue keeps a space and a break the
+    /// author wrote after a comment survives as a break. It reaches that rule through the
+    /// shared broke-after pair — [`Printer::breaking_value_leading_run`] for the geometry
+    /// plus the forced-break question, then
+    /// [`Printer::push_leading_run_before_breaking_value`] — exactly as the annotation `:`
+    /// seam does, so the operator→operand gap cannot answer a run differently from every
+    /// other value gap. A run whose break is not forced keeps the kind-keyed inline
+    /// emitter, whose flat render is what prettier's collapsed `line` produces.
     fn append_post_operator_parts(
         &self,
         parts: &mut DocBuf,
@@ -1173,13 +1184,34 @@ impl<'a> Printer<'a> {
             // Only inline-leading block comments - place as leading on RHS operand.
             // In flat mode: `a || /* comment */ b` (space from line(), comment+trailing space, operand)
             // In break mode: `a ||\n<indent>/* comment */ b` (comment leads continuation line)
+            let lead = if allow_breaks && !lead_with_space {
+                d.line()
+            } else {
+                d.text(" ")
+            };
+            // A block run the author broke AFTER whose break is already FORCED — a
+            // multi-line comment in the run, or an operand that breaks on its own — takes
+            // the shared forced emitter ([`Printer::breaking_value_leading_run`] +
+            // [`Printer::push_leading_run_before_breaking_value`]): every separator the
+            // author broke is a blank-preserving hardline, so the operand leads the
+            // continuation line below the run's closing `*/` exactly as the shell-free
+            // authoring lays it, and an author blank after the run survives. The
+            // kind-keyed emitter below spells a space at every comment→next seam, which
+            // glued the operand onto a multi-line block's closing line and erased that
+            // blank — the class `docs/comments.md` §Leading comments carries. A run that
+            // FITS behind single-line comments declines here and keeps the glued path,
+            // whose flat render is the bytes prettier's collapsed `line` produces.
+            if let Some((run, operand_doc)) =
+                self.breaking_value_leading_run(op_end, operand.span.start, || operand.doc)
+            {
+                parts.push(lead);
+                self.push_leading_run_before_breaking_value(parts, &run, operand.span.start);
+                parts.push(operand_doc);
+                return;
+            }
             let comments_doc =
                 self.build_comments_between(op_end, operand.span.start, CommentSpacing::Trailing);
-            if allow_breaks && !lead_with_space {
-                parts.push(d.line());
-            } else {
-                parts.push(d.text(" "));
-            }
+            parts.push(lead);
             parts.push(comments_doc);
             parts.push(operand.doc);
             return;

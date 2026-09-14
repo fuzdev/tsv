@@ -37,6 +37,16 @@ conditional on the comment's authored newline.
 `prettier_intermediate_own_line` pins that unstable first pass, which
 reconverges to `input`.
 
+The `type G` case carries a **run holding a multi-line block**, which shows what the
+position costs. The block cannot print flat, so the run's break is forced and the
+break the author wrote after it survives: tsv keeps the whole run after the `?` — the
+block on the operator's line, then the glued tail on the continuation line keeping the
+branch beside it — exactly as the own-line authoring of the same run lays out
+([branch_run_broke_after_multiline_block_comment](../branch_run_broke_after_multiline_block_comment/)),
+which is also why the own-line variant reaches `input` in one prettier pass for this
+case. Prettier moves the run's multi-line head back across the `?`, onto the
+`extends` type's line, and leaves the glued tail leading the branch.
+
 The line-comment form of the `:` slot is pinned separately by
 [`comment_after_colon`](../comment_after_colon_prettier_divergence/) — same
 association change, different comment kind.

@@ -305,6 +305,45 @@ pub(crate) enum BrokeAfterBreak {
     Soft,
 }
 
+/// Where a conditional branch's value sits relative to the comment run in its gap, in the
+/// layout a hanging comment has already forced open — the answer both conditional gap
+/// emitters return and neither decides twice, because one producer states it:
+/// [`Printer::conditional_branch_placement`], read by `Printer::emit_ternary_branch_comments`
+/// for the `?:` expression's two gaps and `Printer::push_conditional_branch_gap_comments` for
+/// the `extends ? :` type's.
+///
+/// **The LAST comment alone decides it**, by the same forward reading every leading-run
+/// separator takes ([`Printer::comment_hugs_next`], prettier's `printLeadingComment`): the
+/// author glued the value to that comment, or broke after it. A run-wide reading — "does any
+/// comment here own a line" — answers for a comment the value never meets, and splits
+/// `// c⏎/* m */ D` where prettier keeps `/* m */ D` on one line. That is the TYPE gap's
+/// spelling; at the expression gap the same authoring only reaches the run through a stripped
+/// paren shell (`? // c⏎/* m */ (x)`), since a block glued to the value itself is OWNED by it
+/// and the run never sees it.
+///
+/// A named pair rather than a `(bool, bool)`: the two flags have the same type and are read
+/// at **four** gaps, so a positional tuple is one transposition away from hanging a value
+/// that should trail and keeping a blank that should collapse — a swap the compiler cannot
+/// see and every fixture in either file would still pass on one of the gaps.
+#[derive(Debug, Clone, Copy)]
+pub(in crate::printer) struct ConditionalBranchPlacement {
+    /// The value drops below the run, because the author broke after the run's last comment
+    /// (a `//` never hugs) or left a blank line above the value.
+    pub(in crate::printer) on_own_line: bool,
+    /// The author left a blank line between the run and the value, which survives when the
+    /// value takes its own line.
+    pub(in crate::printer) blank_before: bool,
+}
+
+impl ConditionalBranchPlacement {
+    /// The value trails the run on the operator's own line — the answer for a gap with no
+    /// comments at all, and the one the non-breaking arm tail passes.
+    pub(in crate::printer) const INLINE: Self = Self {
+        on_own_line: false,
+        blank_before: false,
+    };
+}
+
 /// Whether a deferred own-line comment in a trailing run keeps the author's BLANK line
 /// above it (prettier's `isPreviousLineEmpty(locStart(comment))`).
 ///
@@ -439,6 +478,52 @@ impl TrailingLineRef {
 }
 
 impl<'a> Printer<'a> {
+    /// Where a conditional branch's value sits below the comment `run` in its gap — the one
+    /// producer of a [`ConditionalBranchPlacement`], for both conditional gap emitters
+    /// (`Printer::emit_ternary_branch_comments`, `Printer::push_conditional_branch_gap_comments`).
+    /// `run` is the gap's emitted comments and `value_start` the branch's span start.
+    ///
+    /// **The run's LAST comment decides it**, by the forward reading every leading-run
+    /// separator takes ([`Self::comment_hugs_next`], prettier's `printLeadingComment`): the
+    /// value keeps that comment's line where the author glued it, and drops below the run
+    /// where the author broke after it — a `//` never hugs, so a run ending in one always
+    /// hangs the value — or where they left a blank line above the value, which then survives
+    /// below the run.
+    ///
+    /// The blank scan is the STRICT one ([`Self::has_blank_line_between_strict`]), the same
+    /// question [`Self::push_blank_preserving_hardline`] answers for the run's own separators
+    /// and so the same spelling, never the table-only newline count: `value_start` is a span
+    /// start, and at the EXPRESSION gaps the parser discards a grouping paren, so for a
+    /// parenthesized branch it lies INSIDE the stripped shell and a counting scan reads the
+    /// `(`'s two line breaks as an author blank (`a ? /* c */⏎(⏎b⏎) : c` grew one, and since
+    /// the blank feeds `on_own_line` too, the whole conditional came open). At the type gaps
+    /// a `TSParenthesizedType` keeps its `(` and its span starts there, so a shelled branch
+    /// reaches this producer only once the branch claim has widened `value_start` past it.
+    ///
+    /// ⚠️ And it takes the in-source CEILING ([`Self::blank_scan_end_after`]), the spelling
+    /// every leading-run blank scan takes. That half is inert at the type gap — no comment in
+    /// a type branch's gap is owned, since ownership binds at an expression's start, so the
+    /// run's last comment is also the physically last one there — and
+    /// load-bearing at the expression gap, where a block the author glued to the branch is
+    /// OWNED: the run skips it, and a raw scan to `value_start` would read its interior
+    /// newlines as an author blank (`docs/comments.md` §The five hazards, hazard 5).
+    pub(in crate::printer) fn conditional_branch_placement(
+        &self,
+        run: &[&Comment],
+        value_start: u32,
+    ) -> ConditionalBranchPlacement {
+        let blank_before = run.last().is_some_and(|c| {
+            self.has_blank_line_between_strict(
+                c.span.end,
+                self.blank_scan_end_after(c, value_start),
+            )
+        });
+        ConditionalBranchPlacement {
+            on_own_line: run.last().is_some_and(|c| !self.comment_hugs_next(c)) || blank_before,
+            blank_before,
+        }
+    }
+
     /// Push one **block** comment with `spacing` applied to its outer edges — the single
     /// definition of what [`CommentSpacing`] means for a comment that does not end its
     /// line: ` /* c */` (`Leading`), `/* c */ ` (`Trailing`), or bare (`None`).
