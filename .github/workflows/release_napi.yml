@@ -368,7 +368,8 @@ jobs:
     needs: publish
     if: github.ref_type == 'tag' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run))
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    # Above scripts/release_assets.ts's ~10 min registry retry window.
+    timeout-minutes: 20
     permissions:
       contents: write # gh release create + asset upload
       id-token: write # attest-build-provenance (Sigstore cert)
