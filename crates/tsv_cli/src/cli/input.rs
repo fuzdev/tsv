@@ -133,16 +133,27 @@ impl FromStr for ParserType {
 /// Shared input arguments for commands that accept a file path, `--content`, or `--stdin`.
 ///
 /// Each command declares the four argh fields on its own struct and assembles an
-/// `InputArgs` to call [`InputArgs::resolve`] — or [`InputArgs::parser_type`] and then
-/// [`InputArgs::read`], when a flag must be graded against the parser before the read
-/// (`tsv parse`'s `--source-type`). argh has no struct-flattening attribute, so the
-/// field declarations are repeated per command.
+/// `InputArgs` to call [`InputArgs::resolve`] — or [`InputArgs::resolve_with_source_type`]
+/// where the command also takes `--source-type` (`tsv parse`, `tsv format --content`), which
+/// grades that flag against the parser ahead of the read. argh has no struct-flattening
+/// attribute, so the field declarations are repeated per command.
 #[derive(Debug)]
 pub struct InputArgs {
     pub content: Option<String>,
     pub stdin: bool,
     pub parser: Option<ParserType>,
     pub file: Option<String>,
+}
+
+/// What [`InputArgs::resolve_with_source_type`] settles: the input, the parser the
+/// arguments named, and the goal a `--source-type` named — `None` where none was, which
+/// each command reads its own way (`parse` as `Module`, `format` as the module-then-script
+/// fallback).
+#[derive(Debug)]
+pub struct ResolvedInput {
+    pub input: Input,
+    pub parser_type: ParserType,
+    pub goal: Option<tsv_ts::Goal>,
 }
 
 /// The refusal when no input arm is named — the same line from [`InputArgs::parser_type`]
@@ -162,17 +173,39 @@ impl InputArgs {
     /// `tsv format <file>` (`tsv_discover::unsupported_extension_error`), where it is an
     /// argument error for the same reason.
     pub fn resolve(self) -> Result<(Input, ParserType), String> {
-        let parser_type = self.parser_type()?;
-        Ok((self.read()?, parser_type))
+        let ResolvedInput {
+            input, parser_type, ..
+        } = self.resolve_with_source_type(None)?;
+        Ok((input, parser_type))
     }
 
-    /// The parser the arguments settle on, decided before anything is read — so a
-    /// command can grade a flag against it (`--source-type` on a goalless language) ahead
-    /// of a read that may wait on a `--stdin` writer or fail on a missing file, and the
-    /// refusal does not turn on whether the file happens to exist. Everything about the
-    /// arguments themselves is graded here: a missing `--parser` on `--content`/`--stdin`,
-    /// a directory named as the file, an extension tsv does not handle, no input at all.
-    pub fn parser_type(&self) -> Result<ParserType, String> {
+    /// [`Self::resolve`] for a command that also takes `--source-type`: the flag's value is
+    /// graded first ([`parse_source_type_arg`]), then the parser is settled and the flag
+    /// graded against it ([`check_source_type_language`]), and only then is the input read.
+    /// The order is the point, and it is stated here so neither command restates it: a
+    /// `--stdin` this turns away must not first wait on its writer (an open, empty stdin
+    /// would hang the refusal), and a file arm's refusal does not turn on whether the file
+    /// exists.
+    pub fn resolve_with_source_type(
+        self,
+        source_type: Option<&str>,
+    ) -> Result<ResolvedInput, String> {
+        let goal = parse_source_type_arg(source_type)?;
+        let parser_type = self.parser_type()?;
+        check_source_type_language(source_type, parser_type)?;
+        Ok(ResolvedInput {
+            input: self.read()?,
+            parser_type,
+            goal,
+        })
+    }
+
+    /// The parser the arguments settle on, decided before anything is read — so
+    /// [`Self::resolve_with_source_type`] can grade a flag against it ahead of the read.
+    /// Everything about the arguments themselves is graded here: a missing `--parser` on
+    /// `--content`/`--stdin`, a directory named as the file, an extension tsv does not
+    /// handle, no input at all.
+    fn parser_type(&self) -> Result<ParserType, String> {
         if self.content.is_some() {
             self.parser
                 .ok_or_else(|| "--content requires --parser <svelte|typescript|css>".to_string())
@@ -203,8 +236,8 @@ impl InputArgs {
     }
 
     /// The input itself, by the same precedence [`Self::parser_type`] graded the
-    /// arguments under — call that first, since this reads without re-grading them.
-    pub fn read(self) -> Result<Input, String> {
+    /// arguments under — called after it, since this reads without re-grading them.
+    fn read(self) -> Result<Input, String> {
         if let Some(content) = self.content {
             Ok(Input::from_content(content))
         } else if self.stdin {

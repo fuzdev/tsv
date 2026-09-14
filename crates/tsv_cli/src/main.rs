@@ -11,7 +11,7 @@ use tsv_cli::{err_line, out_line};
 /// bin everywhere, so a derived name would print `Usage: tsv.exe format` on one
 /// platform and disagree with the JS mirror's hand-written help, which spells
 /// the same contract as `tsv` on every platform. Running a renamed copy of the
-/// binary is how `tests/cli_tests.rs` holds this — the property is otherwise
+/// binary is how `tests/cli_tests/` holds this — the property is otherwise
 /// only observable on Windows.
 const CMD_NAME: &str = "tsv";
 
@@ -34,6 +34,12 @@ fn main() {
         });
     let arg_strs: Vec<&str> = args.iter().map(String::as_str).collect();
 
+    // a bare `--version` is answered here — the subcommand argh requires is not one
+    // (`cli::is_bare_version`)
+    if tsv_cli::cli::is_bare_version(&arg_strs) {
+        out_line!("{}", tsv_cli::cli::version_line());
+        return;
+    }
     let cmd =
         tsv_cli::cli::TopLevel::from_args(&[CMD_NAME], &arg_strs).unwrap_or_else(|early_exit| {
             std::process::exit(match early_exit.status {

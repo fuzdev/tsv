@@ -755,7 +755,7 @@ describe('libc detection (platform.js)', () => {
 // native `tsv_cli` binary, with the shared `cli.js` (the wasm package's bin,
 // staged here bound to the native loader) as its fallback. The full
 // flag/exit-code matrix lives in `scripts/test_npm.ts` over the wasm copy and
-// in `tests/cli_tests.rs` over the binary itself; what THIS suite pins is the
+// in `tests/cli_tests/` over the binary itself; what THIS suite pins is the
 // dispatch — that the bin really reaches the native binary — and the
 // forwarding: exit codes, stdout/stderr split, stdin piping, in-place writes.
 const bin_path = join(staged, 'node_modules', '@fuzdev', 'tsv', 'bin.js');
@@ -1013,7 +1013,7 @@ describe('cli (bin.js): fallback to the JS mirror without the binary', () => {
 // only ever covers the intersection both sides already agree on.
 //
 // The claim is RECOGNITION, not behavior (each flag's semantics are pinned by
-// the matrix in `scripts/test_npm.ts` and `tests/cli_tests.rs`): each side is
+// the matrix in `scripts/test_npm.ts` and `tests/cli_tests/`): each side is
 // handed the bare flag and must not answer with its unknown-flag error. A
 // missing value or missing input is a different error and passes — that is the
 // point, since it means the flag was understood. Scope is the two commands;
@@ -1334,7 +1334,7 @@ describe('message parity: the native CLI and cli.js refuse in the same order', (
 	// The mirror's `format` help hand-restates the extension list (its help text is a
 	// literal, as argh's is), so it is held against the list the binding renders from
 	// `tsv_discover::FORMATTABLE_EXTENSIONS` — the same const the native help is pinned
-	// to by `tests/cli_tests.rs`. A ninth language then cannot ship a JS help naming
+	// to by `tests/cli_tests/`. A ninth language then cannot ship a JS help naming
 	// eight.
 	it('the mirror help names exactly the extensions the binding formats', () => {
 		const mirror = run_mirror(['help', 'format']);

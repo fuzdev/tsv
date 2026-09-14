@@ -1105,7 +1105,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 	 * (which is what flips fd 1 to non-blocking — `WORKER_FILE_THRESHOLD` on the WASM
 	 * engine), and >64 KiB of changed-path text so the pipe actually fills. 1200 files
 	 * with ordinary names gave ~54 KB and the bug did NOT reproduce — hence the
-	 * deliberately long name, worth ~190 KB. The native rows in `tests/cli_tests.rs`
+	 * deliberately long name, worth ~190 KB. The native rows in `tests/cli_tests/`
 	 * are shaped by the same pair. */
 	const PIPE_TREE_FILES = 1200;
 	const PIPE_TREE_PAD = 'p'.repeat(150);
@@ -1167,7 +1167,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 	// The other end of the same rule: a consumer that goes away mid-stream is
 	// `| head`, and the conventional answer to EPIPE is to stop writing, not to
 	// throw. The native CLI answers the same way (`tsv_cli`'s `cli/out.rs`), with
-	// its own rows in `tests/cli_tests.rs` — see docs/cli.md §Multi-File Formatting.
+	// its own rows in `tests/cli_tests/` — see docs/cli.md §Multi-File Formatting.
 	it('a consumer that exits early is not a crash', { skip: !posix }, () => {
 		with_pipe_tree('tsv-pipe-head-', (tree) => {
 			const result = run_piped(tree, 'format .', '| head -2');
@@ -1327,7 +1327,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 	// flip made before the spawn is undone and one made after lands on the running
 	// child. The control run proves the flip: the same shim over a child that reads
 	// with `readFileSync(0)` dies of `EAGAIN`, so the row cannot pass vacuously on a
-	// Node that stopped flipping. The native twin (`tests/cli_tests.rs`'s
+	// Node that stopped flipping. The native twin (`tests/cli_tests/`'s
 	// `test_format_stdin_non_blocking_is_waited_out_not_a_read_error`) hands the
 	// binary a non-blocking socket end directly.
 	const STDIN_FLIP_SHIM = `
@@ -1381,7 +1381,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 
 	// Two hard links to one inode are two names in scope: nothing reads inodes, so a
 	// `--check` lists both, and a format rewrites the inode through the first name and
-	// finds the other already formatted. The native pin is `tests/cli_tests.rs`'s
+	// finds the other already formatted. The native pin is `tests/cli_tests/`'s
 	// `test_format_hard_links_are_two_names_in_scope`.
 	it('hard links to one inode are two names in scope', { skip: !posix }, () => {
 		const tree = mkdtempSync(join(tmpdir(), 'tsv-hardlink-'));
@@ -1411,7 +1411,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 	// key's byte order — on every name, including one the two runtimes encode
 	// differently: an astral-plane character sits above every BMP one by code point but
 	// below U+E000..U+FFFF by UTF-16 unit, which is what a plain `sort()` reads. The
-	// native pin is `tests/cli_tests.rs`'s `test_format_lists_in_code_point_order`.
+	// native pin is `tests/cli_tests/`'s `test_format_lists_in_code_point_order`.
 	it('sorted-path order is code-point order', () => {
 		const tree = mkdtempSync(join(tmpdir(), 'tsv-code-point-order-'));
 		try {
@@ -1442,7 +1442,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 
 	// A path holding a control character or a double quote is printed C-quoted, as
 	// `git ls-files` prints one, everywhere a path is printed — the native pin is
-	// `tests/cli_tests.rs`'s `test_format_quotes_a_path_holding_a_control_character_wherever_it_prints_it`;
+	// `tests/cli_tests/`'s `test_format_quotes_a_path_holding_a_control_character_wherever_it_prints_it`;
 	// every other path prints as it is, and a warning's re-include patterns stay literal.
 	it('a path holding a control character is quoted wherever it prints', { skip: !posix }, () => {
 		const tree = mkdtempSync(join(tmpdir(), 'tsv-quoted-'));
@@ -1907,7 +1907,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 	// A directory reached by two walks — as an argument (`.`) and as the preloaded
 	// ancestor of another root (`sub`), or under two spellings of one argument — is named
 	// by its absolute path in both, so the warning dedupes to one line. The twin of
-	// `test_format_overlapping_roots_name_a_shadowed_prettierignore_once` in cli_tests.rs.
+	// `test_format_overlapping_roots_name_a_shadowed_prettierignore_once` in tests/cli_tests/.
 	it('format names a shadowed .prettierignore once across overlapping roots', () => {
 		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
 		try {
@@ -2631,7 +2631,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 	// skipped with a warning, untouched, and a run whose every argument was such a file
 	// exits 0. Mirrors the native CLI.
 	//
-	// A deliberate hand-mirrored pair with tests/cli_tests.rs — one of the two the shared
+	// A deliberate hand-mirrored pair with tests/cli_tests/ — one of the two the shared
 	// table cannot take, both for the same reason. That runner invokes `format --list`,
 	// where an empty scope is a valid answer that exits 0, while what these pin is the
 	// FORMAT ACTION's exit code: 0 here when every argument was an excluded file, and 2
@@ -2692,7 +2692,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 	// file_arguments_share_one_scope_moved_per_directory and
 	// explicit_path_reads_no_ignore_file_inside_an_excluded_directory scenarios), which
 	// gained a multi-argument case shape for exactly this. They were a hand-mirrored pair
-	// — one test here, one in tests/cli_tests.rs — which is the drift that table exists
+	// — one test here, one in tests/cli_tests/ — which is the drift that table exists
 	// to remove: it now holds them for all three walkers from one place.
 
 	it('parse --content prints compact JSON with trailing newline', () => {

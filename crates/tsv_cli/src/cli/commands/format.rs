@@ -2,7 +2,7 @@ use crate::cli::discover::{
     Diagnostics, Discovered, discover_files, discover_into, path_from_sort_key,
 };
 use crate::cli::format_source::{format_source_in, format_source_with_source_type};
-use crate::cli::input::{InputArgs, ParserType, check_source_type_language, parse_source_type_arg};
+use crate::cli::input::{InputArgs, ParserType, ResolvedInput};
 use crate::cli::out::{exit_with_error, path_bytes, path_text, write_stdout};
 use crate::cli::pool::{
     FileQueue, QueueSink, ReleasePoolOnUnwind, default_jobs, drain, join_pool, slot_outcomes,
@@ -76,7 +76,7 @@ pub struct FormatCommand {
 /// Both routes read their slots out of one `slot_outcomes` (`cli/pool.rs`), and an empty
 /// slot means one thing: a worker died *outside* `catch_unwind`, which cannot happen in
 /// release (`panic = "abort"` kills the process first). `test_format_jobs_zero_means_one`
-/// in `tests/cli_tests.rs` asserts a `--jobs 0` run never produces it.
+/// in `tests/cli_tests/` asserts a `--jobs 0` run never produces it.
 const WORKER_PANICKED: &str = "worker thread panicked";
 
 /// What path mode does with a file whose output differs from its source: write it back,
@@ -144,26 +144,18 @@ impl FormatCommand {
                 "Error: --list applies to file paths; --content/--stdin format a single input",
             );
         }
-        let goal = parse_source_type_arg(self.source_type.as_deref())
-            .unwrap_or_else(|e| exit_with_error(2, format_args!("Error: {e}")));
-        let input_args = InputArgs {
+        let ResolvedInput {
+            input,
+            parser_type,
+            goal,
+        } = InputArgs {
             content: self.content,
             stdin: self.stdin,
             parser: self.parser,
             file: None,
-        };
-        // the parser is settled and `--source-type` graded against it before the input is
-        // read: a `--stdin` this would turn away must not first wait on its writer (an
-        // open, empty stdin would hang the refusal)
-        let parser_type = input_args
-            .parser_type()
-            .unwrap_or_else(|e| exit_with_error(2, format_args!("Error: {e}")));
-        if let Err(e) = check_source_type_language(self.source_type.as_deref(), parser_type) {
-            exit_with_error(2, format_args!("Error: {e}"));
         }
-        let input = input_args
-            .read()
-            .unwrap_or_else(|e| exit_with_error(2, format_args!("Error: {e}")));
+        .resolve_with_source_type(self.source_type.as_deref())
+        .unwrap_or_else(|e| exit_with_error(2, format_args!("Error: {e}")));
         let formatted = format_source_with_source_type(input.content(), parser_type, goal)
             .unwrap_or_else(|e| exit_with_error(2, format_args!("Parse error: {e}")));
         if self.check {
@@ -410,7 +402,7 @@ fn format_streamed(paths: &[String], mode: FormatMode, jobs: usize) -> Formatted
         queue.finish();
         // ordering the results is this thread's work too, and the pool is still
         // draining, so it costs nothing on the wall
-        sink.keys.sort_unstable();
+        sink.close();
 
         // A pool the OS refused outright leaves this thread as the only worker. It has
         // already walked, so nothing streams — the queue is finished, so the fallback
@@ -423,18 +415,19 @@ fn format_streamed(paths: &[String], mode: FormatMode, jobs: usize) -> Formatted
     // walk's own — handled rather than asserted, and the pool has nothing queued by then
     let diagnostics = discovery.unwrap_or_else(|bad_args| exit_bad_args(&bad_args));
     report_discovery(&diagnostics);
-    exit_if_nothing_in_scope(sink.keys.len(), &diagnostics);
+    let order = sink.report_order();
+    exit_if_nothing_in_scope(order.len(), &diagnostics);
 
     // slot by walk index, then read out in key order
     let mut slots = slot_outcomes(
-        sink.keys.len(),
+        order.len(),
         claimed
             .into_iter()
             .map(|(i, path, outcome)| (i, (path, outcome))),
     );
-    let mut files = Vec::with_capacity(sink.keys.len());
-    let mut outcomes = Vec::with_capacity(sink.keys.len());
-    for (key, walk_index) in &sink.keys {
+    let mut files = Vec::with_capacity(order.len());
+    let mut outcomes = Vec::with_capacity(order.len());
+    for (key, walk_index) in &order {
         // an empty slot is a worker that died outside catch_unwind (cannot happen in
         // release, which is `panic = "abort"`); the path went with the worker, and its
         // sort key still names it for the report

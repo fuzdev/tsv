@@ -6,7 +6,6 @@ pub mod out;
 mod pool;
 pub mod stack;
 
-use crate::out_line;
 use argh::FromArgs;
 use commands::{format::FormatCommand, parse::ParseCommand};
 
@@ -18,7 +17,24 @@ pub struct TopLevel {
     pub version: bool,
 
     #[argh(subcommand)]
-    pub nested: Option<Subcommand>,
+    pub nested: Subcommand,
+}
+
+/// The one argv `tsv` answers without argh: a bare `--version` (repeated or not — argh
+/// counts a repeated switch, and so does the JS mirror's transcription of it).
+///
+/// The switch is declared on [`TopLevel`] so `--help` lists it, but argh would refuse
+/// the bare form for its missing subcommand — and making the subcommand optional to admit
+/// it meant restating argh's own required-subcommand error by hand for a bare `tsv`.
+/// `main` answers this shape itself; every other argv, `--version` beside a subcommand
+/// included, goes to argh and then [`TopLevel::run`].
+pub fn is_bare_version(args: &[&str]) -> bool {
+    !args.is_empty() && args.iter().all(|arg| *arg == "--version")
+}
+
+/// What a bare `--version` prints: `tsv <version>`, the workspace version.
+pub fn version_line() -> String {
+    format!("tsv {}", env!("CARGO_PKG_VERSION"))
 }
 
 #[derive(FromArgs, Debug)]
@@ -30,29 +46,18 @@ pub enum Subcommand {
 
 impl TopLevel {
     pub fn run(self) {
+        // The bare switch never reaches here (`is_bare_version`), so a set switch means
+        // a subcommand stands beside it — the one argv shape argh accepts that means two
+        // things at once, refused rather than silently dropping either
         if self.version {
-            // a subcommand beside the switch would be silently dropped otherwise — the
-            // one argv shape argh accepts that means two things at once
-            if self.nested.is_some() {
-                out::exit_with_error(
-                    1,
-                    "Error: --version cannot be combined with a subcommand\n\nRun tsv --help for more information.",
-                );
-            }
-            out_line!("tsv {}", env!("CARGO_PKG_VERSION"));
-            return;
+            out::exit_with_error(
+                1,
+                "Error: --version cannot be combined with a subcommand\n\nRun tsv --help for more information.",
+            );
         }
         match self.nested {
-            Some(Subcommand::Parse(c)) => c.run(),
-            Some(Subcommand::Format(c)) => c.run(),
-            // The subcommand is optional only so a bare `--version` parses;
-            // a bare `tsv` must keep argh's required-subcommand behavior, so
-            // this mirrors the exact text argh printed when the field was
-            // required (`cli.js` prints the same bytes, exit 1).
-            None => out::exit_with_error(
-                1,
-                "One of the following subcommands must be present:\n    help\n    parse\n    format\n\nRun tsv --help for more information.",
-            ),
+            Subcommand::Parse(c) => c.run(),
+            Subcommand::Format(c) => c.run(),
         }
     }
 }

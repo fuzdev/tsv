@@ -1,4 +1,4 @@
-use crate::cli::input::{InputArgs, ParserType, check_source_type_language, parse_source_type_arg};
+use crate::cli::input::{InputArgs, ParserType, ResolvedInput};
 use crate::cli::out::{exit_with_error, write_stdout};
 use crate::json_utils::indent_json_with_tabs;
 use argh::FromArgs;
@@ -46,31 +46,23 @@ pub struct ParseCommand {
 
 impl ParseCommand {
     pub fn run(self) {
-        // An unnamed source type is `Module` here: the wire carries
-        // `Program.sourceType`, a claim about which grammar produced the AST, so
-        // one settled goal has to produce it (`format`, which exposes neither the
-        // AST nor the source type, reads the same absence as its fallback).
-        let goal = parse_source_type_arg(self.source_type.as_deref())
-            .unwrap_or_else(|e| exit_with_error(1, format_args!("Error: {e}")))
-            .unwrap_or(tsv_ts::Goal::Module);
-        let input_args = InputArgs {
+        let ResolvedInput {
+            input,
+            parser_type,
+            goal,
+        } = InputArgs {
             content: self.content,
             stdin: self.stdin,
             parser: self.parser,
             file: self.file,
-        };
-        // the parser is settled — and `--source-type` graded against it — before the
-        // input is read, whichever arm picks it: a `--stdin` this turns away never waits
-        // on its writer, and a file arm's refusal does not turn on whether the file exists
-        let parser_type = input_args
-            .parser_type()
-            .unwrap_or_else(|e| exit_with_error(1, format_args!("Error: {e}")));
-        if let Err(e) = check_source_type_language(self.source_type.as_deref(), parser_type) {
-            exit_with_error(1, format_args!("Error: {e}"));
         }
-        let input = input_args
-            .read()
-            .unwrap_or_else(|e| exit_with_error(1, format_args!("Error: {e}")));
+        .resolve_with_source_type(self.source_type.as_deref())
+        .unwrap_or_else(|e| exit_with_error(1, format_args!("Error: {e}")));
+        // An unnamed source type is `Module` here: the wire carries
+        // `Program.sourceType`, a claim about which grammar produced the AST, so
+        // one settled goal has to produce it (`format`, which exposes neither the
+        // AST nor the source type, reads the same absence as its fallback).
+        let goal = goal.unwrap_or(tsv_ts::Goal::Module);
 
         let json = parse_to_json(
             input.content(),

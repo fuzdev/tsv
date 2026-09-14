@@ -745,7 +745,7 @@ fn canonicalize(path: &Path) -> std::io::Result<PathBuf> {
 /// `\\?\UNC\s\v\a` → `\\s\v\a`, anything else as it is (a verbatim prefix over
 /// some other shape — a device path — keeps the spelling that names it).
 ///
-/// `pub` for `tests/cli_tests.rs`, which builds an expectation from its own
+/// `pub` for `tests/cli_tests/`, which builds an expectation from its own
 /// `fs::canonicalize` and must spell the result the way the CLI prints it. Reaching the
 /// rule beats re-stating it: a second spelling in the test is a second thing to keep
 /// right, and the one in `tsv_discover::FORMATTABLE_EXTENSIONS` is already gated there for

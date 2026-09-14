@@ -395,7 +395,8 @@ async function main() {
 			run_parse(subcommand);
 			break;
 		default:
-			// no subcommand: argh's required-subcommand refusal, as `TopLevel::run` spells it
+			// no subcommand: argh's required-subcommand refusal, the bytes argh prints for the
+			// native CLI (`main` answers a bare `--version` ahead of it, so the subcommand stays required)
 			exit_with_error(
 				1,
 				'One of the following subcommands must be present:\n    help\n    parse\n    format\n\nRun tsv --help for more information.'
