@@ -16,9 +16,16 @@ const d = (
 `unformatted_ours_paren_shell.svelte` is that parenthesized authoring across seven hosts — a
 ternary's test, a member chain's base, a non-null assertion's operand, a tagged template's
 tag, a sequence's first operand, a chain base the printer needs a pair around, and a bare
-callee — and `input.svelte` is the form all seven converge to, in ONE pass. Both tools hold
-`input.svelte`, so the divergence here is entirely what prettier does with the parenthesized
-spelling.
+callee — plus the ternary host one level down, a **nested** conditional's test in a `?` / `:`
+branch (`const q` / `const u`, and the block spelling `const z`); `input.svelte` is the form
+every cell converges to, in ONE pass. Both tools hold the seven root cells; the nested cells
+are where prettier parts on `input.svelte` too (below).
+
+At the nested host the erased shell is the enclosing branch gap's, so the run hoists into that
+gap on its own line and the nested test freezes from its own scan. The next pass reads the
+hoisted directive as the branch head's and freezes the whole branch — the same coarser claim
+the root cells reach through the value head. The gap's layout gate reads the shell as well,
+which is what forces the parent open for the block spelling.
 
 The freeze scope is that one operand, the construct the directive precedes: the whole
 construct is not a candidate, since its slice would have to contain the `)` the strip
@@ -38,9 +45,11 @@ tsv's own output — is
 
 Prettier relocates the directive out of the parens to trail the `=`, and never comes back:
 its own second pass reformats the operand the directive froze, so the freeze is lost on every
-host (the sequence cell goes further and demotes the directive to a statement-trailing
+root host (the sequence cell goes further and demotes the directive to a statement-trailing
 comment). `audit_signature_paren_shell.txt` pins that chain, which never reaches
-`input.svelte`. A head-trailing placement is **inert** under tsv's classification, so the
+`input.svelte`. At the nested host prettier pulls the directive onto the operator's line in
+both spellings and holds it there — a placement it honors and tsv's floor calls inert
+(`output_prettier.svelte`, its second pass pinned by `audit_signature.txt`). A head-trailing placement is **inert** under tsv's classification, so the
 author's own-line placement is the only one that holds the freeze across a second pass — and
 one authoring of a claim should not reach a different fixed point than the other.
 

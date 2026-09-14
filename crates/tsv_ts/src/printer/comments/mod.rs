@@ -310,11 +310,10 @@ pub(crate) enum BrokeAfterBreak {
 }
 
 /// Where a conditional branch's value sits relative to the comment run in its gap, in the
-/// layout a hanging comment has already forced open — the answer both conditional gap
-/// emitters return and neither decides twice, because one producer states it:
-/// [`Printer::conditional_branch_placement`], read by `Printer::emit_ternary_branch_comments`
-/// for the `?:` expression's two gaps and `Printer::push_conditional_branch_gap_comments` for
-/// the `extends ? :` type's.
+/// layout a hanging comment has already forced open — the answer the four conditional gaps
+/// (the `?:` expression's two and the `extends ? :` type's two) take from their one emitter,
+/// [`Printer::push_conditional_branch_gap_run`], which reads it from one producer,
+/// [`Printer::conditional_branch_placement`], so no gap decides it twice.
 ///
 /// **The LAST comment alone decides it**, by the same forward reading every leading-run
 /// separator takes ([`Printer::comment_hugs_next`], prettier's `printLeadingComment`): the
@@ -484,7 +483,7 @@ impl TrailingLineRef {
 impl<'a> Printer<'a> {
     /// Where a conditional branch's value sits below the comment `run` in its gap — the one
     /// producer of a [`ConditionalBranchPlacement`], for both conditional gap emitters
-    /// (`Printer::emit_ternary_branch_comments`, `Printer::push_conditional_branch_gap_comments`).
+    /// ([`Self::push_conditional_branch_gap_run`], the four gaps' one emitter).
     /// `run` is the gap's emitted comments and `value_start` the branch's span start.
     ///
     /// **The run's LAST comment decides it**, by the forward reading every leading-run
@@ -526,6 +525,98 @@ impl<'a> Printer<'a> {
             on_own_line: run.last().is_some_and(|c| !self.comment_hugs_next(c)) || blank_before,
             blank_before,
         }
+    }
+
+    /// Whether the FIRST comment of a `?` / `:`→branch gap keeps the line the author gave it
+    /// rather than trailing the operator: the gap holds a line comment, so it hangs open
+    /// anyway, and that first comment does not share `op_end`'s line. The keyword→value rule
+    /// ([`Self::append_keyword_value_line_comments`]) for the one emitter that places the
+    /// first comment itself, [`Self::push_conditional_branch_gap_run`]. A comment there leads
+    /// the branch, so own-line-ness is authorship (conformance_prettier.md §Comment Position
+    /// Philosophy).
+    fn first_gap_comment_keeps_own_line(&self, comments: &[&Comment], op_end: u32) -> bool {
+        comments.iter().any(|c| !c.is_block)
+            && comments
+                .first()
+                .is_some_and(|c| !self.is_same_line(op_end, c.span.start))
+    }
+
+    /// Emit the comment RUN of a conditional's `?` / `:`→branch gap — `[from, to)`, the
+    /// operator's end to the branch's start — into `parts`, returning where the branch then
+    /// sits ([`ConditionalBranchPlacement`], from [`Self::conditional_branch_placement`]).
+    /// The one emitter for the expression ternary's two gaps and the conditional type's two,
+    /// in their breaking layouts, so the four cannot drift.
+    ///
+    /// Every separator is the leading-run rule read FORWARD from the comment BEFORE it
+    /// ([`Self::comment_hugs_next`], prettier's `printLeadingComment`): the first comment
+    /// trails the operator inline (`? /* c */`), a pair the author glued keeps its space,
+    /// and a break the author wrote after a comment survives as a blank-preserving
+    /// `hardline`. The layout this serves has already been forced open by a hanging comment,
+    /// so every one of prettier's `line`s here renders as that break.
+    /// [`Self::first_gap_comment_keeps_own_line`] is the one backward question: in a gap
+    /// holding a line comment, a first comment the author put on its OWN line keeps that
+    /// line, leaving the operator alone on its own, because there the comment leads the
+    /// branch and own-line-ness is authorship. An HONORED directive keeps the line the author
+    /// gave it wherever in the run it sits: sharing a line with the operator (or with the
+    /// comment before it) is the placement the floor classifies as inert, and the freeze it
+    /// earns would be lost on the second pass — the rule [`Self::build_header_comment_run`]
+    /// states at the declaration headers and [`Self::comment_hangs_next`] states for what
+    /// follows a comment; the emitter never relocates a directive.
+    ///
+    /// The whole run rides inside ONE `indent` — prettier's `printBranch` indents comments
+    /// and branch alike — never an indent-width text ahead of each own-line comment: a text
+    /// indents a comment's first line only, so an indentable block's continuation lines
+    /// landed one level short of it, in the first slot (a block the author broke after,
+    /// `? /* y⏎ */⏎// c⏎b`) as in every later one
+    /// (`ternary/branch_run_indentable_block_comment`, `conditional/…` its type twin).
+    ///
+    /// The placement is the run's LAST comment alone, read forward, so the value keeps that
+    /// comment's line where the author glued it and drops below the run where the author
+    /// broke after it. Reading the RUN instead ("is there a line comment anywhere in here")
+    /// answers for a comment the value never meets and split the glued pair — at the
+    /// expression gap only through a stripped paren shell (`? // c⏎/* m */ (x)`, which
+    /// prettier keeps on one line), since a block glued to the branch itself is OWNED by it
+    /// and never enters the run; the bare `? // c⏎/* m */ x` is inert there for that reason,
+    /// and moves only at the type gap, where a type owns nothing. Spending the answer is the
+    /// caller's value emitter's job (`Printer::push_ternary_branch_value`,
+    /// `Printer::build_conditional_branch_tail_doc`).
+    pub(in crate::printer) fn push_conditional_branch_gap_run(
+        &self,
+        parts: &mut DocBuf,
+        from: u32,
+        to: u32,
+    ) -> ConditionalBranchPlacement {
+        let d = self.d();
+        let comments: CommentVec<'_> = self.comments_to_emit_between(from, to).collect();
+        let first_keeps_own_line = self.first_gap_comment_keeps_own_line(&comments, from);
+        let mut run = DocBuf::new();
+        for (i, comment) in comments.iter().enumerate() {
+            let directive = self.is_honored_directive(comment);
+            match i.checked_sub(1).map(|p| comments[p]) {
+                // The run's first comment: the operator's line, unless the backward rule
+                // above — or the directive floor — gives it its own.
+                None if directive || first_keeps_own_line => run.push(d.hardline()),
+                None => run.push(d.text(" ")),
+                // Glued to the previous comment — keep the line the author wrote them on.
+                Some(prev) if !directive && self.comment_hugs_next(prev) => {
+                    run.push(d.text(" "));
+                }
+                // The author broke after the previous comment (a `//` always has), so this
+                // one takes its own line, below any blank they left above it.
+                Some(prev) => {
+                    self.push_blank_preserving_hardline(
+                        &mut run,
+                        prev.span.end,
+                        comment.span.start,
+                    );
+                }
+            }
+            run.push(self.build_comment_doc(comment));
+        }
+        if !run.is_empty() {
+            parts.push(d.indent(d.concat(&run)));
+        }
+        self.conditional_branch_placement(&comments, to)
     }
 
     /// Push one **block** comment with `spacing` applied to its outer edges — the single

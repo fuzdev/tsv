@@ -43,4 +43,34 @@
 		// prettier-ignore
 		{q:   1}
 	)(2);
+
+	// the test of a NESTED conditional in a branch: its erased shell is the enclosing `?` / `:`
+	// gap, so the run hoists there, and the next pass freezes the whole branch from it
+	const q = cond
+		? r
+		: (
+				// prettier-ignore
+				{x:   6}
+			)
+			? s
+			: t;
+
+	const u = cond
+		? (
+				// prettier-ignore
+				{x:   7}
+			)
+			? v
+			: w
+		: y;
+
+	// the block spelling of the same shell forces the parent open the same way
+	const z = cond
+		? a1
+		: (
+				/* prettier-ignore */
+				{x:   8}
+			)
+			? b1
+			: c1;
 </script>

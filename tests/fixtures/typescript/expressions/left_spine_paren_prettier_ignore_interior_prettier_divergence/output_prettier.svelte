@@ -39,15 +39,13 @@
 	// gap, so the run hoists there, and the next pass freezes the whole branch from it
 	const q = cond
 		? r
-		:
-			// prettier-ignore
+		: // prettier-ignore
 			{x:   6}
 			? s
 			: t;
 
 	const u = cond
-		?
-			// prettier-ignore
+		? // prettier-ignore
 			{x:   7}
 			? v
 			: w
@@ -56,8 +54,7 @@
 	// the block spelling of the same shell forces the parent open the same way
 	const z = cond
 		? a1
-		:
-			/* prettier-ignore */
+		: /* prettier-ignore */
 			{x:   8}
 			? b1
 			: c1;

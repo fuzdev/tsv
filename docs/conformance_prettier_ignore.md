@@ -713,6 +713,18 @@ tsv diverges at nine places:
   authorings are an ordinary match there —
   [left-spine paren interior converged](../tests/fixtures/typescript/expressions/left_spine_paren_prettier_ignore_interior/)
 
+  A **nested** conditional's test in a `?` / `:` branch is the ternary host one level down, and
+  there the erased shell is the enclosing branch gap's: the run hoists into that gap on its own
+  line (the gap's directive arm), the nested test freezes from its own scan, and the next pass
+  reads the hoisted directive as the branch head's and freezes the whole branch — the coarser
+  claim the root host reaches through the value head. The gap's layout gate reads the shell too,
+  so the block spelling forces the parent open as the `//` does. Emitted by the nested instead,
+  the directive trailed the operator — inert — and the second pass normalized what the first
+  had frozen. Prettier pulls the directive onto the operator's line in both spellings and holds
+  it there, a placement it honors and tsv's floor does not (the fixture's `output_prettier`, its
+  second pass pinned by `audit_signature.txt`) — the chained cells of the same
+  [left-spine paren interior](../tests/fixtures/typescript/expressions/left_spine_paren_prettier_ignore_interior_prettier_divergence/)
+
   A `for` header's sequence CLAUSE is the same host with no envelope around it: the clause
   prints its operands bare, so the erased shell's run is emitted by the clause builder and
   the `[~In]` pair the header needs rides outside the frozen operand (`('aaa'  in  bbb)`).
