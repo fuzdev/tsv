@@ -470,6 +470,29 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// The `[from, to)` range the breaking layout's `?` / `:`→branch gap emitter
+    /// ([`Printer::push_conditional_branch_gap_run`]) covers: from just past the operator
+    /// to where the gap ends. A FROZEN branch (`frozen`, [`Self::frozen_ternary_branch_doc`])
+    /// is a verbatim slice from its own span start, shell and all, so its gap ends there;
+    /// an unfrozen one's ends at [`Self::branch_gap_end`], past a nested conditional's
+    /// stripped test shell — claiming past a frozen slice's start prints the shell's
+    /// comments twice. With no operator found (`op_pos` is `None`, a defensive case: a
+    /// ternary always has one) the range is empty. One spelling for both gaps, so the
+    /// mirror cannot drift.
+    fn breaking_branch_gap(
+        &self,
+        branch: &internal::Expression<'_>,
+        op_pos: Option<u32>,
+        frozen: bool,
+    ) -> (u32, u32) {
+        let to = if frozen {
+            branch.span().start
+        } else {
+            self.branch_gap_end(branch)
+        };
+        (op_pos.map_or(to, |p| p + 1), to)
+    }
+
     /// Build a Doc for a conditional expression — the default layout.
     ///
     /// The paired [`Self::build_conditional_doc_with_binary_test_indent`] is the same
@@ -547,6 +570,26 @@ impl<'a> Printer<'a> {
             || is_multiline_template_literal(cond.consequent)
             || is_multiline_template_literal(cond.alternate);
 
+        // Comments the parser stripped along with the test's grouping parens
+        // (`(/* c */ a ?? b) ? x : y`) live in the gap between the conditional's own start
+        // (the removed `(`) and the test's — no other emitter covers it, so without this the
+        // comment is silently dropped. A no-op when the test wasn't parenthesized (the two
+        // starts coincide).
+        //
+        // A ROOT conditional prepends the run OUTSIDE its doc, in both layouts, never onto
+        // the test: an own-line `//` there carries a hardline, and inside the group that
+        // hardline broke the `?` / `:` lines open for a comment that sits ahead of the whole
+        // conditional (`(⏎// c⏎a as any) ? b : c` → `// c⏎(a as any)⏎\t? b⏎\t: c`), which is
+        // not a fixed point — the reparse reads the comment as leading the conditional and
+        // prints the group flat. Prettier's own second pass lands there for the same reason;
+        // tsv gets there in one. (The breaking layout takes no group, so outside is the same
+        // place as onto its test, and the one spelling here keeps the two layouts from
+        // drifting.) A CHAINED conditional's shell is its parent's branch gap
+        // ([`Self::branch_gap_end`]): the parent's run prints it, and the nested emits none.
+        let root_run = (!is_chained)
+            .then(|| self.removed_paren_comments_opt(cond.span.start, cond.test.span().start))
+            .flatten();
+
         // If there are line comments, a blank-separated branch comment, or multiline
         // template literals, use a breaking layout. Other block comments after ? or :
         // are handled inline in the non-breaking path.
@@ -555,7 +598,8 @@ impl<'a> Printer<'a> {
             || has_blank_separated_comment
             || has_multiline_template
         {
-            return self.build_conditional_doc_with_line_comments(cond, nesting);
+            let doc = self.build_conditional_doc_with_line_comments(cond, nesting);
+            return self.prepend_opt(root_run, doc);
         }
 
         // Prettier's `shouldNotIndent` (`print/binaryish.js`) exempts binaries whose
@@ -567,26 +611,8 @@ impl<'a> Printer<'a> {
         // `<script>` one; at a template expression ROOT the generic
         // `build_conditional_doc` passes false, matching the plugin's flush test).
         //
-        // The test's pairs and freeze are [`Self::build_ternary_test_doc`]'s.
-        // Comments the parser stripped along with the test's grouping parens
-        // (`(/* c */ a ?? b) ? x : y`) live in the gap between the conditional's own
-        // start (the removed `(`) and the test's — no other emitter covers it, so
-        // without this the comment is silently dropped. Outside the re-added parens,
-        // matching every other operand position. A no-op when the test wasn't
-        // parenthesized (the two starts coincide).
-        //
-        // A ROOT conditional prepends the run OUTSIDE its group (below), not onto the
-        // test: an own-line `//` there carries a hardline, and inside the group that
-        // hardline broke the `?` / `:` lines open for a comment that sits ahead of the
-        // whole conditional (`(⏎// c⏎a as any) ? b : c` → `// c⏎(a as any)⏎\t? b⏎\t: c`),
-        // which is not a fixed point — the reparse reads the comment as leading the
-        // conditional and prints the group flat. Prettier's own second pass lands there
-        // for the same reason; tsv gets there in one. A CHAINED conditional's shell is its
-        // parent's branch gap ([`Self::branch_gap_end`]): the parent's run prints it, and the
-        // nested emits none.
-        let root_run = (!is_chained)
-            .then(|| self.removed_paren_comments_opt(cond.span.start, cond.test.span().start))
-            .flatten();
+        // The test's pairs and freeze are [`Self::build_ternary_test_doc`]'s; the test's
+        // stripped shell run is `root_run` above.
         let test = self.place_nested_ternary_test(nesting, cond.test, || {
             self.build_ternary_test_doc(cond, || {
                 if indent_binary_test {
@@ -782,11 +808,8 @@ impl<'a> Printer<'a> {
 
         // If chained (nested in another conditional), don't wrap in group
         // This allows the parent's break decision to cascade
-        if is_chained {
-            inner
-        } else {
-            self.prepend_opt(root_run, d.group(inner))
-        }
+        let doc = if is_chained { inner } else { d.group(inner) };
+        self.prepend_opt(root_run, doc)
     }
 
     /// Build a conditional expression doc when there are line comments
@@ -811,19 +834,13 @@ impl<'a> Printer<'a> {
         let consequent_end = cond.consequent.span().end;
         let alternate_start = cond.alternate.span().start;
 
-        // Stripped-grouping-paren comments on the test — see the sibling in
-        // `build_conditional_doc`; both layouts must emit them or the comment is lost, and
-        // both hand a chained conditional's shell to the parent's gap the same way
-        // ([`Self::branch_gap_end`]).
-        let shell_run = (!nesting.is_chained())
-            .then(|| self.removed_paren_comments_opt(cond.span.start, cond.test.span().start))
-            .flatten();
+        // The test's stripped shell run is the caller's (`build_conditional_doc_impl`'s
+        // `root_run`, prepended outside this doc), so this layout emits none of its own.
         let test = self.place_nested_ternary_test(nesting, cond.test, || {
             // The same seam as the non-breaking path, so the load-bearing arrow/yield parens
             // (and the `as`/`satisfies` clarity parens) are never dropped just because a
             // branch carries a line comment.
-            let test = self.build_ternary_test_doc(cond, || self.build_expression_doc(cond.test));
-            self.prepend_opt(shell_run, test)
+            self.build_ternary_test_doc(cond, || self.build_expression_doc(cond.test))
         });
 
         // Find the ? and : positions for proper comment categorization
@@ -832,23 +849,14 @@ impl<'a> Printer<'a> {
 
         // The `?`→consequent and `:`→alternate value heads: an own-line directive in either
         // gap freezes the whole branch ([`Self::frozen_ternary_branch_doc`]). Resolved ahead
-        // of the gap emitters because the two disagree about where the gap ENDS: a frozen
-        // branch is a verbatim slice from its own span start, shell and all, while an
-        // unfrozen nested conditional's shell is this gap's to print
-        // ([`Self::branch_gap_end`]) — claiming past a frozen slice's start prints the shell's
-        // comments twice.
+        // of the gap emitters because a frozen branch moves where its gap ENDS
+        // ([`Self::breaking_branch_gap`]).
         let consequent_frozen = self.frozen_ternary_branch_doc(cond.consequent, question_pos);
-        let consequent_gap_end = if consequent_frozen.is_some() {
-            consequent_start
-        } else {
-            self.branch_gap_end(cond.consequent)
-        };
+        let consequent_gap =
+            self.breaking_branch_gap(cond.consequent, question_pos, consequent_frozen.is_some());
         let alternate_frozen = self.frozen_ternary_branch_doc(cond.alternate, colon_pos);
-        let alternate_gap_end = if alternate_frozen.is_some() {
-            alternate_start
-        } else {
-            self.branch_gap_end(cond.alternate)
-        };
+        let alternate_gap =
+            self.breaking_branch_gap(cond.alternate, colon_pos, alternate_frozen.is_some());
 
         let mut parts = smallvec![test];
 
@@ -874,11 +882,8 @@ impl<'a> Printer<'a> {
         // line (author blanks preserved). The placement's
         // `on_own_line` is set when a comment can't share the consequent's line (the
         // blank, if any, is preserved below).
-        let consequent_placement = self.push_conditional_branch_gap_run(
-            &mut q_parts,
-            question_pos.map_or(consequent_gap_end, |p| p + 1),
-            consequent_gap_end,
-        );
+        let consequent_placement =
+            self.push_conditional_branch_gap_run(&mut q_parts, consequent_gap.0, consequent_gap.1);
 
         // Consequent expression — when the outer ternary enters breaking layout
         // (line comments or multiline templates), nested conditionals in the
@@ -931,11 +936,8 @@ impl<'a> Printer<'a> {
         q_parts.push(d.text(":"));
 
         // Comments between : and alternate — same shape as the ?→consequent gap.
-        let alternate_placement = self.push_conditional_branch_gap_run(
-            &mut q_parts,
-            colon_pos.map_or(alternate_gap_end, |p| p + 1),
-            alternate_gap_end,
-        );
+        let alternate_placement =
+            self.push_conditional_branch_gap_run(&mut q_parts, alternate_gap.0, alternate_gap.1);
 
         // Alternate expression - nested conditionals cascade the break without extra indent
         // The `:`→alternate value head, the consequent's mirror.
