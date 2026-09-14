@@ -278,9 +278,9 @@ impl FileQueue {
 /// while the pool is still formatting, instead of in front of it.
 pub(crate) struct QueueSink<'a> {
     queue: &'a FileQueue,
-    /// `(sort key, walk index)`, sorted once the walk is done to give the
-    /// reporting order.
-    pub(crate) keys: Vec<(Vec<u8>, u32)>,
+    /// `(sort key, walk index)`, ordered by [`Self::close`] once the walk is done to give
+    /// the reporting order.
+    keys: Vec<(Vec<u8>, u32)>,
     batch: Vec<PathBuf>,
 }
 
@@ -291,6 +291,23 @@ impl<'a> QueueSink<'a> {
             keys: Vec::new(),
             batch: Vec::new(),
         }
+    }
+
+    /// The walk is over: put the keys in reporting order. Called on the walk's thread
+    /// while the pool is still draining, so the sort costs nothing on the wall — which is
+    /// why it is a step of its own rather than part of [`Self::report_order`], read once
+    /// the pool has been joined.
+    pub(crate) fn close(&mut self) {
+        self.keys.sort_unstable();
+    }
+
+    /// Every discovered file as `(sort key, walk index)`, in reporting order.
+    pub(crate) fn report_order(self) -> Vec<(Vec<u8>, u32)> {
+        debug_assert!(
+            self.keys.is_sorted(),
+            "`close` orders the keys before the report reads them"
+        );
+        self.keys
     }
 }
 

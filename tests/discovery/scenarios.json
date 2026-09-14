@@ -1,5 +1,5 @@
 {
-	"_doc": "Shared discovery-parity scenarios, run against BOTH discovery walkers: the native `tsv_cli::cli::discover::discover_files` (tests/discovery_parity.rs) and the WASM `cli.js` (scripts/test_npm.ts). One source of truth so the two implementations can't drift. The matcher itself is checked against real `git check-ignore` by tsv_ignore's git_oracle; this table pins the WALK (repo-root detection, hierarchical layering, the build-output heuristic, the scope of a named path, argument rejection, the .git boundary). Each scenario materializes `tree` in a fresh tempdir (string value = file, null = empty directory; `.git`/`repo/.git` entries make a dir look like a repo root without a real git binary), then for every case runs `format --list` on the case's arguments: `<root>/<target>`, or one `<root>/<t>` per entry of a `targets` LIST in its place. `targets` is the only way the table reaches what a SET of arguments decides — the one ignore scope file arguments share as it moves from each one's directory to the next's, and the canonical-path dedup only overlapping roots run — both of which were pinned by a hand-mirrored test on each bin before the shape existed, which is the drift this table exists to remove. A case carries EITHER `expected` — the in-scope files, relative to the tempdir root, in exact sorted order — OR `error`, a substring of the argument error that must fail the run upfront (exit 2, nothing listed). An `expected` case may add `warns`: substrings each of which some warning the walk emits must carry, and `no_warns`: substrings no warning may carry (exit code and stdout untouched either way) — the one pin on the warnings channel as a walk PRODUCT, where the texts themselves are tsv_discover's unit tests'. A tree value may also be `{\"symlink\": \"<target>\"}`, a symbolic link to `<target>` resolved from the link's own directory; a scenario holding one needs unix, and both harnesses skip it elsewhere. Names are ASCII so a scenario asks nothing of a filesystem's name normalization; the two walkers order by code point alike (cli.js compare_paths, which also states its Windows drive-prefix caveat).",
+	"_doc": "Shared discovery-parity scenarios, run against BOTH discovery walkers: the native `tsv_cli::cli::discover::discover_files` (tests/discovery_parity.rs) and the WASM `cli.js` (scripts/test_npm.ts). One source of truth so the two implementations can't drift. The matcher itself is checked against real `git check-ignore` by tsv_ignore's git_oracle; this table pins the WALK (repo-root detection, hierarchical layering, the build-output heuristic, the scope of a named path, argument rejection, the .git boundary). Each scenario materializes `tree` in a fresh tempdir (string value = file, null = empty directory; a `.git` entry — a `.git/` directory or a `.git` FILE, as a worktree or submodule holds — makes a dir look like a repo root without a real git binary), then for every case runs `format --list` on the case's arguments: `<root>/<target>`, or one `<root>/<t>` per entry of a `targets` LIST in its place. `targets` is the only way the table reaches what a SET of arguments decides — the one ignore scope file arguments share as it moves from each one's directory to the next's, and the canonical-path dedup only overlapping roots run — both of which were pinned by a hand-mirrored test on each bin before the shape existed, which is the drift this table exists to remove. A case carries EITHER `expected` — the in-scope files, relative to the tempdir root, in exact sorted order — OR `error`, a substring of the argument error that must fail the run upfront (exit 2, nothing listed). An `expected` case may add `warns`: substrings each of which some warning the walk emits must carry, and `no_warns`: substrings no warning may carry (exit code and stdout untouched either way) — the one pin on the warnings channel as a walk PRODUCT, where the texts themselves are tsv_discover's unit tests'. A tree value may also be `{\"symlink\": \"<target>\"}`, a symbolic link to `<target>` resolved from the link's own directory; a scenario holding one needs unix, and both harnesses skip it elsewhere. Names are ASCII so a scenario asks nothing of a filesystem's name normalization; the two walkers order by code point alike (cli.js compare_paths, which also states its Windows drive-prefix caveat).",
 	"scenarios": [
 		{
 			"name": "respects_prettierignore",
@@ -586,6 +586,79 @@
 				{"targets": ["a/x.ts", "inner/q.gen.ts", "b/x.ts", "a/sub/x.ts", "r.gen.ts", "a/y.ts"], "expected": ["a/y.ts", "b/x.ts", "inner/q.gen.ts"]},
 				{"target": "", "expected": ["a/y.ts", "b/x.ts"]}
 			]
+		},
+		{
+			"name": "a_git_file_marks_a_repo_root",
+			"note": "a worktree or submodule checkout holds `.git` as a FILE (`gitdir: …`), not a directory, and it marks the repo root all the same: the .gitignore is honored (gen/ pruned) and turns the heuristic off (dist/ walked), the .prettierignore is read as the repo's tsv layer rather than warned about as one outside a repo, and a subdirectory target walks up to the same root",
+			"tree": {
+				".git": "gitdir: /elsewhere/.git/worktrees/wt\n",
+				".gitignore": "gen/\n",
+				".prettierignore": "skip.ts\n",
+				"gen/a.ts": "x",
+				"dist/c.ts": "x",
+				"skip.ts": "x",
+				"keep.ts": "x",
+				"sub/b.ts": "x"
+			},
+			"cases": [
+				{"target": "", "expected": ["dist/c.ts", "keep.ts", "sub/b.ts"], "no_warns": [".prettierignore"]},
+				{"target": "sub", "expected": ["sub/b.ts"], "no_warns": [".prettierignore"]}
+			]
+		},
+		{
+			"name": "a_nested_repo_below_a_non_repo_directory_takes_the_outer_regime",
+			"note": "the regime is decided once at the target root: a non-repo directory holding a repo below it is outside a repo, so the inner .gitignore is not read (ignored.ts stays in scope) and the inner .git is pruned as a safety net. Naming the inner repo itself finds its .git and honors its .gitignore — the per-repo run the docs point at",
+			"tree": {
+				"inner/.git/": null,
+				"inner/.gitignore": "ignored.ts\n",
+				"inner/ignored.ts": "x",
+				"inner/kept.ts": "x",
+				"top.ts": "x"
+			},
+			"cases": [
+				{"target": "", "expected": ["inner/ignored.ts", "inner/kept.ts", "top.ts"]},
+				{"target": "inner", "expected": ["inner/kept.ts"]}
+			]
+		},
+		{
+			"name": "a_directory_named_like_a_formattable_file_is_a_directory",
+			"note": "the extension check grades file arguments and walked files only: a directory named `x.ts` is walked, whether a walk reaches it or the argument names it, and an empty one named `y.css` is an empty scope rather than a bad argument",
+			"tree": {
+				"x.ts/inner.ts": "x",
+				"y.css/": null,
+				"z.ts": "x"
+			},
+			"cases": [
+				{"target": "", "expected": ["x.ts/inner.ts", "z.ts"]},
+				{"target": "x.ts", "expected": ["x.ts/inner.ts"]},
+				{"target": "y.css", "expected": []}
+			]
+		},
+		{
+			"name": "a_symlink_inside_a_walked_directory_is_not_followed",
+			"note": "the walk follows no symbolic link, to a file or to a directory: the linked file is in scope by its real name alone and a directory reached only through a link is not walked — a link is reachable by naming it, graded where it is typed and, for a directory, walked as one",
+			"tree": {
+				"sl/real.ts": "x",
+				"sl/link.ts": {"symlink": "real.ts"},
+				"sl/dirlink": {"symlink": "../other"},
+				"other/o.ts": "x"
+			},
+			"cases": [
+				{"target": "", "expected": ["other/o.ts", "sl/real.ts"]},
+				{"target": "sl", "expected": ["sl/real.ts"]},
+				{"target": "sl/link.ts", "expected": ["sl/link.ts"]},
+				{"target": "sl/dirlink", "expected": ["sl/dirlink/o.ts"]}
+			]
+		},
+		{
+			"name": "a_hidden_file_is_in_scope_where_a_hidden_directory_is_pruned",
+			"note": "the build-output heuristic (no .gitignore in scope) prunes hidden DIRECTORIES, not hidden files: `.hidden.ts` is formatted beside `shown.ts` while `.dir/a.ts` is pruned",
+			"tree": {
+				".hidden.ts": "x",
+				".dir/a.ts": "x",
+				"shown.ts": "x"
+			},
+			"cases": [{"target": "", "expected": [".hidden.ts", "shown.ts"]}]
 		}
 	]
 }

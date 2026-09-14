@@ -197,7 +197,7 @@ directions and fails the section if either runner is ever repointed.
 
 - **Flag sets** — each side is handed every flag the other advertises and must
   not answer with its unknown-flag error. Recognition, not behavior: semantics
-  stay with `scripts/test_npm.ts` and `tests/cli_tests.rs`.
+  stay with `scripts/test_npm.ts` and `tests/cli_tests/`.
 - **Message precedence** — each command validates in a fixed order, so a
   doubly-bad invocation has one right answer. A table of usage errors (each
   landing before any file is touched, several of them faulty two or three ways

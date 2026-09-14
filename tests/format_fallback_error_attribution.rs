@@ -246,7 +246,7 @@ fn a_tie_reports_the_module_error() {
 /// a sloppy-only construct in one file. Either error is a half-truth, and the script
 /// attempt dies on the module-only construct — a goal gate — wherever it sits, so the
 /// ORDER does not decide: both spellings report the `with`, the module attempt's error
-/// (the first is the case `tests/cli_tests.rs` and `scripts/test_npm.ts` pin; the second
+/// (the first is the case `tests/cli_tests/` and `scripts/test_npm.ts` pin; the second
 /// is where position alone would have reported the `import`).
 #[test]
 fn a_mixed_file_reports_the_module_error_whatever_the_order() {

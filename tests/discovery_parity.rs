@@ -158,7 +158,7 @@ fn discover_case(
 /// Discovery emits **native** separators (`PathBuf::push` parity), so on Windows every
 /// path this harness compares — the root prefix, a discovered file, a warning's display
 /// path — comes back `\`-joined. `scripts/discovery_parity_suite.ts` and
-/// `tests/cli_tests.rs` normalize for the same reason, under the same name.
+/// `tests/cli_tests/` normalize for the same reason, under the same name.
 fn to_posix(text: &str) -> String {
     text.replace('\\', "/")
 }
