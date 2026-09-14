@@ -258,8 +258,16 @@ Things the published numbers measure that aren't quite what they look like.
   needs `--compare-baseline`, which a plain `deno task bench` never runs, so before
   this a full bench reached no stability check at all. Calibration: across the three
   committed reports (128 timed rows) cv runs median 1.0% / p90 3.1%, so 10% is ~3× the
-  p90 rather than a round number; the live outlier is `format/css/biome-wasm`, at 24%
-  under Node against 3% on its Deno sibling. Five of 44 node/deno deltas currently land
+  p90 rather than a round number (the live rows are each committed report's §Unstable
+  Rows; a value restated here only goes stale). The cleaned cv is not the whole test:
+  a row is also unstable on its RAW cv (a second mode the MAD cleaner deleted) or on a
+  `drift` past 5% (the second half of its timings against the first) — the 2026-09-14
+  refresh's `format/typescript/biome-wasm` under Node ran four ~4.9 s sweeps and three
+  ~12.5 s ones as biome's wasm heap leaked past ~1 GB, and the cleaner's keep-closest
+  fallback published a mean that was neither mode; at most other sample counts the
+  same row would have cleaned to a cv under 6% with no flag at all, which is why the
+  raw readings exist and why a longer window is not the fix (it moves a drifting
+  row's answer rather than converging it). Five of 44 node/deno deltas currently land
   inside their noise, all of them at ~1.00x — i.e. today this confirms "no difference"
   rather than overturning a reading. The within-noise half also needs ten cleaned
   timings a side before it will call a cell quiet, and prints `n` for each: sample
@@ -512,8 +520,9 @@ prettier. Load-bearing on two axes:
   to `tsv-json` on **both** axes — mechanism (each returns a compact JSON string
   the caller `JSON.parse`s, so both pay the identical serialize + boundary + parse
   cost) and payload (within ~1.5% of `tsv-json`'s bytes across the corpus — the
-  axis a throughput ratio integrates over; per component the spread is wider, p90
-  3% and up to 12%, so the aggregate is the claim) —
+  axis a throughput ratio integrates over; at the 0.3.14 pin with `modern: true`
+  the aggregate is 0.13% under, per component p50 and p90 exactly 1.00, worst 7%
+  under — re-measure on a pin bump) —
   which earns it a curated comparison line, the only one the Svelte surface has.
   Because rsvelte claims the same drop-in contract tsv does, the row is a
   conformance datum too: on that same component its AST differs from
@@ -679,7 +688,10 @@ report quantify coverage.
 
 Benchmark output includes a binary/WASM size comparison. Each row reports **raw
 on-disk size** plus **gzipped size** (≈ npm-tarball wire size), grouped by kind
-(WASM vs native) with ratios relative to `tsv` for both. Implementation:
+(WASM vs native) with ratios relative to `tsv` for both — the native anchor is the
+binding the RUNTIME benchmarks (`tsv (ffi)` under Deno, `tsv (napi)` under Node/Bun),
+so the same third-party artifact reads a different `vs tsv` in the deno and node/bun
+reports; each table's footnote names its anchor. Implementation:
 `lib/binary_sizes.ts`; JSON output carries a per-entry `gzip_bytes: number | null`.
 
 Sizes are **decimal** (`MB` = 1,000,000 B) — the convention shared by every byte

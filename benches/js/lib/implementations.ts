@@ -717,7 +717,8 @@ export function get_benchmark_tasks(
 		);
 		// ⚠ Named for the OPTION it passes, not for tsv's `no-locations` wire: the two
 		// reductions differ (tsv drops per-node `loc` throughout, ~46%; rsvelte drops
-		// only nested expression `loc` and keeps top-level start/end, -34%), so this
+		// only nested expression `loc` and keeps top-level start/end, -29% at 0.3.14
+		// with `modern: true` — re-measure on a pin bump), so this
 		// row is NOT payload-matched to `tsv-json-no-locations` and is deliberately
 		// absent from report.ts's curated payload-matched lines.
 		add(
@@ -920,6 +921,9 @@ export function get_alternative_versions(impls: ImplementationSet): AlternativeV
 		// row is parsing to a different Svelte than the oracle it's compared against.
 		rsvelte_parse: impls.rsvelte_parse?.versions.native,
 		rsvelte_parse_svelte_target: impls.rsvelte_parse?.upstream_svelte_version,
-		swc: impls.swc?.versions.core
+		swc: impls.swc?.versions.core,
+		// Only where the row is: on the perf surface tsc is not a row, and its version
+		// then names nothing the report measured.
+		tsc: impls.tsc ? impls.versions.tsc.typescript : undefined
 	};
 }

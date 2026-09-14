@@ -1,7 +1,7 @@
 {
-	"version": 14,
+	"version": 15,
 	"kind": "combined",
-	"generated": "2026-09-14T22:33:09.442Z",
+	"generated": "2026-09-14T23:41:56.198Z",
 	"runtimes": [
 		"deno",
 		"node",
@@ -24,11 +24,25 @@
 		}
 	],
 	"partial_rows": [],
+	"unstable_cells": [
+		{
+			"group": "format/typescript",
+			"name": "biome-wasm",
+			"runtime": "node",
+			"cv": 0.47839961432057115,
+			"cv_raw": null,
+			"drift": null,
+			"samples": 5
+		}
+	],
 	"within_noise": [
 		{
 			"group": "format/svelte",
 			"name": "tsv",
-			"runtime": "node",
+			"runtimes": [
+				"deno",
+				"node"
+			],
 			"delta": 0.0005072194942070674,
 			"noise": 0.020132625432560308,
 			"samples": [
@@ -39,7 +53,10 @@
 		{
 			"group": "format/svelte",
 			"name": "tsv",
-			"runtime": "bun",
+			"runtimes": [
+				"deno",
+				"bun"
+			],
 			"delta": 0.0011720434810905678,
 			"noise": 0.020209106064909436,
 			"samples": [
@@ -48,9 +65,26 @@
 			]
 		},
 		{
+			"group": "format/svelte",
+			"name": "tsv",
+			"runtimes": [
+				"node",
+				"bun"
+			],
+			"delta": 0.0006651613696969649,
+			"noise": 0.017494349037318214,
+			"samples": [
+				58,
+				58
+			]
+		},
+		{
 			"group": "parse/css",
 			"name": "svelte/compiler",
-			"runtime": "node",
+			"runtimes": [
+				"deno",
+				"node"
+			],
 			"delta": 0.039499193769700014,
 			"noise": 0.04399508954980798,
 			"samples": [
@@ -61,7 +95,10 @@
 		{
 			"group": "parse/css",
 			"name": "postcss",
-			"runtime": "node",
+			"runtimes": [
+				"deno",
+				"node"
+			],
 			"delta": 0.0069806279243277425,
 			"noise": 0.04051284789700777,
 			"samples": [
@@ -72,7 +109,10 @@
 		{
 			"group": "format/css",
 			"name": "oxfmt",
-			"runtime": "bun",
+			"runtimes": [
+				"deno",
+				"bun"
+			],
 			"delta": 0.0024787232381497937,
 			"noise": 0.049019768990172644,
 			"samples": [

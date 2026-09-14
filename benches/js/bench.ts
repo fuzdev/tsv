@@ -268,9 +268,8 @@ const MAX_FILES_PER_LANGUAGE = env_int('BENCH_LIMIT');
 /** Filter files by path pattern (default: none) */
 const FILE_FILTER = env.BENCH_FILTER;
 
-/** Number of warmup iterations (default: 3; slow tasks tier down to 1 unless explicitly set) */
-const BENCH_WARMUP_EXPLICIT = env_int('BENCH_WARMUP');
-const BENCH_WARMUP = BENCH_WARMUP_EXPLICIT ?? 3;
+/** Number of warmup iterations (default: 3, every row — see the tiering note at the task loop) */
+const BENCH_WARMUP = env_int('BENCH_WARMUP') ?? 3;
 
 /**
  * Enable the per-iteration forced-GC hook (default: off — measures realistic
@@ -785,6 +784,11 @@ const effective_corpus_bytes: Map<string, number> = new Map();
  * and the Comparisons table's pairwise file counts.
  */
 const iterated_file_count: Map<string, number> = new Map();
+/**
+ * Per-task digest of the SORTED timed path set (see `BaselineEntry.files_iterated_digest`),
+ * recorded beside `iterated_file_count` for the same tasks.
+ */
+const iterated_files_digest: Map<string, string> = new Map();
 /**
  * Wall-clock ms for one preflight pass per task (iterating every file once).
  * Used to tier per-task `min_iterations` so slow tasks (multi-second per pass)
@@ -1399,14 +1403,34 @@ function get_coverage_by_source(): CoverageBySource {
  *
  * 10% is ~3× the measured p90. Across the three committed perf reports (128 timed
  * rows) cv runs median 1.0%, p90 3.1% — so ordinary variation is nowhere near this,
- * and a row that trips it is doing something other than varying: the live outlier is
- * `format/css/biome-wasm`, which measures a 0.3 MB corpus through a 44 MB wasm module
- * and lands at 24% under Node while its Deno sibling sits at 3%. Deliberately tighter
+ * and a row that trips it is doing something other than varying (the live rows are the
+ * per-runtime reports' §Unstable Rows; a restated value here would only go stale — the
+ * calibration figures are `entries[].cv` in the committed reports). Deliberately tighter
  * than `benchmark_baseline_compare`'s 30% noise gate, which answers a different
  * question (is a REGRESSION real) on a run this one never makes: that path needs
  * `--compare-baseline`, so a plain `deno task bench` reaches no stability check at all.
  */
 const UNSTABLE_CV_THRESHOLD = 0.1;
+
+/**
+ * The `|drift|` past which a row is unstable regardless of its cv (see
+ * `BaselineEntry.drift`). 5% is well outside stationary variation (a stationary
+ * row's two half-medians agree to well under 1% at any sample count the bench
+ * reaches) and well inside the regime this exists for: the case that motivated it
+ * stepped +25–45% mid-row and, at most sample counts, published a cleaned cv under 6%.
+ */
+const UNSTABLE_DRIFT_THRESHOLD = 0.05;
+
+/**
+ * Below this many raw timings the RAW cv also trips a row. With few samples one
+ * deviant sweep is a real share of the measurement — and is exactly what the MAD
+ * cleaner's keep-closest fallback blends into the mean — so a raw cv past the
+ * threshold there is the disclosure the cleaned cv withheld. With hundreds of
+ * samples the raw cv is dominated by isolated pauses (one 80 ms GC among 600 × 8 ms
+ * sweeps reads 35%) that the cleaner rightly removes and the upper percentiles
+ * already report; there the drift statistic, not the raw cv, is the drift detector.
+ */
+const RAW_CV_SAMPLE_CEILING = 30;
 
 /**
  * Timed rows whose measurement was too noisy to read at face value, worst first.
@@ -1415,17 +1439,95 @@ const UNSTABLE_CV_THRESHOLD = 0.1;
  * unstable row silently widens every comparison it appears in — including the
  * cross-runtime table, whose whole subject is small per-runtime deltas.
  */
-function unstable_rows(
-	data: Baseline
-): Array<{ label: string; cv: number; samples: number | null }> {
+function unstable_rows(data: Baseline): Array<{
+	label: string;
+	cv: number;
+	cv_raw: number | null;
+	drift: number | null;
+	samples: number | null;
+	raw_samples: number | null;
+}> {
+	// Three readings, any one of which trips the row: the cleaned cv (ordinary noise),
+	// the RAW cv (a second mode the cleaner deleted) and the drift (a cost that moved
+	// while the row was measured). The cleaned cv alone was blind to the last two —
+	// a bimodal row can clean to a quiet cv over a mean that is neither mode.
 	return data.entries
-		.filter((e) => e.cv !== null && e.cv >= UNSTABLE_CV_THRESHOLD)
+		.filter(
+			(e) =>
+				e.cv !== null &&
+				(e.cv >= UNSTABLE_CV_THRESHOLD ||
+					(e.cv_raw !== null &&
+						e.cv_raw >= UNSTABLE_CV_THRESHOLD &&
+						e.raw_sample_size !== null &&
+						e.raw_sample_size < RAW_CV_SAMPLE_CEILING) ||
+					(e.drift !== null && Math.abs(e.drift) >= UNSTABLE_DRIFT_THRESHOLD))
+		)
 		.map((e) => ({
 			label: `${e.group}/${e.name}`,
 			cv: e.cv as number,
-			samples: e.sample_size ?? null
+			cv_raw: e.cv_raw,
+			drift: e.drift,
+			samples: e.sample_size ?? null,
+			raw_samples: e.raw_sample_size ?? null
 		}))
-		.sort((a, b) => b.cv - a.cv);
+		.sort(
+			(a, b) =>
+				Math.max(b.cv, b.cv_raw ?? 0, Math.abs(b.drift ?? 0)) -
+				Math.max(a.cv, a.cv_raw ?? 0, Math.abs(a.drift ?? 0))
+		);
+}
+
+/**
+ * Stability statistics over a row's RAW timings, in iteration order — what the
+ * MAD-cleaned `cv` cannot see (`BaselineEntry.cv_raw` / `.drift`). Both `null` below
+ * the sample count that makes them meaningful (2 for `cv_raw`, 4 for `drift`).
+ */
+function raw_timing_stats(timings: readonly number[]): {
+	cv_raw: number | null;
+	drift: number | null;
+} {
+	const n = timings.length;
+	const mean_of = (xs: readonly number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length;
+	if (n < 2) return { cv_raw: null, drift: null };
+	const mean = mean_of(timings);
+	const variance = timings.reduce((a, t) => a + (t - mean) ** 2, 0) / (n - 1);
+	const cv_raw = mean > 0 ? Math.sqrt(variance) / mean : null;
+	if (n < 4) return { cv_raw, drift: null };
+	const half = Math.floor(n / 2);
+	const median_of = (xs: readonly number[]): number => {
+		const sorted = [...xs].sort((a, b) => a - b);
+		const mid = Math.floor(sorted.length / 2);
+		return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+	};
+	const first = median_of(timings.slice(0, half));
+	const second = median_of(timings.slice(n - half));
+	return { cv_raw, drift: first > 0 ? second / first - 1 : null };
+}
+
+/**
+ * The verdict an impl gives by returning NOTHING: a `''` for a non-empty input is a
+ * declined file, not a formatted one, and a timed sweep that accepted it would drop
+ * that file's whole cost from the row — on the canonical row, from the denominator of
+ * every published `Nx`. The in-process prettier is documented to do exactly this
+ * intermittently under load (`CLAUDE.md` §Known Issues), and every other consumer of
+ * it guards for it; the bench did not. A `null` return is the `-internal` shape and
+ * is not graded. Returns the error to record (pre-flight records it as a skip against
+ * the tool) or `null` when the output is present.
+ */
+function empty_output_error(task_name: string, file: SourceFile, result: unknown): Error | null {
+	if (file.bytes > 0 && typeof result === 'string' && result.length === 0) {
+		return new Error(
+			`${task_name} returned empty output for a ${file.bytes}-byte input (${file.path}) — a ` +
+				`silently declined file, which would read as zero cost in a timed sweep`
+		);
+	}
+	return null;
+}
+
+/** The timed-loop form of `empty_output_error`: throws, so the row errors rather than fake-wins. */
+function assert_output_present(task_name: string, file: SourceFile, result: unknown): void {
+	const error = empty_output_error(task_name, file, result);
+	if (error !== null) throw error;
 }
 
 /**
@@ -1531,6 +1633,7 @@ async function run_preflight(
 		// row it doesn't grade: `null` here means no hashing happens at all.
 		const digests = byte_graded_names.has(task.name) ? new Map<string, string>() : null;
 		let bytes = 0;
+		let digest_ms = 0;
 		const start_ms = performance.now();
 		for (const file of files) {
 			// ONLY the impl call belongs inside the skip-recording try. Anything else
@@ -1547,10 +1650,24 @@ async function run_preflight(
 				record_skip(task.tracking_key, file.path, e);
 				continue;
 			}
+			// A tool-side verdict, not a harness failure: an empty output on a non-empty
+			// input is the impl declining the file without saying so, recorded as a
+			// skip against it — see `assert_output_present`.
+			const empty = empty_output_error(task.name, file, result);
+			if (empty !== null) {
+				record_skip(task.tracking_key, file.path, empty);
+				continue;
+			}
 			success.add(file.path);
 			bytes += file.bytes;
 			if (digests !== null) {
+				// Digesting is HARNESS work — JSON.stringify + sha1 over the wire, ~+50% of
+				// a parse sweep on the TS corpus — so it is timed out of the pass that the
+				// slow-task tier reads (`preflight_elapsed_ms`); charged in, it moved only
+				// tsv's four byte-graded rows toward the tier threshold.
+				const digest_start_ms = performance.now();
 				const digest = output_digest(result);
+				digest_ms += performance.now() - digest_start_ms;
 				if (digest !== null) {
 					digests.set(file.path, digest);
 				} else if (result !== undefined && result !== null) {
@@ -1563,7 +1680,7 @@ async function run_preflight(
 				}
 			}
 		}
-		const elapsed_ms = performance.now() - start_ms;
+		const elapsed_ms = performance.now() - start_ms - digest_ms;
 		successful_files.set(task.tracking_key, success);
 		if (digests !== null) output_digests.set(task.tracking_key, digests);
 		effective_corpus_size.set(task.tracking_key, { processed: success.size, total: files.length });
@@ -1676,13 +1793,29 @@ async function run_preflight_group(
 	// count and imply a measurement that never happened. Their
 	// `effective_corpus_bytes` likewise keeps the pre-flight value, which is the
 	// only bytes figure that means anything for them.
+	//
+	// A coverage-only RUN times nothing either, so it records no iterated count for
+	// any task: its every row must read `files_iterated: null` on the same terms.
 	for (const task of timed_tasks) {
 		const task_files = filtered_files_by_task.get(task.tracking_key)!;
 		effective_corpus_bytes.set(
 			task.tracking_key,
 			task_files.reduce((sum, f) => sum + f.bytes, 0)
 		);
+		if (COVERAGE_ONLY) continue;
 		iterated_file_count.set(task.tracking_key, task_files.length);
+		iterated_files_digest.set(
+			task.tracking_key,
+			createHash('sha1')
+				.update(
+					task_files
+						.map((f) => f.path)
+						.sort()
+						.join('\n')
+				)
+				.digest('hex')
+				.slice(0, 12)
+		);
 	}
 
 	group_setups.set(group_name, { tasks: timed_tasks, filtered_files_by_task });
@@ -1758,16 +1891,20 @@ async function run_benchmark_group(
 		// costs another 14s of wall clock.
 		const preflight_ms = preflight_elapsed_ms.get(task.tracking_key) ?? 0;
 		const min_iter = preflight_ms > 5000 ? (baselining ? 12 : 7) : undefined;
-		// Slow tasks also tier WARMUP down (3 → 1): a multi-second sweep over
-		// thousands of files fully warms the JIT in one pass, so the 2nd and 3rd
-		// warmups are pure wall clock (~25s/runtime on prettier's TS row alone).
-		// An explicit `BENCH_WARMUP` wins — it's the knob for deliberately
-		// studying warmup effects, so tiering must not silently override it.
-		const warmup_iter = preflight_ms > 5000 && BENCH_WARMUP_EXPLICIT === undefined ? 1 : undefined;
+		// WARMUP is deliberately NOT tiered. It used to drop 3 → 1 on the slow tier
+		// (a multi-second sweep warms the JIT in one pass, so the other two are wall
+		// clock, ~25 s/runtime on prettier's TS row) — but the tier is decided by ONE
+		// cold preflight pass against a 5 s edge, and a row that straddles it
+		// (biome's TS sweep, ~4.5–5.0 s) took the tier on one runtime and not another:
+		// 7 samples from sweep 2 on node against 5 from sweep 4 on deno, two protocols
+		// on the one row whose cost grows per sweep, published as a runtime ratio. The
+		// floor still tiers (it only adds samples); the sample WINDOW now starts at the
+		// same sweep on every runtime. `BENCH_WARMUP` remains the knob for studying
+		// warmup effects; both resolved values ride each row (`warmup_iterations`,
+		// `min_iterations`) so a protocol difference is legible in the report.
 		const base_task = {
 			name: task.name,
 			min_iterations: min_iter,
-			warmup_iterations: warmup_iter,
 			// Untimed (the library excludes `setup`), so every task's warmup and
 			// measurement start from a comparable heap — see `settle_heap`.
 			setup: settle_heap
@@ -1777,7 +1914,7 @@ async function run_benchmark_group(
 				...base_task,
 				fn: async () => {
 					await process_corpus_async(task_files, async (f) => {
-						await task.run_async!(f.content, language, f.goal);
+						assert_output_present(task.name, f, await task.run_async!(f.content, language, f.goal));
 					});
 				},
 				async: true
@@ -1786,7 +1923,9 @@ async function run_benchmark_group(
 			bench.add({
 				...base_task,
 				fn: () => {
-					process_corpus(task_files, (f) => task.run(f.content, language, f.goal));
+					process_corpus(task_files, (f) =>
+						assert_output_present(task.name, f, task.run(f.content, language, f.goal))
+					);
 				},
 				async: false
 			});
@@ -1882,6 +2021,37 @@ interface BaselineEntry {
 	ops_per_second: number | null;
 	sample_size: number | null;
 	/**
+	 * Stability read from the RAW timings, which the cleaned `cv` above cannot see:
+	 * `cv_raw` is std_dev / mean over every timing before outlier removal, and `drift`
+	 * is median(second half) / median(first half) − 1 in iteration order — medians, so
+	 * an isolated pause among hundreds of samples does not read as drift, while a
+	 * level shift (four fast sweeps then three slow) still does. A row whose cost
+	 * changes WHILE it is measured — a wasm heap that leaks per sweep and tips the
+	 * engine into a slower regime mid-row — reads as drift here while its cleaned `cv`
+	 * can read as quiet: the MAD cleaner deletes or blends a second mode rather than
+	 * reporting it, so the cleaned mean is then neither mode and `cv` says nothing.
+	 * `raw_sample_size` is the timing count before cleaning (`sample_size` is after);
+	 * `outlier_ratio` is the share the cleaner removed. `null` on a coverage-only row.
+	 */
+	cv_raw: number | null;
+	drift: number | null;
+	raw_sample_size: number | null;
+	outlier_ratio: number | null;
+	/**
+	 * The protocol this row actually ran under — the warmup and iteration floor the
+	 * slow-task tier resolved for it — so two runtimes that tiered one row differently
+	 * are legible as two protocols rather than as one ratio. `null` on a coverage-only
+	 * row.
+	 */
+	warmup_iterations: number | null;
+	min_iterations: number | null;
+	/**
+	 * sha1 (first 12 hex digits) of the newline-joined sorted paths this row was timed
+	 * on — what `compose_reports.ts` compares across runtimes, since equal
+	 * `files_iterated` COUNTS never proved equal sets. `null` when nothing was timed.
+	 */
+	files_iterated_digest: string | null;
+	/**
 	 * Files this impl successfully processed during preflight / the language's
 	 * total discovered files — the per-impl `Coverage:` line in the markdown
 	 * report, surfaced here so consumers can see which libs support which parts
@@ -1951,8 +2121,18 @@ interface BaselineVersions extends ReportVersions {
  * the tree, so the two agree by construction — but several commits can name one
  * tree (the snapshot repo's own tooling commits do), so this field moving between
  * two reports does not by itself mean the corpus did.
+ *
+ * 15: per-row stability read from the RAW timings — `cv_raw`, `drift`,
+ * `raw_sample_size`, `outlier_ratio` — beside the cleaned `cv`; the protocol the row
+ * ran under (`warmup_iterations`, `min_iterations`); and `files_iterated_digest`, a
+ * hash of the timed path set. Every one answers a question the 14-shape could not: a
+ * row whose cost CHANGED while it was measured (a leaking wasm heap) has its second
+ * mode deleted or blended by the MAD cleaner and can publish a quiet `cv` over a mean
+ * that is neither mode — `drift` and `cv_raw` see the raw series the cleaner does not
+ * report; two runtimes tiering one row differently are two protocols, not one ratio;
+ * and equal `files_iterated` counts never proved equal sets.
  */
-const REPORT_SCHEMA_VERSION = 14;
+const REPORT_SCHEMA_VERSION = 15;
 
 interface Baseline {
 	/** See `REPORT_SCHEMA_VERSION`. */
@@ -2134,7 +2314,13 @@ const NULL_STATS = {
 	std_dev_ns: null,
 	cv: null,
 	ops_per_second: null,
-	sample_size: null
+	sample_size: null,
+	cv_raw: null,
+	drift: null,
+	raw_sample_size: null,
+	outlier_ratio: null,
+	warmup_iterations: null,
+	min_iterations: null
 } as const;
 
 /**
@@ -2166,6 +2352,7 @@ function build_coverage_entries(only_coverage_only_tasks: boolean): BaselineEntr
 					files_processed: coverage?.processed ?? null,
 					files_total: coverage?.total ?? null,
 					files_iterated: iterated ?? null,
+					files_iterated_digest: null,
 					runtime: RUNTIME
 				});
 			}
@@ -2212,9 +2399,16 @@ async function build_results_data(
 					cv: result.stats.cv,
 					ops_per_second: result.stats.ops_per_second,
 					sample_size: result.stats.sample_size,
+					...raw_timing_stats(result.timings_ns),
+					raw_sample_size: result.timings_ns.length,
+					outlier_ratio: result.stats.outlier_ratio,
+					warmup_iterations: result.budget.warmup_iterations,
+					min_iterations: result.budget.min_iterations,
 					files_processed: coverage?.processed ?? null,
 					files_total: coverage?.total ?? null,
 					files_iterated: iterated ?? null,
+					files_iterated_digest:
+						(tracking_key ? iterated_files_digest.get(tracking_key) : undefined) ?? null,
 					runtime: RUNTIME
 				});
 			}
@@ -2344,6 +2538,17 @@ function generate_markdown_report(data: Baseline, groups: GroupResults[]): strin
 			...generate_coverage_only_markdown(LANGUAGES, OPERATIONS, task_tracking, effective_size),
 			...generate_coverage_by_source_markdown(LANGUAGES, OPERATIONS, get_coverage_by_source())
 		);
+		lines.push(
+			'**The test262 source is tsv-scope-filtered, and it favors tsv.** The cache the ' +
+				'`test262` source reads is the expected-positive subset of the tests tsv’s own runner ' +
+				'GRADES — `test262 --emit-manifest` (`crates/tsv_debug/src/test262/`) drops the tests ' +
+				'outside tsv’s scope before the split, every Annex B `noStrict` positive among them, a ' +
+				'grammar tsv declines as a non-browser host and that acorn, oxc, swc, tsc and yuku all ' +
+				'parse. So tsv reads 100% on that source by construction, the way tsc does on the tsc ' +
+				'corpus and svelte/compiler on the Svelte set, and a rival’s number there is its rate on ' +
+				'tsv’s slice, not on test262. The positive/negative split itself is tool-neutral; the ' +
+				'graded subset it starts from is not.\n'
+		);
 	}
 
 	for (const group of groups) {
@@ -2443,16 +2648,26 @@ function generate_markdown_report(data: Baseline, groups: GroupResults[]): strin
 		lines.push('## Unstable Rows');
 		lines.push('');
 		lines.push(
-			`${unstable.length} timed row(s) varied more than ${(UNSTABLE_CV_THRESHOLD * 100).toFixed(0)}% ` +
-				`across iterations (cv = std_dev / mean, post-outlier-removal). Every \`Nx\` involving one ` +
-				`of these divides an unstable mean — read it as approximate, and prefer re-running before ` +
-				`drawing a conclusion from it.`
+			`${unstable.length} timed row(s) were not stable: a cv past ` +
+				`${(UNSTABLE_CV_THRESHOLD * 100).toFixed(0)}% (std_dev / mean — \`cv\` after outlier ` +
+				`removal; \`cv (raw)\` before it, which counts only under ${RAW_CV_SAMPLE_CEILING} raw ` +
+				`samples, where one deviant sweep is a real share of the row) or a drift past ` +
+				`${(UNSTABLE_DRIFT_THRESHOLD * 100).toFixed(0)}% (the median of the second half of the ` +
+				`timings against the first's — a cost that moved WHILE the row was measured, which the ` +
+				`cleaned cv cannot see: a second mode is deleted or blended, not reported). Every \`Nx\` involving ` +
+				`one of these divides a mean that may be neither mode — read it as approximate, and ` +
+				`re-run before drawing a conclusion from it; a longer window does not converge a drifting ` +
+				`row, it moves the answer.`
 		);
 		lines.push('');
-		lines.push('| Row | cv | samples |');
-		lines.push('| --- | ---: | ---: |');
+		lines.push('| Row | cv | cv (raw) | drift | samples (cleaned/raw) |');
+		lines.push('| --- | ---: | ---: | ---: | ---: |');
+		const pct = (v: number | null): string => (v === null ? '—' : `${(v * 100).toFixed(1)}%`);
 		for (const u of unstable) {
-			lines.push(`| ${u.label} | ${(u.cv * 100).toFixed(1)}% | ${u.samples ?? '—'} |`);
+			lines.push(
+				`| ${u.label} | ${pct(u.cv)} | ${pct(u.cv_raw)} | ${u.drift === null ? '—' : `${u.drift >= 0 ? '+' : ''}${(u.drift * 100).toFixed(1)}%`} | ` +
+					`${u.samples ?? '—'}/${u.raw_samples ?? '—'} |`
+			);
 		}
 		lines.push('');
 	}

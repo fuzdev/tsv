@@ -78,6 +78,19 @@ interface Entry {
 	 * two orders of magnitude inside one table.
 	 */
 	sample_size?: number | null;
+	/**
+	 * Stability read from the RAW timings (report `version` 15+): the cv before
+	 * outlier removal and the second-half-over-first-half drift. Absent on an older
+	 * sibling. See `unstable_cells`.
+	 */
+	cv_raw?: number | null;
+	drift?: number | null;
+	raw_sample_size?: number | null;
+	/**
+	 * A hash of the sorted timed path set (report `version` 15+), which is what
+	 * "same files on every runtime" actually means; the counts alone never proved it.
+	 */
+	files_iterated_digest?: string | null;
 }
 
 /**
@@ -181,6 +194,12 @@ interface Row {
 	cv: Partial<Record<Runtime, number>>;
 	/** Timings behind each `cv` — the precondition for trusting it. */
 	samples: Partial<Record<Runtime, number>>;
+	/** The raw-timing readings (`Entry.cv_raw` / `.drift`), where a sibling carries them. */
+	cv_raw: Partial<Record<Runtime, number>>;
+	drift: Partial<Record<Runtime, number>>;
+	raw_samples: Partial<Record<Runtime, number>>;
+	/** `Entry.files_iterated_digest` per runtime, where a sibling carries it. */
+	digest: Partial<Record<Runtime, string>>;
 }
 
 const rows = new Map<string, Row>();
@@ -203,7 +222,11 @@ for (const r of present) {
 				mean_ns: {},
 				files_iterated: {},
 				cv: {},
-				samples: {}
+				samples: {},
+				cv_raw: {},
+				drift: {},
+				raw_samples: {},
+				digest: {}
 			};
 			rows.set(key, row);
 			order.push(key);
@@ -213,6 +236,10 @@ for (const r of present) {
 		row.files_iterated[r] = e.files_iterated;
 		if (e.cv != null) row.cv[r] = e.cv;
 		if (e.sample_size != null) row.samples[r] = e.sample_size;
+		if (e.cv_raw != null) row.cv_raw[r] = e.cv_raw;
+		if (e.drift != null) row.drift[r] = e.drift;
+		if (e.raw_sample_size != null) row.raw_samples[r] = e.raw_sample_size;
+		if (e.files_iterated_digest != null) row.digest[r] = e.files_iterated_digest;
 	}
 }
 
@@ -469,7 +496,18 @@ const machine = sources.find((s) => s.machine)?.machine ?? null;
  * `mixed_vintage`: siblings at one tsv commit over two snapshots are not comparable
  * either.
  */
-const COMBINED_SCHEMA_VERSION = 14;
+/**
+ * 15: `unstable_cells[]` — per-runtime measurements that were not stable (cleaned or
+ * raw cv past 10%, or |drift| past 5%), collected AHEAD of `within_noise`'s sample
+ * gate: a MEASURED cv of 48% needs no minimum n to be believed, and the gate had
+ * silenced exactly that cell. Rows named here are excluded from `within_noise`
+ * (a delta under a 48% "noise" is not "no difference", it is unmeasured). And
+ * `within_noise[]` entries now carry `runtimes: [a, b]` instead of `runtime`, one
+ * per UNORDERED pair of present runtimes rather than per non-base runtime against
+ * the base — the site anchors its ratio columns on node, so the bun/node pair had
+ * no classification at all.
+ */
+const COMBINED_SCHEMA_VERSION = 15;
 
 // JSON: metadata + provenance per source + the comparison rows.
 /**
@@ -515,40 +553,93 @@ const MIN_NOISE_SAMPLES = 10;
  * declines to call. So it currently confirms "no difference" rather than
  * overturning anything; it is here for the case it does overturn.
  */
+/** The per-runtime bench's own thresholds (`bench.ts` `UNSTABLE_*_THRESHOLD`, `RAW_CV_SAMPLE_CEILING`), restated here. */
+const UNSTABLE_CV_THRESHOLD = 0.1;
+const UNSTABLE_DRIFT_THRESHOLD = 0.05;
+const RAW_CV_SAMPLE_CEILING = 30;
+
+/**
+ * Per-runtime measurements that were not stable, so every ratio through them is
+ * unreadable — asked BEFORE any sample gate, because this is the direction where a
+ * cv needs no minimum n: a recorded 48% on five timings is not an estimate that
+ * might be wrong, it is five timings that disagree. The gate on `within_noise` is
+ * about a cv that might be too SMALL; it silenced the one cell that had to be named.
+ *
+ * Three readings, any one of which trips the cell: the cleaned cv, the raw cv (a
+ * second mode the cleaner deleted) and the drift (a cost that moved while the row
+ * was measured) — the raw two only where the sibling carries them (report 15+).
+ */
+const unstable_cells = order.flatMap((key) => {
+	const row = rows.get(key)!;
+	return present
+		.filter((r) => {
+			const cv = row.cv[r];
+			const cv_raw = row.cv_raw[r];
+			const drift = row.drift[r];
+			const raw_n = row.raw_samples[r];
+			return (
+				(cv !== undefined && cv >= UNSTABLE_CV_THRESHOLD) ||
+				(cv_raw !== undefined &&
+					cv_raw >= UNSTABLE_CV_THRESHOLD &&
+					raw_n !== undefined &&
+					raw_n < RAW_CV_SAMPLE_CEILING) ||
+				(drift !== undefined && Math.abs(drift) >= UNSTABLE_DRIFT_THRESHOLD)
+			);
+		})
+		.map((r) => ({
+			group: row.group,
+			name: row.name,
+			runtime: r,
+			cv: row.cv[r] ?? null,
+			cv_raw: row.cv_raw[r] ?? null,
+			drift: row.drift[r] ?? null,
+			samples: row.samples[r] ?? null
+		}));
+});
+const unstable_keys = new Set(unstable_cells.map((c) => `${c.group}/${c.name}`));
+
 const within_noise = order.flatMap((key) => {
 	const row = rows.get(key)!;
 	const cells: Array<{
 		group: string;
 		name: string;
-		runtime: Runtime;
+		/** The two runtimes the cell divides, in canonical order — rendered as `a/b`. */
+		runtimes: [Runtime, Runtime];
 		delta: number;
 		noise: number;
-		/** `[base runtime, this cell's runtime]` — the order the md renders as `n=a/b`. */
+		/** Cleaned timing counts, in the same order as `runtimes` — the md's `n=a/b`. */
 		samples: [number, number];
 	}> = [];
-	const base_ops = row.ops[base_runtime];
-	const base_cv = row.cv[base_runtime];
-	const base_n = row.samples[base_runtime];
-	if (base_ops === undefined || base_cv === undefined) return cells;
-	if (base_n === undefined || base_n < MIN_NOISE_SAMPLES) return cells;
-	for (const r of present) {
-		if (r === base_runtime) continue;
-		const ops = row.ops[r];
-		const cv = row.cv[r];
-		const n = row.samples[r];
-		if (ops === undefined || cv === undefined) continue;
-		if (n === undefined || n < MIN_NOISE_SAMPLES) continue;
-		const delta = Math.abs(ops / base_ops - 1);
-		const noise = Math.sqrt(base_cv ** 2 + cv ** 2);
-		if (delta < noise) {
-			cells.push({
-				group: row.group,
-				name: row.name,
-				runtime: r,
-				delta,
-				noise,
-				samples: [base_n, n]
-			});
+	// An unstable row is reported as such; a delta inside a 48% "noise" is not "no
+	// difference", it is an unmeasured cell.
+	if (unstable_keys.has(key)) return cells;
+	for (let i = 0; i < present.length; i++) {
+		for (let j = i + 1; j < present.length; j++) {
+			const a = present[i];
+			const b = present[j];
+			const a_ops = row.ops[a];
+			const b_ops = row.ops[b];
+			const a_cv = row.cv[a];
+			const b_cv = row.cv[b];
+			const a_n = row.samples[a];
+			const b_n = row.samples[b];
+			if (a_ops === undefined || b_ops === undefined || a_cv === undefined || b_cv === undefined) {
+				continue;
+			}
+			if (a_n === undefined || a_n < MIN_NOISE_SAMPLES) continue;
+			if (b_n === undefined || b_n < MIN_NOISE_SAMPLES) continue;
+			const delta = Math.abs(b_ops / a_ops - 1);
+			const noise = Math.sqrt(a_cv ** 2 + b_cv ** 2);
+			if (delta < noise) {
+				cells.push({
+					group: row.group,
+					name: row.name,
+					runtimes: [a, b],
+					delta,
+					noise,
+					samples: [a_n, b_n]
+				});
+			}
 		}
 	}
 	return cells;
@@ -564,6 +655,7 @@ const combined = {
 	mixed_machine,
 	unavailable_by_runtime,
 	partial_rows,
+	unstable_cells,
 	within_noise,
 	sources,
 	rows: order.map((key) => {
@@ -653,6 +745,26 @@ if (partial_rows.length > 0) {
 			'(`deno task bench:perf`) before reading the ratios in its group.\n'
 	);
 }
+if (unstable_cells.length > 0) {
+	const pct = (v: number | null): string => (v === null ? '—' : `${(v * 100).toFixed(1)}%`);
+	md.push(
+		`**Unstable:** ${unstable_cells.length} per-runtime measurement(s) were not stable, so every ` +
+			'ratio through them is unreadable — ' +
+			unstable_cells
+				.map(
+					(c) =>
+						`\`${c.group}/${c.name}\` ${c.runtime} (cv ${pct(c.cv)}, raw ${pct(c.cv_raw)}, drift ` +
+						`${c.drift === null ? '—' : `${c.drift >= 0 ? '+' : ''}${(c.drift * 100).toFixed(1)}%`}, ` +
+						`n=${c.samples ?? '—'})`
+				)
+				.join('; ') +
+			'. The cell is marked `⚠` in its table. A drift is a cost that moved WHILE the row was ' +
+			'measured (the median of the second half of its timings against the first’s); the cleaned cv cannot see ' +
+			'it, and a longer window moves such a row’s answer rather than converging it. Re-run the ' +
+			'runtime before reading the row, and read the per-runtime report’s §Unstable Rows for ' +
+			'the row’s own detail.\n'
+	);
+}
 if (within_noise.length > 0) {
 	md.push(
 		`**Within noise:** ${within_noise.length} per-runtime delta(s) are smaller than the two ` +
@@ -660,7 +772,7 @@ if (within_noise.length > 0) {
 			within_noise
 				.map(
 					(c) =>
-						`\`${c.group}/${c.name}\` ${c.runtime} (${(c.delta * 100).toFixed(1)}% vs ` +
+						`\`${c.group}/${c.name}\` ${c.runtimes.join('/')} (${(c.delta * 100).toFixed(1)}% vs ` +
 						`${(c.noise * 100).toFixed(1)}% noise, n=${c.samples.join('/')})`
 				)
 				.join('; ') +
@@ -669,7 +781,9 @@ if (within_noise.length > 0) {
 			'only rows past its own 10% threshold and so names none of these: a cell lands here ' +
 			'whenever the delta is small relative to the noise, which two perfectly ordinary 3% rows ' +
 			`satisfy. \`n\` is the cleaned timings behind each cv — a row under ${MIN_NOISE_SAMPLES} ` +
-			'a side is left unclassified rather than called quiet on an estimate that thin.\n'
+			'a side is left unclassified rather than called quiet on an estimate that thin. Every ' +
+			'pair of runtimes is classified, not only each against the ratio base, and a row named ' +
+			'under **Unstable** above is never classified here.\n'
 	);
 }
 md.push(
@@ -692,9 +806,17 @@ function fmt_file_counts(fi: Row['files_iterated']): string {
 	return present.map((r) => `${r} ${fi[r] ?? '—'}`).join(' / ');
 }
 
-/** Whether a row's per-runtime iterated counts differ (nulls ignored). */
-function files_unequal(fi: Row['files_iterated']): boolean {
-	const counts = present.map((r) => fi[r]).filter((v) => typeof v === 'number');
+/**
+ * Whether a row's per-runtime timed SETS differ: by path-set digest where every
+ * present runtime carries one (report 15+), by count otherwise (nulls ignored). Two
+ * equal counts never proved two equal sets — a runtime whose group intersection
+ * lost one impl (biome does not load under Bun) can time the same NUMBER of files
+ * from a different set.
+ */
+function files_unequal(row: Pick<Row, 'files_iterated' | 'digest'>): boolean {
+	const digests = present.map((r) => row.digest[r]).filter((v) => typeof v === 'string');
+	if (digests.length === present.length) return new Set(digests).size > 1;
+	const counts = present.map((r) => row.files_iterated[r]).filter((v) => typeof v === 'number');
 	return new Set(counts).size > 1;
 }
 
@@ -707,7 +829,7 @@ for (const group of groups) {
 	// rows that deviate from the group pattern (union mode).
 	const signatures = new Set(group_rows.map((row) => fmt_file_counts(row.files_iterated)));
 	const uniform = signatures.size === 1;
-	const group_flagged = uniform && files_unequal(group_rows[0].files_iterated);
+	const group_flagged = uniform && files_unequal(group_rows[0]);
 
 	md.push(`## ${group}\n`);
 	if (group_flagged) {
@@ -722,13 +844,23 @@ for (const group of groups) {
 	md.push(`| ${header.map((_, i) => (i === 0 ? '---' : '---:')).join(' | ')} |`);
 	for (const row of group_rows) {
 		const name_cell =
-			!uniform && files_unequal(row.files_iterated)
+			!uniform && files_unequal(row)
 				? `${row.name} ⚠ files ${fmt_file_counts(row.files_iterated)}`
 				: row.name;
+		const unstable_here = new Set(
+			unstable_cells
+				.filter((c) => c.group === row.group && c.name === row.name)
+				.map((c) => c.runtime)
+		);
+		const mark = (r: Runtime, cell: string): string => (unstable_here.has(r) ? `${cell} ⚠` : cell);
 		const cells = [
 			name_cell,
-			...present.map((r) => fmt_ops(row.ops[r])),
-			...others.map((r) => fmt_ratio(row.ops[r], row.ops[base_runtime]))
+			...present.map((r) => mark(r, fmt_ops(row.ops[r]))),
+			...others.map((r) =>
+				unstable_here.has(r) || unstable_here.has(base_runtime)
+					? `${fmt_ratio(row.ops[r], row.ops[base_runtime])} ⚠`
+					: fmt_ratio(row.ops[r], row.ops[base_runtime])
+			)
 		];
 		md.push(`| ${cells.join(' | ')} |`);
 	}
@@ -774,6 +906,14 @@ if (partial_rows.length > 0) {
 		'⚠ compose: rows measured on some runtimes and ABSENT on others with no load failure (' +
 			partial_rows.map((r) => `${r.group}/${r.name}=${r.missing.join('+')}`).join(' | ') +
 			') — unexplained, usually a sibling predating the row; re-run them.'
+	);
+}
+if (unstable_cells.length > 0) {
+	console.error(
+		'⚠ compose: UNSTABLE measurements (' +
+			unstable_cells.map((c) => `${c.group}/${c.name}=${c.runtime}`).join(' | ') +
+			') — a cv or drift past the bench’s thresholds; every ratio through them is unreadable. ' +
+			'Re-run those runtimes (`deno task bench:<runtime>:run && deno task bench:compose`) before publishing.'
 	);
 }
 if (unavailable_by_runtime.length > 0) {

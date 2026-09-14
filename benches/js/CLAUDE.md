@@ -120,10 +120,16 @@ delta on the same row is the detector.
   left to the vintage banner. A runtime whose sibling predates the `unavailable`
   field is skipped there rather than accused: with nothing recorded, an absent row
   can't be told from an unloadable impl. `within_noise` skips on its own precondition
-  — a row needs ten cleaned timings a side, and prints `n` for the ones it does call.
+  — a row needs ten cleaned timings a side, and prints `n` for the ones it does call —
+  classifies every PAIR of present runtimes (the site anchors its columns on node, so
+  a base-only classification left the bun/node column ungraded), and never names a
+  row listed under `unstable_cells`: those are per-runtime measurements whose cleaned
+  or raw cv passed 10% or whose `drift` passed 5%, collected AHEAD of the sample
+  gate — a measured 48% on five timings needs no minimum n to be believed, and the
+  gate had silenced exactly that cell — marked `⚠` in the tables and on stderr.
   The bench floors iterations at 5 (7 on the slow tier) and drives the rest from
   `duration_ms`, so sample count spans two orders of magnitude inside one table and
-  17 of 44 rows per runtime sit under ten; this test consumes cv in the direction
+  roughly 20 of 44 rows per runtime sit under ten; this test consumes cv in the direction
   where an UNDERestimate is expensive, since it would report a real runtime
   difference as "no difference" — the one verdict a reader cannot check against the
   table. The conformance surface writes its own
@@ -651,8 +657,9 @@ deno task bench:clean
 BENCH_LIMIT=5           # files per language (default: all)
 BENCH_FILTER=zzz        # path pattern (default: none)
 BENCH_DURATION=10000    # ms per benchmark (default: 5000; conformance mode: 15000)
-BENCH_WARMUP=10         # warmup iterations (default: 3; slow >5s-per-sweep tasks tier to 1
-                        # unless set explicitly)
+BENCH_WARMUP=10         # warmup iterations (default: 3 on every row — the slow tier no longer
+                        # drops it to 1: that tier is decided by one cold pass against a 5 s
+                        # edge, and a row straddling it ran two protocols on two runtimes)
 BENCH_MODE=union        # per-impl iteration (default: intersection)
 BENCH_CORPUS=conformance  # corpus/surface selector (default: perf)
 BENCH_STALE_OK=1        # run despite stale artifacts (default: off)
@@ -829,8 +836,23 @@ per-language `corpus` totals; `corpus_sources` (per-entry loaded file counts + a
 upstream `repo` link); `corpus_snapshot` (the `fuzdev/corpora` commit every real-code
 source was read from, absent on conformance-only runs); `versions`;
 and `binary_sizes` (each with `gzip_bytes`). Each `entries[]` row adds `runtime`,
-`files_processed`/`files_total` (per-impl preflight coverage — the `Coverage:` line)
-and `files_iterated` (the timed set — the `Files (intersection):` count).
+`files_processed`/`files_total` (per-impl preflight coverage — the `Coverage:` line),
+`files_iterated` (the timed set — the `Files (intersection):` count) and, from
+`version` 15, `files_iterated_digest` (a hash of that set's sorted paths — what
+`compose_reports.ts` compares across runtimes, since equal counts never proved equal
+sets), the RAW-timing stability readings `cv_raw` / `drift` / `raw_sample_size` /
+`outlier_ratio` beside the cleaned `cv` (a row whose cost moved WHILE it was measured
+— biome's wasm heap leaks ~117 MB per TS sweep and tips Node into a slower regime past
+~1 GB — has its second mode deleted or blended by the MAD cleaner, so `cv` can read
+quiet over a mean that is neither mode; `drift` is the median of the second half of
+the timings against the first's and sees it), and the protocol the row ran under
+(`warmup_iterations` / `min_iterations`). §Unstable Rows trips on cleaned cv ≥ 10%,
+|drift| ≥ 5%, or raw cv ≥ 10% on a row under 30 raw samples (with hundreds of samples
+the raw cv is dominated by isolated GC pauses the cleaner rightly removes — one 80 ms
+pause among 600 × 8 ms sweeps reads 35% — so there the median drift is the detector,
+not the raw cv). ⚠ A longer `BENCH_DURATION` is NOT the answer to an unstable row:
+a drifting row's mean keeps moving with n, and at most sample counts the cleaner
+erases the disclosure entirely — re-run the runtime, and read the raw fields.
 
 **Null timing is not exclusive to a coverage-only report:** a coverage-only ROW
 (`rsvelte-fmt`) carries null stats inside an otherwise fully-timed perf report, and
@@ -846,7 +868,9 @@ one field that records a measurement the run could NOT make, so a growing count 
 the byte check quietly covering less; top-level `variant_parity` records any
 same-engine pair (two bindings, or one binding under two options) whose
 pre-flight accept sets disagreed (`[]` when healthy — a non-empty list in a
-committed report is a binding-boundary bug surfacing in the diff); top-level
+committed report is a binding-boundary bug surfacing in the diff, EXCEPT the one
+pair pinned at two engine versions on purpose, `oxc-parser` ↔ `oxc-parser-wasm`
+(§Known Issues), whose entry can be an engine change and says so); top-level
 `unavailable` records each optional impl that failed to init, as `{impl, reason,
 rows}` — the ⚠ init line's label, the load error's first line, and the ROW names its
 absence removed from this surface (`[]` on a full machine; under Bun the one known
@@ -1346,8 +1370,13 @@ internal state), the coverage report and skip counts make it visible without
      guarded three ways: `corpus_compare_format.ts` errors on semantically-empty
      prettier output for non-empty source; the prettier cache neither stores nor
      returns semantically-empty entries; and the Rust sidecar's `run_prettier`
-     returns a hard `DenoError::EmptyOutput` instead of `Ok("")`. Deliberately **no
-     retry** anywhere: a flaky oracle must stay loud.
+     returns a hard `DenoError::EmptyOutput` instead of `Ok("")`; and the bench
+     itself (`bench.ts` `empty_output_error` / `assert_output_present`, every format
+     row) records an empty output for a non-empty input as a skip in pre-flight and
+     throws in the timed loop — before it, an empty return during a timed sweep
+     silently dropped that file's cost from prettier's sweep, the denominator of
+     every published `Nx`. Deliberately **no retry** anywhere: a flaky oracle must
+     stay loud.
 
   **Triage:** a SAFETY finding reproduces by construction (two in-run native runs
   agreed), so treat it as real; confirm root cause with the **native CLI** (`tsv
