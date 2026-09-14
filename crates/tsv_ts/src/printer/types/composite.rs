@@ -21,7 +21,7 @@ use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
 use crate::printer::LeadingGlue;
-use crate::printer::comments::{OwnLineBlock, TrailingBlank};
+use crate::printer::comments::{ConditionalBranchPlacement, OwnLineBlock, TrailingBlank};
 use crate::printer::ignore::RoutedScope;
 use crate::printer::layout::bracketed_list_body;
 use crate::printer::{CommentVec, ShellLeadingRun, ShellPair};
@@ -597,9 +597,13 @@ impl<'a> Printer<'a> {
             Some(p) => {
                 self.build_conditional_arm_tail_doc(branch_type, branch_doc, p + 1, branch_start)
             }
-            None => {
-                self.build_conditional_branch_tail_doc(branch_type, branch_doc, false, None, None)
-            }
+            None => self.build_conditional_branch_tail_doc(
+                branch_type,
+                branch_doc,
+                ConditionalBranchPlacement::INLINE,
+                None,
+                None,
+            ),
         };
         d.concat(&[d.text(op), tail])
     }
@@ -635,7 +639,13 @@ impl<'a> Printer<'a> {
             d.line()
         };
         let run = self.build_branch_comment_run(op_end, branch_start, soft_sep);
-        self.build_conditional_branch_tail_doc(branch_type, branch_doc, false, run, Some(op_end))
+        self.build_conditional_branch_tail_doc(
+            branch_type,
+            branch_doc,
+            ConditionalBranchPlacement::INLINE,
+            run,
+            Some(op_end),
+        )
     }
 
     /// The branch tail of a conditional arm: the separator after `?`/`:` (and
@@ -653,12 +663,16 @@ impl<'a> Printer<'a> {
     ///   with continuations two levels in (unchanged).
     /// - Every other branch stays inline after the separator.
     ///
-    /// `on_new_line` means a line or multiline block comment ended the operator's
-    /// line (breaking layout only), so the branch starts on a fresh line instead —
-    /// one level in (the first union member then taking its leading `| `).
+    /// `placement` is the breaking layout's gap answer
+    /// ([`ConditionalBranchPlacement`], from
+    /// [`Self::push_conditional_branch_gap_comments`]): `on_own_line` starts the branch on a
+    /// fresh line one level in (the first union member then taking its leading `| `), and
+    /// `blank_before` keeps the author's blank line above it. The non-breaking arm tail
+    /// passes [`ConditionalBranchPlacement::INLINE`], whose branch follows the operator's
+    /// space.
     ///
     /// `run` is the operator's branch-gap comment run (inline layout only —
-    /// mutually exclusive with `on_new_line`), separators included; it rides
+    /// mutually exclusive with `placement.on_own_line`), separators included; it rides
     /// inside the branch's structural indent so a comment's collapsible break
     /// lands the branch one level past the operator, except for a
     /// nested-conditional branch, which levels itself (the run's own
@@ -679,34 +693,45 @@ impl<'a> Printer<'a> {
         &self,
         branch_type: &TSType<'_>,
         branch_doc: impl FnOnce() -> DocId,
-        on_new_line: bool,
+        placement: ConditionalBranchPlacement,
         run: Option<DocId>,
         gap_start: Option<u32>,
     ) -> DocId {
         let d = self.d();
         debug_assert!(
-            !(on_new_line && run.is_some()),
+            !(placement.on_own_line && run.is_some()),
             "the breaking layout emits its own comments"
         );
+        // An author blank between the run and the branch survives above it, exactly as at
+        // the ternary's own gaps (`Printer::push_ternary_branch_value`): the `literalline`
+        // ends the run's line with no indent, and the own-line break below it then leaves
+        // that line empty.
+        let blank_lead = |own_line: DocId| {
+            if placement.blank_before {
+                d.concat(&[d.literalline(), own_line])
+            } else {
+                own_line
+            }
+        };
         // Union and intersection branches share one hang: the inner doc sits one
-        // level past the operator (`indent`) — on a fresh line after an
-        // operator-line comment (`on_new_line`, first union member then taking its
-        // leading `| `), or glued after the operator's space.
+        // level past the operator (`indent`) — on a fresh line when the gap's run hangs it
+        // (`placement.on_own_line`, first union member then taking its leading `| `), or
+        // glued after the operator's space.
         let hang = |inner: DocId, run: Option<DocId>| {
-            if on_new_line {
-                d.indent_hardline(inner)
+            if placement.on_own_line {
+                blank_lead(d.indent_hardline(inner))
             } else {
                 d.concat(&[d.text(" "), d.indent(self.prepend_opt(run, inner))])
             }
         };
-        // Every other branch: `on_new_line` puts it one level in via literal tab text
-        // (not `d.indent`, which would shift nested content too), otherwise it follows
+        // Every other branch: an own-line placement puts it one level in via literal tab
+        // text (not `d.indent`, which would shift nested content too), otherwise it follows
         // the operator's space. `structural_indent` is Prettier's `printBranch` =
         // `indent(print(branch))` under useTabs — every non-conditional branch (tuple,
         // mapped, object, function/constructor type, …) sits one level past the operator.
         let plain = |branch_doc: DocId, structural_indent: bool| {
-            if on_new_line {
-                d.concat(&[d.hardline(), d.text(INDENT), branch_doc])
+            if placement.on_own_line {
+                blank_lead(d.concat(&[d.hardline(), d.text(INDENT), branch_doc]))
             } else {
                 let tail = self.prepend_opt(run, branch_doc);
                 d.concat(&[
@@ -1089,13 +1114,13 @@ impl<'a> Printer<'a> {
     ) {
         let branch_doc = || self.build_relocated_conditional_branch_doc(branch_type, paren_leading);
         if self.comments_force_own_line_between(gap_start, branch_start) {
-            let on_new_line =
+            let placement =
                 self.push_conditional_branch_gap_comments(parts, gap_start, branch_start);
             parts.push(self.with_claimed_shell_leading_run(claim, || {
                 self.build_conditional_branch_tail_doc(
                     branch_type,
                     branch_doc,
-                    on_new_line,
+                    placement,
                     None,
                     None,
                 )
@@ -1113,39 +1138,59 @@ impl<'a> Printer<'a> {
     }
 
     /// Emit the comments in a conditional-type branch gap — between `?` and the
-    /// true branch, or between `:` and the false branch — into `parts`, returning
-    /// whether the branch type must itself drop to its own indented line.
+    /// true branch, or between `:` and the false branch — into `parts`, returning where the
+    /// branch itself then sits ([`ConditionalBranchPlacement`]).
     ///
-    /// A first comment on the operator's line trails it (` // c`); in a gap holding a line
-    /// comment, a first comment the author put on its OWN line keeps that line, leaving the
-    /// operator alone on its own — it leads the branch, so own-line-ness is authorship, the
-    /// rule the value-level conditional shares (`first_gap_comment_keeps_own_line`). A line
-    /// comment ends its line, so each subsequent comment drops to its own indented line
-    /// rather than merging onto the operator's line (`// c1 // c2` would reparse as a single
-    /// comment — a boundary loss). A single-line block stays inline (in-place
-    /// collapse). A line comment or a multiline block forces the branch onto its
-    /// own line (`needs_indent`). The `?`- and `:`-branch loops share this so they
-    /// can't drift.
-    fn push_conditional_branch_gap_comments(&self, parts: &mut DocBuf, from: u32, to: u32) -> bool {
+    /// Every separator is the leading-run rule read FORWARD from the comment BEFORE it
+    /// ([`Printer::comment_hugs_next`], prettier's `printLeadingComment`): a pair the author
+    /// glued keeps its space, and a break the author wrote after a comment survives as a
+    /// blank-preserving `hardline` at the branch's indent. The layout this emitter serves has
+    /// already been forced open by a hanging comment, so every one of prettier's `line`s here
+    /// renders as that break. The branch's own placement comes from the shared producer
+    /// ([`Printer::conditional_branch_placement`], the expression twin's too): the run's LAST
+    /// comment alone — glued when the author glued it (`? // c⏎/* m */ D`), on its own line
+    /// when the author broke after it, a `//` never hugging — and an author blank above the
+    /// branch survives there.
+    ///
+    /// `first_gap_comment_keeps_own_line` is the one backward question: in a gap holding a
+    /// line comment, a first comment the author put on its OWN line keeps that line, leaving
+    /// the operator alone on its own, because there the comment leads the branch and
+    /// own-line-ness is authorship. A first comment on the operator's line trails it
+    /// (` // c`). The value-level conditional shares that rule; the `?`- and `:`-branch loops
+    /// share this whole emitter so they can't drift.
+    fn push_conditional_branch_gap_comments(
+        &self,
+        parts: &mut DocBuf,
+        from: u32,
+        to: u32,
+    ) -> ConditionalBranchPlacement {
         let d = self.d();
-        let mut needs_indent = false;
-        let mut prev_was_line_comment = false;
         let comments: CommentVec<'_> = self.comments_to_emit_between(from, to).collect();
         let first_keeps_own_line = self.first_gap_comment_keeps_own_line(&comments, from);
         for (i, comment) in comments.iter().enumerate() {
-            if prev_was_line_comment || (i == 0 && first_keeps_own_line) {
-                parts.push(d.hardline());
-                parts.push(d.text(INDENT));
-            } else {
-                parts.push(d.text(" "));
+            match i.checked_sub(1).map(|p| comments[p]) {
+                // The run's first comment: the operator's line, unless the backward rule
+                // above gives it its own.
+                None if first_keeps_own_line => {
+                    parts.push(d.hardline());
+                    parts.push(d.text(INDENT));
+                }
+                None => parts.push(d.text(" ")),
+                // Glued to the previous comment — keep the line the author wrote them on,
+                // and take no INDENT: the run did not start a new line to indent onto.
+                Some(prev) if self.comment_hugs_next(prev) => parts.push(d.text(" ")),
+                // The author broke after the previous comment (a `//` always has), so this
+                // one takes its own line, below any blank they left above it.
+                Some(prev) => {
+                    self.push_blank_preserving_hardline(parts, prev.span.end, comment.span.start);
+                    parts.push(d.text(INDENT));
+                }
             }
             parts.push(self.build_comment_doc(comment));
-            if !comment.is_block || comment.multiline {
-                needs_indent = true;
-            }
-            prev_was_line_comment = !comment.is_block;
         }
-        needs_indent
+        // The branch's own placement is the expression twin's answer too
+        // (`Printer::emit_ternary_branch_comments`), so both gaps read the one producer.
+        self.conditional_branch_placement(&comments, to)
     }
 
     /// Build conditional type doc when comments force a breaking layout.
