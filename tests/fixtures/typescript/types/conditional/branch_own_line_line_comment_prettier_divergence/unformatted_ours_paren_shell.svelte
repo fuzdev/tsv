@@ -66,6 +66,15 @@
 			)
 		: E;
 
+	// A nested conditional branch carrying a trailing `//` of its own: in the true position the
+	// shell strips (the outer `:` flushes that comment), and the own-line run still hangs it.
+	type O = B extends C
+		? (
+				// c12
+				D extends E ? F : G // c13
+			)
+		: I;
+
 	// Control: a comment the author put ON the operator's line trails it, as before.
 	type L = B extends C
 		? // c8

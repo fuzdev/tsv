@@ -1,0 +1,824 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 644,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 180,
+				"data": " An author blank line after a single-line block comment the author broke after, in a\n\tbraced head's head→value gap: the break is the author's, and so is the blank below it. "
+			},
+			{
+				"type": "Text",
+				"start": 180,
+				"end": 181,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 181,
+				"end": 197,
+				"expression": {
+					"type": "Identifier",
+					"start": 192,
+					"end": 196,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 0
+						},
+						"end": {
+							"line": 5,
+							"column": 4
+						}
+					},
+					"name": "expr",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c1 ",
+							"start": 182,
+							"end": 190
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 197,
+				"end": 198,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 198,
+				"end": 220,
+				"expression": {
+					"type": "Identifier",
+					"start": 215,
+					"end": 219,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 0
+						},
+						"end": {
+							"line": 8,
+							"column": 4
+						}
+					},
+					"name": "expr",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c2 ",
+							"start": 205,
+							"end": 213
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 220,
+				"end": 221,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RenderTag",
+				"start": 221,
+				"end": 245,
+				"expression": {
+					"type": "CallExpression",
+					"start": 240,
+					"end": 244,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 0
+						},
+						"end": {
+							"line": 11,
+							"column": 4
+						}
+					},
+					"callee": {
+						"type": "Identifier",
+						"start": 240,
+						"end": 242,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 0
+							},
+							"end": {
+								"line": 11,
+								"column": 2
+							}
+						},
+						"name": "fn"
+					},
+					"arguments": [],
+					"optional": false,
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c3 ",
+							"start": 230,
+							"end": 238
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 245,
+				"end": 246,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 246,
+				"end": 309,
+				"expression": {
+					"type": "Identifier",
+					"start": 253,
+					"end": 257,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 7
+						},
+						"end": {
+							"line": 12,
+							"column": 11
+						}
+					},
+					"name": "list"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 264,
+							"end": 266,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ConstTag",
+							"start": 266,
+							"end": 295,
+							"declaration": {
+								"type": "VariableDeclaration",
+								"kind": "const",
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"id": {
+											"type": "Identifier",
+											"name": "y",
+											"start": 274,
+											"end": 275,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 9,
+													"character": 274
+												},
+												"end": {
+													"line": 13,
+													"column": 10,
+													"character": 275
+												}
+											}
+										},
+										"init": {
+											"type": "Identifier",
+											"start": 292,
+											"end": 294,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 2
+												},
+												"end": {
+													"line": 16,
+													"column": 4
+												}
+											},
+											"name": "it",
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " c4 ",
+													"start": 280,
+													"end": 288
+												}
+											]
+										},
+										"start": 274,
+										"end": 294
+									}
+								],
+								"start": 268,
+								"end": 294
+							}
+						},
+						{
+							"type": "Text",
+							"start": 295,
+							"end": 297,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 297,
+							"end": 301,
+							"expression": {
+								"type": "Identifier",
+								"start": 298,
+								"end": 300,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 4
+									}
+								},
+								"name": "it"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 301,
+							"end": 302,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "it",
+					"start": 261,
+					"end": 263,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 15,
+							"character": 261
+						},
+						"end": {
+							"line": 12,
+							"column": 17,
+							"character": 263
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 309,
+				"end": 310,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 310,
+				"end": 344,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 19,
+						"column": 1,
+						"character": 311
+					},
+					"end": {
+						"line": 19,
+						"column": 4,
+						"character": 314
+					}
+				},
+				"attributes": [
+					{
+						"type": "SpreadAttribute",
+						"start": 316,
+						"end": 336,
+						"expression": {
+							"type": "Identifier",
+							"start": 331,
+							"end": 335,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 1
+								},
+								"end": {
+									"line": 22,
+									"column": 5
+								}
+							},
+							"name": "expr",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c5 ",
+									"start": 320,
+									"end": 328
+								}
+							]
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 344,
+				"end": 345,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 345,
+				"end": 389,
+				"name": "input",
+				"name_loc": {
+					"start": {
+						"line": 24,
+						"column": 1,
+						"character": 346
+					},
+					"end": {
+						"line": 24,
+						"column": 6,
+						"character": 351
+					}
+				},
+				"attributes": [
+					{
+						"start": 353,
+						"end": 386,
+						"type": "BindDirective",
+						"name": "value",
+						"name_loc": {
+							"start": {
+								"line": 25,
+								"column": 1,
+								"character": 353
+							},
+							"end": {
+								"line": 25,
+								"column": 11,
+								"character": 363
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 380,
+							"end": 383,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 2
+								},
+								"end": {
+									"line": 28,
+									"column": 5
+								}
+							},
+							"name": "val",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c6 ",
+									"start": 368,
+									"end": 376
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 389,
+				"end": 390,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 390,
+				"end": 431,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 31,
+						"column": 1,
+						"character": 391
+					},
+					"end": {
+						"line": 31,
+						"column": 4,
+						"character": 394
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 396,
+						"end": 423,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 32,
+								"column": 1,
+								"character": 396
+							},
+							"end": {
+								"line": 32,
+								"column": 10,
+								"character": 405
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 406,
+							"end": 423,
+							"expression": {
+								"type": "Identifier",
+								"start": 418,
+								"end": 422,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 1
+									},
+									"end": {
+										"line": 34,
+										"column": 5
+									}
+								},
+								"name": "expr",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c7 ",
+										"start": 407,
+										"end": 415
+									}
+								]
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 431,
+				"end": 432,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Comment",
+				"start": 432,
+				"end": 507,
+				"data": " a `bind:` sequence's comma gap, through the sequence's own emitter "
+			},
+			{
+				"type": "Text",
+				"start": 507,
+				"end": 508,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 508,
+				"end": 559,
+				"name": "input",
+				"name_loc": {
+					"start": {
+						"line": 37,
+						"column": 1,
+						"character": 509
+					},
+					"end": {
+						"line": 37,
+						"column": 6,
+						"character": 514
+					}
+				},
+				"attributes": [
+					{
+						"start": 516,
+						"end": 556,
+						"type": "BindDirective",
+						"name": "value",
+						"name_loc": {
+							"start": {
+								"line": 38,
+								"column": 1,
+								"character": 516
+							},
+							"end": {
+								"line": 38,
+								"column": 11,
+								"character": 526
+							}
+						},
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 531,
+							"end": 553,
+							"loc": {
+								"start": {
+									"line": 39,
+									"column": 2
+								},
+								"end": {
+									"line": 42,
+									"column": 5
+								}
+							},
+							"expressions": [
+								{
+									"type": "Identifier",
+									"start": 531,
+									"end": 534,
+									"loc": {
+										"start": {
+											"line": 39,
+											"column": 2
+										},
+										"end": {
+											"line": 39,
+											"column": 5
+										}
+									},
+									"name": "get"
+								},
+								{
+									"type": "Identifier",
+									"start": 550,
+									"end": 553,
+									"loc": {
+										"start": {
+											"line": 42,
+											"column": 2
+										},
+										"end": {
+											"line": 42,
+											"column": 5
+										}
+									},
+									"name": "set",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c8 ",
+											"start": 538,
+											"end": 546
+										}
+									]
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 559,
+				"end": 560,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Comment",
+				"start": 560,
+				"end": 616,
+				"data": " a multi-line block keeps the blank after it too "
+			},
+			{
+				"type": "Text",
+				"start": 616,
+				"end": 617,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 617,
+				"end": 643,
+				"expression": {
+					"type": "Identifier",
+					"start": 638,
+					"end": 642,
+					"loc": {
+						"start": {
+							"line": 49,
+							"column": 0
+						},
+						"end": {
+							"line": 49,
+							"column": 4
+						}
+					},
+					"name": "expr",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c9\nc10 ",
+							"start": 624,
+							"end": 636
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 182,
+			"end": 190,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 205,
+			"end": 213,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 7
+				},
+				"end": {
+					"line": 6,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 230,
+			"end": 238,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 9
+				},
+				"end": {
+					"line": 9,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 280,
+			"end": 288,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 2
+				},
+				"end": {
+					"line": 14,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 320,
+			"end": 328,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 5
+				},
+				"end": {
+					"line": 20,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c6 ",
+			"start": 368,
+			"end": 376,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 2
+				},
+				"end": {
+					"line": 26,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c7 ",
+			"start": 407,
+			"end": 415,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 12
+				},
+				"end": {
+					"line": 32,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c8 ",
+			"start": 538,
+			"end": 546,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 2
+				},
+				"end": {
+					"line": 40,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c9\nc10 ",
+			"start": 624,
+			"end": 636,
+			"loc": {
+				"start": {
+					"line": 46,
+					"column": 7
+				},
+				"end": {
+					"line": 47,
+					"column": 6
+				}
+			}
+		}
+	]
+}

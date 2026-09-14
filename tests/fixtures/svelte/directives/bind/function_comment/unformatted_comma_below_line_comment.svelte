@@ -34,8 +34,8 @@
 <!-- Mid line comment: trails the comma and forces the break -->
 <input
 	bind:value={
-		() => a, // c
-		(v) => (a = v)
+		() => a // c
+		, (v) => (a = v)
 	}
 />
 
@@ -51,8 +51,8 @@
 <!-- Mid line comment followed by an own-line run: one break between them, no blank -->
 <input
 	bind:value={
-		() => a, // c1
+		() => a // c1
 		// c2
-		(v) => (a = v)
+		, (v) => (a = v)
 	}
 />

@@ -35,12 +35,19 @@ What the cases pin:
 - **c7** — a chained conditional's gap, one level deeper.
 - **c9** — a hugging object-type branch hangs the same way.
 - **c10 / c11** — a block glued to the branch rides below the own-line comment with it.
+- **c12 / c13** — a nested conditional branch carrying a trailing `//` of its own. The
+  own-line run hangs the branch as at `c5`; the trailing comment flushes on the branch's own
+  line, where the outer `:` ends it. The shelled spelling (`unformatted_ours_paren_shell`)
+  strips in this position, and the run is the gap's to lay out there too — the claim gate
+  reads the nested branch's retention rule, not the general shell rule, so the two spellings
+  reach one form ([branch_paren_leading_line_comment](../branch_paren_leading_line_comment_prettier_divergence/),
+  its case H, is the glued twin).
 - **c8** — the control: a comment authored **on** the operator's line trails it in both
   formatters. Both authorings are stable under tsv.
 
 `unformatted_ours_compact` authors every case flush and unspaced;
 `unformatted_ours_paren_shell` puts every run inside a redundant paren shell — around the
-whole branch at `c1`, `c2`, `c3`/`c4`, `c7`, `c9` and `c10`/`c11`, and around the branch's leading edge (a
+whole branch at `c1`, `c2`, `c3`/`c4`, `c7`, `c9`, `c10`/`c11` and `c12`/`c13`, and around the branch's leading edge (a
 nested conditional's check type, an intersection's first member) at `c5` and `c6`; each strips
 to the same fixed point, the run staying in the gap it was written in (prettier's chain from
 it is pinned by `audit_signature_paren_shell.txt`). `unformatted_ours_paren_shell_nested`

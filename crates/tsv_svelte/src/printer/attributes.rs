@@ -178,7 +178,8 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build a Doc for a leading JS comment (before content)
+    /// Build a Doc for a leading JS comment (before content), with what follows the comment
+    /// in hand — `next_start`, the next comment of the run or the value.
     ///
     /// The comment's own text comes from `tsv_ts::build_comment_doc` — the *same*
     /// rendering the owned path uses (`prepend_owned_leading_comment`) — so a JS comment
@@ -195,29 +196,19 @@ impl<'a> Printer<'a> {
     /// and expanded only on pass 2 (an F1 non-idempotency). `build_comment_doc` tags the
     /// print-once ledger itself, so this builder must **not** tag again.
     ///
-    /// Single-line block comments: `/*content*/ ` (with trailing space).
-    /// Line comments: `// content\n` (with hardline).
+    /// A glued single-line block: `/*content*/ ` (with trailing space). A `//`, or a block
+    /// the author broke after: the comment, then a hardline — a `//` runs to end of line,
+    /// so the glued answer is never available to it; a block's answer is
+    /// [`Self::leading_js_comment_glued`]'s.
     ///
-    /// A **block** comment's separator is a hardline whenever it doesn't glue to what
-    /// follows — see [`Self::leading_js_comment_separator`], which owns that rule. A `//`
-    /// always takes the hardline: it runs to end of line, so the glued answer is never
-    /// available to it.
-    ///
-    /// The no-blank form of [`Self::build_leading_js_comment_doc_before`], for a caller
-    /// that emits one comment with nothing of the run's own behind it.
-    pub(super) fn build_leading_js_comment_doc(&self, comment: &Comment) -> DocId {
-        self.build_leading_js_comment_doc_before(comment, comment.span.end)
-    }
-
-    /// [`Self::build_leading_js_comment_doc`] with what follows the comment in hand —
-    /// `next_start`, the next comment of the run or the value — so an author **blank line**
-    /// after a `//` survives as a `literalline` ahead of the comment's hardline. The `//`
-    /// forces that break, so the blank it separates is the author's and not a layout the
-    /// head could collapse; every keyword→value gap keeps it the same way (`tsv_ts`'s
+    /// An author **blank line** below that hardline survives as a `literalline` ahead of
+    /// it. The break is one the output keeps — forced by the `//`, or the author's own after
+    /// the block — so the blank it separates is the author's and not a layout the head
+    /// could collapse; every keyword→value gap keeps it the same way (`tsv_ts`'s
     /// `Printer::append_keyword_value_line_comments`), and prettier keeps it at every braced
-    /// head. A blank ABOVE the run sits against the delimiter and is erased, as everywhere,
-    /// and a block's separator is untouched. The scan is the strict one: a stripped paren's
-    /// `)` between the newlines is content, not a blank.
+    /// head. A blank ABOVE the run sits against the delimiter and is erased, as everywhere.
+    /// The scan is the strict one: a stripped paren's `)` between the newlines is content,
+    /// not a blank.
     pub(super) fn build_leading_js_comment_doc_before(
         &self,
         comment: &Comment,
@@ -225,8 +216,8 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let doc = tsv_ts::build_comment_doc(d, comment, &self.ts_inputs());
-        if comment.is_block {
-            return d.concat(&[doc, self.leading_js_comment_separator(comment)]);
+        if comment.is_block && self.leading_js_comment_glued(comment) {
+            return d.concat(&[doc, d.text(" ")]);
         }
         if tsv_lang::printing::has_blank_line_between_strict(
             self.source,
@@ -239,20 +230,12 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// What separates a **block** leading comment from the construct it leads: a space when
-    /// the author glued the two together and the comment is free to share that line, a
-    /// hardline otherwise. Two independent reasons to break, one separator:
-    ///
-    /// - **The author left it on its own line** (a newline after the `*/`). This is
-    ///   prettier's `printLeadingComment` rule, and it reads only the source right after the
-    ///   comment (`hasNewline(text, locEnd(comment))`), never where the value starts. A
-    ///   trailing space instead pulled the value up onto the comment's closing line,
-    ///   reflowing a break the author gave a comment that cannot be reflowed.
-    /// - **An honored directive**, whose placement floor makes a shared line inert — so the
-    ///   freeze it earned on this pass would be gone on the next. Here the rule is about the
-    ///   DIRECTIVE, not the target: a gap that doesn't freeze today can only ever start
-    ///   honoring one if the placement survives to be read. *Placement* keys the freeze,
-    ///   never the spelling.
+    /// Whether a leading block comment **leads its value inline** — nothing but horizontal
+    /// whitespace between it and what follows in the source — as against one the author
+    /// broke after, which ends its output line. The one test behind the separator and the
+    /// blank a broken-after block keeps ([`Self::build_leading_js_comment_doc_before`]). An
+    /// honored directive is never glued: a freeze must end its line to be honored on the
+    /// next pass.
     ///
     /// ⚠️ Same intent as `tsv_ts`'s `Printer::comment_hugs_next`, but **not** the same
     /// question, so this is deliberately not a call into it: that one is *anchored* (is the
@@ -260,12 +243,9 @@ impl<'a> Printer<'a> {
     /// `<script>` gap emitters need because what follows a comment there may be another
     /// comment. Here the rule is prettier's unanchored form — what the author wrote
     /// immediately after the `*/` — so the two spellings are not interchangeable.
-    fn leading_js_comment_separator(&self, comment: &Comment) -> DocId {
-        let d = self.d();
-        let glued =
-            !tsv_lang::source_scan::has_newline_after_position(self.source, comment.span.end)
-                && !self.is_honored_directive(comment);
-        if glued { d.text(" ") } else { d.hardline() }
+    fn leading_js_comment_glued(&self, comment: &Comment) -> bool {
+        !tsv_lang::source_scan::has_newline_after_position(self.source, comment.span.end)
+            && !self.is_honored_directive(comment)
     }
 
     /// Whether a trailing comment **starts its own output line**: the comment immediately
@@ -273,7 +253,7 @@ impl<'a> Printer<'a> {
     /// in a `hardline`. The separator space then has nothing to separate; it would render as
     /// leading whitespace on a fresh line, an indent tsv emits nowhere else.
     ///
-    /// The trailing twin of [`Self::leading_js_comment_separator`], and keyed the same way:
+    /// The trailing twin of [`Self::leading_js_comment_glued`], and keyed the same way:
     /// on what actually gets emitted, not on the author's line treatment. A newline in
     /// source is the wrong test — two block comments the author split across lines
     /// (`a /* c */⏎/* d */`) are emitted on ONE line, where the space is a real separator.
@@ -305,7 +285,7 @@ impl<'a> Printer<'a> {
     /// `}` / `)` / ` as ` token emitted by the caller.
     ///
     /// The comment's own text comes from `tsv_ts::build_comment_doc`, exactly as in
-    /// [`Self::build_leading_js_comment_doc`] — for single-line payloads the identical
+    /// [`Self::build_leading_js_comment_doc_before`] — for single-line payloads the identical
     /// verbatim node, and for the **multi-line block** the `<script>` twin's form:
     /// TypeScript formatting is context-free, so a `*`-aligned interior reindents to
     /// context, any other interior is preserved verbatim, and the break propagates via a
@@ -362,6 +342,95 @@ impl<'a> Printer<'a> {
             });
         }
         d.concat(&parts)
+    }
+
+    /// The comma of a comma-separated JS list — a `bind:` sequence's operands, a `{@debug}`
+    /// tag's identifiers — with both of its gaps: `before`, the run between the previous
+    /// item and the separator at `sep_pos`, and `after`, the run from the separator to the
+    /// next item at `next_start`. The caller has pushed the previous item and pushes the
+    /// next one after. `spacer` is what stands between the comma and the next item when
+    /// nothing forces a break (the sequence's soft `line`, the tag's space).
+    ///
+    /// **Before the comma** a block trails the previous item where it was written; a `//`
+    /// there trails the comma instead, the rest of the run with it — the one relocation the
+    /// element-comma seam sanctions (`docs/comments.md` §The element-comma seam, the
+    /// `tsv_ts` rule for every comma list): the comma is structure, the comment trails the
+    /// item either way, and left in place the `//` ends its line ahead of the comma, which
+    /// then opens the next line alone (`a // c⏎, b` → `a, // c⏎b`; prettier's answer too).
+    ///
+    /// **After the comma** an all-block run leads the next item inline, behind the spacer.
+    /// A run holding a `//` is **partitioned** by the author's line treatment: what shares
+    /// the comma's line trails it, and from the first OWN-LINE comment on the run leads the
+    /// next item on its own line. The partition is what keeps the gap from RELOCATING an
+    /// own-line comment up onto the comma's line (prettier keeps it own-line too) — and for
+    /// an honored directive the relocation is fatal, since a trailing placement is inert,
+    /// so the freeze would die on the next pass. Each leading comment is built with what
+    /// follows it in hand — the next comment, or the item — so an author blank below it
+    /// survives ([`Self::build_leading_js_comment_doc_before`]). A `//` hoisted from before
+    /// the comma opens the same partition: it is the run's first comment and shares the
+    /// comma's line by construction, and what the author wrote below it — on either side of
+    /// the comma — leads the next item.
+    ///
+    /// The break that opens the leading run is owed only when the item just pushed has
+    /// not already ended the output line: a trailing `//` has, its doc closing with a
+    /// hardline, so after one the break is skipped — pushed unconditionally it doubled the
+    /// `//`'s own break, manufacturing a blank line the author never wrote.
+    pub(in crate::printer) fn push_list_separator(
+        &self,
+        items: &mut DocBuf,
+        before: &[&Comment],
+        sep_pos: u32,
+        after: &[&Comment],
+        next_start: u32,
+        spacer: DocId,
+    ) {
+        let d = self.d();
+        let hoist_at = before
+            .iter()
+            .position(|c| !c.is_block)
+            .unwrap_or(before.len());
+        let (trailing, hoisted) = before.split_at(hoist_at);
+        items.extend(
+            trailing
+                .iter()
+                .map(|c| self.build_trailing_js_comment_doc(c, false)),
+        );
+        items.push(d.text(","));
+
+        let gap: CommentRun<'_> = hoisted.iter().chain(after).copied().collect();
+        if gap.iter().all(|c| c.is_block) {
+            items.push(spacer);
+            items.extend(self.leading_comment_run_docs(&gap, next_start));
+            return;
+        }
+        // A hoisted `//` starts ahead of the comma; reading the partition from its own start
+        // puts it on the comma's line, where its output lands.
+        let mut pos = gap.first().map_or(sep_pos, |c| c.span.start.min(sep_pos));
+        let mut in_leading_run = false;
+        let mut line_ended = false;
+        for (i, comment) in gap.iter().enumerate() {
+            if !in_leading_run
+                && tsv_lang::printing::has_newline_between_scan(
+                    self.source.as_bytes(),
+                    self.line_table(),
+                    pos,
+                    comment.span.start,
+                )
+            {
+                in_leading_run = true;
+                if !line_ended {
+                    items.push(d.hardline());
+                }
+            }
+            items.push(if in_leading_run {
+                let after_this = gap.get(i + 1).map_or(next_start, |next| next.span.start);
+                self.build_leading_js_comment_doc_before(comment, after_this)
+            } else {
+                self.build_trailing_js_comment_doc(comment, false)
+            });
+            line_ended = !comment.is_block;
+            pos = comment.span.end;
+        }
     }
 
     //
@@ -938,7 +1007,7 @@ impl<'a> Printer<'a> {
             // braces with no block to break, so the leading run would end up sharing the
             // `{`'s line — which relocates an own-line comment, and for a directive is inert
             // under the placement floor, losing the freeze on the next pass. The block itself
-            // needs no forcing; the run's own hardline (see `build_leading_js_comment_doc`)
+            // needs no forcing; the run's own hardline (see `build_leading_js_comment_doc_before`)
             // breaks the group from inside.
             self.wrap_in_block_structure(head.doc, head.ends_with_line_comment)
         } else if head.layout == HeadLayout::HangsAfterOpen {
@@ -1194,7 +1263,6 @@ impl<'a> Printer<'a> {
         tag_span: Span,
     ) -> DocId {
         let d = self.d();
-        let bytes = self.source.as_bytes();
         let mut content: DocBuf = DocBuf::new();
 
         // Leading comments between `{` and the first operand. A line or multi-line
@@ -1208,35 +1276,52 @@ impl<'a> Printer<'a> {
         // It stays bare: `bind:value={(get, set)}` is a grouped expression to Svelte, not a
         // getter/setter pair (see value_sequence_prettier_ignore_head_prettier_divergence).
         let head_frozen = self.honored_directive_in_gap(tag_span.start + 1, first_start);
-        for comment in self.comments_to_emit_between(tag_span.start + 1, first_start) {
-            if comment.is_block && comment.multiline {
-                // Multi-line block: reindent-to-context through the shared comment
-                // builder (matching `build_leading_js_comment_doc`), then a hardline
-                // instead of the inline trailing space — the sequence's first operand
-                // starts a fresh line, forcing the broken layout. `build_comment_doc`
-                // tags the ledger itself.
-                content.push(tsv_ts::build_comment_doc(d, comment, &self.ts_inputs()));
-                content.push(d.hardline());
-            } else {
-                // Single-line block: `/*…*/ ` inline. Line comment: `//…` + hardline.
-                content.push(self.build_leading_js_comment_doc(comment));
-            }
-        }
+        // The shared head emitter: a `//` or a block the author broke after ends its line
+        // (a multi-line block reindented to context), a glued block leads inline, and an
+        // author blank below a kept break survives. A multi-line block GLUED to the first
+        // operand never reaches this gap — glue makes it owned, so the operand's own doc
+        // prints it.
+        content.extend(self.leading_comment_docs(tag_span.start + 1, first_start));
 
-        if head_frozen {
-            content.push(self.build_frozen_node_doc(seq.span));
-            // The run PAST the slice, exactly as the unfrozen tail below emits it. A freeze
-            // replaces the sequence's own doc; it does not own the gap between that doc's end
-            // and the value's `}`, so returning here left that gap with no emitter at all —
-            // the very hole the unfrozen tail names as its reason for existing. Scanning from
-            // `seq.span.end` keeps it strictly outside the verbatim text, so a comment written
-            // INSIDE the slice still rides in it rather than being printed twice.
-            let (trailing_docs, ends_with_line_comment) =
-                self.trailing_comment_docs(seq.span.end, tag_span.end - 1, true);
-            content.extend(trailing_docs);
-            return self.wrap_in_block_structure(d.concat(&content), ends_with_line_comment);
-        }
+        // The sequence itself, and where the run past it starts. A freeze replaces the
+        // sequence's own doc with a verbatim slice of `seq.span`, so its tail opens at the
+        // slice's end — strictly outside the verbatim text, so a comment written INSIDE the
+        // slice rides in it rather than being printed twice. The built form's tail opens at
+        // the last operand's NODE end instead: a comment inside that operand's stripped paren
+        // shell (`(set /* c */)`) sits past the node and before `seq.span.end`, and the tail
+        // is its only emitter.
+        let (sequence, tail_from) = if head_frozen {
+            (self.build_frozen_node_doc(seq.span), seq.span.end)
+        } else {
+            let last_end = seq.expressions[seq.expressions.len() - 1].span().end;
+            (self.build_bind_sequence_operands_doc(seq), last_end)
+        };
+        content.push(sequence);
 
+        // The run past the last operand — outside the operands' group, so it never breaks
+        // the pair. The whole reason this builder is reached for a trailing-only comment: the
+        // comment-blind path has no emitter for this gap at all, and a freeze does not own
+        // the gap between its slice and the value's `}` either.
+        let (trailing_docs, ends_with_line_comment) =
+            self.trailing_comment_docs(tail_from, tag_span.end - 1, true);
+        content.extend(trailing_docs);
+
+        // Same bare block structure as the comment-free path: flat `{a, b}`, broken
+        // `{\n\ta,\n\tb\n}`. Comment hardlines force the break; a lone inline block
+        // comment leaves the operand group free to stay flat.
+        self.wrap_in_block_structure(d.concat(&content), ends_with_line_comment)
+    }
+
+    /// The operands of a function-binding sequence with their comma gaps, as ONE group: a
+    /// forced break in the surrounding `{ }` (a leading comment) doesn't break them — they
+    /// break only when they overflow or carry an interior forced break (a mid line comment,
+    /// a block-body arrow). Matches prettier.
+    fn build_bind_sequence_operands_doc(
+        &self,
+        seq: &tsv_ts::ast::internal::SequenceExpression<'_>,
+    ) -> DocId {
+        let d = self.d();
+        let bytes = self.source.as_bytes();
         let mut items: DocBuf = DocBuf::new();
         for (i, sub_expr) in seq.expressions.iter().enumerate() {
             // Rule A: an honored directive in the comma gap freezes this operand. The
@@ -1253,81 +1338,29 @@ impl<'a> Printer<'a> {
                     find_char_skipping_comments(bytes, prev_end as usize, cur_start as usize, b',')
                         .map_or(prev_end, |c| c as u32);
 
-                // Comments before the comma trail the previous operand.
-                for comment in self.comments_to_emit_between(prev_end, comma_pos) {
-                    items.push(self.build_trailing_js_comment_doc(comment, false));
-                }
-
-                items.push(d.text(","));
-
-                // Comments after the comma: an all-block run leads the next operand
-                // inline; otherwise the run is partitioned by the author's line
-                // treatment — what shares the comma's line trails it, and from the first
-                // OWN-LINE comment on the run leads the next operand on its own line.
-                //
-                // The partition is what keeps this gap from RELOCATING an own-line comment
-                // up onto the comma's line (prettier keeps it own-line too) — and for an
-                // honored directive the relocation is fatal, since a trailing placement is
-                // inert, so the freeze would die on the next pass.
+                // The comma with both its gaps. The operands sit in their own group, so
+                // the spacer is a soft `line`: they break only when they overflow or a
+                // `//` forces it.
+                let before: CommentRun<'_> =
+                    self.comments_to_emit_between(prev_end, comma_pos).collect();
                 let after: CommentRun<'_> = self
                     .comments_to_emit_between(comma_pos + 1, cur_start)
                     .collect();
-                if after.is_empty() {
-                    items.push(d.line());
-                } else if after.iter().all(|c| c.is_block) {
-                    items.push(d.line());
-                    for comment in &after {
-                        items.push(self.build_leading_js_comment_doc(comment));
-                    }
-                } else {
-                    let mut pos = comma_pos;
-                    let mut in_leading_run = false;
-                    for comment in &after {
-                        if !in_leading_run
-                            && tsv_lang::printing::has_newline_between_scan(
-                                self.source.as_bytes(),
-                                self.line_table(),
-                                pos,
-                                comment.span.start,
-                            )
-                        {
-                            in_leading_run = true;
-                            items.push(d.hardline());
-                        }
-                        items.push(if in_leading_run {
-                            self.build_leading_js_comment_doc(comment)
-                        } else {
-                            self.build_trailing_js_comment_doc(comment, false)
-                        });
-                        pos = comment.span.end;
-                    }
-                }
+                self.push_list_separator(
+                    &mut items,
+                    &before,
+                    comma_pos,
+                    &after,
+                    cur_start,
+                    d.line(),
+                );
             }
 
             // Rule A resolved the operand's own freeze, so this is the ordinary value stage
             // under the host's embed — the operand is measured where it sits.
             items.push(self.build_head_value_doc(sub_expr, frozen, &self.embed));
         }
-
-        // The operands sit in their own group so a forced break in the *surrounding*
-        // `{ }` (a leading comment) doesn't break them — they break only when they
-        // overflow or carry an interior forced break (a mid line comment, a block-body
-        // arrow). Matches prettier.
-        let items_doc = d.concat(&items);
-        content.push(d.group(items_doc));
-
-        // The run past the last operand — outside that group, so it never breaks the pair.
-        // The whole reason this builder is reached for a trailing-only comment: the
-        // comment-blind path has no emitter for this gap at all.
-        let last_end = seq.expressions[seq.expressions.len() - 1].span().end;
-        let (trailing_docs, ends_with_line_comment) =
-            self.trailing_comment_docs(last_end, tag_span.end - 1, true);
-        content.extend(trailing_docs);
-
-        // Same bare block structure as the comment-free path: flat `{a, b}`, broken
-        // `{\n\ta,\n\tb\n}`. Comment hardlines force the break; a lone inline block
-        // comment leaves the operand group free to stay flat.
-        self.wrap_in_block_structure(d.concat(&content), ends_with_line_comment)
+        d.group(d.concat(&items))
     }
 
     /// Build Doc parts using block structure: `={\n\texpr\n}`

@@ -42,6 +42,11 @@ line and the even-numbered one at the end of the opener:
   authoring exists to pin.
 - **c17 / c18** and **c19 / c20** — a blank **inside** a run keeps its place between the
   two comments, from either authoring.
+- **c21** — `{@debug}`, whose own emitter keeps the blank the same way; prettier strips the
+  comment outright there.
+- **c22** — a `bind:` sequence's comma gap, and **c23 / c24** — a run there with the blank
+  inside it: the sequence's own comma-gap emitter keeps the blank as every head does (prettier
+  keeps it too).
 
 ## Related
 

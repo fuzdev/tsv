@@ -113,8 +113,7 @@ enum BranchRoute<'t> {
 
 impl<'t> BranchRoute<'t> {
     /// Whether this branch is routed at all — the emitters' arm test, and the term the
-    /// seams that must decline for a routed branch read (the leading-EDGE claim, the
-    /// relocatable-run collector).
+    /// seam that must decline for a routed branch reads (the leading-EDGE claim).
     fn routed(self) -> bool {
         !matches!(self, Self::None)
     }
@@ -166,20 +165,23 @@ impl<'a> Printer<'a> {
     /// paren-stripped inner instead — the shell it would otherwise claim IS the branch, and
     /// the run inside it is the directive this route exists to keep in the operator gap.
     ///
-    /// A redundant shell that IS the branch, holding a run that FORCES a break — a `//`
-    /// the author started on its OWN line inside the shell
-    /// ([`Self::branch_shell_own_line_run`]), or a block run that does
+    /// A redundant shell that IS the branch, holding a run that FORCES a break — any `//`
+    /// inside the shell, glued to the `(` or on its own line, or a block run that does
     /// ([`Printer::block_run_forces_break`]) with no `//` — is claimed whole: the run is the
     /// `?`/`:` gap's — the gate below routes on it (`comments_force_own_line_between`) and
     /// the breaking layout's branch emitter ([`Self::push_conditional_branch_gap_run`]) lays
     /// it out by the gap's own rule at the branch's own indent, which is where the reparse,
-    /// the shell gone, finds it — the same answer the paren-free authoring gets. Left to the
-    /// shell's emitter the run printed at the shell's indent inside the flat layout, and
-    /// pass 2 re-laid it: a two-pass convergence at every such branch, measured; and an
-    /// own-line `//` relocated to trail the node BEFORE the operator, a comment the author
-    /// wrote leading the branch moved across the `?`/`:`. A `//` GLUED to the `(` is not
-    /// claimed: it sits on the operator's line and takes the relocation
-    /// ([`Self::branch_relocatable_run`]) or the shell's own emitter where that declines.
+    /// the shell gone, finds it — the same answer the paren-free authoring gets: a glued
+    /// `//` trails the operator (`? // c⏎V`), an own-line one keeps its line below it.
+    /// Left to the shell's emitter the run printed at the shell's indent inside the flat
+    /// layout, and pass 2 re-laid it: a two-pass convergence at every such branch,
+    /// measured; and a `//` relocated to trail the node BEFORE the operator, a comment the
+    /// author wrote leading the branch moved across the `?`/`:` — the one cell where the
+    /// shell alone moved a comment, since the paren-free spelling and the value ternary's
+    /// shelled one both keep it in the gap
+    /// (`branch_paren_leading_line_comment_prettier_divergence`). The extends-type's shell
+    /// keeps its trail-on-inner relocation ([`Self::extends_relocatable_run`]): that gap
+    /// has no operator between the comment and its operand.
     /// The leading-EDGE descent deliberately does not reach a shell that is the value itself
     /// (that is the keyword→value seam's first branch), so this arm claims it.
     fn branch_claim_and_start(
@@ -189,15 +191,14 @@ impl<'a> Printer<'a> {
     ) -> (Option<Span>, u32) {
         match route {
             BranchRoute::ShellInterior(inner) => (None, inner.span().start),
-            BranchRoute::Gap | BranchRoute::None => {
-                if !route.routed()
-                    && let Some(shell) = outermost_paren(branch)
-                    && !self.paren_retains_for_trailing_run(branch)
+            BranchRoute::Gap => self.leading_edge_claim_and_start(true, branch),
+            BranchRoute::None => {
+                if let Some(shell) = outermost_paren(branch)
+                    && !self.branch_shell_retains(branch)
                 {
                     let (leading, _) = paren_shell_gaps(shell);
-                    if self.branch_shell_own_line_run(shell)
-                        || (!self.has_line_comments_between(leading.start, leading.end)
-                            && self.block_run_forces_break(leading.start, leading.end))
+                    if self.has_line_comments_between(leading.start, leading.end)
+                        || self.block_run_forces_break(leading.start, leading.end)
                     {
                         let inner_start = unwrap_parenthesized(branch).span().start;
                         return (
@@ -206,8 +207,28 @@ impl<'a> Printer<'a> {
                         );
                     }
                 }
-                self.leading_edge_claim_and_start(route.routed(), branch)
+                self.leading_edge_claim_and_start(false, branch)
             }
+        }
+    }
+
+    /// Whether a conditional branch's redundant shell is **retained** for its trailing run —
+    /// so the shell's own emitter owns both of its gaps and the `?`/`:` gap claims nothing.
+    /// A nested-conditional branch answers by its own reading
+    /// ([`Self::nested_branch_shell_retains`]: a trailing `//` in the TRUE position strips,
+    /// the enclosing `:` flushing it), every other branch by the shell rule in general
+    /// ([`Printer::paren_retains_for_trailing_run`]).
+    ///
+    /// The claim gate and the branch builder must read the SAME predicate. Reading the
+    /// general rule at the gate declined the claim for a nested branch the builder then
+    /// stripped (`? (// c1⏎V extends W ? X : Y // c2⏎) : Z`), so the shell's own emitter
+    /// printed the leading run at the shell's indent — the flat-layout placement the claim
+    /// exists to avoid — and pass 2, the shell gone, hung the branch below it (F1).
+    fn branch_shell_retains(&self, branch: &TSType<'_>) -> bool {
+        if conditional_branch_is_nested(branch) {
+            self.nested_branch_shell_retains(branch)
+        } else {
+            self.paren_retains_for_trailing_run(branch)
         }
     }
 
@@ -290,15 +311,11 @@ impl<'a> Printer<'a> {
         // (e.g., `a extends (// c\n  b)`, or the double-nested `((// c\n  b))`) —
         // these are relocated to trail extends_type and force breaking. The deep
         // predicate scans the whole stripped shell, not just the outer paren's own
-        // gap, so a comment hiding one layer in still forces the break.
+        // gap, so a comment hiding one layer in still forces the break. A `//` inside a
+        // BRANCH's shell needs no term of its own: the branch start is widened over a
+        // claimed shell ([`Self::branch_claim_and_start`]), so the gap scans below see it.
         let extends_paren_has_leading_line_comment =
             self.stripped_paren_has_leading_line_comment(c.extends_type);
-        // Same for true_type / false_type: leading line comments inside their
-        // parens get relocated to trail extends_type / true_type respectively.
-        let true_paren_has_leading_line_comment =
-            self.stripped_paren_has_leading_line_comment(c.true_type);
-        let false_paren_has_leading_line_comment =
-            self.stripped_paren_has_leading_line_comment(c.false_type);
         // In the `?`/`:`→branch gaps, only a comment that HANGS its branch breaks the
         // layout: a line comment, or a multiline block the author broke after
         // (`comments_force_own_line_between` — the shared keyword→value gate). A glued
@@ -319,14 +336,12 @@ impl<'a> Printer<'a> {
                     true_type_start,
                 ),
             }
-            || extends_paren_has_leading_line_comment
-            || true_paren_has_leading_line_comment;
+            || extends_paren_has_leading_line_comment;
         let colon_end = colon_pos.map_or(true_type_end, |c| c + 1);
         // `comments_force_own_line_between` also covers line comments (`!is_block`
         // hangs), so no separate line-comment scan is needed for this gap.
-        let has_breaking_comments_after_colon = self
-            .comments_force_own_line_between(colon_end, false_type_start)
-            || false_paren_has_leading_line_comment;
+        let has_breaking_comments_after_colon =
+            self.comments_force_own_line_between(colon_end, false_type_start);
         // Trailing line comments on true_type also force breaking (they end the line)
         let has_trailing_line_comment_on_true =
             colon_pos.is_some_and(|c| self.has_line_comments_between(true_type_end, c));
@@ -353,11 +368,7 @@ impl<'a> Printer<'a> {
                 // Nested conditional in true position:
                 // - Flat: add parens for readability: `T extends A ? (T extends B ? C : D) : E`
                 // - Broken: no parens (the line breaks provide clarity)
-                let inner_doc = self.build_nested_conditional_branch_doc(
-                    c.true_type,
-                    inner,
-                    ShellLeadingRun::Here,
-                );
+                let inner_doc = self.build_nested_conditional_branch_doc(c.true_type, inner);
                 if d.will_break(inner_doc) {
                     // Inner doc forces breaking — use broken layout directly
                     inner_doc
@@ -369,15 +380,9 @@ impl<'a> Printer<'a> {
             }
         };
 
-        // false_type: if it's a conditional, don't wrap in group.
-        // No parens needed for nested conditionals in false position (right-associative).
-        let false_type_doc = || {
-            if let TSType::Conditional(inner) = unwrap_parenthesized(c.false_type) {
-                self.build_nested_conditional_branch_doc(c.false_type, inner, ShellLeadingRun::Here)
-            } else {
-                self.build_type_doc(c.false_type)
-            }
-        };
+        // No parens needed for nested conditionals in false position (right-associative),
+        // so the false branch is the plain branch doc in both layouts.
+        let false_type_doc = || self.build_conditional_branch_doc(c.false_type);
 
         // Comments trailing on extends_type (between extends_type and ?). The mirror
         // of `trailing_on_true` below: this path assembles the conditional from its
@@ -467,20 +472,16 @@ impl<'a> Printer<'a> {
     /// The one shell that is NOT stripped ([`Self::nested_branch_shell_retains`]) hands
     /// both gaps back to its own emitter instead — this seam claims neither there.
     ///
-    /// `shell_leading_run` is the breaking layout's relocation: at
-    /// [`ShellLeadingRun::Upstream`] a pure leading line-comment run has already been
-    /// emitted above the operator ([`Self::stripped_paren_leading_line_comments`]), so
-    /// claiming it again would double-print it (hazard 3). A shell the `?`/`:` gap CLAIMED
-    /// whole ([`Self::branch_claim_and_start`], read back through
-    /// [`Printer::shell_leading_run_claimed`] like every other branch) has no leading run
-    /// left for this seam at all — the gap printed the blocks along with the `//`, so an
-    /// `Upstream` mark, which skips only the line comments, would double-print the blocks.
-    /// The trailing gap is this seam's in every layout.
+    /// A shell the `?`/`:` gap CLAIMED whole ([`Self::branch_claim_and_start`], read back
+    /// through [`Printer::shell_leading_run_claimed`] like every other branch) has no
+    /// leading run left for this seam at all — the gap printed the blocks along with the
+    /// `//`. What remains for this seam is a leading run with no `//` and no forced break,
+    /// which the shell's own emitter lays out. The trailing gap is this seam's in every
+    /// layout.
     fn build_nested_conditional_branch_doc(
         &self,
         branch: &TSType<'_>,
         inner: &TSConditionalType<'_>,
-        shell_leading_run: ShellLeadingRun,
     ) -> DocId {
         let d = self.d();
         let Some((leading, trailing)) = outermost_paren(branch).map(paren_shell_gaps) else {
@@ -488,21 +489,10 @@ impl<'a> Printer<'a> {
         };
         if self.nested_branch_shell_retains(branch) {
             // The shell survives, so its own emitter owns BOTH gaps — this seam claims
-            // neither. Mutually exclusive with the relocation by construction: what sets
-            // it (`stripped_paren_leading_line_comments`) declines any shell carrying a
-            // trailing comment, which is exactly what retains.
-            debug_assert!(
-                shell_leading_run == ShellLeadingRun::Here,
-                "a retained shell's leading run is never relocated"
-            );
+            // neither.
             return self.build_type_doc(branch);
         }
         let mut parts: DocBuf = DocBuf::new();
-        // `Upstream` skips only the LINE comments, which is the whole of what the
-        // relocation claims: `stripped_paren_leading_line_comments` returns a run only
-        // when every comment in the gap is a `//`, so there is no block left behind for
-        // the emitter to owe — and stating it as the shared axis rather than as a skipped
-        // call keeps that reading checkable at the emitter rather than here.
         // `Stripped`: this branch's shell is gone (the retained one returned above), so
         // the run's layout is the branch gap's. A shell the gap claimed whole owes nothing.
         if !self.shell_leading_run_claimed(branch.span().start, leading.end) {
@@ -510,7 +500,7 @@ impl<'a> Printer<'a> {
                 &mut parts,
                 leading.start,
                 leading.end,
-                shell_leading_run,
+                ShellLeadingRun::Here,
                 ShellPair::Stripped,
             );
         }
@@ -522,11 +512,15 @@ impl<'a> Printer<'a> {
     /// Whether a nested-conditional branch's stripped shell holds a comment that cannot
     /// share its line — one the flat layout has no room for.
     ///
-    /// The gate and the emitter must read the SAME region. Every other `needs_breaking`
-    /// term stops at the branch's own span start, which for a parenthesized branch is the
-    /// shell's `(` — so a `//` the author wrote *inside* the shell was invisible here while
-    /// [`Self::build_nested_conditional_branch_doc`] still emits it, landing a deferred
-    /// comment in a FLAT branch where it swallows the `: …` behind it.
+    /// The gate and the emitter must read the SAME region. A shell the `?`/`:` gap claims
+    /// ([`Self::branch_claim_and_start`]) widens the branch start past its leading gap, so
+    /// the `needs_breaking` scans read a `//` there themselves; this gate is the reading
+    /// for the shells the claim declines — one RETAINED for its trailing `//`, whose run
+    /// [`Self::build_nested_conditional_branch_doc`] hands back to the shell's own emitter,
+    /// and a leading run the claim's own two tests pass over (an honored block-spelled
+    /// directive glued to the `(` hangs the branch without being a `//` or a breaking block
+    /// run) — landing a deferred comment in a FLAT branch, where it swallows the `: …`
+    /// behind it, is what a missed reading costs.
     ///
     /// Only a nested-conditional branch asks: every other branch keeps its shell and routes
     /// through `build_parenthesized_type_unwrap_doc`, which answers retain-vs-defer itself.
@@ -804,7 +798,7 @@ impl<'a> Printer<'a> {
     /// to keep the run in place.
     ///
     /// The licence is losslessness, and it holds exactly while the destination line ends
-    /// up holding **one** `//`. Three runs land on that line and the count is their sum:
+    /// up holding **one** `//`. Two runs land on that line and the count is their sum:
     ///
     /// - the shell's own run — more than one comment in it welds on arrival
     ///   (`T extends (// c1⏎// c2⏎U)`);
@@ -813,18 +807,18 @@ impl<'a> Printer<'a> {
     ///   there keeps its own line above the `?`
     ///   ([`Printer::build_own_line_preserving_run`], the seam that splits this very gap),
     ///   so it can never share the destination — reading the whole gap declined a
-    ///   relocation both formatters perform losslessly;
-    /// - the TRUE branch's own GLUED shell run, which the breaking builder relocates onto
-    ///   this same line right behind the extends run (`T extends (// c1⏎U) ? (// c2⏎V) : W`)
-    ///   — a contributor no window over this conditional's own gaps can see. An own-line
-    ///   run in that shell stays in the `?` gap ([`Self::branch_shell_own_line_run`]) and
-    ///   contributes nothing.
+    ///   relocation both formatters perform losslessly.
+    ///
+    /// The TRUE branch's own shell run is never a contributor: glued or own-line, it is the
+    /// `?`→branch gap's and stays there ([`Self::branch_claim_and_start`]), so
+    /// `T extends (// c1⏎U) ? (// c2⏎V) : W` relocates `// c1` alone.
     ///
     /// The cheap `matches!` + line-comment scan fail-fast
-    /// ([`Printer::stripped_paren_has_leading_line_comment`]) gates the collector, so a
-    /// comment-free conditional — the overwhelming case — allocates nothing here.
+    /// ([`Printer::stripped_paren_hang_has_breaking_leading_run`]) gates the collector, so
+    /// a comment-free conditional — the overwhelming case — allocates nothing here; the
+    /// collector's own emptiness is the `len` test's.
     fn extends_relocatable_run(&self, c: &TSConditionalType<'_>) -> Option<CommentVec<'_>> {
-        if !self.stripped_paren_has_leading_line_comment(c.extends_type) {
+        if !self.stripped_paren_hang_has_breaking_leading_run(c.extends_type) {
             return None;
         }
         let run = self.stripped_paren_leading_line_comments(c.extends_type);
@@ -835,70 +829,7 @@ impl<'a> Printer<'a> {
         let gap_welds = self
             .comments_to_emit_between(extends_end, c.true_type.span().start)
             .any(|cm| !cm.is_block && self.is_same_line(extends_end, cm.span.start));
-        if gap_welds
-            || !self
-                .branch_relocatable_run(c.true_type, extends_end, c.true_type.span().start)
-                .is_empty()
-        {
-            return None;
-        }
-        Some(run)
-    }
-
-    /// Whether a conditional branch's redundant shell holds a `//` run the author started on
-    /// its OWN line inside the shell (`? (⏎// c⏎V)`), as against one glued to the `(`
-    /// (`? (// c⏎V)`). The two spellings part: a glued run sits on the operator's line and
-    /// takes the relocation below (or the shell's own emitter), while an own-line run is
-    /// the `?`/`:` gap's to claim ([`Self::branch_claim_and_start`]) and lays out by the
-    /// gap's rule — the line the author gave it, the branch below — the same answer the
-    /// paren-free authoring gets and the one prettier gives the shelled one too.
-    fn branch_shell_own_line_run(&self, shell: &internal::TSParenthesizedType<'_>) -> bool {
-        let (leading, _) = paren_shell_gaps(shell);
-        let mut run = self
-            .comments_to_emit_between(leading.start, leading.end)
-            .peekable();
-        run.peek()
-            .is_some_and(|first| !self.is_same_line(leading.start, first.span.start))
-            && run.any(|c| !c.is_block)
-    }
-
-    /// A conditional BRANCH shell's leading line-comment run, when relocating it to trail
-    /// the node before the operator is LICENSED — **empty** where it is not, leaving the
-    /// run to print inside the shell the author wrote it in. An own-line run
-    /// ([`Self::branch_shell_own_line_run`]) is never relocated: the gap claims it.
-    ///
-    /// The branch-position twin of [`Self::extends_relocatable_run`], carrying the same
-    /// licence: the destination line must end up holding exactly one `//`. `anchor` is the
-    /// node the run would trail (the extends-type for the `?` arm, the true branch for the
-    /// `:` arm) and `[anchor, gap_end)` its operator gap, whose **same-line** prefix
-    /// shares that line — an own-line comment there keeps its own line above the operator
-    /// ([`Printer::build_own_line_preserving_run`]) and cannot collide.
-    ///
-    /// Without the bound both authorings welded: a run of two inside the shell
-    /// (`? (// c1⏎// c2⏎V)`) and a comment already trailing the anchor
-    /// (`T extends U // c2⏎? (// c1⏎V)`) each rendered back to back on one line, the
-    /// second `//` becoming text of the first — a comment gone, irreversibly, the merged
-    /// form being a fixed point. Declining costs nothing: the shell's own emitter prints
-    /// the run where it was written, which is also where prettier puts it.
-    fn branch_relocatable_run(
-        &self,
-        branch: &TSType<'_>,
-        anchor: u32,
-        gap_end: u32,
-    ) -> CommentVec<'_> {
-        if !self.stripped_paren_has_leading_line_comment(branch)
-            || outermost_paren(branch).is_some_and(|shell| self.branch_shell_own_line_run(shell))
-        {
-            return CommentVec::new();
-        }
-        let run = self.stripped_paren_leading_line_comments(branch);
-        if run.len() != 1 {
-            return CommentVec::new();
-        }
-        let welds = self
-            .comments_to_emit_between(anchor, gap_end)
-            .any(|cm| !cm.is_block && self.is_same_line(anchor, cm.span.start));
-        if welds { CommentVec::new() } else { run }
+        (!gap_welds).then_some(run)
     }
 
     /// Build the extends clause doc for a conditional type, including comments
@@ -1169,10 +1100,9 @@ impl<'a> Printer<'a> {
         gap_start: u32,
         branch_type: &TSType<'_>,
         branch_start: u32,
-        paren_leading: &CommentVec<'_>,
         claim: Option<Span>,
     ) {
-        let branch_doc = || self.build_relocated_conditional_branch_doc(branch_type, paren_leading);
+        let branch_doc = || self.build_conditional_branch_doc(branch_type);
         if self.comments_force_own_line_between(gap_start, branch_start) {
             let placement = self.push_conditional_branch_gap_run(parts, gap_start, branch_start);
             parts.push(self.with_claimed_shell_leading_run(claim, || {
@@ -1240,22 +1170,6 @@ impl<'a> Printer<'a> {
         let (false_claim, false_type_start) =
             self.branch_claim_and_start(false_route, c.false_type);
 
-        // Detect leading line comments inside parens around true_type / false_type
-        // for relocation: prettier moves them to trail extends_type / true_type
-        // (e.g., `extends b ? (// c\n  C) : D` → `extends b // c\n  ? C\n  : D`).
-        // A FROZEN branch freezes its whole shell verbatim (shell comments ride the
-        // slice), so it must not also collect them for relocation (print-once).
-        let true_paren_leading_line_comments: CommentVec<'_> = if true_route.routed() {
-            CommentVec::new()
-        } else {
-            self.branch_relocatable_run(c.true_type, extends_type_end, true_type_start)
-        };
-        let false_paren_leading_line_comments: CommentVec<'_> = if false_route.routed() {
-            CommentVec::new()
-        } else {
-            self.branch_relocatable_run(c.false_type, true_type_end, false_type_start)
-        };
-
         // Find `extends` keyword position (reused for both extends_type_doc and comments_before_extends)
         let check_type_end = c.check_type.span().end;
         let extends_type_start = c.extends_type.span().start;
@@ -1270,19 +1184,19 @@ impl<'a> Printer<'a> {
 
         let extends_type_doc = self.build_conditional_type_extends_doc(c, extends_kw_end);
 
-        let mut trailing_on_extends_parts: DocBuf = DocBuf::new();
         let mut q_parts = DocBuf::new();
 
-        if true_route.routed() {
+        // What trails the extends-type on its own line — the `?` gap's same-line run,
+        // `empty()` when there is none.
+        let trailing_on_extends_doc = if true_route.routed() {
             let (trailing, branch) = self.build_routed_conditional_branch(
                 extends_type_end,
                 true_type_start,
-                &true_paren_leading_line_comments,
                 "?",
                 self.build_routed_branch_doc(true_route, c.true_type),
             );
-            trailing_on_extends_parts.push(trailing);
             q_parts.push(branch);
+            trailing
         } else {
             // Split comments around the `?` token by position so trailing line
             // comments on extends_type (e.g., `b // comment\n? c`) stay on
@@ -1302,14 +1216,9 @@ impl<'a> Printer<'a> {
             //
             // Emitting the whole gap as trailing (what this replaced) pulled an own-line
             // run up onto the extends-type's line, where the second `//` became text of
-            // the first (`B extends C // c1 // c2`) and a comment was lost. Also includes
-            // relocated leading line comments from inside true_type's parens.
+            // the first (`B extends C // c1 // c2`) and a comment was lost.
             let (extends_trailing, own_line_before_q) =
                 self.build_own_line_preserving_run(extends_type_end, before_q_end);
-            trailing_on_extends_parts.push(extends_trailing);
-            for comment in &true_paren_leading_line_comments {
-                trailing_on_extends_parts.push(self.build_trailing_line_comment_doc(comment));
-            }
 
             // Own-line comments sit above the `?`, at the branch indent.
             q_parts.extend(own_line_before_q);
@@ -1324,10 +1233,10 @@ impl<'a> Printer<'a> {
                 after_q_start,
                 c.true_type,
                 true_type_start,
-                &true_paren_leading_line_comments,
                 true_claim,
             );
-        }
+            extends_trailing
+        };
 
         if false_route.routed() {
             // The `:` branch mirrors the routed `?` emission, except that its
@@ -1336,7 +1245,6 @@ impl<'a> Printer<'a> {
             let (trailing, branch) = self.build_routed_conditional_branch(
                 true_type_end,
                 false_type_start,
-                &false_paren_leading_line_comments,
                 ":",
                 self.build_routed_branch_doc(false_route, c.false_type),
             );
@@ -1344,22 +1252,16 @@ impl<'a> Printer<'a> {
             q_parts.push(branch);
         } else {
             // Comments trailing on true_type (between true_type and :) — preserve position.
-            // Also includes relocated leading line comments from inside false_type's parens.
             // Split the same way as the `?` gap above — a comment on the true-branch's
             // line trails it, an own-line one keeps its line above the `:`. The two arms
             // ask one question through one seam, so they cannot drift.
             let colon = self.find_char_outside_comments(true_type_end, false_type_start, b':');
-            let mut own_line_before_colon = DocBuf::new();
             if let Some(c_pos) = colon {
-                let (true_trailing, own_line) =
+                let (true_trailing, own_line_before_colon) =
                     self.build_own_line_preserving_run(true_type_end, c_pos);
                 q_parts.push(true_trailing);
-                own_line_before_colon = own_line;
+                q_parts.extend(own_line_before_colon);
             }
-            for comment in &false_paren_leading_line_comments {
-                q_parts.push(self.build_trailing_line_comment_doc(comment));
-            }
-            q_parts.extend(own_line_before_colon);
 
             // : on new line
             q_parts.push(d.hardline());
@@ -1372,7 +1274,6 @@ impl<'a> Printer<'a> {
                 colon_end,
                 c.false_type,
                 false_type_start,
-                &false_paren_leading_line_comments,
                 false_claim,
             );
         }
@@ -1380,9 +1281,6 @@ impl<'a> Printer<'a> {
         // Comments between check_type and `extends` keyword (reuses extends_kw_start from above)
         let comments_before_extends =
             self.build_comments_between(check_type_end, extends_kw_start, CommentSpacing::Leading);
-
-        // `concat` short-circuits the no-trailing-comment case to `empty()`.
-        let trailing_on_extends_doc = d.concat(&trailing_on_extends_parts);
 
         d.concat(&[
             self.build_conditional_check_doc(c.check_type),
@@ -1394,38 +1292,22 @@ impl<'a> Printer<'a> {
         ])
     }
 
-    /// The ordinarily-built doc for a conditional branch in the BREAKING layout, shared
-    /// by the `?` and `:` arms (same nested-conditional logic as the non-breaking path).
-    /// When leading line comments were relocated out of a parenthesized wrapper (any
-    /// nesting depth, `paren_leading` non-empty), the doc is built from the
-    /// fully-unwrapped inner so those comments aren't emitted twice. A shell the `?`/`:`
-    /// gap CLAIMED ([`Self::branch_claim_and_start`]) is read back by the branch's own
-    /// builder — [`Self::build_nested_conditional_branch_doc`] and
+    /// The ordinarily-built doc for a conditional branch — the `?` and `:` arms of the
+    /// breaking layout and the flat layout's false branch (its true branch adds the
+    /// clarity pair around a nested conditional and so builds the inner itself). A shell
+    /// the `?`/`:` gap CLAIMED ([`Self::branch_claim_and_start`]) is read back by the
+    /// branch's own builder — [`Self::build_nested_conditional_branch_doc`] and
     /// `build_parenthesized_type_unwrap_doc` alike ask `shell_leading_run_claimed`.
     ///
     /// Built lazily by [`Self::build_conditional_branch_tail_doc`], whose union /
     /// intersection arms rebuild the branch from parts and would discard it.
-    fn build_relocated_conditional_branch_doc(
-        &self,
-        branch: &TSType<'_>,
-        paren_leading: &CommentVec<'_>,
-    ) -> DocId {
+    fn build_conditional_branch_doc(&self, branch: &TSType<'_>) -> DocId {
         // The nested-conditional question comes FIRST, and unconditionally: routing a
-        // relocated branch through the grouped `build_type_doc` instead gave the nested
+        // branch through the grouped `build_type_doc` instead gave the nested
         // conditional a group of its own, so it printed FLAT inside an already-broken
         // parent where prettier breaks it with the parent.
         if let TSType::Conditional(inner) = unwrap_parenthesized(branch) {
-            self.build_nested_conditional_branch_doc(
-                branch,
-                inner,
-                if paren_leading.is_empty() {
-                    ShellLeadingRun::Here
-                } else {
-                    ShellLeadingRun::Upstream
-                },
-            )
-        } else if !paren_leading.is_empty() {
-            self.build_type_doc(unwrap_parenthesized(branch))
+            self.build_nested_conditional_branch_doc(branch, inner)
         } else {
             self.build_type_doc(branch)
         }
@@ -1443,8 +1325,7 @@ impl<'a> Printer<'a> {
     /// Every own-line comment (the directive among them) sits ABOVE the operator's
     /// line, and the branch follows the operator on that line. The whole gap
     /// `[gap_start, branch_start)` is claimed here, both sides of the operator, so no
-    /// comment is emitted twice (print-once). A routed composite's stripped-shell
-    /// leading line comments (`paren_leading`) join the own-line run.
+    /// comment is emitted twice (print-once).
     ///
     /// `branch_doc` is the frozen verbatim slice — a routed branch always freezes — so
     /// the branch tail is spelled out here rather than taken from
@@ -1456,16 +1337,11 @@ impl<'a> Printer<'a> {
         &self,
         gap_start: u32,
         branch_start: u32,
-        paren_leading: &CommentVec<'_>,
         operator: &'static str,
         branch_doc: DocId,
     ) -> (DocId, DocId) {
         let d = self.d();
         let (trailing, mut parts) = self.build_own_line_preserving_run(gap_start, branch_start);
-        for comment in paren_leading {
-            parts.push(d.hardline());
-            parts.push(self.build_comment_doc(comment));
-        }
         parts.push(d.hardline());
         parts.push(d.text(operator));
         parts.push(d.text(" "));

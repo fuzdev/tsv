@@ -4,7 +4,7 @@
 // layout, the {@const} initializer break rules, and the declaration tag's own terminator.
 
 use crate::ast::internal;
-use crate::printer::{HeadExpr, HeadLayout, Printer};
+use crate::printer::{CommentRun, HeadExpr, HeadLayout, Printer};
 use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::doc::{DocBuf, GroupId};
@@ -347,10 +347,8 @@ impl<'a> Printer<'a> {
             && self.honored_directive_in_gap(last_end, first.span().start)
         {
             let list = Span::new(first.span().start, last.span().end);
-            let mut frozen_parts: DocBuf = self
-                .comments_in_source_between(last_end, list.start)
-                .map(|c| self.build_leading_js_comment_doc(c))
-                .collect();
+            let mut frozen_parts: DocBuf =
+                self.leading_comment_docs_in_source(last_end, list.start);
             frozen_parts.push(self.verbatim_source_doc(list));
             // This builder emits its own trailing run, so it answers `ends_with_line_comment`
             // off that one run rather than from a second scan that could disagree with it.
@@ -381,9 +379,21 @@ impl<'a> Printer<'a> {
         // `indents_content` is also the dedent the trailing run below owes —
         // `trailing_comment_docs`' `closer_owns_break`, spelled out by hand here since this
         // builder emits its own run.
-        let layout = tag.identifiers.first().map_or(HeadLayout::Inline, |first| {
+        let mut layout = tag.identifiers.first().map_or(HeadLayout::Inline, |first| {
             self.head_layout(last_end, first.span().start, false)
         });
+        // A `//` in a COMMA gap breaks the list the same way one in the head gap does: the
+        // identifiers below it hang one level in and the `}` drops to the tag's column —
+        // the geometry every braced head a `//` breaks already has. Only the inline
+        // verdict moves; a head-gap run that already hangs the content keeps its layout.
+        if !layout.indents_content()
+            && let (Some(first), Some(last)) = (tag.identifiers.first(), tag.identifiers.last())
+            && self
+                .comments_in_source_between(first.span().start, last.span().end)
+                .any(|c| !c.is_block)
+        {
+            layout = HeadLayout::HangsAfterOpen;
+        }
 
         // Content only — the prefix and the `}` are added below, so `hangs` can indent
         // exactly what sits between them (the shape `indent_own_line_head` reaches on the
@@ -412,20 +422,23 @@ impl<'a> Printer<'a> {
                 )
                 .map_or(id_start, |c| c as u32);
 
-                // Comments before the comma trail the previous identifier.
-                parts.extend(
-                    self.comments_in_source_between(last_end, comma)
-                        .map(|c| self.build_trailing_js_comment_doc(c, false)),
-                );
-                parts.push(d.text(", "));
+                // The comma with both its gaps: the `bind:` sequence's rule
+                // ([`Printer::push_list_separator`]) — a block before the comma trails the
+                // previous identifier and a `//` there trails the comma, an all-block run
+                // after it leads this identifier inline, and a run holding a `//` is
+                // partitioned by the author's line treatment. The spacer is a plain space:
+                // the list never width-wraps.
+                let before: CommentRun<'_> =
+                    self.comments_in_source_between(last_end, comma).collect();
                 last_end = comma.saturating_add(1);
+                let after: CommentRun<'_> = self
+                    .comments_in_source_between(last_end, id_start)
+                    .collect();
+                self.push_list_separator(&mut parts, &before, comma, &after, id_start, d.text(" "));
+            } else {
+                // Comments after the keyword lead the first identifier.
+                parts.extend(self.leading_comment_docs_in_source(last_end, id_start));
             }
-            // Comments after the comma (or after the keyword, for the first
-            // identifier) lead this identifier.
-            parts.extend(
-                self.comments_in_source_between(last_end, id_start)
-                    .map(|c| self.build_leading_js_comment_doc(c)),
-            );
             // Not a bare `d.source_span`: a JSDoc-cast entry's span (`(a)`) can
             // hold an interior comment (`(a /* c */)`) that rides out inside the
             // slice and reaches no comment emitter — the ledger is told the
