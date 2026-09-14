@@ -1,0 +1,996 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 640,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An indentable block comment the author broke after, FIRST in a ternary branch run that",
+			"start": 10,
+			"end": 99,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 90
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a `//` forces open, re-indents its continuation lines to the branch's indent",
+			"start": 101,
+			"end": 180,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " y\n\t ",
+			"start": 199,
+			"end": 210,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 4
+				},
+				"end": {
+					"line": 6,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 214,
+			"end": 218,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 3
+				},
+				"end": {
+					"line": 7,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the `:` branch, a JSDoc-style block",
+			"start": 233,
+			"end": 271,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* y\n\t * z\n\t ",
+			"start": 296,
+			"end": 316,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 4
+				},
+				"end": {
+					"line": 16,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 320,
+			"end": 324,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 3
+				},
+				"end": {
+					"line": 17,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " later in the run",
+			"start": 333,
+			"end": 352,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 371,
+			"end": 375,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 4
+				},
+				"end": {
+					"line": 22,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " y\n ",
+			"start": 379,
+			"end": 390,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 3
+				},
+				"end": {
+					"line": 24,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a nested conditional's branch, one level deeper",
+			"start": 405,
+			"end": 455,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " y\n\t ",
+			"start": 487,
+			"end": 499,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 5
+				},
+				"end": {
+					"line": 33,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 504,
+			"end": 508,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 4
+				},
+				"end": {
+					"line": 34,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " control: no line comment, the block alone breaks the branch",
+			"start": 525,
+			"end": 587,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 1
+				},
+				"end": {
+					"line": 38,
+					"column": 63
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " y\n\t ",
+			"start": 606,
+			"end": 617,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 4
+				},
+				"end": {
+					"line": 41,
+					"column": 6
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 639,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 630,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 44,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 182,
+					"end": 230,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 188,
+							"end": 229,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 188,
+								"end": 190,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 9
+									}
+								},
+								"name": "x1"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 193,
+								"end": 229,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 12
+									},
+									"end": {
+										"line": 9,
+										"column": 5
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 193,
+									"end": 194,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 12
+										},
+										"end": {
+											"line": 4,
+											"column": 13
+										}
+									},
+									"name": "a"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 222,
+									"end": 223,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 3
+										},
+										"end": {
+											"line": 8,
+											"column": 4
+										}
+									},
+									"name": "b",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " y\n\t ",
+											"start": 199,
+											"end": 210
+										},
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 214,
+											"end": 218
+										}
+									]
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 228,
+									"end": 229,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 4
+										},
+										"end": {
+											"line": 9,
+											"column": 5
+										}
+									},
+									"name": "c"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An indentable block comment the author broke after, FIRST in a ternary branch run that",
+							"start": 10,
+							"end": 99
+						},
+						{
+							"type": "Line",
+							"value": " a `//` forces open, re-indents its continuation lines to the branch's indent",
+							"start": 101,
+							"end": 180
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 273,
+					"end": 330,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 5
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 279,
+							"end": 329,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 18,
+									"column": 4
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 279,
+								"end": 281,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 9
+									}
+								},
+								"name": "x2"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 284,
+								"end": 329,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 12
+									},
+									"end": {
+										"line": 18,
+										"column": 4
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 284,
+									"end": 285,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 12
+										},
+										"end": {
+											"line": 12,
+											"column": 13
+										}
+									},
+									"name": "a"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 290,
+									"end": 291,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 4
+										},
+										"end": {
+											"line": 13,
+											"column": 5
+										}
+									},
+									"name": "b"
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 328,
+									"end": 329,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 3
+										},
+										"end": {
+											"line": 18,
+											"column": 4
+										}
+									},
+									"name": "d",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": "* y\n\t * z\n\t ",
+											"start": 296,
+											"end": 316
+										},
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 320,
+											"end": 324
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the `:` branch, a JSDoc-style block",
+							"start": 233,
+							"end": 271
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 354,
+					"end": 402,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 360,
+							"end": 401,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 7
+								},
+								"end": {
+									"line": 26,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 360,
+								"end": 362,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 7
+									},
+									"end": {
+										"line": 21,
+										"column": 9
+									}
+								},
+								"name": "x3"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 365,
+								"end": 401,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 12
+									},
+									"end": {
+										"line": 26,
+										"column": 5
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 365,
+									"end": 366,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 12
+										},
+										"end": {
+											"line": 21,
+											"column": 13
+										}
+									},
+									"name": "a"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 394,
+									"end": 395,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 3
+										},
+										"end": {
+											"line": 25,
+											"column": 4
+										}
+									},
+									"name": "b",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 371,
+											"end": 375
+										},
+										{
+											"type": "Block",
+											"value": " y\n ",
+											"start": 379,
+											"end": 390
+										}
+									]
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 400,
+									"end": 401,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 4
+										},
+										"end": {
+											"line": 26,
+											"column": 5
+										}
+									},
+									"name": "c"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " later in the run",
+							"start": 333,
+							"end": 352
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 457,
+					"end": 522,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 1
+						},
+						"end": {
+							"line": 36,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 463,
+							"end": 521,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 7
+								},
+								"end": {
+									"line": 36,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 463,
+								"end": 465,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 7
+									},
+									"end": {
+										"line": 29,
+										"column": 9
+									}
+								},
+								"name": "x4"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 468,
+								"end": 521,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 12
+									},
+									"end": {
+										"line": 36,
+										"column": 6
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 468,
+									"end": 469,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 12
+										},
+										"end": {
+											"line": 29,
+											"column": 13
+										}
+									},
+									"name": "a"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 474,
+									"end": 475,
+									"loc": {
+										"start": {
+											"line": 30,
+											"column": 4
+										},
+										"end": {
+											"line": 30,
+											"column": 5
+										}
+									},
+									"name": "b"
+								},
+								"alternate": {
+									"type": "ConditionalExpression",
+									"start": 480,
+									"end": 521,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 4
+										},
+										"end": {
+											"line": 36,
+											"column": 6
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 480,
+										"end": 481,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 4
+											},
+											"end": {
+												"line": 31,
+												"column": 5
+											}
+										},
+										"name": "c"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 513,
+										"end": 514,
+										"loc": {
+											"start": {
+												"line": 35,
+												"column": 4
+											},
+											"end": {
+												"line": 35,
+												"column": 5
+											}
+										},
+										"name": "d",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " y\n\t ",
+												"start": 487,
+												"end": 499
+											},
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 504,
+												"end": 508
+											}
+										]
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 520,
+										"end": 521,
+										"loc": {
+											"start": {
+												"line": 36,
+												"column": 5
+											},
+											"end": {
+												"line": 36,
+												"column": 6
+											}
+										},
+										"name": "e"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a nested conditional's branch, one level deeper",
+							"start": 405,
+							"end": 455
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 589,
+					"end": 629,
+					"loc": {
+						"start": {
+							"line": 39,
+							"column": 1
+						},
+						"end": {
+							"line": 43,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 595,
+							"end": 628,
+							"loc": {
+								"start": {
+									"line": 39,
+									"column": 7
+								},
+								"end": {
+									"line": 43,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 595,
+								"end": 597,
+								"loc": {
+									"start": {
+										"line": 39,
+										"column": 7
+									},
+									"end": {
+										"line": 39,
+										"column": 9
+									}
+								},
+								"name": "x5"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 600,
+								"end": 628,
+								"loc": {
+									"start": {
+										"line": 39,
+										"column": 12
+									},
+									"end": {
+										"line": 43,
+										"column": 5
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 600,
+									"end": 601,
+									"loc": {
+										"start": {
+											"line": 39,
+											"column": 12
+										},
+										"end": {
+											"line": 39,
+											"column": 13
+										}
+									},
+									"name": "a"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 621,
+									"end": 622,
+									"loc": {
+										"start": {
+											"line": 42,
+											"column": 3
+										},
+										"end": {
+											"line": 42,
+											"column": 4
+										}
+									},
+									"name": "b",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " y\n\t ",
+											"start": 606,
+											"end": 617
+										}
+									]
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 627,
+									"end": 628,
+									"loc": {
+										"start": {
+											"line": 43,
+											"column": 4
+										},
+										"end": {
+											"line": 43,
+											"column": 5
+										}
+									},
+									"name": "c"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " control: no line comment, the block alone breaks the branch",
+							"start": 525,
+							"end": 587
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

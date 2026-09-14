@@ -2088,25 +2088,6 @@ impl<'a> Printer<'a> {
         self.append_keyword_value_line_comments(&mut parts, keyword_end, value_start, value_doc);
         d.concat(&parts)
     }
-
-    /// Whether the FIRST comment of an operator→value gap keeps the line the author gave
-    /// it rather than trailing the operator: the gap holds a line comment, so it hangs open
-    /// anyway, and that first comment does not share `op_end`'s line. This is the
-    /// keyword→value rule ([`Self::append_keyword_value_line_comments`]) for the gap
-    /// emitters that place the first comment themselves — a conditional's `?` / `:`→branch
-    /// gap at the value level (`emit_ternary_branch_comments`) and the type level
-    /// (`push_conditional_branch_gap_comments`). A comment there leads the branch, so
-    /// own-line-ness is authorship (conformance_prettier.md §Comment Position Philosophy).
-    pub(crate) fn first_gap_comment_keeps_own_line(
-        &self,
-        comments: &[&internal::Comment],
-        op_end: u32,
-    ) -> bool {
-        comments.iter().any(|c| !c.is_block)
-            && comments
-                .first()
-                .is_some_and(|c| !self.is_same_line(op_end, c.span.start))
-    }
 }
 
 /// End position of a heritage item (after type arguments if present).

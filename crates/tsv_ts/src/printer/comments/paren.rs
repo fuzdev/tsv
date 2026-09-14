@@ -2061,22 +2061,10 @@ impl<'a> Printer<'a> {
             };
         }
 
-        // Two reasons the shell is RETAINED rather than stripped, and either sends the
-        // comment inside the pair:
-        //
-        // - a line / own-line comment needs the parens on its own account (a bare line
-        //   comment would swallow the following `;`);
-        // - the calling POSITION parenthesizes this value anyway (`const x = (a = b)`),
-        //   so the pair is in the output whatever this builder does.
-        //
-        // The second is what stops the deferral below from marching a comment across a
-        // `)` the output still prints. That arm's licence is "this output erases the
-        // `)`" — true for a plain value (`const a = (x /* t */);` → `const a = x; /* t */`),
-        // false here, and a licence stops where its argument stops: the block comment of
-        // a parenthesized assignment was relocating out of a surviving pair
-        // (`const k = (x = y /* c */);` → `const k = (x = y); /* c */`) while the same
-        // construct one comma over — a non-last declarator, with no terminator to defer
-        // past — already kept it inside, and prettier keeps it inside in both.
+        // A FROZEN value inside a pair the trailing gap RETAINS (the two reasons are the
+        // tail builder's, [`Self::build_stripped_shell_tail_doc_with`]) prints as its slice
+        // inside that pair; the unfrozen twin of the same question is the tail builder's own
+        // first arm.
         if let Some(frozen) = frozen
             && self.shell_gap_retains_parens(expr_end, boundary_end, position_parens)
         {

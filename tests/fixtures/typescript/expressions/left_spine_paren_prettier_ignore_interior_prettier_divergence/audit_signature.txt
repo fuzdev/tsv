@@ -1,3 +1,12 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(output_prettier.<ext>).
+# This file exists when prettier is non-idempotent on output_prettier.* — it pins
+# the full chain so the audit recognizes the case and the validator catches drift.
+# See docs/fixture_overview.md (rule F4) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=2 (fixed point)%%
 <script lang="ts">
 	// an own-line directive inside the grouping parens the parser erases ahead of a
 	// construct's leftmost operand freezes THAT operand: a ternary's test
@@ -39,26 +48,20 @@
 	// gap, so the run hoists there, and the next pass freezes the whole branch from it
 	const q = cond
 		? r
-		:
-			// prettier-ignore
+		: // prettier-ignore
 			{x:   6}
 			? s
 			: t;
 
 	const u = cond
-		?
-			// prettier-ignore
+		? // prettier-ignore
 			{x:   7}
 			? v
 			: w
 		: y;
 
 	// the block spelling of the same shell forces the parent open the same way
-	const z = cond
-		? a1
-		:
-			/* prettier-ignore */
-			{x:   8}
+	const z = cond ? a1 : /* prettier-ignore */ {x:   8}
 			? b1
 			: c1;
 </script>
