@@ -38,13 +38,19 @@ What the cases pin:
   pulls the block up alone.
 - **c9** — a branch that breaks on its own hangs the same way.
 - **c10** — a chained conditional's gap, one level deeper.
+- **c12/c13** — a redundant paren shell around a **nested** conditional's TEST
+  (`: (⏎// c12⏎f2) ? g2 : h2`), in the alternate and the consequent. Stripping the shell
+  leaves the comment in the enclosing branch gap, so it takes the same answer as a shell
+  around the whole branch, in one pass — the one shape where prettier itself needs two
+  passes to reach its relocated form (pinned by `audit_signature_paren_shell.txt`).
 - **c11** — the control: a comment authored **on** the operator's line trails it in both
   formatters. Both authorings are stable under tsv — neither moves the comment to the
   other's line.
 
 `unformatted_ours_compact` authors every case flush and unspaced;
 `unformatted_ours_paren_shell` puts the `c1`, `c3` and `c4` runs inside a redundant paren
-shell around the branch, which strips to the same fixed point.
+shell around the branch, and the `c12` / `c13` runs inside the nested test's shell; each
+strips to the same fixed point.
 
 See [conformance_prettier.md §Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy)
 and [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

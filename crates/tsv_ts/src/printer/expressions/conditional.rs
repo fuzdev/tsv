@@ -135,6 +135,8 @@ enum TernaryNesting {
     /// same way and `printTernaryTest` adds an `align(2)` under the `: `, so the test
     /// continues one level plus two columns past the `:`; a call's arguments inside it
     /// flush that align to a whole tab (two levels), its `)` back at the two-column offset.
+    /// A multi-line block the test OWNS sits between the two — inside the indent, outside
+    /// the align (`Printer::place_nested_ternary_test`).
     Alternate,
 }
 
@@ -348,8 +350,8 @@ impl<'a> Printer<'a> {
     }
 
     /// Give a nested ternary's TEST the geometry its position takes ([`TernaryNesting`]).
-    /// The shared seam for both layouts, applied to the finished test doc — parens, the
-    /// for-init `in` shell and the stripped-paren comments included, since prettier's
+    /// The shared seam for both layouts, wrapped around the test's whole build — parens, the
+    /// for-init `in` shell and a retained shell run included, since prettier's
     /// `print("test")` carries all of those inside its `align`.
     ///
     /// tsv keeps a nested ternary's `?`/`:` lines under its OWN `indent` rather than under
@@ -357,12 +359,79 @@ impl<'a> Printer<'a> {
     /// do — but leaves the test at the parent's level, one indent short of prettier's
     /// `printBranch`. This is that indent, plus the alternate's `align(2)`
     /// (`ternary/nested_test_long`).
-    fn place_nested_ternary_test(&self, nesting: TernaryNesting, test: DocId) -> DocId {
+    ///
+    /// **A multi-line block the alternate's test OWNS is claimed here, between the indent and
+    /// the align.** Prettier binds a glued comment to the OUTERMOST node starting there — the
+    /// nested conditional — and its `printComments` wraps the whole nested doc, so the
+    /// comment sits inside `printBranch`'s indent but outside `printTernaryTest`'s `align(2)`,
+    /// its continuation lines one level past the `:`. tsv's ownership is innermost-wins, so
+    /// unclaimed the comment rides inside the test's doc and its `*/` lands two columns
+    /// further in (`\t\t   */`), the form the gap-emitted spelling of the same comment never
+    /// produces — a two-pass document (`ternary/nested_branch_multiline_block_comment`). The
+    /// seam is the one every other outermost claim goes through
+    /// ([`Printer::build_doc_with_outermost_owned_comment_at`], `docs/comments.md` §Owned
+    /// comments); the node that would otherwise claim is the test itself, since the doc the
+    /// claim wraps is the align around the test's own. The consequent has no align, so its
+    /// indent alone already lands the comment where prettier's does.
+    fn place_nested_ternary_test(
+        &self,
+        nesting: TernaryNesting,
+        test: &internal::Expression<'_>,
+        build_test: impl FnOnce() -> DocId,
+    ) -> DocId {
         let d = self.d();
         match nesting {
-            TernaryNesting::Root => test,
-            TernaryNesting::Consequent => d.indent(test),
-            TernaryNesting::Alternate => d.indent(d.align(2, test)),
+            TernaryNesting::Root => build_test(),
+            TernaryNesting::Consequent => d.indent(build_test()),
+            TernaryNesting::Alternate => d.indent(self.build_doc_with_outermost_owned_comment_at(
+                test.span().start,
+                Some(test),
+                || d.align(2, build_test()),
+            )),
+        }
+    }
+
+    /// Whether a CHAINED conditional's test shell — the grouping parens the parser stripped
+    /// from its test, which its own span still opens at (`(aaa) ? bbb : ccc` starts at the
+    /// `(`, as acorn's does) — belongs to the PARENT's `?` / `:` → branch gap.
+    ///
+    /// A comment inside that shell sits between the parent's operator and the first token the
+    /// nested conditional prints, and once the shell is gone the reparse finds it in the
+    /// parent's gap — so the parent's run is what lays it out, by that gap's rules (a soft
+    /// separator, a pulled-up `//`), and the nested skips its own shell run. Emitted by the
+    /// nested instead, inside the test's `align(2)` and with the shell emitter's own-line
+    /// `hardline`, the comment took a form the shell-free reparse re-laid: two passes, exactly
+    /// prettier's (`ternary/nested_branch_test_shell_comment`).
+    ///
+    /// The one shell the nested keeps is a shell holding an honored directive: the test's own
+    /// erased-paren freeze ([`Printer::build_left_spine_operand_doc`]) prints that region
+    /// verbatim, so a parent claiming it would print the directive twice. Both sides ask this
+    /// one predicate — the parent for where its gap ENDS ([`Self::branch_gap_end`]), the nested
+    /// for whether to emit — so the region has exactly one emitter either way.
+    fn chained_test_shell_is_parents(
+        &self,
+        nesting: TernaryNesting,
+        cond: &internal::ConditionalExpression<'_>,
+    ) -> bool {
+        nesting.is_chained()
+            && self
+                .left_spine_operand_frozen_span(cond.span.start, cond.test)
+                .is_none()
+    }
+
+    /// Where a `?` / `:` → branch gap ENDS: the branch's own start, or for a nested conditional
+    /// whose test shell the gap claims ([`Self::chained_test_shell_is_parents`]) the nested
+    /// TEST's start. Every scan over a branch gap — the line-comment and blank routing, the
+    /// comment-slot gate, the run itself — reads this one bound, so none of them can see the
+    /// shell's comments differently from the emitter that prints them.
+    fn branch_gap_end(&self, branch: &internal::Expression<'_>) -> u32 {
+        match branch {
+            internal::Expression::ConditionalExpression(nested)
+                if self.chained_test_shell_is_parents(TernaryNesting::Alternate, nested) =>
+            {
+                nested.test.span().start
+            }
+            _ => branch.span().start,
         }
     }
 
@@ -411,9 +480,11 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let is_chained = nesting.is_chained();
         let test_end = cond.test.span().end;
-        let consequent_start = cond.consequent.span().start;
+        // Where each branch gap ENDS — the branch's start, or past a nested conditional's
+        // stripped test shell, whose comments this gap claims ([`Self::branch_gap_end`]).
+        let consequent_start = self.branch_gap_end(cond.consequent);
         let consequent_end = cond.consequent.span().end;
-        let alternate_start = cond.alternate.span().start;
+        let alternate_start = self.branch_gap_end(cond.alternate);
 
         // Check for line comments that force breaking
         let has_line_comments = self.has_line_comments_between(test_end, consequent_start)
@@ -466,30 +537,6 @@ impl<'a> Printer<'a> {
         // position pairs its own builder would have) — a paren around the whole conditional
         // is a different authoring and lands in the enclosing head's gap instead, where it
         // freezes the value whole.
-        let test = self.build_left_spine_operand_doc(
-            cond.span.start,
-            cond.test,
-            FrozenOperandPair::Emitted,
-            || {
-                if indent_binary_test {
-                    // The term does not fire, so the ordinary dispatch's continuation-indent
-                    // default is already the answer.
-                    self.build_expression_doc(cond.test)
-                } else {
-                    // shouldNotIndent = true (grandparent is assignment, variable, etc.) — an
-                    // explicit opt-out, through the seam that owns the owned-comment prepend
-                    // so the two arms cannot disagree about it.
-                    self.build_flat_chain_expression_doc(cond.test)
-                }
-            },
-        );
-        // Several test-position expressions get parens (Prettier: needs-parentheses.js).
-        // See `ternary_test_needs_parens` for the arrow/yield semantics vs the
-        // `as`/`satisfies`/assignment/`??` clarity cases.
-        let test = self.parenthesize_ternary_test(cond.test, test);
-        // Parenthesize an `in` test inside a for-header init (`for (a = (b in c) ? …;…)`);
-        // a no-op elsewhere. The test is `[~In]`, so the parens are load-bearing.
-        let test = self.wrap_for_init_in(cond.test, test);
         // Comments the parser stripped along with the test's grouping parens
         // (`(/* c */ a ?? b) ? x : y`) live in the gap between the conditional's own
         // start (the removed `(`) and the test's — no other emitter covers it, so
@@ -503,16 +550,46 @@ impl<'a> Printer<'a> {
         // whole conditional (`(⏎// c⏎a as any) ? b : c` → `// c⏎(a as any)⏎\t? b⏎\t: c`),
         // which is not a fixed point — the reparse reads the comment as leading the
         // conditional and prints the group flat. Prettier's own second pass lands there
-        // for the same reason; tsv gets there in one. A chained conditional keeps the run
-        // on its test: the parent's group breaks either way, and
-        // `place_nested_ternary_test` owns the test's indent.
-        let shell_run = self.removed_paren_comments_opt(cond.span.start, cond.test.span().start);
-        let (test, root_run) = if is_chained {
-            (self.prepend_opt(shell_run, test), None)
+        // for the same reason; tsv gets there in one. A CHAINED conditional's shell is its
+        // parent's branch gap ([`Self::chained_test_shell_is_parents`]): the parent's run
+        // prints it, and only a shell the test's own freeze keeps is emitted here, on the
+        // test inside `place_nested_ternary_test`'s geometry.
+        let shell_is_parents = self.chained_test_shell_is_parents(nesting, cond);
+        let shell_run = (!shell_is_parents)
+            .then(|| self.removed_paren_comments_opt(cond.span.start, cond.test.span().start))
+            .flatten();
+        let (shell_run, root_run) = if is_chained {
+            (shell_run, None)
         } else {
-            (test, shell_run)
+            (None, shell_run)
         };
-        let test = self.place_nested_ternary_test(nesting, test);
+        let test = self.place_nested_ternary_test(nesting, cond.test, || {
+            let test = self.build_left_spine_operand_doc(
+                cond.span.start,
+                cond.test,
+                FrozenOperandPair::Emitted,
+                || {
+                    if indent_binary_test {
+                        // The term does not fire, so the ordinary dispatch's
+                        // continuation-indent default is already the answer.
+                        self.build_expression_doc(cond.test)
+                    } else {
+                        // shouldNotIndent = true (grandparent is assignment, variable, etc.)
+                        // — an explicit opt-out, through the seam that owns the owned-comment
+                        // prepend so the two arms cannot disagree about it.
+                        self.build_flat_chain_expression_doc(cond.test)
+                    }
+                },
+            );
+            // Several test-position expressions get parens (Prettier: needs-parentheses.js).
+            // See `ternary_test_needs_parens` for the arrow/yield semantics vs the
+            // `as`/`satisfies`/assignment/`??` clarity cases.
+            let test = self.parenthesize_ternary_test(cond.test, test);
+            // Parenthesize an `in` test inside a for-header init (`for (a = (b in c) ? …;…)`);
+            // a no-op elsewhere. The test is `[~In]`, so the parens are load-bearing.
+            let test = self.wrap_for_init_in(cond.test, test);
+            self.prepend_opt(shell_run, test)
+        });
         // Prettier's `shouldNotIndent` (`print/binaryish.js`) also applies to binaries
         // in consequent/alternate positions: when parent is ConditionalExpression and
         // grandparent is ReturnStatement/ThrowStatement/CallExpression/NewExpression,
@@ -566,11 +643,13 @@ impl<'a> Printer<'a> {
         // Branch-gap comment runs (`? /* c */ b`, `: /* c */ c`): each comment's
         // separator is keyed on the source after it — glued stays glued, an authored
         // break becomes a collapsible line that holds while the ternary is broken and
-        // yields when it is flat (`build_branch_comment_run`). A nested-conditional
-        // branch levels itself, so its soft separator shifts only the first line
-        // (`indent(line)`); a normal branch's run rides inside the branch's own
-        // structural indent with a bare `line`, so the value and its continuations
-        // land one level past the operator.
+        // yields when it is flat (`build_branch_comment_run`). The run rides inside the
+        // branch's indent at BOTH branch kinds — prettier's `printBranch` indents the whole
+        // branch, comments included, and a nested conditional's run is where that shows: its
+        // `?`/`:` lines level themselves, so the run's own `indent` is what puts a multi-line
+        // comment's continuation lines one level past the operator, beside the nested test
+        // (`ternary/nested_branch_multiline_block_comment`). A normal branch's run rides
+        // inside the branch's own structural indent with the same bare `line`.
 
         // Handle nested conditional in consequent specially:
         // - When flat: parens for parsing `a ? (b ? c : d) : e`
@@ -582,16 +661,22 @@ impl<'a> Printer<'a> {
         let consequent_doc = if let internal::Expression::ConditionalExpression(nested) =
             cond.consequent
         {
-            let run = question_pos.and_then(|q| {
-                self.build_branch_comment_run(q + 1, consequent_start, d.indent(d.line()))
-            });
+            let run = question_pos
+                .and_then(|q| self.build_branch_comment_run(q + 1, consequent_start, d.line()))
+                .map(|run| d.indent(run));
             // Broken version: continue chain without parens. The nested ternary's own
             // binaries have THIS ternary for a grandparent, so `indent_binary_test` stops
             // here.
             let broken_consequent =
                 self.build_conditional_doc_impl(nested, TernaryNesting::Consequent, false);
             let broken_consequent = self.prepend_opt(run, broken_consequent);
-            if d.will_break(consequent) {
+            // The RUN's break counts too: a multi-line block comment in the gap is a hard
+            // break prettier's `propagateBreaks` carries to the enclosing group, but tsv's
+            // `if_break` deliberately softens a forced break in its flat arm
+            // (`DocArena::subtree_layout_memo`), so asked of the arms alone the group stayed
+            // flat around a comment that cannot print flat — parens kept, the comment's
+            // closing line at the wrong indent.
+            if d.will_break(consequent) || run.is_some_and(|run| d.will_break(run)) {
                 // Consequent forces breaking (e.g., line comments produce hardlines).
                 // Skip if_break and use broken layout directly — the outer group
                 // will break because broken_consequent contains hardlines.
@@ -619,14 +704,28 @@ impl<'a> Printer<'a> {
         let alternate_doc = if let internal::Expression::ConditionalExpression(nested) =
             cond.alternate
         {
-            let run = colon_pos.and_then(|c| {
-                self.build_branch_comment_run(c + 1, alternate_start, d.indent(d.line()))
-            });
+            let run = colon_pos
+                .and_then(|c| self.build_branch_comment_run(c + 1, alternate_start, d.line()))
+                .map(|run| d.indent(run));
             // Recursively build as chained (no group wrapper, no parens). No indent
-            // wrapper — the nested conditional indents its own `?`/`:` lines and places
-            // its test for this position. `indent_binary_test` stops here (see above).
-            let nested_doc =
-                self.build_conditional_doc_impl(nested, TernaryNesting::Alternate, false);
+            // wrapper around the nested doc — the nested conditional indents its own
+            // `?`/`:` lines and places its test for this position; the run above carries
+            // its own. `indent_binary_test` stops here (see above).
+            // The alternate's OWN trailing gap — the interior of a stripped shell past the
+            // nested conditional's end (`: (aaa ? bbb : ccc /* t */)`), which the nested
+            // conditional's span stops short of and no other scan reaches (the consequent's
+            // twin gap rides the `:`-gap scan above); without an emitter the comment was
+            // DROPPED (`gaps:audit`). It takes the same tail every other stripped value shell
+            // takes ([`Printer::build_stripped_shell_tail_doc`]): a block defers past a
+            // statement `;` in one pass, as the non-nested branch's does and as prettier's
+            // second pass lands it; a `//` retains the pair. Empty for a bare chain, whose two
+            // ends coincide.
+            let nested_doc = self.build_stripped_shell_tail_doc(
+                cond.alternate,
+                nested.span.end,
+                cond.span.end,
+                || self.build_conditional_doc_impl(nested, TernaryNesting::Alternate, false),
+            );
             self.prepend_opt(run, nested_doc)
         } else {
             let run = colon_pos
@@ -701,29 +800,53 @@ impl<'a> Printer<'a> {
         let consequent_end = cond.consequent.span().end;
         let alternate_start = cond.alternate.span().start;
 
-        // Build test expression with parens if needed — the same seam as the
-        // non-breaking path, so the load-bearing arrow/yield parens (and the
-        // `as`/`satisfies` clarity parens) are never dropped just because a branch
-        // carries a line comment.
-        let test_doc = self.build_left_spine_operand_doc(
-            cond.span.start,
-            cond.test,
-            FrozenOperandPair::Emitted,
-            || self.build_expression_doc(cond.test),
-        );
-        let test = self.parenthesize_ternary_test(cond.test, test_doc);
-        // Parenthesize an `in` test inside a for-header init (`for (a = (b in c) ? …;…)`);
-        // a no-op elsewhere. The test is `[~In]`, so the parens are load-bearing.
-        let test = self.wrap_for_init_in(cond.test, test);
         // Stripped-grouping-paren comments on the test — see the sibling in
-        // `build_conditional_doc`; both layouts must emit them or the comment is lost.
-        let test =
-            self.prepend_removed_paren_comments(cond.span.start, cond.test.span().start, test);
-        let test = self.place_nested_ternary_test(nesting, test);
+        // `build_conditional_doc`; both layouts must emit them or the comment is lost, and
+        // both hand a chained conditional's shell to the parent's gap the same way.
+        let shell_run = (!self.chained_test_shell_is_parents(nesting, cond))
+            .then(|| self.removed_paren_comments_opt(cond.span.start, cond.test.span().start))
+            .flatten();
+        let test = self.place_nested_ternary_test(nesting, cond.test, || {
+            // Build test expression with parens if needed — the same seam as the
+            // non-breaking path, so the load-bearing arrow/yield parens (and the
+            // `as`/`satisfies` clarity parens) are never dropped just because a branch
+            // carries a line comment.
+            let test_doc = self.build_left_spine_operand_doc(
+                cond.span.start,
+                cond.test,
+                FrozenOperandPair::Emitted,
+                || self.build_expression_doc(cond.test),
+            );
+            let test = self.parenthesize_ternary_test(cond.test, test_doc);
+            // Parenthesize an `in` test inside a for-header init (`for (a = (b in c) ? …;…)`);
+            // a no-op elsewhere. The test is `[~In]`, so the parens are load-bearing.
+            let test = self.wrap_for_init_in(cond.test, test);
+            self.prepend_opt(shell_run, test)
+        });
 
         // Find the ? and : positions for proper comment categorization
         let question_pos = self.find_char_outside_comments(test_end, consequent_start, b'?');
         let colon_pos = self.find_char_outside_comments(consequent_end, alternate_start, b':');
+
+        // The `?`→consequent and `:`→alternate value heads: an own-line directive in either
+        // gap freezes the whole branch ([`Self::frozen_ternary_branch_doc`]). Resolved ahead
+        // of the gap emitters because the two disagree about where the gap ENDS: a frozen
+        // branch is a verbatim slice from its own span start, shell and all, while an
+        // unfrozen nested conditional's shell is this gap's to print
+        // ([`Self::branch_gap_end`]) — claiming past a frozen slice's start prints the shell's
+        // comments twice.
+        let consequent_frozen = self.frozen_ternary_branch_doc(cond.consequent, question_pos);
+        let consequent_gap_end = if consequent_frozen.is_some() {
+            consequent_start
+        } else {
+            self.branch_gap_end(cond.consequent)
+        };
+        let alternate_frozen = self.frozen_ternary_branch_doc(cond.alternate, colon_pos);
+        let alternate_gap_end = if alternate_frozen.is_some() {
+            alternate_start
+        } else {
+            self.branch_gap_end(cond.alternate)
+        };
 
         let mut parts = smallvec![test];
 
@@ -750,32 +873,29 @@ impl<'a> Printer<'a> {
         // `on_own_line` is set when a comment can't share the consequent's line (the
         // blank, if any, is preserved below).
         let consequent_placement =
-            self.emit_ternary_branch_comments(&mut q_parts, question_pos, consequent_start);
+            self.emit_ternary_branch_comments(&mut q_parts, question_pos, consequent_gap_end);
 
         // Consequent expression — when the outer ternary enters breaking layout
         // (line comments or multiline templates), nested conditionals in the
         // consequent must also break. Without group_break, the inner ternary's
         // group stays flat (content fits on one line), but Prettier cascades
         // the break from the parent to the entire ternary chain.
-        // The `?`→consequent value head: an own-line directive in the gap freezes the whole
-        // branch ([`Self::frozen_ternary_branch_doc`]).
-        let (consequent, is_nested_cond) =
-            if let Some(frozen) = self.frozen_ternary_branch_doc(cond.consequent, question_pos) {
-                (frozen, false)
-            } else if let internal::Expression::ConditionalExpression(nested) = cond.consequent {
-                let chained =
-                    self.build_conditional_doc_impl(nested, TernaryNesting::Consequent, false);
-                (d.group_break(chained), true)
-            } else {
-                // Clarity parens (`(a ?? b)`, `(x as T)`) exactly as the inline layout
-                // applies them — the line-comment path must not drop them.
-                let expr_doc = self
-                    .wrap_for_init_in(cond.consequent, self.build_expression_doc(cond.consequent));
-                (
-                    self.parenthesize_ternary_branch(cond.consequent, expr_doc, None),
-                    false,
-                )
-            };
+        let (consequent, is_nested_cond) = if let Some(frozen) = consequent_frozen {
+            (frozen, false)
+        } else if let internal::Expression::ConditionalExpression(nested) = cond.consequent {
+            let chained =
+                self.build_conditional_doc_impl(nested, TernaryNesting::Consequent, false);
+            (d.group_break(chained), true)
+        } else {
+            // Clarity parens (`(a ?? b)`, `(x as T)`) exactly as the inline layout
+            // applies them — the line-comment path must not drop them.
+            let expr_doc =
+                self.wrap_for_init_in(cond.consequent, self.build_expression_doc(cond.consequent));
+            (
+                self.parenthesize_ternary_branch(cond.consequent, expr_doc, None),
+                false,
+            )
+        };
         // A nested conditional handles its own indent via its chained structure;
         // any other consequent hangs one level deeper (its own multiline content
         // then aligns with the main layout, whether it sits on its own line after a
@@ -807,23 +927,22 @@ impl<'a> Printer<'a> {
 
         // Comments between : and alternate — same shape as the ?→consequent gap.
         let alternate_placement =
-            self.emit_ternary_branch_comments(&mut q_parts, colon_pos, alternate_start);
+            self.emit_ternary_branch_comments(&mut q_parts, colon_pos, alternate_gap_end);
 
         // Alternate expression - nested conditionals cascade the break without extra indent
         // The `:`→alternate value head, the consequent's mirror.
-        let alternate_doc =
-            if let Some(frozen) = self.frozen_ternary_branch_doc(cond.alternate, colon_pos) {
-                d.indent(frozen)
-            } else if let internal::Expression::ConditionalExpression(nested) = cond.alternate {
-                // Recursively use breaking layout - no indent wrapper (has its own structure)
-                self.build_conditional_doc_with_line_comments(nested, TernaryNesting::Alternate)
-            } else {
-                // Regular expressions get indent wrapper, plus the same clarity parens
-                // the inline layout applies (`(a ?? b)`, `(x as T)`).
-                let expr_doc = self
-                    .wrap_for_init_in(cond.alternate, self.build_expression_doc(cond.alternate));
-                d.indent(self.parenthesize_ternary_branch(cond.alternate, expr_doc, None))
-            };
+        let alternate_doc = if let Some(frozen) = alternate_frozen {
+            d.indent(frozen)
+        } else if let internal::Expression::ConditionalExpression(nested) = cond.alternate {
+            // Recursively use breaking layout - no indent wrapper (has its own structure)
+            self.build_conditional_doc_with_line_comments(nested, TernaryNesting::Alternate)
+        } else {
+            // Regular expressions get indent wrapper, plus the same clarity parens
+            // the inline layout applies (`(a ?? b)`, `(x as T)`).
+            let expr_doc =
+                self.wrap_for_init_in(cond.alternate, self.build_expression_doc(cond.alternate));
+            d.indent(self.parenthesize_ternary_branch(cond.alternate, expr_doc, None))
+        };
 
         self.push_ternary_branch_value(&mut q_parts, alternate_placement, alternate_doc);
 
@@ -869,6 +988,11 @@ impl<'a> Printer<'a> {
     /// and never enters the run; the bare `? // c⏎/* m */ x` is inert here for that reason,
     /// and moves only at the type gap, where a type owns nothing. Spending the answer is
     /// [`Self::push_ternary_branch_value`]'s job, not the caller's.
+    ///
+    /// An own-line comment is placed by a real `indent`, never by an indent-width text ahead
+    /// of it: a text indents the comment's first line only, and a multi-line block's
+    /// continuation lines then land one level short of it
+    /// (`ternary/nested_branch_multiline_block_comment`).
     fn emit_ternary_branch_comments(
         &self,
         parts: &mut DocBuf,
@@ -894,29 +1018,31 @@ impl<'a> Printer<'a> {
             // follows a comment — the emitter never relocates a directive.
             let directive = self.is_honored_directive(comment);
             if i == 0 && (directive || first_keeps_own_line) {
-                parts.push(d.hardline());
-                parts.push(d.text(INDENT));
+                parts.push(d.indent(d.concat(&[d.hardline(), self.build_comment_doc(comment)])));
             } else if i == 0 {
                 // First comment trails the operator inline (`? /* c */`).
                 parts.push(d.text(" "));
+                parts.push(self.build_comment_doc(comment));
             } else if !directive
                 && self.trailing_run_hugs_previous(Some(comments[i - 1]), comment.span.start)
             {
                 // Glued to the previous comment — keep the line the author wrote them on,
-                // and take no INDENT: the run did not start a new line to indent onto
+                // and take no indent: the run did not start a new line to indent onto
                 // ([`Printer::trailing_run_hugs_previous`], the rule every comment run
                 // reads).
                 parts.push(d.text(" "));
+                parts.push(self.build_comment_doc(comment));
             } else {
                 // Subsequent comments take their own line (author blank preserved).
+                let mut own_line = DocBuf::new();
                 self.push_blank_preserving_hardline(
-                    parts,
+                    &mut own_line,
                     comments[i - 1].span.end,
                     comment.span.start,
                 );
-                parts.push(d.text(INDENT));
+                own_line.push(self.build_comment_doc(comment));
+                parts.push(d.indent(d.concat(&own_line)));
             }
-            parts.push(self.build_comment_doc(comment));
         }
         // The placement — the run's last comment alone, read forward — and the strict,
         // ceiling-bounded blank scan behind it are the type gap's answer too, so both gaps

@@ -2077,19 +2077,91 @@ impl<'a> Printer<'a> {
         // (`const k = (x = y /* c */);` → `const k = (x = y); /* c */`) while the same
         // construct one comma over — a non-last declarator, with no terminator to defer
         // past — already kept it inside, and prettier keeps it inside in both.
+        if let Some(frozen) = frozen
+            && self.shell_gap_retains_parens(expr_end, boundary_end, position_parens)
+        {
+            return self.build_frozen_kept_paren_doc(frozen, boundary_end);
+        }
+        self.build_stripped_shell_tail_doc_with(
+            expr,
+            expr_end,
+            boundary_end,
+            tail,
+            position_parens,
+            || wrap_in(self.build_shell_inner_doc(expr, frozen)),
+        )
+    }
+
+    /// The trailing half of [`Self::build_shell_value_doc`] for a value whose doc the
+    /// CALLER builds: a chained conditional in a ternary ALTERNATE (`: (aaa ? bbb : ccc /* t */)`),
+    /// whose branch arm builds the nested conditional in its chained geometry and so cannot
+    /// hand the whole value to the shell builder. `expr_end` is where the value's own
+    /// printed content ends, `boundary_end` where the stripped shell closes; the caller's
+    /// position supplies no pair of its own. The tail policy is the position's
+    /// ([`Self::shell_tail`]), read here so the caller cannot name it wrong.
+    pub(in crate::printer) fn build_stripped_shell_tail_doc(
+        &self,
+        expr: &internal::Expression<'_>,
+        expr_end: u32,
+        boundary_end: u32,
+        inner: impl FnOnce() -> DocId,
+    ) -> DocId {
+        self.build_stripped_shell_tail_doc_with(
+            expr,
+            expr_end,
+            boundary_end,
+            self.shell_tail(boundary_end),
+            false,
+            inner,
+        )
+    }
+
+    /// A stripped value shell's TRAILING gap — `expr_end` (the value's printed end) to
+    /// `boundary_end` (the shell's close) — laid out around the value's doc, which `inner`
+    /// builds on demand. One spelling for [`Self::build_shell_value_doc`] and the
+    /// caller-built values ([`Self::build_stripped_shell_tail_doc`]): the drop the
+    /// ternary's nested-alternate arm carried was exactly a value this builder never saw.
+    ///
+    /// Two reasons the shell is RETAINED rather than stripped, and either sends the
+    /// comment inside the pair:
+    ///
+    /// - a line / own-line comment needs the parens on its own account (a bare line
+    ///   comment would swallow the following `;`);
+    /// - the calling POSITION parenthesizes this value anyway (`const x = (a = b)`),
+    ///   so the pair is in the output whatever this builder does.
+    ///
+    /// The second is what stops the deferral below from marching a comment across a
+    /// `)` the output still prints. That arm's licence is "this output erases the
+    /// `)`" — true for a plain value (`const a = (x /* t */);` → `const a = x; /* t */`),
+    /// false here, and a licence stops where its argument stops: the block comment of
+    /// a parenthesized assignment was relocating out of a surviving pair
+    /// (`const k = (x = y /* c */);` → `const k = (x = y); /* c */`) while the same
+    /// construct one comma over — a non-last declarator, with no terminator to defer
+    /// past — already kept it inside, and prettier keeps it inside in both. A retained pair
+    /// prints the value afresh through the keep-paren builder — inside the author's pair a
+    /// chained conditional is a root one, so `inner`'s chained geometry is not wanted there.
+    fn build_stripped_shell_tail_doc_with(
+        &self,
+        expr: &internal::Expression<'_>,
+        expr_end: u32,
+        boundary_end: u32,
+        tail: ShellTail,
+        position_parens: bool,
+        inner: impl FnOnce() -> DocId,
+    ) -> DocId {
+        if !self.has_trailing_paren_comments(expr_end, boundary_end) {
+            return inner();
+        }
         if self.shell_gap_retains_parens(expr_end, boundary_end, position_parens) {
-            return match frozen {
-                Some(frozen) => self.build_frozen_kept_paren_doc(frozen, boundary_end),
-                None => self.build_expression_doc_keep_paren_comments(
-                    expr,
-                    boundary_end,
-                    SeqLayout::Aligned,
-                ),
-            };
+            return self.build_expression_doc_keep_paren_comments(
+                expr,
+                boundary_end,
+                SeqLayout::Aligned,
+            );
         }
 
         let d = self.d();
-        let inner = wrap_in(self.build_shell_inner_doc(expr, frozen));
+        let inner = inner();
 
         // Every comment left here is a same-line block. Where the shell is the last
         // thing before a statement `;`, that block defers past the terminator — the same
