@@ -237,6 +237,8 @@ Hard non-goals:
 - [docs/architecture.md](docs/architecture.md) - the major design decisions
 - [docs/directives.md](docs/directives.md) - `format-ignore` / `prettier-ignore` formatting directives
 - [docs/cli.md](docs/cli.md) - commands and design
+- [docs/audits.md](docs/audits.md) - the standing audit gates: what each proves, its blind spots, and where it gates
+- [docs/benchmarks.md](docs/benchmarks.md) - benchmark fairness caveats, the implementation catalog, and binary size reporting
 - [docs/conformance_prettier.md](docs/conformance_prettier.md) - where formatting diverges from Prettier (and why); its §Catalogs table indexes the per-language catalogs
 - [docs/conformance_svelte.md](docs/conformance_svelte.md) - where the parser diverges from Svelte (and why)
 - [docs/conformance_test262.md](docs/conformance_test262.md) - ECMAScript parser conformance
