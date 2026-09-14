@@ -53,6 +53,21 @@
 				y
 			: z;
 
+	// A redundant paren shell around a NESTED conditional's test strips to the same gap, so an
+	// own-line `//` inside it keeps its line the same way, in the alternate and the consequent.
+	const b2 = cond
+		? e2
+		: // c12
+			f2
+			? g2
+			: h2;
+	const d2 = cond
+		? // c13
+			e3
+			? f3
+			: g3
+		: h3;
+
 	// Control: a comment the author put ON the operator's line trails it, as before.
 	const a1 = cond
 		? // c11

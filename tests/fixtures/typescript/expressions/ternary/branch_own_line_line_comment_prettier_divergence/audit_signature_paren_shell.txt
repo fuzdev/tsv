@@ -1,0 +1,164 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script lang="ts">
+	// An own-line `//` in a conditional's `?`→consequent gap keeps the line the author gave it;
+	// the branch hangs one level in below it.
+	const a = cond
+		? // c1
+			b
+		: c;
+
+	// ...and in the `:`→alternate gap.
+	const d = cond
+		? e
+		: // c2
+			f;
+
+	// A branch's clarity parens survive the hang, and so does a comment trailing the branch.
+	const g = cond
+		? // c3
+			(h ?? i)
+		: j;
+
+	const k = cond
+		? l
+		: // c4
+			(m as T); // t
+
+	// A run keeps one comment per line, in order.
+	const n = cond
+		? // c5
+			// c6
+			o
+		: p;
+
+	// A block ahead of the line comment keeps its own line too.
+	const q = cond
+		? r
+		: /* c7 */
+			// c8
+			s;
+
+	// A branch that breaks on its own hangs the same way.
+	const t = cond
+		? // c9
+			fn({
+				u: 1
+			})
+		: v;
+
+	// A chained conditional's alternate gap.
+	const w = cond1
+		? x
+		: cond2
+			? // c10
+				y
+			: z;
+
+	// A redundant paren shell around a NESTED conditional's test strips to the same gap, so an
+	// own-line `//` inside it keeps its line the same way, in the alternate and the consequent.
+	const b2 = cond
+		? e2
+		: // c12
+			  f2
+			? g2
+			: h2;
+	const d2 = cond
+		? // c13
+			e3
+			? f3
+			: g3
+		: h3;
+
+	// Control: a comment the author put ON the operator's line trails it, as before.
+	const a1 = cond
+		? // c11
+			b1
+		: c1;
+</script>
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// An own-line `//` in a conditional's `?`→consequent gap keeps the line the author gave it;
+	// the branch hangs one level in below it.
+	const a = cond
+		? // c1
+			b
+		: c;
+
+	// ...and in the `:`→alternate gap.
+	const d = cond
+		? e
+		: // c2
+			f;
+
+	// A branch's clarity parens survive the hang, and so does a comment trailing the branch.
+	const g = cond
+		? // c3
+			(h ?? i)
+		: j;
+
+	const k = cond
+		? l
+		: // c4
+			(m as T); // t
+
+	// A run keeps one comment per line, in order.
+	const n = cond
+		? // c5
+			// c6
+			o
+		: p;
+
+	// A block ahead of the line comment keeps its own line too.
+	const q = cond
+		? r
+		: /* c7 */
+			// c8
+			s;
+
+	// A branch that breaks on its own hangs the same way.
+	const t = cond
+		? // c9
+			fn({
+				u: 1
+			})
+		: v;
+
+	// A chained conditional's alternate gap.
+	const w = cond1
+		? x
+		: cond2
+			? // c10
+				y
+			: z;
+
+	// A redundant paren shell around a NESTED conditional's test strips to the same gap, so an
+	// own-line `//` inside it keeps its line the same way, in the alternate and the consequent.
+	const b2 = cond
+		? e2
+		: // c12
+			f2
+			? g2
+			: h2;
+	const d2 = cond
+		? // c13
+			e3
+			? f3
+			: g3
+		: h3;
+
+	// Control: a comment the author put ON the operator's line trails it, as before.
+	const a1 = cond
+		? // c11
+			b1
+		: c1;
+</script>

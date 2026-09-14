@@ -1,0 +1,1693 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1058,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An indentable block comment leading a NESTED conditional in the alternate: its",
+			"start": 10,
+			"end": 91,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " continuation lines take the branch's indent, ahead of the nested test",
+			"start": 93,
+			"end": 165,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " y\n\t ",
+			"start": 190,
+			"end": 201,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 4
+				},
+				"end": {
+					"line": 7,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " JSDoc-style star lines land at the same column",
+			"start": 227,
+			"end": 276,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* y\n\t * z\n\t ",
+			"start": 301,
+			"end": 321,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 4
+				},
+				"end": {
+					"line": 16,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A comment the author broke after: the nested test drops below it at that indent",
+			"start": 347,
+			"end": 429,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " y\n\t ",
+			"start": 454,
+			"end": 465,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 4
+				},
+				"end": {
+					"line": 24,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Deeper in a chain, one level further",
+			"start": 494,
+			"end": 533,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " y\n\t ",
+			"start": 572,
+			"end": 584,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 5
+				},
+				"end": {
+					"line": 35,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " In the consequent the comment breaks the conditional, so the nested one prints bare",
+			"start": 612,
+			"end": 698,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 1
+				},
+				"end": {
+					"line": 39,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " y\n\t ",
+			"start": 717,
+			"end": 728,
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 4
+				},
+				"end": {
+					"line": 42,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A preserved (non-indentable) block keeps its own columns and still breaks it",
+			"start": 760,
+			"end": 839,
+			"loc": {
+				"start": {
+					"line": 47,
+					"column": 1
+				},
+				"end": {
+					"line": 47,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " y\n\tz ",
+			"start": 858,
+			"end": 868,
+			"loc": {
+				"start": {
+					"line": 49,
+					"column": 4
+				},
+				"end": {
+					"line": 50,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Controls: a non-nested branch and the test position",
+			"start": 900,
+			"end": 954,
+			"loc": {
+				"start": {
+					"line": 55,
+					"column": 1
+				},
+				"end": {
+					"line": 55,
+					"column": 55
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " y\n\t ",
+			"start": 979,
+			"end": 990,
+			"loc": {
+				"start": {
+					"line": 58,
+					"column": 4
+				},
+				"end": {
+					"line": 59,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " y\n ",
+			"start": 1010,
+			"end": 1020,
+			"loc": {
+				"start": {
+					"line": 61,
+					"column": 2
+				},
+				"end": {
+					"line": 62,
+					"column": 5
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1057,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 1048,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 63,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 167,
+					"end": 224,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 173,
+							"end": 223,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 173,
+								"end": 175,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 9
+									}
+								},
+								"name": "x1"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 178,
+								"end": 223,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 12
+									},
+									"end": {
+										"line": 9,
+										"column": 8
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 178,
+									"end": 179,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 12
+										},
+										"end": {
+											"line": 4,
+											"column": 13
+										}
+									},
+									"name": "a"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 184,
+									"end": 185,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 4
+										},
+										"end": {
+											"line": 5,
+											"column": 5
+										}
+									},
+									"name": "b"
+								},
+								"alternate": {
+									"type": "ConditionalExpression",
+									"start": 202,
+									"end": 223,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 7
+										},
+										"end": {
+											"line": 9,
+											"column": 8
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 202,
+										"end": 205,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 7
+											},
+											"end": {
+												"line": 7,
+												"column": 10
+											}
+										},
+										"name": "aaa"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 211,
+										"end": 214,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 5
+											},
+											"end": {
+												"line": 8,
+												"column": 8
+											}
+										},
+										"name": "bbb"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 220,
+										"end": 223,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 5
+											},
+											"end": {
+												"line": 9,
+												"column": 8
+											}
+										},
+										"name": "ccc"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " y\n\t ",
+											"start": 190,
+											"end": 201
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An indentable block comment leading a NESTED conditional in the alternate: its",
+							"start": 10,
+							"end": 91
+						},
+						{
+							"type": "Line",
+							"value": " continuation lines take the branch's indent, ahead of the nested test",
+							"start": 93,
+							"end": 165
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 278,
+					"end": 344,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 284,
+							"end": 343,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 18,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 284,
+								"end": 286,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 9
+									}
+								},
+								"name": "x2"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 289,
+								"end": 343,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 12
+									},
+									"end": {
+										"line": 18,
+										"column": 8
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 289,
+									"end": 290,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 12
+										},
+										"end": {
+											"line": 12,
+											"column": 13
+										}
+									},
+									"name": "a"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 295,
+									"end": 296,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 4
+										},
+										"end": {
+											"line": 13,
+											"column": 5
+										}
+									},
+									"name": "b"
+								},
+								"alternate": {
+									"type": "ConditionalExpression",
+									"start": 322,
+									"end": 343,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 7
+										},
+										"end": {
+											"line": 18,
+											"column": 8
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 322,
+										"end": 325,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 7
+											},
+											"end": {
+												"line": 16,
+												"column": 10
+											}
+										},
+										"name": "aaa"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 331,
+										"end": 334,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 5
+											},
+											"end": {
+												"line": 17,
+												"column": 8
+											}
+										},
+										"name": "bbb"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 340,
+										"end": 343,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 5
+											},
+											"end": {
+												"line": 18,
+												"column": 8
+											}
+										},
+										"name": "ccc"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": "* y\n\t * z\n\t ",
+											"start": 301,
+											"end": 321
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " JSDoc-style star lines land at the same column",
+							"start": 227,
+							"end": 276
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 431,
+					"end": 491,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 437,
+							"end": 490,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 7
+								},
+								"end": {
+									"line": 27,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 437,
+								"end": 439,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 7
+									},
+									"end": {
+										"line": 21,
+										"column": 9
+									}
+								},
+								"name": "x3"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 442,
+								"end": 490,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 12
+									},
+									"end": {
+										"line": 27,
+										"column": 8
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 442,
+									"end": 443,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 12
+										},
+										"end": {
+											"line": 21,
+											"column": 13
+										}
+									},
+									"name": "a"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 448,
+									"end": 449,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 4
+										},
+										"end": {
+											"line": 22,
+											"column": 5
+										}
+									},
+									"name": "b"
+								},
+								"alternate": {
+									"type": "ConditionalExpression",
+									"start": 469,
+									"end": 490,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 3
+										},
+										"end": {
+											"line": 27,
+											"column": 8
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 469,
+										"end": 472,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 3
+											},
+											"end": {
+												"line": 25,
+												"column": 6
+											}
+										},
+										"name": "aaa"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 478,
+										"end": 481,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 5
+											},
+											"end": {
+												"line": 26,
+												"column": 8
+											}
+										},
+										"name": "bbb"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 487,
+										"end": 490,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 5
+											},
+											"end": {
+												"line": 27,
+												"column": 8
+											}
+										},
+										"name": "ccc"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " y\n\t ",
+											"start": 454,
+											"end": 465
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment the author broke after: the nested test drops below it at that indent",
+							"start": 347,
+							"end": 429
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 535,
+					"end": 609,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 37,
+							"column": 10
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 541,
+							"end": 608,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 7
+								},
+								"end": {
+									"line": 37,
+									"column": 9
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 541,
+								"end": 543,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 7
+									},
+									"end": {
+										"line": 30,
+										"column": 9
+									}
+								},
+								"name": "x4"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 546,
+								"end": 608,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 12
+									},
+									"end": {
+										"line": 37,
+										"column": 9
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 546,
+									"end": 547,
+									"loc": {
+										"start": {
+											"line": 30,
+											"column": 12
+										},
+										"end": {
+											"line": 30,
+											"column": 13
+										}
+									},
+									"name": "a"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 552,
+									"end": 553,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 4
+										},
+										"end": {
+											"line": 31,
+											"column": 5
+										}
+									},
+									"name": "b"
+								},
+								"alternate": {
+									"type": "ConditionalExpression",
+									"start": 558,
+									"end": 608,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 4
+										},
+										"end": {
+											"line": 37,
+											"column": 9
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 558,
+										"end": 559,
+										"loc": {
+											"start": {
+												"line": 32,
+												"column": 4
+											},
+											"end": {
+												"line": 32,
+												"column": 5
+											}
+										},
+										"name": "c"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 565,
+										"end": 566,
+										"loc": {
+											"start": {
+												"line": 33,
+												"column": 5
+											},
+											"end": {
+												"line": 33,
+												"column": 6
+											}
+										},
+										"name": "d"
+									},
+									"alternate": {
+										"type": "ConditionalExpression",
+										"start": 585,
+										"end": 608,
+										"loc": {
+											"start": {
+												"line": 35,
+												"column": 8
+											},
+											"end": {
+												"line": 37,
+												"column": 9
+											}
+										},
+										"test": {
+											"type": "Identifier",
+											"start": 585,
+											"end": 588,
+											"loc": {
+												"start": {
+													"line": 35,
+													"column": 8
+												},
+												"end": {
+													"line": 35,
+													"column": 11
+												}
+											},
+											"name": "aaa"
+										},
+										"consequent": {
+											"type": "Identifier",
+											"start": 595,
+											"end": 598,
+											"loc": {
+												"start": {
+													"line": 36,
+													"column": 6
+												},
+												"end": {
+													"line": 36,
+													"column": 9
+												}
+											},
+											"name": "bbb"
+										},
+										"alternate": {
+											"type": "Identifier",
+											"start": 605,
+											"end": 608,
+											"loc": {
+												"start": {
+													"line": 37,
+													"column": 6
+												},
+												"end": {
+													"line": 37,
+													"column": 9
+												}
+											},
+											"name": "ccc"
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " y\n\t ",
+												"start": 572,
+												"end": 584
+											}
+										]
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Deeper in a chain, one level further",
+							"start": 494,
+							"end": 533
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 700,
+					"end": 757,
+					"loc": {
+						"start": {
+							"line": 40,
+							"column": 1
+						},
+						"end": {
+							"line": 45,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 706,
+							"end": 756,
+							"loc": {
+								"start": {
+									"line": 40,
+									"column": 7
+								},
+								"end": {
+									"line": 45,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 706,
+								"end": 708,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 7
+									},
+									"end": {
+										"line": 40,
+										"column": 9
+									}
+								},
+								"name": "x5"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 711,
+								"end": 756,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 12
+									},
+									"end": {
+										"line": 45,
+										"column": 5
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 711,
+									"end": 712,
+									"loc": {
+										"start": {
+											"line": 40,
+											"column": 12
+										},
+										"end": {
+											"line": 40,
+											"column": 13
+										}
+									},
+									"name": "a"
+								},
+								"consequent": {
+									"type": "ConditionalExpression",
+									"start": 729,
+									"end": 750,
+									"loc": {
+										"start": {
+											"line": 42,
+											"column": 7
+										},
+										"end": {
+											"line": 44,
+											"column": 8
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 729,
+										"end": 732,
+										"loc": {
+											"start": {
+												"line": 42,
+												"column": 7
+											},
+											"end": {
+												"line": 42,
+												"column": 10
+											}
+										},
+										"name": "aaa"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 738,
+										"end": 741,
+										"loc": {
+											"start": {
+												"line": 43,
+												"column": 5
+											},
+											"end": {
+												"line": 43,
+												"column": 8
+											}
+										},
+										"name": "bbb"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 747,
+										"end": 750,
+										"loc": {
+											"start": {
+												"line": 44,
+												"column": 5
+											},
+											"end": {
+												"line": 44,
+												"column": 8
+											}
+										},
+										"name": "ccc"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " y\n\t ",
+											"start": 717,
+											"end": 728
+										}
+									]
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 755,
+									"end": 756,
+									"loc": {
+										"start": {
+											"line": 45,
+											"column": 4
+										},
+										"end": {
+											"line": 45,
+											"column": 5
+										}
+									},
+									"name": "c"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " In the consequent the comment breaks the conditional, so the nested one prints bare",
+							"start": 612,
+							"end": 698
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 841,
+					"end": 897,
+					"loc": {
+						"start": {
+							"line": 48,
+							"column": 1
+						},
+						"end": {
+							"line": 53,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 847,
+							"end": 896,
+							"loc": {
+								"start": {
+									"line": 48,
+									"column": 7
+								},
+								"end": {
+									"line": 53,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 847,
+								"end": 849,
+								"loc": {
+									"start": {
+										"line": 48,
+										"column": 7
+									},
+									"end": {
+										"line": 48,
+										"column": 9
+									}
+								},
+								"name": "x6"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 852,
+								"end": 896,
+								"loc": {
+									"start": {
+										"line": 48,
+										"column": 12
+									},
+									"end": {
+										"line": 53,
+										"column": 5
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 852,
+									"end": 853,
+									"loc": {
+										"start": {
+											"line": 48,
+											"column": 12
+										},
+										"end": {
+											"line": 48,
+											"column": 13
+										}
+									},
+									"name": "a"
+								},
+								"consequent": {
+									"type": "ConditionalExpression",
+									"start": 869,
+									"end": 890,
+									"loc": {
+										"start": {
+											"line": 50,
+											"column": 6
+										},
+										"end": {
+											"line": 52,
+											"column": 8
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 869,
+										"end": 872,
+										"loc": {
+											"start": {
+												"line": 50,
+												"column": 6
+											},
+											"end": {
+												"line": 50,
+												"column": 9
+											}
+										},
+										"name": "aaa"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 878,
+										"end": 881,
+										"loc": {
+											"start": {
+												"line": 51,
+												"column": 5
+											},
+											"end": {
+												"line": 51,
+												"column": 8
+											}
+										},
+										"name": "bbb"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 887,
+										"end": 890,
+										"loc": {
+											"start": {
+												"line": 52,
+												"column": 5
+											},
+											"end": {
+												"line": 52,
+												"column": 8
+											}
+										},
+										"name": "ccc"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " y\n\tz ",
+											"start": 858,
+											"end": 868
+										}
+									]
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 895,
+									"end": 896,
+									"loc": {
+										"start": {
+											"line": 53,
+											"column": 4
+										},
+										"end": {
+											"line": 53,
+											"column": 5
+										}
+									},
+									"name": "c"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A preserved (non-indentable) block keeps its own columns and still breaks it",
+							"start": 760,
+							"end": 839
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 956,
+					"end": 995,
+					"loc": {
+						"start": {
+							"line": 56,
+							"column": 1
+						},
+						"end": {
+							"line": 59,
+							"column": 11
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 962,
+							"end": 994,
+							"loc": {
+								"start": {
+									"line": 56,
+									"column": 7
+								},
+								"end": {
+									"line": 59,
+									"column": 10
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 962,
+								"end": 964,
+								"loc": {
+									"start": {
+										"line": 56,
+										"column": 7
+									},
+									"end": {
+										"line": 56,
+										"column": 9
+									}
+								},
+								"name": "x7"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 967,
+								"end": 994,
+								"loc": {
+									"start": {
+										"line": 56,
+										"column": 12
+									},
+									"end": {
+										"line": 59,
+										"column": 10
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 967,
+									"end": 968,
+									"loc": {
+										"start": {
+											"line": 56,
+											"column": 12
+										},
+										"end": {
+											"line": 56,
+											"column": 13
+										}
+									},
+									"name": "a"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 973,
+									"end": 974,
+									"loc": {
+										"start": {
+											"line": 57,
+											"column": 4
+										},
+										"end": {
+											"line": 57,
+											"column": 5
+										}
+									},
+									"name": "b"
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 991,
+									"end": 994,
+									"loc": {
+										"start": {
+											"line": 59,
+											"column": 7
+										},
+										"end": {
+											"line": 59,
+											"column": 10
+										}
+									},
+									"name": "ccc",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " y\n\t ",
+											"start": 979,
+											"end": 990
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Controls: a non-nested branch and the test position",
+							"start": 900,
+							"end": 954
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 997,
+					"end": 1047,
+					"loc": {
+						"start": {
+							"line": 60,
+							"column": 1
+						},
+						"end": {
+							"line": 62,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1003,
+							"end": 1046,
+							"loc": {
+								"start": {
+									"line": 60,
+									"column": 7
+								},
+								"end": {
+									"line": 62,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1003,
+								"end": 1005,
+								"loc": {
+									"start": {
+										"line": 60,
+										"column": 7
+									},
+									"end": {
+										"line": 60,
+										"column": 9
+									}
+								},
+								"name": "x8"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 1021,
+								"end": 1046,
+								"loc": {
+									"start": {
+										"line": 62,
+										"column": 6
+									},
+									"end": {
+										"line": 62,
+										"column": 31
+									}
+								},
+								"test": {
+									"type": "ConditionalExpression",
+									"start": 1022,
+									"end": 1037,
+									"loc": {
+										"start": {
+											"line": 62,
+											"column": 7
+										},
+										"end": {
+											"line": 62,
+											"column": 22
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 1022,
+										"end": 1025,
+										"loc": {
+											"start": {
+												"line": 62,
+												"column": 7
+											},
+											"end": {
+												"line": 62,
+												"column": 10
+											}
+										},
+										"name": "aaa"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 1028,
+										"end": 1031,
+										"loc": {
+											"start": {
+												"line": 62,
+												"column": 13
+											},
+											"end": {
+												"line": 62,
+												"column": 16
+											}
+										},
+										"name": "bbb"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 1034,
+										"end": 1037,
+										"loc": {
+											"start": {
+												"line": 62,
+												"column": 19
+											},
+											"end": {
+												"line": 62,
+												"column": 22
+											}
+										},
+										"name": "ccc"
+									}
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 1041,
+									"end": 1042,
+									"loc": {
+										"start": {
+											"line": 62,
+											"column": 26
+										},
+										"end": {
+											"line": 62,
+											"column": 27
+										}
+									},
+									"name": "b"
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 1045,
+									"end": 1046,
+									"loc": {
+										"start": {
+											"line": 62,
+											"column": 30
+										},
+										"end": {
+											"line": 62,
+											"column": 31
+										}
+									},
+									"name": "c"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " y\n ",
+										"start": 1010,
+										"end": 1020
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
