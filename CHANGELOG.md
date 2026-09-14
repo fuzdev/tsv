@@ -16,17 +16,28 @@ Each `## Unreleased` section must be non-empty and carry a
 - **breaking** feat: native binaries, both CLI and JS lib — install `@fuzdev/tsv` (N-API addon plus
   the real native `tsv` CLI; `npx tsv` execs the binary) over `@fuzdev/tsv-<triple>` platform
   packages for Linux (x64 gnu and musl, arm64 gnu), macOS arm64, and Windows x64; API-compatible
-  with `@fuzdev/tsv_wasm` (minus the WASM-only `init`/`init_sync`/`wasm_module`/`reinstantiate`),
-  which stays the universal fallback. Every package now requires Node >=22
+  with `@fuzdev/tsv_wasm` (minus the WASM-only `init`/`init_sync`/`wasm_module`/`reinstantiate` and
+  `IgnoreStack`'s `free()`), which stays the universal fallback. The same CLI binaries are attached
+  to each GitHub Release with a `SHA256SUMS`, every asset carrying a Sigstore build provenance
+  attestation, for use without npm
   ([#717](https://github.com/fuzdev/tsv/pull/717), [#718](https://github.com/fuzdev/tsv/pull/718),
   [#720](https://github.com/fuzdev/tsv/pull/720), [#725](https://github.com/fuzdev/tsv/pull/725),
-  [#726](https://github.com/fuzdev/tsv/pull/726))
+  [#726](https://github.com/fuzdev/tsv/pull/726), [#1035](https://github.com/fuzdev/tsv/pull/1035))
+- **breaking** chore: every package now requires Node >=22 (was >=20)
+  ([#725](https://github.com/fuzdev/tsv/pull/725))
 - **breaking** feat: every parse/format export takes an optional acorn-style options object —
   `parse_*(source, {locations?, sourceType?})` and `format_*(source, {sourceType?})`, replacing the
   flat `*_no_locations` / `*_with_goal` names; unknown keys throw, `sourceType` is TypeScript-only,
-  and the option interfaces are exported types. The CLI flag is `--source-type` (was `--goal`), and
-  naming one for a Svelte or CSS input is an error rather than ignored
-  ([#645](https://github.com/fuzdev/tsv/pull/645), [#713](https://github.com/fuzdev/tsv/pull/713))
+  and `ParseOptions`/`FormatOptions` (plus their `TypeScript*` variants) are exported types. The CLI
+  flag is `--source-type` (was `--goal`), and naming one for a Svelte or CSS input is an error rather
+  than ignored ([#645](https://github.com/fuzdev/tsv/pull/645),
+  [#713](https://github.com/fuzdev/tsv/pull/713))
+- **breaking** feat: the exported `IgnoreStack` splits `push_tsv` into `push_formatignore` /
+  `push_prettierignore`, `heuristic_shadow_warning` becomes `shadow_warning` (returning `undefined`
+  when there's nothing to warn), and it gains the per-path queries the CLIs use —
+  `path_shadow_warning`, `unsupported_extension_error`, `excluded_argument_warning`,
+  `gitignore_symlink_warning`, `unresolvable_root_error` — so an embedder reproduces exactly what
+  `tsv format` would touch
 - **breaking** feat: strictness follows the spec — `sourceType: 'script'` parses a sloppy script
   (strict only under its own `"use strict"` prologue, so `with` and legacy octal literals and
   escapes parse there), a module is always strict (legacy string escapes now reject in one), and
@@ -35,19 +46,28 @@ Each `## Unreleased` section must be non-empty and carry a
   in every mode, so it no longer parses as a name
 - **breaking** fix: the parsers reject what their oracles reject — TypeScript: a raw newline inside
   a string literal, the `[no LineTerminator here]` positions, `for await` without `of`, a definite
-  `!` in a `for` head, `typeof 5`; Svelte: a duplicate `{:else}`, a block tag in attribute position,
-  an unterminated quoted attribute (each of which used to parse and corrupt the document), an
-  unknown `<svelte:*>` name, a nested `<svelte:options>` — and accept what they accept:
-  strict-mode-reserved words as binding names (`let`, `yield`, `implements`), `let` as a reference
-  in `for` heads, decorator type arguments, ambient generator/async declarations, and the tsc
-  corpus's remaining over-rejections ([#628](https://github.com/fuzdev/tsv/pull/628),
+  `!` on a `for` header's declaration, `typeof 5`, a compound operator inside a destructuring or
+  `for` target (`[a += b] = xs`, which used to parse and drop the operator); Svelte: a duplicate
+  `{:else}`, a block tag in attribute position, an unterminated quoted attribute (each of which used
+  to parse and corrupt the document), an unknown `<svelte:*>` name, a nested `<svelte:options>` —
+  and accept what they accept: strict-mode-reserved words as binding names (`let`, `yield`,
+  `implements`), `let` as a reference in `for` heads, type-asserted `for-in`/`of` targets
+  (`for (a! of xs)`), decorator type arguments, ambient generator/async declarations,
+  `declare module 'x'` with no `;`, and the tsc corpus's remaining over-rejections
+  ([#618](https://github.com/fuzdev/tsv/pull/618), [#619](https://github.com/fuzdev/tsv/pull/619),
+  [#621](https://github.com/fuzdev/tsv/pull/621), [#628](https://github.com/fuzdev/tsv/pull/628),
   [#629](https://github.com/fuzdev/tsv/pull/629), [#630](https://github.com/fuzdev/tsv/pull/630),
   [#638](https://github.com/fuzdev/tsv/pull/638), [#640](https://github.com/fuzdev/tsv/pull/640),
+  [#673](https://github.com/fuzdev/tsv/pull/673), [#705](https://github.com/fuzdev/tsv/pull/705),
   [#708](https://github.com/fuzdev/tsv/pull/708), [#710](https://github.com/fuzdev/tsv/pull/710),
-  [#736](https://github.com/fuzdev/tsv/pull/736), [#737](https://github.com/fuzdev/tsv/pull/737),
-  [#776](https://github.com/fuzdev/tsv/pull/776), [#778](https://github.com/fuzdev/tsv/pull/778),
-  [#872](https://github.com/fuzdev/tsv/pull/872), [#912](https://github.com/fuzdev/tsv/pull/912),
-  [#915](https://github.com/fuzdev/tsv/pull/915))
+  [#711](https://github.com/fuzdev/tsv/pull/711), [#736](https://github.com/fuzdev/tsv/pull/736),
+  [#737](https://github.com/fuzdev/tsv/pull/737), [#776](https://github.com/fuzdev/tsv/pull/776),
+  [#778](https://github.com/fuzdev/tsv/pull/778), [#812](https://github.com/fuzdev/tsv/pull/812),
+  [#814](https://github.com/fuzdev/tsv/pull/814), [#872](https://github.com/fuzdev/tsv/pull/872),
+  [#877](https://github.com/fuzdev/tsv/pull/877), [#878](https://github.com/fuzdev/tsv/pull/878),
+  [#881](https://github.com/fuzdev/tsv/pull/881), [#893](https://github.com/fuzdev/tsv/pull/893),
+  [#894](https://github.com/fuzdev/tsv/pull/894), [#895](https://github.com/fuzdev/tsv/pull/895),
+  [#912](https://github.com/fuzdev/tsv/pull/912), [#915](https://github.com/fuzdev/tsv/pull/915))
 - **breaking** fix: parse output tracks its canonical oracles — CSS roots gain `comments:
   CSSComment[]` and `::part()`/`::slotted()` gain an `args: SelectorList`
   ([#766](https://github.com/fuzdev/tsv/pull/766)), Svelte components without `lang="ts"` emit
@@ -58,23 +78,37 @@ Each `## Unreleased` section must be non-empty and carry a
   acorn-typescript alignments through 1.0.13 ([#702](https://github.com/fuzdev/tsv/pull/702),
   [#764](https://github.com/fuzdev/tsv/pull/764)), span, loc and key-order alignments
   ([#583](https://github.com/fuzdev/tsv/pull/583), [#625](https://github.com/fuzdev/tsv/pull/625),
-  [#885](https://github.com/fuzdev/tsv/pull/885)), JS-exact numeric literal values
+  [#882](https://github.com/fuzdev/tsv/pull/882), [#885](https://github.com/fuzdev/tsv/pull/885),
+  [#888](https://github.com/fuzdev/tsv/pull/888), [#889](https://github.com/fuzdev/tsv/pull/889),
+  [#919](https://github.com/fuzdev/tsv/pull/919)), Svelte and CSS offsets counted past a leading
+  BOM as their parsers strip it (TypeScript keeps file coordinates, as acorn does), a template
+  element's `raw`/`cooked` folding a literal `<CR><LF>` to `<LF>` per the spec
+  ([#727](https://github.com/fuzdev/tsv/pull/727)), JS-exact numeric literal values
   ([#553](https://github.com/fuzdev/tsv/pull/553)), and corrected legacy-octal-escape and HTML
   character-reference decoding ([#633](https://github.com/fuzdev/tsv/pull/633),
   [#635](https://github.com/fuzdev/tsv/pull/635))
-- fix: the bundled `tsv_ast.d.ts` now types the whole wire and is gated against the fixture corpus —
-  `Script.content` is a `Program` (was `unknown`), `Program.sourceType` is `'script' | 'module'`,
-  `LogicalExpression`, `WithStatement` and the Svelte-built node shapes are declared, acorn nodes
-  inside a Svelte component carry `leadingComments`/`trailingComments`, and the never-emitted
-  `TSInterfaceHeritage` and `TSMappedTypeParameter` are gone
+- fix: the bundled `tsv_ast.d.ts` now types the whole wire outside the CSS subtree and is gated
+  against the fixture corpus — `Script.content` is a `Program` (was `unknown`),
+  `Program.sourceType` is `'script' | 'module'`, `LogicalExpression`, `WithStatement` and the
+  Svelte-built node shapes are declared, acorn nodes inside a Svelte component carry
+  `leadingComments`/`trailingComments`, and the never-emitted `TSInterfaceHeritage` and
+  `TSMappedTypeParameter` are gone
   ([#890](https://github.com/fuzdev/tsv/pull/890))
-- **breaking** fix: naming a file tsv doesn't format (`tsv format some.json`) is now an upfront
-  argument error instead of being parsed as TypeScript; directory arguments are unaffected
+- **breaking** fix: a path named on the command line is bounded by the ignore files like a walked
+  one — a file or directory a `.gitignore` rule excludes is skipped with a warning that gives the
+  re-include lines, one a `.formatignore`/`.prettierignore` rule excludes is skipped quietly (as
+  prettier does), and a run whose every argument was an excluded file exits 0; a symlinked argument
+  is graded as the link git sees, not its target. Naming a file tsv doesn't format
+  (`tsv format some.json`) is now an upfront argument error instead of being parsed as TypeScript
   ([#709](https://github.com/fuzdev/tsv/pull/709))
 - **breaking** feat: `format-ignore` / `prettier-ignore` are honored in many more positions (type
   members, parameters, arguments, declarators, statement and declaration heads, Svelte braced
   heads), and only an own-line directive acts — one sharing its line with code is an ordinary
-  comment ([#913](https://github.com/fuzdev/tsv/pull/913))
+  comment ([#572](https://github.com/fuzdev/tsv/pull/572),
+  [#913](https://github.com/fuzdev/tsv/pull/913)); a frozen statement keeps its ASI semicolon and
+  required parens so the output reparses
+  ([#897](https://github.com/fuzdev/tsv/pull/897)), and a `-start`/`-end` range no longer prints a
+  `<script>`/`<style>` inside it twice ([#610](https://github.com/fuzdev/tsv/pull/610))
 - feat: more formatting that takes advantage of Svelte 5 whitespace changes
   ([#558](https://github.com/fuzdev/tsv/pull/558), [#563](https://github.com/fuzdev/tsv/pull/563),
   [#600](https://github.com/fuzdev/tsv/pull/600), [#601](https://github.com/fuzdev/tsv/pull/601),
@@ -86,16 +120,20 @@ Each `## Unreleased` section must be non-empty and carry a
   [#910](https://github.com/fuzdev/tsv/pull/910), [#911](https://github.com/fuzdev/tsv/pull/911),
   [#918](https://github.com/fuzdev/tsv/pull/918), [#1006](https://github.com/fuzdev/tsv/pull/1006))
 - fix: many formatting fixes
-- fix: no comment is dropped or double-printed, and an embedded body in a language tsv doesn't
-  format (`<script lang="coffee">`, `<template lang="pug">`, `type="application/json"`) is copied
-  verbatim instead of being parsed or re-indented ([#875](https://github.com/fuzdev/tsv/pull/875),
+- fix: no comment is dropped or double-printed, and a `//` no longer swallows the code after it
+  into an output that doesn't reparse; an embedded body in a language tsv doesn't format
+  (`<script lang="coffee">`, `<template lang="pug">`, `type="application/json"`) is copied verbatim
+  instead of being parsed or re-indented ([#875](https://github.com/fuzdev/tsv/pull/875),
   [#879](https://github.com/fuzdev/tsv/pull/879))
 - feat: the JS CLIs format directories in parallel on `node:worker_threads` — `--jobs` is no longer
-  ignored — and consumers get the same machinery: the Node entry exports `wasm_module` and the
-  `./worker` subpath initializes a worker from it without recompiling. On every CLI, an explicit
-  `--jobs` past `4 × logical CPUs` clamps with a warning and a thread the OS refuses narrows the
-  pool instead of failing the run ([#873](https://github.com/fuzdev/tsv/pull/873),
-  [#883](https://github.com/fuzdev/tsv/pull/883), [#884](https://github.com/fuzdev/tsv/pull/884))
+  ignored. The Node entry exports `wasm_module` and the `./worker` subpath initializes a worker from
+  it without recompiling. On every CLI, an explicit `--jobs` past `4 × logical CPUs` clamps with a
+  warning and a thread the OS refuses narrows the pool instead of failing the run
+  ([#873](https://github.com/fuzdev/tsv/pull/873), [#883](https://github.com/fuzdev/tsv/pull/883),
+  [#884](https://github.com/fuzdev/tsv/pull/884))
+- fix: both CLIs survive a closed or non-blocking pipe (`tsv format . | head` no longer aborts or
+  loses its report of what changed), and the JS CLI refuses to rewrite a file whose bytes aren't
+  valid UTF-8 rather than writing U+FFFD back over it
 - fix: a panic no longer breaks the engine — the WASM instance stays callable after a trap
   ([#616](https://github.com/fuzdev/tsv/pull/616)) and the native addon throws a JS error instead of
   aborting the host ([#717](https://github.com/fuzdev/tsv/pull/717)); the one trap that does poison
@@ -114,6 +152,7 @@ Each `## Unreleased` section must be non-empty and carry a
   than guessing, on the two Svelte shapes the span-only wire can't disambiguate
   ([#885](https://github.com/fuzdev/tsv/pull/885)); `.d.ts` relative specifiers carry `.js`, so the
   packages type under `moduleResolution: node16`/`nodenext`
+  ([#873](https://github.com/fuzdev/tsv/pull/873))
 
 ## 0.2.0
 
