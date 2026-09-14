@@ -11,7 +11,9 @@ Each `## Unreleased` section must be non-empty and carry a
 `## Unreleased` (reset to `bump: patch`) for the next cycle.
 
 ## Unreleased
-<!-- bump: minor -->
+<!-- bump: patch -->
+
+## 0.3.0
 
 - **breaking** feat: native binaries, both CLI and JS lib — install `@fuzdev/tsv` (N-API addon plus
   the real native `tsv` CLI; `npx tsv` execs the binary) over `@fuzdev/tsv-<triple>` platform
