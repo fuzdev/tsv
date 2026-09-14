@@ -9,7 +9,7 @@
  */
 
 import { BaseImplementation, type Language, LANGUAGE_EXTENSIONS, type ParseGoal } from './types.ts';
-import type { OxcVersions } from './versions.ts';
+import type { OxcWasmVersions } from './versions.ts';
 import { assert_oxc_rejects_invalid, type OxcDiagnostic, oxc_fatal_errors } from './oxc.ts';
 import { current_runtime } from './runtime.ts';
 
@@ -33,7 +33,7 @@ type JsonParseAst = (programJson: string) => unknown;
  * - Format: None (oxfmt has no WASM variant)
  */
 export class OxcWasmImplementation extends BaseImplementation {
-	readonly versions: OxcVersions;
+	readonly versions: OxcWasmVersions;
 	private _parser: OxcParserWasmModule | null = null;
 	private _json_parse_ast: JsonParseAst | null = null;
 
@@ -41,7 +41,7 @@ export class OxcWasmImplementation extends BaseImplementation {
 	/** oxfmt has no WASM variant. */
 	readonly format_languages: ReadonlyArray<Language> = [];
 
-	constructor(versions: OxcVersions) {
+	constructor(versions: OxcWasmVersions) {
 		super();
 		this.versions = versions;
 	}
@@ -63,8 +63,11 @@ export class OxcWasmImplementation extends BaseImplementation {
 		this._parser = mod as OxcParserWasmModule;
 		// The native package's own deserializer (dependency-free ESM; the package has
 		// no `exports` map, so the deep import resolves). Importing rather than
-		// copying keeps the two rows' materialization identical by construction and
-		// tracks the pinned oxc-parser version; a moved upstream path fails init loudly.
+		// copying keeps the two rows' materialization identical by construction; a
+		// moved upstream path fails init loudly. ⚠ It comes from `oxc-parser` at ITS
+		// pin, while this binding is pinned apart (`package.json` `//oxc-wasi`): the two
+		// agree only while `wrap.js` is unchanged across that version gap, so re-diff
+		// it whenever either pin moves.
 		const wrap = await import('oxc-parser/src-js/wrap.js');
 		this._json_parse_ast = (wrap as { jsonParseAst: JsonParseAst }).jsonParseAst;
 

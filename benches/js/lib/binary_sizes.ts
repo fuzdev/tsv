@@ -20,7 +20,7 @@ import { execFile } from 'node:child_process';
 import { readdir, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { OXC_WASI_BINDING } from './check_node_modules.ts';
+import { OXC_WASI_BINDING } from './versions.ts';
 import type { ImplementationSet } from './implementations.ts';
 import { current_arch, current_os, current_runtime } from './runtime.ts';
 import { rsvelte_binary_path } from './rsvelte.ts';

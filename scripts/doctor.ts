@@ -102,10 +102,13 @@ function read_pkg_version(path: string): string | null {
 }
 
 /**
- * The distinct versions `check.yml` installs for `tool` — one entry when its jobs
- * agree, empty when the workflow can't be read.
+ * Every `<tool>-version:` pin under `.github/workflows/`, as `file -> version`
+ * pairs (one per distinct version a file carries) — empty when the directory can't
+ * be read. EVERY workflow, not just `check.yml`: `release_napi.yml` installs the
+ * same runtimes for the tag-triggered publish, and a pin that drifts there is
+ * graded by nothing else.
  *
- * READ from the workflow rather than mirrored into a constant here, unlike
+ * READ from the workflows rather than mirrored into a constant here, unlike
  * `WASM_PACK_PIN` below: that one pins a calibration this repo owns (the wasm size
  * bounds), so a local constant IS its source of truth, while deno and node are
  * pinned in CI and nowhere else — a mirror would just be a second place to forget.
@@ -113,38 +116,50 @@ function read_pkg_version(path: string): string | null {
  * leaves CI on the old one, every gate stays green on both, and the machine that
  * produced the committed bench reports is no longer the machine CI verifies.
  */
-function ci_pin(tool: 'deno' | 'node'): ReadonlyArray<string> {
+function ci_pins(tool: 'deno' | 'node'): ReadonlyArray<{ file: string; version: string }> {
+	const dir = '.github/workflows';
+	const pins: Array<{ file: string; version: string }> = [];
 	try {
-		const yml = Deno.readTextFileSync('.github/workflows/check.yml');
-		// `node-version: '24.14.1'` is quoted, `deno-version: 2.9.5` is not. EVERY
-		// occurrence, not the first: the workflow sets each pin once per job, so a
-		// bump that reached one job and not the others is its own drift — and reading
-		// only the first would report the machine aligned while a job trails.
-		const all = [...yml.matchAll(new RegExp(`${tool}-version:\\s*'?([\\d.]+)'?`, 'g'))];
-		return [...new Set(all.map((m) => m[1]))];
+		const files = [...Deno.readDirSync(dir)]
+			.filter((e) => e.isFile && /\.ya?ml$/.test(e.name))
+			.map((e) => e.name)
+			.sort();
+		for (const file of files) {
+			const yml = Deno.readTextFileSync(`${dir}/${file}`);
+			// `node-version: '24.14.1'` is quoted, `deno-version: 2.9.5` is not. EVERY
+			// occurrence, not the first: a workflow sets each pin once per job, so a
+			// bump that reached one job and not the others is its own drift — and
+			// reading only the first would report the machine aligned while a job trails.
+			const all = [...yml.matchAll(new RegExp(`${tool}-version:\\s*'?([\\d.]+)'?`, 'g'))];
+			for (const version of new Set(all.map((m) => m[1]))) pins.push({ file, version });
+		}
 	} catch {
 		return [];
 	}
+	return pins;
 }
 
-/** Warn when the installed version differs from what CI pins — see `ci_pin`. */
+/** Warn when the installed version differs from what CI pins — see `ci_pins`. */
 function check_ci_pin(tool: 'deno' | 'node', installed: string): void {
-	const pins = ci_pin(tool);
+	const pins = ci_pins(tool);
 	if (pins.length === 0) return;
-	if (pins.length > 1) {
+	const versions = [...new Set(pins.map((p) => p.version))];
+	if (versions.length > 1) {
 		warn(
-			`${tool} — .github/workflows/check.yml pins more than one version (${pins.join(', ')}); ` +
-				`its jobs disagree about which ${tool} verifies this repo`
+			`${tool} — the workflows pin more than one version ` +
+				`(${pins.map((p) => `${p.file}: ${p.version}`).join(', ')}); ` +
+				`CI disagrees with itself about which ${tool} verifies this repo`
 		);
 		return;
 	}
 	// Exact, not `includes` as the wasm-pack check below does: both versions here are
 	// already bare (`2.9.5`, and node's `v` stripped by the caller), so a substring
 	// test would only buy the false pass where `2.9.5` matches an installed `2.9.50`.
-	if (installed === pins[0]) return;
+	if (installed === versions[0]) return;
+	const files = [...new Set(pins.map((p) => p.file))].join(' + ');
 	warn(
-		`${tool} ${installed} — differs from the ${pins[0]} .github/workflows/check.yml installs; ` +
-			`bump the workflow (${tool}-version) so CI verifies what you develop against`
+		`${tool} ${installed} — differs from the ${versions[0]} that ${files} install; ` +
+			`bump the workflows (${tool}-version) so CI verifies what you develop against`
 	);
 }
 
@@ -234,7 +249,9 @@ section('Harness deps (benches/js/node_modules)');
 try {
 	const nm = await probe_node_modules();
 	if (nm.status === 'ok') {
-		ok('installed, and every exact pin (plus the oxc wasi binding) matches the installed version');
+		ok(
+			'installed, and every exact pin (plus each `force_installed` pin) matches the installed version'
+		);
 	} else if (nm.status === 'missing') warn(nm.message);
 	else fail(`${nm.message} — reports would label OLD installed versions with the new pins`);
 } catch (e) {

@@ -356,7 +356,7 @@ export async function init_implementations(
 	// would leave a failed impl's instance unreachable, and with it the only
 	// non-hand-written answer to which rows its absence removed (`complete`).
 	const oxc = new OxcImplementation(versions.oxc);
-	const oxc_wasm = new OxcWasmImplementation(versions.oxc);
+	const oxc_wasm = new OxcWasmImplementation(versions.oxc_wasm);
 	const tsc = new TscImplementation();
 	// One class, two bindings — see lib/yuku.ts.
 	const yuku = new YukuImplementation('yuku-parser', versions.yuku);
@@ -899,6 +899,9 @@ export function unavailable_with_rows(
 export function get_alternative_versions(impls: ImplementationSet): AlternativeVersionInfo {
 	return {
 		oxc_parser: impls.oxc?.versions['oxc-parser'],
+		// Pinned apart from `oxc-parser` (`package.json` `//oxc-wasi`), so the wasm row
+		// reports the binding it actually loads.
+		oxc_parser_wasm: impls.oxc_wasm?.versions.binding,
 		oxfmt: impls.oxc?.versions.oxfmt,
 		// Two packages over one engine, versioned in lockstep upstream — reported
 		// separately so a skewed local install is visible rather than implied.

@@ -7,6 +7,7 @@ import { benchmark_format_number } from '@fuzdev/fuz_util/benchmark_format.ts';
 import { time_format, time_unit_detect_best, TIME_UNIT_DISPLAY } from '@fuzdev/fuz_util/time.ts';
 
 import { CANONICAL_FORMATTER_ROW, CANONICAL_PARSER_ROWS, type Language } from './types.ts';
+import { OXC_WASI_BINDING } from './versions.ts';
 
 /** Results from a benchmark group */
 export interface GroupResults {
@@ -520,6 +521,11 @@ export interface CanonicalVersionInfo {
  */
 export interface AlternativeVersionInfo {
 	oxc_parser?: string;
+	/**
+	 * The `@oxc-parser/binding-wasm32-wasi` version behind `oxc-parser-wasm` — pinned
+	 * apart from `oxc-parser` (`package.json` `//oxc-wasi`), so it can differ.
+	 */
+	oxc_parser_wasm?: string;
 	oxfmt?: string;
 	yuku_parser?: string;
 	yuku_parser_wasm?: string;
@@ -543,19 +549,22 @@ export interface AlternativeVersionInfo {
 export type ReportVersions = CanonicalVersionInfo & AlternativeVersionInfo;
 
 /**
- * Version parts for yuku's two packages. They ship one engine behind two
- * bindings and version in lockstep upstream, so the matched case collapses to a
- * single `yuku-parser@X`; a skewed local install prints both, making the skew
- * legible in the report rather than silently comparing two engines.
+ * Version parts for one engine shipped as a native package plus a WASM binding
+ * package. A matched pair collapses to the native label alone; a split pair prints
+ * both, so a row measuring a different engine version than its sibling is legible in
+ * the report rather than implied. yuku's pair is pinned together, so a split there is
+ * a skewed install; oxc's is pinned apart on purpose (`package.json` `//oxc-wasi`).
  */
-function yuku_version_parts(versions: AlternativeVersionInfo): string[] {
-	const { yuku_parser, yuku_parser_wasm } = versions;
-	if (yuku_parser && yuku_parser_wasm && yuku_parser === yuku_parser_wasm) {
-		return [`yuku-parser@${yuku_parser}`];
-	}
+function binding_pair_version_parts(
+	native_label: string,
+	native: string | undefined,
+	wasm_label: string,
+	wasm: string | undefined
+): string[] {
+	if (native && wasm && native === wasm) return [`${native_label}@${native}`];
 	const parts: string[] = [];
-	if (yuku_parser) parts.push(`yuku-parser@${yuku_parser}`);
-	if (yuku_parser_wasm) parts.push(`@yuku-parser/wasm@${yuku_parser_wasm}`);
+	if (native) parts.push(`${native_label}@${native}`);
+	if (wasm) parts.push(`${wasm_label}@${wasm}`);
 	return parts;
 }
 
@@ -570,9 +579,23 @@ function yuku_version_parts(versions: AlternativeVersionInfo): string[] {
  */
 export function alternative_version_parts(versions: AlternativeVersionInfo): string[] {
 	const parts: string[] = [];
-	if (versions.oxc_parser) parts.push(`oxc-parser@${versions.oxc_parser}`);
+	parts.push(
+		...binding_pair_version_parts(
+			'oxc-parser',
+			versions.oxc_parser,
+			OXC_WASI_BINDING,
+			versions.oxc_parser_wasm
+		)
+	);
 	if (versions.oxfmt) parts.push(`oxfmt@${versions.oxfmt}`);
-	parts.push(...yuku_version_parts(versions));
+	parts.push(
+		...binding_pair_version_parts(
+			'yuku-parser',
+			versions.yuku_parser,
+			'@yuku-parser/wasm',
+			versions.yuku_parser_wasm
+		)
+	);
 	if (versions.biome) parts.push(`@biomejs/wasm-bundler@${versions.biome}`);
 	if (versions.dprint) parts.push(`@dprint/typescript@${versions.dprint}`);
 	if (versions.malva) parts.push(`dprint-plugin-malva@${versions.malva}`);
