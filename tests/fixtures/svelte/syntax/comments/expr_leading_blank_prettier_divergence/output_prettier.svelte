@@ -78,3 +78,21 @@ expr}
 
 // c20
 expr}
+{@debug a}
+<input
+	bind:value={
+		get,
+		// c22
+
+		set
+	}
+/>
+<input
+	bind:value={
+		get,
+		// c23
+
+		// c24
+		set
+	}
+/>

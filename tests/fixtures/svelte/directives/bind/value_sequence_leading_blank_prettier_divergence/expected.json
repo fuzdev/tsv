@@ -1,0 +1,233 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 184,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 122,
+				"data": " an author blank after a line comment leading a function-binding sequence survives, as at\n\tevery other braced head "
+			},
+			{
+				"type": "Text",
+				"start": 122,
+				"end": 123,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 123,
+				"end": 183,
+				"name": "input",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 124
+					},
+					"end": {
+						"line": 3,
+						"column": 6,
+						"character": 129
+					}
+				},
+				"attributes": [
+					{
+						"start": 131,
+						"end": 180,
+						"type": "BindDirective",
+						"name": "value",
+						"name_loc": {
+							"start": {
+								"line": 4,
+								"column": 1,
+								"character": 131
+							},
+							"end": {
+								"line": 4,
+								"column": 11,
+								"character": 141
+							}
+						},
+						"expression": {
+							"type": "SequenceExpression",
+							"start": 154,
+							"end": 177,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 2
+								},
+								"end": {
+									"line": 7,
+									"column": 25
+								}
+							},
+							"expressions": [
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 154,
+									"end": 161,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 7,
+											"column": 9
+										}
+									},
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "Identifier",
+										"start": 160,
+										"end": 161,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 8
+											},
+											"end": {
+												"line": 7,
+												"column": 9
+											}
+										},
+										"name": "a"
+									}
+								},
+								{
+									"type": "ArrowFunctionExpression",
+									"start": 163,
+									"end": 177,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 11
+										},
+										"end": {
+											"line": 7,
+											"column": 25
+										}
+									},
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 164,
+											"end": 165,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 12
+												},
+												"end": {
+													"line": 7,
+													"column": 13
+												}
+											},
+											"name": "v"
+										}
+									],
+									"body": {
+										"type": "AssignmentExpression",
+										"start": 171,
+										"end": 176,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 19
+											},
+											"end": {
+												"line": 7,
+												"column": 24
+											}
+										},
+										"operator": "=",
+										"left": {
+											"type": "Identifier",
+											"start": 171,
+											"end": 172,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 19
+												},
+												"end": {
+													"line": 7,
+													"column": 20
+												}
+											},
+											"name": "a"
+										},
+										"right": {
+											"type": "Identifier",
+											"start": 175,
+											"end": 176,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 23
+												},
+												"end": {
+													"line": 7,
+													"column": 24
+												}
+											},
+											"name": "v"
+										}
+									}
+								}
+							],
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c",
+									"start": 146,
+									"end": 150
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 146,
+			"end": 150,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 6
+				}
+			}
+		}
+	]
+}

@@ -5,7 +5,7 @@
 // used in inline run grouping and multiline formatting decisions.
 
 use crate::ast::internal::{EachBlock, EachKey, FragmentNode};
-use crate::printer::{HeadExpr, Printer};
+use crate::printer::{CommentRun, HeadExpr, Printer};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -162,7 +162,7 @@ fn has_expanding_block_in_await(nodes: &[FragmentNode<'_>]) -> bool {
 
 impl<'a> Printer<'a> {
     /// Collect the leading-comment run in `[from, to)` — one doc per comment via
-    /// [`build_leading_js_comment_doc`](Self::build_leading_js_comment_doc), so every
+    /// [`build_leading_js_comment_doc_before`](Self::build_leading_js_comment_doc_before), so every
     /// leading-comment site (directive/tag values, block heads, `{@const}` init,
     /// braced attribute expressions, destructure patterns) flows through the one
     /// emitter that reindents+breaks a multi-line block. Empty when the range holds
@@ -171,7 +171,23 @@ impl<'a> Printer<'a> {
     /// author blank after a `//` survives
     /// ([`build_leading_js_comment_doc_before`](Self::build_leading_js_comment_doc_before)).
     pub(in crate::printer) fn leading_comment_docs(&self, from: u32, to: u32) -> DocBuf {
-        let run: SmallVec<[&Comment; 4]> = self.comments_to_emit_between(from, to).collect();
+        let run: CommentRun<'_> = self.comments_to_emit_between(from, to).collect();
+        self.leading_comment_run_docs(&run, to)
+    }
+
+    /// [`leading_comment_docs`](Self::leading_comment_docs) on the **in-source** axis, for
+    /// the one builder that is the sole positional emitter of every comment in its content
+    /// and so must print an owned glued block too — `{@debug}`
+    /// ([`build_debug_tag_doc`](Self::build_debug_tag_doc)). Same emitter, same blank rule;
+    /// only which comments the range yields differs.
+    pub(in crate::printer) fn leading_comment_docs_in_source(&self, from: u32, to: u32) -> DocBuf {
+        let run: CommentRun<'_> = self.comments_in_source_between(from, to).collect();
+        self.leading_comment_run_docs(&run, to)
+    }
+
+    /// The two above over a run the caller already holds — `to` is what follows the run's
+    /// last comment, so the blank below it is read the same way.
+    pub(in crate::printer) fn leading_comment_run_docs(&self, run: &[&Comment], to: u32) -> DocBuf {
         run.iter()
             .enumerate()
             .map(|(i, comment)| {

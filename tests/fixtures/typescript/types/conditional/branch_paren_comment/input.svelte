@@ -25,19 +25,6 @@
 			: Yaaaa /* c */
 		: Zaaaa;
 
-	// A LINE comment in the shell's leading gap ends its line, so it trails what
-	// precedes the branch and the nested conditional breaks below it
-	type I = T extends U // c
-		? V extends W
-			? X
-			: Y
-		: Z;
-	type J = T extends U
-		? Z // c
-		: V extends W
-			? X
-			: Y;
-
 	// A line comment in the trailing gap stays on the branch it was written on
 	type K = T extends U
 		? V extends W

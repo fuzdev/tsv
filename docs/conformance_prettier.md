@@ -344,7 +344,15 @@ its tail:
   the same sweep). An author **blank** after the comment survives in either authoring, as at
   every forced continuation — both formatters keep it, and only the placement and indent
   diverge
-  ([expr_leading_blank](../tests/fixtures/svelte/syntax/comments/expr_leading_blank_prettier_divergence/)).
+  ([expr_leading_blank](../tests/fixtures/svelte/syntax/comments/expr_leading_blank_prettier_divergence/),
+  which reaches the two hosts with comment emitters of their own, a `bind:` sequence's comma
+  gap and `{@debug}`). A blank below a single-line **block** the author broke after is kept
+  the same way — the break is the author's, and the blank below a kept break is theirs
+  whichever comment kind made it — where prettier keeps it at every value head
+  ([expr_leading_block_blank](../tests/fixtures/svelte/syntax/comments/expr_leading_block_blank/))
+  and drops it at the block heads, whose value its second pass then pulls up onto the
+  comment's line
+  ([expr_leading_block_blank_prettier_divergence](../tests/fixtures/svelte/syntax/comments/expr_leading_block_blank_prettier_divergence/)).
   That shape is not new — it is the one an honored `prettier-ignore` in
   this gap already took, because a directive flush against the prefix is inert under the
   placement floor; one resolver answers both (`Printer::head_layout`), so the freeze

@@ -12,8 +12,8 @@
 		? V
 		: W;
 
-	// The TRUE branch's own shell run is relocated onto the same line, a third
-	// contributor no window over this conditional's own gaps can see
+	// The TRUE branch's own shell run stays in the `?` gap, so it never shares the
+	// destination line: the extends-type's run relocates alone
 	type C = T extends (// c1
 		U) ? (// c2
 		V) : W;

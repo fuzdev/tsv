@@ -1,0 +1,380 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 491,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 168,
+				"data": " a line comment after the comma trails it; the identifiers below hang one level in and\n\tthe `}` drops to the tag's column, as at every braced head a `//` breaks "
+			},
+			{
+				"type": "Text",
+				"start": 168,
+				"end": 169,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "DebugTag",
+				"start": 169,
+				"end": 190,
+				"identifiers": [
+					{
+						"type": "Identifier",
+						"start": 177,
+						"end": 178,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 8
+							},
+							"end": {
+								"line": 3,
+								"column": 9
+							}
+						},
+						"name": "a",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c1",
+								"start": 180,
+								"end": 185
+							}
+						]
+					},
+					{
+						"type": "Identifier",
+						"start": 187,
+						"end": 188,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 4,
+								"column": 2
+							}
+						},
+						"name": "b"
+					}
+				]
+			},
+			{
+				"type": "Text",
+				"start": 190,
+				"end": 192,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 192,
+				"end": 280,
+				"data": " an own-line comment after the comma keeps its line, leading the next identifier "
+			},
+			{
+				"type": "Text",
+				"start": 280,
+				"end": 281,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "DebugTag",
+				"start": 281,
+				"end": 303,
+				"identifiers": [
+					{
+						"type": "Identifier",
+						"start": 289,
+						"end": 290,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 8
+							},
+							"end": {
+								"line": 8,
+								"column": 9
+							}
+						},
+						"name": "a"
+					},
+					{
+						"type": "Identifier",
+						"start": 300,
+						"end": 301,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 1
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"name": "b",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c2",
+								"start": 293,
+								"end": 298
+							}
+						]
+					}
+				]
+			},
+			{
+				"type": "Text",
+				"start": 303,
+				"end": 305,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 305,
+				"end": 347,
+				"data": " an author blank below it survives "
+			},
+			{
+				"type": "Text",
+				"start": 347,
+				"end": 348,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "DebugTag",
+				"start": 348,
+				"end": 371,
+				"identifiers": [
+					{
+						"type": "Identifier",
+						"start": 356,
+						"end": 357,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 8
+							},
+							"end": {
+								"line": 14,
+								"column": 9
+							}
+						},
+						"name": "a"
+					},
+					{
+						"type": "Identifier",
+						"start": 368,
+						"end": 369,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 1
+							},
+							"end": {
+								"line": 17,
+								"column": 2
+							}
+						},
+						"name": "b",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c3",
+								"start": 360,
+								"end": 365
+							}
+						]
+					}
+				]
+			},
+			{
+				"type": "Text",
+				"start": 371,
+				"end": 373,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 373,
+				"end": 458,
+				"data": " a run: what shares the comma's line trails it, the rest leads the identifier "
+			},
+			{
+				"type": "Text",
+				"start": 458,
+				"end": 459,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "DebugTag",
+				"start": 459,
+				"end": 490,
+				"identifiers": [
+					{
+						"type": "Identifier",
+						"start": 467,
+						"end": 468,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 8
+							},
+							"end": {
+								"line": 21,
+								"column": 9
+							}
+						},
+						"name": "a",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c4",
+								"start": 470,
+								"end": 475
+							}
+						]
+					},
+					{
+						"type": "Identifier",
+						"start": 484,
+						"end": 485,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 1
+							},
+							"end": {
+								"line": 23,
+								"column": 2
+							}
+						},
+						"name": "b",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c5",
+								"start": 477,
+								"end": 482
+							}
+						]
+					},
+					{
+						"type": "Identifier",
+						"start": 487,
+						"end": 488,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 4
+							},
+							"end": {
+								"line": 23,
+								"column": 5
+							}
+						},
+						"name": "c"
+					}
+				]
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 180,
+			"end": 185,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 11
+				},
+				"end": {
+					"line": 3,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 293,
+			"end": 298,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 360,
+			"end": 365,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 470,
+			"end": 475,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 11
+				},
+				"end": {
+					"line": 21,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 477,
+			"end": 482,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 6
+				}
+			}
+		}
+	]
+}

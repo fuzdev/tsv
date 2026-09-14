@@ -102,3 +102,25 @@ as item}
 	// c20
 	expr
 }
+{@debug
+	// c21
+
+	a
+}
+<input
+	bind:value={
+		get,
+		// c22
+
+		set
+	}
+/>
+<input
+	bind:value={
+		get,
+		// c23
+
+		// c24
+		set
+	}
+/>

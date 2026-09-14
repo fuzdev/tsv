@@ -27,3 +27,8 @@
 <input bind:value={()=>a,
 // c
 (v)=>(a=v)} />
+
+<!-- Mid line comment followed by an own-line run: one break between them, no blank -->
+<input bind:value={()=>a,// c1
+// c2
+(v)=>(a=v)} />

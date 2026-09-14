@@ -7,29 +7,32 @@ canonical for. That fixture pins the rule: a redundant paren shell around the
 relocates to trail the extends-type — matching prettier, and lossless because the comment
 ends up alone on that line.
 
-It stops being lossless the moment a **second** line comment shares the destination. Three
+It stops being lossless the moment a **second** line comment shares the destination. Two
 runs land on that one line, and this fixture holds an authoring for each:
 
 - **A** — a comment already trailing the extends-type (`T extends (// c1⏎U) // c2`).
 - **B** — a **run** of two inside the shell itself (`T extends (// c1⏎// c2⏎U)`).
-- **C** — the **true branch's own shell** run, which the breaking builder relocates onto
-  this same line right behind the extends run (`T extends (// c1⏎U) ? (// c2⏎V) : W`,
-  pinned by `unformatted_ours_branch_shell_run.svelte`). No window over this conditional's
-  own gaps can see that contributor, so the count asks the branch shell directly.
+- **C** — the control from the other side: the **true branch's own shell** run
+  (`T extends (// c1⏎U) ? (// c2⏎V) : W`, pinned by
+  `unformatted_ours_branch_shell_run.svelte`) is the `?` gap's and stays there
+  ([branch_paren_leading_line_comment](../branch_paren_leading_line_comment_prettier_divergence/)),
+  so it never shares the destination and the extends run relocates alone. Prettier relocates
+  both onto the extends-type's line and welds them.
 
 The question is asked of the destination **line**, not of the gap: a comment the author put
 on its own line between the extends-type and the `?` keeps that line and can never share
 the destination, so it does not decline the relocation — see case I of
 [extends_question_own_line_line_comment](../extends_question_own_line_line_comment_prettier_divergence/).
 
-**tsv**: declines the relocation in both and keeps the shell's run in place (the
+**tsv**: declines the relocation in A and B and keeps the shell's run in place (the
 mixed / trailing hang), so every comment stays distinct and on its own line. Case A's
 required pair is retained with it.
 
 **Prettier**: relocates anyway and the two comments render back to back, where the second
 `//` becomes text of the first — `// c1 // c2`, one comment where the author wrote two,
 irreversibly (the merged form is a fixed point). Case **B** additionally **reorders** them
-(`// c2 // c1`) and takes two passes to get there, pinned by `audit_signature.txt`.
+(`// c2 // c1`) and takes two passes to get there, pinned by `audit_signature.txt`; case
+**C** welds from the branch side (`T extends U // c1 // c2`).
 
 **D** is the control: a single comment with nothing else on the destination line still
 relocates, exactly as the canonical fixture says.
