@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 163,
+	"end": 407,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -57,24 +57,88 @@
 					"column": 14
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " A run the author GLUED — a multi-line block ahead of a single-line one — and broke",
+			"start": 155,
+			"end": 240,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " after, in the accessor keyword→name gap: both formatters drop the name below the run",
+			"start": 242,
+			"end": 329,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3\n\td3 ",
+			"start": 347,
+			"end": 359,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 6
+				},
+				"end": {
+					"line": 14,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 360,
+			"end": 368,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 7
+				},
+				"end": {
+					"line": 14,
+					"column": 15
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 162,
+		"end": 406,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 153,
+			"end": 397,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 9,
+					"line": 19,
 					"column": 9
 				}
 			},
@@ -339,6 +403,186 @@
 							"value": " Comment between accessor keyword and name is preserved",
 							"start": 20,
 							"end": 77
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 331,
+					"end": 396,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 337,
+						"end": 338,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 7
+							},
+							"end": {
+								"line": 12,
+								"column": 8
+							}
+						},
+						"name": "B"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 339,
+						"end": 396,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 9
+							},
+							"end": {
+								"line": 18,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "MethodDefinition",
+								"start": 343,
+								"end": 393,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 3
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 371,
+									"end": 372,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 2
+										},
+										"end": {
+											"line": 15,
+											"column": 3
+										}
+									},
+									"name": "b",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c3\n\td3 ",
+											"start": 347,
+											"end": 359
+										},
+										{
+											"type": "Block",
+											"value": " c4 ",
+											"start": 360,
+											"end": 368
+										}
+									]
+								},
+								"kind": "get",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 372,
+									"end": 393,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 3
+										},
+										"end": {
+											"line": 17,
+											"column": 3
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 375,
+										"end": 393,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 6
+											},
+											"end": {
+												"line": 17,
+												"column": 3
+											}
+										},
+										"body": [
+											{
+												"type": "ReturnStatement",
+												"start": 380,
+												"end": 389,
+												"loc": {
+													"start": {
+														"line": 16,
+														"column": 3
+													},
+													"end": {
+														"line": 16,
+														"column": 12
+													}
+												},
+												"argument": {
+													"type": "Literal",
+													"start": 387,
+													"end": 388,
+													"loc": {
+														"start": {
+															"line": 16,
+															"column": 10
+														},
+														"end": {
+															"line": 16,
+															"column": 11
+														}
+													},
+													"value": 1,
+													"raw": "1"
+												}
+											}
+										]
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A run the author GLUED — a multi-line block ahead of a single-line one — and broke",
+							"start": 155,
+							"end": 240
+						},
+						{
+							"type": "Line",
+							"value": " after, in the accessor keyword→name gap: both formatters drop the name below the run",
+							"start": 242,
+							"end": 329
 						}
 					]
 				}

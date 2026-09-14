@@ -889,7 +889,21 @@ impl<'a> Printer<'a> {
         // glued) collapses inline (`extends /* c */ Y`, the fall-through below);
         // prettier relocates the collapsed comment before `extends`. See
         // check_extends_line_comment / extends_own_line_block_comment.
-        if self.comments_force_own_line_between(extends_kw_end, extends_type_start) {
+        //
+        // The second disjunct is the run the author GLUED — a multi-line block ahead of a
+        // single-line one — and then BROKE AFTER
+        // ([`Printer::broke_after_run_holds_multiline_block`]): the multi-line body cannot
+        // print flat, so the run's break is forced whichever comment carries it, and
+        // `comments_force_own_line_between`, which reads each comment against its own
+        // neighbour, answers no. The shelled spelling of that run is CLAIMED by this gap
+        // (the leading-edge seam), so a gate that declined it printed the hang on pass 1
+        // and welded the type back onto the `*/` line on pass 2 — an F1 break. Both
+        // spellings ask here, so both land on the hang. Only that half: an isolated
+        // own-line block stays collapsed (`extends⏎/* c */⏎Y` → `extends /* c */ Y`), at
+        // the bare and shelled authorings alike.
+        if self.comments_force_own_line_between(extends_kw_end, extends_type_start)
+            || self.broke_after_run_holds_multiline_block(extends_kw_end, extends_type_start)
+        {
             // An alone-on-line format-ignore directive in the `extends`→type gap
             // freezes a non-composite extends type verbatim (`single_child_frozen`;
             // a union/intersection extends type declines and freezes via its own
@@ -996,10 +1010,22 @@ impl<'a> Printer<'a> {
         // keyword→value seam (mirroring the prefix-operator site). `value_hang_start !=`
         // the shell start means the wide seam stripped it; pure-line already returned
         // above, so only mixed/trailing reach here.
+        //
+        // The hang gate is the keyword→value one, both halves: a comment that forces its own
+        // line, OR a block run the author BROKE AFTER holding a multi-line block
+        // ([`Printer::broke_after_run_holds_multiline_block`] — the half of the function the
+        // shell's ownership claim reads that this gap does not already answer; the other
+        // half, an isolated own-line block, this gap deliberately COLLAPSES, at both
+        // authorings alike). Asking only the first left the run the author GLUED — a multi-line block
+        // ahead of a single-line one, broken after that — to the flat arms below while the
+        // claim still took it, so pass 1 printed the shell's soft `line` at the enclosing
+        // group's own indent and pass 2, reading the bare bytes, welded the type back onto
+        // the `*/` line: the F1 shape docs/comments.md names.
         let hang = self.keyword_value_stripped_paren_hang(extends_type);
         let (value_hang_start, value_hang_type) = (hang.value_start, hang.value_type);
         if value_hang_start != extends_type_start
-            && self.comments_force_own_line_between(extends_kw_end, value_hang_start)
+            && (self.comments_force_own_line_between(extends_kw_end, value_hang_start)
+                || self.broke_after_run_holds_multiline_block(extends_kw_end, value_hang_start))
         {
             // A re-added extends-type paren carries the conditional check/extends indent
             // depth (`build_type_doc_maybe_parens`), matching this builder's other arms —

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 112,
+	"end": 406,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -73,24 +73,104 @@
 					"column": 11
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " A run the author GLUED — a multi-line block ahead of a single-line one — and then broke",
+			"start": 104,
+			"end": 194,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " after. The run's break is forced by the multi-line block, so the predicate type hangs",
+			"start": 196,
+			"end": 284,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " below the whole run exactly as it does under the `//` above.",
+			"start": 286,
+			"end": 349,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " a\nb ",
+			"start": 371,
+			"end": 380,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 21
+				},
+				"end": {
+					"line": 12,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 381,
+			"end": 388,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 5
+				},
+				"end": {
+					"line": 12,
+					"column": 12
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 111,
+		"end": 405,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 102,
+			"end": 396,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 7,
+					"line": 14,
 					"column": 9
 				}
 			},
@@ -446,6 +526,201 @@
 						},
 						"body": []
 					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 351,
+					"end": 395,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 360,
+						"end": 361,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 10
+							},
+							"end": {
+								"line": 11,
+								"column": 11
+							}
+						},
+						"name": "h"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 362,
+							"end": 363,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 12
+								},
+								"end": {
+									"line": 11,
+									"column": 13
+								}
+							},
+							"name": "x"
+						}
+					],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 364,
+						"end": 392,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 14
+							},
+							"end": {
+								"line": 13,
+								"column": 3
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSTypePredicate",
+							"start": 366,
+							"end": 392,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 16
+								},
+								"end": {
+									"line": 13,
+									"column": 3
+								}
+							},
+							"parameterName": {
+								"type": "Identifier",
+								"start": 366,
+								"end": 367,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 16
+									},
+									"end": {
+										"line": 11,
+										"column": 17
+									}
+								},
+								"name": "x"
+							},
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 391,
+								"end": 392,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 3
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 391,
+									"end": 392,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 2
+										},
+										"end": {
+											"line": 13,
+											"column": 3
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 391,
+										"end": 392,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 2
+											},
+											"end": {
+												"line": 13,
+												"column": 3
+											}
+										},
+										"name": "A"
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " a\nb ",
+										"start": 371,
+										"end": 380
+									},
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 381,
+										"end": 388
+									}
+								]
+							},
+							"asserts": false
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 393,
+						"end": 395,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 4
+							},
+							"end": {
+								"line": 13,
+								"column": 6
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A run the author GLUED — a multi-line block ahead of a single-line one — and then broke",
+							"start": 104,
+							"end": 194
+						},
+						{
+							"type": "Line",
+							"value": " after. The run's break is forced by the multi-line block, so the predicate type hangs",
+							"start": 196,
+							"end": 284
+						},
+						{
+							"type": "Line",
+							"value": " below the whole run exactly as it does under the `//` above.",
+							"start": 286,
+							"end": 349
+						}
+					]
 				}
 			],
 			"sourceType": "module"

@@ -4,4 +4,10 @@
 	export default /* x */
 		/* y
 		 */ aaa ? bbb : ccc;
+
+	// the run the author GLUED the other way round — a multi-line block ahead of a single-line
+	// one, broken after that — keeps the glue, and the value hangs one level under the keyword
+	export default /* x
+y */ /* z */
+		ddd ? eee : fff;
 </script>

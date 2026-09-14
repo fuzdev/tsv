@@ -1,0 +1,575 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 542,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A run the author GLUED — a multi-line block ahead of a single-line one — and then",
+			"start": 20,
+			"end": 104,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " broke after, inside a redundant paren shell at a COMPOSITE head: the shell strips and",
+			"start": 106,
+			"end": 194,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the run lays out as the shell-free authoring does, the value dropping below the run's",
+			"start": 196,
+			"end": 284,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " closing `*/`. Prettier is non-idempotent on the shell authoring at these two seams.",
+			"start": 286,
+			"end": 372,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " conditional check type",
+			"start": 375,
+			"end": 400,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1\n\td1 ",
+			"start": 413,
+			"end": 425,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 426,
+			"end": 434,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 7
+				},
+				"end": {
+					"line": 10,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " first intersection member",
+			"start": 460,
+			"end": 488,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3\n\td3 ",
+			"start": 501,
+			"end": 513,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 16,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 514,
+			"end": 522,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 7
+				},
+				"end": {
+					"line": 16,
+					"column": 15
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 541,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 532,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 18,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 402,
+					"end": 457,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 22
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 407,
+						"end": 408,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 6
+							},
+							"end": {
+								"line": 8,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 437,
+						"end": 456,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 2
+							},
+							"end": {
+								"line": 11,
+								"column": 21
+							}
+						},
+						"checkType": {
+							"type": "TSTypeReference",
+							"start": 437,
+							"end": 438,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 2
+								},
+								"end": {
+									"line": 11,
+									"column": 3
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 437,
+								"end": 438,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 3
+									}
+								},
+								"name": "B"
+							}
+						},
+						"extendsType": {
+							"type": "TSTypeReference",
+							"start": 447,
+							"end": 448,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 12
+								},
+								"end": {
+									"line": 11,
+									"column": 13
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 447,
+								"end": 448,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 12
+									},
+									"end": {
+										"line": 11,
+										"column": 13
+									}
+								},
+								"name": "C"
+							}
+						},
+						"trueType": {
+							"type": "TSTypeReference",
+							"start": 451,
+							"end": 452,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 16
+								},
+								"end": {
+									"line": 11,
+									"column": 17
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 451,
+								"end": 452,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 16
+									},
+									"end": {
+										"line": 11,
+										"column": 17
+									}
+								},
+								"name": "D"
+							}
+						},
+						"falseType": {
+							"type": "TSTypeReference",
+							"start": 455,
+							"end": 456,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 20
+								},
+								"end": {
+									"line": 11,
+									"column": 21
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 455,
+								"end": 456,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 20
+									},
+									"end": {
+										"line": 11,
+										"column": 21
+									}
+								},
+								"name": "E"
+							}
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c1\n\td1 ",
+								"start": 413,
+								"end": 425
+							},
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 426,
+								"end": 434
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A run the author GLUED — a multi-line block ahead of a single-line one — and then",
+							"start": 20,
+							"end": 104
+						},
+						{
+							"type": "Line",
+							"value": " broke after, inside a redundant paren shell at a COMPOSITE head: the shell strips and",
+							"start": 106,
+							"end": 194
+						},
+						{
+							"type": "Line",
+							"value": " the run lays out as the shell-free authoring does, the value dropping below the run's",
+							"start": 196,
+							"end": 284
+						},
+						{
+							"type": "Line",
+							"value": " closing `*/`. Prettier is non-idempotent on the shell authoring at these two seams.",
+							"start": 286,
+							"end": 372
+						},
+						{
+							"type": "Line",
+							"value": " conditional check type",
+							"start": 375,
+							"end": 400
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 490,
+					"end": 531,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 8
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 495,
+						"end": 496,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 6
+							},
+							"end": {
+								"line": 14,
+								"column": 7
+							}
+						},
+						"name": "F"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 525,
+						"end": 530,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 2
+							},
+							"end": {
+								"line": 17,
+								"column": 7
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 525,
+								"end": 526,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 525,
+									"end": 526,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 2
+										},
+										"end": {
+											"line": 17,
+											"column": 3
+										}
+									},
+									"name": "G"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 529,
+								"end": 530,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 6
+									},
+									"end": {
+										"line": 17,
+										"column": 7
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 529,
+									"end": 530,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 6
+										},
+										"end": {
+											"line": 17,
+											"column": 7
+										}
+									},
+									"name": "H"
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c3\n\td3 ",
+								"start": 501,
+								"end": 513
+							},
+							{
+								"type": "Block",
+								"value": " c4 ",
+								"start": 514,
+								"end": 522
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " first intersection member",
+							"start": 460,
+							"end": 488
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

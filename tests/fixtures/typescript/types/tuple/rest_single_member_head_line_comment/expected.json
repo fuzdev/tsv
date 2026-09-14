@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 402,
+	"end": 630,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -121,24 +121,88 @@
 					"column": 10
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " The block-run face of the same gap: a run the author GLUED — a multi-line block ahead",
+			"start": 394,
+			"end": 482,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " of a single-line one — and broke after. Both formatters drop the type below the run",
+			"start": 484,
+			"end": 570,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c4\n\td4 ",
+			"start": 588,
+			"end": 600,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 5
+				},
+				"end": {
+					"line": 27,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 601,
+			"end": 609,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 7
+				},
+				"end": {
+					"line": 27,
+					"column": 15
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 401,
+		"end": 629,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 392,
+			"end": 620,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 22,
+					"line": 30,
 					"column": 9
 				}
 			},
@@ -583,6 +647,143 @@
 							}
 						]
 					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 572,
+					"end": 619,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 577,
+						"end": 578,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 6
+							},
+							"end": {
+								"line": 25,
+								"column": 7
+							}
+						},
+						"name": "I"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 581,
+						"end": 618,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 10
+							},
+							"end": {
+								"line": 29,
+								"column": 2
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSRestType",
+								"start": 585,
+								"end": 615,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 2
+									},
+									"end": {
+										"line": 28,
+										"column": 5
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSArrayType",
+									"start": 612,
+									"end": 615,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 2
+										},
+										"end": {
+											"line": 28,
+											"column": 5
+										}
+									},
+									"elementType": {
+										"type": "TSTypeReference",
+										"start": 612,
+										"end": 613,
+										"loc": {
+											"start": {
+												"line": 28,
+												"column": 2
+											},
+											"end": {
+												"line": 28,
+												"column": 3
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 612,
+											"end": 613,
+											"loc": {
+												"start": {
+													"line": 28,
+													"column": 2
+												},
+												"end": {
+													"line": 28,
+													"column": 3
+												}
+											},
+											"name": "J"
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c4\n\td4 ",
+											"start": 588,
+											"end": 600
+										},
+										{
+											"type": "Block",
+											"value": " c5 ",
+											"start": 601,
+											"end": 609
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The block-run face of the same gap: a run the author GLUED — a multi-line block ahead",
+							"start": 394,
+							"end": 482
+						},
+						{
+							"type": "Line",
+							"value": " of a single-line one — and broke after. Both formatters drop the type below the run",
+							"start": 484,
+							"end": 570
+						}
+					]
 				}
 			],
 			"sourceType": "module"

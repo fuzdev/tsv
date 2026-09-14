@@ -8,4 +8,11 @@
 	// hangs the type; the trailing block stays inline at this type position.
 	type T2 = A extends (// c
 	B /* t */) ? X : Y;
+
+	// A run the author GLUED — a multi-line block ahead of a single-line one — and then broke
+	// after. The run's break is forced by the multi-line block, so the extends-type hangs
+	// below the whole run exactly as it does under the `//` above.
+	type T3 = A extends (/* a
+b */ /* c */
+	B) ? X : Y;
 </script>

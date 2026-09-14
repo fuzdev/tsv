@@ -832,8 +832,21 @@ impl<'a> Printer<'a> {
             // that line — Prettier's `shouldIndentUnionType` returns false for
             // `TSTypeAssertion`, so it never gets the leading-`|` hanging indent that
             // `as`/`satisfies` casts use (see `build_union_hanging_indent_doc`).
-            let comments_doc =
-                self.build_comments_between(angle_end, type_start, CommentSpacing::Trailing);
+            // The `<`→type gap takes the RUN-level reading a keyword→value gap takes: a
+            // broke-after run holding a multi-line block
+            // ([`Printer::broke_after_run_holds_multiline_block`]) cannot print flat, so
+            // every separator the author broke opens and the type drops below the run —
+            // which is prettier's own form here, at the bare authoring too. The
+            // per-comment `Trailing` spacing below answers with a space for both halves of
+            // `/* a⏎b */ /* c */⏎T` (the first is glued, the second single-line) and welded
+            // the type onto the run's closing line; the shelled twin, whose stripped shell
+            // hands this gap the same run, then converged only on its second pass.
+            let comments_doc = if self.broke_after_run_holds_multiline_block(angle_end, type_start)
+            {
+                self.build_trailing_comments_hang_next(angle_end, type_start)
+            } else {
+                self.build_comments_between(angle_end, type_start, CommentSpacing::Trailing)
+            };
             let before_close_doc = self.build_comments_between_filtered(
                 type_end,
                 close_angle,
@@ -1176,13 +1189,29 @@ impl<'a> Printer<'a> {
             // A line comment or multiline block hangs the type on its own line; a
             // single-line block comment collapses inline (the fall-through below).
             // Prettier relocates the collapsed comment before the keyword instead.
-            if head.frozen || self.comments_force_own_line_between(kw_end, head.value_start) {
+            //
+            // The gate is the shared keyword→value one ([`Printer::keyword_value_hang_doc`]),
+            // as at the annotation `:` and the function type's `=>`: a comment that forces
+            // its own line, OR a block run the author BROKE AFTER whose break is forced
+            // ([`Printer::breaking_value_leading_run`] — a multi-line block anywhere in the
+            // run, or a type that breaks on its own). Asking only the first left the run
+            // whose multi-line block is glued ahead of a single-line one
+            // (`as /* a⏎b */ /* c */⏎T`) to the flat fall-through, which welded the type onto
+            // the block's closing line — and once the shell claim widened to that run, the
+            // shelled authoring took the hang on pass 1 and the weld on pass 2 (F1).
+            // A cast is a value position: a trailing block lifted from the shell defers past
+            // the statement `;` (`x as // c\n\tA; /* t */`), matching the declarator's own
+            // value→`;` trailing handling.
+            let hang_type_doc = if head.frozen {
+                Some(self.build_keyword_value_doc(&head, TrailingBlock::Deferred))
+            } else {
+                self.keyword_value_hang_doc(kw_end, head.value_start, || {
+                    self.build_keyword_value_doc(&head, TrailingBlock::Deferred)
+                })
+            };
+            if let Some(type_doc) = hang_type_doc {
                 parts.push(d.text(" "));
                 parts.push(d.text(keyword));
-                // A cast is a value position: a trailing block lifted from the shell
-                // defers past the statement `;` (`x as // c\n\tA; /* t */`), matching the
-                // declarator's own value→`;` trailing handling.
-                let type_doc = self.build_keyword_value_doc(&head, TrailingBlock::Deferred);
                 self.append_keyword_value_line_comments(
                     &mut parts,
                     kw_end,

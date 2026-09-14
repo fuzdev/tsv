@@ -46,4 +46,28 @@ z */ B;
 		| keyof /* x */
 				/* y
 				 */ B;
+
+	// the run the author GLUED the other way round — a multi-line block ahead of a single-line
+	// one, broken after that — keeps the glue, and the type hangs one level under the keyword
+	type T9 = keyof /* x
+y */ /* z */
+		B;
+
+	// the same glued run with an author blank after it: both are kept
+	type T10 = keyof /* x
+y */ /* z */
+
+		B;
+
+	// the same glued run with a `//` as its tail: the line comment keeps the block's closing
+	// line, and the type hangs below the whole run
+	type T11 = keyof /* x
+y */ // z
+		B;
+
+	// the same glued run at the function type's `=>`: the run stays intact and the return type
+	// hangs one level under the arrow
+	type T12 = () => /* x
+y */ /* z */
+		B;
 </script>

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 270,
+	"end": 510,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -73,24 +73,88 @@
 					"column": 5
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " the run the author GLUED the other way round — a multi-line block ahead of a single-line",
+			"start": 262,
+			"end": 353,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 92
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " one, broken after that — keeps the glue, and the value hangs one level under the keyword",
+			"start": 355,
+			"end": 446,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 92
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x\ny ",
+			"start": 463,
+			"end": 472,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 16
+				},
+				"end": {
+					"line": 11,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " z ",
+			"start": 473,
+			"end": 480,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 5
+				},
+				"end": {
+					"line": 11,
+					"column": 12
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 269,
+		"end": 509,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 260,
+			"end": 500,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 7,
+					"line": 13,
 					"column": 9
 				}
 			},
@@ -199,6 +263,113 @@
 							"value": " after the first comment is forced, and the value keeps its own layout below the comment",
 							"start": 115,
 							"end": 205
+						}
+					]
+				},
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 448,
+					"end": 499,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 18
+						}
+					},
+					"exportKind": "value",
+					"declaration": {
+						"type": "ConditionalExpression",
+						"start": 483,
+						"end": 498,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 2
+							},
+							"end": {
+								"line": 12,
+								"column": 17
+							}
+						},
+						"test": {
+							"type": "Identifier",
+							"start": 483,
+							"end": 486,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 2
+								},
+								"end": {
+									"line": 12,
+									"column": 5
+								}
+							},
+							"name": "ddd"
+						},
+						"consequent": {
+							"type": "Identifier",
+							"start": 489,
+							"end": 492,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 8
+								},
+								"end": {
+									"line": 12,
+									"column": 11
+								}
+							},
+							"name": "eee"
+						},
+						"alternate": {
+							"type": "Identifier",
+							"start": 495,
+							"end": 498,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 14
+								},
+								"end": {
+									"line": 12,
+									"column": 17
+								}
+							},
+							"name": "fff"
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " x\ny ",
+								"start": 463,
+								"end": 472
+							},
+							{
+								"type": "Block",
+								"value": " z ",
+								"start": 473,
+								"end": 480
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the run the author GLUED the other way round — a multi-line block ahead of a single-line",
+							"start": 262,
+							"end": 353
+						},
+						{
+							"type": "Line",
+							"value": " one, broken after that — keeps the glue, and the value hangs one level under the keyword",
+							"start": 355,
+							"end": 446
 						}
 					]
 				}
