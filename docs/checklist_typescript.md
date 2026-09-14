@@ -219,7 +219,7 @@ written in the flags position) is not a flags production at all and is rejected,
 - Prefix decrement (`--x`)
 - Postfix increment (`x++`)
 - Postfix decrement (`x--`)
-- Operand parenthesization preserved for a type-assertion operand — `(a as T)++` not `a as T++`
+- Operand parenthesization preserved for every operand looser than a member access — `(a * b)++`, `(-b)++`, `(a = b)++`, `((a) => a)++`, `(a as T)++`, and postfix-only for an instantiation (`(f<T>)++`)
 
 ### Binary Operators
 

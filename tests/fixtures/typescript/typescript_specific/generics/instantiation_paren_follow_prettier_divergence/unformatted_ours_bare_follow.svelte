@@ -22,13 +22,13 @@
 	// The pair wraps whatever operand ENDS on the close: a binary whose right operand is
 	// an instantiation, a prefix operator's argument, or an angle-bracket assertion's
 	// operand, all re-lex the same way.
-	const r = a * (fn<T>) + 1;
-	const s = 1 + (fn<T>) + 2;
-	const t = -(fn<T>) + 1;
-	const u = typeof (fn<T>) > 1;
-	const v = (fn<T> /* c */) + 1;
-	const x = <T>(fn<U>) + 1;
-	const y = a * <T>(fn<U>) + 1;
+	const r = (a * fn<T>) + 1;
+	const s = (1 + fn<T>) + 2;
+	const t = (-fn<T>) + 1;
+	const u = (typeof fn<T>) > 1;
+	const v = (fn<T>) /* c */ + 1;
+	const x = (<T>fn<U>) + 1;
+	const y = (a * <T>fn<U>) + 1;
 
 	// An inner assertion that takes its own pair ends the operand on a `)`, so the outer
 	// one needs none.
@@ -46,5 +46,5 @@
 	prettier's own tsc-based parse, which rejects `fn<T> < 1` outright. So both halves of the
 	rule are oracle-visible on these cells — prettier strips the pair, and tsv puts it back on
 	the bare spelling. -->
-{(fn<T>) < 1}
-{(fn<T>) >= 1}
+{fn<T> < 1}
+{fn<T> >= 1}

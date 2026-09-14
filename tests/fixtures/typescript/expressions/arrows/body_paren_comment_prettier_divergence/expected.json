@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1411,
+	"end": 1717,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -492,9 +492,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " object-literal body — parens are required, comment kept inside (not after `)`)",
+			"value": " sequence body — the pair the sequence prints for ITSELF stands in for the erased",
 			"start": 1219,
-			"end": 1300,
+			"end": 1302,
 			"loc": {
 				"start": {
 					"line": 50,
@@ -502,6 +502,86 @@
 				},
 				"end": {
 					"line": 50,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " shell, so the comment stays on the last operand inside it from every authoring",
+			"start": 1304,
+			"end": 1385,
+			"loc": {
+				"start": {
+					"line": 51,
+					"column": 1
+				},
+				"end": {
+					"line": 51,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " t",
+			"start": 1414,
+			"end": 1418,
+			"loc": {
+				"start": {
+					"line": 54,
+					"column": 4
+				},
+				"end": {
+					"line": 54,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the block spelling of the same, collapsed inline in that pair",
+			"start": 1425,
+			"end": 1489,
+			"loc": {
+				"start": {
+					"line": 57,
+					"column": 1
+				},
+				"end": {
+					"line": 57,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 1513,
+			"end": 1520,
+			"loc": {
+				"start": {
+					"line": 58,
+					"column": 23
+				},
+				"end": {
+					"line": 58,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " object-literal body — parens are required, comment kept inside (not after `)`)",
+			"start": 1525,
+			"end": 1606,
+			"loc": {
+				"start": {
+					"line": 60,
+					"column": 1
+				},
+				"end": {
+					"line": 60,
 					"column": 82
 				}
 			}
@@ -509,15 +589,15 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 1328,
-			"end": 1335,
+			"start": 1634,
+			"end": 1641,
 			"loc": {
 				"start": {
-					"line": 51,
+					"line": 61,
 					"column": 27
 				},
 				"end": {
-					"line": 51,
+					"line": 61,
 					"column": 34
 				}
 			}
@@ -525,15 +605,15 @@
 		{
 			"type": "Line",
 			"value": " inside call arg — parens preserved",
-			"start": 1340,
-			"end": 1377,
+			"start": 1646,
+			"end": 1683,
 			"loc": {
 				"start": {
-					"line": 53,
+					"line": 63,
 					"column": 1
 				},
 				"end": {
-					"line": 53,
+					"line": 63,
 					"column": 38
 				}
 			}
@@ -541,15 +621,15 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 1390,
-			"end": 1397,
+			"start": 1696,
+			"end": 1703,
 			"loc": {
 				"start": {
-					"line": 54,
+					"line": 64,
 					"column": 12
 				},
 				"end": {
-					"line": 54,
+					"line": 64,
 					"column": 19
 				}
 			}
@@ -558,19 +638,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 1410,
+		"end": 1716,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 1401,
+			"end": 1707,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 55,
+					"line": 65,
 					"column": 9
 				}
 			},
@@ -1922,61 +2002,61 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 1302,
-					"end": 1337,
+					"start": 1387,
+					"end": 1422,
 					"loc": {
 						"start": {
-							"line": 51,
+							"line": 52,
 							"column": 1
 						},
 						"end": {
-							"line": 51,
-							"column": 36
+							"line": 55,
+							"column": 3
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 1308,
-							"end": 1336,
+							"start": 1393,
+							"end": 1421,
 							"loc": {
 								"start": {
-									"line": 51,
+									"line": 52,
 									"column": 7
 								},
 								"end": {
-									"line": 51,
-									"column": 35
+									"line": 55,
+									"column": 2
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 1308,
-								"end": 1309,
+								"start": 1393,
+								"end": 1394,
 								"loc": {
 									"start": {
-										"line": 51,
+										"line": 52,
 										"column": 7
 									},
 									"end": {
-										"line": 51,
+										"line": 52,
 										"column": 8
 									}
 								},
-								"name": "j"
+								"name": "n"
 							},
 							"init": {
 								"type": "ArrowFunctionExpression",
-								"start": 1312,
-								"end": 1336,
+								"start": 1397,
+								"end": 1421,
 								"loc": {
 									"start": {
-										"line": 51,
+										"line": 52,
 										"column": 11
 									},
 									"end": {
-										"line": 51,
-										"column": 35
+										"line": 55,
+										"column": 2
 									}
 								},
 								"id": null,
@@ -1985,79 +2065,59 @@
 								"async": false,
 								"params": [],
 								"body": {
-									"type": "ObjectExpression",
-									"start": 1319,
-									"end": 1327,
+									"type": "SequenceExpression",
+									"start": 1407,
+									"end": 1413,
 									"loc": {
 										"start": {
-											"line": 51,
-											"column": 18
+											"line": 53,
+											"column": 2
 										},
 										"end": {
-											"line": 51,
-											"column": 26
+											"line": 54,
+											"column": 3
 										}
 									},
-									"properties": [
+									"expressions": [
 										{
-											"type": "Property",
-											"start": 1321,
-											"end": 1325,
+											"type": "Identifier",
+											"start": 1407,
+											"end": 1408,
 											"loc": {
 												"start": {
-													"line": 51,
-													"column": 20
+													"line": 53,
+													"column": 2
 												},
 												"end": {
-													"line": 51,
-													"column": 24
+													"line": 53,
+													"column": 3
 												}
 											},
-											"method": false,
-											"shorthand": false,
-											"computed": false,
-											"key": {
-												"type": "Identifier",
-												"start": 1321,
-												"end": 1322,
-												"loc": {
-													"start": {
-														"line": 51,
-														"column": 20
-													},
-													"end": {
-														"line": 51,
-														"column": 21
-													}
+											"name": "x"
+										},
+										{
+											"type": "Identifier",
+											"start": 1412,
+											"end": 1413,
+											"loc": {
+												"start": {
+													"line": 54,
+													"column": 2
 												},
-												"name": "k"
+												"end": {
+													"line": 54,
+													"column": 3
+												}
 											},
-											"value": {
-												"type": "Literal",
-												"start": 1324,
-												"end": 1325,
-												"loc": {
-													"start": {
-														"line": 51,
-														"column": 23
-													},
-													"end": {
-														"line": 51,
-														"column": 24
-													}
-												},
-												"value": 1,
-												"raw": "1"
-											},
-											"kind": "init"
+											"name": "y"
 										}
 									],
 									"trailingComments": [
 										{
-											"type": "Block",
-											"value": " c ",
-											"start": 1328,
-											"end": 1335
+											"type": "Line",
+											"value": " t",
+											"start": 1414,
+											"end": 1418
 										}
 									]
 								}
@@ -2080,51 +2140,345 @@
 						},
 						{
 							"type": "Line",
-							"value": " object-literal body — parens are required, comment kept inside (not after `)`)",
+							"value": " sequence body — the pair the sequence prints for ITSELF stands in for the erased",
 							"start": 1219,
-							"end": 1300
+							"end": 1302
+						},
+						{
+							"type": "Line",
+							"value": " shell, so the comment stays on the last operand inside it from every authoring",
+							"start": 1304,
+							"end": 1385
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1491,
+					"end": 1522,
+					"loc": {
+						"start": {
+							"line": 58,
+							"column": 1
+						},
+						"end": {
+							"line": 58,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1497,
+							"end": 1521,
+							"loc": {
+								"start": {
+									"line": 58,
+									"column": 7
+								},
+								"end": {
+									"line": 58,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1497,
+								"end": 1498,
+								"loc": {
+									"start": {
+										"line": 58,
+										"column": 7
+									},
+									"end": {
+										"line": 58,
+										"column": 8
+									}
+								},
+								"name": "o"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 1501,
+								"end": 1521,
+								"loc": {
+									"start": {
+										"line": 58,
+										"column": 11
+									},
+									"end": {
+										"line": 58,
+										"column": 31
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "SequenceExpression",
+									"start": 1508,
+									"end": 1512,
+									"loc": {
+										"start": {
+											"line": 58,
+											"column": 18
+										},
+										"end": {
+											"line": 58,
+											"column": 22
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 1508,
+											"end": 1509,
+											"loc": {
+												"start": {
+													"line": 58,
+													"column": 18
+												},
+												"end": {
+													"line": 58,
+													"column": 19
+												}
+											},
+											"name": "x"
+										},
+										{
+											"type": "Identifier",
+											"start": 1511,
+											"end": 1512,
+											"loc": {
+												"start": {
+													"line": 58,
+													"column": 21
+												},
+												"end": {
+													"line": 58,
+													"column": 22
+												}
+											},
+											"name": "y"
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " t ",
+											"start": 1513,
+											"end": 1520
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the block spelling of the same, collapsed inline in that pair",
+							"start": 1425,
+							"end": 1489
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1608,
+					"end": 1643,
+					"loc": {
+						"start": {
+							"line": 61,
+							"column": 1
+						},
+						"end": {
+							"line": 61,
+							"column": 36
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1614,
+							"end": 1642,
+							"loc": {
+								"start": {
+									"line": 61,
+									"column": 7
+								},
+								"end": {
+									"line": 61,
+									"column": 35
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1614,
+								"end": 1615,
+								"loc": {
+									"start": {
+										"line": 61,
+										"column": 7
+									},
+									"end": {
+										"line": 61,
+										"column": 8
+									}
+								},
+								"name": "j"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 1618,
+								"end": 1642,
+								"loc": {
+									"start": {
+										"line": 61,
+										"column": 11
+									},
+									"end": {
+										"line": 61,
+										"column": 35
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "ObjectExpression",
+									"start": 1625,
+									"end": 1633,
+									"loc": {
+										"start": {
+											"line": 61,
+											"column": 18
+										},
+										"end": {
+											"line": 61,
+											"column": 26
+										}
+									},
+									"properties": [
+										{
+											"type": "Property",
+											"start": 1627,
+											"end": 1631,
+											"loc": {
+												"start": {
+													"line": 61,
+													"column": 20
+												},
+												"end": {
+													"line": 61,
+													"column": 24
+												}
+											},
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 1627,
+												"end": 1628,
+												"loc": {
+													"start": {
+														"line": 61,
+														"column": 20
+													},
+													"end": {
+														"line": 61,
+														"column": 21
+													}
+												},
+												"name": "k"
+											},
+											"value": {
+												"type": "Literal",
+												"start": 1630,
+												"end": 1631,
+												"loc": {
+													"start": {
+														"line": 61,
+														"column": 23
+													},
+													"end": {
+														"line": 61,
+														"column": 24
+													}
+												},
+												"value": 1,
+												"raw": "1"
+											},
+											"kind": "init"
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 1634,
+											"end": 1641
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " object-literal body — parens are required, comment kept inside (not after `)`)",
+							"start": 1525,
+							"end": 1606
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 1379,
-					"end": 1400,
+					"start": 1685,
+					"end": 1706,
 					"loc": {
 						"start": {
-							"line": 54,
+							"line": 64,
 							"column": 1
 						},
 						"end": {
-							"line": 54,
+							"line": 64,
 							"column": 22
 						}
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 1379,
-						"end": 1399,
+						"start": 1685,
+						"end": 1705,
 						"loc": {
 							"start": {
-								"line": 54,
+								"line": 64,
 								"column": 1
 							},
 							"end": {
-								"line": 54,
+								"line": 64,
 								"column": 21
 							}
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 1379,
-							"end": 1380,
+							"start": 1685,
+							"end": 1686,
 							"loc": {
 								"start": {
-									"line": 54,
+									"line": 64,
 									"column": 1
 								},
 								"end": {
-									"line": 54,
+									"line": 64,
 									"column": 2
 								}
 							},
@@ -2133,15 +2487,15 @@
 						"arguments": [
 							{
 								"type": "ArrowFunctionExpression",
-								"start": 1381,
-								"end": 1398,
+								"start": 1687,
+								"end": 1704,
 								"loc": {
 									"start": {
-										"line": 54,
+										"line": 64,
 										"column": 3
 									},
 									"end": {
-										"line": 54,
+										"line": 64,
 										"column": 20
 									}
 								},
@@ -2152,15 +2506,15 @@
 								"params": [],
 								"body": {
 									"type": "Identifier",
-									"start": 1388,
-									"end": 1389,
+									"start": 1694,
+									"end": 1695,
 									"loc": {
 										"start": {
-											"line": 54,
+											"line": 64,
 											"column": 10
 										},
 										"end": {
-											"line": 54,
+											"line": 64,
 											"column": 11
 										}
 									},
@@ -2169,8 +2523,8 @@
 										{
 											"type": "Block",
 											"value": " c ",
-											"start": 1390,
-											"end": 1397
+											"start": 1696,
+											"end": 1703
 										}
 									]
 								}
@@ -2182,8 +2536,8 @@
 						{
 							"type": "Line",
 							"value": " inside call arg — parens preserved",
-							"start": 1340,
-							"end": 1377
+							"start": 1646,
+							"end": 1683
 						}
 					]
 				}
