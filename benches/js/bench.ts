@@ -32,7 +32,11 @@
  *   BENCH_FILTER        Filter files by path pattern (default: none)
  *   BENCH_DURATION      Duration per benchmark in ms (default: 5000; 15000 in
  *                       conformance mode — full-corpus sweeps per iteration)
- *   BENCH_WARMUP        Warmup iterations (default: 3)
+ *   BENCH_WARMUP        Warmup iteration FLOOR per row (default: 3); every row also
+ *                       warms for at least BENCH_WARMUP_MS, whichever is more
+ *   BENCH_WARMUP_MS     Warmup duration floor per row in ms (default: 1000) — a
+ *                       fast row's three sweeps were ~50 ms of warmup, and the
+ *                       JIT was still tiering through the measured window
  *   BENCH_MODE          'intersection' (default) | 'union' — iteration corpus mode
  *   BENCH_CORPUS        'perf' (default) | 'conformance' — corpus + surface selector:
  *                       perf = real-world corpus, parse + format groups (every in-scope
@@ -131,7 +135,8 @@ import {
 	CANONICAL_PARSER_ROWS,
 	type Language,
 	LANGUAGES,
-	type SourceFile
+	type SourceFile,
+	type TsvImplementation
 } from './lib/types.ts';
 import {
 	check_executed_artifacts,
@@ -268,8 +273,21 @@ const MAX_FILES_PER_LANGUAGE = env_int('BENCH_LIMIT');
 /** Filter files by path pattern (default: none) */
 const FILE_FILTER = env.BENCH_FILTER;
 
-/** Number of warmup iterations (default: 3, every row — see the tiering note at the task loop) */
+/** Warmup iteration floor (default: 3, every row — see `warmup_iterations_for`) */
 const BENCH_WARMUP = env_int('BENCH_WARMUP') ?? 3;
+
+/**
+ * Warmup DURATION floor per row in ms (default: 1000). Warmup is an iteration
+ * count in the timing library, so a fixed count warms a 25 ms row for 75 ms and a
+ * 13 s row for 39 s: the fast rows entered their measured window with the JIT
+ * still tiering (V8 and JSC alike, and the wasm tier-up is time-based), read as a
+ * negative `drift` on every runtime — median −1.9% on rows under 50 ms, to −10%
+ * on bun's `parse/css` json rows — and a mean biased slow by about half of it,
+ * on exactly the rows the ratios favor. Sizing warmup by time from the row's own
+ * pre-flight sweep evens that out at ~16 s of wall per runtime; slow rows are
+ * unchanged, since three of their sweeps already exceed the floor.
+ */
+const BENCH_WARMUP_MS = env_int('BENCH_WARMUP_MS') ?? 1000;
 
 /**
  * Enable the per-iteration forced-GC hook (default: off — measures realistic
@@ -389,8 +407,7 @@ const BENCH_DURATION = env_int('BENCH_DURATION') ?? (IS_CONFORMANCE ? 15_000 : 5
  * Coverage-only mode (`BENCH_COVERAGE_ONLY=1`): run pre-flight — which fully
  * determines per-tool parse coverage — and emit the report straight from it,
  * SKIPPING the timed benchmark phase entirely. That phase costs a fixed floor
- * of ≥8 full-corpus sweeps per row (3 warmup + ≥5 measured; slow tasks tier to
- * 1 warmup + ≥7 measured) no matter how low
+ * of ≥8 full-corpus sweeps per row (≥3 warmup + ≥5 measured) no matter how low
  * `BENCH_DURATION` goes, yet the conformance surface's coverage consumers (the
  * site's per-engine table, `derive_conformance_groups`) read only the
  * pre-flight counts — so on a coverage refresh the whole timing cost is wasted.
@@ -1505,6 +1522,17 @@ function raw_timing_stats(timings: readonly number[]): {
 }
 
 /**
+ * Warmup sweeps for a row: the iteration floor, or as many sweeps as it takes to
+ * warm for `BENCH_WARMUP_MS`, whichever is more — sized from the row's cold
+ * pre-flight sweep, which over-estimates a warm sweep and so under-counts a little
+ * (fine: the floor is a floor). A row with no pre-flight time gets the iteration floor.
+ */
+function warmup_iterations_for(preflight_ms: number): number {
+	if (preflight_ms <= 0) return BENCH_WARMUP;
+	return Math.max(BENCH_WARMUP, Math.ceil(BENCH_WARMUP_MS / preflight_ms));
+}
+
+/**
  * The verdict an impl gives by returning NOTHING: a `''` for a non-empty input is a
  * declined file, not a formatted one, and a timed sweep that accepted it would drop
  * that file's whole cost from the row — on the canonical row, from the denominator of
@@ -1834,6 +1862,15 @@ async function run_benchmark_group(
 
 	log(`\n▶ ${group_name}`);
 
+	// Task name → the impl's `reset_heap`, for the tasks whose impl declares one.
+	// Keyed by name because the library's `on_iteration` hands back the task name.
+	const reset_heap_by_task = new Map<string, () => void>();
+	for (const task of tasks) {
+		const impl: TsvImplementation | undefined = impls[task.impl];
+		const reset_heap = impl?.reset_heap;
+		if (reset_heap) reset_heap_by_task.set(task.name, () => reset_heap.call(impl));
+	}
+
 	const bench = new Benchmark({
 		duration_ms: BENCH_DURATION,
 		warmup_iterations: BENCH_WARMUP,
@@ -1861,7 +1898,17 @@ async function run_benchmark_group(
 		// cooldown would put a settle under Node/Bun and none under Deno, biasing
 		// the very cross-runtime ratios this bench exists to read.
 		cooldown_ms: 0,
-		on_iteration: BENCH_GC ? () => globalThis.gc?.() : undefined,
+		// Runs between one sweep's end timer and the next's start timer — outside
+		// every timing, inside the duration budget, never during warmup. Two things
+		// live here: the opt-in forced GC, and the per-sweep heap reset for an impl
+		// whose heap a GC cannot settle (`TsvImplementation.reset_heap`).
+		on_iteration:
+			BENCH_GC || reset_heap_by_task.size > 0
+				? (name: string) => {
+						if (BENCH_GC) globalThis.gc?.();
+						reset_heap_by_task.get(name)?.();
+					}
+				: undefined,
 		on_task_complete: (result: BenchmarkResult, index: number, total: number) => {
 			const ops_per_sec = result.stats.ops_per_second.toFixed(1);
 			// Throughput uses effective bytes (this impl's success set) so
@@ -1882,32 +1929,33 @@ async function run_benchmark_group(
 
 	for (const task of tasks) {
 		const task_files = filtered_files_by_task.get(task.tracking_key)!;
-		// Tier per-task `min_iterations` based on preflight pass time. The
-		// suite floor (5; 10 when baselining) handles most cases; very slow
-		// tasks (>5s/pass — prettier on the full TS corpus, oxfmt full passes)
-		// get a bump (7; 12 when baselining) because at n=5 their p75/p90
-		// still sit too close to max and the Welch DOF is on the edge. Above
-		// that we don't keep climbing: each extra iteration on a 14s/pass task
-		// costs another 14s of wall clock.
+		// ONE protocol per row on every runtime: the suite floor (5; 10 when
+		// baselining), the duration budget, and a warmup sized by TIME from the
+		// row's own pre-flight sweep. There used to be a slow-task tier here (a cold
+		// pre-flight pass over 5 s raised the floor 5 → 7, and once dropped warmup
+		// 3 → 1) — but the tier was decided by ONE cold pass against a 5 s edge, and
+		// a row straddling it (biome's TS sweep, ~4.5–5.0 s) took the tier on one
+		// runtime and not another: two protocols on one row, published as a runtime
+		// ratio. A runtime-stable key does not exist in-process (each runtime knows
+		// only its own sweep time), so the tier is gone: its two extra samples on a
+		// 5–15 s row served percentiles no consumer reads (the baseline mode, whose
+		// Welch statistics do need samples, keeps its own higher floor). Both
+		// resolved values ride each row (`warmup_iterations`, `min_iterations`) so
+		// a protocol difference would be legible in the report.
 		const preflight_ms = preflight_elapsed_ms.get(task.tracking_key) ?? 0;
-		const min_iter = preflight_ms > 5000 ? (baselining ? 12 : 7) : undefined;
-		// WARMUP is deliberately NOT tiered. It used to drop 3 → 1 on the slow tier
-		// (a multi-second sweep warms the JIT in one pass, so the other two are wall
-		// clock, ~25 s/runtime on prettier's TS row) — but the tier is decided by ONE
-		// cold preflight pass against a 5 s edge, and a row that straddles it
-		// (biome's TS sweep, ~4.5–5.0 s) took the tier on one runtime and not another:
-		// 7 samples from sweep 2 on node against 5 from sweep 4 on deno, two protocols
-		// on the one row whose cost grows per sweep, published as a runtime ratio. The
-		// floor still tiers (it only adds samples); the sample WINDOW now starts at the
-		// same sweep on every runtime. `BENCH_WARMUP` remains the knob for studying
-		// warmup effects; both resolved values ride each row (`warmup_iterations`,
-		// `min_iterations`) so a protocol difference is legible in the report.
+		const reset_heap = reset_heap_by_task.get(task.name);
 		const base_task = {
 			name: task.name,
-			min_iterations: min_iter,
+			warmup_iterations: warmup_iterations_for(preflight_ms),
 			// Untimed (the library excludes `setup`), so every task's warmup and
-			// measurement start from a comparable heap — see `settle_heap`.
-			setup: settle_heap
+			// measurement start from a comparable heap — see `settle_heap`; an impl
+			// that declares `reset_heap` starts from a FRESH one.
+			setup: reset_heap
+				? () => {
+						settle_heap();
+						reset_heap();
+					}
+				: settle_heap
 		};
 		if (task.is_async) {
 			bench.add({
@@ -2654,7 +2702,10 @@ function generate_markdown_report(data: Baseline, groups: GroupResults[]): strin
 				`samples, where one deviant sweep is a real share of the row) or a drift past ` +
 				`${(UNSTABLE_DRIFT_THRESHOLD * 100).toFixed(0)}% (the median of the second half of the ` +
 				`timings against the first's — a cost that moved WHILE the row was measured, which the ` +
-				`cleaned cv cannot see: a second mode is deleted or blended, not reported). Every \`Nx\` involving ` +
+				`cleaned cv cannot see: a second mode is deleted or blended, not reported). The drift's sign ` +
+				`names the mechanism: negative means the row got FASTER while measured (still warming up — ` +
+				`under-warmed), positive means it got slower (degrading — a leak, a heap tipping over, ` +
+				`thermal). Every \`Nx\` involving ` +
 				`one of these divides a mean that may be neither mode — read it as approximate, and ` +
 				`re-run before drawing a conclusion from it; a longer window does not converge a drifting ` +
 				`row, it moves the answer.`

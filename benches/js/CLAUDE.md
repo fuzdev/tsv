@@ -127,7 +127,7 @@ delta on the same row is the detector.
   or raw cv passed 10% or whose `drift` passed 5%, collected AHEAD of the sample
   gate — a measured 48% on five timings needs no minimum n to be believed, and the
   gate had silenced exactly that cell — marked `⚠` in the tables and on stderr.
-  The bench floors iterations at 5 (7 on the slow tier) and drives the rest from
+  The bench floors iterations at 5 and drives the rest from
   `duration_ms`, so sample count spans two orders of magnitude inside one table and
   roughly 20 of 44 rows per runtime sit under ten; this test consumes cv in the direction
   where an UNDERestimate is expensive, since it would report a real runtime
@@ -193,10 +193,13 @@ alone to the default entry and everything else to the browser one. `dprint-wasm`
 under all three for a simpler reason: the `@dprint/formatter` host loads its plugin
 from a plain buffer (`createFromBuffer` over `node:fs`) with no wasm-bindgen `start`
 hook and no `node:wasi` dependency — verified byte-identical output under all three.
-`biome-wasm` is the one row Bun still lacks: `@biomejs/wasm-bundler` is a
-wasm-bindgen *bundler*-target build whose `__wbindgen_start` hook Bun's ESM wasm
-handling never calls, and the `@biomejs/wasm-nodejs` target that would sidestep it is
-an optional peer the harness does not install.
+`biome-wasm` runs under all three too, but only because the harness instantiates the
+wasm itself: `@biomejs/wasm-bundler`'s own entry is a wasm-bindgen *bundler*-target
+build whose `__wbindgen_start` hook Bun's ESM wasm handling never calls, so the row
+was Bun's one `unavailable` until `lib/biome.ts` stopped importing that entry — it
+compiles the `.wasm` bytes and instantiates them against the package's glue, calling
+the start hook explicitly (the same construction its per-sweep heap reset needs,
+§Report files).
 
 ## Corpus Comparison
 
@@ -657,9 +660,11 @@ deno task bench:clean
 BENCH_LIMIT=5           # files per language (default: all)
 BENCH_FILTER=zzz        # path pattern (default: none)
 BENCH_DURATION=10000    # ms per benchmark (default: 5000; conformance mode: 15000)
-BENCH_WARMUP=10         # warmup iterations (default: 3 on every row — the slow tier no longer
-                        # drops it to 1: that tier is decided by one cold pass against a 5 s
-                        # edge, and a row straddling it ran two protocols on two runtimes)
+BENCH_WARMUP=10         # warmup iteration FLOOR (default: 3); every row also warms for at least
+BENCH_WARMUP_MS=2000    # this many ms (default: 1000), sized from its own pre-flight sweep — a fixed
+                        # count left fast rows still tiering inside the measured window (negative
+                        # drift on every runtime). There is no slow-task tier any more: one
+                        # protocol per row on every runtime (floor 5, 5 s budget, warmup ≥ 1 s)
 BENCH_MODE=union        # per-impl iteration (default: intersection)
 BENCH_CORPUS=conformance  # corpus/surface selector (default: perf)
 BENCH_STALE_OK=1        # run despite stale artifacts (default: off)
@@ -701,7 +706,7 @@ so the timed phase is skipped, and it's runtime-invariant (same parser engine �
 site folds a tool's native/wasm variants into one per-engine row), so one node run
 is the whole surface. Entries carry null timing; no throughput/comparison sections;
 baseline save/compare are no-ops. Skipping the timed phase reclaims a fixed ≥8
-full-corpus sweeps/row (3 warmup + ≥5 measured) that no consumer reads. The timed
+full-corpus sweeps/row (≥3 warmup + ≥5 measured) that no consumer reads. The timed
 parse-throughput over this adversarial corpus has no consumer, so no task produces
 it; to investigate ad-hoc run `BENCH_CORPUS=conformance node benches/js/bench.ts`
 (coverage flag unset) — it overwrites `report.conformance.node.*`, so re-run
@@ -842,11 +847,21 @@ and `binary_sizes` (each with `gzip_bytes`). Each `entries[]` row adds `runtime`
 `compose_reports.ts` compares across runtimes, since equal counts never proved equal
 sets), the RAW-timing stability readings `cv_raw` / `drift` / `raw_sample_size` /
 `outlier_ratio` beside the cleaned `cv` (a row whose cost moved WHILE it was measured
-— biome's wasm heap leaks ~117 MB per TS sweep and tips Node into a slower regime past
-~1 GB — has its second mode deleted or blended by the MAD cleaner, so `cv` can read
-quiet over a mean that is neither mode; `drift` is the median of the second half of
-the timings against the first's and sees it), and the protocol the row ran under
-(`warmup_iterations` / `min_iterations`). §Unstable Rows trips on cleaned cv ≥ 10%,
+— biome's wasm heap leaked ~117 MB per TS sweep and tipped Node into a slower regime
+past ~1 GB, before the per-sweep reset below — has its second mode deleted or blended
+by the MAD cleaner, so `cv` can read quiet over a mean that is neither mode; `drift` is
+the median of the second half of the timings against the first's and sees it — its
+SIGN is the mechanism, negative still warming up, positive degrading), and the
+protocol the row ran under (`warmup_iterations` / `min_iterations` — warmup is sized
+by time, ≥ `BENCH_WARMUP_MS` from the row's pre-flight sweep, so a fast row no longer
+enters its window still tiering; there is no slow-task tier). **One impl is reset
+between sweeps**: biome's `Workspace.openFile` retains ~4.5 B of wasm linear memory
+per source byte on every call and `closeFile` frees nothing (a genuine upstream leak,
+not a cache), and linear memory never shrinks, so `lib/biome.ts` re-instantiates the
+module in the two untimed slots — the per-task `setup` beside the major GC every task
+gets, and `on_iteration` between two timed sweeps — at ~10 ms a swap, 0% of any
+timing. That is the honest footing: every in-process impl starts each sweep from a
+settled heap, and biome's is the one a GC cannot settle. §Unstable Rows trips on cleaned cv ≥ 10%,
 |drift| ≥ 5%, or raw cv ≥ 10% on a row under 30 raw samples (with hundreds of samples
 the raw cv is dominated by isolated GC pauses the cleaner rightly removes — one 80 ms
 pause among 600 × 8 ms sweeps reads 35% — so there the median drift is the detector,
@@ -890,8 +905,8 @@ present but wouldn't load published a report with every `tsv_wasm-*` row silentl
 gone behind one ⚠ line, and five diagnostics each hand-rolled their own
 `if (!impls.native) throw`. Note the division of labour with the freshness guard:
 `check_artifact_freshness` makes a MISSING artifact fatal, a present-yet-unloadable
-one surfaces only here. The expected-`unavailable` set is never tsv on any runtime
-(under Bun it is biome), so nothing legitimate is refused.
+one surfaces only here. The expected-`unavailable` set is never tsv on any runtime, so
+nothing legitimate is refused.
 
 **`rows` is the joinable half, and the reason it exists.** Every other identity the
 report publishes is a row name (`entries[].name`, `variant_parity.impl`/`.sibling`,

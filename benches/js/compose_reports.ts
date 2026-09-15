@@ -73,7 +73,7 @@ interface Entry {
 	 *
 	 * Read together with it, never separately: a cv is an ESTIMATE, and its own
 	 * error falls off with n. The bench drives sample count from `duration_ms` with
-	 * a floor of 5 (7 on the slow tier), so a multi-second row can land at 3–7
+	 * a floor of 5, so a multi-second row can land at 3–7
 	 * cleaned timings while a microsecond row lands at four figures — a spread of
 	 * two orders of magnitude inside one table.
 	 */
@@ -542,7 +542,7 @@ const MIN_NOISE_SAMPLES = 10;
  * estimate, and this test consumes it in the direction where being wrong is
  * expensive: too SMALL a cv makes a real per-runtime difference read as "no
  * difference", which is the one verdict here a reader cannot check from the table.
- * The bench floors iterations at 5 (7 on the slow tier) and drives the rest from
+ * The bench floors iterations at 5 and drives the rest from
  * `duration_ms`, so a multi-second row lands at a handful of cleaned timings —
  * measured, 17 of 44 rows per runtime sit under ten — while a fast row lands at
  * four figures. Three timings that happen to agree are not evidence of quiet.
@@ -759,7 +759,8 @@ if (unstable_cells.length > 0) {
 				)
 				.join('; ') +
 			'. The cell is marked `⚠` in its table. A drift is a cost that moved WHILE the row was ' +
-			'measured (the median of the second half of its timings against the first’s); the cleaned cv cannot see ' +
+			'measured (the median of the second half of its timings against the first’s — negative: it got ' +
+			'faster, still warming up; positive: it got slower, degrading); the cleaned cv cannot see ' +
 			'it, and a longer window moves such a row’s answer rather than converging it. Re-run the ' +
 			'runtime before reading the row, and read the per-runtime report’s §Unstable Rows for ' +
 			'the row’s own detail.\n'

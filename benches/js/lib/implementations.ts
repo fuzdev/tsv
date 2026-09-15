@@ -223,8 +223,8 @@ export interface InitOptions {
  * bench published tsv's OWN rows missing from every table behind a single ⚠ line,
  * and five diagnostics each hand-rolled their own `if (!impls.native) throw`,
  * every one of them a separate chance to word the requirement differently or
- * forget it. The expected-`unavailable` set is never tsv on any runtime (under Bun
- * it is biome), so nothing legitimate is lost by refusing.
+ * forget it. The expected-`unavailable` set is never tsv on any runtime, so nothing
+ * legitimate is lost by refusing.
  *
  * Note the asymmetry with the freshness guard, which is what leaves a gap for this
  * to close: `check_artifact_freshness` makes a MISSING artifact fatal, but a

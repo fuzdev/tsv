@@ -241,6 +241,14 @@ Things the published numbers measure that aren't quite what they look like.
   turns that carryover into a systematic per-position effect. So each task's untimed
   `setup` forces a major GC (`settle_heap` in `bench.ts`), and every task — the
   first one after pre-flight included — begins its warmup from a comparable heap.
+  One impl gets more than a GC there: biome's wasm linear memory leaks per call
+  (`Workspace.openFile` retains ~4.5 B per source byte and `closeFile` frees
+  nothing) and never shrinks, so a GC settles nothing and a TypeScript row on Node
+  tripled its sweep time once the process passed ~1 GB — `lib/biome.ts` therefore
+  re-instantiates the wasm module in the same untimed `setup` slot and again
+  between every two timed sweeps (~10 ms a swap, outside every timer). Same
+  footing as the GC — a settled heap per sweep — for the one heap a GC cannot
+  settle; the leak itself is disclosed rather than measured.
   This is deliberately NOT the same knob as the per-iteration hook below: it
   normalizes where a task *starts* without touching the measured workload's own GC
   profile, which is why it is always on where that one is off. It needs
@@ -267,13 +275,17 @@ Things the published numbers measure that aren't quite what they look like.
   fallback published a mean that was neither mode; at most other sample counts the
   same row would have cleaned to a cv under 6% with no flag at all, which is why the
   raw readings exist and why a longer window is not the fix (it moves a drifting
-  row's answer rather than converging it). Five of 44 node/deno deltas currently land
+  row's answer rather than converging it). The drift's sign is the mechanism —
+  negative, the row got faster while measured (under-warmed); positive, slower
+  (degrading) — which is also why warmup is sized by time (`BENCH_WARMUP_MS`): a
+  fixed three sweeps left every fast row still tiering inside its window, a
+  negative drift on all three runtimes. Five of 44 node/deno deltas currently land
   inside their noise, all of them at ~1.00x — i.e. today this confirms "no difference"
   rather than overturning a reading. The within-noise half also needs ten cleaned
   timings a side before it will call a cell quiet, and prints `n` for each: sample
   count varies by two orders of magnitude across one table (a microsecond row gets
-  four figures; a multi-second row gets the iteration floor of 5, or 7 on the slow
-  tier), and a cv from three timings that happen to agree is not evidence of quiet.
+  four figures; a multi-second row gets the iteration floor of 5), and a cv from
+  three timings that happen to agree is not evidence of quiet.
   That floor is what excludes a sixth cell, `format/svelte/prettier` at n=7.
 - **Per-iteration forced GC** — off by default (`BENCH_GC=1` makes the bench call
   `globalThis.gc()` between every iteration), and not a uniform bias. Measured on a BENCH_LIMIT=20 / 500ms / WARMUP=2 sample: low-
