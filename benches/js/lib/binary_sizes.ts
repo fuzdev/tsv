@@ -438,6 +438,20 @@ function format_bytes(bytes: number): string {
 	return `${bytes} B`;
 }
 
+/**
+ * The sentence naming what `vs tsv` divides by. The native anchor is RUNTIME-DEPENDENT
+ * (FFI under Deno, N-API under Node/Bun), so the same third-party artifact reads a
+ * different ratio in two sibling reports; unnamed, that read as the artifact moving.
+ */
+function anchor_note(native_anchor: string | null): string {
+	const native = native_anchor === null ? 'no tsv native artifact on disk' : `\`${native_anchor}\``;
+	return (
+		`\`vs tsv\` divides native rows by ${native} — the binding this runtime benchmarks ` +
+		'(FFI under Deno, N-API under Node/Bun), so the same artifact reads a different ratio in ' +
+		'the deno and node/bun reports — and wasm rows by `tsv_wasm`.'
+	);
+}
+
 /** Display row: an entry plus ratios vs tsv on raw and gzipped bytes. */
 interface DisplayRow {
 	entry: BinarySize;
@@ -449,6 +463,8 @@ interface DisplayRow {
 function build_display_entries(sizes: BinarySize[]): {
 	wasm_entries: DisplayRow[];
 	native_entries: DisplayRow[];
+	/** The label the native `vs tsv` column divides by (`null` when no tsv native artifact is on disk). */
+	native_anchor: string | null;
 } {
 	// Native "vs tsv" anchor: the binding THIS runtime actually benchmarks — FFI
 	// under Deno, N-API under Node/Bun — so the native ratios compare against the
@@ -514,7 +530,7 @@ function build_display_entries(sizes: BinarySize[]): {
 		}
 	}
 
-	return { wasm_entries, native_entries };
+	return { wasm_entries, native_entries, native_anchor: tsv_native?.label ?? null };
 }
 
 /** Format a gzipped byte count or fall back to em-dash when unavailable. */
@@ -536,7 +552,7 @@ function any_gzipped(rows: DisplayRow[]): boolean {
 export function generate_binary_size_report(sizes: BinarySize[]): string | null {
 	if (sizes.length === 0) return null;
 
-	const { wasm_entries, native_entries } = build_display_entries(sizes);
+	const { wasm_entries, native_entries, native_anchor } = build_display_entries(sizes);
 	const all_rows = [...wasm_entries, ...native_entries];
 	const show_gzip = any_gzipped(all_rows);
 
@@ -571,9 +587,10 @@ export function generate_binary_size_report(sizes: BinarySize[]): string | null 
 		for (const r of native_entries) lines.push('  ' + format_row(r));
 	}
 
+	lines.push('');
+	lines.push(`  ${anchor_note(native_anchor)}`);
 	if (show_gzip) {
-		lines.push('');
-		lines.push('  Gzipped column ≈ wire size for npm tarballs (`gzip -c`, system default level).');
+		lines.push('  Gzipped column ≈ the artifact’s wire size (`gzip -c`, system default level).');
 	}
 
 	return lines.join('\n');
@@ -583,7 +600,7 @@ export function generate_binary_size_report(sizes: BinarySize[]): string | null 
 export function generate_binary_size_markdown(sizes: BinarySize[]): string | null {
 	if (sizes.length === 0) return null;
 
-	const { wasm_entries, native_entries } = build_display_entries(sizes);
+	const { wasm_entries, native_entries, native_anchor } = build_display_entries(sizes);
 	const show_gzip = any_gzipped([...wasm_entries, ...native_entries]);
 
 	const lines: string[] = [];
@@ -614,12 +631,14 @@ export function generate_binary_size_markdown(sizes: BinarySize[]): string | nul
 	add_rows(wasm_entries);
 	add_rows(native_entries);
 
-	if (show_gzip) {
-		lines.push('');
-		lines.push(
-			'_Gzipped ≈ npm-tarball wire size (`gzip -c`, system default level). `vs tsv (gz)` compares gzipped bytes; `vs tsv` compares raw on-disk bytes._'
-		);
-	}
+	lines.push('');
+	lines.push(
+		`_${anchor_note(native_anchor)}${
+			show_gzip
+				? ' Gzipped ≈ the artifact’s wire size (`gzip -c`, system default level; the `tsv (napi)` platform package also ships the `tsv` CLI binary, so its tarball is larger than this row). `vs tsv (gz)` compares gzipped bytes; `vs tsv` compares raw on-disk bytes.'
+				: ''
+		}_`
+	);
 
 	return lines.join('\n');
 }

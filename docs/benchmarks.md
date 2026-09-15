@@ -241,6 +241,27 @@ Things the published numbers measure that aren't quite what they look like.
   turns that carryover into a systematic per-position effect. So each task's untimed
   `setup` forces a major GC (`settle_heap` in `bench.ts`), and every task — the
   first one after pre-flight included — begins its warmup from a comparable heap.
+  One impl gets more than a GC there: biome's wasm linear memory leaks per call
+  (`Workspace.openFile` retains ~4.5 B per source byte and `closeFile` frees
+  nothing) and never shrinks, so a GC settles nothing and a TypeScript row on Node
+  tripled its sweep time once the process passed ~1 GB — `lib/biome.ts` therefore
+  re-instantiates the wasm module once the sweeps it has run have grown its
+  linear memory by more than 16 MiB (`RESET_GROWTH_BYTES`), checked in the same
+  untimed `setup` slot and between every two sweeps (~10 ms a swap, outside every
+  timer) — so the svelte and TypeScript rows start every sweep on a fresh instance,
+  the css row every ~4 sweeps, and a millisecond-sweep `BENCH_LIMIT` row almost never
+  (there, a 70 MB instantiation per sweep out-churns the collector). Keyed on
+  growth, not on a size, because the cost of a grown heap is runtime-dependent: on
+  V8 the sweep time is flat to at least 974 MB, but on JSC bun's svelte row, flat
+  in a bare process, climbs with the buffer's size after the group's prettier-class
+  tasks have run in the same process (~0.4–1.2 ms per MB) and falls back at each
+  reset, so a size budget put a sawtooth inside the timed window and the row
+  published flagged (cv 8.6% under a 320 MB budget against cv 1.4% with a reset
+  before every sweep, same context — `benches/js/diagnostics/biome_heap_probe.ts`,
+  numbers in `lib/biome.ts`). A fresh instance's first sweep costs ~+1% on bun and
+  ~+3% on node, paid on every sweep of every runtime alike. Same footing as the GC —
+  a settled heap per sweep — for the one heap a GC cannot settle; the leak itself is
+  disclosed rather than measured.
   This is deliberately NOT the same knob as the per-iteration hook below: it
   normalizes where a task *starts* without touching the measured workload's own GC
   profile, which is why it is always on where that one is off. It needs
@@ -258,15 +279,28 @@ Things the published numbers measure that aren't quite what they look like.
   needs `--compare-baseline`, which a plain `deno task bench` never runs, so before
   this a full bench reached no stability check at all. Calibration: across the three
   committed reports (128 timed rows) cv runs median 1.0% / p90 3.1%, so 10% is ~3× the
-  p90 rather than a round number; the live outlier is `format/css/biome-wasm`, at 24%
-  under Node against 3% on its Deno sibling. Five of 44 node/deno deltas currently land
-  inside their noise, all of them at ~1.00x — i.e. today this confirms "no difference"
-  rather than overturning a reading. The within-noise half also needs ten cleaned
-  timings a side before it will call a cell quiet, and prints `n` for each: sample
-  count varies by two orders of magnitude across one table (a microsecond row gets
-  four figures; a multi-second row gets the iteration floor of 5, or 7 on the slow
-  tier), and a cv from three timings that happen to agree is not evidence of quiet.
-  That floor is what excludes a sixth cell, `format/svelte/prettier` at n=7.
+  p90 rather than a round number (the live rows are each committed report's §Unstable
+  Rows; a value restated here only goes stale). The cleaned cv is not the whole test:
+  a row is also unstable on its RAW cv (a second mode the MAD cleaner deleted) or on a
+  `drift` past 5% (the second half of its timings against the first) — the 2026-09-14
+  refresh's `format/typescript/biome-wasm` under Node ran four ~4.9 s sweeps and three
+  ~12.5 s ones as biome's wasm heap leaked past ~1 GB, and the cleaner's keep-closest
+  fallback published a mean that was neither mode; at most other sample counts the
+  same row would have cleaned to a cv under 6% with no flag at all, which is why the
+  raw readings exist and why a longer window is not the fix (it moves a drifting
+  row's answer rather than converging it). The drift's sign is the mechanism —
+  negative, the row got faster while measured (under-warmed); positive, slower
+  (degrading) — which is also why warmup is sized by time (`BENCH_WARMUP_MS`): a
+  fixed three sweeps left every fast row still tiering inside its window, a
+  negative drift on all three runtimes. Every pair of runtimes is classified, and the
+  cells that land inside their noise are the combined report's **Within noise** line
+  (a handful per refresh, each at ~1.00x — this confirms "no difference" rather than
+  overturning a reading). The within-noise half also needs ten cleaned timings a side
+  before it will call a cell quiet, and prints `n` for each: sample count varies by
+  two orders of magnitude across one table (a microsecond row gets four figures; a
+  multi-second row gets the iteration floor of 8), and a cv from a handful of timings
+  that happen to agree is not evidence of quiet — which is what leaves the
+  multi-second rows (prettier and oxfmt on svelte and typescript, at n=8) unclassified.
 - **Per-iteration forced GC** — off by default (`BENCH_GC=1` makes the bench call
   `globalThis.gc()` between every iteration), and not a uniform bias. Measured on a BENCH_LIMIT=20 / 500ms / WARMUP=2 sample: low-
   allocation paths are penalized heavily (`tsv-internal` 1.4–1.7× slower with the
@@ -512,8 +546,9 @@ prettier. Load-bearing on two axes:
   to `tsv-json` on **both** axes — mechanism (each returns a compact JSON string
   the caller `JSON.parse`s, so both pay the identical serialize + boundary + parse
   cost) and payload (within ~1.5% of `tsv-json`'s bytes across the corpus — the
-  axis a throughput ratio integrates over; per component the spread is wider, p90
-  3% and up to 12%, so the aggregate is the claim) —
+  axis a throughput ratio integrates over; at the 0.3.14 pin with `modern: true`
+  the aggregate is 0.13% under, per component p50 and p90 exactly 1.00, worst 7%
+  under — re-measure on a pin bump) —
   which earns it a curated comparison line, the only one the Svelte surface has.
   Because rsvelte claims the same drop-in contract tsv does, the row is a
   conformance datum too: on that same component its AST differs from
@@ -679,7 +714,10 @@ report quantify coverage.
 
 Benchmark output includes a binary/WASM size comparison. Each row reports **raw
 on-disk size** plus **gzipped size** (≈ npm-tarball wire size), grouped by kind
-(WASM vs native) with ratios relative to `tsv` for both. Implementation:
+(WASM vs native) with ratios relative to `tsv` for both — the native anchor is the
+binding the RUNTIME benchmarks (`tsv (ffi)` under Deno, `tsv (napi)` under Node/Bun),
+so the same third-party artifact reads a different `vs tsv` in the deno and node/bun
+reports; each table's footnote names its anchor. Implementation:
 `lib/binary_sizes.ts`; JSON output carries a per-entry `gzip_bytes: number | null`.
 
 Sizes are **decimal** (`MB` = 1,000,000 B) — the convention shared by every byte

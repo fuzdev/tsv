@@ -223,8 +223,8 @@ export interface InitOptions {
  * bench published tsv's OWN rows missing from every table behind a single ⚠ line,
  * and five diagnostics each hand-rolled their own `if (!impls.native) throw`,
  * every one of them a separate chance to word the requirement differently or
- * forget it. The expected-`unavailable` set is never tsv on any runtime (under Bun
- * it is biome), so nothing legitimate is lost by refusing.
+ * forget it. The expected-`unavailable` set is never tsv on any runtime, so nothing
+ * legitimate is lost by refusing.
  *
  * Note the asymmetry with the freshness guard, which is what leaves a gap for this
  * to close: `check_artifact_freshness` makes a MISSING artifact fatal, but a
@@ -717,7 +717,8 @@ export function get_benchmark_tasks(
 		);
 		// ⚠ Named for the OPTION it passes, not for tsv's `no-locations` wire: the two
 		// reductions differ (tsv drops per-node `loc` throughout, ~46%; rsvelte drops
-		// only nested expression `loc` and keeps top-level start/end, -34%), so this
+		// only nested expression `loc` and keeps top-level start/end, -29% at 0.3.14
+		// with `modern: true` — re-measure on a pin bump), so this
 		// row is NOT payload-matched to `tsv-json-no-locations` and is deliberately
 		// absent from report.ts's curated payload-matched lines.
 		add(
@@ -896,7 +897,10 @@ export function unavailable_with_rows(
  * renders it — so producer and renderer can't disagree about which impls a report
  * carries. Adding an impl extends it there, once.
  */
-export function get_alternative_versions(impls: ImplementationSet): AlternativeVersionInfo {
+export function get_alternative_versions(
+	impls: ImplementationSet,
+	options: Pick<BenchmarkTaskOptions, 'corpus_kind'>
+): AlternativeVersionInfo {
 	return {
 		oxc_parser: impls.oxc?.versions['oxc-parser'],
 		// Pinned apart from `oxc-parser` (`package.json` `//oxc-wasi`), so the wasm row
@@ -920,6 +924,12 @@ export function get_alternative_versions(impls: ImplementationSet): AlternativeV
 		// row is parsing to a different Svelte than the oracle it's compared against.
 		rsvelte_parse: impls.rsvelte_parse?.versions.native,
 		rsvelte_parse_svelte_target: impls.rsvelte_parse?.upstream_svelte_version,
-		swc: impls.swc?.versions.core
+		swc: impls.swc?.versions.core,
+		// Only where the row is. The impl loads on every surface (it costs the perf
+		// surface nothing), but `get_benchmark_tasks` adds its row on the conformance
+		// surface alone, so the same condition gates the version: on the perf surface
+		// it would name nothing the report measured.
+		tsc:
+			impls.tsc && options.corpus_kind === 'conformance' ? impls.versions.tsc.typescript : undefined
 	};
 }

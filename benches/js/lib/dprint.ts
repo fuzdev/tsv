@@ -28,6 +28,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { BaseImplementation, type Language, LANGUAGE_EXTENSIONS } from './types.ts';
+import { assert_format_config_landed, FORMAT_CONFIG_PROBES } from './format_config_probe.ts';
 import type { DprintVersions } from './versions.ts';
 // Type-only — `import type` is erased, so naming `Formatter` here does NOT load
 // the Wasm plugin at this module's import. The value imports are deferred to
@@ -88,6 +89,17 @@ export class DprintImplementation extends BaseImplementation {
 		if (diagnostics.length > 0) {
 			const detail = diagnostics.map((d) => `${d.propertyName}: ${d.message}`).join('; ');
 			throw new Error(`dprint rejected the benchmark config (${detail})`);
+		}
+		// A clean diagnostic list proves every key was RECOGNIZED, not that its value
+		// had the pinned effect (`trailingCommas: 'never'` fans out to twelve keys, any
+		// of which a plugin bump could re-default). The behavioral proof is the shared
+		// probe every other formatter row already runs.
+		for (const language of this.format_languages) {
+			assert_format_config_landed(
+				'dprint',
+				language,
+				this.format(FORMAT_CONFIG_PROBES[language], language)
+			);
 		}
 	}
 
