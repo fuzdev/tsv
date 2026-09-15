@@ -245,12 +245,23 @@ Things the published numbers measure that aren't quite what they look like.
   (`Workspace.openFile` retains ~4.5 B per source byte and `closeFile` frees
   nothing) and never shrinks, so a GC settles nothing and a TypeScript row on Node
   tripled its sweep time once the process passed ~1 GB — `lib/biome.ts` therefore
-  re-instantiates the wasm module once its linear memory passes 320 MB, checked
-  in the same untimed `setup` slot and between every two sweeps (~10 ms a swap,
-  outside every timer; the sweep time is flat to at least 414 MB, so the budget
-  keeps every sweep in that regime without instantiating 70 MB per sweep). Same
-  footing as the GC — a settled heap per sweep — for the one heap a GC cannot
-  settle; the leak itself is disclosed rather than measured.
+  re-instantiates the wasm module once the sweeps it has run have grown its
+  linear memory by more than 16 MiB (`RESET_GROWTH_BYTES`), checked in the same
+  untimed `setup` slot and between every two sweeps (~10 ms a swap, outside every
+  timer) — so the svelte and TypeScript rows start every sweep on a fresh instance,
+  the css row every ~4 sweeps, and a millisecond-sweep `BENCH_LIMIT` row almost never
+  (there, a 70 MB instantiation per sweep out-churns the collector). Keyed on
+  growth, not on a size, because the cost of a grown heap is runtime-dependent: on
+  V8 the sweep time is flat to at least 974 MB, but on JSC bun's svelte row, flat
+  in a bare process, climbs with the buffer's size after the group's prettier-class
+  tasks have run in the same process (~0.4–1.2 ms per MB) and falls back at each
+  reset, so a size budget put a sawtooth inside the timed window and the row
+  published flagged (cv 8.6% under a 320 MB budget against cv 1.4% with a reset
+  before every sweep, same context — `benches/js/diagnostics/biome_heap_probe.ts`,
+  numbers in `lib/biome.ts`). A fresh instance's first sweep costs ~+1% on bun and
+  ~+3% on node, paid on every sweep of every runtime alike. Same footing as the GC —
+  a settled heap per sweep — for the one heap a GC cannot settle; the leak itself is
+  disclosed rather than measured.
   This is deliberately NOT the same knob as the per-iteration hook below: it
   normalizes where a task *starts* without touching the measured workload's own GC
   profile, which is why it is always on where that one is off. It needs

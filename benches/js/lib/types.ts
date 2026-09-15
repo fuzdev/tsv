@@ -151,7 +151,8 @@ export interface TsvImplementation {
 	 * change a sweep's cost. Synchronous, because the between-sweeps slot is
 	 * (`on_iteration`). Today only biome declares it (`lib/biome.ts`: wasm linear
 	 * memory leaks per call and never shrinks, so the clean heap is a fresh
-	 * instance, taken once the live one passes 320 MB).
+	 * instance, taken once the sweeps the live one has run grew it by more than
+	 * `RESET_GROWTH_BYTES`).
 	 */
 	reset_heap?(): void;
 

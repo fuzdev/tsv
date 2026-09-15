@@ -859,13 +859,27 @@ enters its window still tiering; there is no slow-task tier). **One impl is rese
 between sweeps**: biome's `Workspace.openFile` retains ~4.5 B of wasm linear memory
 per source byte on every call and `closeFile` frees nothing (a genuine upstream leak,
 not a cache), and linear memory never shrinks, so `lib/biome.ts` re-instantiates the
-module once its memory passes 320 MB — offered in the untimed slots (the per-task
+module once the sweeps it has run have grown its memory by more than 16 MiB
+(`RESET_GROWTH_BYTES`) — offered in the untimed slots (the per-task
 `setup` beside the major GC every task gets, after each warmup sweep, and
-`on_iteration` between two timed sweeps) at ~10 ms a swap, 0% of any timing. The
-budget, not every sweep, because the leak's cost is a STEP (sweep time is flat to at
-least 414 MB on node and bun, ±1%; Node's external memory past ~1 GB is where it
-triples) while a 70 MB instantiation per millisecond sweep out-churns the collector
-(a `BENCH_LIMIT` probe read a 40x slowdown that way). Such a row also WARMS in its
+`on_iteration` between two timed sweeps) at ~10 ms a swap, 0% of any timing — so the
+svelte (+30 MB a sweep) and TypeScript (+117 MB) rows start EVERY sweep on a fresh
+instance, the css row (+4 MB) every ~4, and a millisecond-sweep `BENCH_LIMIT` row
+almost never (a 70 MB instantiation per millisecond sweep out-churns the collector; a
+probe read a 40x slowdown that way when the swap was unconditional). Growth rather
+than a size, because a grown heap's cost is runtime-dependent: on V8 it is a STEP
+(sweep time flat to at least 974 MB on node, bare and inside the bench's process alike;
+Node's external memory past ~1 GB is where it triples), on JSC a SLOPE that only the
+bench's process shows — bun's svelte row is flat in a bare process (857 ms to a 974 MB
+heap, cv 1.0%) but after the group's prettier-class tasks have run it climbs ~0.4–1.2 ms
+per MB of buffer and falls back at each reset, so the earlier 320 MB size budget put a
+sawtooth inside the window (1217 ms at cv 8.6%, drift past ±5% either way depending on
+where the resets landed — the `format/svelte/biome-wasm` row §Unstable Rows flagged
+under bun, with the TypeScript row's cv 3–4% the same shape under the threshold) where a
+reset before every sweep reads 1046 ms at cv 1.4% in the same context, for a fresh
+instance's first-sweep price of ~+1% on bun and ~+3% on node, paid on every runtime
+alike. `diagnostics/biome_heap_probe.ts` holds the measurement; `lib/biome.ts`'s
+`RESET_GROWTH_BYTES` the numbers. Such a row also WARMS in its
 `setup` (the library warming 0 times and the row carrying the harness's count),
 because the library's warmup loop has no between-sweeps hook to offer the reset in.
 That is the honest footing: every in-process impl starts each sweep from a settled
@@ -1559,3 +1573,4 @@ Six live here but are documented above: the parse-conformance gates
 | `wasm_json_probe.ts` | splits parse cost into pure-parse vs materialization for native + WASM, isolating JS-side `JSON.parse` | — |
 | `wasm_format_probe.ts` | WASM **format** wall-time A/B at single-digit-% resolution (paired discipline: interleaved pairs, in-run A/A noise floor, byte-identity gate) | — |
 | `wasm_memory_probe.ts` | WASM **linear-memory high-water** for `format()` — the axis the wall-time probe can't see, and the gate for doc-IR memory work. `--cold` (per-file cold-start peak) or default steady-state | — |
+| `biome_heap_probe.ts` | does biome's sweep time move with its leaked wasm linear memory, per runtime? N consecutive full sweeps of one format row under a reset regime (`never` / `every` / the production rule), wall beside heap size, grow count and JSC's own heap stats per sweep; `--prelude prettier,oxfmt,…` first runs the group's earlier tasks in the same process, which is the state that decides the answer on bun. Runs under **node and bun** (not `deno task`: `node --expose-gc --disable-warning=ExperimentalWarning …` / `bun --expose-gc …`); what sized `RESET_GROWTH_BYTES` | — |
