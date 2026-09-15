@@ -63,6 +63,9 @@
 //   nothing welds after a `:` either — a `colon` node is no operator for a sign to bind to
 //   (`--x: a:+b` → `a: + b`).
 
+use bumpalo::Bump;
+use bumpalo::collections::Vec as BumpVec;
+
 use super::scan::{comment_end, is_comment_start, matching_close_paren};
 use crate::escapes::escape_len;
 use crate::lexer::{hyphen_starts_own_token, string_end};
@@ -297,52 +300,157 @@ pub(crate) struct ValueToken {
 /// splits (which is what keeps `inset: a\+b` on its cataloged divergence), a `/*` opens a
 /// comment rather than a division, and an operator inside a function's arguments belongs
 /// to that function's own run.
-pub(crate) fn split_value_run(
+pub(crate) fn split_value_run<'arena>(
     run: &str,
     colon_is_operator: bool,
     head_welds: bool,
-) -> Option<Vec<ValueToken>> {
+    arena: &'arena Bump,
+) -> Option<BumpVec<'arena, ValueToken>> {
     let bytes = run.as_bytes();
-    let len = bytes.len();
     // A run holding no byte that could open a boundary is the common case, and one pass
-    // that can only answer "no" is cheaper than the tokenizer's state machine.
-    if !bytes.iter().copied().any(may_open_boundary) {
+    // that can only answer "no" is cheaper than the tokenizer's state machine. A run that
+    // opens on a word asks a narrower set (see [`opens_on_word`]), which is what keeps a
+    // hyphenated ident (`sans-serif`, `border-box`) out of the tokenizer.
+    let may_split = match bytes {
+        _ if opens_on_word(bytes) => any_byte_has(bytes, ENDS_WORD_RUN),
+        // A `-` before a digit signs the number it opens (§4.3.10), so the run's first token
+        // is that number and its boundaries are the ordinary set, read past the sign.
+        [b'-', digit, rest @ ..] if digit.is_ascii_digit() => any_byte_has(rest, MAY_OPEN_BOUNDARY),
+        _ => any_byte_has(bytes, MAY_OPEN_BOUNDARY),
+    };
+    if !may_split {
+        debug_assert!(
+            tokenize_run(run, colon_is_operator, head_welds, arena).is_none(),
+            "the refusal pass declined a run that splits: {run:?}"
+        );
         return None;
     }
+    tokenize_run(run, colon_is_operator, head_welds, arena)
+}
 
-    let mut tokens: Vec<ValueToken> = Vec::new();
+/// Does `bytes` open on a [`TokenKind::Word`] — an ASCII letter, `_` or `#`, a `-` before
+/// a letter, or the doubled `-` of a custom-property name? At the run's head none of them
+/// is an operator (a `--` is content, [`is_content_pair`]) and none starts a number or a
+/// unicode range without a `+` after it, so the first token is a word, and a word ends
+/// only at a byte [`ends_word_run`] names. A run holding none of those is that one word,
+/// whatever `/` and `-` it carries.
+fn opens_on_word(bytes: &[u8]) -> bool {
+    match bytes {
+        [b, ..] if b.is_ascii_alphabetic() || matches!(b, b'_' | b'#') => true,
+        [b'-', b'-', ..] => true,
+        [b'-', b, ..] => b.is_ascii_alphabetic(),
+        _ => false,
+    }
+}
+
+/// Every byte at which [`scan_token_body`] can end a [`TokenKind::Word`], the `:` read as
+/// an operator: [`ends_word`], [`ends_every_token`], and the `(` that closes it into a
+/// group (after which `/` and `-` release). The opaque constructs it steps over (escapes,
+/// strings, comments, `[…]` blocks) only hide bytes from it, never add one.
+const fn ends_word_run(b: u8) -> bool {
+    ends_word(b, true) || b == b'(' || ends_every_token(b)
+}
+
+/// [`may_open_boundary`] and [`ends_word_run`] as one table, one bit each.
+const BOUNDARY_BITS: [u8; 256] = {
+    let mut table = [0u8; 256];
+    let mut b = 0usize;
+    while b < 256 {
+        table[b] = (may_open_boundary(b as u8) as u8) * MAY_OPEN_BOUNDARY
+            + (ends_word_run(b as u8) as u8) * ENDS_WORD_RUN;
+        b += 1;
+    }
+    table
+};
+const MAY_OPEN_BOUNDARY: u8 = 1;
+const ENDS_WORD_RUN: u8 = 2;
+
+/// Does any byte of `bytes` carry `bit` in [`BOUNDARY_BITS`]? An OR folded over the whole
+/// run with no exit: a value run is a handful of bytes, too short for an early exit's
+/// per-byte branch or a word loop's per-call splats to pay for themselves.
+#[inline]
+fn any_byte_has(bytes: &[u8], bit: u8) -> bool {
+    bytes
+        .iter()
+        .fold(0u8, |seen, &b| seen | BOUNDARY_BITS[b as usize])
+        & bit
+        != 0
+}
+
+/// The tokenizer behind [`split_value_run`], without its refusal pass.
+fn tokenize_run<'arena>(
+    run: &str,
+    colon_is_operator: bool,
+    head_welds: bool,
+    arena: &'arena Bump,
+) -> Option<BumpVec<'arena, ValueToken>> {
+    let len = run.len();
+    if len == 0 {
+        return None;
+    }
     let mut i = 0usize;
     // What stands to the left of `i` (see [`Preceding`]).
     let mut previous = Preceding::Head;
 
-    while i < len {
-        if operator_stands_here(run, i, previous, colon_is_operator, head_welds) {
-            tokens.push(ValueToken {
-                start: i,
-                end: i + 1,
-                is_operator: true,
-            });
-            previous = Preceding::Operator {
-                colon: bytes[i] == b':',
-            };
-            i += 1;
-            continue;
-        }
-        let start = i;
-        previous = Preceding::Token(scan_token(run, &mut i, colon_is_operator));
-        debug_assert!(i > start, "a token consumed nothing: {run:?} at {start}");
-        tokens.push(ValueToken {
-            start,
-            end: i,
-            is_operator: false,
-        });
+    // The first member alone settles the common case — a run that is one operand token —
+    // before any `Vec` is minted. A one-token run splits only when that token is an
+    // operator (the whitespace-delimited element above). The verdict is the splitter's own
+    // — read back off the bytes, the `-a` in `1.5*-a` would be minted as an operator it is
+    // not (see [`ValueToken::is_operator`]).
+    let first = next_member(run, &mut i, &mut previous, colon_is_operator, head_welds);
+    if i == len && !first.is_operator {
+        return None;
     }
+    // In the document's arena rather than the heap: the members are read once, straight
+    // into the `List` the caller builds there, and a heap `Vec` paid a free for each.
+    let mut tokens = BumpVec::with_capacity_in(4, arena);
+    tokens.push(first);
+    while i < len {
+        tokens.push(next_member(
+            run,
+            &mut i,
+            &mut previous,
+            colon_is_operator,
+            head_welds,
+        ));
+    }
+    Some(tokens)
+}
 
-    // A one-token run splits only when that token is an operator (the whitespace-delimited
-    // element above). The verdict is the splitter's own — read back off the bytes, the
-    // `-a` in `1.5*-a` would be minted as an operator it is not (see
-    // [`ValueToken::is_operator`]).
-    (tokens.len() > 1 || tokens.first().is_some_and(|t| t.is_operator)).then_some(tokens)
+/// Read the member at `*i`, leaving `*i` one past it and `previous` naming it.
+///
+/// ⚠️ `inline(always)`, not `inline`, and the difference is measured: under a plain
+/// `#[inline]` it outlines with `scan_token` folded into it, and the tokenizer's two call
+/// sites each pay the call — about +2.8% cycles on the CSS parse-and-wire path with
+/// instructions flat.
+#[expect(clippy::inline_always)]
+#[inline(always)]
+fn next_member(
+    run: &str,
+    i: &mut usize,
+    previous: &mut Preceding,
+    colon_is_operator: bool,
+    head_welds: bool,
+) -> ValueToken {
+    let start = *i;
+    if operator_stands_here(run, start, *previous, colon_is_operator, head_welds) {
+        *previous = Preceding::Operator {
+            colon: run.as_bytes()[start] == b':',
+        };
+        *i += 1;
+        return ValueToken {
+            start,
+            end: start + 1,
+            is_operator: true,
+        };
+    }
+    *previous = Preceding::Token(scan_token(run, i, colon_is_operator));
+    debug_assert!(*i > start, "a token consumed nothing: {run:?} at {start}");
+    ValueToken {
+        start,
+        end: *i,
+        is_operator: false,
+    }
 }
 
 /// Is the byte at `i` an operator in its own right, given what came before it?
@@ -645,7 +753,8 @@ mod tests {
     }
 
     fn split_at(run: &str, colon_is_operator: bool, head_welds: bool) -> Option<Vec<String>> {
-        split_value_run(run, colon_is_operator, head_welds).map(|tokens| {
+        let arena = bumpalo::Bump::new();
+        split_value_run(run, colon_is_operator, head_welds, &arena).map(|tokens| {
             tokens
                 .into_iter()
                 .map(|t| {

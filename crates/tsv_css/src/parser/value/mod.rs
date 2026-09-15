@@ -156,13 +156,29 @@ pub(crate) fn parse_single_value<'arena>(
     head_welds: bool,
     arena: &'arena Bump,
 ) -> CssValue<'arena> {
+    // A whole-run function under a PLAIN name (`var(--a)`, `rgba(0, 0, 0, 0.5)`,
+    // `-webkit-gradient(…)`) is one closed token to the splitter by construction: the name
+    // holds no byte that ends a word, and the run ends at the group's own `)`. So it is read
+    // as the leaf straight away, and the group's interior is scanned once — the split walks
+    // it to find the `)` and the function arm walks it again. Whatever the arm declines (a
+    // `)` closing early, an unbalanced group) takes the split exactly as before.
+    if let Some(paren_pos) = plain_function_paren(s.as_bytes())
+        && let Some((name, args)) = plain_function_parts(s, paren_pos)
+    {
+        debug_assert!(
+            operators::split_value_run(s, colon_is_operator, head_welds, arena).is_none(),
+            "a plain-name function run splits: {s:?}"
+        );
+        return parse_function_leaf(s, span, paren_pos, name, args, arena);
+    }
+
     // An operator run is several members, not a leaf — `12px/1.5` is a dimension, a `/`
     // and a dimension, and every classification below then runs on each of them. Asked
     // first because the run's own shape is what the rest of this function would otherwise
     // misread: `(1.5)(2.5)` ends in a `)` without being one function, and `1.5/2.5` starts
     // with a number without being one dimension. It answers `None` for a single-token
     // OPERAND run, which is nearly every value, so the leaf path below is untouched.
-    if let Some(tokens) = operators::split_value_run(s, colon_is_operator, head_welds) {
+    if let Some(tokens) = operators::split_value_run(s, colon_is_operator, head_welds, arena) {
         let mut values = bumpalo::collections::Vec::with_capacity_in(tokens.len(), arena);
         for token in tokens {
             let member = &s[token.start..token.end];
@@ -236,52 +252,7 @@ fn parse_leaf_value<'arena>(s: &str, span: Span, arena: &'arena Bump) -> CssValu
         && let Some(paren_pos) = bytes.iter().position(|&b| b == b'(')
         && let Some((name, args)) = extract_function_parts(s, paren_pos)
     {
-        // Try color function first
-        if let Some(color) = parse_color_function(name, args) {
-            return CssValue::Color { color, span };
-        }
-        // Fall back to generic function
-        // Calculate accurate span for arguments (inside parens)
-        // The args string starts at: paren_pos + 1 (after opening paren)
-        // The args string ends at: paren_pos + 1 + args.len()
-        let args_start = paren_pos + 1;
-        let args_span = Span {
-            start: span.start + args_start as u32,
-            end: span.start + args_start as u32 + args.len() as u32,
-        };
-        // A comma **closing** the argument list (`var(--a,)`, `rgb(1, 2, 3,)`) terminated
-        // no argument, so it is not one — CSS Syntax 3's comma-split stops once the input
-        // is empty. It is still authored content the printer must spell back, and it reads
-        // that off the source between the last argument and the `)`
-        // (`printer::declarations::list_has_closing_comma`) rather than from a synthesized
-        // empty argument here: an *escaped* comma (`var(--b, x\,)`) is content inside the
-        // last argument, and a synthesized one would double it.
-        //
-        // The name is a slice of `s`, so it is a slice of the source: hand the printer
-        // its span rather than a copy of its bytes (span-for-verbatim). `name` itself
-        // still answers `parse_color_function` above, at parse time.
-        //
-        // Its offset is read off the two heads rather than threaded out of the split,
-        // which keeps that tuple at four words (returning it as a fifth cost ~288 bytes
-        // of `.text` and a little of the lever).
-        //
-        // ⚠️ It does NOT buy back the frame. This is the CSS value parser's own
-        // recursion, and the name's location has to live across `parse_function_arguments`
-        // below, so `build_leaf` grows 16 bytes and `calc(calc(…))` loses ~1,157 levels of
-        // its depth budget. Three spellings were measured — the fifth tuple element, this
-        // one, and hoisting the recursive call above the struct expression — and all three
-        // read exactly that number. It is the shape's price, not a spelling's; don't spend
-        // a session re-spelling it.
-        let name_start = name.as_ptr() as usize - s.as_ptr() as usize;
-        let name_span = Span {
-            start: span.start + name_start as u32,
-            end: span.start + (name_start + name.len()) as u32,
-        };
-        return CssValue::Function {
-            name_span,
-            args: parse_function_arguments(args, args_span, arena),
-            span,
-        };
+        return parse_function_leaf(s, span, paren_pos, name, args, arena);
     }
 
     // Hex or named color
@@ -296,6 +267,106 @@ fn parse_leaf_value<'arena>(s: &str, span: Span, arena: &'arena Bump) -> CssValu
 
     // Default to identifier (text recovered from `span` at print time)
     CssValue::Identifier { span }
+}
+
+/// The offset of the `(` after a PLAIN name opening `bytes` — an ASCII letter or `_` (or a
+/// `-` before one), then letters, digits, `_` and `-` — when `bytes` also ends in a `)`.
+/// `None` for every other shape, which [`parse_single_value`] leaves to the split.
+fn plain_function_paren(bytes: &[u8]) -> Option<usize> {
+    if bytes.last() != Some(&b')') {
+        return None;
+    }
+    // The nameless group (`(1.5 - a)`) is the same closed token with an empty name.
+    if bytes[0] == b'(' {
+        return Some(0);
+    }
+    let head = usize::from(bytes[0] == b'-');
+    if !bytes
+        .get(head)
+        .is_some_and(|b| b.is_ascii_alphabetic() || *b == b'_')
+    {
+        return None;
+    }
+    for (i, &b) in bytes.iter().enumerate().skip(head + 1) {
+        match b {
+            b'(' => return Some(i),
+            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | b'-' => {}
+            _ => return None,
+        }
+    }
+    None
+}
+
+/// [`extract_function_parts`] for a run [`plain_function_paren`] accepted: its name is the
+/// whole of `s[..paren_pos]` and already a valid one (plain ASCII word content, no
+/// whitespace, no escape), so only the paren scan is left to ask.
+fn plain_function_parts(s: &str, paren_pos: usize) -> Option<(&str, &str)> {
+    let close = scan::matching_close_paren(s, paren_pos)?;
+    let parts = (close == s.len() - 1).then(|| (&s[..paren_pos], &s[paren_pos + 1..close]));
+    debug_assert_eq!(
+        parts,
+        extract_function_parts(s, paren_pos),
+        "a plain-name function read two ways: {s:?}"
+    );
+    parts
+}
+
+/// The function or colour-function leaf `s` is, given the `name` and `args` its
+/// `(` at `paren_pos` splits it into.
+fn parse_function_leaf<'arena>(
+    s: &str,
+    span: Span,
+    paren_pos: usize,
+    name: &str,
+    args: &str,
+    arena: &'arena Bump,
+) -> CssValue<'arena> {
+    // Try color function first
+    if let Some(color) = parse_color_function(name, args) {
+        return CssValue::Color { color, span };
+    }
+    // Fall back to generic function
+    // Calculate accurate span for arguments (inside parens)
+    // The args string starts at: paren_pos + 1 (after opening paren)
+    // The args string ends at: paren_pos + 1 + args.len()
+    let args_start = paren_pos + 1;
+    let args_span = Span {
+        start: span.start + args_start as u32,
+        end: span.start + args_start as u32 + args.len() as u32,
+    };
+    // A comma **closing** the argument list (`var(--a,)`, `rgb(1, 2, 3,)`) terminated
+    // no argument, so it is not one — CSS Syntax 3's comma-split stops once the input
+    // is empty. It is still authored content the printer must spell back, and it reads
+    // that off the source between the last argument and the `)`
+    // (`printer::declarations::list_has_closing_comma`) rather than from a synthesized
+    // empty argument here: an *escaped* comma (`var(--b, x\,)`) is content inside the
+    // last argument, and a synthesized one would double it.
+    //
+    // The name is a slice of `s`, so it is a slice of the source: hand the printer
+    // its span rather than a copy of its bytes (span-for-verbatim). `name` itself
+    // still answers `parse_color_function` above, at parse time.
+    //
+    // Its offset is read off the two heads rather than threaded out of the split,
+    // which keeps that tuple at four words (returning it as a fifth cost ~288 bytes
+    // of `.text` and a little of the lever).
+    //
+    // ⚠️ It does NOT buy back the frame. This is the CSS value parser's own
+    // recursion, and the name's location has to live across `parse_function_arguments`
+    // below, so `build_leaf` grows 16 bytes and `calc(calc(…))` loses ~1,157 levels of
+    // its depth budget. Three spellings were measured — the fifth tuple element, this
+    // one, and hoisting the recursive call above the struct expression — and all three
+    // read exactly that number. It is the shape's price, not a spelling's; don't spend
+    // a session re-spelling it.
+    let name_start = name.as_ptr() as usize - s.as_ptr() as usize;
+    let name_span = Span {
+        start: span.start + name_start as u32,
+        end: span.start + (name_start + name.len()) as u32,
+    };
+    CssValue::Function {
+        name_span,
+        args: parse_function_arguments(args, args_span, arena),
+        span,
+    }
 }
 
 /// Extract function name and arguments, validating balanced parentheses.
