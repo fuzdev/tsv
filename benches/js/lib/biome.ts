@@ -27,6 +27,19 @@ interface BiomeWasmGlue {
 const GLUE_IMPORT_MODULE = './biome_wasm_bg.js';
 
 /**
+ * Linear-memory size past which `reset_heap` swaps in a fresh instance. A fresh
+ * instance sits at ~71 MB and the sweep time is FLAT as retained documents pile up
+ * — measured to 414 MB on node and bun at ±1% — until Node's external memory
+ * passes ~1 GB, where the sweep nearly triples. 320 MB keeps every sweep in the
+ * flat regime with the largest sweep's ~117 MB of headroom, and makes the reset
+ * rare where the leak is small (a css sweep retains ~1 MB, a svelte sweep ~15 MB):
+ * resetting on EVERY sweep instantiates 70 MB per sweep, which on a
+ * millisecond-sweep row (a `BENCH_LIMIT` probe) out-churns the collector and read
+ * as a 40x slowdown.
+ */
+const RESET_BUDGET_BYTES = 320 * 1024 * 1024;
+
+/**
  * Match the prettier/tsv config — tabs, line width 100, single quotes, no
  * trailing commas — so every format row does the same layout work (at
  * biome's defaults, width 80 + double quotes, the rows wrap different
@@ -80,16 +93,18 @@ const BIOME_CONFIGURATION: Configuration = {
  *   point (only `formatContent`/`lintContent`/`fixFile`); Biome parses
  *   internally but never surfaces the AST across the JS boundary.
  *
- * **The wasm module is instantiated BY HAND, and re-instantiated per task and per
- * timed sweep (`reset_heap`).** `Workspace.openFile` retains ~4.5 B of linear
+ * **The wasm module is instantiated BY HAND, and re-instantiated whenever its
+ * linear memory passes a budget (`reset_heap`, called between sweeps).**
+ * `Workspace.openFile` retains ~4.5 B of linear
  * memory per source byte on every call — identical content, identical path and
  * no formatting at all cost the same, and `closeFile` releases nothing (measured
  * at `@biomejs/wasm-bundler` 2.5.13: 200 open/close pairs on one 13 KB file grow
  * the heap 11.2 MB) — so one full TypeScript sweep leaks ~117 MB that no GC can
  * reach, and Node's per-sweep time nearly triples once the process's external
  * memory passes ~1 GB. A row measured on that heap publishes the leak, not the
- * formatter. Linear memory never shrinks, so the only way back to a clean heap is
- * a new instance: `@biomejs/wasm-bundler`'s own entry (`biome_wasm.js`) binds ONE
+ * formatter (the cost is a STEP, not a slope: sweep time is flat to at least
+ * 414 MB on node and bun). Linear memory never shrinks, so the only way back to a
+ * clean heap is a new instance: `@biomejs/wasm-bundler`'s own entry (`biome_wasm.js`) binds ONE
  * ESM-cached instance for the life of the process, so this wrapper never imports
  * it — it compiles the `.wasm` bytes once and instantiates them itself against the
  * package's glue (`biome_wasm_bg.js`), which is also what makes the row load under
@@ -169,8 +184,9 @@ export class BiomeImplementation extends BaseImplementation {
 
 	/**
 	 * Drop the live wasm instance and start a fresh one — the same project and
-	 * configuration on a linear memory that holds nothing. Synchronous, ~10 ms
-	 * (`new WebAssembly.Instance` over the compiled module, then a workspace),
+	 * configuration on a linear memory that holds nothing — once the live one has
+	 * grown past `RESET_BUDGET_BYTES`; a no-op below it. Synchronous, ~10 ms when it
+	 * swaps (`new WebAssembly.Instance` over the compiled module, then a workspace),
 	 * which is what lets the bench call it from the untimed slots between sweeps.
 	 *
 	 * Order matters twice. The old `Workspace` is `shutdown()` BEFORE the swap: its
@@ -185,8 +201,12 @@ export class BiomeImplementation extends BaseImplementation {
 		if (!this._module || !this._glue || !this._biome_class) {
 			throw new Error('Biome not initialized');
 		}
-		if (this._biome) this._biome.shutdown();
-		if (this._instance) (this._instance.exports.memory as WebAssembly.Memory).grow(0);
+		if (this._instance) {
+			const memory = this._instance.exports.memory as WebAssembly.Memory;
+			if (memory.buffer.byteLength <= RESET_BUDGET_BYTES) return;
+			this._biome?.shutdown();
+			memory.grow(0);
+		}
 		const instance = new WebAssembly.Instance(this._module, { [GLUE_IMPORT_MODULE]: this._glue });
 		this._glue.__wbg_set_wasm(instance.exports);
 		(instance.exports.__wbindgen_start as () => void)();

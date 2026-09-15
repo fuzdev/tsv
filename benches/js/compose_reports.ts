@@ -73,7 +73,7 @@ interface Entry {
 	 *
 	 * Read together with it, never separately: a cv is an ESTIMATE, and its own
 	 * error falls off with n. The bench drives sample count from `duration_ms` with
-	 * a floor of 5, so a multi-second row can land at 3–7
+	 * a floor of 8, so a multi-second row can land at 6–8
 	 * cleaned timings while a microsecond row lands at four figures — a spread of
 	 * two orders of magnitude inside one table.
 	 */
@@ -542,7 +542,7 @@ const MIN_NOISE_SAMPLES = 10;
  * estimate, and this test consumes it in the direction where being wrong is
  * expensive: too SMALL a cv makes a real per-runtime difference read as "no
  * difference", which is the one verdict here a reader cannot check from the table.
- * The bench floors iterations at 5 and drives the rest from
+ * The bench floors iterations at 8 and drives the rest from
  * `duration_ms`, so a multi-second row lands at a handful of cleaned timings —
  * measured, 17 of 44 rows per runtime sit under ten — while a fast row lands at
  * four figures. Three timings that happen to agree are not evidence of quiet.

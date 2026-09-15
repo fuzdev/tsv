@@ -245,8 +245,10 @@ Things the published numbers measure that aren't quite what they look like.
   (`Workspace.openFile` retains ~4.5 B per source byte and `closeFile` frees
   nothing) and never shrinks, so a GC settles nothing and a TypeScript row on Node
   tripled its sweep time once the process passed ~1 GB — `lib/biome.ts` therefore
-  re-instantiates the wasm module in the same untimed `setup` slot and again
-  between every two timed sweeps (~10 ms a swap, outside every timer). Same
+  re-instantiates the wasm module once its linear memory passes 320 MB, checked
+  in the same untimed `setup` slot and between every two sweeps (~10 ms a swap,
+  outside every timer; the sweep time is flat to at least 414 MB, so the budget
+  keeps every sweep in that regime without instantiating 70 MB per sweep). Same
   footing as the GC — a settled heap per sweep — for the one heap a GC cannot
   settle; the leak itself is disclosed rather than measured.
   This is deliberately NOT the same knob as the per-iteration hook below: it
@@ -284,9 +286,9 @@ Things the published numbers measure that aren't quite what they look like.
   rather than overturning a reading. The within-noise half also needs ten cleaned
   timings a side before it will call a cell quiet, and prints `n` for each: sample
   count varies by two orders of magnitude across one table (a microsecond row gets
-  four figures; a multi-second row gets the iteration floor of 5), and a cv from
+  four figures; a multi-second row gets the iteration floor of 8), and a cv from
   three timings that happen to agree is not evidence of quiet.
-  That floor is what excludes a sixth cell, `format/svelte/prettier` at n=7.
+  That gate is what excludes a sixth cell, `format/svelte/prettier` at n=7.
 - **Per-iteration forced GC** — off by default (`BENCH_GC=1` makes the bench call
   `globalThis.gc()` between every iteration), and not a uniform bias. Measured on a BENCH_LIMIT=20 / 500ms / WARMUP=2 sample: low-
   allocation paths are penalized heavily (`tsv-internal` 1.4–1.7× slower with the

@@ -127,7 +127,7 @@ delta on the same row is the detector.
   or raw cv passed 10% or whose `drift` passed 5%, collected AHEAD of the sample
   gate — a measured 48% on five timings needs no minimum n to be believed, and the
   gate had silenced exactly that cell — marked `⚠` in the tables and on stderr.
-  The bench floors iterations at 5 and drives the rest from
+  The bench floors iterations at 8 and drives the rest from
   `duration_ms`, so sample count spans two orders of magnitude inside one table and
   roughly 20 of 44 rows per runtime sit under ten; this test consumes cv in the direction
   where an UNDERestimate is expensive, since it would report a real runtime
@@ -661,10 +661,11 @@ BENCH_LIMIT=5           # files per language (default: all)
 BENCH_FILTER=zzz        # path pattern (default: none)
 BENCH_DURATION=10000    # ms per benchmark (default: 5000; conformance mode: 15000)
 BENCH_WARMUP=10         # warmup iteration FLOOR (default: 3); every row also warms for at least
-BENCH_WARMUP_MS=2000    # this many ms (default: 1000), sized from its own pre-flight sweep — a fixed
+BENCH_WARMUP_MS=2000    # this many ms (default: 5000), sized from its own pre-flight sweep — a fixed
                         # count left fast rows still tiering inside the measured window (negative
-                        # drift on every runtime). There is no slow-task tier any more: one
-                        # protocol per row on every runtime (floor 5, 5 s budget, warmup ≥ 1 s)
+                        # drift on every runtime), and JSC keeps tiering for seconds, so 1 s was not
+                        # enough for bun. There is no slow-task tier any more: one protocol per row
+                        # on every runtime (floor 8, 5 s budget, warmup ≥ 5 s)
 BENCH_MODE=union        # per-impl iteration (default: intersection)
 BENCH_CORPUS=conformance  # corpus/surface selector (default: perf)
 BENCH_STALE_OK=1        # run despite stale artifacts (default: off)
@@ -858,10 +859,17 @@ enters its window still tiering; there is no slow-task tier). **One impl is rese
 between sweeps**: biome's `Workspace.openFile` retains ~4.5 B of wasm linear memory
 per source byte on every call and `closeFile` frees nothing (a genuine upstream leak,
 not a cache), and linear memory never shrinks, so `lib/biome.ts` re-instantiates the
-module in the two untimed slots — the per-task `setup` beside the major GC every task
-gets, and `on_iteration` between two timed sweeps — at ~10 ms a swap, 0% of any
-timing. That is the honest footing: every in-process impl starts each sweep from a
-settled heap, and biome's is the one a GC cannot settle. §Unstable Rows trips on cleaned cv ≥ 10%,
+module once its memory passes 320 MB — offered in the untimed slots (the per-task
+`setup` beside the major GC every task gets, after each warmup sweep, and
+`on_iteration` between two timed sweeps) at ~10 ms a swap, 0% of any timing. The
+budget, not every sweep, because the leak's cost is a STEP (sweep time is flat to at
+least 414 MB on node and bun, ±1%; Node's external memory past ~1 GB is where it
+triples) while a 70 MB instantiation per millisecond sweep out-churns the collector
+(a `BENCH_LIMIT` probe read a 40x slowdown that way). Such a row also WARMS in its
+`setup` (the library warming 0 times and the row carrying the harness's count),
+because the library's warmup loop has no between-sweeps hook to offer the reset in.
+That is the honest footing: every in-process impl starts each sweep from a settled
+heap, and biome's is the one a GC cannot settle. §Unstable Rows trips on cleaned cv ≥ 10%,
 |drift| ≥ 5%, or raw cv ≥ 10% on a row under 30 raw samples (with hundreds of samples
 the raw cv is dominated by isolated GC pauses the cleaner rightly removes — one 80 ms
 pause among 600 × 8 ms sweeps reads 35% — so there the median drift is the detector,

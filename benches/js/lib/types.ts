@@ -142,13 +142,16 @@ export interface TsvImplementation {
 
 	/**
 	 * Return the engine to a clean heap without a new process — for an impl whose
-	 * heap a GC cannot settle. The bench calls it in the two UNTIMED slots, once
-	 * before a task's warmup beside the major GC every task gets (`settle_heap`)
-	 * and again between every two timed sweeps, so a row measures the engine's
-	 * work rather than what its previous sweeps left behind. Synchronous, because
-	 * the between-sweeps slot is (`on_iteration`); must be cheap against one sweep.
-	 * Today only biome declares it (`lib/biome.ts`: wasm linear memory leaks per
-	 * call and never shrinks, so the clean heap is a fresh instance).
+	 * heap a GC cannot settle. The bench calls it in the UNTIMED slots: before a
+	 * task's warmup beside the major GC every task gets (`settle_heap`), after
+	 * every warmup sweep, and between every two timed sweeps — so a row measures
+	 * the engine's work rather than what its previous sweeps left behind. The impl
+	 * owns the budget: it is called between EVERY two sweeps, so it must be a cheap
+	 * no-op while the retained state is small and act only once that state could
+	 * change a sweep's cost. Synchronous, because the between-sweeps slot is
+	 * (`on_iteration`). Today only biome declares it (`lib/biome.ts`: wasm linear
+	 * memory leaks per call and never shrinks, so the clean heap is a fresh
+	 * instance, taken once the live one passes 320 MB).
 	 */
 	reset_heap?(): void;
 
