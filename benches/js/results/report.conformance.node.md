@@ -6,13 +6,13 @@
 
 **Corpus kind:** conformance — fixtures-only corpus (disjoint from perf; Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)
 
-**Date:** 2026-09-14T22:33:09.128Z — tsv 0.3.0 (7eb42464)
+**Date:** 2026-09-15T01:31:43.272Z — tsv 0.3.0 (b2f9c39e)
 
 **Corpus:** 4571 Svelte (1.1 MB), 53952 TypeScript (70.9 MB), 22642 CSS (7.7 MB) — 81165 files, 79.7 MB total
 
 **Sources:** ../prettier-plugin-svelte/test (318), ../prettier/tests/format/typescript (795), ../prettier/tests/format/js (1106), ../prettier/tests/format/css (228), ../prettier/tests/format/html (84), ../svelte/packages/svelte/tests (4488), benches/js/.cache/wpt_css (22310), benches/js/.cache/test262_files.json (43739), benches/js/.cache/ts_repo_files.json (8097)
 
-**Versions:** svelte@5.56.9, acorn@8.16.0, acorn-typescript@1.0.13, prettier@3.9.6, prettier-plugin-svelte@4.1.1, oxc-parser@0.150.0, @oxc-parser/binding-wasm32-wasi@0.142.0, oxfmt@0.68.0, yuku-parser@0.10.1, @biomejs/wasm-bundler@2.5.13, @dprint/typescript@0.96.1, dprint-plugin-malva@0.16.0, postcss@8.5.28, @rsvelte/fmt@0.7.23, @rsvelte/vite-plugin-svelte-native@0.3.14 (targets svelte@5.57.0), @swc/core@1.16.2
+**Versions:** svelte@5.56.9, acorn@8.16.0, acorn-typescript@1.0.13, prettier@3.9.6, prettier-plugin-svelte@4.1.1, oxc-parser@0.150.0, @oxc-parser/binding-wasm32-wasi@0.142.0, oxfmt@0.68.0, yuku-parser@0.10.1, @biomejs/wasm-bundler@2.5.13, @dprint/typescript@0.96.1, dprint-plugin-malva@0.16.0, postcss@8.5.28, @rsvelte/fmt@0.7.23, @rsvelte/vite-plugin-svelte-native@0.3.14 (targets svelte@5.57.0), @swc/core@1.16.2, typescript@6.0.3
 
 **Excluded here:** yuku-parser (N-API) — its native binding faults the host process on this corpus (test262 escaped-identifier fixtures), so it cannot be measured against it. The WASM binding runs the same engine and carries the row; both are measured on the perf corpus.
 
@@ -59,6 +59,8 @@
 | `../svelte/packages/svelte/tests` | 182 | 181 (99%) | 181 (99%) | 181 (99%) | 181 (99%) | 181 (99%) | 182 (100%) |
 | `benches/js/.cache/wpt_css` | 22310 | 22101 (99%) | 22152 (99%) | 22152 (99%) | 22152 (99%) | 22152 (99%) | 22210 (99%) |
 
+**The test262 source is tsv-scope-filtered, and it favors tsv.** The cache the `test262` source reads is the expected-positive subset of the tests tsv’s own runner GRADES — `test262 --emit-manifest` (`crates/tsv_debug/src/test262/`) drops the tests outside tsv’s scope before the split, every Annex B `noStrict` positive among them, a grammar tsv declines as a non-browser host and that acorn, oxc, swc, tsc and yuku all parse. So tsv reads 100% on that source by construction, the way tsc does on the tsc corpus and svelte/compiler on the Svelte set, and a rival’s number there is its rate on tsv’s slice, not on test262. The positive/negative split itself is tool-neutral; the graded subset it starts from is not.
+
 ## Binary Sizes
 
 | Binary | Size | Gzipped | vs tsv | vs tsv (gz) |
@@ -83,7 +85,7 @@
 | rsvelte compiler (napi) | 17.6 MB | 7.4 MB | 4.5x | 4.2x |
 | swc (napi) | 32.7 MB | 12.2 MB | 8.4x | 6.9x |
 
-_Gzipped ≈ npm-tarball wire size (`gzip -c`, system default level). `vs tsv (gz)` compares gzipped bytes; `vs tsv` compares raw on-disk bytes._
+_`vs tsv` divides native rows by `tsv (napi)` — the binding this runtime benchmarks (FFI under Deno, N-API under Node/Bun), so the same artifact reads a different ratio in the deno and node/bun reports — and wasm rows by `tsv_wasm`. Gzipped ≈ the artifact’s wire size (`gzip -c`, system default level; the `tsv (napi)` platform package also ships the `tsv` CLI binary, so its tarball is larger than this row). `vs tsv (gz)` compares gzipped bytes; `vs tsv` compares raw on-disk bytes._
 
 ## Skipped Files
 

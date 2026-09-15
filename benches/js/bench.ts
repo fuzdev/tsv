@@ -2966,9 +2966,18 @@ if (write_report) {
 	const unstable_published = unstable_rows(results_data);
 	if (unstable_published.length > 0) {
 		log(
-			`  ⚠ ${unstable_published.length} unstable row(s) (cv ≥ ${(UNSTABLE_CV_THRESHOLD * 100).toFixed(0)}%): ` +
-				`${unstable_published.map((u) => `${u.label} ${(u.cv * 100).toFixed(0)}%`).join(', ')} ` +
-				`(per-entry \`cv\`; §Unstable Rows in the md)`
+			`  ⚠ ${unstable_published.length} unstable row(s) (cv ≥ ${(UNSTABLE_CV_THRESHOLD * 100).toFixed(0)}%, ` +
+				`or |drift| ≥ ${(UNSTABLE_DRIFT_THRESHOLD * 100).toFixed(0)}%): ` +
+				`${unstable_published
+					.map(
+						(u) =>
+							`${u.label} cv ${(u.cv * 100).toFixed(1)}%` +
+							(u.drift === null
+								? ''
+								: ` drift ${u.drift >= 0 ? '+' : ''}${(u.drift * 100).toFixed(1)}%`)
+					)
+					.join(', ')} ` +
+				`(per-entry \`cv\` / \`cv_raw\` / \`drift\`; §Unstable Rows in the md)`
 		);
 	}
 } else {
