@@ -13,6 +13,9 @@ Each `## Unreleased` section must be non-empty and carry a
 ## Unreleased
 <!-- bump: patch -->
 
+- fix: restore the CSS parse speed lost in 0.3.0 — a declaration value is ruled out for operator
+  splitting before its run is tokenized ([#1037](https://github.com/fuzdev/tsv/pull/1037))
+
 ## 0.3.0
 
 - **breaking** feat: native binaries, both CLI and JS lib — install `@fuzdev/tsv` (N-API addon plus
