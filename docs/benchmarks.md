@@ -281,14 +281,15 @@ Things the published numbers measure that aren't quite what they look like.
   negative, the row got faster while measured (under-warmed); positive, slower
   (degrading) — which is also why warmup is sized by time (`BENCH_WARMUP_MS`): a
   fixed three sweeps left every fast row still tiering inside its window, a
-  negative drift on all three runtimes. Five of 44 node/deno deltas currently land
-  inside their noise, all of them at ~1.00x — i.e. today this confirms "no difference"
-  rather than overturning a reading. The within-noise half also needs ten cleaned
-  timings a side before it will call a cell quiet, and prints `n` for each: sample
-  count varies by two orders of magnitude across one table (a microsecond row gets
-  four figures; a multi-second row gets the iteration floor of 8), and a cv from
-  three timings that happen to agree is not evidence of quiet.
-  That gate is what excludes a sixth cell, `format/svelte/prettier` at n=7.
+  negative drift on all three runtimes. Every pair of runtimes is classified, and the
+  cells that land inside their noise are the combined report's **Within noise** line
+  (a handful per refresh, each at ~1.00x — this confirms "no difference" rather than
+  overturning a reading). The within-noise half also needs ten cleaned timings a side
+  before it will call a cell quiet, and prints `n` for each: sample count varies by
+  two orders of magnitude across one table (a microsecond row gets four figures; a
+  multi-second row gets the iteration floor of 8), and a cv from a handful of timings
+  that happen to agree is not evidence of quiet — which is what leaves the
+  multi-second rows (prettier and oxfmt on svelte and typescript, at n=8) unclassified.
 - **Per-iteration forced GC** — off by default (`BENCH_GC=1` makes the bench call
   `globalThis.gc()` between every iteration), and not a uniform bias. Measured on a BENCH_LIMIT=20 / 500ms / WARMUP=2 sample: low-
   allocation paths are penalized heavily (`tsv-internal` 1.4–1.7× slower with the

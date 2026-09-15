@@ -820,10 +820,12 @@ const iterated_files_digest: Map<string, string> = new Map();
 const preflight_elapsed_ms: Map<string, number> = new Map();
 
 /**
- * Warmup sweeps the HARNESS ran in a task's `setup`, by task name — the rows whose
+ * Warmup sweeps the HARNESS ran in a task's `setup`, by tracking_key — the rows whose
  * impl declares `reset_heap`, which warm outside the library's loop (task loop in
  * `run_benchmark_group`). Read back when the row is serialized, since the library
- * reports 0 for them.
+ * reports 0 for them. Keyed by tracking_key, not display name: one impl's rows share
+ * a name across groups, and a name-keyed map published the LAST group's count on
+ * every one of them (biome's css warmup, ~45, on its svelte and typescript rows).
  */
 const harness_warmups: Map<string, number> = new Map();
 /**
@@ -1061,7 +1063,7 @@ const same_engine_sibling_name = (name: string): string | null => {
 const same_engine_pair_versions = (
 	name: string
 ): [string | undefined, string | undefined] | null => {
-	const alt = get_alternative_versions(impls);
+	const alt = get_alternative_versions(impls, TASK_OPTIONS);
 	if (name === 'oxc-parser') return [alt.oxc_parser, alt.oxc_parser_wasm];
 	if (name === 'yuku-parser') return [alt.yuku_parser, alt.yuku_parser_wasm];
 	return null;
@@ -1992,7 +1994,7 @@ async function run_benchmark_group(
 		// `TsvImplementation.reset_heap`). The library then warms 0 times;
 		// `harness_warmups` carries the count actually run into the row.
 		if (reset_heap) {
-			harness_warmups.set(task.name, warmup_iterations);
+			harness_warmups.set(task.tracking_key, warmup_iterations);
 			bench.add({
 				name: task.name,
 				warmup_iterations: 0,
@@ -2490,7 +2492,9 @@ async function build_results_data(
 					outlier_ratio: result.stats.outlier_ratio,
 					// A `reset_heap` row warms in its `setup` (see the task loop), so the
 					// library's count is 0 for it and the harness's is the protocol.
-					warmup_iterations: harness_warmups.get(result.name) ?? result.budget.warmup_iterations,
+					warmup_iterations:
+						(tracking_key ? harness_warmups.get(tracking_key) : undefined) ??
+						result.budget.warmup_iterations,
 					min_iterations: result.budget.min_iterations,
 					files_processed: coverage?.processed ?? null,
 					files_total: coverage?.total ?? null,
@@ -2937,7 +2941,7 @@ const corpus = {
 	typescript: ts_files.length,
 	css: css_files.length
 };
-const alt_versions = get_alternative_versions(impls);
+const alt_versions = get_alternative_versions(impls, TASK_OPTIONS);
 const v = impls.versions.canonical;
 const versions: BaselineVersions = {
 	tsv: await get_tsv_version(),

@@ -897,7 +897,10 @@ export function unavailable_with_rows(
  * renders it — so producer and renderer can't disagree about which impls a report
  * carries. Adding an impl extends it there, once.
  */
-export function get_alternative_versions(impls: ImplementationSet): AlternativeVersionInfo {
+export function get_alternative_versions(
+	impls: ImplementationSet,
+	options: Pick<BenchmarkTaskOptions, 'corpus_kind'>
+): AlternativeVersionInfo {
 	return {
 		oxc_parser: impls.oxc?.versions['oxc-parser'],
 		// Pinned apart from `oxc-parser` (`package.json` `//oxc-wasi`), so the wasm row
@@ -922,8 +925,11 @@ export function get_alternative_versions(impls: ImplementationSet): AlternativeV
 		rsvelte_parse: impls.rsvelte_parse?.versions.native,
 		rsvelte_parse_svelte_target: impls.rsvelte_parse?.upstream_svelte_version,
 		swc: impls.swc?.versions.core,
-		// Only where the row is: on the perf surface tsc is not a row, and its version
-		// then names nothing the report measured.
-		tsc: impls.tsc ? impls.versions.tsc.typescript : undefined
+		// Only where the row is. The impl loads on every surface (it costs the perf
+		// surface nothing), but `get_benchmark_tasks` adds its row on the conformance
+		// surface alone, so the same condition gates the version: on the perf surface
+		// it would name nothing the report measured.
+		tsc:
+			impls.tsc && options.corpus_kind === 'conformance' ? impls.versions.tsc.typescript : undefined
 	};
 }
