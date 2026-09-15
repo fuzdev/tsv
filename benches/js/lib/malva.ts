@@ -17,6 +17,7 @@
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { BaseImplementation, type Language } from './types.ts';
+import { assert_format_config_landed, FORMAT_CONFIG_PROBES } from './format_config_probe.ts';
 import type { MalvaVersions } from './versions.ts';
 // Type-only, so naming `Formatter` here does not load the plugin at import time;
 // the value imports are deferred to `init()`. Same posture as lib/dprint.ts.
@@ -70,6 +71,15 @@ export class MalvaImplementation extends BaseImplementation {
 		if (diagnostics.length > 0) {
 			const detail = diagnostics.map((d) => `${d.propertyName}: ${d.message}`).join('; ');
 			throw new Error(`malva rejected the benchmark config (${detail})`);
+		}
+		// Recognized is not landed — the behavioral proof, as lib/dprint.ts and every
+		// other formatter row run it.
+		for (const language of this.format_languages) {
+			assert_format_config_landed(
+				'malva',
+				language,
+				this.format(FORMAT_CONFIG_PROBES[language], language)
+			);
 		}
 	}
 

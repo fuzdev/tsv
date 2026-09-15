@@ -283,10 +283,12 @@ export function generate_summary_report(
 		// - The Svelte pair: rsvelte's parser is the only third-party engine there,
 		//   and it matches `tsv-json` on BOTH axes — mechanism (each returns a compact
 		//   JSON string the caller parses, so both pay the identical serialize +
-		//   boundary + JSON.parse cost) and payload (-1.1% of tsv's bytes ACROSS THE
-		//   CORPUS — the axis a throughput ratio integrates over; per component the
-		//   spread is wider, p90 3% and up to 12%, so the aggregate is the claim.
-		//   Measured over 120 real components; re-measure on an rsvelte pin bump).
+		//   boundary + JSON.parse cost) and payload (-0.13% of tsv's bytes ACROSS THE
+		//   CORPUS — the axis a throughput ratio integrates over; per component p50
+		//   1.000, p90 1.000, worst 7% under and 0.7% over, so the aggregate is the
+		//   claim. Measured over the 951-file Svelte perf corpus at
+		//   @rsvelte/vite-plugin-svelte-native 0.3.14 with `modern: true`; re-measure
+		//   on an rsvelte pin bump).
 		//   Deliberately NOT paired with the no-locations rows:
 		//   `skipExpressionLoc` is a different reduction from tsv's span-only wire
 		//   (see lib/rsvelte_parse.ts), which is also why that row is named for its
@@ -543,6 +545,13 @@ export interface AlternativeVersionInfo {
 	 */
 	rsvelte_parse_svelte_target?: string;
 	swc?: string;
+	/**
+	 * The `typescript` package behind the `tsc` row — present only where that row
+	 * is (the conformance surface), where it is both a coverage column and the oracle
+	 * that selected the tsc-corpus source, so a report naming that source without
+	 * naming this version was naming a corpus nothing could reproduce.
+	 */
+	tsc?: string;
 }
 
 /** Everything the versions blocks render. */
@@ -611,6 +620,7 @@ export function alternative_version_parts(versions: AlternativeVersionInfo): str
 		);
 	}
 	if (versions.swc) parts.push(`@swc/core@${versions.swc}`);
+	if (versions.tsc) parts.push(`typescript@${versions.tsc}`);
 	return parts;
 }
 
@@ -698,7 +708,7 @@ const SWC_NOTE: FairnessNote = {
 		'   so like oxc it emits neither tsv’s loc-bearing drop-in shape nor its span-only wire)'
 	],
 	markdown:
-		'swc parses to its own AST dialect (root `Module`, `span` rather than `loc`, `Ts`-prefixed kinds), so it carries the same payload disclosure oxc-parser does — the mechanism matches `tsv-json` (serialize, cross, materialize) while the tree it produces is neither tsv’s loc-bearing drop-in shape nor its span-only wire'
+		'swc parses to its own AST dialect (root `Module`, `span` rather than `loc`, `Ts`-prefixed kinds), so it carries the same payload disclosure oxc-parser does — the mechanism matches `tsv-json` (serialize, cross, materialize) while the tree it produces is neither tsv’s loc-bearing drop-in shape nor its span-only wire; measured on the perf corpus its JSON is 0.64× `tsv-json`’s bytes'
 };
 
 const RSVELTE_PARSE_NOTE: FairnessNote = {
@@ -707,7 +717,7 @@ const RSVELTE_PARSE_NOTE: FairnessNote = {
 		'   tsv-json measures, and within ~1.5% of its payload corpus-wide, so this pair matches on both axes)'
 	],
 	markdown:
-		'rsvelte-parse returns a compact JSON string the caller parses — the identical mechanism `tsv-json` measures (same serialize + boundary + `JSON.parse` cost) and within ~1.5% of its payload measured across the corpus (the axis a throughput ratio integrates; per component the spread is wider), so it is the one third-party parse row matched to tsv on BOTH axes. Its `skipExpressionLoc` variant is deliberately not compared: that reduction is not tsv’s span-only wire'
+		'rsvelte-parse returns a compact JSON string the caller parses — the identical mechanism `tsv-json` measures (same serialize + boundary + `JSON.parse` cost) and within ~1.5% of its payload measured across the corpus (0.13% smaller in aggregate at the current pin, per-component median exactly 1.00 — the axis a throughput ratio integrates), so it is the one third-party parse row matched to tsv on BOTH axes. Its `skipExpressionLoc` variant is deliberately not compared: that reduction is not tsv’s span-only wire'
 };
 
 const POSTCSS_NOTE: FairnessNote = {
@@ -716,7 +726,7 @@ const POSTCSS_NOTE: FairnessNote = {
 		'   format/css baseline; no Rust CSS parser exposes an AST to JS, so it is the only peer)'
 	],
 	markdown:
-		'postcss is the JS parser behind prettier’s CSS printer, i.e. behind the `format/css` baseline — a JS-vs-native read like prettier’s own, not a same-tier one; it is the only third-party engine available on `parse/css`, since no Rust CSS parser exposes an AST to JS'
+		'postcss is the JS parser behind prettier’s CSS printer, i.e. behind the `format/css` baseline — a JS-vs-native read like prettier’s own, not a same-tier one; it is the only third-party engine available on `parse/css`, since no Rust CSS parser exposes an AST to JS. Not payload-matched either: it keeps selectors and values as strings where `parseCss` (and so tsv) builds full ASTs — 0.38× tsv’s node count and at most 0.56× its JSON bytes on the perf corpus'
 };
 
 const MALVA_NOTE: FairnessNote = {
