@@ -76,13 +76,15 @@ into `crates/tsv_napi/pkg/` (gitignored):
   execs), + a generated package.json whose `os`/`cpu`/`libc` fields drive
   install-time selection. Naming is the ecosystem-universal
   `<loader>-<dash triple>` shape (swc's). The set: `linux-x64-gnu`,
-  `linux-arm64-gnu`, `linux-x64-musl`, `darwin-arm64`, `win32-x64`. One per
-  invocation by design — a machine can only have built its own triple; the
-  release workflow runs the script once per matrix target with `--triple` alone —
-  every row builds on its own architecture (the gnu/musl rows in pinned containers, the
-  arm row on an arm runner, mac and Windows on native runners), so the
-  `--artifact`/`--cli-artifact` flags that would name cross-built binaries exist but go
-  unused today.
+  `linux-arm64-gnu`, `linux-x64-musl`, `darwin-arm64`, `darwin-x64`, `win32-x64`.
+  One per invocation by design — a machine can only have built its own triple; the
+  release workflow runs the script once per matrix target with `--triple` —
+  every row but one builds on its own architecture (the gnu/musl rows in pinned
+  containers, the arm row on an arm runner, mac and Windows on native runners).
+  The exception is `darwin-x64`: Intel macOS runners are being retired, so it
+  cross-compiles on the arm64 mac runner (`cargo build --target x86_64-apple-darwin`),
+  names its binaries via `--artifact`/`--cli-artifact`, and runs the npm-shape test under
+  x64 Node through Rosetta 2, where `platform_triple()` reads the staged triple.
 
 **The loader is ESM**, the same module system as the wasm packages — one
 dialect across tsv's whole npm surface, which is what lets shared sources
@@ -252,7 +254,7 @@ both artifacts; musl in rust:alpine with `-crt-static` off, both gated
 GLIBC-free. Then per-artifact size bounds
 (`scripts/validate_napi_artifact.ts`, one anchored band per binary) and the
 npm-shape test over the real artifacts (node:alpine for musl). The publish
-job gathers all five, stages the loader (`--loader-only`), and runs
+job gathers all six, stages the loader (`--loader-only`), and runs
 `scripts/publish_napi.ts` — completeness (addon + CLI binary per platform)
 and version-lockstep checks, re-arming the CLI binaries' executable bit
 (artifact transport drops file modes — without it every posix `npx tsv`

@@ -122,7 +122,7 @@ const ast: Root = parse_svelte('<script>const x = 1;</script>');
 
 `@fuzdev/tsv` and `@fuzdev/tsv-wasm` are drop-in swaps.
 The native package is prebuilt
-for Linux (x64 gnu and musl, arm64 gnu), macOS arm64, and Windows x64.
+for Linux (x64 gnu and musl, arm64 gnu), macOS (arm64 and x64), and Windows x64.
 As with other wasm packages, browsers must call `await init()`.
 
 The same native `tsv` CLI binaries are attached to each

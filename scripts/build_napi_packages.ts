@@ -52,6 +52,7 @@ const SUPPORTED_TRIPLES = [
 	'linux-arm64-gnu',
 	'linux-x64-musl',
 	'darwin-arm64',
+	'darwin-x64',
 	'win32-x64'
 ];
 
@@ -76,16 +77,17 @@ const native_library_filename = (): string => {
 const triple = args.triple ?? host_triple();
 const artifact = args.artifact ?? `target/napi/${native_library_filename()}`;
 // The staged NAME follows the target triple; the default SOURCE path follows
-// the host (every matrix leg builds natively or in a same-arch container, so
-// the two agree — a genuine cross-build names its binary via --cli-artifact).
+// the host (every matrix leg but darwin-x64 builds natively or in a same-arch
+// container, so the two agree — that one cross-compiles on the arm64 mac
+// runner and names both binaries via --artifact / --cli-artifact).
 const cli_binary = cli_binary_name(triple);
 const cli_artifact =
 	args['cli-artifact'] ?? `target/release/${Deno.build.os === 'windows' ? 'tsv.exe' : 'tsv'}`;
 
 const cargo_toml = Deno.readTextFileSync('Cargo.toml');
 // `^version` (multiline) avoids matching a `rust-version = "..."` MSRV pin — without it,
-// the lazy section scan would stamp the MSRV as the package version across all five
-// platform packages. `[^[]*?` bounds the search to the section (stops at the next `[`
+// the lazy section scan would stamp the MSRV as the package version across every
+// platform package. `[^[]*?` bounds the search to the section (stops at the next `[`
 // heading). Same grammar as bench.ts's read and publish.ts's `workspace_pkg_re` rewrite.
 const version = /\[workspace\.package\][^[]*?^version\s*=\s*"([^"]+)"/m.exec(cargo_toml)?.[1];
 if (!version) throw new Error('workspace version not found in Cargo.toml');

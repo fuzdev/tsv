@@ -1,5 +1,5 @@
 # Release workflow for the N-API npm packages — the @fuzdev/tsv loader +
-# the five @fuzdev/tsv-<triple> platform packages. This is the per-platform
+# the six @fuzdev/tsv-<triple> platform packages. This is the per-platform
 # matrix the single-machine scripts/publish.ts deliberately does NOT own:
 # publish.ts releases the WASM set and pushes the annotated v* tag, and that tag
 # triggers this workflow. The tag is also the assertion that the local
@@ -11,7 +11,7 @@
 # a process that owns its own crash, the same artifact the hyperfine benches
 # measure), stage the platform package (addon + CLI binary), gate it (glibc
 # floor / musl purity over BOTH binaries, size bounds, the npm-shape test over
-# the real artifacts), upload. The publish job downloads all five, stages the
+# the real artifacts), upload. The publish job downloads all six, stages the
 # loader, re-arms the CLI binaries' executable bit (artifact transport drops
 # file modes), and publishes platforms-then-loader idempotently
 # (scripts/publish_napi.ts) — a partial matrix never publishes anything.
@@ -31,7 +31,7 @@
 #
 # Auth: NPM_TOKEN secret (granular, publish-only) for the bootstrap releases —
 # npm trusted publishing is only configurable on packages that already exist.
-# Once the six packages are live, configure Trusted Publishers and switch this
+# Once the seven packages are live, configure Trusted Publishers and switch this
 # to OIDC, dropping the token. `id-token: write` is already scoped on the
 # publish job for `npm --provenance`.
 #
@@ -90,8 +90,8 @@ defaults:
 jobs:
   build:
     strategy:
-      # Publish requires ALL five artifacts (a partial set never publishes),
-      # but let every target report — a one-target failure with four green
+      # Publish requires ALL six artifacts (a partial set never publishes),
+      # but let every target report — a one-target failure with five green
       # uploads means a re-run only rebuilds what changed.
       fail-fast: false
       matrix:
@@ -108,6 +108,18 @@ jobs:
           - triple: darwin-arm64
             runner: macos-15
             build: native
+          # The one row whose staged triple is not its host's: Intel macOS
+          # runners are being retired, so darwin-x64 CROSS-COMPILES on the
+          # arm64 mac runner (`target` names the rust target; cargo then writes
+          # under target/<target>/) and runs its npm-shape test under x64 Node
+          # through Rosetta 2 (`node_arch`), where `process.arch` reads `x64` and
+          # the loader resolves the staged package. Rosetta training for a PGO
+          # leg is the same mechanism, unverified until that leg exists.
+          - triple: darwin-x64
+            runner: macos-15
+            build: native
+            target: x86_64-apple-darwin
+            node_arch: x64
           - triple: win32-x64
             runner: windows-2025
             build: native
@@ -137,9 +149,23 @@ jobs:
         uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (no semver tags; bump manually)
         with:
           toolchain: 1.94.1
+          # The cross row's std; empty (no `target`) on the native-host rows.
+          targets: ${{ matrix.target }}
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         if: matrix.build == 'native'
+        with:
+          # Two rows share the macos-15 runner (darwin-arm64 and the darwin-x64
+          # cross row) and must not share a target-dir cache.
+          key: ${{ matrix.triple }}
+
+      # The cross row's test half runs x64 Node under Rosetta 2. The hosted arm64
+      # mac images ship it; this asks before the build rather than at the test
+      # step an hour in (`arch -x86_64` exits non-zero when no x64 slice can
+      # run), and installs it if an image ever stops shipping it.
+      - name: Rosetta 2 (cross rows)
+        if: matrix.node_arch
+        run: arch -x86_64 /usr/bin/true || sudo softwareupdate --install-rosetta --agree-to-license
 
       # The container rows' cache: cargo/rustup homes + target live under the
       # workspace (mounted into the container) so actions/cache can carry them.
@@ -161,19 +187,28 @@ jobs:
           deno-version: 2.9.6
 
       # For the npm-shape test (`node --test` executes the .ts directly via
-      # native type stripping, >= 22.18). Pinned to match check.yml.
+      # native type stripping, >= 22.18). Pinned to match check.yml. The cross
+      # row asks for the x64 build of Node (run under Rosetta); the empty
+      # default everywhere else is the runner's own architecture.
       - name: Install Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24.14.1'
+          architecture: ${{ matrix.node_arch }}
 
       # Each leg builds BOTH shipped binaries in one environment: the addon
       # (napi profile) and the tsv_cli binary (release profile — abort + LTO).
+      # A row with a `target` cross-compiles; cargo then writes under
+      # target/<target>/, which the stage step names.
       - name: Build (native)
         if: matrix.build == 'native'
+        env:
+          TARGET: ${{ matrix.target }}
         run: |
-          cargo build --locked -p tsv_napi --profile napi
-          cargo build --locked -p tsv_cli --release
+          flags=()
+          if [ -n "$TARGET" ]; then flags+=(--target "$TARGET"); fi
+          cargo build --locked -p tsv_napi --profile napi "${flags[@]}"
+          cargo build --locked -p tsv_cli --release "${flags[@]}"
 
       - name: Build (almalinux:8 — glibc 2.28 floor)
         if: matrix.build == 'gnu-container'
@@ -244,15 +279,28 @@ jobs:
             fi
           done
 
+      # The cross row names its binaries: the staging script's defaults follow the
+      # HOST (target/napi/, target/release/), and a cross build lands under
+      # target/<target>/ instead. The `.dylib` spelling is the mac's, and the one
+      # cross row is a mac row.
       - name: Stage platform package
-        run: deno run --allow-read --allow-write=crates/tsv_napi/pkg scripts/build_napi_packages.ts --triple ${{ matrix.triple }}
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          flags=(--triple ${{ matrix.triple }})
+          if [ -n "$TARGET" ]; then
+            flags+=(--artifact "target/$TARGET/napi/libtsv_napi.dylib" --cli-artifact "target/$TARGET/release/tsv")
+          fi
+          deno run --allow-read --allow-write=crates/tsv_napi/pkg scripts/build_napi_packages.ts "${flags[@]}"
 
       - name: Size bounds
         run: deno run --allow-read scripts/validate_napi_artifact.ts --triple ${{ matrix.triple }}
 
       # The npm-shape test over the REAL artifacts: loader platform-resolution,
       # the wasm-parity options surface, the packaged .node, and the `tsv` bin
-      # dispatching to the packaged CLI binary. (The panic-contract
+      # dispatching to the packaged CLI binary. On the cross row this is x64
+      # Node under Rosetta loading the x64 addon and exec'ing the x64 CLI, and
+      # its `platform_triple()` must equal the staged triple. (The panic-contract
       # probe test runs per OS in check.yml's platforms job on every PR; it
       # needs a separate probe build, and the contract is profile+attribute
       # determined — identical across targets — so it is not re-proven here.)
@@ -317,7 +365,7 @@ jobs:
       - name: Stage loader package
         run: deno run --allow-read --allow-write=crates/tsv_napi/pkg scripts/build_napi_packages.ts --loader-only
 
-      # Completeness (all five platforms, versions in lockstep), tag↔version
+      # Completeness (all six platforms, versions in lockstep), tag↔version
       # agreement, platforms-then-loader order, and skip-if-already-published
       # idempotency all live in the script. A missing NPM_TOKEN secret yields
       # an EMPTY token, which `npm view` (public) and `npm publish --dry-run`

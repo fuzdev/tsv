@@ -19,7 +19,7 @@ Requires Node.js 22+ or Bun.
 The right platform binary installs automatically (per-platform `optionalDependencies`). Prebuilt platforms:
 
 - `linux-x64-gnu`, `linux-arm64-gnu`, `linux-x64-musl` (Alpine)
-- `darwin-arm64`
+- `darwin-arm64`, `darwin-x64`
 - `win32-x64`
 
 On any other platform the import throws with a pointer at `@fuzdev/tsv-wasm`.
