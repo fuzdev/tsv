@@ -746,9 +746,10 @@ export function get_benchmark_tasks(
 
 		// postcss (CSS only) — the first third-party engine on `parse/css`, and the
 		// parser behind prettier's CSS printer, i.e. behind the `format/css` baseline.
-		// No native peer exists to add here: no Rust CSS parser exposes an AST to JS
-		// (lightningcss is transform-only, biome's js-api exposes no parse, malva is a
-		// formatter, oxc has no CSS parse binding). See lib/postcss.ts.
+		// No native peer exists to add here: none of the Rust CSS tools considered
+		// exposes a parse call to JS (lightningcss hands a tree to its `visitor` only
+		// mid-transform, biome's js-api exposes no parse, malva is a formatter, oxc has
+		// no CSS parse binding). See lib/postcss.ts.
 		add(
 			'postcss',
 			impls.postcss?.supports_parse_language(language),

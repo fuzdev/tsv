@@ -229,8 +229,9 @@ export class OxcImplementation extends BaseImplementation {
 		}
 
 		// Accessing `.program` runs the package's `wrap()` getter, which `JSON.parse`s
-		// the Rust-serialized AST — a full eager materialization (matching `tsv-json`,
-		// so the `oxc-parser` row is apples-to-apples with it). There is deliberately no
+		// the Rust-serialized AST — a full eager materialization (matching `tsv-json` in
+		// mechanism; the payload is span-only where `tsv-json` carries `loc`, so the
+		// payload-matched row is `tsv-json-no-locations`). There is deliberately no
 		// lazy variant: oxc's `experimentalLazy` raw transfer is setup-dominated
 		// (~1.7ms/call on Node, ~2.1ms on Deno, vs ~0.7ms eager + ~0.16ms parse-only) —
 		// it eagerly copies the whole AST transfer buffer, so it measures buffer setup,
