@@ -676,30 +676,32 @@ interface FairnessNote {
 
 const OXFMT_NOTE: FairnessNote = {
 	terminal: [
-		'  (oxfmt formats JS/TS natively; its css/svelte rows route through its BUNDLED',
-		'   prettier — native-vs-native reads apply to the typescript group only)'
+		'  (oxfmt formats JS/TS and CSS natively; only its svelte row routes through its',
+		'   BUNDLED prettier + svelte plugin — native-vs-native reads apply to typescript and css)'
 	],
 	markdown:
-		'oxfmt formats JS/TS natively; its css/svelte rows route through its bundled prettier (+ svelte plugin, with the embedded `<script>` formatted natively), so `tsv` vs `oxfmt` is native-vs-native on typescript only'
+		'oxfmt formats JS/TS and CSS natively; only its svelte row routes through its bundled prettier (+ svelte plugin, with the embedded `<script>` formatted natively), so `tsv` vs `oxfmt` is native-vs-native on typescript and css, and the svelte ratio is a prettier-pipeline number in oxfmt packaging'
 };
 
 const OXC_NOTE: FairnessNote = {
 	terminal: [
-		'  (oxc-parser — native and wasm — serializes the AST to JSON in Rust and',
-		'   deserializes in JS, the same eager materialization as tsv-json — apples-to-apples)'
+		'  (oxc-parser — native and wasm — serializes the AST to JSON in Rust and deserializes',
+		'   in JS, the same eager materialization as tsv-json — mechanism-matched; its payload is',
+		'   span-only, so the payload-matched read is the no-locations line, not this cell)'
 	],
 	markdown:
-		'oxc-parser (native and wasm) serializes the AST to JSON in Rust and deserializes it in JS — the same eager materialization as tsv-json/tsv-wasm-json, so these parse rows are apples-to-apples'
+		'oxc-parser (native and wasm) serializes the AST to JSON in Rust and deserializes it in JS — the same eager materialization as tsv-json/tsv-wasm-json, so these parse rows are mechanism-matched; the payload is not: oxc’s default AST is span-only (`start`/`end`, no per-node `loc`, and no option to add one) where `tsv-json` carries the loc-bearing drop-in AST, so the payload-matched read is the `no-locations` line under each parse group'
 };
 
 const YUKU_NOTE: FairnessNote = {
 	terminal: [
 		'  (yuku-parser — native and wasm — decodes a binary AST buffer into JS objects,',
 		'   also full eager materialization; its parse() is lazy, so the bench forces it —',
-		'   verified: no lazy accessors survive, and its tree serializes to oxc-parser’s size)'
+		'   verified: no lazy accessors survive, and its tree serializes to oxc-parser’s size,',
+		'   so it is span-only too and the no-locations line is its payload-matched read)'
 	],
 	markdown:
-		'yuku-parser (native and wasm) decodes a binary AST buffer into JS objects — also full eager materialization (verified: no lazy accessors survive, and the tree serializes to within 3 bytes of oxc-parser), but its `parse()` is lazy, so the bench reads `.program` to force it — an unforced row would report a throughput for a tree nobody built'
+		'yuku-parser (native and wasm) decodes a binary AST buffer into JS objects — also full eager materialization (verified: no lazy accessors survive, and the tree serializes to within 3 bytes of oxc-parser, so it is span-only like oxc and its payload-matched read is the same `no-locations` line), but its `parse()` is lazy, so the bench reads `.program` to force it — an unforced row would report a throughput for a tree nobody built'
 };
 
 const SWC_NOTE: FairnessNote = {
@@ -723,10 +725,11 @@ const RSVELTE_PARSE_NOTE: FairnessNote = {
 const POSTCSS_NOTE: FairnessNote = {
 	terminal: [
 		'  (postcss is the JS parser behind prettier’s CSS printer — i.e. behind the',
-		'   format/css baseline; no Rust CSS parser exposes an AST to JS, so it is the only peer)'
+		'   format/css baseline; none of the Rust CSS tools considered exposes a parse call',
+		'   to JS, so it is the only peer)'
 	],
 	markdown:
-		'postcss is the JS parser behind prettier’s CSS printer, i.e. behind the `format/css` baseline — a JS-vs-native read like prettier’s own, not a same-tier one; it is the only third-party engine available on `parse/css`, since no Rust CSS parser exposes an AST to JS. Not payload-matched either: it keeps selectors and values as strings where `parseCss` (and so tsv) builds full ASTs — 0.38× tsv’s node count and at most 0.56× its JSON bytes on the perf corpus'
+		'postcss is the JS parser behind prettier’s CSS printer, i.e. behind the `format/css` baseline — a JS-vs-native read like prettier’s own, not a same-tier one; it is the only third-party engine available on `parse/css`, since none of the Rust CSS tools considered exposes a parse call to JS (Lightning CSS hands a tree to a visitor only mid-transform, Biome surfaces no parser, malva is a formatter). Not payload-matched either: it keeps selectors and values as strings where `parseCss` (and so tsv) builds full ASTs — 0.38× tsv’s node count and at most 0.56× its JSON bytes on the perf corpus'
 };
 
 const MALVA_NOTE: FairnessNote = {

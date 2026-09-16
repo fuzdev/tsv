@@ -601,10 +601,11 @@ prettier. Load-bearing on two axes:
   argument: it is the parser behind prettier's CSS printer, i.e. behind the
   `format/css` **baseline**, which the parse surface therefore could not see. Not
   payload-matched (a CSSOM-ish `Root` with `nodes`/`raws`, not the `parseCss` shape
-  tsv is a drop-in for). **No native peer can be added to that group**: no Rust CSS
-  parser exposes an AST to JS at all — lightningcss ships `transform`/`bundle` only
-  (its `./ast` export is types for the `visitor` callback, a napi round-trip per
-  visited node rather than a parse product), biome's `js-api` exposes
+  tsv is a drop-in for). **No native peer can be added to that group**: none of the
+  Rust CSS tools considered exposes a parse call to JS — lightningcss ships
+  `transform`/`bundle` only (its `./ast` export is types for the `visitor` callback,
+  which can hand JS the whole `StyleSheet` but only as a side channel of a
+  transform run, not a parse product), biome's `js-api` exposes
   `formatContent`/`lintContent`/`openProject`, malva is a formatter, and oxc's CSS
   is `oxc_formatter_css` with no JS parse binding. So that surface's missing native
   row is an **availability fact, not an omission**. `css-tree` was evaluated for
