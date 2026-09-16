@@ -72,7 +72,7 @@ tsv's features:
 - [x] parsers for TypeScript/JS, CSS, and Svelte, drop-in for Svelte+acorn+acorn-typescript
 - [x] formatter following Prettier + prettier-plugin-svelte + Svelte's prettier config
       (with intentional divergences and no supported style config)
-- [ ] [vscode formatter plugin](https://github.com/fuzdev/vscode_extension_tsv_format) - `fuzdev.tsv-format`
+- [ ] [vscode formatter plugin](https://github.com/fuzdev/vscode-extension-tsv-format) - `fuzdev.tsv-format`
 - [ ] ts-to-js conversion (types-to-whitespace only)
 - [ ] module lexer
 
