@@ -631,7 +631,9 @@ if (wetrun) {
 			? `\n  The N-API set does NOT publish until the v${version} tag is pushed —`
 			: `\n  The pushed v${version} tag triggers release_napi.yml —`
 	);
-	console.log('  the six N-API packages (@fuzdev/tsv + its five platform packages) publish there.');
+	console.log(
+		'  the seven N-API packages (@fuzdev/tsv + its six platform packages) publish there.'
+	);
 	console.log(
 		no_git
 			? '  Finish the finalize above, then watch that run.'

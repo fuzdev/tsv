@@ -49,6 +49,7 @@ const SUPPORTED = [
 	'linux-arm64-gnu',
 	'linux-x64-musl',
 	'darwin-arm64',
+	'darwin-x64',
 	'win32-x64'
 ];
 
