@@ -445,16 +445,15 @@ impl<'a> Printer<'a> {
         self.build_expanding_construct(head_doc, false, inline_tail, multiline_tail, gt_prefix)
     }
 
-    /// Prepend a split-off preceding sibling's closing `>` (`gt_prefix`) to a block
-    /// candidate: hugged in the inline candidate (`>{#…}`) and dangled onto its own line
-    /// in a multiline candidate (`⏎>{#…}`), so the `>` tracks the block's own
-    /// inline-vs-multiline choice. `None` leaves the candidate untouched. See the axis-3
-    /// sibling-`>` dangle in `build_inline_element_omit_close_gt`.
-    fn fold_gt(&self, gt_prefix: Option<DocId>, dangle: bool, body: DocId) -> DocId {
+    /// Dangle a split-off preceding sibling's closing `>` (`gt_prefix`) onto its own line
+    /// ahead of a block that unconditionally renders multiline (`⏎>{#…}`). `None` leaves
+    /// the doc untouched. The width-decided placements — hug, dangle + inline, dangle +
+    /// expand — are `build_expanding_construct`'s own; see the axis-3 sibling-`>` dangle in
+    /// `build_inline_element_omit_close_gt`.
+    fn fold_gt(&self, gt_prefix: Option<DocId>, body: DocId) -> DocId {
         let d = self.d();
         match gt_prefix {
-            Some(gt) if dangle => d.concat(&[d.hardline(), gt, body]),
-            Some(gt) => d.concat(&[gt, body]),
+            Some(gt) => d.concat(&[d.hardline(), gt, body]),
             None => body,
         }
     }
@@ -543,11 +542,28 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         if head_forced_break || d.will_break(head_doc) || d.will_break(inline_tail) {
-            return self.fold_gt(gt_prefix, true, d.concat(&[head_doc, multiline_tail]));
+            return self.fold_gt(gt_prefix, d.concat(&[head_doc, multiline_tail]));
         }
-        let inline = self.fold_gt(gt_prefix, false, d.concat(&[head_doc, inline_tail]));
-        let expanded = self.fold_gt(gt_prefix, true, d.concat(&[head_doc, multiline_tail]));
-        d.conditional_group(&[inline, expanded])
+        let inline = d.concat(&[head_doc, inline_tail]);
+        let expanded = d.concat(&[head_doc, multiline_tail]);
+        let Some(gt) = gt_prefix else {
+            return d.conditional_group(&[inline, expanded]);
+        };
+        // With a sibling's `>` to place, the choice is THREE-way: hug the `>` and stay inline
+        // (`</span>{#if…}…{/if}`), dangle the `>` and stay inline (`</span⏎>{#if…}…{/if}`),
+        // dangle and expand. The middle state is what a WIDE preceding element leaves — its
+        // line has no room for the hugged block, and the block itself fits on the fresh line.
+        // Offering only the outer two expanded a short block for no reason of its own (the
+        // dangle was gated on the block expanding, so expanding was the only route to it).
+        //
+        // The dangled states nest rather than sit as a flat third candidate: `fits()` stops
+        // its lookahead at a hardline and reports "fits", so a flat candidate that BEGINS with
+        // the dangle's hardline would always win and shadow the expanded state. Nested, the
+        // outer group asks only "does the hugged form fit?", and the inner group measures the
+        // block's own inline-vs-expand choice from the fresh line the `>` opens.
+        let hugged = d.concat(&[gt, inline]);
+        let dangled = d.concat(&[d.hardline(), gt, d.conditional_group(&[inline, expanded])]);
+        d.conditional_group(&[hugged, dangled])
     }
 
     /// Whether every if-block branch (consequent, each `{:else if}` consequent,

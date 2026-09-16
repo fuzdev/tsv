@@ -49,6 +49,16 @@
 //! is emitted verbatim and gets no trim at all. Anything the printer may not do
 //! compares byte-exact. See `normalize_interior`.
 //!
+//! **The Svelte scanner also takes a template-head census** — every open tag's
+//! name (`<name`, [`CensusKind::TagHead`]) and every `{#…}` / `{@…}` head
+//! ([`CensusKind::BlockHead`]) — on the same principle: a wire-vs-wire compare
+//! ([`crate::audit::properties::node_conservation_diff`]) sees a node the PRINTER
+//! dropped, but not one the PARSER consumed before the wire was built. A raw count
+//! is arithmetic over the author's bytes and the output's, with no parser between.
+//! Close tags are not counted (`<Comp></Comp>` → `<Comp />` is one node either way),
+//! and a `{:else}` / `{/if}` clause is a shape the parser owns (`{:else}{#if}` and
+//! `{:else if}` are one wire), so only the opening heads count.
+//!
 //! The consumer is `census_audit` (`deno task census:audit`), which formats each
 //! pristine seed, runs `comment_census` on both sides, and ratchets the per-file
 //! deltas.
@@ -80,8 +90,9 @@ impl CensusBucket {
     }
 }
 
-/// The comment's delimiter kind. Part of the multiset key so a (never expected)
-/// delimiter rewrite reads as a drop + an add rather than silently matching.
+/// The entry's kind — a comment's delimiter kind (part of the multiset key so a (never
+/// expected) delimiter rewrite reads as a drop + an add rather than silently matching), or
+/// one of the two template heads the Svelte scanner counts beside the comments.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum CensusKind {
     /// `//` (and the byte-0 `#!` hashbang, whose content includes the `#!`).
@@ -90,6 +101,12 @@ pub(crate) enum CensusKind {
     Block,
     /// `<!-- -->`
     Html,
+    /// A template open tag's name (`<name` — `div`, `Comp`, `svelte:head`), the content
+    /// being the name. Template bucket only.
+    TagHead,
+    /// A template block or tag head's sigil + keyword (`#if`, `#each`, `@html`, `@const`),
+    /// the content being exactly that. Template bucket only.
+    BlockHead,
 }
 
 impl CensusKind {
@@ -98,6 +115,8 @@ impl CensusKind {
             CensusKind::Line => "line",
             CensusKind::Block => "block",
             CensusKind::Html => "html",
+            CensusKind::TagHead => "tag_head",
+            CensusKind::BlockHead => "block_head",
         }
     }
 }
@@ -165,6 +184,8 @@ fn normalize_interior(kind: CensusKind, raw: &str) -> String {
         // interior columns and trailing spaces included (measured; the only thing that moves
         // is the opener's own indent, which is outside the interior).
         CensusKind::Html => raw.into_owned(),
+        // A tag name / block head is a token, never respelled.
+        CensusKind::TagHead | CensusKind::BlockHead => raw.into_owned(),
         // Only the `*`-aligned form reindents; every other block is copied verbatim, so a
         // line edge there is content and stays byte-exact.
         CensusKind::Block if !tsv_lang::printing::is_indentable_block_comment(raw.split('\n')) => {
@@ -656,6 +677,12 @@ fn scan_svelte(src: &str, out: &mut CensusMultiset) {
 fn scan_svelte_brace(src: &str, brace: usize, out: &mut CensusMultiset) -> usize {
     let bytes = src.as_bytes();
     let mut i = brace + 1;
+    // Svelte admits whitespace between the brace and the sigil (`{ #if cond}`), and the
+    // formatter closes it — so the head census must read the sigil through it, or the
+    // authored form counts no head and the formatted one counts one.
+    while bytes.get(i).is_some_and(|&b| is_markup_ws(b)) {
+        i += 1;
+    }
     let sigil = bytes.get(i).copied().filter(|b| {
         matches!(b, b'#' | b':' | b'/' | b'@')
             && bytes.get(i + 1).is_some_and(u8::is_ascii_alphabetic)
@@ -672,11 +699,29 @@ fn scan_svelte_brace(src: &str, brace: usize, out: &mut CensusMultiset) -> usize
                 "if" | "each" | "await" | "key" | "snippet"
             );
         if is_sigil {
+            // An OPENING head (`{#if`, `{@html`) joins the template-head census; a clause
+            // or close (`{:else`, `{/if`) is a shape the parser owns and is not counted.
+            if matches!(sigil, b'#' | b'@') {
+                record(
+                    out,
+                    CensusBucket::Template,
+                    CensusKind::BlockHead,
+                    &src[i..word_end],
+                );
+            }
             i = word_end;
         }
     }
     let rel = scan_ts_expression(&src[i..], out);
     (i + rel + 1).min(src.len())
+}
+
+/// The whitespace the Svelte scanner steps over inside a tag or at a brace's sigil —
+/// the ASCII class only, on purpose: the scanner is lexical, and both sides of the census
+/// are scanned with the same eyes, so a wider class would only change what counts as a
+/// boundary, not what balances.
+fn is_markup_ws(b: u8) -> bool {
+    matches!(b, b' ' | b'\t' | b'\n' | b'\r')
 }
 
 /// An open tag from its `<`. Scans the attribute list (expressions and quoted
@@ -695,6 +740,7 @@ fn scan_svelte_tag(src: &str, lt: usize, out: &mut CensusMultiset) -> usize {
         i += 1;
     }
     let name = &src[name_start..i];
+    record(out, CensusBucket::Template, CensusKind::TagHead, name);
 
     // Attribute list.
     let mut self_closing = false;
@@ -713,10 +759,7 @@ fn scan_svelte_tag(src: &str, lt: usize, out: &mut CensusMultiset) -> usize {
             q @ (b'"' | b'\'') => i = scan_quoted_attr_value(src, i, q, out),
             b'=' => {
                 i += 1;
-                while bytes
-                    .get(i)
-                    .is_some_and(|&b| matches!(b, b' ' | b'\t' | b'\n' | b'\r'))
-                {
+                while bytes.get(i).is_some_and(|&b| is_markup_ws(b)) {
                     i += 1;
                 }
                 match bytes.get(i) {
@@ -725,9 +768,10 @@ fn scan_svelte_tag(src: &str, lt: usize, out: &mut CensusMultiset) -> usize {
                     _ => {
                         // Unquoted value: to whitespace, `>`, or a `{` opening
                         // an embedded expression.
-                        while bytes.get(i).is_some_and(|&b| {
-                            !matches!(b, b' ' | b'\t' | b'\n' | b'\r' | b'>' | b'{')
-                        }) {
+                        while bytes
+                            .get(i)
+                            .is_some_and(|&b| !is_markup_ws(b) && !matches!(b, b'>' | b'{'))
+                        {
                             i += 1;
                         }
                     }
@@ -820,11 +864,42 @@ fn scan_raw_island(
 mod tests {
     use super::*;
 
+    /// The COMMENT entries of the census — the head kinds are filtered out so the comment
+    /// tests assert comments alone; [`heads`] asserts those.
     fn census(source: &str, parser: ParserType) -> Vec<(CensusBucket, CensusKind, String, usize)> {
         comment_census(source, parser)
             .into_iter()
+            .filter(|(e, _)| !matches!(e.kind, CensusKind::TagHead | CensusKind::BlockHead))
             .map(|(e, n)| (e.bucket, e.kind, e.content, n))
             .collect()
+    }
+
+    /// The template-head entries of a Svelte census, as `(kind, content, count)`.
+    fn heads(source: &str) -> Vec<(CensusKind, String, usize)> {
+        comment_census(source, ParserType::Svelte)
+            .into_iter()
+            .filter(|(e, _)| matches!(e.kind, CensusKind::TagHead | CensusKind::BlockHead))
+            .map(|(e, n)| (e.kind, e.content, n))
+            .collect()
+    }
+
+    #[test]
+    fn svelte_template_heads_are_counted() {
+        // Open tags by name (a close tag and a self-closing form count once each), the `#`
+        // and `@` heads by sigil + keyword, a `{ #if` with brace whitespace included; the
+        // `:else` clause, the `/if` close and a TS expression's `<` are not heads.
+        let src = "<div><b>x</b><i>y</i><br />{ #if a < b}z{:else}{@html w}{/if}</div>";
+        assert_eq!(
+            heads(src),
+            vec![
+                (CensusKind::TagHead, "b".to_owned(), 1),
+                (CensusKind::TagHead, "br".to_owned(), 1),
+                (CensusKind::TagHead, "div".to_owned(), 1),
+                (CensusKind::TagHead, "i".to_owned(), 1),
+                (CensusKind::BlockHead, "#if".to_owned(), 1),
+                (CensusKind::BlockHead, "@html".to_owned(), 1),
+            ]
+        );
     }
 
     fn ts(source: &str) -> Vec<(CensusBucket, CensusKind, String, usize)> {

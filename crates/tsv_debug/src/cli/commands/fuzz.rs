@@ -879,7 +879,7 @@ impl FuzzCommand {
             stats.reflow_paths.count()
         );
         println!(
-            "  {:>7}  HARD findings (panic / unreparseable / non-idempotent)",
+            "  {:>7}  HARD findings (panic / format_error / unreparseable / node_loss /\n           leaf_value_corruption / non_idempotent)",
             stats.hard_count
         );
         println!(

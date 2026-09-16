@@ -16,7 +16,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Comment ledger](#comment-ledger-audit-commentsaudit) | `comments:audit` | a parsed comment DROPPED or DOUBLE-PRINTED (print-once) | `deno task check`; `audit:corpus` (real code) |
 | [Gap injection](#gap-injection-audit-gapsaudit) | `gaps:audit` | comment drops — and `//` swallows — in gaps no fixture covers | `deno task check` (ratchet) |
 | [Wire injection](#wire-injection-audit-wireaudit) | `wire:audit` | a WIRE divergence from the canonical parser that only a spelling no corpus contains reveals — the parse-side sibling of gap injection | on demand (⚠️ red by design) |
-| [Blank injection](#blank-line-injection-audit-blanksaudit) | `blanks:audit` | blank-line handling: panic / idempotency / reparse / ledger / blank-run — plus the blank-DROP absorb pin (a new kind of silently-eaten blank) | `deno task check` (ratchet) |
+| [Blank injection](#blank-line-injection-audit-blanksaudit) | `blanks:audit` | blank-line handling: panic / idempotency / reparse (incl. node loss) / ledger / blank-run — plus the blank-DROP absorb pin (a new kind of silently-eaten blank) | `deno task check` (ratchet) |
 | [Blank fabrication](#blank-fabrication-audit-fabricationaudit) | `fabrication:audit` | a blank line the formatter INVENTS on a pristine seed (the author never wrote it) | `deno task check` (ratchet); `audit:corpus` (real code) |
 | [Comment census](#comment-census-audit-censusaudit) | `census:audit` | a comment interior lost, gained, or rewritten between raw input and raw output — parse-time drops included, which the ledger can't see | `deno task check` (ratchet); `audit:corpus` (real code) |
 | [Print width](#print-width-audit-widthaudit) | `width:audit` | a new KIND of over-width output line — the shape a hard-limit bug takes | `deno task check` (ratchet) |
@@ -33,11 +33,11 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Authoring independence](#authoring-independence-audit-authoringaudit) | `authoring:audit` | two render-equivalent authorings settling on two fixed points; non-idempotency | `deno task check`; `audit:corpus` (real code) |
 | [Paren authoring](#paren-authoring-independence-audit-parenaudit) | `paren:audit` | a same-operator logical chain formatting differently from its redundantly-parenthesized twin — the class a rule left on the raw `binary.right` falls into, invisible on every paren-free authoring | `deno task check`; `audit:corpus` (real code) |
 | [Razor sweep](#print-width-razor-sweep-razoraudit) | `razor:audit` | width-keyed layout bugs — an F1 break at some column, and the stray line-head boundary space that is its OWN fixed point | `deno task check` |
-| [Round-trip](#formatreparse-round-trip-audit-roundtripaudit) | `roundtrip:audit` · `roundtrip:audit:prettier` | formatted output the parser rejects (delimiter/structure corruption) | `deno task check` (fixtures always; the prettier suites when `../prettier` is present); `audit:corpus` (real code) |
+| [Round-trip](#formatreparse-round-trip-audit-roundtripaudit) | `roundtrip:audit` · `roundtrip:audit:prettier` | formatted output the parser rejects (delimiter/structure corruption), or that DROPS / duplicates a node (the population census) | `deno task check` (fixtures always; the prettier suites when `../prettier` is present); `audit:corpus` (real code) |
 | [Binding](#commenttoken-binding-audit-bindingaudit) | `binding:audit` | a glued comment re-bound to a different subtree by a migrating paren | `deno task check`; `audit:corpus` (real code) |
 | [Render equivalence](#render-equivalence-audit-renderaudit) | `render:audit` | `tsv format` changing what a Svelte component renders | `deno task conformance` (release) |
 | [Layout neutrality](#layout-neutrality-audit-neutrality_audit) | — | a layout gate reading comment *ownership* instead of page occupancy | dev tool (pre-ownership-change) |
-| [Fuzz](#seeded-mutational-fuzzer-fuzzaudit) | `fuzz:audit` | panic / non-idempotency / structural divergence on arbitrary input | `deno task check` |
+| [Fuzz](#seeded-mutational-fuzzer-fuzzaudit) | `fuzz:audit` | panic / non-idempotency / node loss / structural divergence on arbitrary input | `deno task check` |
 | [F1 sweep](#f1-idempotency-sweep-idempotencysweep) | `idempotency:sweep` | pass-2 reflow on real code | conformance cadence |
 | [Corpus bundle](#the-corpus-bundle-auditcorpus) | `audit:corpus` | the content-loss / robustness bundle over real code | publish Step 3c |
 | [Lexer diff](#differential-lexer-harness-lex_diff) | — | token-stream drift after a lexer change | dev tool |
@@ -439,7 +439,7 @@ Full reference — flags, the ratchet, the absorb pin, reading a finding, the si
 ```bash
 # blank_audit - inject a blank line into EVERY code gap and grade six policy-free
 # invariants on the result: (1) no panic, (2) F1 idempotency (pass 2 is a fixed
-# point), (3) structural reparse, (4) leaf conservation, (5) ledger-clean (no
+# point), (3) structural reparse (incl. NODE-LOSS, gated), (4) leaf conservation, (5) ledger-clean (no
 # dropped/double-printed comment), (6) blank-run ≤ 1 (no 2+ blank run outside a
 # template quasi / <pre> / <textarea> / format-ignore region). Mechanizes the
 # blank-line handling class — the specifier-list / array-pattern bugs. Invariants
@@ -530,9 +530,11 @@ Why it needs its own gate: every other comment instrument reads a channel the pa
 # census_audit - format each pristine seed, lex comment trivia from BOTH raw sides with
 # self-contained scanners (audit/census.rs), and compare normalized interior
 # multisets per language bucket: `ts` (TS-family files, <script> islands, template
-# {expressions}), `css` (.css files, <style> islands), `template` (Svelte <!-- -->).
-# MISSING = dropped comment; EXTRA = duplicated/fabricated one; a merge or interior
-# rewrite shows as a MISSING + EXTRA pair. Pure Rust, no Deno.
+# {expressions}), `css` (.css files, <style> islands), `template` (Svelte <!-- -->,
+# plus every open-tag NAME and `{#…}` / `{@…}` HEAD — the template-head census, so a
+# template node the PARSER consumed, which no wire-vs-wire compare can see, is a
+# MISSING here). MISSING = dropped comment / node; EXTRA = duplicated/fabricated one; a
+# merge or interior rewrite shows as a MISSING + EXTRA pair. Pure Rust, no Deno.
 cargo run --profile corpus -p tsv_debug --features audits census_audit                # tests/fixtures
 cargo run --profile corpus -p tsv_debug --features audits census_audit ../corpora/collections/zzz/src  # a real codebase
 # Also: --json, --update. ~0.35 s over tests/fixtures.
@@ -1404,11 +1406,18 @@ the default width).
 # characters (attr='a"b' → attr="a"b", `+(+x)` → `++x`) — corpus:compare:format's
 # SAFETY is char-frequency, BLIND to delimiter/structure corruption. Two phases
 # (tsv-self pre-filter → canonical confirm via sidecar): parse input and formatted
-# output, reduce each to a STRUCTURAL SKELETON (node-tree shape + `type`, erasing
+# output, take the NODE-POPULATION CENSUS of each (every node by `type`, minus the
+# wrappers and separators the formatter rewrites by design — whitespace Text, EmptyStatement,
+# union/intersection/paren/instantiation/chain shells, directive shorthand values — plus
+# every word of template text; `node_conservation_diff`'s table is the invariant), then
+# reduce each to a STRUCTURAL SKELETON (node-tree shape + `type`, erasing
 # reformattable leaf scalars, acorn `extra`, and per-node comment ATTACHMENT — the root
 # `comments` array still pins every comment's presence + kind, the leaf check its text),
 # compare — so legit reformatting doesn't read as corruption. Buckets:
 # {tsv,canonical}_unreparseable (the prize — output the parser rejects),
+# {tsv,canonical}_node_loss (a node dropped / duplicated / re-typed — the class the skeleton
+# SEES but filed into the render-noisy divergent bucket, which is how a glued element run
+# before a block printing only its last member shipped; zero-tolerance, no ratchet),
 # {tsv,canonical}_leaf_corruption (the skeleton holds but conserved leaf text changed) and
 # {tsv,canonical}_divergent (structural change); read_error, format_error and
 # canonical_rejects_input are skips that carry no verdict. The gate buckets read zero on real
@@ -1419,10 +1428,11 @@ the default width).
 # point it at the delimiter-dense prettier suites for the work-list.
 cargo run -p tsv_debug roundtrip_audit                              # audit tests/fixtures
 cargo run -p tsv_debug roundtrip_audit ../prettier/tests/format/js ../corpora/collections/zzz/src
-# --gate fails on the *_unreparseable and *_leaf_corruption buckets (divergent is
-# render-model noise over tests/fixtures). Bare --gate runs phase 1 only via a
-# reparse-only fast path (pure Rust, no sidecar) — the `deno task roundtrip:audit`
-# check gate; a cheap tripwire over tests/fixtures, real yield on external corpora.
+# --gate fails on the *_unreparseable, *_node_loss and *_leaf_corruption buckets (divergent
+# is render-model noise over tests/fixtures). Bare --gate runs phase 1 only via a
+# population-only fast path (reparse + the node census, no skeleton / leaves; pure Rust,
+# no sidecar) — the `deno task roundtrip:audit` check gate; a cheap tripwire over
+# tests/fixtures, real yield on external corpora.
 # --canonical-all confirms every file (also guards canonical_unreparseable: tsv's
 # parser accepting output the real parser rejects).
 cargo run -p tsv_debug roundtrip_audit --gate                       # the check gate (pure Rust, tests/fixtures)
@@ -1438,8 +1448,9 @@ cargo run -p tsv_debug roundtrip_audit --canonical-all --verbose ../prettier/tes
 ### Two scopes in `check`, and why the second one is opportunistic
 
 `deno task check` runs the audit twice: over `tests/fixtures` (`roundtrip:audit`) and over the
-pinned Prettier format suites (`roundtrip:audit:prettier`, ~2,350 files in ~0.1 s on the binary
-the first leg already built). The second scope is not redundancy — it is the only corpus in
+pinned Prettier format suites (`roundtrip:audit:prettier`, ~2,350 files in ~0.65 s on the binary
+the first leg already built; the first leg is ~3.0 s over `tests/fixtures`, nearly all of it
+materializing both wires for the node census — see the command's module doc). The second scope is not redundancy — it is the only corpus in
 `check` that is **not format-stable**. The fixture tree cannot contain the input shape that
 triggers a valid→unreparseable regression, which is how a statement-head paren strip
 (`for ((let) of foo);` → `for (let of foo);`, output tsv's own parser rejects) sat behind a green
@@ -1584,7 +1595,8 @@ cargo run -p tsv_debug neutrality_audit ../svelte/packages/svelte/src
 # nothing else guards on ARBITRARY input: (1) no panic — the parser must never
 # crash (prod WASM is panic=abort → a panic is a DoS; the corpus profile only
 # catches panics on real code); (2) format idempotency (the F1 fixed point);
-# (3) structural reparse (reusing roundtrip_audit's skeleton compare).
+# (3) structural reparse (reusing roundtrip_audit's compare: the node-population
+# census, HARD, ahead of the soft skeleton compare).
 # Deterministic per --seed + corpus — and CORPUS-ADD-STABLE: each seed file draws
 # mutants from its own path-keyed PRNG stream, scheduled round-robin, so a
 # fixture add/remove/rename changes only that file's mutants (every other stream
@@ -1612,8 +1624,8 @@ cargo run -p tsv_debug neutrality_audit ../svelte/packages/svelte/src
 cargo run -p tsv_debug fuzz                                    # 2000 iters over tests/fixtures
 cargo run -p tsv_debug fuzz --seed 7 --iterations 20000 --evolve --minimize --dump-dir /tmp/fz  # discovery
 cargo run -p tsv_debug fuzz --iterations 0 ../corpora/collections/zzz/src       # pristine pass only = an F1 sweep
-# HARD findings (exit 1): panic / unreparseable / non_idempotent / format_error —
-# always real bugs. SOFT findings (reported, non-fatal): structural_divergence — the
+# HARD findings (exit 1): panic / unreparseable / node_loss / leaf_value_corruption /
+# non_idempotent / format_error — always real bugs. SOFT findings (reported, non-fatal): structural_divergence — the
 # render-model-noisy bucket that needs canonical confirmation (roundtrip_audit
 # --canonical-all), like roundtrip_audit --gate. --strict fails on soft too.
 #
