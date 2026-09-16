@@ -47,9 +47,10 @@ pub fn render_normalize(mut value: Value) -> Value {
 /// Apply the shared AST-comparison prep to a pair: Svelte-5 render-time
 /// whitespace normalization (when `render`) followed by location stripping.
 ///
-/// Both `ast_diff` (exact-equality compare) and `roundtrip_audit`
-/// (structural-skeleton compare) build on this same normalized pair — only the
-/// final equality test differs.
+/// `ast_diff`'s exact-equality compare builds on this pair, and so does the AST diff the
+/// round-trip audits PRINT for a divergence. The skeleton VERDICT no longer does:
+/// [`skeletons_equal`] folds both rewrites into its walk, so the pair is built only where its
+/// two trees are the thing wanted.
 #[must_use]
 pub fn normalize_pair(a: Value, b: Value, render: bool) -> (Value, Value) {
     let (a, b) = if render {
@@ -86,6 +87,10 @@ pub fn normalize_pair(a: Value, b: Value, render: bool) -> (Value, Value) {
 /// Used by `roundtrip_audit`'s corruption hunt (a re-quoted `attr='a"b'` →
 /// `attr="a"b"` reparses to two attributes, an array-length change the skeleton
 /// catches while ignoring the legitimate leaf-content reformatting around it).
+///
+/// This is the **definition**, and the oracle its tests grade against. What production asks is
+/// [`skeletons_equal`], which reaches the same verdict on a pair without materializing either
+/// skeleton — every consumer of this rule compares two documents and throws the trees away.
 #[must_use]
 pub fn structural_skeleton(v: &Value) -> Value {
     match v {
@@ -110,6 +115,174 @@ pub fn structural_skeleton(v: &Value) -> Value {
         Value::Array(arr) => Value::Array(arr.iter().map(structural_skeleton).collect()),
         // Erase scalar leaves — reformattable source content.
         _ => Value::Null,
+    }
+}
+
+/// Do `a` and `b` reduce to the SAME [structural skeleton](structural_skeleton) under
+/// [`normalize_pair`] — that verdict, without building any of the four trees that spell it.
+///
+/// `structural_skeleton(remove_locations(render_normalize(a))) == …(b)` is a question about two
+/// documents, and every tree it names is discarded the moment it is answered: the two normalized
+/// clones, and the two skeletons built only to be compared. On a per-injection audit that is the
+/// most expensive thing on the page — the skeleton pair alone rebuilds both trees with a fresh
+/// `String` per key, for one `bool`. This walks the two inputs together and answers the same
+/// question with no allocation at all. [`structural_skeleton`] stays the DEFINITION (and this
+/// walk's differential test oracle); this is what production asks.
+///
+/// Each rewrite the pipeline names is folded in where it is decided:
+///
+/// - **render normalization** ([`normalize_fragment_nodes`]) rewrites a `Text`'s `data` / `raw`
+///   and then drops the nodes the boundary trim emptied. The skeleton erases every scalar, so
+///   only the DROP is observable — folded in as [`fragment_node_dropped`], a predicate on a
+///   node's position in its fragment. Each side carries its own whitespace-`preserve` context,
+///   because the tag `name` that flips it is itself a scalar the skeleton erases: two documents
+///   can normalize under different contexts and still be skeleton-equal.
+/// - **location stripping** ([`remove_locations`]) and the skeleton's own metadata drops are one
+///   key filter, [`skeleton_skips_key`].
+/// - **scalar erasure** makes every leaf pair equal, whatever it held — except a `type`, the
+///   node discriminator, whose string value is compared.
+///
+/// Objects compare by KEY, never by iteration order: with `serde_json`'s `preserve_order` a `Map`
+/// is an `IndexMap`, whose equality is order-free, and field order on the wire is the writer's
+/// property, not the shape's.
+#[must_use]
+pub fn skeletons_equal(a: &Value, b: &Value, render: bool) -> bool {
+    skeleton_eq(a, b, render, false, false)
+}
+
+/// The keys [`skeletons_equal`] drops: [`remove_locations`]' three positions, then
+/// [`structural_skeleton`]'s own three metadata bags.
+fn skeleton_skips_key(key: &str) -> bool {
+    matches!(
+        key,
+        "start" | "end" | "loc" | "extra" | "leadingComments" | "trailingComments"
+    )
+}
+
+/// True when this object is a template `Fragment` — the one node whose child list
+/// [`normalize_fragment_nodes`] rewrites.
+fn is_fragment(map: &serde_json::Map<String, Value>) -> bool {
+    map.get("type").and_then(Value::as_str) == Some("Fragment")
+}
+
+/// Is the fragment node at `index` (of `len`) one [`normalize_fragment_nodes`] drops — the only
+/// part of render normalization the skeleton can see?
+///
+/// [`collapse_ws`] empties an already-empty string and nothing else; every other all-collapsible
+/// `data` becomes exactly one `' '`, which [`trim_text`] then removes — and the trim reaches the
+/// first and the last node only (the same node when the list holds one). A `data` holding any
+/// non-collapsible character keeps it, so it survives the trim, and a mid-list `" "` is a
+/// significant inter-sibling space that stays.
+fn fragment_node_dropped(node: &Value, index: usize, len: usize) -> bool {
+    if !is_text(node) {
+        return false;
+    }
+    // A non-string `data` is what `collapse_text_ws` and `is_empty_text` both decline to touch.
+    let Some(data) = node.get("data").and_then(Value::as_str) else {
+        return false;
+    };
+    data.is_empty() || ((index == 0 || index + 1 == len) && data.chars().all(is_collapsible_ws))
+}
+
+/// One step of [`skeletons_equal`], carrying each side's own whitespace-`preserve` context.
+fn skeleton_eq(a: &Value, b: &Value, render: bool, preserve_a: bool, preserve_b: bool) -> bool {
+    match (a, b) {
+        (Value::Object(ma), Value::Object(mb)) => {
+            // The flip is keyed on the element, so it is read before any child is compared —
+            // and once per side, since the two may disagree (see `skeletons_equal`).
+            let child_a = preserve_a || node_preserves_whitespace(ma);
+            let child_b = preserve_b || node_preserves_whitespace(mb);
+            let live = |m: &serde_json::Map<String, Value>| {
+                m.keys().filter(|k| !skeleton_skips_key(k)).count()
+            };
+            if live(ma) != live(mb) {
+                return false;
+            }
+            // A fragment's own node list is normalized in the context its PARENT established,
+            // and `normalize_fragment_nodes` returns untouched under `preserve`.
+            let filter_a = render && !preserve_a && is_fragment(ma);
+            let filter_b = render && !preserve_b && is_fragment(mb);
+            for (key, value_a) in ma {
+                if skeleton_skips_key(key) {
+                    continue;
+                }
+                let Some(value_b) = mb.get(key) else {
+                    return false;
+                };
+                if key == "type" {
+                    match (value_a.as_str(), value_b.as_str()) {
+                        // The discriminator is the one scalar the skeleton keeps.
+                        (Some(ta), Some(tb)) => {
+                            if ta != tb {
+                                return false;
+                            }
+                            continue;
+                        }
+                        // One side keeps a string where the other erases or recurses.
+                        (Some(_), None) | (None, Some(_)) => return false,
+                        // Neither is a string, so neither is kept — an ordinary value.
+                        (None, None) => {}
+                    }
+                }
+                if key == "nodes"
+                    && (filter_a || filter_b)
+                    && let (Value::Array(nodes_a), Value::Array(nodes_b)) = (value_a, value_b)
+                {
+                    if !fragment_nodes_eq(
+                        nodes_a, nodes_b, filter_a, filter_b, render, child_a, child_b,
+                    ) {
+                        return false;
+                    }
+                    continue;
+                }
+                if !skeleton_eq(value_a, value_b, render, child_a, child_b) {
+                    return false;
+                }
+            }
+            true
+        }
+        (Value::Array(items_a), Value::Array(items_b)) => {
+            items_a.len() == items_b.len()
+                && items_a
+                    .iter()
+                    .zip(items_b)
+                    .all(|(x, y)| skeleton_eq(x, y, render, preserve_a, preserve_b))
+        }
+        // A container against anything else is a shape change; two scalars both erase to `Null`.
+        (Value::Object(_) | Value::Array(_), _) | (_, Value::Object(_) | Value::Array(_)) => false,
+        _ => true,
+    }
+}
+
+/// Compare two fragment node lists with each side's render-normalization drops applied —
+/// [`normalize_fragment_nodes`]'s `retain`, read rather than performed.
+fn fragment_nodes_eq(
+    a: &[Value],
+    b: &[Value],
+    filter_a: bool,
+    filter_b: bool,
+    render: bool,
+    preserve_a: bool,
+    preserve_b: bool,
+) -> bool {
+    let mut kept_a = a
+        .iter()
+        .enumerate()
+        .filter(|(i, node)| !(filter_a && fragment_node_dropped(node, *i, a.len())));
+    let mut kept_b = b
+        .iter()
+        .enumerate()
+        .filter(|(i, node)| !(filter_b && fragment_node_dropped(node, *i, b.len())));
+    loop {
+        match (kept_a.next(), kept_b.next()) {
+            (Some((_, x)), Some((_, y))) => {
+                if !skeleton_eq(x, y, render, preserve_a, preserve_b) {
+                    return false;
+                }
+            }
+            (None, None) => return true,
+            _ => return false,
+        }
     }
 }
 
@@ -474,6 +647,110 @@ mod tests {
             structural_skeleton(&on_statement),
             structural_skeleton(&re_kinded)
         );
+    }
+
+    /// The verdict [`skeletons_equal`] replaces, spelled the long way — the oracle every test
+    /// below grades it against, so the fused walk can never quietly drift from its definition.
+    fn skeleton_oracle(a: &Value, b: &Value, render: bool) -> bool {
+        let (a, b) = normalize_pair(a.clone(), b.clone(), render);
+        structural_skeleton(&a) == structural_skeleton(&b)
+    }
+
+    /// Both readings of one pair, asserted to agree — and to reach `expected`.
+    #[track_caller]
+    fn assert_skeletons(a: &Value, b: &Value, render: bool, expected: bool) {
+        let oracle = skeleton_oracle(a, b, render);
+        assert_eq!(
+            oracle, expected,
+            "the oracle itself disagrees with the case"
+        );
+        assert_eq!(
+            skeletons_equal(a, b, render),
+            oracle,
+            "skeletons_equal diverged from structural_skeleton(normalize_pair(..))"
+        );
+    }
+
+    /// A `loc` bag is not shape: the fused walk skips the key where the pipeline stripped it, so
+    /// a wire that carries line/column compares equal to the same document with different ones.
+    /// The canonical parsers emit `loc`; tsv's audit wire does not — both reach this walk.
+    #[test]
+    fn skeletons_equal_ignores_positions() {
+        let with_loc = json!({
+            "type": "Program",
+            "start": 0, "end": 1,
+            "loc": {"start": {"line": 1, "column": 0}, "end": {"line": 1, "column": 1}},
+            "body": [{"type": "Identifier", "name": "a", "start": 0, "end": 1}]
+        });
+        let moved = json!({
+            "type": "Program",
+            "start": 4, "end": 5,
+            "loc": {"start": {"line": 3, "column": 2}, "end": {"line": 3, "column": 3}},
+            "body": [{"type": "Identifier", "name": "b", "start": 4, "end": 5}]
+        });
+        let position_free = json!({
+            "type": "Program",
+            "body": [{"type": "Identifier", "name": "a"}]
+        });
+        assert_skeletons(&with_loc, &moved, false, true);
+        assert_skeletons(&with_loc, &position_free, false, true);
+    }
+
+    /// The node discriminator is the one scalar kept, and a key set is shape.
+    #[test]
+    fn skeletons_equal_reads_type_and_key_set() {
+        let identifier = json!({"type": "Identifier", "name": "a"});
+        let literal = json!({"type": "Literal", "name": "a"});
+        let extra_key = json!({"type": "Identifier", "name": "a", "optional": false});
+        assert_skeletons(&identifier, &literal, false, false);
+        assert_skeletons(&identifier, &extra_key, false, false);
+        // A non-string `type` is erased like any other scalar, so two of them compare equal.
+        assert_skeletons(&json!({"type": 1}), &json!({"type": 2}), false, true);
+        // …but a kept string against an erased scalar is not.
+        assert_skeletons(&json!({"type": "A"}), &json!({"type": 1}), false, false);
+        // A container against a scalar is a shape change; two scalars both erase to `Null`.
+        assert_skeletons(&json!({"k": []}), &json!({"k": 0}), false, false);
+        assert_skeletons(&json!({"k": "x"}), &json!({"k": 7}), false, true);
+    }
+
+    /// Field order on the wire is the writer's property, not the shape's — `Map` equality is
+    /// order-free, so the walk compares by key.
+    #[test]
+    fn skeletons_equal_is_key_order_free() {
+        let a = json!({"type": "Identifier", "name": "a", "start": 0});
+        let b = json!({"start": 9, "name": "a", "type": "Identifier"});
+        assert_skeletons(&a, &b, false, true);
+    }
+
+    /// Only the boundary-emptied `Text` nodes are dropped, and only under `render`.
+    #[test]
+    fn skeletons_equal_folds_the_fragment_drop() {
+        let padded = root(vec![text("\n\t"), element("b", vec![]), text("\n")]);
+        let bare = root(vec![element("b", vec![])]);
+        assert_skeletons(&padded, &bare, true, true);
+        // Without render normalization the two `Text` nodes are ordinary siblings.
+        assert_skeletons(&padded, &bare, false, false);
+        // A mid-list space is a significant inter-sibling separator, never dropped.
+        let spaced = root(vec![element("b", vec![]), text(" "), element("i", vec![])]);
+        let glued = root(vec![element("b", vec![]), element("i", vec![])]);
+        assert_skeletons(&spaced, &glued, true, false);
+        // A boundary text holding real content survives the trim.
+        let worded = root(vec![text(" word "), element("b", vec![])]);
+        assert_skeletons(&worded, &bare, true, false);
+    }
+
+    /// The `preserve` context is read per side, because the tag `name` that flips it is a scalar
+    /// the skeleton erases — so the two documents can normalize under different contexts.
+    #[test]
+    fn skeletons_equal_reads_preserve_per_side() {
+        let in_pre = element("pre", vec![text("\n"), element("b", vec![])]);
+        let in_div = element("div", vec![text("\n"), element("b", vec![])]);
+        let stripped = element("div", vec![element("b", vec![])]);
+        // `<pre>` keeps its boundary text; `<div>` drops it — and the tag name is erased, so the
+        // verdict turns entirely on each side's own context.
+        assert_skeletons(&in_pre, &stripped, true, false);
+        assert_skeletons(&in_div, &stripped, true, true);
+        assert_skeletons(&in_pre, &in_div, true, false);
     }
 
     #[test]

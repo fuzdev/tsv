@@ -52,7 +52,7 @@ use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
 use crate::diff::{DiffOptions, diff_to_string};
-use crate::render_normalize::{normalize_pair, structural_skeleton};
+use crate::render_normalize::{normalize_pair, skeletons_equal};
 
 /// The seed's own fixed point, or why it has none — the precondition every **mutation** audit
 /// rests on and neither can state for itself.
@@ -134,20 +134,44 @@ pub(crate) fn tsv_parse_to_value(source: &str, parser: ParserType) -> Option<Val
 /// The round-trip gate's population-only path takes this one instead: its whole question is the
 /// node census ([`streamed_node_census`]), which the bytes answer directly, and the tree it
 /// would otherwise build costs more than the parse, the emit and the census together.
+///
+/// ## The audit substrate's wire is the `no-locations` wire
+///
+/// Both halves emit the **narrower** `convert_ast_json_bytes_no_locations` product — `start` /
+/// `end` offsets, no per-node `loc` (and, on the Svelte wire, no `name_loc`). That is not a
+/// cheaper approximation of the drop-in wire: `loc` is a pure function of `start` / `end` plus
+/// the source, and **no consumer in this crate reads one**. Every walk over an audit wire either
+/// skips the key by name (the node census's [`census_skips_key`], the leaf multiset's
+/// [`collect_conserved_leaves`], [`node_edge`](crate::audit::node_edge)'s non-structural set, the
+/// site scans, the blank audit's verbatim-region scan, `ast_census`) or strips it first
+/// ([`remove_locations`](crate::fixtures::remove_locations), which every `Value`-compare runs
+/// ahead of the skeleton). The span consumers read `start` / `end`, which are untouched.
+///
+/// Dropping it is the substrate's single biggest lever, because the audits pay the wire on the
+/// hottest path they have — once per injection, per side. Three nested objects and six numbers
+/// per node is ~40% of the wire bytes over the fixture corpus, and the `Value` tree those bytes
+/// build is the dominant cost of a per-injection property battery (the workspace enables
+/// `serde_json`'s `arbitrary_precision`, so every one of those numbers is also a heap `String`).
+///
+/// A future consumer that genuinely wants line/column asks the emitter for it directly rather
+/// than widening this one — the whole point of the narrower product is that the audits never
+/// query the line table.
 pub(crate) fn tsv_parse_to_wire_bytes(source: &str, parser: ParserType) -> Option<Vec<u8>> {
     let arena = bumpalo::Bump::new();
     match parser {
         ParserType::TypeScript => {
             let ast = tsv_ts::parse_with_goal_or_fallback(source, None, &arena).ok()?;
-            Some(tsv_ts::convert_ast_json_bytes(&ast, source))
+            Some(tsv_ts::convert_ast_json_bytes_no_locations(&ast, source))
         }
         ParserType::Svelte => {
             let ast = tsv_svelte::parse(source, &arena).ok()?;
-            Some(tsv_svelte::convert_ast_json_bytes(&ast, source))
+            Some(tsv_svelte::convert_ast_json_bytes_no_locations(
+                &ast, source,
+            ))
         }
         ParserType::Css => {
             let ast = tsv_css::parse(source, &arena).ok()?;
-            Some(tsv_css::convert_ast_json_bytes(&ast, source))
+            Some(tsv_css::convert_ast_json_bytes_no_locations(&ast, source))
         }
     }
 }
@@ -245,7 +269,7 @@ impl Utf16ToByte {
 /// Compare two ASTs for **structural** equivalence — the corruption-hunt basis.
 ///
 /// Both are [`normalize_pair`]'d (render-normalized when `render`, then
-/// location-stripped) and compared as [`structural_skeleton`]s, so legitimate
+/// location-stripped) and compared as [`structural_skeleton`](crate::render_normalize::structural_skeleton)s, so legitimate
 /// leaf reformatting doesn't read as corruption while an injected / dropped /
 /// re-typed node still does (see `structural_skeleton` for what the skeleton
 /// keeps vs erases). Char-dropping *value* corruption stays covered by the
@@ -262,16 +286,18 @@ impl Utf16ToByte {
 ///
 /// Shared by the `roundtrip_audit` and `fuzz` commands.
 pub(crate) fn structurally_equivalent(
-    a: Value,
-    b: Value,
+    a: &Value,
+    b: &Value,
     render: bool,
     verbose: bool,
 ) -> (bool, Option<String>) {
-    let (a, b) = normalize_pair(a, b, render);
-    if structural_skeleton(&a) == structural_skeleton(&b) {
+    if skeletons_equal(a, b, render) {
         return (true, None);
     }
+    // Only a divergence that will be PRINTED pays for the normalized pair — the equal verdict,
+    // which is every verdict but a handful over a standing corpus, builds nothing.
     let diff = if verbose {
+        let (a, b) = normalize_pair(a.clone(), b.clone(), render);
         match (
             serde_json::to_string_pretty(&a),
             serde_json::to_string_pretty(&b),
@@ -289,7 +315,7 @@ pub(crate) fn structurally_equivalent(
 /// conserved scalars a legitimate reformat must never change, keyed so that an equal multiset
 /// means every such leaf survived the format.
 ///
-/// [`structural_skeleton`] erases *every* scalar leaf to `Null`, so a format that still
+/// [`structural_skeleton`](crate::render_normalize::structural_skeleton) erases *every* scalar leaf to `Null`, so a format that still
 /// parses but corrupts a leaf value — a mis-decoded string, a number canonicalized to a
 /// *different* value, a mangled multi-line comment — reparses to an equal skeleton and slips
 /// past [`structurally_equivalent`]. This is the complementary check: conserve the leaves
@@ -450,7 +476,7 @@ pub(crate) fn leaf_conservation_diff(input: &Value, output: &Value) -> Option<St
 ///
 /// The zero-tolerance sibling of [`leaf_value_multiset`] on the OTHER axis: the leaf check
 /// conserves scalar values across an equal shape, this conserves the **population** of the
-/// tree across any shape. [`structural_skeleton`] already sees a dropped node — but as one more
+/// tree across any shape. [`structural_skeleton`](crate::render_normalize::structural_skeleton) already sees a dropped node — but as one more
 /// entry in the render-noisy `divergent` bucket (a whitespace `Text` appearing or vanishing
 /// beside a block element is a divergence too), which every consumer holds report-only. A
 /// dropped `<b>x</b>` filed there was reported into noise, so this census names the class on
@@ -964,13 +990,11 @@ pub(crate) fn compare_reparsed(
     if let Some(detail) = node_conservation_diff(&wire_in, &wire_out) {
         return ReparseCompare::NodeLoss(detail);
     }
-    // Computed before the move-consuming structural compare.
-    let leaf_diff = leaf_conservation_diff(&wire_in, &wire_out);
-    let (equal, diff) = structurally_equivalent(wire_in, wire_out, render, verbose);
+    let (equal, diff) = structurally_equivalent(&wire_in, &wire_out, render, verbose);
     if !equal {
         return ReparseCompare::Divergent(diff);
     }
-    if let Some(detail) = leaf_diff {
+    if let Some(detail) = leaf_conservation_diff(&wire_in, &wire_out) {
         return ReparseCompare::LeafCorruption(detail);
     }
     ReparseCompare::Equal
