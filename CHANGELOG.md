@@ -11,7 +11,9 @@ Each `## Unreleased` section must be non-empty and carry a
 `## Unreleased` (reset to `bump: patch`) for the next cycle.
 
 ## Unreleased
-<!-- bump: minor -->
+<!-- bump: patch -->
+
+## 0.4.0
 
 - **breaking** chore: the three WASM packages are renamed to kebab-case — `@fuzdev/tsv_wasm` →
   `@fuzdev/tsv-wasm`, `@fuzdev/tsv_format_wasm` → `@fuzdev/tsv-format-wasm`,
