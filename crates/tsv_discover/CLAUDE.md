@@ -301,7 +301,7 @@ crates (the open-convention stance):
   `excluded_argument_warning`), plus the per-argument `unsupported_extension_error`
   (through a throwaway stack — the receiver is unused, an argument check running
   before any matcher exists), and keeps no policy *decision* of its own (the literal extension list does appear in its help/error text, hand-mirrored from the native CLI — the decision stays here). `quote_path` is the one text rule it restates by hand (its own `quote_path`), for the paths it names itself — the `--list`/changed-path lines, `error:` lines, its traversal and argument errors — since the binding's warnings arrive quoted already.
-- **VS Code extension** (`vscode_extension_tsv_format`) — assembles an
+- **VS Code extension** (`vscode-extension-tsv-format`) — assembles an
   `IgnoreStack` per open document and calls `is_ignored(rel, false) ||
   is_path_pruned(rel)`. It has no directory walk, so `is_path_pruned` is its entry
   to the shared prune policy, so it never reconstructs the heuristic walk in TS.
