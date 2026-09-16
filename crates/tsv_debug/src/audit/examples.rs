@@ -67,7 +67,7 @@ impl<E: ExampleOrd, const N: usize> ExampleSet<E, N> {
     /// A recorded shape is always created *with* the hit that recorded it (every audit's
     /// `record` offers an example on the same entry it creates), so this never sees an
     /// empty set — an empty one is a construction bug.
-    #[allow(clippy::expect_used)] // invariant: a recorded shape carries an example
+    #[expect(clippy::expect_used)] // invariant: a recorded shape carries an example
     pub(crate) fn canonical(&self) -> &E {
         self.examples
             .first()

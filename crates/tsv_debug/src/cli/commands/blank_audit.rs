@@ -157,7 +157,6 @@ use super::profile::{is_input_invalid_fixture, resolve_seed_files};
 /// class.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "blank_audit")]
-#[allow(clippy::struct_excessive_bools)] // independent CLI flags
 pub struct BlankAuditCommand {
     /// emit JSON
     #[argh(switch)]

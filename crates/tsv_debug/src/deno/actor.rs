@@ -97,7 +97,7 @@ fn sidecar_runtime() -> &'static Runtime {
         // One worker thread is plenty: the sidecars are I/O-bound and each
         // queues its own requests (the JS side processes them serially); this
         // thread only drives the actor loops and the stdout/stderr readers.
-        #[allow(clippy::expect_used)]
+        #[expect(clippy::expect_used)]
         // runtime build fails only on catastrophic OS resource exhaustion, with no recovery path
         // The one reservation every tsv thread takes (`tsv_cli::cli::stack`): this
         // thread reads the canonical AST back with the recursion limit disabled
@@ -440,7 +440,7 @@ impl ActorState {
         }
 
         // Find and complete the pending request
-        #[allow(clippy::cast_sign_loss)]
+        #[expect(clippy::cast_sign_loss)]
         if let Some(tx) = self.pending.remove(&(response.id as u64)) {
             let result = if response.ok {
                 response.output.ok_or(DenoError::MissingOutput)
@@ -468,7 +468,7 @@ impl ActorState {
 impl Drop for ActorState {
     fn drop(&mut self) {
         // Kill the child process
-        #[allow(clippy::let_underscore_must_use)]
+        #[expect(clippy::let_underscore_must_use)]
         let _ = self.child.start_kill();
     }
 }

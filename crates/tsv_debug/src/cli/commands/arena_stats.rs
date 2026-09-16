@@ -300,7 +300,7 @@ fn measure_bump_demand(source: &str, parser: ParserType) -> u64 {
 /// Format one already-read file into a fresh arena and fold its node population into
 /// `stats`. A parse failure returns `Err(msg)` (counted/listed by the caller, which also
 /// owns the read and counts an unreadable file apart), never aborting the walk.
-#[allow(clippy::cast_precision_loss)]
+#[expect(clippy::cast_precision_loss)]
 fn collect_file(source: &str, parser: ParserType, stats: &mut Stats) -> Result<(), String> {
     let bump = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
     let arena = DocArena::for_source(source);
@@ -432,7 +432,7 @@ fn classify_text(t: &DocText) -> &'static str {
     }
 }
 
-#[allow(clippy::cast_precision_loss)]
+#[expect(clippy::cast_precision_loss)]
 fn pct(part: u64, whole: u64) -> f64 {
     part as f64 * 100.0 / whole.max(1) as f64
 }
@@ -466,7 +466,7 @@ fn density_line(label: &str, sorted: &[f64]) {
     );
 }
 
-#[allow(clippy::cast_precision_loss)]
+#[expect(clippy::cast_precision_loss)]
 fn print_report(s: &Stats, parse_errors: usize, read_errors: usize) {
     eprintln!(
         "DocArena node stats — {} files, {} bytes ({parse_errors} parse errors, {read_errors} unreadable)\n",

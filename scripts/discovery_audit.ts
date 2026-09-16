@@ -37,8 +37,8 @@
  * tsv finding. `deno task doctor` reports the same state.
  *
  * Cost is ~0.1 s (pure Rust, ~6,700 files — every collection the snapshot vendors, not
- * only the ones the bench views read) on the `--profile corpus` `tsv_cli` binary the
- * `format:audit` leg has already built.
+ * only the ones the bench views read) on the `--profile corpus` `tsv` binary of the shared
+ * build world (deno.json `//build:check`), which the `format:audit` leg has already built.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -59,6 +59,12 @@ import {
  * consumers; tsv formats none of them, so they are expected NOT to be listed.
  */
 const TSV_EXTENSIONS = ['ts', 'mts', 'cts', 'js', 'mjs', 'cjs', 'svelte', 'css'];
+
+/**
+ * The `tsv` binary of the shared `--profile corpus` build world (deno.json `//build:check`),
+ * which the `discovery:audit` task builds before running this.
+ */
+const TSV_BIN = 'target/corpus/tsv';
 
 const log = (...args: unknown[]) => console.error(...args);
 
@@ -111,12 +117,15 @@ function run(): never {
 		process.exit(1);
 	}
 
-	// The production discovery, on the binary `format:audit` built earlier in `check`.
-	const list = spawnSync(
-		'cargo',
-		['run', '--profile', 'corpus', '-p', 'tsv_cli', '--quiet', '--', 'format', '--list', tree],
-		{ encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] }
-	);
+	// The production discovery, on the `--profile corpus` `tsv` binary. Exec'd by PATH rather
+	// than through `cargo run`: that form selects `-p tsv_cli` alone, which resolves features
+	// without `audits` and so rebuilds the whole stack into a second corpus-profile world (see
+	// deno.json `//build:check`). The `discovery:audit` task runs `build:check` ahead of this,
+	// so the binary is fresh on a standalone run too.
+	const list = spawnSync(TSV_BIN, ['format', '--list', tree], {
+		encoding: 'utf8',
+		stdio: ['ignore', 'pipe', 'inherit']
+	});
 	if (list.status !== 0) {
 		log(`Error: tsv format --list exited ${list.status}.`);
 		process.exit(list.status ?? 1);

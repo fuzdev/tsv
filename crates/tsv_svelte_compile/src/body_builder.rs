@@ -104,7 +104,7 @@ impl<'arena> BodyBuilder<'arena> {
     pub(crate) fn push_text(&mut self, chunk: &str) {
         // Every element of `texts` exists by construction (starts with one entry;
         // `push_expr` appends the follower).
-        #[allow(clippy::unwrap_used)]
+        #[expect(clippy::unwrap_used)]
         let current = self.texts.last_mut().unwrap();
         if current.ends_with('$') && chunk.starts_with('{') {
             // The trailing `$` is raw (any preceding backslash was already

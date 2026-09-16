@@ -1,15 +1,23 @@
-//! The stride-chunked worker-pool driver the injection audits run their per-file loop under.
+//! The stride-chunked worker-pool driver every corpus-walking audit runs its per-file loop under.
 //!
 //! `gap_audit`, `blank_audit` and `ignore_audit` each walk the fixture corpus on a small thread
 //! pool, folding a per-worker tally into one after the join. The loop was byte-identical between
 //! them (job-count resolution, stride chunking, join-and-merge) — extracted here so there is one
-//! copy, and one home for the panic-safety and thread-sizing contracts below.
+//! copy, and one home for the panic-safety and thread-sizing contracts below. The
+//! [`sweep`](crate::audit::sweep) consumers reach the same pool through that loop rather than
+//! calling [`run_pool`] themselves, so there is one answer to "how does an audit walk a corpus"
+//! and not two.
+//!
+//! [`run_pool`] itself is feature-free — four of its consumers drive no instrumentation seam and
+//! exist in a default build. Only [`ArmedRun`], which arms `tsv_lang::comment_ledger`, carries
+//! the `comment_check` gate.
 
 use std::num::NonZero;
 use std::path::{Path, PathBuf};
 
 use tsv_cli::cli::stack::{clamp_worker_count, sized_thread};
 
+#[cfg(feature = "comment_check")]
 use crate::audit::panic_hook::SuppressedPanicHook;
 use crate::cli::CliError;
 
@@ -26,6 +34,12 @@ use crate::cli::CliError;
 /// correctness is free here). Callers `drop(armed)` explicitly at the point the audit
 /// stops formatting (gap's verify pass formats, so its window is wider), keeping each
 /// audit's disarm point deliberate rather than wherever scope happens to end.
+///
+/// Gated where [`run_pool`] is not: it arms `tsv_lang::comment_ledger`, which only a
+/// `comment_check` build has. The pristine sweep's own consumers that drain a sink
+/// (`swallow_audit`, `comment_audit`) arm theirs directly and take the hook suppression from
+/// [`sweep`](crate::audit::sweep), which installs the same [`SuppressedPanicHook`].
+#[cfg(feature = "comment_check")]
 pub(crate) struct ArmedRun {
     /// The hook suppression itself, restored by its own `Drop` — shared with
     /// the pristine sweep so there is one definition of "how a corpus walk
@@ -34,6 +48,7 @@ pub(crate) struct ArmedRun {
     swallow: bool,
 }
 
+#[cfg(feature = "comment_check")]
 impl ArmedRun {
     pub(crate) fn arm(swallow: bool) -> Self {
         tsv_lang::comment_ledger::set_comment_check(true);
@@ -47,6 +62,7 @@ impl ArmedRun {
     }
 }
 
+#[cfg(feature = "comment_check")]
 impl Drop for ArmedRun {
     fn drop(&mut self) {
         tsv_lang::comment_ledger::set_comment_check(false);

@@ -8,7 +8,7 @@ use tsv_cli::cli::input::{Input, InputArgs, ParserType};
 /// Compare our printer output with prettier (shows diff).
 // argh models each flag as an independent `#[argh(switch)]` bool — orthogonal
 // CLI toggles, not a state machine to refactor into an enum.
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "compare")]
 pub struct CompareCommand {

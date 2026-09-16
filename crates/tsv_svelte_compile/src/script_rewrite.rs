@@ -127,7 +127,7 @@ fn refuse_bare_derived_arg(
 /// refs into the parsed AST, and the original wrapper never enters the printed
 /// tree (no duplicate spans in what the printer walks). See `build.rs` for the
 /// address-keyed side-table caveat.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn rewrite_script_statement<'arena>(
     b: &mut Builder<'arena>,
     stmt: &'arena Statement<'arena>,
@@ -296,7 +296,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
             }
             // `rune` is `Some(Derived | DerivedBy)` by the `matches!` guard above;
             // extract it to move into the expander.
-            #[allow(clippy::unreachable)] // the guard above proved the variant
+            #[expect(clippy::unreachable)] // the guard above proved the variant
             let Some(rune) = rune else {
                 unreachable!("guarded to a derived rune above")
             };
@@ -342,7 +342,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
             }
             // `rune` is `Some(State | StateSnapshot)` by the `matches!` guard above;
             // extract it to move into the expander.
-            #[allow(clippy::unreachable)] // the guard above proved the variant
+            #[expect(clippy::unreachable)] // the guard above proved the variant
             let Some(rune) = rune else {
                 unreachable!("guarded to a state rune above")
             };
@@ -394,7 +394,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
         let mut new_id = declarator.id.clone();
         // `RuneInit::PropsId` is skipped via `continue` above, so the arm below is
         // genuinely dead — it documents that invariant rather than a live branch.
-        #[allow(clippy::unreachable)]
+        #[expect(clippy::unreachable)]
         let new_init = match rune {
             Some(RuneInit::Props) => {
                 *uses_props = true;
@@ -541,7 +541,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
 /// `class.clone()` having allocated no member `Vec`. The per-member side effects —
 /// the guard walk, the refusal checks, the `dropped_regions` pushes — run for every
 /// member regardless of whether `out` ever materializes.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn rewrite_class_state_fields<'arena>(
     b: &Builder<'arena>,
     class: &'arena ClassDeclaration<'arena>,

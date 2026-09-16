@@ -362,7 +362,7 @@ fn push_whitespace_runs(out: &mut Vec<u32>, source: &str, span: tsv_lang::Span) 
         // is past the terminator, so the pair is already complete there.
         let continuation = matches!(bytes[start], b'\n' | b'\r')
             && source.as_bytes().get((base + start).wrapping_sub(1)) == Some(&b'\\');
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         {
             if !continuation {
                 out.push((base + start) as u32);
@@ -412,7 +412,7 @@ fn push_css_ident_ends(out: &mut Vec<u32>, source: &str, span: tsv_lang::Span) {
             i += 1;
         }
         if i > start {
-            #[allow(clippy::cast_possible_truncation)]
+            #[expect(clippy::cast_possible_truncation)]
             out.push((base + i) as u32);
         }
     }

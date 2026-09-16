@@ -264,7 +264,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
         Ok(self.statement(stmt)?.map(|new| &*self.b.arena.alloc(new)))
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     fn statement(
         &mut self,
         stmt: &Statement<'arena>,
@@ -791,7 +791,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
         Ok(self.expr(expr)?.unwrap_or_else(|| expr.clone()))
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     fn expr(
         &mut self,
         expr: &Expression<'arena>,
@@ -1073,7 +1073,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
     // `Option<Option<T>>`: outer `None` = element unchanged, `Some(inner)` = a
     // rebuilt element (`inner` preserves the hole/value distinction). `&Option`
     // matches the slice-element shape (mirrors `erase::opt_expr`).
-    #[allow(clippy::option_option, clippy::ref_option)]
+    #[expect(clippy::option_option, clippy::ref_option)]
     fn opt_expr(
         &mut self,
         element: &'arena Option<Expression<'arena>>,

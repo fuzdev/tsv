@@ -546,7 +546,7 @@ impl<'arena> Extractor<'_, 'arena> {
     /// A small non-negative integer (an array index or length) as a numeric
     /// literal. The value is a destructuring-pattern position, always far below
     /// the f64 integer-exact range, so the cast is lossless in practice.
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     fn small_number(&mut self, n: usize) -> Expression<'arena> {
         self.b.number(n as f64)
     }

@@ -244,7 +244,7 @@ fn attach_sizes(rows: &mut [Row]) {
     }
 }
 
-#[allow(clippy::cast_precision_loss)]
+#[expect(clippy::cast_precision_loss)]
 fn megabytes(bytes: usize) -> f64 {
     bytes as f64 / (1024.0 * 1024.0)
 }

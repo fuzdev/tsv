@@ -83,7 +83,7 @@ use crate::cli::CliError;
 /// 0 when clean — so it doubles as a CI gate.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "fuzz")]
-#[allow(clippy::struct_excessive_bools)] // independent CLI flags
+#[expect(clippy::struct_excessive_bools)] // independent CLI flags
 pub struct FuzzCommand {
     /// PRNG master seed (default 0) — same seed + corpus ⇒ identical run
     #[argh(option, default = "0")]

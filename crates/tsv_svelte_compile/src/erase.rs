@@ -1497,7 +1497,7 @@ impl<'arena> Eraser<'arena, '_> {
     /// and re-derives them from precedence, exactly as the oracle's printer
     /// does — so `(x as T).y` erases to `x.y` and `(a + b as T) * c` keeps the
     /// parens it needs.
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     fn expr(
         &mut self,
         expr: &Expression<'arena>,
@@ -1948,7 +1948,7 @@ impl<'arena> Eraser<'arena, '_> {
     /// An array/array-pattern element slot — `None` is a hole (`[a, , b]`). The
     /// nesting is the `map_slice!` contract (`&T` in, `Option<T>` out, with
     /// `T = Option<Expression>`), not a modelling choice.
-    #[allow(clippy::option_option, clippy::ref_option)]
+    #[expect(clippy::option_option, clippy::ref_option)]
     fn opt_expr(
         &mut self,
         element: &Option<Expression<'arena>>,

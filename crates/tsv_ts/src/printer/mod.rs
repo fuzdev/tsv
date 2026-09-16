@@ -148,7 +148,6 @@ pub(crate) enum ArrowChainContext {
 }
 
 /// Printer state for building output
-#[allow(clippy::struct_excessive_bools)] // independent document-level facts, each read on its own seam
 pub struct Printer<'a> {
     /// Output buffer
     buffer: OutputBuffer,

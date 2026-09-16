@@ -176,7 +176,7 @@ impl Fixture {
     pub fn input_type(&self) -> InputType {
         // SAFETY: input_file comes from find_input_file's closed set of
         // known input filenames
-        #[allow(clippy::expect_used)]
+        #[expect(clippy::expect_used)]
         InputType::from_filepath(&self.input_file).expect("known fixture input filename")
     }
 

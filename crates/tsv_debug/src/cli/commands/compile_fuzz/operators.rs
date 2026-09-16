@@ -890,7 +890,7 @@ mod tests {
         assert_eq!(SOURCE.as_bytes()[run_start], b'\n', "the run opens with LF");
 
         let anchors = anchors_of(SOURCE);
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         let run_start = run_start as u32;
         assert!(
             !anchors.script_ws.contains(&run_start),
@@ -899,7 +899,7 @@ mod tests {
         );
         // The end edge is past the terminator — the pair is already complete, so
         // an appended character is ordinary string content.
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         let run_end = (backslash + 3) as u32; // `\` + LF + ' '
         assert!(
             anchors.script_ws.contains(&run_end),
@@ -936,7 +936,7 @@ mod tests {
         let anchors =
             anchors_of("<script>\n\tlet a = 1;\u{000B}let b = 2;\n</script>\n<p>{a}{b}</p>\n");
         let vt = "<script>\n\tlet a = 1;".len();
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         let vt = vt as u32;
         assert!(
             anchors.script_ws.contains(&vt),

@@ -146,7 +146,7 @@ impl Value {
     /// set deduplicates by): `NaN` equals `NaN`, `-0` equals `0`.
     // Exact bitwise-style comparison IS the JS semantics being ported — an
     // epsilon here would be wrong.
-    #[allow(clippy::float_cmp)]
+    #[expect(clippy::float_cmp)]
     fn same_value_zero(&self, other: &Value) -> bool {
         match (self, other) {
             (Value::Num(a), Value::Num(b)) => (a.is_nan() && b.is_nan()) || a == b,
@@ -696,7 +696,7 @@ fn global_keypath(expr: &Expression<'_>, scope: &Scope<'_, '_>, source: &str) ->
 /// Compute a known binary operation, `Gray` outside the ported combos.
 // The `** ` special-case compares against exactly ±1.0 — the ECMAScript
 // `Number::exponentiate` rule being ported, not an approximate comparison.
-#[allow(clippy::float_cmp)]
+#[expect(clippy::float_cmp)]
 fn binary_op(op: BinaryOperator, a: &Value, b: &Value) -> Result<Value, Gray> {
     use BinaryOperator::{
         BangEquals, BangEqualsEquals, EqualsEquals, EqualsEqualsEquals, GreaterThan,
@@ -751,7 +751,7 @@ fn binary_op(op: BinaryOperator, a: &Value, b: &Value) -> Result<Value, Gray> {
 }
 
 // Exact comparison IS the JS `===` semantics being ported.
-#[allow(clippy::float_cmp)]
+#[expect(clippy::float_cmp)]
 fn strict_equals(a: &Value, b: &Value) -> bool {
     match (a, b) {
         // `===`: NaN is not equal to itself; -0 equals 0 (f64 == does both).
@@ -800,7 +800,7 @@ fn numeric_coerce(v: &Value) -> Result<f64, Gray> {
 
 /// ECMAScript ToInt32.
 // The modulo-2^32 wrap through u32 is the spec's ToInt32 — sign loss intended.
-#[allow(clippy::cast_sign_loss)]
+#[expect(clippy::cast_sign_loss)]
 fn to_int32(n: f64) -> i32 {
     if !n.is_finite() || n == 0.0 {
         return 0;

@@ -146,7 +146,7 @@ impl<'a> FlowBuilder<'a> {
     /// the true target otherwise), then the right against the original targets;
     /// a logical compound-assignment additionally mutates its target and tests
     /// the whole node.
-    #[allow(clippy::too_many_arguments)] // faithful port of the tsgo signature
+    #[expect(clippy::too_many_arguments)] // faithful port of the tsgo signature
     fn bind_logical_like_expression(
         &mut self,
         node: &Expression<'_>,

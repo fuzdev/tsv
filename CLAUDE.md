@@ -221,7 +221,7 @@ deno task fuzz:audit                 # seeded mutational fuzzer (fixed seed/iter
 deno task swallow:audit              # `//` line comment swallowing following output-line content (also over real code via audit:corpus)
 deno task comments:audit             # print-once comment ledger: DROPPED / DOUBLE-PRINTED comments
 deno task gaps:audit                 # gap-injection RATCHET, ~37 s: ledger DROPPED/DOUBLE-PRINTED + SWALLOW + a bare reparse of every output (UNREPARSEABLE — a comment relocated into a slot the grammar forbids, or a valid output the parser over-rejects; the class no as-authored gate reaches) (./docs/gap_audit.md; also :update and :rank for triage)
-deno task blanks:audit               # blank-line injection RATCHET (node loss among its pinned kinds) + the blank-DROP absorb pin (a new kind of silently-eaten blank fails), ~30 s (./docs/blank_audit.md; also :update)
+deno task blanks:audit               # blank-line injection RATCHET (node loss among its pinned kinds) + the blank-DROP absorb pin (a new kind of silently-eaten blank fails), ~52 s (./docs/blank_audit.md; also :update)
 deno task fabrication:audit          # blank-FABRICATION on pristine seeds — the F1-blind counterpart to blanks (ratchet born EMPTY; also :update)
 deno task census:audit               # comment CENSUS: raw input-vs-output trivia multisets per language bucket (own scanners, never parse().comments) — catches parse-time drops/merges/rewrites the ledger can't see; the Svelte scanner also counts every open-tag name and `{#…}`/`{@…}` head, the parse-time complement of roundtrip's node census (also :update)
 deno task width:audit                # print-width RATCHET: a new KIND of over-width output line — the ONLY gate that measures a column. ⚠️ NOT a debt list (sanctioned overruns are real); also :update
@@ -1147,6 +1147,15 @@ formatting behavior. Key files: `src/language-js/print/assignment.js` (assignmen
 ## Development conventions
 
 - **Leave `// TODO:` comments** - when there's known future work or the code smells
+- **Suppress a lint with `#[expect]`, never `#[allow]`** - `expect` warns (and so, under
+  the gate's `-D warnings`, FAILS) once the lint stops firing, so a suppression cannot
+  outlive its cause. An `#[allow]` that does is worse than clutter: it goes on
+  suppressing the lint for code added under it later, which is how a stale
+  `struct_excessive_bools` silently swallows the next bool. The exception is a lint
+  `expect` cannot see fulfilled - one emitted from inside a function body, or from
+  behind a proc-macro expansion (`#[napi]`) - where the expectation reads as dead
+  however it is placed. Those keep `#[allow]` **and** carry a comment saying `allow`,
+  not `expect`, and why; there are three, and a fourth needs the same sentence.
 
 ## Documentation
 

@@ -133,7 +133,7 @@ impl CleanNode<'_> {
 }
 
 /// Per-fragment emission context.
-#[allow(clippy::struct_excessive_bools)] // independent per-fragment flags, not a state machine
+#[expect(clippy::struct_excessive_bools)] // independent per-fragment flags, not a state machine
 pub(crate) struct FragmentCtx<'p> {
     /// Whether a text-first fragment gets the leading `<!---->` anchor. True for
     /// the component root and `{#each}` bodies (the oracle's `is_text_first`:
@@ -274,7 +274,7 @@ pub(crate) fn emit_fragment<'arena>(
                     | SpecialElementKind::SlotElement
                     | SpecialElementKind::SvelteFragment => {
                         // A silent `{}` here would DROP the node from the output.
-                        #[allow(clippy::unreachable)] // the mapping refused these above
+                        #[expect(clippy::unreachable)] // the mapping refused these above
                         {
                             unreachable!("refused above via special_element_refusal_kind")
                         }

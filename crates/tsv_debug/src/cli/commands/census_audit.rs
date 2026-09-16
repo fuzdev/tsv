@@ -6,7 +6,7 @@ use crate::audit::census::{CensusEntry, CensusMultiset, comment_census};
 use crate::audit::ratchet::{
     Ratchet, SnapshotKey, grade_narrowed_strictly, refuse_narrowed_update,
 };
-use crate::audit::sweep::{PristineSweep, sweep_pristine};
+use crate::audit::sweep::{PristineSweep, sort_findings_by_path, sweep_pristine};
 use crate::cli::CliError;
 
 use super::profile::resolve_seed_files;
@@ -50,6 +50,11 @@ pub struct CensusAuditCommand {
     /// regenerate the ratchet snapshot (refused on a narrowed run)
     #[argh(switch)]
     update: bool,
+
+    /// worker threads (default: available parallelism). Results are `--jobs`-invariant —
+    /// see `audit::sweep`, which restores the serial walk's order exactly
+    #[argh(option)]
+    jobs: Option<usize>,
 
     /// file paths, directories, or glob patterns (default: tests/fixtures)
     #[argh(positional)]
@@ -181,7 +186,7 @@ impl CensusAuditCommand {
             "SUBSET",
         )?;
         let files = resolve_seed_files(&self.paths, 0)?;
-        let sweep = sweep_files(&files);
+        let sweep = sweep_files(&files, self.jobs)?;
 
         if self.json {
             print_json(&sweep);
@@ -219,7 +224,8 @@ impl CensusAuditCommand {
 
 /// What one corpus walk produced.
 struct Sweep {
-    /// Files with a multiset imbalance, in walk order — the human report.
+    /// Files with a multiset imbalance, in walk order (restored after the per-worker
+    /// merge by `sort_findings_by_path`) — the human report.
     findings: Vec<CensusFinding>,
     /// Every `(path, bucket, direction)` seen — what the ratchet grades.
     keys: BTreeSet<CensusKey>,
@@ -228,35 +234,55 @@ struct Sweep {
     pristine: PristineSweep,
 }
 
+/// One worker's share of the walk. `keys` is a `BTreeSet`, so the ratchet's product is
+/// order-free by construction; `findings` is the human report's list and gets its order back
+/// from the stable path sort in [`sweep_files`].
+#[derive(Default)]
+struct Tally {
+    findings: Vec<CensusFinding>,
+    keys: BTreeSet<CensusKey>,
+}
+
 /// Format every file (via the shared pristine sweep) and compare the two censuses.
-fn sweep_files(files: &[PathBuf]) -> Sweep {
-    let mut findings = Vec::new();
-    let mut keys = BTreeSet::new();
-    let pristine = sweep_pristine(files, |path, parser, source, output| {
-        let input_census = comment_census(source, parser);
-        let output_census = comment_census(output, parser);
-        let deltas = diff_censuses(&input_census, &output_census);
-        if deltas.is_empty() {
-            return;
-        }
-        let path_key = path.display().to_string();
-        for delta in &deltas {
-            keys.insert(CensusKey {
-                path: path_key.clone(),
-                bucket: delta.entry.bucket.name().to_string(),
-                direction: delta.direction(),
+///
+/// # Errors
+///
+/// Returns [`CliError::Failed`] when a sweep worker panics outside the per-file catch.
+fn sweep_files(files: &[PathBuf], jobs: Option<usize>) -> Result<Sweep, CliError> {
+    let (pristine, mut tally) = sweep_pristine(
+        files,
+        jobs,
+        |path, parser, source, output, tally: &mut Tally| {
+            let input_census = comment_census(source, parser);
+            let output_census = comment_census(output, parser);
+            let deltas = diff_censuses(&input_census, &output_census);
+            if deltas.is_empty() {
+                return;
+            }
+            let path_key = path.display().to_string();
+            for delta in &deltas {
+                tally.keys.insert(CensusKey {
+                    path: path_key.clone(),
+                    bucket: delta.entry.bucket.name().to_string(),
+                    direction: delta.direction(),
+                });
+            }
+            tally.findings.push(CensusFinding {
+                path: path.to_path_buf(),
+                deltas,
             });
-        }
-        findings.push(CensusFinding {
-            path: path.to_path_buf(),
-            deltas,
-        });
-    });
-    Sweep {
-        findings,
-        keys,
+        },
+        |dst, src| {
+            dst.findings.extend(src.findings);
+            dst.keys.extend(src.keys);
+        },
+    )?;
+    sort_findings_by_path(&mut tally.findings, |f| &f.path);
+    Ok(Sweep {
+        findings: tally.findings,
+        keys: tally.keys,
         pristine,
-    }
+    })
 }
 
 /// The multiset comparison: every interior class whose counts disagree, in entry order.

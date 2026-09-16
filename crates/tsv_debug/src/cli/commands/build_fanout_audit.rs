@@ -485,7 +485,7 @@ fn measure(c: &Construct) -> ConstructResult {
     }
     // doc_nodes ~ depth^E  ⇒  E = log_(d_hi/d_lo)(n_hi/n_lo). Counts are bounded
     // by NODE_CAP and depths are tiny, so the f64 conversions are exact.
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     let exponent = match (points.first(), points.last()) {
         (Some(lo), Some(hi)) if points.len() >= 2 => {
             Some((hi.nodes as f64 / lo.nodes as f64).log(hi.depth as f64 / lo.depth as f64))

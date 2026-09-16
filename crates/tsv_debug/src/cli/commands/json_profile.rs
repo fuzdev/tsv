@@ -205,7 +205,7 @@ fn aggregate(results: &[FileResult]) -> Vec<(ParserType, LangAggregate)> {
             None => {
                 out.push((r.parser_type, LangAggregate::default()));
                 // SAFETY: just pushed
-                #[allow(clippy::unwrap_used)]
+                #[expect(clippy::unwrap_used)]
                 let last = out.last_mut().unwrap();
                 &mut last.1
             }

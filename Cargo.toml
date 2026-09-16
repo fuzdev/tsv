@@ -233,9 +233,13 @@ panic = "abort"
 strip = true
 
 # The audit / corpus-tool profile, and the ONE build world every `deno task check`
-# audit shares. `panic = "unwind"` is the reason it exists: the audits and the fuzzer
-# drive `catch_unwind`, so a formatter panic must be a reported finding rather than a
-# process kill (plain `--release` is `panic = "abort"`).
+# audit shares — a profile alone does not make it one, so `deno task build:check`
+# builds `tsv_cli` and `tsv_debug` in a single feature resolution and the legs run
+# out of it (see deno.json `//build:check`; a narrower `-p tsv_cli` selection is a
+# second, duplicated compile of the whole stack). `panic = "unwind"` is the reason
+# the profile exists: the audits and the fuzzer drive `catch_unwind`, so a formatter
+# panic must be a reported finding rather than a process kill (plain `--release` is
+# `panic = "abort"`).
 #
 # `lto` / `codegen-units` are overridden back off the inherited `release` values. The
 # inherited `lto = true, codegen-units = 1` was incidental — nothing here wants it, and

@@ -528,7 +528,7 @@ fn classify_output(
 }
 
 /// Classify a novel Prettier result and generate a suggestion
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 async fn classify_novel(
     prettier_result: Option<&FormatResult>,
     ours_result: Option<&FormatResult>,

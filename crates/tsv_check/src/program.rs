@@ -259,7 +259,6 @@ pub fn bind_program<'a>(units: &[SourceUnit<'a>], arena: &'a Bump) -> BoundProgr
 /// output, routed to `diagnostics` (error) or the separate `suggestions` sink.
 // `options` is threaded by reference (uniform with `lib: Option<&LibBase>` and
 // future-proof if `CheckOptions` grows) though it is currently `Copy`-small.
-#[allow(clippy::trivially_copy_pass_by_ref)]
 #[must_use]
 pub fn check_bound(
     bound: &BoundProgram,
@@ -314,7 +313,6 @@ pub fn check_bound(
 
 /// Check a program with no lib base — parse every unit via the goal rule, bind,
 /// merge, and return canonically sorted diagnostics.
-#[allow(clippy::trivially_copy_pass_by_ref)] // `&CheckOptions` — see `check_bound`
 #[must_use]
 pub fn check_program<'a>(
     units: &[SourceUnit<'a>],
@@ -325,7 +323,6 @@ pub fn check_program<'a>(
 }
 
 /// Check a program against an optional lib base (the lib-aware entry point).
-#[allow(clippy::trivially_copy_pass_by_ref)] // `&CheckOptions` — see `check_bound`
 #[must_use]
 pub fn check_program_with_lib<'a>(
     units: &[SourceUnit<'a>],

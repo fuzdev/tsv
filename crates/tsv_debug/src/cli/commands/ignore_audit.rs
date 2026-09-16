@@ -163,7 +163,6 @@ use super::profile::{is_input_invalid_fixture, resolve_seed_files};
 /// Exits 1 on a new / stale / panic finding shape (a ratchet, like `gap_audit` / `blank_audit`).
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "ignore_audit")]
-#[allow(clippy::struct_excessive_bools)] // independent CLI flags
 pub struct IgnoreAuditCommand {
     /// emit JSON
     #[argh(switch)]
