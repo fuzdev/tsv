@@ -20,6 +20,13 @@ Each `## Unreleased` section must be non-empty and carry a
   npm surface spells one way; the snake_case names stop at 0.3.x and are deprecated on npm with a
   pointer to their replacement. Exports, options and the `tsv` bin are unchanged; the Rust crates
   keep their `tsv_*` names
+- feat: a `darwin-x64` platform package joins the native set, so `@fuzdev/tsv` installs on Intel
+  Macs and under x64 Node on Apple Silicon instead of throwing at import; its `tsv` CLI binary is
+  attached to the GitHub Release like the others
+- fix: a relational chain such as `x < y > z` no longer prints in a form that re-parses as a
+  type-argument instantiation when a line break lands after the `>` — tsv keeps a paren pair around
+  the `<` operand, so the output reads back as the comparison the author wrote
+  ([#1039](https://github.com/fuzdev/tsv/pull/1039))
 - fix: restore the CSS parse speed lost in 0.3.0 — a declaration value is ruled out for operator
   splitting before its run is tokenized ([#1037](https://github.com/fuzdev/tsv/pull/1037))
 
