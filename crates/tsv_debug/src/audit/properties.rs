@@ -4,8 +4,10 @@
 //! This is the shared home for the **input → property** layer that every audit
 //! in the [`audit`](crate::audit) substrate builds on:
 //!
-//! - **reparse** — [`tsv_parse_to_value`] (parse to the wire `Value`), [`tsv_parses`] (the
-//!   parse-only twin — does the text parse at all, no wire built),
+//! - **reparse** — [`tsv_parse_to_value`] (parse to the wire `Value`),
+//!   [`tsv_parse_to_wire_bytes`] (its bytes half, for a caller whose question the wire
+//!   answers without a tree), [`tsv_parses`] (the parse-only twin — does the text parse at
+//!   all, no wire built),
 //!   [`compare_reparsed`] (the one input-wire-vs-output-wire verdict every round-trip
 //!   consumer asks, layering [`node_conservation_diff`] / [`node_census`] (the
 //!   zero-tolerance node-count census — a node the formatter DROPPED),
@@ -13,7 +15,11 @@
 //!   [`leaf_conservation_diff`] / [`leaf_value_multiset`] (the complementary
 //!   decode-invariant leaf-value check that the skeleton, erasing every scalar,
 //!   is blind to)) — the round-trip primitives the `roundtrip_audit` / `fuzz` /
-//!   `blank_audit` commands share.
+//!   `blank_audit` commands share. The census has a second reader,
+//!   [`streamed_node_census`] / [`streamed_node_conservation_diff`], which takes the same
+//!   [rules](census_entry) over the wire BYTES for the one consumer that asks the population
+//!   and nothing else (the round-trip gate's fast path) — so the tree-building `Value` walk
+//!   is paid only where a tree is used.
 //! - **directive pre-scan** — [`source_has_ignore_directive`], the coarse "does this
 //!   source freeze a region" question every audit whose property does not survive a
 //!   verbatim region asks of its seed.
@@ -39,6 +45,7 @@
 
 use std::collections::BTreeMap;
 
+use serde::de::DeserializeSeed;
 use serde_json::Value;
 
 use tsv_cli::cli::format_source::format_source;
@@ -116,25 +123,31 @@ pub(crate) fn source_has_ignore_directive(source: &str) -> bool {
 /// the wire it builds is compared against another wire from the same reader, never
 /// published as a `Program.sourceType` claim.
 pub(crate) fn tsv_parse_to_value(source: &str, parser: ParserType) -> Option<Value> {
+    Some(crate::json::wire_value(&tsv_parse_to_wire_bytes(
+        source, parser,
+    )?))
+}
+
+/// Parse `source` with tsv's own parser and emit the wire JSON — the **bytes** half of
+/// [`tsv_parse_to_value`], which reads them back into a tree.
+///
+/// The round-trip gate's population-only path takes this one instead: its whole question is the
+/// node census ([`streamed_node_census`]), which the bytes answer directly, and the tree it
+/// would otherwise build costs more than the parse, the emit and the census together.
+pub(crate) fn tsv_parse_to_wire_bytes(source: &str, parser: ParserType) -> Option<Vec<u8>> {
     let arena = bumpalo::Bump::new();
     match parser {
         ParserType::TypeScript => {
             let ast = tsv_ts::parse_with_goal_or_fallback(source, None, &arena).ok()?;
-            Some(crate::json::wire_value(&tsv_ts::convert_ast_json_bytes(
-                &ast, source,
-            )))
+            Some(tsv_ts::convert_ast_json_bytes(&ast, source))
         }
         ParserType::Svelte => {
             let ast = tsv_svelte::parse(source, &arena).ok()?;
-            Some(crate::json::wire_value(
-                &tsv_svelte::convert_ast_json_bytes(&ast, source),
-            ))
+            Some(tsv_svelte::convert_ast_json_bytes(&ast, source))
         }
         ParserType::Css => {
             let ast = tsv_css::parse(source, &arena).ok()?;
-            Some(crate::json::wire_value(&tsv_css::convert_ast_json_bytes(
-                &ast, source,
-            )))
+            Some(tsv_css::convert_ast_json_bytes(&ast, source))
         }
     }
 }
@@ -502,6 +515,105 @@ impl std::fmt::Display for CensusKey<'_> {
     }
 }
 
+/// What one wire object contributes to the census — [`node_census`]'s table as a verdict, so
+/// that the classification has one home and the two walks below can only ever agree.
+enum CensusEntry<'a> {
+    /// Nothing: an erased wrapper or container, a whitespace-only separator `Text`, or a value
+    /// that is not a node at all.
+    Erased,
+    /// One conserved node, keyed as the table says (its `type`, or the conflated `key`).
+    Node(&'a str),
+    /// A fragment text's WORDS rather than its node — the `data` to split.
+    Words(&'a str),
+}
+
+/// The census entry a wire object contributes, from the four things the table keys on: its
+/// `type`, the object `key` it was reached through, its own `data` / `value` shape, and whether
+/// it sits inside a raw `<script>` / `<style>` island.
+///
+/// The table in [`node_census`] is the invariant; this is the one implementation of it.
+///
+/// `data` and `value_is_string` come as thunks because only two of the table's rows read them
+/// (a `Text` and a property-key `Literal`), and the `Value` walk answers each with a map lookup
+/// it would otherwise pay on every node of the tree.
+fn census_entry<'a>(
+    ty: Option<&'a str>,
+    key: Option<&str>,
+    raw_island: bool,
+    data: impl FnOnce() -> Option<&'a str>,
+    value_is_string: impl FnOnce() -> bool,
+) -> CensusEntry<'a> {
+    match ty {
+        None
+        | Some(
+            "EmptyStatement"
+            | "TSParenthesizedType"
+            | "TSUnionType"
+            | "TSIntersectionType"
+            | "TSInstantiationExpression"
+            | "ChainExpression"
+            | "Fragment",
+        ) => CensusEntry::Erased,
+        Some("Text") => {
+            let data = data().unwrap_or("");
+            if data.trim().is_empty() {
+                // The formatter's own separator.
+                CensusEntry::Erased
+            } else if key == Some("nodes") && !raw_island {
+                CensusEntry::Words(data)
+            } else {
+                CensusEntry::Node("Text")
+            }
+        }
+        Some("Identifier") if key == Some("key") => CensusEntry::Node("key"),
+        Some("Literal") if key == Some("key") && value_is_string() => CensusEntry::Node("key"),
+        Some(ty) => CensusEntry::Node(ty),
+    }
+}
+
+/// Whether the census skips the subtree at `key` inside a node of type `ty` — the table's
+/// skip rules (metadata and positions, comments, a directive's shorthand-normalized value, an
+/// await block's binding).
+fn census_skips_key(key: &str, ty: Option<&str>) -> bool {
+    matches!(
+        key,
+        "extra" | "loc" | "comments" | "leadingComments" | "trailingComments" | "comment"
+    ) || (ty.is_some_and(|t| t.ends_with("Directive")) && matches!(key, "value" | "expression"))
+        || (ty == Some("AwaitBlock") && matches!(key, "value" | "error"))
+}
+
+/// Whether a node of this type steers how its OWN children are censused — the three the rules
+/// above read a parent's `type` for: a directive (whose shorthand-normalized value is skipped),
+/// an await block (whose binding is), and an element (which may open a raw island). Every other
+/// type is read only for the node's own entry, which is settled once the object closes.
+///
+/// [`streamed_node_census`] is the caller: taking children as they arrive, it needs these three
+/// to have been spelled BEFORE them, and this is the predicate that says which wire fields it
+/// actually waits on. (Svelte's `Root` spells its `type` fifth, and steers nothing.)
+fn census_type_steers_children(ty: &str) -> bool {
+    ty.ends_with("Directive") || matches!(ty, "AwaitBlock" | "RegularElement")
+}
+
+/// Whether this node opens a raw `<script>` / `<style>` island — a text inside one is code the
+/// formatter reformats, so the table counts it as a node rather than as words.
+fn census_opens_raw_island(ty: Option<&str>, name: Option<&str>) -> bool {
+    ty == Some("RegularElement") && matches!(name, Some("script" | "style"))
+}
+
+/// Tally one object's [`CensusEntry`] — the census's only mutation. A `Words` entry splits into
+/// one tally per word, which is why this is a step of its own rather than a key.
+fn census_count<'a>(out: &mut BTreeMap<CensusKey<'a>, usize>, entry: CensusEntry<'a>) {
+    match entry {
+        CensusEntry::Erased => {}
+        CensusEntry::Node(ty) => count(out, CensusKey::Node(ty)),
+        CensusEntry::Words(data) => {
+            for word in data.split_whitespace() {
+                count(out, CensusKey::Word(word));
+            }
+        }
+    }
+}
+
 /// Walk `v`, counting one entry per conserved node (and per word of a fragment text). `key` is the
 /// object key the value was reached through (`None` at the root; an array hands its own key
 /// down), which is how a text node's role — fragment child vs attribute value — and a property
@@ -516,57 +628,20 @@ fn collect_conserved_nodes<'a>(
     match v {
         Value::Object(map) => {
             let ty = map.get("type").and_then(Value::as_str);
-            match ty {
-                None
-                | Some(
-                    "EmptyStatement"
-                    | "TSParenthesizedType"
-                    | "TSUnionType"
-                    | "TSIntersectionType"
-                    | "TSInstantiationExpression"
-                    | "ChainExpression"
-                    | "Fragment",
-                ) => {}
-                Some("Text") => {
-                    let data = map.get("data").and_then(Value::as_str).unwrap_or("");
-                    if data.trim().is_empty() {
-                        // The formatter's own separator.
-                    } else if key == Some("nodes") && !raw_island {
-                        for word in data.split_whitespace() {
-                            count(out, CensusKey::Word(word));
-                        }
-                    } else {
-                        count(out, CensusKey::Node("Text"));
-                    }
-                }
-                Some("Identifier") if key == Some("key") => count(out, CensusKey::Node("key")),
-                Some("Literal")
-                    if key == Some("key") && map.get("value").is_some_and(Value::is_string) =>
-                {
-                    count(out, CensusKey::Node("key"));
-                }
-                Some(ty) => count(out, CensusKey::Node(ty)),
-            }
-            let is_directive = ty.is_some_and(|t| t.ends_with("Directive"));
-            let is_await = ty == Some("AwaitBlock");
-            let raw_island = raw_island
-                || (ty == Some("RegularElement")
-                    && matches!(
-                        map.get("name").and_then(Value::as_str),
-                        Some("script" | "style")
-                    ));
+            census_count(
+                out,
+                census_entry(
+                    ty,
+                    key,
+                    raw_island,
+                    || map.get("data").and_then(Value::as_str),
+                    || map.get("value").is_some_and(Value::is_string),
+                ),
+            );
+            let raw_island =
+                raw_island || census_opens_raw_island(ty, map.get("name").and_then(Value::as_str));
             for (k, child) in map {
-                let skip = matches!(
-                    k.as_str(),
-                    "extra"
-                        | "loc"
-                        | "comments"
-                        | "leadingComments"
-                        | "trailingComments"
-                        | "comment"
-                ) || (is_directive && matches!(k.as_str(), "value" | "expression"))
-                    || (is_await && matches!(k.as_str(), "value" | "error"));
-                if skip {
+                if census_skips_key(k, ty) {
                     continue;
                 }
                 collect_conserved_nodes(child, Some(k), raw_island, out);
@@ -581,8 +656,7 @@ fn collect_conserved_nodes<'a>(
     }
 }
 
-/// Add one to `key`'s tally — the census's only mutation, named so the walk above reads as the
-/// classification it is.
+/// Add one to `key`'s tally.
 fn count<'a>(out: &mut BTreeMap<CensusKey<'a>, usize>, key: CensusKey<'a>) {
     *out.entry(key).or_insert(0) += 1;
 }
@@ -592,15 +666,242 @@ fn count<'a>(out: &mut BTreeMap<CensusKey<'a>, usize>, key: CensusKey<'a>) {
 /// signal every round-trip consumer files as a node-loss finding: a formatter never changes a
 /// document's node population, so there is no sanctioned reading of a difference here.
 pub(crate) fn node_conservation_diff(input: &Value, output: &Value) -> Option<String> {
-    let before = node_census(input);
-    let after = node_census(output);
+    census_verdict(&node_census(input), &node_census(output))
+}
+
+/// [`node_conservation_diff`] over the wire BYTES, reading each side with
+/// [`streamed_node_census`] and falling back to the `Value` walk on a wire that census
+/// declines. The round-trip gate's population-only path, which has no other use for a tree.
+pub(crate) fn streamed_node_conservation_diff(input: &[u8], output: &[u8]) -> Option<String> {
+    let names = bumpalo::Bump::new();
+    match (
+        streamed_node_census(input, &names),
+        streamed_node_census(output, &names),
+    ) {
+        (Some(before), Some(after)) => census_verdict(&before, &after),
+        // Either wire spells something the streaming reader declines to census (see
+        // `streamed_node_census`). The verdict is the `Value` walk's, at the `Value` walk's cost.
+        _ => node_conservation_diff(
+            &crate::json::wire_value(input),
+            &crate::json::wire_value(output),
+        ),
+    }
+}
+
+/// The population verdict two censuses reach — `None` when they are equal, the delta otherwise.
+/// One spelling for the two readers, so a wire censused either way reports identically.
+fn census_verdict<K: Ord + std::fmt::Display>(
+    before: &BTreeMap<K, usize>,
+    after: &BTreeMap<K, usize>,
+) -> Option<String> {
     if before == after {
         return None;
     }
     Some(format!(
         "node population not conserved — {}",
-        multiset_delta(&before, &after)
+        multiset_delta(before, after)
     ))
+}
+
+/// [`node_census`] over the wire BYTES, with no `Value` tree in between.
+///
+/// The census is the one question the round-trip gate's fast path asks beyond "does it
+/// reparse?", and building a `Value` to answer it cost more than everything else that path does
+/// put together (the tree is ~11x the cost of reading the same bytes without one, and its drop
+/// a fifth of that again). This reads the same bytes through the same
+/// [rules](census_entry) with a `serde_json` [`Deserializer`](serde_json::Deserializer) and a
+/// seed per value, materializing nothing but the census itself — which is why `json.rs` stays
+/// the one place this crate reads JSON into a **tree**.
+///
+/// `names` holds the census keys of the few strings that arrive escaped (a `data` with a `\n`
+/// in it); everything else borrows straight out of `wire`, exactly as the `Value` walk's keys
+/// borrow out of the tree.
+///
+/// **`None` means "not censused here"** — never "conserved". The reader takes each object's
+/// children as they arrive, so the few fields that steer them
+/// ([`census_type_steers_children`], and such an element's `name`) have to be spelled ahead of
+/// them; a wire that spells one late — or that this reader otherwise declines — is handed back
+/// for the `Value` walk rather than censused on a guess.
+/// [`streamed_node_conservation_diff`] is what closes that loop, so the verdict is the same
+/// either way.
+pub(crate) fn streamed_node_census<'a>(
+    wire: &'a [u8],
+    names: &'a bumpalo::Bump,
+) -> Option<BTreeMap<CensusKey<'a>, usize>> {
+    let mut state = CensusState {
+        out: BTreeMap::new(),
+        names,
+        steering_fields_led: true,
+    };
+    let mut de = serde_json::Deserializer::from_slice(wire);
+    // The same unbounded depth `crate::json` reads at, for the same reason — and on the same
+    // sized stacks, since every caller here is an audit.
+    de.disable_recursion_limit();
+    CensusSeed {
+        state: &mut state,
+        key: None,
+        raw_island: false,
+    }
+    .deserialize(&mut de)
+    .ok()?;
+    de.end().ok()?;
+    state.steering_fields_led.then_some(state.out)
+}
+
+/// The streaming census's accumulator: the tally, the arena its escaped keys live in, and
+/// whether the wire held the field order the reader needs (see [`streamed_node_census`]).
+struct CensusState<'a> {
+    out: BTreeMap<CensusKey<'a>, usize>,
+    names: &'a bumpalo::Bump,
+    steering_fields_led: bool,
+}
+
+/// One value of the wire, seeded with the context its census needs: the object `key` it is
+/// reached through and whether it sits in a raw `<script>` / `<style>` island.
+struct CensusSeed<'s, 'a> {
+    state: &'s mut CensusState<'a>,
+    key: Option<&'a str>,
+    raw_island: bool,
+}
+
+/// What a censused value turned out to be — the shape its parent needs to read its own fields
+/// (a `type` / `name` / `data` / `value`) and to know whether a child subtree has been walked.
+enum CensusValue<'a> {
+    Str(&'a str),
+    Subtree,
+    Other,
+}
+
+impl<'de, 'a> DeserializeSeed<'de> for CensusSeed<'_, 'a>
+where
+    'de: 'a,
+{
+    type Value = CensusValue<'a>;
+
+    fn deserialize<D: serde::Deserializer<'de>>(self, de: D) -> Result<Self::Value, D::Error> {
+        de.deserialize_any(self)
+    }
+}
+
+impl<'de, 'a> serde::de::Visitor<'de> for CensusSeed<'_, 'a>
+where
+    'de: 'a,
+{
+    type Value = CensusValue<'a>;
+
+    fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("a wire AST value")
+    }
+
+    fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E> {
+        Ok(CensusValue::Str(v))
+    }
+
+    /// An escaped string: serde decoded it into its own scratch, so the census's key takes a
+    /// copy in the arena (the `Value` walk's keys borrow from the tree's `String` the same way).
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> {
+        Ok(CensusValue::Str(self.state.names.alloc_str(v)))
+    }
+
+    fn visit_map<A: serde::de::MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+        let CensusSeed {
+            state,
+            key,
+            raw_island,
+        } = self;
+        let mut ty: Option<&'a str> = None;
+        let mut name: Option<&'a str> = None;
+        let mut data: Option<&'a str> = None;
+        let mut value_is_string = false;
+        let mut walked_subtree = false;
+        while let Some(field) = map.next_key::<&str>()? {
+            if census_skips_key(field, ty) {
+                map.next_value::<serde::de::IgnoredAny>()?;
+                continue;
+            }
+            let child_island = raw_island || census_opens_raw_island(ty, name);
+            let value = map.next_value_seed(CensusSeed {
+                state,
+                key: Some(field),
+                raw_island: child_island,
+            })?;
+            match (field, &value) {
+                ("type", CensusValue::Str(s)) => {
+                    // Late, this `type` could not have steered the children it was supposed to
+                    // steer — see the doc above. A type that steers none is late for nothing.
+                    state.steering_fields_led &= !walked_subtree || !census_type_steers_children(s);
+                    ty = Some(s);
+                }
+                ("name", CensusValue::Str(s)) => {
+                    // The `name` only steers an element's children, and only its own.
+                    state.steering_fields_led &= !walked_subtree || ty != Some("RegularElement");
+                    name = Some(s);
+                }
+                ("data", CensusValue::Str(s)) => data = Some(s),
+                ("value", CensusValue::Str(_)) => value_is_string = true,
+                _ => {}
+            }
+            walked_subtree |= matches!(value, CensusValue::Subtree);
+        }
+        census_count(
+            &mut state.out,
+            census_entry(ty, key, raw_island, || data, || value_is_string),
+        );
+        Ok(CensusValue::Subtree)
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        let CensusSeed {
+            state,
+            key,
+            raw_island,
+        } = self;
+        // An array hands its own key down, exactly as the `Value` walk does.
+        while seq
+            .next_element_seed(CensusSeed {
+                state,
+                key,
+                raw_island,
+            })?
+            .is_some()
+        {}
+        Ok(CensusValue::Subtree)
+    }
+
+    fn visit_bool<E>(self, _v: bool) -> Result<Self::Value, E> {
+        Ok(CensusValue::Other)
+    }
+
+    fn visit_i64<E>(self, _v: i64) -> Result<Self::Value, E> {
+        Ok(CensusValue::Other)
+    }
+
+    fn visit_u64<E>(self, _v: u64) -> Result<Self::Value, E> {
+        Ok(CensusValue::Other)
+    }
+
+    fn visit_f64<E>(self, _v: f64) -> Result<Self::Value, E> {
+        Ok(CensusValue::Other)
+    }
+
+    // A number too wide for `u64` / `i64` reaches a `deserialize_any` visitor through
+    // serde_json's arbitrary-precision path, which hands it back as whichever width holds it.
+    // Unimplemented, these would error — declining a whole wire over a big integer.
+    fn visit_u128<E>(self, _v: u128) -> Result<Self::Value, E> {
+        Ok(CensusValue::Other)
+    }
+
+    fn visit_i128<E>(self, _v: i128) -> Result<Self::Value, E> {
+        Ok(CensusValue::Other)
+    }
+
+    fn visit_unit<E>(self) -> Result<Self::Value, E> {
+        Ok(CensusValue::Other)
+    }
+
+    fn visit_none<E>(self) -> Result<Self::Value, E> {
+        Ok(CensusValue::Other)
+    }
 }
 
 /// The `lost [...] gained [...]` rendering of two multisets' difference, shared by the two
@@ -936,6 +1237,156 @@ mod node_census_tests {
             node_conservation_diff(&a, &b)
                 .unwrap()
                 .contains("n:Comment (-1)")
+        );
+    }
+}
+
+#[cfg(test)]
+mod streamed_census_tests {
+    use super::*;
+    use serde_json::json;
+
+    /// The wire bytes of a `json!` tree, in the order the macro spells its keys (serde_json
+    /// runs with `preserve_order` here) — which is what these tests are about.
+    fn wire(value: &Value) -> Vec<u8> {
+        serde_json::to_vec(value).expect("serialize")
+    }
+
+    fn streamed(bytes: &[u8], names: &bumpalo::Bump) -> BTreeMap<String, usize> {
+        streamed_node_census(bytes, names)
+            .expect("the streamed census must not decline this wire")
+            .into_iter()
+            .map(|(k, n)| (k.to_string(), n))
+            .collect()
+    }
+
+    fn walked(value: &Value) -> BTreeMap<String, usize> {
+        node_census(value)
+            .into_iter()
+            .map(|(k, n)| (k.to_string(), n))
+            .collect()
+    }
+
+    /// Svelte's `Root` spells its `type` fifth, after the `css` and `js` subtrees — and steers
+    /// nothing, so the streamed census reads it rather than declining. This is the pin on that:
+    /// declining here would hand every Svelte file to the `Value` walk and cost the whole point.
+    #[test]
+    fn a_root_spelling_its_type_late_is_still_censused() {
+        let root = json!({
+            "css": {"type": "StyleSheet", "children": []},
+            "js": [],
+            "start": 0,
+            "end": 3,
+            "type": "Root",
+            "fragment": {"type": "Fragment", "nodes": [{"type": "Text", "data": "hi there"}]},
+        });
+        let bytes = wire(&root);
+        let names = bumpalo::Bump::new();
+        assert_eq!(streamed(&bytes, &names), walked(&root));
+        assert!(walked(&root).contains_key("n:Root"));
+    }
+
+    /// A `type` that DOES steer its children (an element, which may open a raw island) is a
+    /// different matter: spelled after them, it could not have steered them, so the streamed
+    /// census declines and [`streamed_node_conservation_diff`] falls back to the `Value` walk —
+    /// which is why the verdict is the same either way.
+    #[test]
+    fn a_late_steering_type_declines_and_falls_back() {
+        let late = json!({
+            "fragment": {"type": "Fragment", "nodes": [{"type": "Text", "data": "let a = 1"}]},
+            "name": "script",
+            "type": "RegularElement",
+        });
+        let bytes = wire(&late);
+        let names = bumpalo::Bump::new();
+        assert!(
+            streamed_node_census(&bytes, &names).is_none(),
+            "a steering type spelled after its children must not be censused on a guess"
+        );
+        // The fallback still reaches the verdict — and the right one: the text sits in a raw
+        // island, so it counts as a node rather than as its words.
+        assert!(streamed_node_conservation_diff(&bytes, &bytes).is_none());
+        assert_eq!(walked(&late).get("n:Text"), Some(&1));
+        let dropped = json!({
+            "fragment": {"type": "Fragment", "nodes": []},
+            "name": "script",
+            "type": "RegularElement",
+        });
+        assert!(streamed_node_conservation_diff(&bytes, &wire(&dropped)).is_some());
+    }
+
+    /// An escaped string arrives decoded in serde's own scratch rather than borrowed from the
+    /// wire, so its census keys take a copy in the arena. The words must come out the same.
+    #[test]
+    fn escaped_text_data_counts_the_same_words() {
+        let a = json!({"type": "Fragment", "nodes": [{"type": "Text", "data": "a\n\tb \"c\""}]});
+        let bytes = wire(&a);
+        let names = bumpalo::Bump::new();
+        let census = streamed(&bytes, &names);
+        assert_eq!(census, walked(&a));
+        assert_eq!(census.get("w:a"), Some(&1));
+        assert_eq!(census.get("w:\"c\""), Some(&1));
+    }
+
+    /// A non-integer `Literal.value` reaches a `deserialize_any` visitor through serde_json's
+    /// arbitrary-precision path — as a one-field map with a private key, not as a number — and
+    /// a reader that mishandled that shape would decline every wire holding a float.
+    #[test]
+    fn a_float_literal_does_not_decline_the_streamed_census() {
+        let a = json!({"type": "Program", "body": [
+            {"type": "Literal", "value": 1.5, "raw": "1.5"},
+            {"type": "Literal", "value": 1e30, "raw": "1e30"},
+            {"type": "Literal", "value": 10_000_000_000_000_000_000_000.0_f64, "raw": "1e22"},
+        ]});
+        let bytes = wire(&a);
+        let names = bumpalo::Bump::new();
+        assert_eq!(streamed(&bytes, &names), walked(&a));
+    }
+
+    /// The drift guard between the two walks: over every fixture input, in all three
+    /// languages, the streamed census and the `Value` walk must agree entry for entry — and
+    /// the streamed one must never decline, or the round-trip gate quietly pays for a tree it
+    /// has no other use for.
+    #[test]
+    fn the_two_walks_agree_over_every_fixture_wire() {
+        use tsv_cli::cli::input::ParserType;
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
+        let mut checked = 0usize;
+        let mut stack = vec![root];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).expect("fixtures dir") {
+                let path = entry.expect("dir entry").path();
+                if path.is_dir() {
+                    stack.push(path);
+                    continue;
+                }
+                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                if !name.starts_with("input.") || name.starts_with("input_invalid") {
+                    continue;
+                }
+                let Ok(source) = std::fs::read_to_string(&path) else {
+                    continue;
+                };
+                let parser = ParserType::from_extension(&path.to_string_lossy());
+                let Some(bytes) = tsv_parse_to_wire_bytes(&source, parser) else {
+                    continue;
+                };
+                let names = bumpalo::Bump::new();
+                let streamed = streamed_node_census(&bytes, &names)
+                    .unwrap_or_else(|| panic!("the streamed census declined {}", path.display()));
+                let value = crate::json::wire_value(&bytes);
+                assert_eq!(
+                    census_verdict(&streamed, &node_census(&value)),
+                    None,
+                    "the two census walks disagree on {}",
+                    path.display()
+                );
+                checked += 1;
+            }
+        }
+        assert!(
+            checked > 4_000,
+            "censused only {checked} fixture wires — the fixture tree moved?"
         );
     }
 }
