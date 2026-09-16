@@ -1419,13 +1419,14 @@ the default width).
 # SEES but filed into the render-noisy divergent bucket, which is how a glued element run
 # before a block printing only its last member shipped; zero-tolerance, no ratchet),
 # {tsv,canonical}_leaf_corruption (the skeleton holds but conserved leaf text changed) and
-# {tsv,canonical}_divergent (structural change); read_error, format_error and
-# canonical_rejects_input are skips that carry no verdict. The gate buckets read zero on real
-# formatted code; the divergent bucket there holds a handful of template files where a
-# whitespace Text node appears or vanishes beside a BLOCK element — real document drift
-# for this audit's deliberately narrower question (see `render_browser`'s module doc),
-# render-free for the compiler (`render:audit` grades the same files equivalent) — so
-# point it at the delimiter-dense prettier suites for the work-list.
+# {tsv,canonical}_divergent (structural change); read_error, format_error,
+# canonical_rejects_input and canonical_diverges_on_input are skips that carry no verdict.
+# The gate buckets read zero on real formatted code; the divergent bucket there holds a
+# handful of template files where a whitespace Text node appears or vanishes beside a BLOCK
+# element — real document drift for this audit's deliberately narrower question (see
+# `render_browser`'s module doc), render-free for the compiler (`render:audit` grades the
+# same files equivalent) — so point it at the delimiter-dense prettier suites for the
+# work-list.
 cargo run -p tsv_debug roundtrip_audit                              # audit tests/fixtures
 cargo run -p tsv_debug roundtrip_audit ../prettier/tests/format/js ../corpora/collections/zzz/src
 # --gate fails on the *_unreparseable, *_node_loss and *_leaf_corruption buckets (divergent
@@ -1466,6 +1467,53 @@ a smaller corpus can only cost coverage, never soften a verdict. A *partial* `..
 checkout exists but a listed suite does not) warns per suite and audits the rest. The suite list
 is shared with [the corpus bundle](#the-corpus-bundle-auditcorpus) from
 `scripts/roundtrip_audit_prettier.ts`, so the cheap leg and the release-cadence one cannot drift.
+
+### Standing to grade: `canonical_diverges_on_input`
+
+The canonical phase asks whether the formatter changed the document **as the canonical
+parser reads it**. That question is only well posed while both parsers are reading the same
+document, so the phase first checks that canonical's node census of the *input* matches
+tsv's. Where it does not, the file is skipped as `canonical_diverges_on_input` — the same
+standing-to-grade question `canonical_rejects_input` already answers in its extreme form,
+where canonical produces no tree at all.
+
+The skip is what it is because the two parsers **do** disagree in places, deliberately, and
+every such disagreement would otherwise read as node loss: tsv formats the program *it*
+read, the output is a form both parsers then agree on, and the census delta across the
+format is the divergence closing rather than a node the formatter dropped. Every member is
+cataloged in [conformance_svelte.md](./conformance_svelte.md) — a class-member `static`
+across a line break, `export default abstract⏎class`, the type-assertion-vs-generic-arrow
+reading and an `each` block's optional-member context annotation under §TypeScript
+Corrections, the `:nth-child(… of …)` selectors and the consecutive combinator under §CSS
+Corrections, the entity decodings under §Entity Decoding Corrections — and in every one of
+them tsc, prettier, or the spec grades tsv right and the canonical parser wrong.
+
+It stays **tight**, which is the property that makes it safe: 20 of 10,171 `tests/fixtures`
+files, 2 of the 2,351 files the pinned prettier suites walk (3 of 4,784 across all of
+`../prettier/tests/format`), and **0 of 6,702** in the `../corpora` snapshot. 18 of those 20
+sit in fixture directories whose own `_svelte_divergence` /
+`_svelte_prettier_divergence` suffix already declares the parse divergence, so the census
+rediscovers the declared set from the other side. The two that do not are
+[class/abstract/export_default_line_break](../tests/fixtures/typescript/declarations/class/abstract/export_default_line_break/)
+and [class/modifier_line_break](../tests/fixtures/typescript/declarations/class/modifier_line_break/),
+where the divergence is reachable only from an `unformatted_*` **variant** — and a variant
+tsv parses differently from the canonical parser has no fixture shape to declare it with
+([fixture_overview.md §P4](./fixture_overview.md)), so its trees are pinned by
+[class_modifier_line_break.rs](../tests/class_modifier_line_break.rs) instead.
+
+**The blind spot it concedes**: a formatter bug that *only* the canonical parser can see, on
+a file where the two parsers already disagree about the input. Phase 1 still grades every
+such file tsv-vs-tsv, so what is lost is exactly the cell where tsv's own parser is blind to
+the corruption **and** the input carries a pre-existing divergence; separating that from a
+sanctioned divergence would mean deciding which parser is right, which is
+`corpus:compare:parse`'s question, not this audit's. `canonical_unreparseable` is asked
+*before* the standing check and so still fires — canonical rejecting tsv's output is a
+drop-in violation however canonical read the input.
+
+Nothing else reaches those two. The fixture gate's render-equivalence check (R rules)
+compiles each variant and `input` through Svelte and compares the browser-visible render,
+so it is blind to anything inside a `<script>` island — both fixtures live in one — and the
+`static` case is a class body, which renders nothing at all.
 
 ## Comment↔Token Binding Audit (`binding:audit`)
 
