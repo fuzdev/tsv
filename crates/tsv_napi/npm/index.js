@@ -5,7 +5,7 @@
  * (`@fuzdev/tsv-<triple>`, installed as optionalDependencies — the
  * package manager selects by their `os`/`cpu`/`libc` fields; this file only
  * resolves the matching name). The formatter and parser API mirrors
- * `@fuzdev/tsv_wasm` — same names, same `(source, options?)` bags, same error
+ * `@fuzdev/tsv-wasm` — same names, same `(source, options?)` bags, same error
  * strings — so the two are drop-in swaps: this one is the fast native path,
  * that one the universal fallback (browsers + unsupported platforms). What is
  * absent here is only what a WASM engine needs and this one doesn't: `init()`
@@ -23,7 +23,7 @@
  * wider pool, crossing over at fewer files — and as the signal that a trapped
  * engine cannot be recovered (`recover_engine_suffix`, unreachable here).
  *
- * ESM, the same module system as `@fuzdev/tsv_wasm` — one dialect across tsv's
+ * ESM, the same module system as `@fuzdev/tsv-wasm` — one dialect across tsv's
  * whole npm surface, which is what lets the shared `locations.js` and `cli.js`
  * sources load unchanged in either package. `.node` binaries have no ESM
  * loader, so the platform addon itself is always `require`d, through
@@ -65,9 +65,9 @@ try {
 		? `This platform is prebuilt, so the package should have installed with @fuzdev/tsv — ` +
 			`run \`npm i @fuzdev/tsv-${triple}\`, or delete node_modules and the lockfile and ` +
 			`reinstall (a lockfile from another platform, or --omit=optional, drops it); ` +
-			`@fuzdev/tsv_wasm (universal WASM, same API) needs no native package. `
+			`@fuzdev/tsv-wasm (universal WASM, same API) needs no native package. `
 		: `Prebuilt platforms: ${SUPPORTED.join(', ')}. ` +
-			`On an unsupported platform use @fuzdev/tsv_wasm (universal WASM, same API). `;
+			`On an unsupported platform use @fuzdev/tsv-wasm (universal WASM, same API). `;
 	throw new Error(
 		`@fuzdev/tsv: failed to load the native binding for ${triple} ` +
 			`(@fuzdev/tsv-${triple}). ${remedy}Cause: ${cause?.message ?? cause}`,
@@ -76,7 +76,7 @@ try {
 }
 
 /**
- * Mirror of `@fuzdev/tsv_wasm`'s `read_options`, key for key — same defaults,
+ * Mirror of `@fuzdev/tsv-wasm`'s `read_options`, key for key — same defaults,
  * same error strings — so swapping the WASM package for this one never changes
  * an error a caller matches on. Unknown keys error whatever their value (a
  * typo like `{locatons: false}` must not silently opt out); a supported key
@@ -178,6 +178,6 @@ export const format_css = (source, options) => {
 
 // The discovery matcher, re-exported straight off the addon — it takes no
 // options bag, so there is nothing to wrap. Same class name and method surface
-// as `@fuzdev/tsv_wasm`'s, including `undefined` (not `null`) from the three
+// as `@fuzdev/tsv-wasm`'s, including `undefined` (not `null`) from the three
 // maybe-a-warning methods, so `cli.js` drives either package's copy unchanged.
 export const IgnoreStack = addon.IgnoreStack;

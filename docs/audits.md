@@ -969,7 +969,7 @@ deno task check:ast-types
 ```
 
 **What it proves.** That `crates/tsv_wasm/types/tsv_ast.d.ts` still describes what the
-converter emits. That `.d.ts` is hand-maintained and it **ships** — `@fuzdev/tsv_parse_wasm`
+converter emits. That `.d.ts` is hand-maintained and it **ships** — `@fuzdev/tsv-parse-wasm`
 bundles it, so it is the wire contract consumers type against, and nothing in the Rust build
 knows it exists. TypeScript's excess-property checking on the generated object literals catches
 both directions of drift: a field the converter emits that the `.d.ts` lacks ("may only specify

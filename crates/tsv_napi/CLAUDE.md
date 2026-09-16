@@ -100,10 +100,10 @@ positively — a runtime shipping no report, or a partial one, must not read as
 musl. Cheapest question first, and each is able to end it; the three probes go
 in as a bag, so `scripts/test_napi_npm.ts` drives the verdict over hosts no
 runner has), requires `@fuzdev/tsv-<triple>`, and on failure throws an error
-naming the triple, the prebuilt set, and `@fuzdev/tsv_wasm` as the universal
+naming the triple, the prebuilt set, and `@fuzdev/tsv-wasm` as the universal
 fallback.
 
-**`@fuzdev/tsv` is the full native distribution; `@fuzdev/tsv_wasm` is the
+**`@fuzdev/tsv` is the full native distribution; `@fuzdev/tsv-wasm` is the
 fallback** — so parity runs the whole way, not just the engine calls. Same
 export names, same `(source, options?)` bags, same error strings: the loader's
 `read_options` mirrors the wasm crate's key for key, and
@@ -165,7 +165,7 @@ packaged shape under Node — loader resolution (by BARE SPECIFIER: the ESM walk
 of the `exports` map from a cwd inside the staging, and the CommonJS
 `require.resolve` walk of the same map, plus the encapsulation — a file the map
 does not name stays unreachable), the options surface with exact error strings,
-the export-set diff against `@fuzdev/tsv_wasm` when that package is staged and
+the export-set diff against `@fuzdev/tsv-wasm` when that package is staged and
 fresh, package.json coherence (pins, selection fields, `files` on both
 packages, the executable bit on the CLI binary, the
 loader-`SUPPORTED`-vs-optionalDependencies agreement), the

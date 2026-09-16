@@ -10,7 +10,7 @@
 //! shared.
 //!
 //! Behind the `json` feature (enabled transitively by each language crate's
-//! `convert` feature) so the format-only `@fuzdev/tsv_format_wasm` build — which
+//! `convert` feature) so the format-only `@fuzdev/tsv-format-wasm` build — which
 //! turns `convert` off — never links `serde_json`.
 //!
 //! **Escape / format parity contract**: static structure and tokens are written
@@ -600,7 +600,7 @@ impl JsonWriter {
     // ⚠️ `inline(never)`, and that is a **size** constraint. The body below is
     // small enough that LLVM will happily inline it at all ~200 writer call
     // sites, and each copy carries the fixed-width blit — which grew the
-    // `@fuzdev/tsv_parse_wasm` bundle 6% and blew its publish size bound.
+    // `@fuzdev/tsv-parse-wasm` bundle 6% and blew its publish size bound.
     // Out-of-line the win is unaffected: it comes from removing the libc
     // `memmove` **call** inside the body, not from removing the call *to* the
     // body (which the pre-existing code also paid).

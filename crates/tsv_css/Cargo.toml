@@ -7,7 +7,7 @@ description = "CSS parsing and formatting library"
 [features]
 default = ["convert"]
 # The wire-JSON conversion layer (`ast/convert/write.rs`). Off in the
-# @fuzdev/tsv_format_wasm build; on for every other consumer. Pulls in the
+# @fuzdev/tsv-format-wasm build; on for every other consumer. Pulls in the
 # shared wire-JSON writer substrate (`tsv_lang/json`) the emitter builds on.
 convert = ["tsv_lang/json"]
 # Exposes `debug_token_stream` for the differential lexer harness (`tsv_debug

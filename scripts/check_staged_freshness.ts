@@ -18,7 +18,7 @@
  * artifact and hands the reason back, for a caller whose right answer is to
  * SKIP — a check reaching into a package it cannot rebuild, where failing
  * would only be telling the operator to run someone else's build (that is
- * `test_napi_npm.ts` over `@fuzdev/tsv_wasm`). Both read the same mtimes, so a
+ * `test_napi_npm.ts` over `@fuzdev/tsv-wasm`). Both read the same mtimes, so a
  * skip and an abort never disagree about what is stale.
  *
  * Staleness here has two lags — the `target/` build behind the sources, and the
