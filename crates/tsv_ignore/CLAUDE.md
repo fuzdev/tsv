@@ -17,7 +17,7 @@ git-faithful evaluator (the surface the CLI / WASM / extension actually use for
 
 Zero dependencies (no `tsv_*` crates, no external crates — not even the `ignore`
 crate). Hand-rolled on purpose: keeps the format-only WASM artifact
-(`@fuzdev/tsv_format_wasm`) tiny by avoiding `regex`/`globset`, and sidesteps the
+(`@fuzdev/tsv-format-wasm`) tiny by avoiding `regex`/`globset`, and sidesteps the
 dependency-approval gate.
 
 Consumers:

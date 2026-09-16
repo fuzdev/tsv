@@ -7,8 +7,8 @@
  * including the benchmark-only `parse_internal_*`:
  *  - Deno: the `deno` target (ESM; explicit `default()` init)
  *  - Node/Bun: the `nodejs` target (CommonJS; self-initializing on require)
- * The shipped `@fuzdev/tsv_wasm` (web) bundle is deliberately NOT used here — it
- * curates out `parse_internal_*`, which the `tsv_wasm-internal` row needs.
+ * The shipped `@fuzdev/tsv-wasm` (web) bundle is deliberately NOT used here — it
+ * curates out `parse_internal_*`, which the `tsv-wasm-internal` row needs.
  */
 
 import { stat } from 'node:fs/promises';
@@ -145,13 +145,13 @@ export class WasmImplementation extends BaseImplementation {
 		// Fairness guard for the parse rows: the wasm parse fns must return a
 		// js_sys-materialized OBJECT (the engine runs the host's JSON.parse from
 		// Rust). If a glue/build regression ever handed back the raw JSON string
-		// instead, the timed `tsv_wasm-json` rows would silently skip
+		// instead, the timed `tsv-wasm-json` rows would silently skip
 		// materialization and read artificially fast vs `tsv-json`. Probe once
 		// here, outside any timed loop.
 		const probe = this._module.parse_typescript('const x = 1;');
 		if (typeof probe !== 'object' || probe === null) {
 			throw new Error(
-				`tsv_wasm parse returned a ${typeof probe} — expected a materialized AST object`
+				`tsv-wasm parse returned a ${typeof probe} — expected a materialized AST object`
 			);
 		}
 

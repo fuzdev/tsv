@@ -111,7 +111,7 @@ for (const [from, to] of [
 	['crates/tsv_wasm/npm/locations.d.ts', 'locations.d.ts'],
 	// the JS CLI — imports its engine from `./index.js`, so the same source
 	// binds to the native loader here and to the wasm engine in
-	// @fuzdev/tsv_wasm (where it IS the bin); here it is bin.js's fallback
+	// @fuzdev/tsv-wasm (where it IS the bin); here it is bin.js's fallback
 	['crates/tsv_wasm/npm/cli.js', 'cli.js'],
 	['LICENSE', 'LICENSE']
 ]) {

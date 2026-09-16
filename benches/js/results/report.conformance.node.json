@@ -163,7 +163,7 @@
 					"processed": 318,
 					"total": 318
 				},
-				"tsv_wasm-json": {
+				"tsv-wasm-json": {
 					"processed": 318,
 					"total": 318
 				},
@@ -171,7 +171,7 @@
 					"processed": 318,
 					"total": 318
 				},
-				"tsv_wasm-json-no-locations": {
+				"tsv-wasm-json-no-locations": {
 					"processed": 318,
 					"total": 318
 				},
@@ -179,7 +179,7 @@
 					"processed": 318,
 					"total": 318
 				},
-				"tsv_wasm-internal": {
+				"tsv-wasm-internal": {
 					"processed": 318,
 					"total": 318
 				},
@@ -201,7 +201,7 @@
 					"processed": 84,
 					"total": 84
 				},
-				"tsv_wasm-json": {
+				"tsv-wasm-json": {
 					"processed": 84,
 					"total": 84
 				},
@@ -209,7 +209,7 @@
 					"processed": 84,
 					"total": 84
 				},
-				"tsv_wasm-json-no-locations": {
+				"tsv-wasm-json-no-locations": {
 					"processed": 84,
 					"total": 84
 				},
@@ -217,7 +217,7 @@
 					"processed": 84,
 					"total": 84
 				},
-				"tsv_wasm-internal": {
+				"tsv-wasm-internal": {
 					"processed": 84,
 					"total": 84
 				},
@@ -239,7 +239,7 @@
 					"processed": 4169,
 					"total": 4169
 				},
-				"tsv_wasm-json": {
+				"tsv-wasm-json": {
 					"processed": 4169,
 					"total": 4169
 				},
@@ -247,7 +247,7 @@
 					"processed": 4169,
 					"total": 4169
 				},
-				"tsv_wasm-json-no-locations": {
+				"tsv-wasm-json-no-locations": {
 					"processed": 4169,
 					"total": 4169
 				},
@@ -255,7 +255,7 @@
 					"processed": 4169,
 					"total": 4169
 				},
-				"tsv_wasm-internal": {
+				"tsv-wasm-internal": {
 					"processed": 4169,
 					"total": 4169
 				},
@@ -279,7 +279,7 @@
 					"processed": 781,
 					"total": 795
 				},
-				"tsv_wasm-json": {
+				"tsv-wasm-json": {
 					"processed": 781,
 					"total": 795
 				},
@@ -287,7 +287,7 @@
 					"processed": 781,
 					"total": 795
 				},
-				"tsv_wasm-json-no-locations": {
+				"tsv-wasm-json-no-locations": {
 					"processed": 781,
 					"total": 795
 				},
@@ -295,7 +295,7 @@
 					"processed": 781,
 					"total": 795
 				},
-				"tsv_wasm-internal": {
+				"tsv-wasm-internal": {
 					"processed": 781,
 					"total": 795
 				},
@@ -329,7 +329,7 @@
 					"processed": 920,
 					"total": 1106
 				},
-				"tsv_wasm-json": {
+				"tsv-wasm-json": {
 					"processed": 920,
 					"total": 1106
 				},
@@ -337,7 +337,7 @@
 					"processed": 920,
 					"total": 1106
 				},
-				"tsv_wasm-json-no-locations": {
+				"tsv-wasm-json-no-locations": {
 					"processed": 920,
 					"total": 1106
 				},
@@ -345,7 +345,7 @@
 					"processed": 920,
 					"total": 1106
 				},
-				"tsv_wasm-internal": {
+				"tsv-wasm-internal": {
 					"processed": 920,
 					"total": 1106
 				},
@@ -379,7 +379,7 @@
 					"processed": 78,
 					"total": 78
 				},
-				"tsv_wasm-json": {
+				"tsv-wasm-json": {
 					"processed": 78,
 					"total": 78
 				},
@@ -387,7 +387,7 @@
 					"processed": 78,
 					"total": 78
 				},
-				"tsv_wasm-json-no-locations": {
+				"tsv-wasm-json-no-locations": {
 					"processed": 78,
 					"total": 78
 				},
@@ -395,7 +395,7 @@
 					"processed": 78,
 					"total": 78
 				},
-				"tsv_wasm-internal": {
+				"tsv-wasm-internal": {
 					"processed": 78,
 					"total": 78
 				},
@@ -429,7 +429,7 @@
 					"processed": 137,
 					"total": 137
 				},
-				"tsv_wasm-json": {
+				"tsv-wasm-json": {
 					"processed": 137,
 					"total": 137
 				},
@@ -437,7 +437,7 @@
 					"processed": 137,
 					"total": 137
 				},
-				"tsv_wasm-json-no-locations": {
+				"tsv-wasm-json-no-locations": {
 					"processed": 137,
 					"total": 137
 				},
@@ -445,7 +445,7 @@
 					"processed": 137,
 					"total": 137
 				},
-				"tsv_wasm-internal": {
+				"tsv-wasm-internal": {
 					"processed": 137,
 					"total": 137
 				},
@@ -479,7 +479,7 @@
 					"processed": 43739,
 					"total": 43739
 				},
-				"tsv_wasm-json": {
+				"tsv-wasm-json": {
 					"processed": 43739,
 					"total": 43739
 				},
@@ -487,7 +487,7 @@
 					"processed": 43739,
 					"total": 43739
 				},
-				"tsv_wasm-json-no-locations": {
+				"tsv-wasm-json-no-locations": {
 					"processed": 43739,
 					"total": 43739
 				},
@@ -495,7 +495,7 @@
 					"processed": 43739,
 					"total": 43739
 				},
-				"tsv_wasm-internal": {
+				"tsv-wasm-internal": {
 					"processed": 43739,
 					"total": 43739
 				},
@@ -529,7 +529,7 @@
 					"processed": 8015,
 					"total": 8097
 				},
-				"tsv_wasm-json": {
+				"tsv-wasm-json": {
 					"processed": 8015,
 					"total": 8097
 				},
@@ -537,7 +537,7 @@
 					"processed": 8015,
 					"total": 8097
 				},
-				"tsv_wasm-json-no-locations": {
+				"tsv-wasm-json-no-locations": {
 					"processed": 8015,
 					"total": 8097
 				},
@@ -545,7 +545,7 @@
 					"processed": 8015,
 					"total": 8097
 				},
-				"tsv_wasm-internal": {
+				"tsv-wasm-internal": {
 					"processed": 8015,
 					"total": 8097
 				},
@@ -581,7 +581,7 @@
 					"processed": 124,
 					"total": 150
 				},
-				"tsv_wasm-json": {
+				"tsv-wasm-json": {
 					"processed": 124,
 					"total": 150
 				},
@@ -589,7 +589,7 @@
 					"processed": 124,
 					"total": 150
 				},
-				"tsv_wasm-internal": {
+				"tsv-wasm-internal": {
 					"processed": 124,
 					"total": 150
 				},
@@ -607,7 +607,7 @@
 					"processed": 181,
 					"total": 182
 				},
-				"tsv_wasm-json": {
+				"tsv-wasm-json": {
 					"processed": 181,
 					"total": 182
 				},
@@ -615,7 +615,7 @@
 					"processed": 181,
 					"total": 182
 				},
-				"tsv_wasm-internal": {
+				"tsv-wasm-internal": {
 					"processed": 181,
 					"total": 182
 				},
@@ -633,7 +633,7 @@
 					"processed": 22152,
 					"total": 22310
 				},
-				"tsv_wasm-json": {
+				"tsv-wasm-json": {
 					"processed": 22152,
 					"total": 22310
 				},
@@ -641,7 +641,7 @@
 					"processed": 22152,
 					"total": 22310
 				},
-				"tsv_wasm-internal": {
+				"tsv-wasm-internal": {
 					"processed": 22152,
 					"total": 22310
 				},
@@ -700,19 +700,19 @@
 			"gzip_bytes": 1767902
 		},
 		{
-			"label": "tsv_format_wasm",
+			"label": "tsv-format-wasm",
 			"bytes": 2513526,
 			"kind": "wasm",
 			"gzip_bytes": 928354
 		},
 		{
-			"label": "tsv_parse_wasm",
+			"label": "tsv-parse-wasm",
 			"bytes": 995585,
 			"kind": "wasm",
 			"gzip_bytes": 384559
 		},
 		{
-			"label": "tsv_wasm",
+			"label": "tsv-wasm",
 			"bytes": 2801351,
 			"kind": "wasm",
 			"gzip_bytes": 1030055
@@ -841,7 +841,7 @@
 			"runtime": "node"
 		},
 		{
-			"name": "tsv_wasm-json",
+			"name": "tsv-wasm-json",
 			"group": "parse/svelte",
 			"mean_ns": null,
 			"p50_ns": null,
@@ -895,7 +895,7 @@
 			"runtime": "node"
 		},
 		{
-			"name": "tsv_wasm-json-no-locations",
+			"name": "tsv-wasm-json-no-locations",
 			"group": "parse/svelte",
 			"mean_ns": null,
 			"p50_ns": null,
@@ -949,7 +949,7 @@
 			"runtime": "node"
 		},
 		{
-			"name": "tsv_wasm-internal",
+			"name": "tsv-wasm-internal",
 			"group": "parse/svelte",
 			"mean_ns": null,
 			"p50_ns": null,
@@ -1084,7 +1084,7 @@
 			"runtime": "node"
 		},
 		{
-			"name": "tsv_wasm-json",
+			"name": "tsv-wasm-json",
 			"group": "parse/typescript",
 			"mean_ns": null,
 			"p50_ns": null,
@@ -1138,7 +1138,7 @@
 			"runtime": "node"
 		},
 		{
-			"name": "tsv_wasm-json-no-locations",
+			"name": "tsv-wasm-json-no-locations",
 			"group": "parse/typescript",
 			"mean_ns": null,
 			"p50_ns": null,
@@ -1192,7 +1192,7 @@
 			"runtime": "node"
 		},
 		{
-			"name": "tsv_wasm-internal",
+			"name": "tsv-wasm-internal",
 			"group": "parse/typescript",
 			"mean_ns": null,
 			"p50_ns": null,
@@ -1408,7 +1408,7 @@
 			"runtime": "node"
 		},
 		{
-			"name": "tsv_wasm-json",
+			"name": "tsv-wasm-json",
 			"group": "parse/css",
 			"mean_ns": null,
 			"p50_ns": null,
@@ -1462,7 +1462,7 @@
 			"runtime": "node"
 		},
 		{
-			"name": "tsv_wasm-internal",
+			"name": "tsv-wasm-internal",
 			"group": "parse/css",
 			"mean_ns": null,
 			"p50_ns": null,
@@ -1519,9 +1519,9 @@
 	"suppressed_noise": {},
 	"output_digest_ungraded": {
 		"parse/typescript/tsv-json": 1,
-		"parse/typescript/tsv_wasm-json": 1,
+		"parse/typescript/tsv-wasm-json": 1,
 		"parse/typescript/tsv-json-no-locations": 1,
-		"parse/typescript/tsv_wasm-json-no-locations": 1
+		"parse/typescript/tsv-wasm-json-no-locations": 1
 	},
 	"variant_parity": [
 		{

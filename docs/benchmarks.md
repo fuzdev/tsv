@@ -86,7 +86,7 @@ Things the published numbers measure that aren't quite what they look like.
   baseline is `prettier` (JS) and the flagship `tsv` row is the native FFI binary
   (AOT Rust) — a fair "what you get replacing prettier with tsv" number, not a
   language-neutral algorithm comparison. The same-tier reads are WASM-vs-WASM
-  (`tsv_wasm` vs `biome-wasm` vs `dprint-wasm` vs `oxc-parser-wasm`) and
+  (`tsv-wasm` vs `biome-wasm` vs `dprint-wasm` vs `oxc-parser-wasm`) and
   native-vs-native (`tsv` vs `oxfmt`/`oxc-parser`); compare within a tier before
   attributing a gap to the formatter rather than the runtime.
 - **Format groups include parse time.** Every formatter parses internally before
@@ -184,8 +184,8 @@ Things the published numbers measure that aren't quite what they look like.
   (a) Every `tsv` FFI format call UTF-8-encodes the input and decodes the output
   back to a JS string (`lib/ffi.ts`, through persistent grow-only staging
   buffers, so the boundary cost is the encode/copy itself, not per-call
-  allocation); `tsv_wasm` marshals strings across the JS↔WASM boundary. prettier
-  pays no such tax — so the published `tsv` / `tsv_wasm` format numbers are
+  allocation); `tsv-wasm` marshals strings across the JS↔WASM boundary. prettier
+  pays no such tax — so the published `tsv` / `tsv-wasm` format numbers are
   _conservative_ (the parse analogue is the `tsv-internal` vs `tsv-json` gap).
   One nuance cuts the other way: the persistent buffers amortize across the warm
   loop, so a cold one-shot consumer pays a first-call allocation the warm
@@ -207,11 +207,11 @@ Things the published numbers measure that aren't quite what they look like.
   measured.)
   (c) Task return values are discarded uniformly for all impls; the FFI/WASM/async
   boundaries block dead-code elimination, so no impl's work is optimized away.
-- **`tsv_wasm` is measured on the full build.** The WASM bench loads
+- **`tsv-wasm` is measured on the full build.** The WASM bench loads
   `pkg/all/deno` (the default both-features artifact, ~2.7 MB — what
-  `@fuzdev/tsv_wasm` ships) for _both_ parse and format, while subset consumers
-  ship the smaller `@fuzdev/tsv_format_wasm` (~2.5 MB, no convert layer) or
-  `@fuzdev/tsv_parse_wasm` (~1.0 MB, no printers). Same story natively: the perf
+  `@fuzdev/tsv-wasm` ships) for _both_ parse and format, while subset consumers
+  ship the smaller `@fuzdev/tsv-format-wasm` (~2.5 MB, no convert layer) or
+  `@fuzdev/tsv-parse-wasm` (~1.0 MB, no printers). Same story natively: the perf
   row loads the full `libtsv_ffi`, while the Binary Sizes table also lists the
   `tsv format (ffi)` / `tsv parse (ffi)` subset builds (no perf rows of their own
   — they exist only to size scope-matched against `oxfmt` and `oxc-parser`).
@@ -318,7 +318,7 @@ Things the published numbers measure that aren't quite what they look like.
   string in Rust and deserialized in JS — the native package's `index.js`
   `wrap()` runs `JSON.parse` on `.program` access (verified: `typeof program ===
   'object'`), exactly the model `tsv-json` uses (Rust → JSON string → FFI →
-  `JSON.parse`) and `tsv_wasm-json` uses (Rust → JSON string → boundary decode →
+  `JSON.parse`) and `tsv-wasm-json` uses (Rust → JSON string → boundary decode →
   engine `JSON.parse` via `js_sys`). So the rows are like-for-like
   full-materialization comparisons in _mechanism_ — but the _deliverables_
   differ: tsv emits the acorn/svelte drop-in AST with per-node `loc` line/column
@@ -352,7 +352,7 @@ Things the published numbers measure that aren't quite what they look like.
     the eager paths are byte-identical across Node and Deno (0.706/0.705 ms
     materialize, 0.165 ms parse-only), and only the lazy path is ~20% worse under
     Deno on top of an already-slow Node baseline. So `tsv-internal` /
-    `tsv_wasm-internal` (parse-only, no JS materialization) have **no fair oxc
+    `tsv-wasm-internal` (parse-only, no JS materialization) have **no fair oxc
     counterpart** — oxc's JS API always serializes to cross into JS — and that
     asymmetry is left honest rather than papered over with a misleading row.
 - **The `yuku-parser` rows need two corrections to be honest, and both are
@@ -737,7 +737,7 @@ section whose *composition* varies by machine — and the ratios read the same e
 way (`biome is 18.4x tsv`), so an omission is easy to miss. The top-level
 `binary_sizes_absent` is the disclosure: every label the collector reached for and
 did not find. Two different facts share that list, told apart by the label. A **tsv**
-variant (`tsv format (ffi)`, `tsv_parse_wasm`, …) is absent whenever its optional
+variant (`tsv format (ffi)`, `tsv-parse-wasm`, …) is absent whenever its optional
 build task hasn't run, routine on a machine that built only what it measures. A
 **third-party** label is absent although its impl initialized, which means the
 package shipped nothing where this module looked — a stale path here, or an upstream
@@ -763,14 +763,14 @@ with nothing else wrong.
 - **oxc-parser**: N-API binding + WASM (`binding-wasm32-wasi`).
 - **oxfmt**: N-API binding (no WASM variant).
 - **yuku-parser**: N-API binding + WASM, both parse-only artifacts — pair each
-  against the parse-only tsv build (`tsv parse (ffi)` / `tsv_parse_wasm`); against a
+  against the parse-only tsv build (`tsv parse (ffi)` / `tsv-parse-wasm`); against a
   bundle carrying the printers it would size a scope difference and read as an
   engine one. As for `oxc-parser` and `dprint`, that pairing is the reader's to
   make: the emitted `vs tsv` ratio anchors every row on the full build.
 - **malva**: WASM (`dprint-plugin-malva`'s `plugin.wasm` — the package ships only
   `*.wasm`, with no JS entry and so no `getPath()` helper like `@dprint/typescript`
   has). CSS-only scope, and tsv has no CSS-only build, so pair it against
-  `tsv_format_wasm` knowing malva formats one language where that build formats three.
+  `tsv-format-wasm` knowing malva formats one language where that build formats three.
 - **rsvelte-fmt**: the standalone executable from its platform package — the one
   native row not scope-matched to a tsv artifact (it carries a CLI plus the whole
   oxc formatter for JS/TS/CSS beside its Svelte engine, where `tsv (ffi)` is a bare

@@ -6,7 +6,7 @@
  * verbatim — so `npx tsv` here IS the native CLI (real `--jobs` parallelism,
  * native discovery and error paths), the esbuild/biome shape. When no binary
  * is reachable it defers to `./cli.js`, the shared JS mirror of the same
- * contract that `@fuzdev/tsv_wasm` ships as its bin — on an unsupported
+ * contract that `@fuzdev/tsv-wasm` ships as its bin — on an unsupported
  * platform that path ends at the loader's error pointing at the WASM package.
  *
  * The binary is resolved from this package's own optionalDependency, never

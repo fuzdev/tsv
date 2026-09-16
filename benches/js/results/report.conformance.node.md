@@ -22,19 +22,19 @@
 
 ## parse/svelte
 
-**Coverage:** svelte/compiler 4571/4571 (100%), tsv-json 4571/4571 (100%), tsv_wasm-json 4571/4571 (100%), tsv-json-no-locations 4571/4571 (100%), tsv_wasm-json-no-locations 4571/4571 (100%), tsv-internal 4571/4571 (100%), tsv_wasm-internal 4571/4571 (100%), rsvelte-parse 4571/4571 (100%), rsvelte-parse-skip-expr-loc 4571/4571 (100%)
+**Coverage:** svelte/compiler 4571/4571 (100%), tsv-json 4571/4571 (100%), tsv-wasm-json 4571/4571 (100%), tsv-json-no-locations 4571/4571 (100%), tsv-wasm-json-no-locations 4571/4571 (100%), tsv-internal 4571/4571 (100%), tsv-wasm-internal 4571/4571 (100%), rsvelte-parse 4571/4571 (100%), rsvelte-parse-skip-expr-loc 4571/4571 (100%)
 
 ## parse/typescript
 
-**Coverage:** acorn-typescript 53043/53952 (98%), tsv-json 53670/53952 (99%), tsv_wasm-json 53670/53952 (99%), tsv-json-no-locations 53670/53952 (99%), tsv_wasm-json-no-locations 53670/53952 (99%), tsv-internal 53670/53952 (99%), tsv_wasm-internal 53670/53952 (99%), oxc-parser 53642/53952 (99%), oxc-parser-wasm 53644/53952 (99%), tsc 53730/53952 (99%), yuku-parser-wasm 53620/53952 (99%), swc 53074/53952 (98%)
+**Coverage:** acorn-typescript 53043/53952 (98%), tsv-json 53670/53952 (99%), tsv-wasm-json 53670/53952 (99%), tsv-json-no-locations 53670/53952 (99%), tsv-wasm-json-no-locations 53670/53952 (99%), tsv-internal 53670/53952 (99%), tsv-wasm-internal 53670/53952 (99%), oxc-parser 53642/53952 (99%), oxc-parser-wasm 53644/53952 (99%), tsc 53730/53952 (99%), yuku-parser-wasm 53620/53952 (99%), swc 53074/53952 (98%)
 
 ## parse/css
 
-**Coverage:** svelte/compiler 22402/22642 (98%), tsv-json 22457/22642 (99%), tsv_wasm-json 22457/22642 (99%), tsv-internal 22457/22642 (99%), tsv_wasm-internal 22457/22642 (99%), postcss 22534/22642 (99%)
+**Coverage:** svelte/compiler 22402/22642 (98%), tsv-json 22457/22642 (99%), tsv-wasm-json 22457/22642 (99%), tsv-internal 22457/22642 (99%), tsv-wasm-internal 22457/22642 (99%), postcss 22534/22642 (99%)
 
 ### parse/svelte by corpus source
 
-| Source | Files | svelte/compiler | tsv-json | tsv_wasm-json | tsv-json-no-locations | tsv_wasm-json-no-locations | tsv-internal | tsv_wasm-internal | rsvelte-parse | rsvelte-parse-skip-expr-loc |
+| Source | Files | svelte/compiler | tsv-json | tsv-wasm-json | tsv-json-no-locations | tsv-wasm-json-no-locations | tsv-internal | tsv-wasm-internal | rsvelte-parse | rsvelte-parse-skip-expr-loc |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `../prettier-plugin-svelte/test` | 318 | 318 (100%) | 318 (100%) | 318 (100%) | 318 (100%) | 318 (100%) | 318 (100%) | 318 (100%) | 318 (100%) | 318 (100%) |
 | `../prettier/tests/format/html` | 84 | 84 (100%) | 84 (100%) | 84 (100%) | 84 (100%) | 84 (100%) | 84 (100%) | 84 (100%) | 84 (100%) | 84 (100%) |
@@ -42,7 +42,7 @@
 
 ### parse/typescript by corpus source
 
-| Source | Files | acorn-typescript | tsv-json | tsv_wasm-json | tsv-json-no-locations | tsv_wasm-json-no-locations | tsv-internal | tsv_wasm-internal | oxc-parser | oxc-parser-wasm | tsc | yuku-parser-wasm | swc |
+| Source | Files | acorn-typescript | tsv-json | tsv-wasm-json | tsv-json-no-locations | tsv-wasm-json-no-locations | tsv-internal | tsv-wasm-internal | oxc-parser | oxc-parser-wasm | tsc | yuku-parser-wasm | swc |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `../prettier/tests/format/typescript` | 795 | 716 (90%) | 781 (98%) | 781 (98%) | 781 (98%) | 781 (98%) | 781 (98%) | 781 (98%) | 768 (96%) | 769 (96%) | 791 (99%) | 779 (97%) | 758 (95%) |
 | `../prettier/tests/format/js` | 1106 | 862 (77%) | 920 (83%) | 920 (83%) | 920 (83%) | 920 (83%) | 920 (83%) | 920 (83%) | 935 (84%) | 935 (84%) | 950 (85%) | 937 (84%) | 908 (82%) |
@@ -53,7 +53,7 @@
 
 ### parse/css by corpus source
 
-| Source | Files | svelte/compiler | tsv-json | tsv_wasm-json | tsv-internal | tsv_wasm-internal | postcss |
+| Source | Files | svelte/compiler | tsv-json | tsv-wasm-json | tsv-internal | tsv-wasm-internal | postcss |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `../prettier/tests/format/css` | 150 | 120 (80%) | 124 (82%) | 124 (82%) | 124 (82%) | 124 (82%) | 142 (94%) |
 | `../svelte/packages/svelte/tests` | 182 | 181 (99%) | 181 (99%) | 181 (99%) | 181 (99%) | 181 (99%) | 182 (100%) |
@@ -65,9 +65,9 @@
 
 | Binary | Size | Gzipped | vs tsv | vs tsv (gz) |
 | --- | ---: | ---: | ---: | ---: |
-| tsv_format_wasm | 2.5 MB | 928.4 KB | 0.9x | 0.9x |
-| tsv_parse_wasm | 995.6 KB | 384.6 KB | 0.4x | 0.4x |
-| tsv_wasm | 2.8 MB | 1.0 MB | — | — |
+| tsv-format-wasm | 2.5 MB | 928.4 KB | 0.9x | 0.9x |
+| tsv-parse-wasm | 995.6 KB | 384.6 KB | 0.4x | 0.4x |
+| tsv-wasm | 2.8 MB | 1.0 MB | — | — |
 | biome (wasm) | 44.6 MB | 11.4 MB | 15.9x | 11.1x |
 | dprint (wasm) | 4.2 MB | 1.2 MB | 1.5x | 1.1x |
 | oxc-parser (wasm) | 1.5 MB | 481.4 KB | 0.5x | 0.5x |
@@ -85,7 +85,7 @@
 | rsvelte compiler (napi) | 17.6 MB | 7.4 MB | 4.5x | 4.2x |
 | swc (napi) | 32.7 MB | 12.2 MB | 8.4x | 6.9x |
 
-_`vs tsv` divides native rows by `tsv (napi)` — the binding this runtime benchmarks (FFI under Deno, N-API under Node/Bun), so the same artifact reads a different ratio in the deno and node/bun reports — and wasm rows by `tsv_wasm`. Gzipped ≈ the artifact’s wire size (`gzip -c`, system default level; the `tsv (napi)` platform package also ships the `tsv` CLI binary, so its tarball is larger than this row). `vs tsv (gz)` compares gzipped bytes; `vs tsv` compares raw on-disk bytes._
+_`vs tsv` divides native rows by `tsv (napi)` — the binding this runtime benchmarks (FFI under Deno, N-API under Node/Bun), so the same artifact reads a different ratio in the deno and node/bun reports — and wasm rows by `tsv-wasm`. Gzipped ≈ the artifact’s wire size (`gzip -c`, system default level; the `tsv (napi)` platform package also ships the `tsv` CLI binary, so its tarball is larger than this row). `vs tsv (gz)` compares gzipped bytes; `vs tsv` compares raw on-disk bytes._
 
 ## Skipped Files
 
@@ -98,17 +98,17 @@ _`vs tsv` divides native rows by `tsv (napi)` — the binding this runtime bench
 - parse/typescript: oxc-parser: 310
 - parse/typescript: oxc-parser-wasm: 308
 - parse/typescript: tsv-json: 282
-- parse/typescript: tsv_wasm-json: 282
+- parse/typescript: tsv-wasm-json: 282
 - parse/typescript: tsv-json-no-locations: 282
-- parse/typescript: tsv_wasm-json-no-locations: 282
+- parse/typescript: tsv-wasm-json-no-locations: 282
 - parse/typescript: tsv-internal: 282
-- parse/typescript: tsv_wasm-internal: 282
+- parse/typescript: tsv-wasm-internal: 282
 - parse/css: svelte/compiler: 240
 - parse/typescript: tsc: 222
 - parse/css: tsv-json: 185
-- parse/css: tsv_wasm-json: 185
+- parse/css: tsv-wasm-json: 185
 - parse/css: tsv-internal: 185
-- parse/css: tsv_wasm-internal: 185
+- parse/css: tsv-wasm-internal: 185
 - parse/css: postcss: 108
 
 _Per-file detail omitted. Re-run with `--verbose` to include error messages and failure sets per file._

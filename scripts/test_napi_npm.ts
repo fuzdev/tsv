@@ -151,7 +151,7 @@ await assert_staged_fresh([
 	}
 ]);
 
-// The one artifact this suite READS but does not build: `@fuzdev/tsv_wasm`,
+// The one artifact this suite READS but does not build: `@fuzdev/tsv-wasm`,
 // which the export-set parity claim below compares the loader against. Absent
 // or STALE it is skipped, not failed — `deno task test:napi:npm` cannot
 // refresh another package's staging, and the two cases are equally unusable
@@ -160,7 +160,7 @@ await assert_staged_fresh([
 // same set), because a feature or an export moves with them.
 const wasm_package_index = 'crates/tsv_wasm/pkg/all/npm/index.js';
 const wasm_parity_staleness = await staged_staleness({
-	label: 'the @fuzdev/tsv_wasm package',
+	label: 'the @fuzdev/tsv-wasm package',
 	staged: wasm_package_index,
 	crates: [...CORE_CRATES, ...WASM_CRATES],
 	files: ['scripts/patch_npm_package.ts', 'scripts/npm_metadata.ts', 'deno.json'],
@@ -333,7 +333,7 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 	// reading mtimes is async and a `describe` body must register its tests
 	// synchronously.
 	it(
-		'differs from @fuzdev/tsv_wasm by exactly the WASM lifecycle',
+		'differs from @fuzdev/tsv-wasm by exactly the WASM lifecycle',
 		{ skip: wasm_parity_skip },
 		async () => {
 			const wasm = await import(pathToFileURL(wasm_package_index).href);
@@ -658,7 +658,7 @@ process.stdout.write(JSON.stringify({out: tsv.format_typescript('const   x=1'), 
 				`message names the install remedy: ${e.message}`
 			);
 			assert.ok(
-				e.message.includes('@fuzdev/tsv_wasm'),
+				e.message.includes('@fuzdev/tsv-wasm'),
 				`message points at the WASM fallback: ${e.message}`
 			);
 			return true;

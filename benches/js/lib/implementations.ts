@@ -600,7 +600,7 @@ export function get_benchmark_tasks(
 		add('native', true, 'tsv-json', 'native', (source, _language, goal) =>
 			impls.native.parse(source, language, goal)
 		);
-		add('wasm', true, 'tsv_wasm-json', 'wasm', (source, _language, goal) =>
+		add('wasm', true, 'tsv-wasm-json', 'wasm', (source, _language, goal) =>
 			impls.wasm.parse(source, language, goal)
 		);
 
@@ -619,7 +619,7 @@ export function get_benchmark_tasks(
 		add(
 			'wasm',
 			language !== 'css',
-			'tsv_wasm-json-no-locations',
+			'tsv-wasm-json-no-locations',
 			'wasm-no-locations',
 			(source, _language, goal) => impls.wasm.parse_no_locations(source, language, goal)
 		);
@@ -628,7 +628,7 @@ export function get_benchmark_tasks(
 		add('native', true, 'tsv-internal', 'native-internal', (source, _language, goal) =>
 			impls.native.parse_internal(source, language, goal)
 		);
-		add('wasm', true, 'tsv_wasm-internal', 'wasm-internal', (source, _language, goal) =>
+		add('wasm', true, 'tsv-wasm-internal', 'wasm-internal', (source, _language, goal) =>
 			impls.wasm.parse_internal(source, language, goal)
 		);
 
@@ -764,7 +764,7 @@ export function get_benchmark_tasks(
 
 		// Native + WASM formatters
 		add('native', true, 'tsv', 'native', (source) => impls.native.format(source, language));
-		add('wasm', true, 'tsv_wasm', 'wasm', (source) => impls.wasm.format(source, language));
+		add('wasm', true, 'tsv-wasm', 'wasm', (source) => impls.wasm.format(source, language));
 
 		// Forced-async control (opt-in). Same native engine as `tsv`, routed through
 		// the awaited async path so the `tsv` vs `tsv-forced-async` delta measures the

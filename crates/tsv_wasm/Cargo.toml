@@ -25,11 +25,11 @@ wasm-opt = [
 ]
 
 [features]
-# Default build: everything (@fuzdev/tsv_wasm). Subset packages build with
+# Default build: everything (@fuzdev/tsv-wasm). Subset packages build with
 # `--no-default-features --features format|parse`.
 default = ["format", "parse"]
 # `format_*` exports + the `IgnoreStack` discovery matcher and its
-# `tsv_discover` verdict methods (@fuzdev/tsv_format_wasm when alone).
+# `tsv_discover` verdict methods (@fuzdev/tsv-format-wasm when alone).
 # `tsv_arena/format` adds the reusable doc arena (`with_doc_arena`).
 # `js-sys` reads the format exports' options bag — one shared reader with the
 # parse exports, so the two families can't drift (measured cost of adding it
@@ -41,7 +41,7 @@ format = [
     "dep:tsv_lang",
     "dep:js-sys",
 ]
-# `parse_*` exports + convert layer (@fuzdev/tsv_parse_wasm when alone).
+# `parse_*` exports + convert layer (@fuzdev/tsv-parse-wasm when alone).
 # The parse-only build drops the printers via link-level dead-code
 # elimination — no printer feature gates in the language crates.
 parse = [

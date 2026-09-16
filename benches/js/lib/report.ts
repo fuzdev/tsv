@@ -68,7 +68,7 @@ function create_bar(value: number, max: number, width = 40): string {
  */
 const INTERNAL_PARSE_PAIRS: ReadonlyArray<readonly [internal: string, json: string]> = [
 	['tsv-internal', 'tsv-json'],
-	['tsv_wasm-internal', 'tsv_wasm-json']
+	['tsv-wasm-internal', 'tsv-wasm-json']
 ];
 
 /** The `-internal` half of `INTERNAL_PARSE_PAIRS` — the rows a group table shows separately. */
@@ -100,10 +100,10 @@ const DISPLAY_ORDER = [
 	// tsv variants
 	'tsv-json',
 	'tsv-json-no-locations',
-	'tsv_wasm-json',
-	'tsv_wasm-json-no-locations',
+	'tsv-wasm-json',
+	'tsv-wasm-json-no-locations',
 	'tsv',
-	'tsv_wasm',
+	'tsv-wasm',
 	// Opt-in diagnostic (`BENCH_FORCED_ASYNC=1`), so it reaches no committed report
 	// — but the completeness guard asks about every row the surface DEFINES, not
 	// every row a default run renders, so leaving it out fired a ⚠ on each
@@ -112,7 +112,7 @@ const DISPLAY_ORDER = [
 	'tsv-forced-async',
 	// Internal variants (shown separately)
 	'tsv-internal',
-	'tsv_wasm-internal',
+	'tsv-wasm-internal',
 	// Third-party alternatives (alphabetical)
 	'biome-wasm',
 	'dprint-wasm',
@@ -296,8 +296,8 @@ export function generate_summary_report(
 		for (const [ours, opponent, note] of [
 			['tsv-json-no-locations', 'oxc-parser', 'payload-matched, span-only'],
 			['tsv-json-no-locations', 'yuku-parser', 'payload-matched, span-only'],
-			['tsv_wasm-json-no-locations', 'oxc-parser-wasm', 'payload-matched, span-only'],
-			['tsv_wasm-json-no-locations', 'yuku-parser-wasm', 'payload-matched, span-only'],
+			['tsv-wasm-json-no-locations', 'oxc-parser-wasm', 'payload-matched, span-only'],
+			['tsv-wasm-json-no-locations', 'yuku-parser-wasm', 'payload-matched, span-only'],
 			['tsv-json', 'rsvelte-parse', 'mechanism- and payload-matched, full AST']
 		] as const) {
 			const ours_result = results.find((r) => r.name === ours);
@@ -689,7 +689,7 @@ const OXC_NOTE: FairnessNote = {
 		'   deserializes in JS, the same eager materialization as tsv-json — apples-to-apples)'
 	],
 	markdown:
-		'oxc-parser (native and wasm) serializes the AST to JSON in Rust and deserializes it in JS — the same eager materialization as tsv-json/tsv_wasm-json, so these parse rows are apples-to-apples'
+		'oxc-parser (native and wasm) serializes the AST to JSON in Rust and deserializes it in JS — the same eager materialization as tsv-json/tsv-wasm-json, so these parse rows are apples-to-apples'
 };
 
 const YUKU_NOTE: FairnessNote = {
@@ -769,7 +769,7 @@ function opponent_row(opponent: ComparisonOpponent, lang: Language): string {
  * guard that keeps it from happening again; this table is what that guard can read.
  *
  * Sections are TIERS — tsv's native binding and its wasm bundle — so a wasm engine
- * belongs under `tsv_wasm` and a native one under `tsv`. The two JS opponents
+ * belongs under `tsv-wasm` and a native one under `tsv`. The two JS opponents
  * (`prettier`/the canonical parsers, and `postcss`) appear under BOTH: a JS
  * reference is equally meaningful against either build, which is the reading
  * prettier has always had here.
@@ -800,8 +800,8 @@ const COMPARISON_SECTIONS: readonly ComparisonSectionSpec[] = [
 		}
 	},
 	{
-		label: 'tsv_wasm',
-		self: { format: 'tsv_wasm', parse: 'tsv_wasm-json' },
+		label: 'tsv-wasm',
+		self: { format: 'tsv-wasm', parse: 'tsv-wasm-json' },
 		opponents: {
 			format: [
 				{ row: CANONICAL_FORMATTER_ROW },
@@ -847,10 +847,10 @@ const COMPARISON_SECTIONS: readonly ComparisonSectionSpec[] = [
  */
 const COMPARISON_EXCLUSIONS: Readonly<Record<string, string>> = {
 	'tsv-json-no-locations': "tsv's own wire variant — a row of the group table, not an opponent",
-	'tsv_wasm-json-no-locations':
+	'tsv-wasm-json-no-locations':
 		"tsv's own wire variant — a row of the group table, not an opponent",
 	'tsv-internal': "tsv's own parse-only variant; no third-party row is the same tier",
-	'tsv_wasm-internal': "tsv's own parse-only variant; no third-party row is the same tier",
+	'tsv-wasm-internal': "tsv's own parse-only variant; no third-party row is the same tier",
 	'tsv-forced-async': 'opt-in async-tax control (`BENCH_FORCED_ASYNC=1`), deliberately unpublished',
 	'rsvelte-fmt': 'coverage-only — never timed, so there is no ratio to take',
 	tsc: 'conformance surface only — a verdict row, never timed',
@@ -1130,11 +1130,11 @@ function comparison_notes(
 	if (seen.has(OXC_NOTE) || seen.has(YUKU_NOTE)) {
 		if (surface === 'markdown') {
 			notes.push(
-				'tsv-internal/tsv_wasm-internal are parse-only (no JS materialization) and have no counterpart row — oxc always serializes to cross into JS (experimentalLazy is setup-dominated), and yuku still serializes to a binary buffer before its decode, so neither is the same tier'
+				'tsv-internal/tsv-wasm-internal are parse-only (no JS materialization) and have no counterpart row — oxc always serializes to cross into JS (experimentalLazy is setup-dominated), and yuku still serializes to a binary buffer before its decode, so neither is the same tier'
 			);
 		} else {
 			notes.push(
-				'  (tsv-internal/tsv_wasm-internal are parse-only, no JS materialization; neither',
+				'  (tsv-internal/tsv-wasm-internal are parse-only, no JS materialization; neither',
 				'   oxc nor yuku has a matching mode, so they have no counterpart row)'
 			);
 		}
@@ -1459,7 +1459,7 @@ export type CoverageBySource = Map<string, Map<string, Map<string, SourceCoverag
  * sources in corpus order; columns are the impls in display order.
  *
  * The same-engine variant columns (`tsv-json` / `tsv-internal` /
- * `tsv_wasm-*`, `oxc-parser` / `oxc-parser-wasm`) look redundant and are
+ * `tsv-wasm-*`, `oxc-parser` / `oxc-parser-wasm`) look redundant and are
  * deliberately kept: they read identically only while the *bindings and payloads*
  * agree, which is a claim, not a given — a wire-writer failure would show as
  * `-json` trailing `-internal`, and a broken binding error surface as a native/wasm
@@ -1743,7 +1743,7 @@ export function generate_skipped_files_markdown(
  *
  * `task_tracking_by_group` is the per-group `display_name → tracking_key` map
  * captured in `bench.ts`. We invert it here to render display names
- * (e.g. `svelte/compiler`, `tsv_wasm-internal`) instead of the tracking_key
+ * (e.g. `svelte/compiler`, `tsv-wasm-internal`) instead of the tracking_key
  * suffix (e.g. `canonical`, `wasm-internal`) so the labels line up with
  * the bench tables.
  *

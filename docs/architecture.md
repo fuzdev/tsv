@@ -8,7 +8,7 @@ tsv is a **multi-tool foundation** for Svelte/TypeScript/CSS—formatter, parser
 
 This inverts the typical approach where JSON compatibility drives AST design.
 
-**Optimal artifacts (invariant).** Runtime speed _and_ compiled code size are first-class, non-negotiable goals for **every** shipped artifact. The format-only `@fuzdev/tsv_format_wasm` is the current yardstick—it's the most-developed and first-shipped artifact—but it holds no long-term primacy; `@fuzdev/tsv_parse_wasm`, the CLI, and the native N-API binding count just as much as they mature. The architecture serves this directly: concrete types end-to-end (no `dyn` dispatch), per-language crates that WASM tree-shakes independently, and unneeded layers excluded at the link level — the printers from parse-only builds, the convert layer from format-only builds (see §"Closed Scope, Open Convention"). Heavier infrastructure for future tools—incremental reparse, red-green/CST layers for LSP—must be added as later, feature-gated layers that don't regress this, not as weight in the initial artifacts (see §"Red-Green Trees (Deferred)").
+**Optimal artifacts (invariant).** Runtime speed _and_ compiled code size are first-class, non-negotiable goals for **every** shipped artifact. The format-only `@fuzdev/tsv-format-wasm` is the current yardstick—it's the most-developed and first-shipped artifact—but it holds no long-term primacy; `@fuzdev/tsv-parse-wasm`, the CLI, and the native N-API binding count just as much as they mature. The architecture serves this directly: concrete types end-to-end (no `dyn` dispatch), per-language crates that WASM tree-shakes independently, and unneeded layers excluded at the link level — the printers from parse-only builds, the convert layer from format-only builds (see §"Closed Scope, Open Convention"). Heavier infrastructure for future tools—incremental reparse, red-green/CST layers for LSP—must be added as later, feature-gated layers that don't regress this, not as weight in the initial artifacts (see §"Red-Green Trees (Deferred)").
 
 **Safety constraint**: `unsafe_code = "forbid"` at the workspace level — no unsafe Rust in core crates. Only the two native binding crates relax it, each to the weakest level that compiles: `tsv_ffi` to `"allow"`, since the crate *is* the C ABI boundary and hand-writes the raw-pointer work; `tsv_napi` to `"deny"`, because it hand-writes no unsafe at all and `#[napi]`'s generated items carry their own `#[allow(unsafe_code)]` — enough to override `deny`, so every other site in that crate stays a compile error. (Neither can inherit `forbid`, which no inner `allow` may override; `tests/lint_parity.rs` pins both relaxations and guards the hand-mirrored tables against drift.) Combined with a deliberately small dependency set (authoritative list: `[workspace.dependencies]` in the root `Cargo.toml`, whose externals are the twelve library/binding crates — the `napi`/`napi-derive`/`napi-build` trio being the N-API carve-out — plus the CLI/debug-only `argh`/`tokio`/`futures-util`; the wasm32-only `talc` allocator lives in `tsv_wasm`'s own manifest; purpose table in [CLAUDE.md § Rust Crates](../CLAUDE.md#rust-crates-minimal-deps)), the attack surface and audit burden stay minimal.
 
@@ -211,9 +211,9 @@ This shape gives both:
 
 - **Optimal artifacts** — concrete types end-to-end, no dyn dispatch,
   inlining works freely, WASM tree-shakes by language. A parse-only
-  build (`@fuzdev/tsv_parse_wasm`) excludes printer code at the link level
+  build (`@fuzdev/tsv-parse-wasm`) excludes printer code at the link level
   because nothing references it, and a format-only build
-  (`@fuzdev/tsv_format_wasm`) compiles out the JSON-AST conversion layer via
+  (`@fuzdev/tsv-format-wasm`) compiles out the JSON-AST conversion layer via
   the lang crates' `convert` feature — build-time selection, not runtime
   feature flags.
 - **Convention openness (Rust source level)** — anyone can write a
@@ -251,8 +251,8 @@ in those two dispatch sites), not a structural one — adding a
 tsv-shaped crate to the workspace later requires no edits to existing
 language crates.
 
-The npm publish surface (`@fuzdev/tsv_format_wasm`, `@fuzdev/tsv_parse_wasm`,
-`@fuzdev/tsv_wasm`, and the native `@fuzdev/tsv` set) groups
+The npm publish surface (`@fuzdev/tsv-format-wasm`, `@fuzdev/tsv-parse-wasm`,
+`@fuzdev/tsv-wasm`, and the native `@fuzdev/tsv` set) groups
 artifacts for user ergonomics independent of the Rust workspace shape.
 
 #### Cargo feature surface
@@ -261,10 +261,10 @@ artifacts for user ergonomics independent of the Rust workspace shape.
 feature that gates `pub mod convert` (the writer) and the
 `convert_ast_json_bytes` / `convert_ast_json_string` free functions (and
 their `_no_locations` twins). The format-only WASM
-build (`@fuzdev/tsv_format_wasm`) declares its language deps with
+build (`@fuzdev/tsv-format-wasm`) declares its language deps with
 `default-features = false` so the convert layer is excluded at link
-time; the parse-capable builds (`@fuzdev/tsv_parse_wasm` and the full
-`@fuzdev/tsv_wasm`) opt in via the `tsv_wasm/parse` feature, which
+time; the parse-capable builds (`@fuzdev/tsv-parse-wasm` and the full
+`@fuzdev/tsv-wasm`) opt in via the `tsv_wasm/parse` feature, which
 forwards to each language crate's `convert`. The parse-only build
 conversely omits the `tsv_wasm/format` feature, so the `format_*`
 exports and the printers behind them drop at link time. `tsv_ffi`

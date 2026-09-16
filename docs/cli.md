@@ -37,7 +37,7 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
   npm registry at release time, so it is byte-identical to the binary the
   platform package ships; every asset carries a build provenance attestation
   (`gh attestation verify <file> -R fuzdev/tsv`).
-- **`tsv` npm bin, WASM (`@fuzdev/tsv_wasm`)**: `crates/tsv_wasm/npm/cli.js`
+- **`tsv` npm bin, WASM (`@fuzdev/tsv-wasm`)**: `crates/tsv_wasm/npm/cli.js`
   — a hand-written Node mirror of this CLI's contract (subcommands, flags,
   exit codes, output streams, traversal rules). `--jobs` is real: path mode
   fans onto `node:worker_threads`, spawning `cli.js` as its own worker. Where

@@ -129,7 +129,7 @@ export interface CollectedBinarySizes {
 	 * Labels reached for but absent — the table's composition disclosure.
 	 *
 	 * Two different facts share this list, told apart by the label. A **tsv**
-	 * variant (`tsv format (ffi)`, `tsv_parse_wasm`, …) is absent whenever its
+	 * variant (`tsv format (ffi)`, `tsv-parse-wasm`, …) is absent whenever its
 	 * optional build task hasn't been run, which is routine on a machine that
 	 * built only what it measures; the full `deno task bench` builds them all. A
 	 * **third-party** label is absent although its impl initialized, which means
@@ -316,7 +316,7 @@ export async function collect_binary_sizes(
 
 	// yuku-parser — parse-only in both bindings, and yuku ships no formatter, so the
 	// row a reader should pair each against is the parse-only tsv build (`tsv parse
-	// (ffi)` / `tsv_parse_wasm`); against a bundle carrying the printers it would
+	// (ffi)` / `tsv-parse-wasm`); against a bundle carrying the printers it would
 	// size a scope difference and read as an engine one. The emitted `vs tsv` ratio
 	// does NOT make that pairing — every row anchors on the full build (see
 	// `build_display_entries`), so the parse-only rows are listed for the reader to
@@ -364,7 +364,7 @@ export async function collect_binary_sizes(
 	}
 
 	// malva — dprint's CSS plugin wasm. Scope-matched to nothing tsv ships exactly
-	// (tsv has no CSS-only build), so pair it against `tsv_format_wasm` in the
+	// (tsv has no CSS-only build), so pair it against `tsv-format-wasm` in the
 	// knowledge that malva formats one language where that build formats three.
 	if (impls.malva) {
 		await push_resolved(
@@ -448,7 +448,7 @@ function anchor_note(native_anchor: string | null): string {
 	return (
 		`\`vs tsv\` divides native rows by ${native} — the binding this runtime benchmarks ` +
 		'(FFI under Deno, N-API under Node/Bun), so the same artifact reads a different ratio in ' +
-		'the deno and node/bun reports — and wasm rows by `tsv_wasm`.'
+		'the deno and node/bun reports — and wasm rows by `tsv-wasm`.'
 	);
 }
 
@@ -475,7 +475,7 @@ function build_display_entries(sizes: BinarySize[]): {
 	const tsv_native =
 		sizes.find((s) => s.label === native_anchor_label) ??
 		sizes.find((s) => s.label === LABELS.tsv_ffi);
-	// "vs tsv" wasm anchor: the flagship full build (`tsv_wasm`), the artifact the
+	// "vs tsv" wasm anchor: the flagship full build (`tsv-wasm`), the artifact the
 	// bench executes — identical `.wasm` across runtimes (only the JS glue differs).
 	const tsv_wasm = sizes.find((s) => s.label === LABELS.tsv_wasm);
 

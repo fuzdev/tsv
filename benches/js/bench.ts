@@ -1035,6 +1035,16 @@ async function enforce_css_reject_pin(full_corpus: boolean): Promise<void> {
 }
 
 /**
+ * A NATIVE tsv row — `tsv` and its `tsv-<variant>` rows — as opposed to the
+ * `tsv-wasm` family, which shares the `tsv-` prefix since the WASM package took its
+ * kebab-case name. The wasm rows are the SIBLINGS these predicates derive, never a
+ * base: the prefix test alone would pair `tsv-wasm-json` with a `tsv-wasm-wasm-json`
+ * that no row defines.
+ */
+const is_native_tsv_row = (name: string): boolean =>
+	name === 'tsv' || (name.startsWith('tsv-') && !name.startsWith('tsv-wasm'));
+
+/**
  * The task name that runs the SAME ENGINE as `name`, or `null` when it has no
  * such sibling. Two shapes qualify, and the invariant is identical for both: one
  * engine behind two BINDINGS (native/wasm), and one binding driven with two
@@ -1046,7 +1056,7 @@ const same_engine_sibling_name = (name: string): string | null => {
 	if (name === 'oxc-parser') return 'oxc-parser-wasm';
 	if (name === 'yuku-parser') return 'yuku-parser-wasm';
 	if (name === 'rsvelte-parse') return 'rsvelte-parse-skip-expr-loc';
-	if (name === 'tsv' || name.startsWith('tsv-')) return name.replace(/^tsv/, 'tsv_wasm');
+	if (is_native_tsv_row(name)) return name.replace(/^tsv/, 'tsv-wasm');
 	return null;
 };
 
@@ -1102,7 +1112,7 @@ const same_engine_pair_versions = (
  * second hand-written predicate — see `run_preflight`.
  */
 const sibling_outputs_must_match = (name: string): boolean =>
-	(name === 'tsv' || name.startsWith('tsv-')) && !name.endsWith('-internal');
+	is_native_tsv_row(name) && !name.endsWith('-internal');
 
 /**
  * Digest one pre-flight result for byte-parity comparison, or `null` when the

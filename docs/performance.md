@@ -584,7 +584,7 @@ noise floor before trusting any delta; on this workload the floor is roughly
 
 The tools above measure the native Rust side. Allocation *counts* are
 target-independent (heaptrack reads the same on either), but WASM *wall-time* is
-not: `@fuzdev/tsv_format_wasm` runs on talc (the wasm32 `#[global_allocator]` in
+not: `@fuzdev/tsv-format-wasm` runs on talc (the wasm32 `#[global_allocator]` in
 `tsv_wasm`; std's default dlmalloc before the swap), whose per-call cost profile
 differs from native glibc — so an allocation-count win can move WASM format time
 even when the same change is a wash on native. The full `deno task bench` is too coarse to
@@ -1191,7 +1191,7 @@ tag-triggered release workflow), not in `check`.
 The worked case: rewriting the wire writer's integer emitter to end in a
 fixed-width copy instead of a runtime-length one removed a libc `memmove` call
 and measured a clean **−3.2% parse-product instructions**. It also grew
-`@fuzdev/tsv_parse_wasm` **+6% raw, past its `max` bound** — the smaller body was
+`@fuzdev/tsv-parse-wasm` **+6% raw, past its `max` bound** — the smaller body was
 now inlined at ~200 writer call sites, each carrying the fixed-width blit.
 `cargo test --workspace`, `deno task check`, an 8,257-file byte-identity diff and
 the instruction A/B were **all green through the regression**.
@@ -1942,7 +1942,7 @@ on `profile` and 0.000% on `json_profile`, the parse-only entry point):
 The first three rows carry the bit forward as a *flag per identifier*: the lexer
 seeds it from the start char, keeps it live across the scan loop (a spill and a
 reload), stores it, and the parser copies it past its one-token lookahead. The
-parse path — `tsv parse`, `@fuzdev/tsv_parse_wasm`, the `parse/typescript` bench
+parse path — `tsv parse`, `@fuzdev/tsv-parse-wasm`, the `parse/typescript` bench
 rows — runs all of that and never builds a name doc, so it paid **+0.47%** for
 nothing; attributed by deleting one piece at a time on `json_profile`, the
 lexer's write was 0.091 points, the save-slot write 0.019, the parser's
@@ -3132,9 +3132,9 @@ kind's static slice; a buffer is assembled only under `declare`.
 The `tsv_wasm` crate produces three WASM binaries via the `format` +
 `parse` cargo features, each published as a separate npm package:
 
-- `--no-default-features --features format` → `@fuzdev/tsv_format_wasm` (format only)
-- `--no-default-features --features parse` → `@fuzdev/tsv_parse_wasm` (parse only)
-- default build (both) → `@fuzdev/tsv_wasm` (full tool + `tsv` bin)
+- `--no-default-features --features format` → `@fuzdev/tsv-format-wasm` (format only)
+- `--no-default-features --features parse` → `@fuzdev/tsv-parse-wasm` (parse only)
+- default build (both) → `@fuzdev/tsv-wasm` (full tool + `tsv` bin)
 
 `binary_sizes.ts` in the bench runner reads the three
 `pkg/<variant>/deno/tsv_wasm_bg.wasm` files and reports them side-by-side, with

@@ -1,10 +1,10 @@
 //! WebAssembly bindings for tsv.
 //!
 //! Three builds from two features:
-//! - default (`@fuzdev/tsv_wasm`): everything — `format_*` plus the parse exports.
-//! - `--no-default-features --features format` (`@fuzdev/tsv_format_wasm`):
+//! - default (`@fuzdev/tsv-wasm`): everything — `format_*` plus the parse exports.
+//! - `--no-default-features --features format` (`@fuzdev/tsv-format-wasm`):
 //!   `format_*` exports only.
-//! - `--no-default-features --features parse` (`@fuzdev/tsv_parse_wasm`):
+//! - `--no-default-features --features parse` (`@fuzdev/tsv-parse-wasm`):
 //!   `parse_*`, `parse_*_json`, and `parse_internal_*` plus the convert layer
 //!   that serializes ASTs to JS; the printers drop out at link time.
 //!
@@ -94,7 +94,7 @@ fn err(e: impl ToString) -> JsError {
 /// verdict (`classify_dir`/`should_format_file`). Exposed so the JS CLI
 /// (`npm/cli.js`) and the VS Code extension share the exact same matcher **and**
 /// prune decision as the native CLI — agreement by construction. Built only into
-/// the `format`-capable packages (`@fuzdev/tsv_format_wasm`, `@fuzdev/tsv_wasm`);
+/// the `format`-capable packages (`@fuzdev/tsv-format-wasm`, `@fuzdev/tsv-wasm`);
 /// the parse-only package omits it.
 #[cfg(feature = "format")]
 #[wasm_bindgen]
@@ -319,8 +319,8 @@ impl IgnoreStack {
 }
 
 /// Re-export every type from the bundled `./tsv_ast` declaration file
-/// so consumers of `@fuzdev/tsv_parse_wasm` can `import type { Program } from
-/// '@fuzdev/tsv_parse_wasm'` without reaching into the bundled `.d.ts`.
+/// so consumers of `@fuzdev/tsv-parse-wasm` can `import type { Program } from
+/// '@fuzdev/tsv-parse-wasm'` without reaching into the bundled `.d.ts`.
 ///
 /// Spelled `./tsv_ast.js`, here and in every `import(...)` below: under
 /// `moduleResolution: node16`/`nodenext` a relative specifier inside a
