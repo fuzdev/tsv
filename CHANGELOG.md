@@ -25,6 +25,7 @@ Each `## Unreleased` section must be non-empty and carry a
 - feat: a `darwin-x64` platform package joins the native set, so `@fuzdev/tsv` installs on Intel
   Macs and under x64 Node on Apple Silicon instead of throwing at import; its `tsv` CLI binary is
   attached to the GitHub Release like the others
+  ([#1040](https://github.com/fuzdev/tsv/pull/1040))
 - fix: a relational chain such as `x < y > z` no longer prints in a form that re-parses as a
   type-argument instantiation when a line break lands after the `>` — tsv keeps a paren pair around
   the `<` operand, so the output reads back as the comparison the author wrote
