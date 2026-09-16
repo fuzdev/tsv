@@ -1,0 +1,29 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(output_prettier.<ext>).
+# This file exists when prettier is non-idempotent on output_prettier.* — it pins
+# the full chain so the audit recognizes the case and the validator catches drift.
+# See docs/fixture_overview.md (rule F4) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// Width alone re-lexes a bare relational chain: the first break the printer takes
+	// after the `>` makes `canFollowTypeArgumentsInExpression` read a preceding line
+	// terminator and accept the type-argument list. The pair is layout-blind — it is
+	// there at every width, including the ones that never break.
+
+	// With the pair, the continuation line below is exactly 100 and the chain stays flat.
+	const l1 =
+		aaaaaaaaaaaaaaaaaaaaaaaaaaaaa < bbbbbbbbbbbbbbbbbbbbbbbbbbbbb > ccccccccccccccccccccccccccccc;
+
+	// One character longer in the right operand than `l1`: with the pair, the flat form no
+	// longer fits, so the break lands after the `>` — the join the pair protects.
+	const l2 =
+		aaaaaaaaaaaaaaaaaaaaaaaaaaaaa < bbbbbbbbbbbbbbbbbbbbbbbbbbbbb > cccccccccccccccccccccccccccccc;
+
+	// Wider still, the operands break one per line and the `<` operand hangs.
+	const l3 =
+		aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa<bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb>;
+	cccccccccccccccccccccccccccccccccccccccccccccc;
+</script>

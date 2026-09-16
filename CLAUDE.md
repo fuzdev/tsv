@@ -216,7 +216,11 @@ deno task paren:audit                # authoring-independence over redundant PAR
 #                          (`a ?? b ?? c`) must format identically to the twin prettier rebalances it from
 #                          (`a ?? (b ?? c)`). Zero-tolerance, no ratchet — a redundant paren carries no authoring
 #                          signal, so every divergence is a bug. The class is invisible on every paren-free
-#                          authoring, which is every authoring a formatted corpus holds (bug539)
+#                          authoring, which is every authoring a formatted corpus holds (bug539). Also the
+#                          relational `<`…`>` chain: `a < X > c` against `(a < X) > c` and `a < (X) > c`, the
+#                          redundant shells that can move its byte-read type-argument pair. `--require-relational`
+#                          (passed here, not by `audit:corpus`) adds a floor on relational sites, which only
+#                          tests/fixtures holds — a narrowed run drops it
 deno task fuzz:audit                 # seeded mutational fuzzer (fixed seed/iterations): no-panic + idempotency + structural reparse (node loss HARD, skeleton divergence soft); its token dictionary carries `// prettier-ignore`, the only standing instrument that composes a freeze with a comment or a paren shell
 deno task swallow:audit              # `//` line comment swallowing following output-line content (also over real code via audit:corpus)
 deno task comments:audit             # print-once comment ledger: DROPPED / DOUBLE-PRINTED comments

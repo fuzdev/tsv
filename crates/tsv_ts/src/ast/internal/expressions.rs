@@ -578,6 +578,30 @@ pub struct BinaryExpression<'arena> {
     pub operator: BinaryOperator,
     pub right: &'arena Expression<'arena>,
     pub span: Span,
+    /// For a `<` node UNDER A `>` only: whether the region this `<` opens would re-lex as a
+    /// TYPE-ARGUMENT LIST once printed — the parser's own relaxed reading of the same
+    /// lookahead that decided this `<` is the less-than operator, recorded here because the
+    /// printer cannot re-derive it (it holds a tree, and the question is about bytes).
+    ///
+    /// The two readings grade different TEXT — the printed form against every parser that
+    /// reads tsv's output, rather than the source against acorn. The printer's own line
+    /// breaks are the plainest case: it folds the author's break away (`fn<A⏎[T]>(t, u)`
+    /// prints as `fn < A[T] > (t, u)`, a `CallExpression` on re-parse) and may add its own
+    /// past the `>` (`x < y >⏎{ a: 1 }` is an instantiation plus a free-standing block).
+    /// Every place the two readings differ, with the seam each is read at, is enumerated
+    /// once on `TypeArgScan`.
+    ///
+    /// A `>` whose LEFT operand is such a `<` therefore keeps a paren pair —
+    /// `(fn < A[T]) > (t, u)` — synthesized and retained by `needs_parens`, which is the one
+    /// reader of this field.
+    ///
+    /// Set LAZILY, at the `>` that would close the region rather than at the `<`: the
+    /// verdict is a fact about the join of the two tokens, and a `<` with no `>` over it —
+    /// every ordinary comparison — must not pay the scan. The node is already in the arena
+    /// by then, so the parser re-allocates this one node to set the bit.
+    ///
+    /// `false` on every other operator, and free in the struct's existing padding.
+    pub relexes_as_type_arguments: bool,
 }
 
 impl<'arena> BinaryExpression<'arena> {

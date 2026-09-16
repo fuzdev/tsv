@@ -19,8 +19,16 @@
 //!
 //! `fn<T> + 1` and `fn<T> - 1` are the CONTRAST that bounds the repair class, and they are
 //! unfixturable for the opposite reason: both parsers accept them, as a relational chain
-//! (`fn < T > +1`), so tsv prints that chain instead of repairing anything. A variant
-//! must normalize to its `input.*`, and a third form is not its input.
+//! (`fn < T > +1`), so the instantiation rule has nothing to repair — the input was never an
+//! instantiation. A variant must normalize to its `input.*`, and a third form is not its
+//! input. What tsv prints is that chain with a pair around the `<` operand — the SEPARATE
+//! relational-chain rule, which is the contrast's whole point: the pair lands around the
+//! chain's left operand, never around the instantiation the tail rule would have wrapped.
+//! That rule fires here because tsv's own parse, like acorn-typescript, reads `fn < T >⏎+1`
+//! as `(fn<T>) + 1`, so a bare chain would re-lex once a break lands past the `>`. tsc would
+//! not, so this pair is owed to tsv's reparse of its own output rather than to tsc (which
+//! followers commit, for each parser, is stated in `docs/conformance_prettier_ts.md`
+//! §Relational chain type-argument parens).
 //!
 //! The followers the two parsers BOTH reject are the class's far edge — no repair to make,
 //! so tsv matching acorn is the drop-in contract rather than an over-rejection. They are
@@ -66,15 +74,23 @@ fn what_the_canonical_parser_rejects_gets_the_pair_back() {
 fn a_follower_that_re_lexes_is_not_repaired() {
     // A `+` or `-` continues a comparison chain, so the bare spelling is not a mis-spelled
     // instantiation at all — it is a different program, and tsv prints the program it
-    // parsed rather than inventing a pair.
+    // parsed. The pair it prints is the RELATIONAL-chain one, around the `<` operand, not
+    // the instantiation pair this file's other case is about: tsv's own parse reads
+    // `fn < T >⏎+1` as `fn<T> + 1`, so the chain would re-lex the moment a break lands past
+    // the `>` (tsc would keep the chain there; see the module docs). The two pairs are in
+    // different places, and which one appears is the assertion.
     for (bare, printed) in [
-        ("const a = fn<T> + 1;\n", "const a = fn < T > +1;\n"),
-        ("const b = fn<T> - 1;\n", "const b = fn < T > -1;\n"),
+        ("const a = fn<T> + 1;\n", "const a = (fn < T) > +1;\n"),
+        ("const b = fn<T> - 1;\n", "const b = (fn < T) > -1;\n"),
     ] {
         assert_eq!(
             format(bare),
             printed,
             "a re-lexed follower keeps its reading"
+        );
+        assert!(
+            parses(&format(bare)),
+            "the printed chain must reparse: {bare}"
         );
     }
 }

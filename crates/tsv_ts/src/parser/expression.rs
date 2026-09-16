@@ -18,6 +18,7 @@ use tsv_lang::{ParseError, Span, TAB_WIDTH};
 
 use super::Parser;
 use super::expression_lookahead::{ArrowHead, matching_angle_close};
+use super::expression_type_args::TypeArgScan;
 use super::scan::{
     LeadingZeroLiteral, classify_leading_zero, parse_number_literal, skip_whitespace_and_comments,
 };
@@ -265,6 +266,23 @@ fn contains_type_or_satisfies_tag(value: &str) -> bool {
         }
     }
     false
+}
+
+/// The byte offset of the infix operator that joins an ALREADY-BUILT binary node's two
+/// operands, located forward from the left operand's `span.end` — the first significant
+/// byte past it that is not a `)`, since a paren shell around an operand is outside that
+/// operand's own span (`(a) < b`, `((a)) < b`). `None` when the byte found is not
+/// `expected`, which is the whole verification: a caller that cannot place its own
+/// operator asks nothing further of it.
+///
+/// A binary node records no operator offset of its own — 4 bytes on every one, to serve
+/// the one reader below — so the bytes answer instead, and the reader is a cold path.
+fn infix_operator_offset(bytes: &[u8], left_end: usize, expected: u8) -> Option<usize> {
+    let mut pos = skip_whitespace_and_comments(bytes, left_end);
+    while bytes.get(pos) == Some(&b')') {
+        pos = skip_whitespace_and_comments(bytes, pos + 1);
+    }
+    (bytes.get(pos) == Some(&expected)).then_some(pos)
 }
 
 /// Infix operator info: binding powers and the corresponding binary operator.
@@ -622,6 +640,36 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 ));
             }
 
+            // Ask the RELAXED reading of the same type-argument lookahead that declined
+            // the `<` below — the one component that has already read these bytes, and the
+            // last moment they are still in reach (the printer holds a tree). It answers
+            // whether this chain's PRINTED form re-lexes as a type-argument list, which is
+            // what decides a paren pair at the enclosing `>`
+            // (`Printer::needs_parens_binary_operand`).
+            //
+            // Asked HERE, at the `>` that would close the region, rather than at the `<`
+            // that opens it: the verdict is a fact about the JOIN of the two tokens, and
+            // this is the first point both exist. A `<` with no `>` over it — `check(a < b)`
+            // and every other ordinary comparison — then pays nothing, where a question asked
+            // at the `<` would walk each one to the statement's end looking for a close that
+            // is not there. The bit rides the `<` node, already in the arena, so setting it
+            // re-allocates that one node; only a chain that takes the pair pays for it.
+            if operator == BinaryOperator::GreaterThan
+                && let Expression::BinaryExpression(child) = left.expr
+                && child.operator == BinaryOperator::LessThan
+                && let Some(lt) = infix_operator_offset(
+                    self.source.as_bytes(),
+                    self.local_pos(child.left.span().end),
+                    b'<',
+                )
+                && self.is_type_arguments_start_at(lt, TypeArgScan::Relex)
+            {
+                left.expr = arena.alloc(Expression::BinaryExpression(BinaryExpression {
+                    relexes_as_type_arguments: true,
+                    ..child.clone()
+                }));
+            }
+
             self.advance()?; // consume operator
 
             // Parse right-hand side with right binding power
@@ -637,6 +685,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     operator,
                     right: right.expr,
                     span,
+                    // Set only by the lazy `>` reading above, which re-allocates the node.
+                    relexes_as_type_arguments: false,
                 })),
                 actual_start: expr_start as u32,
                 actual_end: right.actual_end,
@@ -1085,7 +1135,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let type_arguments = if matches!(
             self.current_kind(),
             TokenKind::LessThan | TokenKind::LeftShift
-        ) && self.is_type_arguments_start()
+        ) && self.is_type_arguments_start(TypeArgScan::Parse)
         {
             Some(self.parse_type_parameter_instantiation()?)
         } else {
@@ -1305,7 +1355,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             );
                         }
                         TokenKind::LessThan | TokenKind::LeftShift
-                            if self.is_type_arguments_start() =>
+                            if self.is_type_arguments_start(TypeArgScan::Parse) =>
                         {
                             // obj?.<T>(args) - optional call with explicit type arguments;
                             // only a call may follow (`a?.<T>` without `(` is a syntax error)
@@ -1452,7 +1502,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // leave it for the caller; only `Base<T>(...)` is consumed here (the
                     // `(` arm below flattens the instantiation into a call with type
                     // arguments). A `<` that isn't type args stops the chain either way.
-                    let consume = self.is_type_arguments_start()
+                    let consume = self.is_type_arguments_start(TypeArgScan::Parse)
                         && (mode == SubscriptMode::Normal || self.is_type_args_followed_by_call());
                     if consume {
                         left = self.parse_instantiation_expression(left)?;
@@ -1563,7 +1613,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return false;
         }
 
-        match matching_angle_close(bytes, start + 1) {
+        match matching_angle_close(bytes, start + 1, TypeArgScan::Parse) {
             None => false,
             Some(close) => {
                 let after = skip_whitespace_and_comments(bytes, close + 1);
@@ -2124,8 +2174,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse a TypeScript instantiation expression `expr<Type>` from an
     /// already-parsed `left` operand.
     ///
-    /// The caller gates this on `is_type_arguments_start()`: when `<` follows an
-    /// expression it could be type arguments (`f<number>`, `arr<T, U>`) or a
+    /// The caller gates this on `is_type_arguments_start(TypeArgScan::Parse)`: when `<`
+    /// follows an expression it could be type arguments (`f<number>`, `arr<T, U>`) or a
     /// comparison (`a < b`), and that lookahead disambiguates before we commit.
     fn parse_instantiation_expression(
         &mut self,
@@ -2637,7 +2687,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // disambiguates: it consumes them into the tag and the callee chain
                 // continues (`new Foo<T>`x`.bar`); otherwise they are the `new`'s and
                 // the chain ends here.
-                _ if self.check_less_than_in_type() && self.is_type_arguments_start() => {
+                _ if self.check_less_than_in_type()
+                    && self.is_type_arguments_start(TypeArgScan::Parse) =>
+                {
                     let ta = self.parse_type_parameter_instantiation()?;
                     if matches!(
                         self.current_kind(),

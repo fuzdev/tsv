@@ -616,6 +616,14 @@ fn is_unary_or_update(expr: &Expression<'_>) -> bool {
 ///
 /// Every other operator lets all three backtrack to the type arguments, which is what makes
 /// the bare spelling AST-identical there.
+///
+/// This is the TAIL half of the `canFollowTypeArgumentsInExpression` seam — an operand that
+/// ENDS on a `>`. Its DUAL, an operand that ends on the `>`'s left and whose own `<`…`>`
+/// region would re-lex as the argument list, lives in the arm of
+/// [`needs_parens_binary_operand`] keyed on
+/// `internal::BinaryExpression::relexes_as_type_arguments`. Neither half is derivable from
+/// the other, and a change to one is a question about the other: the two are findable from
+/// here and from there, and nowhere else.
 pub(in crate::printer) const fn joins_a_trailing_angle_bracket(op: BinaryOperator) -> bool {
     matches!(
         op,
@@ -945,6 +953,37 @@ fn needs_parens_binary_operand(
     if !is_right
         && joins_a_trailing_angle_bracket(parent_op)
         && ends_with_instantiation_close(expr, in_for_init)
+    {
+        return true;
+    }
+
+    // The DUAL of the arm above, read off the same `canFollowTypeArgumentsInExpression`
+    // seam from the other side. There the operand IS an instantiation and the operator's
+    // first token re-lexes its closing `>`; here the operand is a relational `<` chain
+    // whose own printed `<`…`>` region would BE a type-argument list, and the enclosing
+    // `>` is the close. `(fn < A[T]) > (t, u)` and `(x < y) > { a: 1 }` are the same tree
+    // in the spelling every parser reads alike; bare, both re-parse as something else —
+    // a `CallExpression` with type arguments where the printer folded the author's break
+    // away, an instantiation plus a free-standing statement where it added one of its own
+    // (past a line break tsv's own parse commits the list ahead of any expression, so
+    // width alone reaches it; which followers commit, for each parser, is stated in the
+    // catalog entry). Prettier strips the pair at both, a cataloged ◆prettier_bug.
+    //
+    // The axis is the JOIN of two tokens, not the operand's node — the same doctrine — so
+    // the question was answered where the tokens still exist: the parser recorded it on
+    // the `<` node (`BinaryExpression::relexes_as_type_arguments`), at the `>` that closes
+    // the region. It is deliberately LAYOUT-BLIND: whether the `>` ends a line is
+    // unknowable here, so the pair stands at every width, the ones that never break
+    // included. And it is REGION-keyed rather than shape-keyed: an operand that is no type
+    // keeps the chain bare, whatever it is parenthesized with.
+    if !is_right
+        && parent_op == BinaryOperator::GreaterThan
+        && matches!(
+            expr,
+            Expression::BinaryExpression(child)
+                if child.operator == BinaryOperator::LessThan
+                    && child.relexes_as_type_arguments
+        )
     {
         return true;
     }

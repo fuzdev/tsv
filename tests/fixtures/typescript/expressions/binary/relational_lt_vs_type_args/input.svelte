@@ -8,11 +8,8 @@
 	const a6 = x < { a: 1 };
 	const a7 = x < [1];
 
-	// a closing `>` followed by an identifier is a chained comparison, not type args;
-	// this holds across string, numeric, and bare-identifier operands
-	const a8 = x < 'b' > c;
-	const a9 = x < 1 > c;
-	const a10 = a < b > c;
+	// a second `<` after the operand opens no nested list — nothing closes one, so the
+	// line is a chained comparison
 	const a11 = a < b < c;
 
 	// a parenthesized ternary operand is a comparison, not a `(b?: T) => ...` function type
@@ -20,19 +17,6 @@
 
 	// a `>` inside an array literal belongs to the array, not the relational chain
 	const a13 = x < [a > b];
-
-	// any expression-starting token after the closing `>` makes it a comparison
-	// chain too — literal, unary, array, and object operands behave like the
-	// identifier and typeof operands
-	const a14 = x < y > 1;
-	const a15 = x < y > 'b';
-	const a16 = x < y > !c;
-	const a17 = x < y > ~c;
-	const a18 = x < y > -1;
-	const a19 = x < y > +1;
-	const a20 = x < y > [0];
-	const a21 = x < y > { a: 1 };
-	const a22 = x < y > typeof c;
 
 	// an indexed member access after `<` is a comparison operand, not an indexed access
 	// type; the `,` that follows it belongs to the enclosing argument, element, or
@@ -64,9 +48,8 @@
 	const a34 = a < B[0 || 1] > c;
 	const a35 = a < B[0 <= 1] > c;
 
-	// a `>` or a shift operator after the indexed operand continues the comparison
-	// chain — the `>` run belongs to the operator, not to a type-argument close
-	const a28 = a < B[c] > d;
+	// a shift operator after the indexed operand continues the comparison chain — the
+	// `>` run belongs to the operator, not to a type-argument close
 	const a29 = a < B[c] >> d;
 	const a30 = a < B[c] >>> d;
 

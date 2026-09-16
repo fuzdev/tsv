@@ -1,10 +1,10 @@
-//! The **vacuity guard** — the two checks that stop a gate over nothing from
+//! The **vacuity guard** — the checks that stop a gate over nothing from
 //! reading as a green gate.
 //!
 //! Every audit's happy path prints a `✓` and exits 0, and so does an audit that
 //! graded nothing at all: an empty walk, a corpus the parser rejects end to end,
-//! a fixture tree that silently shrank. The two layers here answer that at the
-//! two scopes a run can have:
+//! a fixture tree that silently shrank. The layers here answer that at the
+//! scopes a run can have:
 //!
 //! - [`check_graded_nonzero`] — **scope-relative**, called unconditionally by
 //!   every corpus-walking audit. Zero graded is vacuous whatever the paths, so it
@@ -12,6 +12,9 @@
 //! - [`check_formatted_min`] + [`FIXTURES_FORMATTED_MIN`] — **default-corpus**,
 //!   called only on a full default run. It grades a *shrink*, which only a run
 //!   over the committed fixtures tree can be held to.
+//! - [`check_required_nonzero`] — **seed-set**, asked for by an explicit flag.
+//!   It grades a sub-population that only some corpora hold, so the invocation
+//!   that knows its seeds carry the population is the one that claims it.
 //!
 //! Its own module rather than [`super::sweep`]'s (where it was born) because the
 //! floor is a question about an audit's DENOMINATOR, not about that loop: nine
@@ -129,6 +132,43 @@ pub(crate) fn check_graded_nonzero(graded: usize, subject: &str) -> Result<(), C
     eprintln!(
         "Error: vacuous run — 0 {subject}. A gate over nothing proves nothing: check the \
          paths, and that the corpus still parses."
+    );
+    Err(CliError::Failed)
+}
+
+/// The **seed-set** layer: a floor over a SUB-population, asked for by the `flag` the
+/// invocation passes. `subject` names what was counted; `flag` is the switch to drop.
+///
+/// [`check_graded_nonzero`] is a claim about the AUDIT — zero graded is vacuous whatever the
+/// paths, so no invocation may opt out of it. This one is a claim about the SEED SET: a
+/// sub-population an audit grades may be dense in one corpus and legitimately absent from
+/// another (a construct real code does not write), and there zero is the correct reading, not
+/// a defect. So the floor belongs to whichever invocation knows its seeds carry the
+/// population, rather than to the audit — and it is spelled as an explicit flag rather than
+/// inferred from the paths, because a flag is greppable and cannot silently mean the wrong
+/// thing on a subtree run.
+///
+/// A NARROWED run under the flag fails, deliberately and like a ratchet's `:update`: the flag
+/// asserts the run covers the population's corpus, which a subtree does not. The message says
+/// to drop the flag rather than to widen the paths, since a narrowed run is an ordinary triage
+/// run that was never entitled to the claim.
+///
+/// # Errors
+///
+/// Returns [`CliError::Failed`] (after a user-facing message) when `graded` is 0.
+pub(crate) fn check_required_nonzero(
+    graded: usize,
+    subject: &str,
+    flag: &str,
+) -> Result<(), CliError> {
+    if graded > 0 {
+        return Ok(());
+    }
+    eprintln!(
+        "Error: vacuous run — 0 {subject}, under {flag}. That flag asserts this run's seeds \
+         COVER them, so it belongs only to an invocation whose corpus holds them: a narrowed \
+         run, or one over a corpus without them, drops {flag} rather than being graded \
+         against a population it does not contain."
     );
     Err(CliError::Failed)
 }

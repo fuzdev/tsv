@@ -8,6 +8,7 @@
 //
 // All functions operate on byte slices for performance (no tokenization needed).
 
+use super::expression_type_args::TypeArgScan;
 use super::scan::{
     identifier_starts_at, is_word_at, skip_identifier, skip_numeric_literal,
     skip_whitespace_and_comments,
@@ -451,7 +452,7 @@ fn scan_for_arrow(bytes: &[u8], colon: usize) -> bool {
                 position = TypePos::Atom;
             }
             b'<' => {
-                let Some(close) = matching_angle_close(bytes, pos + 1) else {
+                let Some(close) = matching_angle_close(bytes, pos + 1, TypeArgScan::Parse) else {
                     return false;
                 };
                 // At a full-type position `<…>` opens a generic function type,
@@ -724,8 +725,18 @@ pub(super) fn is_function_type_start(bytes: &[u8], pos: usize) -> bool {
 /// `)`, `]`, `}`, or `;` at depth 0, and the close isn't followed by a token
 /// that makes the `>` a comparison instead: a `>`/`>>`/`>>>` (relational or
 /// shift) run, or an expression-starting token on the same line.
-pub(super) fn scan_for_closing_angle_bracket(bytes: &[u8], pos: usize) -> bool {
-    match matching_angle_close(bytes, pos) {
+///
+/// The follower half is the one the two readings disagree on. [`TypeArgScan::Relex`] asks
+/// about the REGION alone and stops at the matching `>`: past a line terminator the
+/// [`TypeArgScan::Parse`] arm below commits the list ahead of any expression, and whether the
+/// printer puts a break there is unknowable where the question is asked. (Which followers
+/// commit, for tsc and for acorn-typescript, is stated in `docs/conformance_prettier_ts.md`
+/// §Relational chain type-argument parens; where tsc refuses one this parse commits on,
+/// [`TypeArgScan`]'s soundness property is why the pair still stands.) The `>`-led run is
+/// NOT part of that half — a `>>` / `>>>` is one token the printer can never split, so both
+/// readings reject it.
+pub(super) fn scan_for_closing_angle_bracket(bytes: &[u8], pos: usize, scan: TypeArgScan) -> bool {
+    match matching_angle_close(bytes, pos, scan) {
         None => false,
         Some(close) => {
             let after = skip_whitespace_and_comments(bytes, close + 1);
@@ -751,8 +762,13 @@ pub(super) fn scan_for_closing_angle_bracket(bytes: &[u8], pos: usize) -> bool {
             // `tokenCanStartExpression && !hasPrecedingLineBreak` bail). `(` (call),
             // a template (tagged template), and other non-expression tokens (`;`,
             // `,`, `)`, `.`, an operator…) continue the instantiation — and across a
-            // line break an expression-starting token begins a new statement via ASI,
-            // leaving the `<…>` an instantiation.
+            // line break an expression-starting token leaves the `<…>` an instantiation
+            // too, whether it then begins a new statement via ASI (`x<y>⏎c`) or continues
+            // as an operand (`x<y>⏎+1`). The whole follower split, tsc's beside acorn's, is
+            // in `docs/conformance_prettier_ts.md` §Relational chain type-argument parens.
+            if !scan.reads_source_as_written() {
+                return true;
+            }
             !starts_expression_after_type_args(bytes, after)
                 || has_line_terminator_between(bytes, close + 1, after)
         }
@@ -769,7 +785,7 @@ pub(super) fn scan_for_closing_angle_bracket(bytes: &[u8], pos: usize) -> bool {
 /// parenthesized (`a << b > (c)`): an arrow can never be a relational
 /// operand, so real shift code never has `(…) =>` after the would-be close.
 pub(super) fn is_generic_function_type_start(bytes: &[u8], pos: usize) -> bool {
-    let Some(close) = matching_angle_close(bytes, pos) else {
+    let Some(close) = matching_angle_close(bytes, pos, TypeArgScan::Parse) else {
         return false;
     };
     let after = skip_whitespace_and_comments(bytes, close + 1);
@@ -822,9 +838,30 @@ pub(super) fn is_construct_type_start(bytes: &[u8], pos: usize) -> bool {
 /// (`pos` is the first byte after the `<`), or `None` if an unbalanced `)`,
 /// `]`, `}`, or a top-level `;` intervenes.
 ///
+// TODO: this walk is O(distance to the enclosing delimiter) and every `<` in a construct
+// pays it, so a call whose arguments are all comparisons is quadratic in the argument count
+// — `f(a1 < b1, …, aN < bN)` quadruples per doubling of N, against a `+` control that stays
+// flat and unmeasurable. (A wall-clock figure is deliberately not quoted: the ratio is the
+// property, and an absolute second belongs to one machine.) Both readings pay it — a `<` that
+// opens no type-argument list reads to the construct's own close before it can say so. A memo keyed on the enclosing delimiter's span would collapse it; nothing
+// real has the shape, so it has not been worth the state.
+///
 /// Operator disambiguation: `<=` and `>=` are comparison operators (not angle
 /// brackets) and `=>` is an arrow operator (not a closing bracket).
-pub(super) fn matching_angle_close(bytes: &[u8], mut pos: usize) -> Option<usize> {
+///
+/// The unbalanced `)` is the one stop the two readings split on. Under
+/// [`TypeArgScan::Relex`] a `)` the region did not open is a **paren shell the printer
+/// strips**, and the question is about the PRINTED bytes, where it is absent — so it does
+/// not end the region and the scan reads on. Without that, the pair this reading exists to
+/// justify would erase itself on the next pass: `(a < b) > c` re-read as source stops the
+/// scan at its own `)` and prints back out as `a < b > c`. `]`, `}` and a top-level `;`
+/// stop both readings — a bracket or brace is never a shell the printer strips, and a `;`
+/// ends the statement in either spelling.
+pub(super) fn matching_angle_close(
+    bytes: &[u8],
+    mut pos: usize,
+    scan: TypeArgScan,
+) -> Option<usize> {
     let mut angle_depth: i32 = 1;
     let mut paren_depth: i32 = 0;
     let mut bracket_depth: i32 = 0;
@@ -864,7 +901,12 @@ pub(super) fn matching_angle_close(bytes: &[u8], mut pos: usize) -> Option<usize
             b')' => {
                 paren_depth -= 1;
                 if paren_depth < 0 {
-                    return None; // Unbalanced - hit call/group end
+                    if scan.reads_source_as_written() {
+                        return None; // Unbalanced - hit call/group end
+                    }
+                    // A shell the printer strips is not in the form this reading grades;
+                    // re-level and read on (see the doc above).
+                    paren_depth = 0;
                 }
             }
             b'[' => bracket_depth += 1,
