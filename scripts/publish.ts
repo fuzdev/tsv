@@ -90,15 +90,15 @@ const dec = new TextDecoder();
 /** The published packages, in publish order. */
 const packages = [
 	{
-		label: '@fuzdev/tsv_format_wasm',
+		label: '@fuzdev/tsv-format-wasm',
 		dir: 'crates/tsv_wasm/pkg/format/npm'
 	},
 	{
-		label: '@fuzdev/tsv_parse_wasm',
+		label: '@fuzdev/tsv-parse-wasm',
 		dir: 'crates/tsv_wasm/pkg/parse/npm'
 	},
 	{
-		label: '@fuzdev/tsv_wasm',
+		label: '@fuzdev/tsv-wasm',
 		dir: 'crates/tsv_wasm/pkg/all/npm'
 	}
 ];

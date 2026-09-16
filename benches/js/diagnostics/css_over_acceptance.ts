@@ -277,7 +277,7 @@ if (impls === null) {
 const rows: Array<{ name: string; impl: TsvImplementation | undefined }> = [
 	{ name: ORACLE_ROW, impl: impls.canonical },
 	{ name: 'tsv', impl: impls.native },
-	{ name: 'tsv_wasm', impl: impls.wasm },
+	{ name: 'tsv-wasm', impl: impls.wasm },
 	{ name: 'postcss', impl: impls.postcss }
 ];
 

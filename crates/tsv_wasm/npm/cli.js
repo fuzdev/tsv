@@ -3,7 +3,7 @@
  * The `tsv` bin — mirrors the native `tsv_cli` contract (subcommands, flags,
  * exit codes, output streams, traversal rules) over whichever engine
  * `./index.js` resolves to: one source shipped verbatim in both
- * `@fuzdev/tsv_wasm` (WASM) and the native `@fuzdev/tsv` (N-API). The Rust
+ * `@fuzdev/tsv-wasm` (WASM) and the native `@fuzdev/tsv` (N-API). The Rust
  * `tsv_cli` binary is still the fast path for large trees — the per-file
  * engine tax is the gap, not the driver.
  *
@@ -407,7 +407,7 @@ async function main() {
 /** `tsv --version` — mirrors the native CLI's top-level version switch, exact
  * output shape (`tsv <version>`). The version is this package's own — read
  * lazily from the sibling package.json (cli.js ships at the package root of
- * both `@fuzdev/tsv_wasm` and `@fuzdev/tsv`, and the published sets move in
+ * both `@fuzdev/tsv-wasm` and `@fuzdev/tsv`, and the published sets move in
  * version lockstep with the native binary). */
 function print_version() {
 	const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8'));

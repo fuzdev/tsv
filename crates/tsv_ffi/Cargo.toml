@@ -29,7 +29,7 @@ serde_json.workspace = true
 # Default build — both halves: the full libtsv_ffi the bench perf rows load and
 # any FFI host links against. The format-only size build uses
 # `--no-default-features --features format` (deno task build:ffi:format), the
-# native mirror of @fuzdev/tsv_format_wasm — it drops the convert/JSON layer.
+# native mirror of @fuzdev/tsv-format-wasm — it drops the convert/JSON layer.
 default = ["format", "parse"]
 # tsv_format_<lang> exports. Pulls the reusable `DocArena` (tsv_arena/format → tsv_lang).
 format = ["tsv_arena/format", "dep:tsv_lang"]

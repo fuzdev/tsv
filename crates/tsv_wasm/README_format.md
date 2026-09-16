@@ -1,4 +1,4 @@
-# @fuzdev/tsv_format_wasm
+# @fuzdev/tsv-format-wasm
 
 > formatter for Svelte, TypeScript, and CSS
 
@@ -6,14 +6,14 @@ Rust-based formatter compiled to WASM. A near-Prettier formatter that tracks **P
 
 tsv is non-configurable: settings are fixed at Prettier's defaults except `printWidth: 100`, `useTabs: true`, `singleQuote: true`, and `trailingComma: 'none'` — no options, like `gofmt` and Black.
 
-Formatting only — for parser / AST extraction, see [`@fuzdev/tsv_parse_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_parse_wasm), or [`@fuzdev/tsv_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_wasm) for both plus a CLI. On Node.js and Bun, [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) is the native build of the same API.
+Formatting only — for parser / AST extraction, see [`@fuzdev/tsv-parse-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-parse-wasm), or [`@fuzdev/tsv-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-wasm) for both plus a CLI. On Node.js and Bun, [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) is the native build of the same API.
 
 Docs and benchmarks: [tsv.fuz.dev](https://tsv.fuz.dev/). Source and conformance notes: [github.com/fuzdev/tsv](https://github.com/fuzdev/tsv).
 
 ## Install
 
 ```bash
-npm i @fuzdev/tsv_format_wasm
+npm i @fuzdev/tsv-format-wasm
 ```
 
 Requires Node.js 22+; Bun and Deno work too, and browsers via `init()` (below).
@@ -35,7 +35,7 @@ Deeply nested input has a ceiling: the WASM stack is 1 MiB, and the deepest shap
 Zero config — WASM is initialized synchronously at import time:
 
 ```javascript
-import {format_css, format_svelte, format_typescript} from '@fuzdev/tsv_format_wasm';
+import {format_css, format_svelte, format_typescript} from '@fuzdev/tsv-format-wasm';
 
 const formatted = format_svelte('<script>\nconst   x=1\n</script>');
 ```
@@ -45,7 +45,7 @@ const formatted = format_svelte('<script>\nconst   x=1\n</script>');
 Call `await init()` once before formatting. Bundlers that understand `new URL('./file.wasm', import.meta.url)` (Vite, Webpack, Rollup) resolve the WASM asset automatically:
 
 ```javascript
-import {format_svelte, init} from '@fuzdev/tsv_format_wasm';
+import {format_svelte, init} from '@fuzdev/tsv-format-wasm';
 
 await init();
 const formatted = format_svelte('<script>\nconst   x=1\n</script>');
@@ -55,17 +55,17 @@ const formatted = format_svelte('<script>\nconst   x=1\n</script>');
 
 ### Worker pools
 
-To format across threads, compile once and share: the main entry exports `wasm_module`, the compiled `WebAssembly.Module` behind its exports, and the `@fuzdev/tsv_format_wasm/worker` subpath is the same API without the import-time initialization, so a worker starts from that module instead of reading and compiling the WASM again. Compiled code is shared across isolates, so no worker pays for a second compile. `wasm_module` is the Node/Bun entry's alone — that entry is the one that compiles at import — so in a browser Worker call `await init()` instead, or `postMessage` a `WebAssembly.Module` you compiled yourself.
+To format across threads, compile once and share: the main entry exports `wasm_module`, the compiled `WebAssembly.Module` behind its exports, and the `@fuzdev/tsv-format-wasm/worker` subpath is the same API without the import-time initialization, so a worker starts from that module instead of reading and compiling the WASM again. Compiled code is shared across isolates, so no worker pays for a second compile. `wasm_module` is the Node/Bun entry's alone — that entry is the one that compiles at import — so in a browser Worker call `await init()` instead, or `postMessage` a `WebAssembly.Module` you compiled yourself.
 
 ```typescript
 // main thread
 import {Worker} from 'node:worker_threads';
-import {wasm_module} from '@fuzdev/tsv_format_wasm';
+import {wasm_module} from '@fuzdev/tsv-format-wasm';
 new Worker(worker_url, {workerData: {wasm_module}});
 
 // worker
 import {workerData} from 'node:worker_threads';
-import {format_typescript, init_sync} from '@fuzdev/tsv_format_wasm/worker';
+import {format_typescript, init_sync} from '@fuzdev/tsv-format-wasm/worker';
 init_sync({module: workerData.wasm_module});
 ```
 
@@ -74,7 +74,7 @@ init_sync({module: workerData.wasm_module});
 For tooling that needs tsv's exact file scoping, this package also exports an `IgnoreStack` class — the same hierarchical, git-faithful matcher the `tsv` CLI uses (per-directory `.gitignore` layers plus one tsv layer per directory, fed by `.formatignore` or, failing that, `.prettierignore`) to decide which files it formats. Build it from a repo's ignore files (one layer per directory, anchored at that directory), then query per path. Walking directories is the caller's job, but the class also carries tsv's discovery policy — `classify_dir`, `should_format_file`, `is_path_pruned`, `path_shadow_warning`, `excluded_argument_warning`, `unsupported_extension_error`, `shadow_warning`, `prettierignore_outside_repo_warning`, `prettierignore_shadowed_warning`, and `gitignore_symlink_warning` — so a walker reproduces the CLI's decisions, and its warnings, exactly.
 
 ```javascript
-import {IgnoreStack} from '@fuzdev/tsv_format_wasm';
+import {IgnoreStack} from '@fuzdev/tsv-format-wasm';
 
 const stack = new IgnoreStack();
 stack.push_gitignore('', 'build/\n*.log\n'); // a .gitignore (anchor '' = root)

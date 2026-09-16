@@ -19,7 +19,7 @@ agree **by construction** rather than by hand-mirrored constants and templates
 
 Depends only on [`tsv_ignore`](../tsv_ignore/CLAUDE.md) (the matcher) — **no other
 `tsv_*` crates, no external crates**. Same zero-dep discipline as `tsv_ignore`:
-keeps the format-only WASM artifact (`@fuzdev/tsv_format_wasm`) tiny and sidesteps
+keeps the format-only WASM artifact (`@fuzdev/tsv-format-wasm`) tiny and sidesteps
 the dependency-approval gate.
 
 **Policy vs. matcher.** `tsv_ignore` stays a pure gitignore(5) matcher and must

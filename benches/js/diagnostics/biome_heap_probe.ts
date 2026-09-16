@@ -27,7 +27,7 @@
  *
  * `--prelude <rows>` reproduces the bench's PROCESS context instead of a bare one: the
  * whole implementation set is initialized the way `bench.ts` does it, and the named
- * format rows of the same group (`prettier`, `tsv`, `tsv_wasm`, `oxfmt` — the tasks the
+ * format rows of the same group (`prettier`, `tsv`, `tsv-wasm`, `oxfmt` — the tasks the
  * bench times ahead of `biome-wasm` in `format/<lang>`) each sweep the corpus
  * `--prelude-sweeps` times (default 4) in the bench's order, with the bench's untimed
  * major GC (`settle_heap`) between tasks, before the biome sweeps begin. Isolated, the
@@ -69,8 +69,8 @@ import { load_all_versions } from '../lib/versions.ts';
 type Regime = 'never' | 'every' | 'budget';
 const REGIMES: ReadonlyArray<Regime> = ['never', 'every', 'budget'];
 
-type PreludeRow = 'prettier' | 'tsv' | 'tsv_wasm' | 'oxfmt';
-const PRELUDE_ROWS: ReadonlyArray<PreludeRow> = ['prettier', 'tsv', 'tsv_wasm', 'oxfmt'];
+type PreludeRow = 'prettier' | 'tsv' | 'tsv-wasm' | 'oxfmt';
+const PRELUDE_ROWS: ReadonlyArray<PreludeRow> = ['prettier', 'tsv', 'tsv-wasm', 'oxfmt'];
 
 let regime: Regime = 'budget';
 let sweeps = 30;
@@ -163,7 +163,7 @@ if (prelude.length === 0) {
 	const sweep_of: Record<PreludeRow, (f: SourceFile) => Promise<unknown> | unknown> = {
 		prettier: (f) => impls.canonical.format_async(f.content, language),
 		tsv: (f) => impls.native.format(f.content, language),
-		tsv_wasm: (f) => impls.wasm.format(f.content, language),
+		'tsv-wasm': (f) => impls.wasm.format(f.content, language),
 		oxfmt: (f) => {
 			if (!impls.oxc) throw new Error('oxfmt failed to initialize');
 			return impls.oxc.format_async(f.content, language);

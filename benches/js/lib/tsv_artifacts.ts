@@ -141,7 +141,7 @@ export const TSV_ARTIFACTS = {
 		binding_crates: ['tsv_ffi'],
 		rebuild: 'deno task build:ffi'
 	},
-	// The native mirror of @fuzdev/tsv_format_wasm: dropping the convert/JSON layer
+	// The native mirror of @fuzdev/tsv-format-wasm: dropping the convert/JSON layer
 	// (and the parse exports) leaves a scope-matched comparison against oxfmt
 	// (napi), which is format-only too. A separate target dir so it doesn't
 	// clobber the full library the perf rows load.
@@ -152,7 +152,7 @@ export const TSV_ARTIFACTS = {
 		binding_crates: ['tsv_ffi'],
 		rebuild: 'deno task build:ffi:format'
 	},
-	// The native mirror of @fuzdev/tsv_parse_wasm: keeps the parse exports + the
+	// The native mirror of @fuzdev/tsv-parse-wasm: keeps the parse exports + the
 	// convert/JSON layer and drops the printers, scope-matched to oxc-parser
 	// (napi), which also materializes a JSON AST.
 	tsv_parse_ffi: {
@@ -173,24 +173,24 @@ export const TSV_ARTIFACTS = {
 		rebuild: 'deno task build:napi'
 	},
 	// Three WASM builds from one crate via the `format`/`parse` features:
-	// @fuzdev/tsv_format_wasm, @fuzdev/tsv_parse_wasm, and @fuzdev/tsv_wasm (both —
+	// @fuzdev/tsv-format-wasm, @fuzdev/tsv-parse-wasm, and @fuzdev/tsv-wasm (both —
 	// the bundle the bench executes).
 	tsv_format_wasm: {
-		label: 'tsv_format_wasm',
+		label: 'tsv-format-wasm',
 		kind: 'wasm',
 		path: wasm_bundle_path('format', 'deno'),
 		binding_crates: WASM_CRATES,
 		rebuild: 'deno task build:wasm:deno'
 	},
 	tsv_parse_wasm: {
-		label: 'tsv_parse_wasm',
+		label: 'tsv-parse-wasm',
 		kind: 'wasm',
 		path: wasm_bundle_path('parse', 'deno'),
 		binding_crates: WASM_CRATES,
 		rebuild: 'deno task build:wasm:parse:deno'
 	},
 	tsv_wasm: {
-		label: 'tsv_wasm',
+		label: 'tsv-wasm',
 		kind: 'wasm',
 		path: wasm_bundle_path('all', 'deno'),
 		binding_crates: WASM_CRATES,

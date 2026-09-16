@@ -62,7 +62,7 @@
 //! The remaining unstaged tails (combinator, the pseudo selectors, `Nth`,
 //! `Percentage`, `CSSComment`, the synthesized selector lists) are ~8% of nodes
 //! across ten sites — below the floor at which a ratio can be measured, and each
-//! staged emitter inlines at its site and costs `@fuzdev/tsv_parse_wasm` bytes.
+//! staged emitter inlines at its site and costs `@fuzdev/tsv-parse-wasm` bytes.
 
 use super::super::internal;
 use super::{

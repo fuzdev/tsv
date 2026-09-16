@@ -1,5 +1,5 @@
 /**
- * Hand-written types for `@fuzdev/tsv` — mirrors `@fuzdev/tsv_wasm`'s
+ * Hand-written types for `@fuzdev/tsv` — mirrors `@fuzdev/tsv-wasm`'s
  * surface (same option interfaces, same overloads, same `tsv_ast` re-export),
  * so the two packages type-check interchangeably except for what a WASM engine
  * needs and this one doesn't: `init()` and `init_sync()` (nothing here needs
@@ -126,7 +126,7 @@ export function format_css(source: string, options?: FormatOptions): string;
  * construction. Push layers shallowest-first; anchors are `/`-separated and
  * relative to the format root (`''` = the root).
  *
- * Mirrors `@fuzdev/tsv_wasm`'s class method for method, including the
+ * Mirrors `@fuzdev/tsv-wasm`'s class method for method, including the
  * `string | undefined` (never `null`) of the maybe-a-warning methods, so the
  * two type-check interchangeably — save the WASM class's wasm-bindgen
  * lifecycle pair, `free()` and `[Symbol.dispose]()`: this class is

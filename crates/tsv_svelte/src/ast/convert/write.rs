@@ -69,7 +69,7 @@
 //!
 //! **Four, because a run is earned by frequency.** Those bursts emit 4.6–14.1
 //! times per KB of source, and each staged emitter is *inlined at its site* —
-//! so a rare burst buys nothing and still costs `@fuzdev/tsv_parse_wasm` bytes.
+//! so a rare burst buys nothing and still costs `@fuzdev/tsv-parse-wasm` bytes.
 //! `ExpressionTag`, `write_text`'s raw-content arm, `write_text_sequence` and
 //! the directive heads are deliberately left on the plain appends.
 //! ⚠️ It is the *staged emitters* that pay, not the `stage_flush` copy — grade

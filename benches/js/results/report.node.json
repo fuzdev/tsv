@@ -439,19 +439,19 @@
 			"gzip_bytes": 1767902
 		},
 		{
-			"label": "tsv_format_wasm",
+			"label": "tsv-format-wasm",
 			"bytes": 2513526,
 			"kind": "wasm",
 			"gzip_bytes": 928354
 		},
 		{
-			"label": "tsv_parse_wasm",
+			"label": "tsv-parse-wasm",
 			"bytes": 995585,
 			"kind": "wasm",
 			"gzip_bytes": 384559
 		},
 		{
-			"label": "tsv_wasm",
+			"label": "tsv-wasm",
 			"bytes": 2801351,
 			"kind": "wasm",
 			"gzip_bytes": 1030055
@@ -580,7 +580,7 @@
 			"runtime": "node"
 		},
 		{
-			"name": "tsv_wasm-json",
+			"name": "tsv-wasm-json",
 			"group": "parse/svelte",
 			"mean_ns": 290331663.5,
 			"p50_ns": 290158877.5,
@@ -634,7 +634,7 @@
 			"runtime": "node"
 		},
 		{
-			"name": "tsv_wasm-json-no-locations",
+			"name": "tsv-wasm-json-no-locations",
 			"group": "parse/svelte",
 			"mean_ns": 183737156.5,
 			"p50_ns": 183642585,
@@ -688,7 +688,7 @@
 			"runtime": "node"
 		},
 		{
-			"name": "tsv_wasm-internal",
+			"name": "tsv-wasm-internal",
 			"group": "parse/svelte",
 			"mean_ns": 30845041.08275862,
 			"p50_ns": 30839096.5,
@@ -823,7 +823,7 @@
 			"runtime": "node"
 		},
 		{
-			"name": "tsv_wasm",
+			"name": "tsv-wasm",
 			"group": "format/svelte",
 			"mean_ns": 109525312.43478261,
 			"p50_ns": 109413807.5,
@@ -958,7 +958,7 @@
 			"runtime": "node"
 		},
 		{
-			"name": "tsv_wasm-json",
+			"name": "tsv-wasm-json",
 			"group": "parse/typescript",
 			"mean_ns": 2203390623.25,
 			"p50_ns": 2201956126.5,
@@ -1012,7 +1012,7 @@
 			"runtime": "node"
 		},
 		{
-			"name": "tsv_wasm-json-no-locations",
+			"name": "tsv-wasm-json-no-locations",
 			"group": "parse/typescript",
 			"mean_ns": 1092176982.875,
 			"p50_ns": 1091962102,
@@ -1066,7 +1066,7 @@
 			"runtime": "node"
 		},
 		{
-			"name": "tsv_wasm-internal",
+			"name": "tsv-wasm-internal",
 			"group": "parse/typescript",
 			"mean_ns": 152591868.54545453,
 			"p50_ns": 152475333,
@@ -1282,7 +1282,7 @@
 			"runtime": "node"
 		},
 		{
-			"name": "tsv_wasm",
+			"name": "tsv-wasm",
 			"group": "format/typescript",
 			"mean_ns": 608151843.4444444,
 			"p50_ns": 608061329,
@@ -1444,7 +1444,7 @@
 			"runtime": "node"
 		},
 		{
-			"name": "tsv_wasm-json",
+			"name": "tsv-wasm-json",
 			"group": "parse/css",
 			"mean_ns": 24148567.881656803,
 			"p50_ns": 24143171,
@@ -1498,7 +1498,7 @@
 			"runtime": "node"
 		},
 		{
-			"name": "tsv_wasm-internal",
+			"name": "tsv-wasm-internal",
 			"group": "parse/css",
 			"mean_ns": 6832402.973837209,
 			"p50_ns": 6829231,
@@ -1606,7 +1606,7 @@
 			"runtime": "node"
 		},
 		{
-			"name": "tsv_wasm",
+			"name": "tsv-wasm",
 			"group": "format/css",
 			"mean_ns": 11671406.492718447,
 			"p50_ns": 11659056.5,

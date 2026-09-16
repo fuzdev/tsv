@@ -18,8 +18,8 @@
  * point works under all three runtimes. It instantiates at import time (top-level
  * `await`), which puts its setup in `init()` where every other impl's setup lives.
  * Its parse path encodes the source into linear memory, calls in, then copies the
- * result buffer back out — a boundary tax of the same shape `tsv_wasm` pays, and
- * the reason that row belongs beside `tsv_wasm-json` and `oxc-parser-wasm` rather
+ * result buffer back out — a boundary tax of the same shape `tsv-wasm` pays, and
+ * the reason that row belongs beside `tsv-wasm-json` and `oxc-parser-wasm` rather
  * than beside the native ones.
  *
  * ⚠ **The native binding is not memory-safe on adversarial input, so the N-API row

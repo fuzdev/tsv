@@ -923,7 +923,7 @@ run's output.
 out of `init_implementations` (`init_required`) instead of joining `unavailable`,
 and their slots are correspondingly non-`undefined` in `ImplementationSet` — a
 broken tree, not a machine coming up short. Before that, a wasm bundle that was
-present but wouldn't load published a report with every `tsv_wasm-*` row silently
+present but wouldn't load published a report with every `tsv-wasm-*` row silently
 gone behind one ⚠ line, and five diagnostics each hand-rolled their own
 `if (!impls.native) throw`. Note the division of labour with the freshness guard:
 `check_artifact_freshness` makes a MISSING artifact fatal, a present-yet-unloadable
@@ -1469,7 +1469,7 @@ internal state), the coverage report and skip counts make it visible without
   (`lib/oxc_wasm.ts` does; `lib/oxc.ts` mirrors the form defensively). Two guards
   exist: the single-read pattern at the wrappers, and `bench.ts`'s
   `check_variant_parity` — after pre-flight, same-engine pairs
-  (tsv↔tsv_wasm variants, oxc-parser↔oxc-parser-wasm, yuku-parser↔yuku-parser-wasm,
+  (tsv↔tsv-wasm variants, oxc-parser↔oxc-parser-wasm, yuku-parser↔yuku-parser-wasm,
   rsvelte-parse↔rsvelte-parse-skip-expr-loc) are compared file-for-file and
   any accept-set divergence prints a `⚠ variant parity` warning (same engine ⇒ a
   divergence is a binding-boundary bug, not an engine difference).

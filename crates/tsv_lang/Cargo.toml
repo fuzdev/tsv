@@ -29,7 +29,7 @@ comment_check = []
 audits = ["swallow_check", "comment_check"]
 # Shared wire-JSON writer substrate (`json_writer`), pulled in transitively by
 # each language crate's `convert` feature. Off in the format-only
-# @fuzdev/tsv_format_wasm build, so `serde_json` never enters that graph.
+# @fuzdev/tsv-format-wasm build, so `serde_json` never enters that graph.
 json = ["dep:serde_json"]
 
 [dependencies]

@@ -1,7 +1,7 @@
 # tsv changelog
 
-Covers the npm packages published from this repo — `@fuzdev/tsv_format_wasm`,
-`@fuzdev/tsv_parse_wasm`, and `@fuzdev/tsv_wasm`, plus the native N-API set
+Covers the npm packages published from this repo — `@fuzdev/tsv-format-wasm`,
+`@fuzdev/tsv-parse-wasm`, and `@fuzdev/tsv-wasm`, plus the native N-API set
 (`@fuzdev/tsv` and its `@fuzdev/tsv-<triple>` platform packages). All move
 together at the `Cargo.toml [workspace.package]` version.
 Each `## Unreleased` section must be non-empty and carry a
@@ -11,8 +11,15 @@ Each `## Unreleased` section must be non-empty and carry a
 `## Unreleased` (reset to `bump: patch`) for the next cycle.
 
 ## Unreleased
-<!-- bump: patch -->
+<!-- bump: minor -->
 
+- **breaking** chore: the three WASM packages are renamed to kebab-case — `@fuzdev/tsv_wasm` →
+  `@fuzdev/tsv-wasm`, `@fuzdev/tsv_format_wasm` → `@fuzdev/tsv-format-wasm`,
+  `@fuzdev/tsv_parse_wasm` → `@fuzdev/tsv-parse-wasm` — matching the `@fuzdev/tsv-<triple>` platform
+  packages, the `tsv-<triple>` release assets and the `tsv-format` VS Code extension, so tsv's whole
+  npm surface spells one way; the snake_case names stop at 0.3.x and are deprecated on npm with a
+  pointer to their replacement. Exports, options and the `tsv` bin are unchanged; the Rust crates
+  keep their `tsv_*` names
 - fix: restore the CSS parse speed lost in 0.3.0 — a declaration value is ruled out for operator
   splitting before its run is tokenized ([#1037](https://github.com/fuzdev/tsv/pull/1037))
 

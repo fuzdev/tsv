@@ -23,11 +23,11 @@ A per-runtime delta on the same row is the signal: same engine, different runtim
 | --- | ---: | ---: | ---: | ---: | ---: |
 | svelte/compiler | 1.7 | 1.6 | 1.2 | 0.97x | 0.74x |
 | tsv-json | 4.1 | 3.7 | 6.1 | 0.89x | 1.47x |
-| tsv_wasm-json | 3.5 | 3.4 | 5.9 | 0.98x | 1.67x |
+| tsv-wasm-json | 3.5 | 3.4 | 5.9 | 0.98x | 1.67x |
 | tsv-json-no-locations | 6.7 | 6.1 | 8.4 | 0.91x | 1.26x |
-| tsv_wasm-json-no-locations | 5.4 | 5.4 | 7.8 | 1.01x | 1.45x |
+| tsv-wasm-json-no-locations | 5.4 | 5.4 | 7.8 | 1.01x | 1.45x |
 | tsv-internal | 47.4 | 45.6 | 50.4 | 0.96x | 1.06x |
-| tsv_wasm-internal | 28.7 | 32.4 | 32.9 | 1.13x | 1.15x |
+| tsv-wasm-internal | 28.7 | 32.4 | 32.9 | 1.13x | 1.15x |
 | rsvelte-parse | 1.8 | 1.7 | 2.1 | 0.94x | 1.16x |
 | rsvelte-parse-skip-expr-loc | 2.7 | 2.6 | 3.1 | 0.95x | 1.11x |
 
@@ -37,7 +37,7 @@ A per-runtime delta on the same row is the signal: same engine, different runtim
 | --- | ---: | ---: | ---: | ---: | ---: |
 | prettier | 0.2 | 0.2 | 0.2 | 0.93x | 1.23x |
 | tsv | 12.7 | 12.7 | 12.5 | 1.00x | 0.99x |
-| tsv_wasm | 7.9 | 9.1 | 8.8 | 1.15x | 1.11x |
+| tsv-wasm | 7.9 | 9.1 | 8.8 | 1.15x | 1.11x |
 | oxfmt | 0.2 | 0.2 | 0.2 | 0.95x | 1.16x |
 | biome-wasm | 1.1 | 0.9 | 1.0 | 0.80x | 0.88x |
 
@@ -47,11 +47,11 @@ A per-runtime delta on the same row is the signal: same engine, different runtim
 | --- | ---: | ---: | ---: | ---: | ---: |
 | acorn-typescript | 0.3 | 0.3 | 0.2 | 0.93x | 0.62x |
 | tsv-json | 0.5 | 0.5 | 0.9 | 0.88x | 1.66x |
-| tsv_wasm-json | 0.5 | 0.5 | 0.9 | 0.96x | 1.87x |
+| tsv-wasm-json | 0.5 | 0.5 | 0.9 | 0.96x | 1.87x |
 | tsv-json-no-locations | 1.1 | 1.0 | 1.5 | 0.88x | 1.38x |
-| tsv_wasm-json-no-locations | 0.9 | 0.9 | 1.5 | 0.99x | 1.58x |
+| tsv-wasm-json-no-locations | 0.9 | 0.9 | 1.5 | 0.99x | 1.58x |
 | tsv-internal | 9.1 | 8.4 | 10.0 | 0.92x | 1.10x |
-| tsv_wasm-internal | 5.7 | 6.6 | 6.9 | 1.14x | 1.21x |
+| tsv-wasm-internal | 5.7 | 6.6 | 6.9 | 1.14x | 1.21x |
 | oxc-parser | 0.8 | 0.7 | 1.1 | 0.89x | 1.44x |
 | oxc-parser-wasm | 0.7 | 0.7 | 0.9 ⚠ | 0.95x | 1.21x ⚠ |
 | yuku-parser | 2.1 | 2.3 | 2.9 | 1.11x | 1.39x |
@@ -64,7 +64,7 @@ A per-runtime delta on the same row is the signal: same engine, different runtim
 | --- | ---: | ---: | ---: | ---: | ---: |
 | prettier | 0.1 | 0.1 | 0.1 | 0.89x | 0.98x |
 | tsv | 2.3 | 2.2 | 2.2 | 0.97x | 0.97x |
-| tsv_wasm | 1.4 | 1.6 | 1.6 | 1.17x | 1.12x |
+| tsv-wasm | 1.4 | 1.6 | 1.6 | 1.17x | 1.12x |
 | oxfmt | 1.1 | 1.1 | 1.1 | 0.98x | 0.99x |
 | biome-wasm | 0.2 | 0.2 | 0.2 | 0.95x | 1.07x |
 | dprint-wasm | 0.3 | 0.3 | 0.3 | 1.13x | 1.16x |
@@ -75,9 +75,9 @@ A per-runtime delta on the same row is the signal: same engine, different runtim
 | --- | ---: | ---: | ---: | ---: | ---: |
 | svelte/compiler | 91.9 | 88.1 | 50.1 | 0.96x | 0.55x |
 | tsv-json | 49.2 | 44.4 | 61.2 | 0.90x | 1.24x |
-| tsv_wasm-json | 39.8 | 41.4 | 60.8 | 1.04x | 1.53x |
+| tsv-wasm-json | 39.8 | 41.4 | 60.8 | 1.04x | 1.53x |
 | tsv-internal | 229.1 | 215.3 | 239.7 | 0.94x | 1.05x |
-| tsv_wasm-internal | 128.8 | 146.4 | 153.4 | 1.14x | 1.19x |
+| tsv-wasm-internal | 128.8 | 146.4 | 153.4 | 1.14x | 1.19x |
 | postcss | 83.1 | 81.9 | 72.6 | 0.99x | 0.87x |
 
 ## format/css
@@ -86,7 +86,7 @@ A per-runtime delta on the same row is the signal: same engine, different runtim
 | --- | ---: | ---: | ---: | ---: | ---: |
 | prettier | 1.6 | 1.5 | 2.1 | 0.92x | 1.26x |
 | tsv | 131.7 | 122.7 | 126.6 | 0.93x | 0.96x |
-| tsv_wasm | 74.2 | 85.7 | 87.9 | 1.15x | 1.18x |
+| tsv-wasm | 74.2 | 85.7 | 87.9 | 1.15x | 1.18x |
 | oxfmt | 47.9 | 48.7 | 49.9 | 1.02x | 1.04x |
 | biome-wasm | 9.8 | 10.1 | 11.6 | 1.02x | 1.18x |
 | malva-wasm | 17.5 | 19.2 | 16.6 | 1.10x | 0.95x |

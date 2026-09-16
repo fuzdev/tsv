@@ -171,7 +171,7 @@
 		},
 		{
 			"group": "parse/svelte",
-			"name": "tsv_wasm-json",
+			"name": "tsv-wasm-json",
 			"ops_per_second": {
 				"deno": 3.52617523089127,
 				"node": 3.4443366870317265,
@@ -209,7 +209,7 @@
 		},
 		{
 			"group": "parse/svelte",
-			"name": "tsv_wasm-json-no-locations",
+			"name": "tsv-wasm-json-no-locations",
 			"ops_per_second": {
 				"deno": 5.411268274621815,
 				"node": 5.44255728699056,
@@ -247,7 +247,7 @@
 		},
 		{
 			"group": "parse/svelte",
-			"name": "tsv_wasm-internal",
+			"name": "tsv-wasm-internal",
 			"ops_per_second": {
 				"deno": 28.702730710181473,
 				"node": 32.42012216216394,
@@ -342,7 +342,7 @@
 		},
 		{
 			"group": "format/svelte",
-			"name": "tsv_wasm",
+			"name": "tsv-wasm",
 			"ops_per_second": {
 				"deno": 7.917102808589516,
 				"node": 9.130309494396146,
@@ -437,7 +437,7 @@
 		},
 		{
 			"group": "parse/typescript",
-			"name": "tsv_wasm-json",
+			"name": "tsv-wasm-json",
 			"ops_per_second": {
 				"deno": 0.4740293589297919,
 				"node": 0.45384599056022146,
@@ -475,7 +475,7 @@
 		},
 		{
 			"group": "parse/typescript",
-			"name": "tsv_wasm-json-no-locations",
+			"name": "tsv-wasm-json-no-locations",
 			"ops_per_second": {
 				"deno": 0.9246902236372715,
 				"node": 0.9156025220085143,
@@ -513,7 +513,7 @@
 		},
 		{
 			"group": "parse/typescript",
-			"name": "tsv_wasm-internal",
+			"name": "tsv-wasm-internal",
 			"ops_per_second": {
 				"deno": 5.726233905833656,
 				"node": 6.553429154071319,
@@ -665,7 +665,7 @@
 		},
 		{
 			"group": "format/typescript",
-			"name": "tsv_wasm",
+			"name": "tsv-wasm",
 			"ops_per_second": {
 				"deno": 1.4041850203971264,
 				"node": 1.6443261839612453,
@@ -779,7 +779,7 @@
 		},
 		{
 			"group": "parse/css",
-			"name": "tsv_wasm-json",
+			"name": "tsv-wasm-json",
 			"ops_per_second": {
 				"deno": 39.753034867183146,
 				"node": 41.41032316701471,
@@ -817,7 +817,7 @@
 		},
 		{
 			"group": "parse/css",
-			"name": "tsv_wasm-internal",
+			"name": "tsv-wasm-internal",
 			"ops_per_second": {
 				"deno": 128.8421921264593,
 				"node": 146.36139054286207,
@@ -893,7 +893,7 @@
 		},
 		{
 			"group": "format/css",
-			"name": "tsv_wasm",
+			"name": "tsv-wasm",
 			"ops_per_second": {
 				"deno": 74.24335576331215,
 				"node": 85.67947664438555,

@@ -7,7 +7,7 @@
  *   - crates/tsv_css/src/ast/convert/write.rs
  *   - crates/tsv_svelte/src/ast/convert/write.rs
  *
- * Bundled inside `@fuzdev/tsv_parse_wasm`, `@fuzdev/tsv_wasm`, and `@fuzdev/tsv`. Any change
+ * Bundled inside `@fuzdev/tsv-parse-wasm`, `@fuzdev/tsv-wasm`, and `@fuzdev/tsv`. Any change
  * to the JSON a writer emits must be mirrored here — see
  * `crates/tsv_wasm/CLAUDE.md` for the maintenance checklist.
  *

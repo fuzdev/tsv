@@ -1,17 +1,17 @@
-# @fuzdev/tsv_parse_wasm
+# @fuzdev/tsv-parse-wasm
 
 > parser for Svelte, TypeScript, and CSS
 
 Rust-based parser compiled to WASM. Drop-in replacement for **Svelte's parser** + **acorn** + **acorn-typescript**.
 
-Parsing only — for formatting, see [`@fuzdev/tsv_format_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_format_wasm), or [`@fuzdev/tsv_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_wasm) for both plus a CLI. On Node.js and Bun, [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) is the native build of the same API.
+Parsing only — for formatting, see [`@fuzdev/tsv-format-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-format-wasm), or [`@fuzdev/tsv-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-wasm) for both plus a CLI. On Node.js and Bun, [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) is the native build of the same API.
 
 Docs and benchmarks: [tsv.fuz.dev](https://tsv.fuz.dev/). Source and conformance notes: [github.com/fuzdev/tsv](https://github.com/fuzdev/tsv).
 
 ## Install
 
 ```bash
-npm i @fuzdev/tsv_parse_wasm
+npm i @fuzdev/tsv-parse-wasm
 ```
 
 Requires Node.js 22+; Bun and Deno work too, and browsers via `init()` (below).
@@ -21,8 +21,8 @@ Requires Node.js 22+; Bun and Deno work too, and browsers via `init()` (below).
 In Node.js, Bun, and Deno, WASM is initialized synchronously at import time — zero config. In browsers and bundlers, call `await init()` once first (Vite, Webpack, and Rollup resolve the WASM asset automatically; `init_sync({ module })` is also exported for Workers and custom loading).
 
 ```typescript
-import {parse_css, parse_svelte, parse_typescript} from '@fuzdev/tsv_parse_wasm';
-import type {Program, Root, StyleSheetFile} from '@fuzdev/tsv_parse_wasm';
+import {parse_css, parse_svelte, parse_typescript} from '@fuzdev/tsv-parse-wasm';
+import type {Program, Root, StyleSheetFile} from '@fuzdev/tsv-parse-wasm';
 
 const root: Root = parse_svelte('<script>const x = 1;</script>');
 const program: Program = parse_typescript('const x: number = 1;');
@@ -33,7 +33,7 @@ Three parsers: `parse_svelte` (matches Svelte's modern parser), `parse_typescrip
 
 AST types are bundled in `tsv_ast.d.ts` and re-exported from the package — `import type` any node directly.
 
-To parse across threads, compile once and share: the main entry exports `wasm_module`, the compiled `WebAssembly.Module` behind its exports, and the `@fuzdev/tsv_parse_wasm/worker` subpath is the same API without the import-time initialization — so a worker calls `init_sync({module: wasm_module})` on the module handed to it (`workerData` or `postMessage`) instead of reading and compiling the WASM again. Compiled code is shared across isolates, so no worker pays for a second compile. `wasm_module` is the Node/Bun entry's alone — that entry is the one that compiles at import — so in a browser Worker call `await init()` instead, or `postMessage` a `WebAssembly.Module` you compiled yourself.
+To parse across threads, compile once and share: the main entry exports `wasm_module`, the compiled `WebAssembly.Module` behind its exports, and the `@fuzdev/tsv-parse-wasm/worker` subpath is the same API without the import-time initialization — so a worker calls `init_sync({module: wasm_module})` on the module handed to it (`workerData` or `postMessage`) instead of reading and compiling the WASM again. Compiled code is shared across isolates, so no worker pays for a second compile. `wasm_module` is the Node/Bun entry's alone — that entry is the one that compiles at import — so in a browser Worker call `await init()` instead, or `postMessage` a `WebAssembly.Module` you compiled yourself.
 
 Each parser also has a `parse_*_json` variant (`parse_svelte_json`, `parse_typescript_json`, `parse_css_json`) taking the same arguments but returning the AST as a compact JSON string — faster when you're writing it to disk or sending it over the wire, since it skips materializing the JS object tree.
 
@@ -57,7 +57,7 @@ Deeply nested input has a ceiling: the WASM stack is 1 MiB, and the deepest shap
 Need `loc` back? The package ships a pure-JS helper that derives it from the span-only wire + your source — no re-parse:
 
 ```typescript
-import {parse_typescript, reconstruct_locations} from '@fuzdev/tsv_parse_wasm';
+import {parse_typescript, reconstruct_locations} from '@fuzdev/tsv-parse-wasm';
 
 const src = 'const x = 1;\n';
 const ast = reconstruct_locations(parse_typescript(src, {locations: false}), src);

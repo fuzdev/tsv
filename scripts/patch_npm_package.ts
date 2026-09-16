@@ -50,9 +50,9 @@
  *
  * Usage:  patch_npm_package.ts <format|parse|all>
  *
- *   format → crates/tsv_wasm/pkg/format/npm/ → @fuzdev/tsv_format_wasm
- *   parse  → crates/tsv_wasm/pkg/parse/npm/  → @fuzdev/tsv_parse_wasm
- *   all    → crates/tsv_wasm/pkg/all/npm/    → @fuzdev/tsv_wasm
+ *   format → crates/tsv_wasm/pkg/format/npm/ → @fuzdev/tsv-format-wasm
+ *   parse  → crates/tsv_wasm/pkg/parse/npm/  → @fuzdev/tsv-parse-wasm
+ *   all    → crates/tsv_wasm/pkg/all/npm/    → @fuzdev/tsv-wasm
  */
 
 import { NPM_SHARED_METADATA } from './npm_metadata.ts';
@@ -65,9 +65,9 @@ if (variant !== 'format' && variant !== 'parse' && variant !== 'all') {
 }
 
 const PKG_NAMES = {
-	format: '@fuzdev/tsv_format_wasm',
-	parse: '@fuzdev/tsv_parse_wasm',
-	all: '@fuzdev/tsv_wasm'
+	format: '@fuzdev/tsv-format-wasm',
+	parse: '@fuzdev/tsv-parse-wasm',
+	all: '@fuzdev/tsv-wasm'
 } as const;
 const pkg_name = PKG_NAMES[variant];
 const has_format_exports = variant !== 'parse';

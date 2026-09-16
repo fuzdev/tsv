@@ -149,7 +149,7 @@ pub fn with_doc_arena<R>(f: impl FnOnce(&tsv_lang::doc::arena::DocArena) -> R) -
 ///
 /// One spelling for `tsv_wasm` and `tsv_napi` — the loader `crates/tsv_napi/npm/index.js`
 /// restates it by hand in JS, the one copy this crate cannot reach — so a consumer
-/// swapping `@fuzdev/tsv_wasm` for `@fuzdev/tsv` reads the same text. The C FFI has no
+/// swapping `@fuzdev/tsv-wasm` for `@fuzdev/tsv` reads the same text. The C FFI has no
 /// noun (a code, not a bag) and spells its own.
 #[must_use]
 pub fn source_type_unsupported_message(noun: &str) -> String {

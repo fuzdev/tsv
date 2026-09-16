@@ -98,7 +98,7 @@ const rows: Array<{ name: string; impl: TsvImplementation | undefined }> = [
 	{ name: ORACLE_ROW, impl: impls.tsc },
 	{ name: CANONICAL_PARSER_ROWS.typescript, impl: impls.canonical },
 	{ name: 'tsv', impl: impls.native },
-	{ name: 'tsv_wasm', impl: impls.wasm },
+	{ name: 'tsv-wasm', impl: impls.wasm },
 	{ name: 'oxc-parser', impl: impls.oxc },
 	{ name: 'oxc-parser-wasm', impl: impls.oxc_wasm },
 	{ name: 'yuku-parser-wasm', impl: impls.yuku_wasm }

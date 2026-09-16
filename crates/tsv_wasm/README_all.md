@@ -1,4 +1,4 @@
-# @fuzdev/tsv_wasm
+# @fuzdev/tsv-wasm
 
 > precise language tools for TypeScript/JS, CSS, and Svelte in Rust
 
@@ -6,14 +6,14 @@ Rust-based formatter + parser compiled to WASM — the full tool in one package,
 
 tsv is non-configurable: formatter settings are fixed at Prettier's defaults except `printWidth: 100`, `useTabs: true`, `singleQuote: true`, and `trailingComma: 'none'` — no options, like `gofmt` and Black.
 
-Only need one half? The subset packages ship smaller WASM blobs: [`@fuzdev/tsv_format_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_format_wasm) (format only) and [`@fuzdev/tsv_parse_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_parse_wasm) (parse only). On Node.js and Bun, [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) is the native build of the same API and CLI.
+Only need one half? The subset packages ship smaller WASM blobs: [`@fuzdev/tsv-format-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-format-wasm) (format only) and [`@fuzdev/tsv-parse-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-parse-wasm) (parse only). On Node.js and Bun, [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) is the native build of the same API and CLI.
 
 Docs and benchmarks: [tsv.fuz.dev](https://tsv.fuz.dev/). Source and conformance notes: [github.com/fuzdev/tsv](https://github.com/fuzdev/tsv).
 
 ## Install
 
 ```bash
-npm i -D @fuzdev/tsv_wasm
+npm i -D @fuzdev/tsv-wasm
 ```
 
 Requires Node.js 22+; Bun and Deno work too, and browsers via `init()` (below).
@@ -21,10 +21,10 @@ Requires Node.js 22+; Bun and Deno work too, and browsers via `init()` (below).
 ## CLI
 
 ```bash
-npx @fuzdev/tsv_wasm format src        # format .ts/.mts/.cts/.js/.mjs/.cjs/.svelte/.css in place, recursively
-npx @fuzdev/tsv_wasm format --check .  # CI: exit 1 if anything would change
-npx @fuzdev/tsv_wasm format --list .   # list the in-scope files, format nothing
-npx @fuzdev/tsv_wasm parse file.svelte # JSON AST to stdout (--pretty to indent)
+npx @fuzdev/tsv-wasm format src        # format .ts/.mts/.cts/.js/.mjs/.cjs/.svelte/.css in place, recursively
+npx @fuzdev/tsv-wasm format --check .  # CI: exit 1 if anything would change
+npx @fuzdev/tsv-wasm format --list .   # list the in-scope files, format nothing
+npx @fuzdev/tsv-wasm parse file.svelte # JSON AST to stdout (--pretty to indent)
 ```
 
 Installed, the bin is `tsv`. Directories recurse over the JS/TS family (`.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cjs`), `.svelte`, and `.css` with gitignore-aware discovery. **Inside a git repo** it honors `.gitignore`, then `.formatignore` — both hierarchical, like git — plus `.prettierignore` as a drop-in fallback, read in any directory that has no `.formatignore` of its own (a sibling `.formatignore` shadows it, with a warning); all scoped to the repo so results are reproducible. **Outside a repo** it honors only `.formatignore`. With no `.gitignore` in scope (in or out of a repo), discovery falls back to skipping hidden directories and `dist`/`build`/`target`. `node_modules` and VCS directories are always skipped by a walk. A path you name — file or directory — is bounded by the ignore files alone: one they exclude is skipped (with a warning, unless it is a file your `.formatignore` or `.prettierignore` excludes), while the built-in skips never apply to it; a named file's extension must still be one tsv formats.
@@ -38,8 +38,8 @@ Large trees format across worker threads — `--jobs N` sets the count, and the 
 In Node.js, Bun, and Deno, WASM is initialized synchronously at import time — zero config. In browsers and bundlers, call `await init()` once first (Vite, Webpack, and Rollup resolve the WASM asset automatically; `init_sync({ module })` is also exported for Workers and custom loading).
 
 ```typescript
-import {format_svelte, parse_svelte} from '@fuzdev/tsv_wasm';
-import type {Root} from '@fuzdev/tsv_wasm';
+import {format_svelte, parse_svelte} from '@fuzdev/tsv-wasm';
+import type {Root} from '@fuzdev/tsv-wasm';
 
 const formatted = format_svelte('<script>\nconst   x=1\n</script>');
 const root: Root = parse_svelte('<script>const x = 1;</script>');
@@ -71,11 +71,11 @@ Deeply nested input has a ceiling: the WASM stack is 1 MiB, and the deepest shap
 
 ### Worker pools
 
-To run tsv across threads, compile once and share: the main entry exports `wasm_module`, the compiled `WebAssembly.Module` behind its exports, and the `@fuzdev/tsv_wasm/worker` subpath is the same API without the import-time initialization — so a worker calls `init_sync({module: wasm_module})` on the module handed to it (`workerData` or `postMessage`) instead of reading and compiling the WASM again. Compiled code is shared across isolates, so no worker pays for a second compile. The `tsv` bin above uses exactly this. `wasm_module` is the Node/Bun entry's alone — that entry is the one that compiles at import — so in a browser Worker call `await init()` instead, or `postMessage` a `WebAssembly.Module` you compiled yourself. [`@fuzdev/tsv_format_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_format_wasm) shows the two-line pattern.
+To run tsv across threads, compile once and share: the main entry exports `wasm_module`, the compiled `WebAssembly.Module` behind its exports, and the `@fuzdev/tsv-wasm/worker` subpath is the same API without the import-time initialization — so a worker calls `init_sync({module: wasm_module})` on the module handed to it (`workerData` or `postMessage`) instead of reading and compiling the WASM again. Compiled code is shared across isolates, so no worker pays for a second compile. The `tsv` bin above uses exactly this. `wasm_module` is the Node/Bun entry's alone — that entry is the one that compiles at import — so in a browser Worker call `await init()` instead, or `postMessage` a `WebAssembly.Module` you compiled yourself. [`@fuzdev/tsv-format-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-format-wasm) shows the two-line pattern.
 
 ### File scoping (`IgnoreStack`)
 
-For tooling that needs tsv's exact file scoping, the package also exports the `IgnoreStack` class — the hierarchical `.gitignore` matcher with tsv's `.formatignore`/`.prettierignore` layer, plus tsv's discovery policy (`classify_dir`, `should_format_file`, `is_path_pruned`, `path_shadow_warning`, `excluded_argument_warning`, `unsupported_extension_error`, `shadow_warning`, `prettierignore_outside_repo_warning`, `prettierignore_shadowed_warning`, `gitignore_symlink_warning`); [`@fuzdev/tsv_format_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_format_wasm) documents it with examples.
+For tooling that needs tsv's exact file scoping, the package also exports the `IgnoreStack` class — the hierarchical `.gitignore` matcher with tsv's `.formatignore`/`.prettierignore` layer, plus tsv's discovery policy (`classify_dir`, `should_format_file`, `is_path_pruned`, `path_shadow_warning`, `excluded_argument_warning`, `unsupported_extension_error`, `shadow_warning`, `prettierignore_outside_repo_warning`, `prettierignore_shadowed_warning`, `gitignore_symlink_warning`); [`@fuzdev/tsv-format-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-format-wasm) documents it with examples.
 
 ## Status
 

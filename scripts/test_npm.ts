@@ -1,6 +1,6 @@
 /**
- * Node.js tests for the built npm packages (@fuzdev/tsv_format_wasm,
- * @fuzdev/tsv_parse_wasm, and @fuzdev/tsv_wasm).
+ * Node.js tests for the built npm packages (@fuzdev/tsv-format-wasm,
+ * @fuzdev/tsv-parse-wasm, and @fuzdev/tsv-wasm).
  *
  * Verifies the wasm-pack web target + patch_npm_package.ts wrapper works
  * correctly when imported as ESM in Node.js: the auto-init node entry
@@ -78,9 +78,9 @@ const has_parse = variant !== 'format';
 const posix = process.platform !== 'win32';
 
 const PKG_NAMES = {
-	format: '@fuzdev/tsv_format_wasm',
-	parse: '@fuzdev/tsv_parse_wasm',
-	all: '@fuzdev/tsv_wasm'
+	format: '@fuzdev/tsv-format-wasm',
+	parse: '@fuzdev/tsv-parse-wasm',
+	all: '@fuzdev/tsv-wasm'
 };
 
 // A stale staged package silently green-tests OLD code — the trap the bench
