@@ -27,12 +27,14 @@
 //! Sketched here (not migrated) to prove `{skeleton + detail}` doesn't flatten a
 //! load-bearing distinction:
 //!
-//! - **`roundtrip_audit`** — 10 buckets (`clean`, `read_error`, `format_error`,
-//!   `canonical_rejects_input`, `{canonical,tsv}_unreparseable`,
-//!   `{canonical,tsv}_leaf_corruption`, `{canonical,tsv}_divergent`). The four
-//!   `*_unreparseable` / `*_leaf_corruption` (`--gate`-fatal) → `severity: GateFailing`;
-//!   the two `*_divergent` (render-model noise, informational under `--gate`) →
-//!   `Informational`; `clean` / `read_error` / `format_error` / `*_rejects_input` are
+//! - **`roundtrip_audit`** — 13 buckets (`clean`, `read_error`, `format_error`,
+//!   `canonical_rejects_input`, `canonical_diverges_on_input`,
+//!   `{canonical,tsv}_unreparseable`, `{canonical,tsv}_node_loss`,
+//!   `{canonical,tsv}_leaf_corruption`, `{canonical,tsv}_divergent`). The six
+//!   `*_unreparseable` / `*_node_loss` / `*_leaf_corruption` (`--gate`-fatal) →
+//!   `severity: GateFailing`; the two `*_divergent` (render-model noise,
+//!   informational under `--gate`) → `Informational`; the five skips (`clean`,
+//!   `read_error`, `format_error`, `*_rejects_input`, `*_diverges_on_input`) are
 //!   non-findings, not emitted.
 //!   The two-phase oracle → `confidence`: a canonical-confirmed finding is
 //!   `Confirmed`, a tsv-self-only suspect (canonical didn't run) `Unconfirmed`.

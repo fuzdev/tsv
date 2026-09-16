@@ -42,9 +42,22 @@
 //!
 //! The eight finding buckets (`{tsv,canonical}_unreparseable`,
 //! `{tsv,canonical}_node_loss`, `{tsv,canonical}_leaf_corruption`,
-//! `{tsv,canonical}_divergent`) are the work-list; `format_error` (tsv rejects the input — a parse-gap for other gates)
-//! and `canonical_rejects_input` (an invalid / error fixture) are counted and
-//! skipped, not findings.
+//! `{tsv,canonical}_divergent`) are the work-list; the four skips — `read_error`,
+//! `format_error` (tsv rejects the input — a parse-gap for other gates),
+//! `canonical_rejects_input` (an invalid / error fixture) and
+//! `canonical_diverges_on_input` (below) — are counted, not findings.
+//!
+//! **Standing to grade.** The canonical phase asks whether the formatter changed the
+//! document *as the canonical parser reads it*, which is only well posed while both
+//! parsers are reading the same document. So it first checks canonical's node census
+//! of the INPUT against tsv's and skips a mismatch as
+//! [`CanVerdict::DivergesOnInput`] — the same question `RejectsInput` answers in its
+//! extreme form. Without it every deliberate parser divergence reads as node loss:
+//! tsv formats the program *it* read into an output both parsers then agree on, so
+//! canonical's delta across the format is the divergence closing, not a dropped node.
+//! The class is cataloged in `docs/conformance_svelte.md` §TypeScript Corrections;
+//! the skip's measured tightness and the blind spot it concedes are in
+//! `docs/audits.md` §Round-trip.
 //!
 //! **Node loss** is the class the structural skeleton SEES but could not gate: a
 //! dropped element is one more skeleton difference, filed into the same `divergent`
@@ -117,8 +130,8 @@ use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
 use crate::audit::properties::{
-    ReparseCompare, compare_reparsed, streamed_node_conservation_diff, tsv_parse_to_value,
-    tsv_parse_to_wire_bytes,
+    ReparseCompare, compare_reparsed, node_conservation_diff, streamed_node_conservation_diff,
+    tsv_parse_to_value, tsv_parse_to_wire_bytes,
 };
 use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
@@ -216,6 +229,11 @@ enum CanVerdict {
     Clean,
     /// The canonical parser rejects the *input* (invalid / error fixture).
     RejectsInput,
+    /// The canonical parser reads the *input* to a different node population than tsv does —
+    /// a settled parser divergence, so canonical has no census of the document tsv's
+    /// formatter was actually given. A skip, like [`Self::RejectsInput`], which is the same
+    /// standing-to-grade question in its extreme form; the argument is in the module doc.
+    DivergesOnInput,
     /// The canonical parser throws on tsv's *output* (invalid per the real language).
     Unreparseable,
     /// A conserved node was dropped, duplicated or re-typed under the canonical parser (the
@@ -237,6 +255,7 @@ enum Bucket {
     FormatError,
     ReadError,
     CanonicalRejectsInput,
+    CanonicalDivergesOnInput,
     CanonicalUnreparseable,
     TsvUnreparseable,
     CanonicalNodeLoss,
@@ -285,6 +304,7 @@ impl Bucket {
             Self::FormatError => "format_error",
             Self::ReadError => "read_error",
             Self::CanonicalRejectsInput => "canonical_rejects_input",
+            Self::CanonicalDivergesOnInput => "canonical_diverges_on_input",
             Self::CanonicalUnreparseable => "canonical_unreparseable",
             Self::TsvUnreparseable => "tsv_unreparseable",
             Self::CanonicalNodeLoss => "canonical_node_loss",
@@ -296,15 +316,19 @@ impl Bucket {
         }
     }
 
-    /// A bucket the round-trip property was actually EVALUATED on. The three
-    /// negations are skips — the file couldn't be read, tsv couldn't format it, or
-    /// the canonical oracle rejected it — so none carries a verdict. The vacuity
-    /// floor counts these: a run where every file skipped reports "no round-trip
-    /// findings" and exits 0, which is what a clean run reports too.
+    /// A bucket the round-trip property was actually EVALUATED on. The four
+    /// negations are skips — the file couldn't be read, tsv couldn't format it, the
+    /// canonical oracle rejected it, or the canonical oracle read it to a different
+    /// document than tsv did — so none carries a verdict. The vacuity floor counts
+    /// these: a run where every file skipped reports "no round-trip findings" and
+    /// exits 0, which is what a clean run reports too.
     fn is_graded(self) -> bool {
         !matches!(
             self,
-            Self::ReadError | Self::FormatError | Self::CanonicalRejectsInput
+            Self::ReadError
+                | Self::FormatError
+                | Self::CanonicalRejectsInput
+                | Self::CanonicalDivergesOnInput
         )
     }
 
@@ -376,6 +400,9 @@ impl FileResult {
         }
         if self.canonical == Some(CanVerdict::RejectsInput) {
             return Bucket::CanonicalRejectsInput;
+        }
+        if self.canonical == Some(CanVerdict::DivergesOnInput) {
+            return Bucket::CanonicalDivergesOnInput;
         }
         if self.tsv == TsvVerdict::ReadError {
             return Bucket::ReadError;
@@ -697,6 +724,20 @@ async fn canonical_roundtrip(
     let Ok(canon_out) = deno::parse_by_type(&formatted, parser).await else {
         return (CanVerdict::Unreparseable, None);
     };
+
+    // Standing to grade (module doc): canonical must read the INPUT to the same node
+    // population tsv does, or the delta it reports across the format is the two parsers'
+    // disagreement closing rather than a node the formatter lost. Three facts live here:
+    // it is asked AFTER `Unreparseable`, which is a drop-in violation however canonical read
+    // the input; it uses the same census `compare_reparsed` does, so the membership rule has
+    // one spelling; and the `None` arm is unreachable — `format_source` above parses through
+    // the same three functions, the TypeScript one at the same unnamed goal — so it falls
+    // through to the compare rather than inventing a verdict for a state that cannot occur.
+    if let Some(tsv_in) = tsv_parse_to_value(&source, parser)
+        && node_conservation_diff(&tsv_in, &canon_in).is_some()
+    {
+        return (CanVerdict::DivergesOnInput, None);
+    }
 
     // The same compare as phase 1, under the canonical parser — the drop-in-oracle
     // confirmation of each verdict.
