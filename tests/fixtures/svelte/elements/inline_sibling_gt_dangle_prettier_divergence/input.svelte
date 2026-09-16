@@ -54,3 +54,21 @@
 <div>
 	<span>text</span>{#if cond}text{/if}
 </div>
+
+<!-- a glued RUN of inline elements before an expanding block: the whole run prints, and the
+     run's last closing > dangles -->
+<div>
+	<span>inline1</span><span>inline2</span
+	>{#if cond}
+		<Comp prop1={value1} prop2={value2} prop3={value3} prop4={value4} prop5={value5} />
+	{/if}
+</div>
+
+<!-- the same run behind a glued comment prefix: the comment and BOTH elements print, and
+     only the run's last closing > dangles -->
+<div>
+	<!-- c --><span>inline1</span><span>inline2</span
+	>{#if cond}
+		<Comp prop1={value1} prop2={value2} prop3={value3} prop4={value4} prop5={value5} />
+	{/if}
+</div>

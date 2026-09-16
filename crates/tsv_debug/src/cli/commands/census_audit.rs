@@ -11,7 +11,8 @@ use crate::cli::CliError;
 
 use super::profile::resolve_seed_files;
 
-/// The comment CENSUS: does every comment the author wrote survive formatting?
+/// The comment CENSUS: does every comment the author wrote survive formatting? And, over a
+/// Svelte template, every open tag and every `{#…}` / `{@…}` head?
 ///
 /// Per file, lex the comment trivia off the raw INPUT and the raw formatted OUTPUT with the
 /// census scanners (`audit::census` — never `parse().comments`, which inherits exactly the
@@ -21,7 +22,10 @@ use super::profile::resolve_seed_files;
 /// which internal layer lost it — parse-time consumption included, the class the print-once
 /// ledger is structurally blind to (a comment the parser never registered never existed as far
 /// as the ledger knows). An interior the output holds that the input did not is a duplicated
-/// or fabricated one.
+/// or fabricated one. The Svelte scanner counts the template's open-tag names and block / tag
+/// heads (`tag_head` / `block_head` kinds) into the same multiset, so a template node the
+/// PARSER consumed — invisible to the wire-vs-wire node census, which only sees what the parser
+/// built — is a plain MISSING here.
 ///
 /// Whole-comment drops are sanctioned in exactly ONE place — the CSS CDO/CDC `<!-- ... -->`
 /// span, which tsv (matching `parseCss`) discards wholesale — and that carve-out lives in the
@@ -55,13 +59,14 @@ pub struct CensusAuditCommand {
 const SNAPSHOT_HEADER: &str = "\
 # Comment-census ratchet — every line is a KNOWN BUG, the file shrinking is the goal.
 #
-# One line per (file, language bucket, direction): a comment interior present in the raw
-# INPUT lex but not the raw OUTPUT lex (MISSING — a dropped comment, whichever internal
-# layer lost it), or present in the output but not the input (EXTRA — a duplicated or
-# fabricated one). Interiors compare as per-line-trimmed multisets, so a re-indented
-# multi-line block matches; everything else is byte-exact. The one sanctioned drop (the
-# CSS CDO/CDC `<!-- ... -->` span, discarded wholesale to match parseCss) is carved out
-# in the scanner and can never appear here.
+# One line per (file, language bucket, direction): a comment interior — or, in the
+# template bucket, an open-tag name or a `{#…}` / `{@…}` head — present in the raw
+# INPUT lex but not the raw OUTPUT lex (MISSING — a dropped comment or node, whichever
+# internal layer lost it), or present in the output but not the input (EXTRA — a
+# duplicated or fabricated one). Interiors compare as per-line-trimmed multisets, so
+# a re-indented multi-line block matches; everything else is byte-exact. The one
+# sanctioned drop (the CSS CDO/CDC `<!-- ... -->` span, discarded wholesale to match
+# parseCss) is carved out in the scanner and can never appear here.
 #
 # A key found but not pinned FAILS (a new loss site). A pinned key that no longer fires
 # FAILS (fix landed — re-pin).

@@ -6,11 +6,14 @@
 //!
 //! - **reparse** — [`tsv_parse_to_value`] (parse to the wire `Value`), [`tsv_parses`] (the
 //!   parse-only twin — does the text parse at all, no wire built),
-//!   [`structurally_equivalent`] (the structural-skeleton compare), and
+//!   [`compare_reparsed`] (the one input-wire-vs-output-wire verdict every round-trip
+//!   consumer asks, layering [`node_conservation_diff`] / [`node_census`] (the
+//!   zero-tolerance node-count census — a node the formatter DROPPED),
+//!   [`structurally_equivalent`] (the structural-skeleton compare) and
 //!   [`leaf_conservation_diff`] / [`leaf_value_multiset`] (the complementary
 //!   decode-invariant leaf-value check that the skeleton, erasing every scalar,
-//!   is blind to) — the round-trip primitives the `roundtrip_audit` / `fuzz`
-//!   commands share.
+//!   is blind to)) — the round-trip primitives the `roundtrip_audit` / `fuzz` /
+//!   `blank_audit` commands share.
 //! - **directive pre-scan** — [`source_has_ignore_directive`], the coarse "does this
 //!   source freeze a region" question every audit whose property does not survive a
 //!   verbatim region asks of its seed.
@@ -25,17 +28,14 @@
 //!
 //! The shared property set includes [`f1_check`], which lives here — the
 //! core that (wrapped in `catch_unwind` by its callers) drives the no-panic
-//! guard, the F1 idempotency fixed point, the reparse-skeleton compare, and the
-//! leaf-conservation check — and `fuzz` consumes it (as does `blank_audit`).
-//! `roundtrip_audit` shares the reparse primitives directly
-//! ([`tsv_parse_to_value`] / [`structurally_equivalent`] /
-//! [`leaf_conservation_diff`]); its phase-1 verdict orchestration stays
-//! **deliberately separate** rather than reusing [`f1_check`], because it keeps
+//! guard, the F1 idempotency fixed point, and the reparse compare — and `fuzz`
+//! consumes it (as does `blank_audit`, for its pristine pass). `roundtrip_audit`
+//! and `blank_audit`'s per-injection grade share the reparse compare through
+//! [`compare_reparsed`] rather than through [`f1_check`]: the round-trip keeps
 //! the verbose AST diff (which [`f1_check`] discards) and must *not* run the
-//! idempotency step — folding it onto [`f1_check`] would force a diff-return +
-//! skip-idempotency toggle onto `fuzz` / `blank_audit`, which want neither. If
-//! this is ever unified, the non-degrading shape is a smaller shared
-//! reparse-compare core that both phase-1 and [`f1_check`] call.
+//! idempotency step, and the blank grade reuses an output the ledger already
+//! paid for — so the shared piece is the smaller reparse-compare core, and the
+//! orchestration around it stays each consumer's own.
 
 use std::collections::BTreeMap;
 
@@ -425,25 +425,254 @@ pub(crate) fn leaf_conservation_diff(input: &Value, output: &Value) -> Option<St
     if before == after {
         return None;
     }
+    Some(format!(
+        "leaf-value not conserved — {}",
+        multiset_delta(&before, &after)
+    ))
+}
+
+/// The multiset of **conserved nodes** in a wire AST — every node the formatter must carry
+/// from input to output, keyed by `type`, plus the words of every template text — so an equal
+/// multiset means no node was dropped, duplicated or re-typed and no word of prose was lost.
+///
+/// The zero-tolerance sibling of [`leaf_value_multiset`] on the OTHER axis: the leaf check
+/// conserves scalar values across an equal shape, this conserves the **population** of the
+/// tree across any shape. [`structural_skeleton`] already sees a dropped node — but as one more
+/// entry in the render-noisy `divergent` bucket (a whitespace `Text` appearing or vanishing
+/// beside a block element is a divergence too), which every consumer holds report-only. A
+/// dropped `<b>x</b>` filed there was reported into noise, so this census names the class on
+/// its own, where it can gate: a formatter that reorders, re-quotes or reflows never changes
+/// how many `RegularElement`s a document has.
+///
+/// ## What is counted vs erased
+///
+/// Every exclusion below is a rewrite the formatter makes BY DESIGN and prettier makes too —
+/// measured over the fixture tree and the prettier suites, where the census is born green.
+/// The invariant is zero-tolerance, so an exclusion must name a sanctioned rewrite, never a
+/// bug: a new kind of difference is a finding until it is understood.
+///
+/// | wire node | verdict | why |
+/// | --- | --- | --- |
+/// | every object with a string `type` | **count** `n:<type>` | the population |
+/// | `Text` whose `data` is whitespace-only | **erase** | the formatter's own separator — appears and vanishes at every block boundary (the skeleton's noise) |
+/// | `Text` in a fragment `nodes` array | **count each whitespace-split word** of `data` as `w:<word>`, not the node | a text node's WORDS are what a content drop loses, and its node count is not conserved: hoisting a `<script>` / `<style>` out from between two texts leaves them adjacent, and they reparse as one. Excluded from the word count (node counted instead): the text of a `<script>` / `<style>` the parser keeps as an element (a non-JS `type=` script, a `lang=` style), whose JS / CSS the formatter reformats as code; attribute-value text likewise counts as a node only (a `style=""` value may be reformatted) |
+/// | `Fragment` | **erase** | a container, one per owner; an `{#await}` branch's fragment appears and vanishes with the branch's authored form (`{:then value}` with an empty body is dropped, `{:catch}` folds to the `catch` shorthand) — its NODES still count |
+/// | `EmptyStatement` | **erase** | a stray `;` the formatter drops by design |
+/// | `TSParenthesizedType` / `TSUnionType` / `TSIntersectionType` / `TSInstantiationExpression` / `ChainExpression` | **erase** | wrapper shells the formatter strips or flattens by design (a redundant type paren, a single-member `\| A`, a nested `A \| (B \| C)`, a redundant `(a?.b)?.c` chain shell); acorn-typescript reads `Base<T>` in a class heritage as an instantiation expression or not by the SPELLING of what follows, so tsv's drop-in parse does too. The shell's operands still count |
+/// | a string `Literal` or an `Identifier` reached through `key` | **conflate** as `n:key` | the quote-props rewrite (`{"a": 1}` ↔ `{a: 1}`) flips the node type of a property key; the leaf check conserves the text across it |
+/// | a `*Directive`'s `value` / `expression` | **skip the subtree** | shorthand normalization (`style:color={color}` → `style:color`, `let:x={x}` → `let:x`) drops the expression node; the directive and its name still count |
+/// | an `AwaitBlock`'s `value` / `error` | **skip the subtree** | the binding rides the branch's authored form (above) |
+/// | `comments` / `leadingComments` / `trailingComments` / `comment` | **skip the subtree** | comments have their own gates (ledger, census), and the nestled-JSDoc merge legitimately prints two parsed blocks as one; the singular `comment` is a Svelte `<style>`'s `content.comment`, a COPY of the template comment preceding the tag (which the fragment already counts once) |
+/// | `extra` / `loc` | **skip the subtree** | metadata / positions |
+///
+/// Walks generically on `type` plus the key a subtree was reached through, so a wire shape with
+/// none of the erased kinds (CSS) is simply counted whole. A `Comment` node in a Svelte fragment
+/// (a template `<!-- -->`) IS counted — it is a child node, never merged.
+pub(crate) fn node_census(wire: &Value) -> BTreeMap<CensusKey<'_>, usize> {
+    let mut ms: BTreeMap<CensusKey<'_>, usize> = BTreeMap::new();
+    collect_conserved_nodes(wire, None, false, &mut ms);
+    ms
+}
+
+/// One entry of the node census — a conserved NODE, or a WORD of template text, the two things
+/// the table above counts.
+///
+/// Borrowed from the wire rather than formatted into an owned `String` per entry: the census runs
+/// over both wires of every file in a standing gate, so a `format!` per node would be pure
+/// allocation. The `n:` / `w:` spellings the table and the reports use are this type's
+/// [`Display`](std::fmt::Display), paid only on the entries that actually appear in a delta.
+///
+/// The variant order is the report order (nodes before words), matching the prefixes it renders.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum CensusKey<'a> {
+    /// A conserved node, keyed by its wire `type` — or by `key`, the one position where two
+    /// spellings of the same thing conflate (a quoted vs bare property key).
+    Node(&'a str),
+    /// A whitespace-split word of a fragment text — what a content drop loses, where the text
+    /// NODE count is not conserved (see the table above).
+    Word(&'a str),
+}
+
+impl std::fmt::Display for CensusKey<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Node(ty) => write!(f, "n:{ty}"),
+            Self::Word(word) => write!(f, "w:{word}"),
+        }
+    }
+}
+
+/// Walk `v`, counting one entry per conserved node (and per word of a fragment text). `key` is the
+/// object key the value was reached through (`None` at the root; an array hands its own key
+/// down), which is how a text node's role — fragment child vs attribute value — and a property
+/// key's position are told apart; `raw_island` is set inside a `<script>` / `<style>` element
+/// the parser kept as an element, whose text is code the formatter may reformat.
+fn collect_conserved_nodes<'a>(
+    v: &'a Value,
+    key: Option<&str>,
+    raw_island: bool,
+    out: &mut BTreeMap<CensusKey<'a>, usize>,
+) {
+    match v {
+        Value::Object(map) => {
+            let ty = map.get("type").and_then(Value::as_str);
+            match ty {
+                None
+                | Some(
+                    "EmptyStatement"
+                    | "TSParenthesizedType"
+                    | "TSUnionType"
+                    | "TSIntersectionType"
+                    | "TSInstantiationExpression"
+                    | "ChainExpression"
+                    | "Fragment",
+                ) => {}
+                Some("Text") => {
+                    let data = map.get("data").and_then(Value::as_str).unwrap_or("");
+                    if data.trim().is_empty() {
+                        // The formatter's own separator.
+                    } else if key == Some("nodes") && !raw_island {
+                        for word in data.split_whitespace() {
+                            count(out, CensusKey::Word(word));
+                        }
+                    } else {
+                        count(out, CensusKey::Node("Text"));
+                    }
+                }
+                Some("Identifier") if key == Some("key") => count(out, CensusKey::Node("key")),
+                Some("Literal")
+                    if key == Some("key") && map.get("value").is_some_and(Value::is_string) =>
+                {
+                    count(out, CensusKey::Node("key"));
+                }
+                Some(ty) => count(out, CensusKey::Node(ty)),
+            }
+            let is_directive = ty.is_some_and(|t| t.ends_with("Directive"));
+            let is_await = ty == Some("AwaitBlock");
+            let raw_island = raw_island
+                || (ty == Some("RegularElement")
+                    && matches!(
+                        map.get("name").and_then(Value::as_str),
+                        Some("script" | "style")
+                    ));
+            for (k, child) in map {
+                let skip = matches!(
+                    k.as_str(),
+                    "extra"
+                        | "loc"
+                        | "comments"
+                        | "leadingComments"
+                        | "trailingComments"
+                        | "comment"
+                ) || (is_directive && matches!(k.as_str(), "value" | "expression"))
+                    || (is_await && matches!(k.as_str(), "value" | "error"));
+                if skip {
+                    continue;
+                }
+                collect_conserved_nodes(child, Some(k), raw_island, out);
+            }
+        }
+        Value::Array(arr) => {
+            for child in arr {
+                collect_conserved_nodes(child, key, raw_island, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Add one to `key`'s tally — the census's only mutation, named so the walk above reads as the
+/// classification it is.
+fn count<'a>(out: &mut BTreeMap<CensusKey<'a>, usize>, key: CensusKey<'a>) {
+    *out.entry(key).or_insert(0) += 1;
+}
+
+/// `None` when every conserved node (and fragment word) survives `input` → `output`; otherwise a
+/// compact description — nodes lost from the input, nodes gained in the output. The gate-fatal
+/// signal every round-trip consumer files as a node-loss finding: a formatter never changes a
+/// document's node population, so there is no sanctioned reading of a difference here.
+pub(crate) fn node_conservation_diff(input: &Value, output: &Value) -> Option<String> {
+    let before = node_census(input);
+    let after = node_census(output);
+    if before == after {
+        return None;
+    }
+    Some(format!(
+        "node population not conserved — {}",
+        multiset_delta(&before, &after)
+    ))
+}
+
+/// The `lost [...] gained [...]` rendering of two multisets' difference, shared by the two
+/// conservation diffs so their reports read alike.
+///
+/// Generic over the key so each census keeps the key it walks with — owned for the leaf check,
+/// borrowed for the node census ([`CensusKey`]) — and the spelling is paid here, on the entries
+/// that actually moved, rather than on every node of both trees.
+fn multiset_delta<K: Ord + std::fmt::Display>(
+    before: &BTreeMap<K, usize>,
+    after: &BTreeMap<K, usize>,
+) -> String {
     let mut lost: Vec<String> = Vec::new();
-    for (k, &n_before) in &before {
+    for (k, &n_before) in before {
         let n_after = after.get(k).copied().unwrap_or(0);
         if n_before > n_after {
             lost.push(format!("{k} (-{})", n_before - n_after));
         }
     }
     let mut gained: Vec<String> = Vec::new();
-    for (k, &n_after) in &after {
+    for (k, &n_after) in after {
         let n_before = before.get(k).copied().unwrap_or(0);
         if n_after > n_before {
             gained.push(format!("{k} (+{})", n_after - n_before));
         }
     }
-    Some(format!(
-        "leaf-value not conserved — lost [{}] gained [{}]",
-        lost.join(", "),
-        gained.join(", ")
-    ))
+    format!("lost [{}] gained [{}]", lost.join(", "), gained.join(", "))
+}
+
+/// The verdict of comparing a document's parse against the parse of its formatted output —
+/// the one reparse question every round-trip consumer asks, in one priority order.
+pub(crate) enum ReparseCompare {
+    /// Same population, same skeleton, same conserved leaves.
+    Equal,
+    /// A conserved node (or a word of template text) was dropped, duplicated or re-typed
+    /// ([`node_conservation_diff`]) — always a bug, and the precise subset of a structural
+    /// divergence. Carries the population delta.
+    NodeLoss(String),
+    /// The skeleton changed with the population intact ([`structurally_equivalent`]) — the soft,
+    /// render-model-noisy bucket every consumer reports without gating. Carries the AST diff
+    /// when the caller asked for it.
+    Divergent(Option<String>),
+    /// Equal skeleton, but a decode-invariant leaf value changed
+    /// ([`leaf_conservation_diff`]). Carries the leaf delta.
+    LeafCorruption(String),
+}
+
+/// Compare an input wire against its formatted output's wire. Node loss is asked FIRST: it is
+/// a subset of structural divergence, so asked second it would be filed into the soft bucket
+/// and never gate — which is exactly how a dropped element shipped. Then the skeleton (a shape
+/// change is a divergence, which the skeleton owns), then — on an equal shape only — the
+/// leaves. `render` toggles Svelte-5 render-time whitespace normalization before the skeleton
+/// compare; `verbose` keeps the readable AST diff on a divergence.
+pub(crate) fn compare_reparsed(
+    wire_in: Value,
+    wire_out: Value,
+    render: bool,
+    verbose: bool,
+) -> ReparseCompare {
+    if let Some(detail) = node_conservation_diff(&wire_in, &wire_out) {
+        return ReparseCompare::NodeLoss(detail);
+    }
+    // Computed before the move-consuming structural compare.
+    let leaf_diff = leaf_conservation_diff(&wire_in, &wire_out);
+    let (equal, diff) = structurally_equivalent(wire_in, wire_out, render, verbose);
+    if !equal {
+        return ReparseCompare::Divergent(diff);
+    }
+    if let Some(detail) = leaf_diff {
+        return ReparseCompare::LeafCorruption(detail);
+    }
+    ReparseCompare::Equal
 }
 
 /// The outcome of the shared format fixed-point check ([`f1_check`]) on one input — every
@@ -451,7 +680,8 @@ pub(crate) fn leaf_conservation_diff(input: &Value, output: &Value) -> Option<St
 ///
 /// The panic-free property core the [`fuzz`](crate::cli::commands) and
 /// [`blank_audit`](crate::cli::commands) commands share: parse → format → reparse →
-/// structural-skeleton compare → leaf conservation → idempotency fixed point. It does **not**
+/// node conservation → structural-skeleton compare → leaf conservation → idempotency fixed
+/// point. It does **not**
 /// catch panics — the caller wraps the call in
 /// [`catch_unwind`](std::panic::catch_unwind) (fuzz's `attempt`, blank_audit's inject loop),
 /// so a panic is the caller's own finding and this stays a pure, panic-free classifier.
@@ -468,6 +698,10 @@ pub(crate) enum F1Outcome {
     FormatError,
     /// `format`'s output does not reparse (tsv rejects its own output).
     Unreparseable,
+    /// Output reparses but a conserved node — an element, a block, a statement, a word of
+    /// template text — was dropped, duplicated or re-typed. The precise, always-a-bug subset
+    /// of `StructuralDivergence`, filed ahead of it so it gates.
+    NodeLoss,
     /// Output reparses with an **equal skeleton** but a decode-invariant leaf value changed
     /// (a mis-decoded string, a miscanonicalized number, a mangled comment) — the
     /// skeleton-blind class.
@@ -480,14 +714,16 @@ pub(crate) enum F1Outcome {
 
 impl F1Outcome {
     /// A **reliable** finding — always a real bug: `format_error` / `unreparseable` mean tsv
-    /// can't round-trip its own output, `non_idempotent` breaks the F1 fixed point, and
-    /// `leaf_value_corruption` is a still-parses value change invisible to the structural
-    /// skeleton. `structural_divergence` is the soft bucket; `rejected` and `ok` aren't findings.
+    /// can't round-trip its own output, `node_loss` is a dropped or duplicated node,
+    /// `non_idempotent` breaks the F1 fixed point, and `leaf_value_corruption` is a
+    /// still-parses value change invisible to the structural skeleton. `structural_divergence`
+    /// is the soft bucket; `rejected` and `ok` aren't findings.
     pub(crate) fn is_hard(self) -> bool {
         matches!(
             self,
             Self::FormatError
                 | Self::Unreparseable
+                | Self::NodeLoss
                 | Self::LeafValueCorruption
                 | Self::NonIdempotent
         )
@@ -500,6 +736,7 @@ impl F1Outcome {
             Self::Ok => "ok",
             Self::FormatError => "format_error",
             Self::Unreparseable => "unreparseable",
+            Self::NodeLoss => "node_loss",
             Self::LeafValueCorruption => "leaf_value_corruption",
             Self::StructuralDivergence => "structural_divergence",
             Self::NonIdempotent => "non_idempotent",
@@ -515,9 +752,8 @@ impl F1Outcome {
 /// catches panics; this only ever *returns* an outcome.
 ///
 /// Hoisted here from `fuzz::check` so a second consumer ([`blank_audit`](crate::cli::commands))
-/// can drive the no-panic guard, the F1 idempotency fixed point, the reparse-skeleton compare,
-/// and the leaf-conservation check without copying the six-step sequence — exactly the
-/// migration this module's docs anticipate.
+/// can drive the no-panic guard, the F1 idempotency fixed point and the reparse compare
+/// without copying the sequence.
 pub(crate) fn f1_check(src: &str, parser: ParserType, render: bool) -> F1Outcome {
     // 1. Parse. A clean rejection is the common, expected case for garbage / a broken splice.
     let Some(wire_in) = tsv_parse_to_value(src, parser) else {
@@ -531,22 +767,176 @@ pub(crate) fn f1_check(src: &str, parser: ParserType, render: bool) -> F1Outcome
     let Some(wire_out) = tsv_parse_to_value(&f1, parser) else {
         return F1Outcome::Unreparseable;
     };
-    // 4. Same document (structure)? Compute the leaf diff first, before the move-consuming
-    //    structural compare.
-    let leaf_changed = leaf_conservation_diff(&wire_in, &wire_out).is_some();
-    let (equal, _) = structurally_equivalent(wire_in, wire_out, render, false);
-    if !equal {
-        return F1Outcome::StructuralDivergence;
+    // 4. Same document? Population, then shape, then leaves.
+    match compare_reparsed(wire_in, wire_out, render, false) {
+        ReparseCompare::NodeLoss(_) => return F1Outcome::NodeLoss,
+        ReparseCompare::Divergent(_) => return F1Outcome::StructuralDivergence,
+        ReparseCompare::LeafCorruption(_) => return F1Outcome::LeafValueCorruption,
+        ReparseCompare::Equal => {}
     }
-    // 5. Same shape, but a decode-invariant leaf value changed — the skeleton-blind class.
-    if leaf_changed {
-        return F1Outcome::LeafValueCorruption;
-    }
-    // 6. Idempotent fixed point.
+    // 5. Idempotent fixed point.
     match format_source(&f1, parser) {
         Ok(f2) if f2 == f1 => F1Outcome::Ok,
         Ok(_) => F1Outcome::NonIdempotent,
         Err(_) => F1Outcome::FormatError,
+    }
+}
+
+#[cfg(test)]
+mod node_census_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn fragment(nodes: Vec<Value>) -> Value {
+        json!({"type": "Fragment", "nodes": nodes})
+    }
+
+    fn element(name: &str, text: &str) -> Value {
+        json!({"type": "RegularElement", "name": name, "attributes": [],
+               "fragment": fragment(vec![json!({"type": "Text", "data": text})])})
+    }
+
+    #[test]
+    fn dropped_element_is_a_loss() {
+        let a = fragment(vec![element("b", "x"), element("i", "y")]);
+        let b = fragment(vec![element("i", "y")]);
+        let detail = node_conservation_diff(&a, &b).expect("a dropped element must not conserve");
+        assert!(detail.contains("n:RegularElement (-1)"), "{detail}");
+        assert!(detail.contains("w:x (-1)"), "{detail}");
+    }
+
+    #[test]
+    fn adjacent_texts_merging_conserves() {
+        // `}<style>…</style>!` hoists the style out and leaves `}` and `!` one text.
+        let a = fragment(vec![
+            json!({"type": "Text", "data": "}"}),
+            json!({"type": "Text", "data": "!"}),
+        ]);
+        let b = fragment(vec![json!({"type": "Text", "data": "}\n!"})]);
+        assert!(node_conservation_diff(&a, &b).is_none());
+    }
+
+    #[test]
+    fn whitespace_text_appearing_or_vanishing_conserves() {
+        let a = fragment(vec![element("b", "x"), element("i", "y")]);
+        let b = fragment(vec![
+            json!({"type": "Text", "data": "\n\t"}),
+            element("b", "x"),
+            json!({"type": "Text", "data": " "}),
+            element("i", "y"),
+            json!({"type": "Text", "data": "\n"}),
+        ]);
+        assert!(node_conservation_diff(&a, &b).is_none());
+    }
+
+    #[test]
+    fn reflowed_text_conserves_its_words() {
+        let a = fragment(vec![json!({"type": "Text", "data": "a  b\n\tc"})]);
+        let b = fragment(vec![json!({"type": "Text", "data": "a b c"})]);
+        assert!(node_conservation_diff(&a, &b).is_none());
+        let c = fragment(vec![json!({"type": "Text", "data": "a b"})]);
+        assert!(node_conservation_diff(&a, &c).is_some());
+    }
+
+    #[test]
+    fn attribute_value_text_counts_as_a_node_but_not_by_word() {
+        let attr = |v: &str| json!({"type": "Attribute", "name": "style", "value": [{"type": "Text", "data": v}]});
+        assert!(node_conservation_diff(&attr("color:red"), &attr("color: red")).is_none());
+        assert!(
+            node_conservation_diff(
+                &attr("color:red"),
+                &json!({"type": "Attribute", "name": "style", "value": true})
+            )
+            .is_some()
+        );
+    }
+
+    #[test]
+    fn sanctioned_drops_are_erased() {
+        let body = |stmts: Vec<Value>| json!({"type": "Program", "body": stmts});
+        let expr = json!({"type": "ExpressionStatement", "expression": {"type": "Identifier", "name": "a"}});
+        let a = body(vec![expr.clone(), json!({"type": "EmptyStatement"})]);
+        let b = body(vec![expr]);
+        assert!(node_conservation_diff(&a, &b).is_none());
+        let ty = |t: Value| json!({"type": "TSTypeAliasDeclaration", "typeAnnotation": t});
+        let inner = json!({"type": "TSStringKeyword"});
+        let a = ty(json!({"type": "TSParenthesizedType", "typeAnnotation": inner}));
+        let b = ty(inner.clone());
+        assert!(node_conservation_diff(&a, &b).is_none());
+        // `type A = | string` → `type A = string`: the single-member union shell.
+        let a = ty(json!({"type": "TSUnionType", "types": [inner]}));
+        assert!(node_conservation_diff(&a, &b).is_none());
+        // …but a dropped MEMBER is not a shell.
+        let a = ty(json!({"type": "TSUnionType", "types": [inner, {"type": "TSNumberKeyword"}]}));
+        assert!(node_conservation_diff(&a, &b).is_some());
+    }
+
+    #[test]
+    fn quote_props_key_flip_conserves_in_key_position_only() {
+        let prop = |k: Value| json!({"type": "Property", "key": k, "value": {"type": "Literal", "value": 1}});
+        let quoted = prop(json!({"type": "Literal", "value": "a"}));
+        let bare = prop(json!({"type": "Identifier", "name": "a"}));
+        assert!(node_conservation_diff(&quoted, &bare).is_none());
+        // A value-position flip is not the quote-props rewrite.
+        let v = |x: Value| json!({"type": "ExpressionStatement", "expression": x});
+        assert!(
+            node_conservation_diff(
+                &v(json!({"type": "Literal", "value": "a"})),
+                &v(json!({"type": "Identifier", "name": "a"}))
+            )
+            .is_some()
+        );
+    }
+
+    #[test]
+    fn directive_shorthand_and_raw_island_words_are_not_graded() {
+        let long = json!({"type": "StyleDirective", "name": "color",
+            "value": [{"type": "ExpressionTag", "expression": {"type": "Identifier", "name": "color"}}]});
+        let short = json!({"type": "StyleDirective", "name": "color", "value": true});
+        assert!(node_conservation_diff(&long, &short).is_none());
+        let script = |code: &str| {
+            json!({"type": "RegularElement", "name": "script", "attributes": [],
+            "fragment": fragment(vec![json!({"type": "Text", "data": code})])})
+        };
+        assert!(node_conservation_diff(&script("a=1;"), &script("a = 1;")).is_none());
+        assert!(node_conservation_diff(&script("a=1;"), &json!({"type": "RegularElement", "name": "script", "attributes": [], "fragment": fragment(vec![])})).is_some());
+    }
+
+    #[test]
+    fn comment_arrays_are_not_the_census_business() {
+        let prog =
+            |comments: Vec<Value>| json!({"type": "Program", "body": [], "comments": comments});
+        let a = prog(vec![
+            json!({"type": "Block", "value": "a"}),
+            json!({"type": "Block", "value": "b"}),
+        ]);
+        let b = prog(vec![json!({"type": "Block", "value": "a*//*b"})]);
+        assert!(node_conservation_diff(&a, &b).is_none());
+    }
+
+    #[test]
+    fn style_content_comment_copy_is_not_double_counted() {
+        let comment = json!({"type": "Comment", "data": " c "});
+        let root = |css_comment: Option<Value>| {
+            json!({"type": "Root",
+            "fragment": fragment(vec![comment.clone()]),
+            "css": {"type": "StyleSheet", "children": [], "content": {"styles": "", "comment": css_comment}}})
+        };
+        assert!(node_conservation_diff(&root(Some(comment.clone())), &root(None)).is_none());
+    }
+
+    #[test]
+    fn template_comment_node_is_counted() {
+        let a = fragment(vec![
+            json!({"type": "Comment", "data": " c "}),
+            element("b", "x"),
+        ]);
+        let b = fragment(vec![element("b", "x")]);
+        assert!(
+            node_conservation_diff(&a, &b)
+                .unwrap()
+                .contains("n:Comment (-1)")
+        );
     }
 }
 

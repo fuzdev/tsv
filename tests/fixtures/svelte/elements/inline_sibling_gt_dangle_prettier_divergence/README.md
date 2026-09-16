@@ -2,8 +2,10 @@
 
 An inline-element sibling immediately before an **expanding** block: tsv dangles the
 element's closing `>` onto its own line so the block head starts fresh
-(`</span⏎>{#if…}`). A short block that stays inline keeps the `>` hugged. Prettier keeps
-the `>` hugged in both.
+(`</span⏎>{#if…}`). A short block that hugs within the width keeps the `>` hugged (a
+wide preceding element dangles the `>` with the block still inline — the prettier-matching
+case [inline_sibling_gt_dangle_inline_block_long](../inline_sibling_gt_dangle_inline_block_long/)
+pins). Prettier keeps the `>` hugged in both.
 
 - **Dangle case** — `<span>text</span>` directly before a block whose body overflows:
   the `</span>` closing `>` drops to the block-head line. The rule is uniform across
@@ -14,6 +16,11 @@ the `>` hugged in both.
   keeps the author's line and stays in the dangle regime — its multiline form dangles the
   preceding `>` exactly like `{#if}`. See
   [blocks/snippet/own_line](../../blocks/snippet/own_line_prettier_divergence/).
+- **Glued run** — a byte-glued run of inline elements (`<span>inline1</span><span>inline2</span>`)
+  before an expanding block: the whole run prints and only the run's LAST closing `>`
+  dangles — the dangle rewrites the run's tail, never the run. The same holds behind a
+  glued HTML-comment prefix (`<!-- c --><span>a</span><span>b</span>`), the widest unit
+  the dangle can be handed: the comment, both elements and the dangled `>` all print.
 - **Control** — the same `<span>` before a short `{#if cond}text{/if}` that stays
   inline: the `>` keeps hugging (no dangle), because the block never goes multiline.
 
@@ -31,7 +38,8 @@ render-safe. Prettier never expands the block, so it keeps `</span>{#if…}` hug
 The `>` token immediately preceding an expanding block's `{#…}` dangles onto the
 block-head line — the closing `>` of a preceding inline sibling exactly as the opening
 `>` of an enclosing inline element already does for a sole-content block. Gated on the
-block actually rendering multiline (a short inline block keeps the `>` hugged). See
+rendered layout: the block rendering multiline, or the hugged line overflowing (a short
+inline block that fits keeps the `>` hugged). See
 [conformance_prettier_svelte.md §Svelte: Blocks](../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).
 
 ## Related

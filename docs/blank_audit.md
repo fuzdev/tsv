@@ -32,7 +32,7 @@ Each injected blank is graded, keyed by the [site shape](#reading-a-finding) of 
 | --- | --- | --- | --- |
 | 1 | **no panic** — the formatter must never crash on a blank in a gap | `PANIC` | gates (never pinned — always fails) |
 | 2 | **F1 idempotency** — pass 1 may keep or drop the blank, pass 2 must be a fixed point | `NON-IDEMPOTENT` | pinned |
-| 3 | **structural reparse** — `format(injected)` reparses to the same document | `UNREPARSEABLE` (pinned) / `STRUCTURAL-DIVERGENCE` (**report-only**) | see below |
+| 3 | **structural reparse** — `format(injected)` reparses to the same document | `UNREPARSEABLE` (pinned) / `NODE-LOSS` (pinned — a node or word of template text dropped, duplicated or re-typed; the gated subset of a structural change) / `STRUCTURAL-DIVERGENCE` (**report-only**) | see below |
 | 4 | **leaf conservation** — no decode-invariant leaf value changes | `LEAF-CORRUPTION` | pinned |
 | 5 | **ledger-clean** — the blank must not drop / double-print a comment | `DROPPED` / `DOUBLE-PRINTED` | pinned |
 | 6 | **blank-run ≤ 1** — the output never holds a 2+ blank run outside a verbatim region | `BLANK-RUN` | pinned |

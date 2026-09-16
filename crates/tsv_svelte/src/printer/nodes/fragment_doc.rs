@@ -110,6 +110,32 @@ struct PendingFreeze {
     gap: Option<usize>,
 }
 
+/// The inline unit the sibling loop pushed as ONE child doc, carried forward one iteration so the
+/// element→block sibling-`>` dangle can REBUILD it: a lone inline element, a glued element run, or
+/// either behind a glued HTML-comment prefix. Every other way a unit is pushed — a text fill, a
+/// frozen slice, a comment, a block — leaves the loop's slot `None`, and the dangle keeps its
+/// hands off (rebuilding a frozen element would reformat what the directive pinned).
+///
+/// The dangle replaces the pushed doc wholesale, so the unit must name what to undo, not just what
+/// to rebuild — hence three fields rather than an index:
+///
+/// - `head` is where the unit's source range BEGINS, which is where its doc was built (a
+///   consume-ahead unit's tail indices are skipped, so `i - 1` would name a run's tail element and
+///   say nothing about the unit).
+/// - `docs_len` is the `child_docs` length BEFORE the push — a mark to truncate back to, not a
+///   count of one. A [`LeadBoundary`] is free to spend more than one entry
+///   ([`LeadBoundary::SpacedBare`] pushes the separator beside the doc), so a `pop()` would strand
+///   the separator of any lead that did: silent doc-list corruption, the same class as the dropped
+///   run this rebuild exists to fix.
+/// - `lead` is the boundary the unit was pushed under, re-applied to the rebuilt unit: a `Spaced` /
+///   `Glued` lead is folded INTO the pushed doc, so a bare swap would lose it.
+#[derive(Clone, Copy)]
+struct PushedUnit {
+    head: usize,
+    docs_len: usize,
+    lead: LeadBoundary,
+}
+
 /// Whether `raw` begins with a linebreak, ignoring leading horizontal whitespace — prettier's
 /// `startsWithLinebreak` (`^([\t\f\r ]*\n)`) with the form feed dropped, since a form feed is
 /// content rather than skippable whitespace ([`is_collapsible_ws`]). Used by the block-child
@@ -259,6 +285,11 @@ impl<'a> Printer<'a> {
         // across exactly one iteration: the run's own indices are skipped via
         // `glued_run_consumed_until`, so the very next node visited is the text that takes it.
         let mut pending_glued_prefix: Option<(DocId, usize)> = None;
+        // The inline unit the previous iteration pushed as ONE child doc ([`PushedUnit`], whose
+        // doc carries what each field is for). Taken at the top of every visited iteration, so it
+        // names the entries the PREVIOUS visited iteration added and nothing older; the block arm
+        // truncates back to its mark and re-pushes the rebuilt unit under the same lead.
+        let mut pushed_unit: Option<PushedUnit> = None;
         // Index of the node the most recently VISITED iteration began its unit at — usually the
         // head of the previously pushed sibling doc, but a visit that pushes nothing (a
         // whitespace-only text) claims it too. Handed to the next visited node as
@@ -282,6 +313,7 @@ impl<'a> Printer<'a> {
             if i < glued_run_consumed_until {
                 continue;
             }
+            let prev_unit = pushed_unit.take();
             // Hand the PREVIOUS visited index forward and claim this one. Every sibling doc is
             // built at its unit's HEAD (a glued element run and a comment-prefixed element are both
             // consume-ahead, their tails skipped by the `continue` above), so the previous visited
@@ -382,7 +414,7 @@ impl<'a> Printer<'a> {
                 // forceBreakContent — prettier-plugin-svelte's handleBlockChild. Gated on
                 // `multiline` — the convergence path (the multiline element arm) is the only
                 // caller that opts in; the legacy non-multiline callers keep routing blocks
-                // through handle_inline_child until the element-arm reroute lands (it is
+                // through the inline arm until the element-arm reroute lands (it is
                 // currently parked on a corpus parity gap, tracked in internal notes).
                 self.handle_block_child(
                     trimmed_nodes,
@@ -407,19 +439,20 @@ impl<'a> Printer<'a> {
                 // Axis-3 sibling-`>` dangle first: a block directly following an inline-element
                 // sibling (no whitespace between) sheds that element's closing `>` onto the
                 // block-head line (`</span⏎>{#if…}`) — a deliberate tsv divergence (block-tag
-                // wrapping). The element was already pushed as the previous child; swap in its
-                // omit-`>` form and append the block that now owns the `>`.
-                if let Some((element_doc, block_doc)) =
-                    self.try_block_sibling_gt_dangle(trimmed_nodes, i)
+                // wrapping). The element's unit was already pushed as the previous child: pop
+                // it, re-push the unit rebuilt with its last `>` split off (under the lead it
+                // was pushed with), and append the block that now owns the `>`.
+                if let Some(unit) = prev_unit
+                    && let Some((element_doc, block_doc)) =
+                        self.try_block_sibling_gt_dangle(trimmed_nodes, i, unit.head)
                 {
                     // Glued to the element: no whitespace node stands between them, so no
                     // separator can have deferred to this block.
                     debug_assert!(!prev_text_ws);
-                    if let Some(last) = child_docs.last_mut() {
-                        *last = element_doc;
-                    } else {
-                        child_docs.push(element_doc);
-                    }
+                    // Back to the mark the unit's push started at — its lead may have spent more
+                    // than one entry — then re-push the rebuilt unit under that same lead.
+                    child_docs.truncate(unit.docs_len);
+                    self.push_inline_child_doc(&mut child_docs, element_doc, unit.lead);
                     child_docs.push(block_doc);
                 } else {
                     // No dangle. A block the root marked as part of a SINGLE-LINE inline run builds
@@ -469,6 +502,7 @@ impl<'a> Printer<'a> {
                 // element→block dangle. Checked before the element-run (disjoint: this needs a
                 // following TEXT, the run a following element).
                 if let Some(dangle_doc) = self.try_build_glued_both_text_dangle(trimmed_nodes, i) {
+                    // Glued to TEXT on its far side, so no block follows it: not a dangle unit.
                     self.push_inline_child_doc(&mut child_docs, dangle_doc, lead);
                 }
                 // Axis-3 element→element sibling-`>` dangle ("G2"), over a maximal glued RUN: when
@@ -487,10 +521,24 @@ impl<'a> Printer<'a> {
                     // an inter-sibling space before a glued run (`</span>` ` ` `<br/><br/>`)
                     // renders (a space when it fits, a break when the fill wraps) rather than
                     // being dropped.
+                    let docs_len = child_docs.len();
                     self.push_inline_child_doc(&mut child_docs, run_doc, lead);
                     glued_run_consumed_until = run_end + 1;
-                } else {
-                    self.handle_inline_child(node, &mut child_docs, lead);
+                    pushed_unit = Some(PushedUnit {
+                        head: i,
+                        docs_len,
+                        lead,
+                    });
+                } else if let Some(node_doc) = self.build_fragment_node_doc(node) {
+                    let docs_len = child_docs.len();
+                    self.push_inline_child_doc(&mut child_docs, node_doc, lead);
+                    if matches!(node, FragmentNode::Element(_)) {
+                        pushed_unit = Some(PushedUnit {
+                            head: i,
+                            docs_len,
+                            lead,
+                        });
+                    }
                 }
             } else if !freeze.armed
                 && let Some((unit_doc, run_end)) =
@@ -512,8 +560,14 @@ impl<'a> Printer<'a> {
                 } else {
                     LeadBoundary::Plain
                 };
+                let docs_len = child_docs.len();
                 self.push_inline_child_doc(&mut child_docs, unit_doc, lead);
                 glued_run_consumed_until = run_end + 1;
+                pushed_unit = Some(PushedUnit {
+                    head: i,
+                    docs_len,
+                    lead,
+                });
             } else if !freeze.armed
                 && !prev_text_ws
                 && let Some((prefix, text_idx)) =
@@ -927,25 +981,17 @@ impl<'a> Printer<'a> {
             .starts_with(internal::is_collapsible_ws_char)
     }
 
-    /// Handle an inline child element - matches prettier-plugin-svelte's handleInlineChild
-    fn handle_inline_child(
-        &self,
-        node: &FragmentNode<'_>,
-        child_docs: &mut DocBuf,
-        lead: LeadBoundary,
-    ) {
-        if let Some(node_doc) = self.build_fragment_node_doc(node) {
-            self.push_inline_child_doc(child_docs, node_doc, lead);
-        }
-    }
-
     /// Push an already-built inline child doc with its leading-boundary treatment
     /// ([`LeadBoundary`], whose variants carry each case's contract).
     ///
-    /// Shared by the single-element path (`handle_inline_child`), the glued-element-run path and
-    /// the comment-prefixed-unit path in `build_nodes_doc`, so a trimmed boundary space is never
-    /// dropped before a byte-glued run (`</span>` ` ` `<br/><br/>`) — the single-sibling case
-    /// already worked because a run of one falls through to `handle_inline_child`.
+    /// Shared by the single-element path, the glued-element-run path and the comment-prefixed-unit
+    /// path in `build_nodes_doc`, so a trimmed boundary space is never dropped before a byte-glued
+    /// run (`</span>` ` ` `<br/><br/>`).
+    ///
+    /// ⚠️ How many entries a push spends is the LEAD's business, not one per call
+    /// ([`LeadBoundary::SpacedBare`] pushes the separator beside the doc). A caller that means to
+    /// UNDO a push therefore records `child_docs.len()` beforehand and truncates back to it
+    /// ([`PushedUnit`]) — a `pop()` reads as "one doc" and strands the rest.
     fn push_inline_child_doc(&self, child_docs: &mut DocBuf, node_doc: DocId, lead: LeadBoundary) {
         match lead {
             LeadBoundary::Spaced => {
