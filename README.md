@@ -104,9 +104,6 @@ packages for browsers, Deno, and platforms without a prebuilt binary:
 - [`@fuzdev/tsv-format-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-format-wasm) - formatter only (smaller)
 - [`@fuzdev/tsv-parse-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-parse-wasm) - parser + JSON AST only (smallest)
 
-The WASM packages were published as `@fuzdev/tsv_wasm`, `@fuzdev/tsv_format_wasm` and
-`@fuzdev/tsv_parse_wasm` through 0.3.x; those names are deprecated and receive no further versions.
-
 ```bash
 npm i @fuzdev/tsv
 npx tsv format src            # if installed locally
