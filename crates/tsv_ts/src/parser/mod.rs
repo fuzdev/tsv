@@ -638,6 +638,30 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         (self.base_offset + raw) as u32
     }
 
+    /// The inverse of [`Parser::span_pos`]: an absolute `Span` coordinate back to a raw
+    /// offset into `self.source`.
+    ///
+    /// Stored spans are **host** coordinates while `self.source` is the local (possibly
+    /// embedded) slice, so a span read back as an index has to shift — indexing with one
+    /// directly reads the wrong bytes under Svelte embedding, or past the slice end. The
+    /// same hazard [`Parser::resolve_cooked`] names, and the reason a byte scan keyed on a
+    /// node's span goes through here.
+    ///
+    /// A position BELOW the base is the wrong base, not a clamp: the saturation would hand
+    /// back offset 0, where a byte scan simply finds nothing and reports no verdict —
+    /// exactly the silent miss this function exists to prevent. Asserted rather than
+    /// returned, since every caller holds a span this parser itself produced.
+    #[inline]
+    pub(super) fn local_pos(&self, span_pos: u32) -> usize {
+        debug_assert!(
+            span_pos as usize >= self.base_offset,
+            "span position {span_pos} is below the parser's base offset {} — a host \
+             coordinate from another parse, or a base that moved",
+            self.base_offset,
+        );
+        (span_pos as usize).saturating_sub(self.base_offset)
+    }
+
     /// Get the end position of the previously consumed token (with base_offset).
     ///
     /// Useful for determining where statements end after consuming optional tokens

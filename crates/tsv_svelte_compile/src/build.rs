@@ -441,6 +441,9 @@ impl<'arena> Builder<'arena> {
             operator: op,
             right,
             span,
+            // Minted code, not source the printer will re-lex: the builder emits its own
+            // spelling, and no shape it mints opens a type-argument region.
+            relexes_as_type_arguments: false,
         })
     }
 

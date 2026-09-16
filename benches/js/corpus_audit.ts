@@ -41,6 +41,12 @@
  *   sweep below. Real code carries twice the fixture corpus's chains, and the class it gates is
  *   one a corpus of formatted code cannot otherwise show: the paren-nested authoring is exactly
  *   what tsv's own output normalizes away (docs/audits.md §Paren-Authoring Independence).
+ *   Run WITHOUT `--require-relational`, which `deno task paren:audit` (the fixture-tree gate)
+ *   passes: that flag is the audit's per-class vacuity floor over its relational `<`…`>` sites,
+ *   and it is a claim about the SEED SET rather than about the audit. Nobody writes `a < b > c`
+ *   in real code, so both relational rows are legitimately 0 here and a floor over them would
+ *   fail a clean run. This leg still grades every relational site it finds; it holds only the
+ *   unconditional total floor.
  * - `census_audit` — every comment interior the author wrote survives formatting, compared as raw
  *   input-vs-output trivia multisets by the audit's own scanners. All dirs. This is the leg whose
  *   yield is external corpora *by its own design* — over `tests/fixtures` it is a tripwire, and its

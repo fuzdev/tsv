@@ -877,6 +877,10 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                     Some(Expression::BinaryExpression(ast::BinaryExpression {
                         left: left.unwrap_or(binary.left),
                         right: right.unwrap_or(binary.right),
+                        // `relexes_as_type_arguments` rides along: it is a claim about the SOURCE
+                        // bytes this rewrite invalidates, and inheriting is the SAFE direction — a
+                        // stale `true` costs a redundant paren pair, a stale `false` an output
+                        // nothing reparses.
                         ..binary.clone()
                     }))
                 }
