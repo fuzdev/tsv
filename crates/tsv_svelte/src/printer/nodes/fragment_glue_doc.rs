@@ -94,16 +94,18 @@ impl<'a> Printer<'a> {
     /// Axis-3 sibling-`>` dangle: when a control-flow block directly follows (no
     /// whitespace) an inline-element sibling, build the element without its closing `>`
     /// and hand that `>` to the block so it dangles onto the block-head line when the
-    /// block renders multiline. Returns `(element_without_gt, block_with_gt)`, or `None`
-    /// to keep the pair hugged. The `>` only moves *into* the closing tag (`</tag⏎>{#…}`),
-    /// injecting no render-significant whitespace.
+    /// block renders multiline — or when the hugged block-head line would overflow, where
+    /// the `>` dangles and the block stays inline on the fresh line. Returns
+    /// `(element_without_gt, block_with_gt)`, or `None` to keep the pair hugged. The `>`
+    /// only moves *into* the closing tag (`</tag⏎>{#…}`), injecting no render-significant
+    /// whitespace.
     ///
-    /// The dangle keys on whether the block actually renders multiline, not on how its
-    /// body is authored — so it is a fixed point on its own output (the dangled form's
-    /// own-line body would otherwise read as authored-multiline on a second pass):
+    /// The dangle keys on the rendered layout, not on how the block's body is authored — so
+    /// it is a fixed point on its own output (the dangled form's own-line body would
+    /// otherwise read as authored-multiline on a second pass):
     /// - a conditional block (an inline-authored body that may stay inline or expand on
-    ///   width) folds the `>` into its own inline-vs-multiline `conditional_group`
-    ///   (`build_expanding_construct`/`build_expanding_block` via `fold_gt`);
+    ///   width) folds the `>` into its own three-way `conditional_group` — hug, dangle +
+    ///   inline, dangle + expand (`build_expanding_construct`/`build_expanding_block`);
     /// - a block that unconditionally breaks (authored-multiline / forced) dangles the `>`
     ///   onto its own line (`⏎>` prefix), applied on the non-expanding tails by `dangle_gt`.
     ///
@@ -119,24 +121,33 @@ impl<'a> Printer<'a> {
     /// layout (`has_control_flow_after_sibling` → `compute_multiline_cause`), so the
     /// block's body-drop keys on `can_wrap` (true here) and the dangle is a one-pass fixed
     /// point — including for `{#await}`, whose body-drop is likewise gated on `can_wrap`.
+    ///
+    /// `unit_head` is the index the previously pushed sibling doc BEGINS at — the element itself,
+    /// or the head of the glued unit it ends (a glued element run, a glued comment prefix, or
+    /// both: `<!--c--><span>a</span><span>b</span>{#if…}`). The whole unit is rebuilt with only
+    /// its LAST closing `>` split off ([`Self::build_unit_omit_close_gt`]), because the caller
+    /// replaces the pushed doc wholesale: rebuilding the last element alone dropped every earlier
+    /// member of the unit from the output — a silent content loss no as-authored gate reached.
     pub(super) fn try_block_sibling_gt_dangle(
         &self,
         trimmed_nodes: &[FragmentNode<'_>],
         i: usize,
+        unit_head: usize,
     ) -> Option<(DocId, DocId)> {
         let block = trimmed_nodes.get(i)?;
         if !is_control_flow_block(block) {
             return None;
         }
-        let prev = trimmed_nodes.get(i.checked_sub(1)?)?;
-        let FragmentNode::Element(element) = prev else {
+        let last = i.checked_sub(1)?;
+        let prev = trimmed_nodes.get(last)?;
+        if !matches!(prev, FragmentNode::Element(_)) {
             return None;
-        };
+        }
         // Inline element, directly adjacent (no whitespace between it and the block).
         if self.is_block_fragment_node(prev) || !Self::byte_glued(prev, block) {
             return None;
         }
-        let element_doc = self.build_inline_element_omit_close_gt(element)?;
+        let element_doc = self.build_unit_omit_close_gt(trimmed_nodes, unit_head, last)?;
         let gt = self.d().text(">");
         // Build the block exactly once with the `>` threaded in: the expanding path folds
         // it into the inline-vs-multiline `conditional_group` (hug inline, dangle when the
@@ -145,6 +156,44 @@ impl<'a> Printer<'a> {
         // `will_break`, then a rebuild — which made nested dangles O(2^depth).)
         let block_doc = self.build_block_node_doc_with_gt(block, gt)?;
         Some((element_doc, block_doc))
+    }
+
+    /// Rebuild the inline unit `nodes[head..=last]` — the doc a previous iteration pushed as ONE
+    /// child — with the LAST element's closing `>` split off, for the element→block dangle
+    /// ([`Self::try_block_sibling_gt_dangle`]). The unit is one of the shapes
+    /// `build_nodes_doc_trimmed` pushes at its head and skips the tail of: a lone element
+    /// (`head == last`), a glued element run, or either behind a glued HTML-comment prefix. Every
+    /// member but the last is rebuilt exactly as it was pushed; `None` when the last element is
+    /// not the flat hug-both shape whose `>` can be split (the caller then keeps the pushed unit
+    /// and hugs the block), or when the range is not a unit this printer pushes.
+    fn build_unit_omit_close_gt(
+        &self,
+        nodes: &[FragmentNode<'_>],
+        head: usize,
+        last: usize,
+    ) -> Option<DocId> {
+        // A glued comment prefix, if the unit has one, ends at its element.
+        let elem_head = if matches!(nodes.get(head)?, FragmentNode::Comment(_)) {
+            self.glued_comment_run_element(nodes, head)?
+        } else {
+            head
+        };
+        if elem_head > last {
+            return None;
+        }
+        let elem_doc = if elem_head == last {
+            let FragmentNode::Element(element) = &nodes[last] else {
+                return None;
+            };
+            self.build_inline_element_omit_close_gt(element)?
+        } else {
+            self.build_glued_element_run(nodes, elem_head, last, true)?
+        };
+        if elem_head == head {
+            return Some(elem_doc);
+        }
+        let prefix = self.build_glued_comment_run_doc(nodes, head, elem_head)?;
+        Some(self.d().concat(&[prefix, elem_doc]))
     }
 
     /// The element→element analog of [`Self::try_block_sibling_gt_dangle`] ("G2"), generalized from
@@ -229,7 +278,7 @@ impl<'a> Printer<'a> {
         if end == i {
             return None;
         }
-        let run_doc = self.build_glued_element_run(trimmed_nodes, i, end)?;
+        let run_doc = self.build_glued_element_run(trimmed_nodes, i, end, false)?;
         Some((run_doc, end))
     }
 
@@ -409,11 +458,17 @@ impl<'a> Printer<'a> {
     /// the boundary stays an intact `>` (the element renders its ordinary doc), so nothing is ever
     /// lost. The `>` moves only *inside* a closing tag, so every reparse is byte-identical —
     /// render-safe.
+    ///
+    /// `shed_last`: the run's LAST element sheds its `>` too — to a glued following control-flow
+    /// block, which always receives (the element→block dangle, [`Self::build_unit_omit_close_gt`]).
+    /// `None` then if that element is ineligible: a run whose tail keeps its `>` is not the unit
+    /// the caller asked for, and it keeps the run it already pushed.
     fn build_glued_element_run(
         &self,
         nodes: &[FragmentNode<'_>],
         start: usize,
         end: usize,
+        shed_last: bool,
     ) -> Option<DocId> {
         let d = self.d();
         let mut els: SmallVec<[&internal::Element<'_>; 8]> = SmallVec::new();
@@ -429,13 +484,22 @@ impl<'a> Printer<'a> {
             els.push(el);
         }
         let n = els.len();
+        if shed_last && !eligible[n - 1] {
+            return None;
+        }
         let mut parts: SmallVec<[DocId; 8]> = SmallVec::new();
         for idx in 0..n {
-            let sheds = idx + 1 < n && eligible[idx] && eligible[idx + 1];
+            let sheds = if idx + 1 < n {
+                eligible[idx] && eligible[idx + 1]
+            } else {
+                shed_last
+            };
             let receives = idx > 0 && eligible[idx] && eligible[idx - 1];
             let doc = if sheds || receives {
                 let gt = if receives { Some(d.text(">")) } else { None };
-                // `sheds || receives` implies `eligible[idx]`, so this is `Some`.
+                // `sheds || receives` implies `eligible[idx]`, so this is `Some`: the two
+                // mid-run spellings name it directly, and the tail's `shed_last` is reached only
+                // past the `eligible[n - 1]` guard above.
                 self.build_inline_element_sibling_gt(els[idx], sheds, gt)?
             } else {
                 self.build_fragment_node_doc(&nodes[start + idx])?

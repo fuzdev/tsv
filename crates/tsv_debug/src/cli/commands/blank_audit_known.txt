@@ -2,9 +2,10 @@
 #
 # Every line is a KNOWN BUG: a site shape where injecting a blank line makes the
 # formatter break an invariant — leave a 2+ blank run, settle on a non-idempotent
-# fixed point, fail to reparse, corrupt a leaf, or drop/double-print a comment. The
-# gate fails on a line that is NOT here (a new kind of break), on a line here that no
-# longer fires (a stale entry — delete it when you fix one), and on any PANIC.
+# fixed point, fail to reparse, drop or duplicate a node, corrupt a leaf, or
+# drop/double-print a comment. The gate fails on a line that is NOT here (a new kind
+# of break), on a line here that no longer fires (a stale entry — delete it when you
+# fix one), and on any PANIC.
 #
 # Counts are deliberately not pinned: they churn with every ordinary fixture PR, and a
 # gate that fails per added fixture gets turned off. NON-IDEMPOTENT and every policy
@@ -19,7 +20,7 @@
 # deleted, the blank-DROP class every invariant above is blind to.
 #
 # Format: KIND<TAB>SHAPE
-# shapes: 57
+# shapes: 64
 NON-IDEMPOTENT	(){⟨⟩}).
 NON-IDEMPOTENT	(){⟨⟩});
 NON-IDEMPOTENT	(⟨⟩IDENT
@@ -77,3 +78,10 @@ NON-IDEMPOTENT	␣⟨⟩?
 NON-IDEMPOTENT	␣⟨⟩IDENT
 NON-IDEMPOTENT	␣⟨⟩NUM
 NON-IDEMPOTENT	␣⟨⟩␣
+NODE-LOSS	>{⟨⟩IDENT
+NODE-LOSS	IDENT⟨⟩[
+NODE-LOSS	IDENT⟨⟩[.
+NODE-LOSS	IDENT⟨⟩[\
+NODE-LOSS	interface⟨⟩␣
+NODE-LOSS	{⟨⟩␣
+NODE-LOSS	␣⟨⟩IDENT
