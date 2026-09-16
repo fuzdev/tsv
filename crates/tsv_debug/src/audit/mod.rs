@@ -10,9 +10,12 @@
 //!   (`census_audit`): per-language extraction that never consults the parser's
 //!   own comment carrying, so parse-time drops are visible.
 //! - [`sweep`] — the pristine-format corpus loop the as-authored audits
-//!   (`fabrication_audit`, `census_audit`, `width_audit`, `swallow_audit`,
-//!   `comment_audit`) share: skip/read/format bookkeeping with a per-file
-//!   visitor, and the human + `--json` report tails for it.
+//!   (`razor_audit`, `fabrication_audit`, `census_audit`, `width_audit`,
+//!   `swallow_audit`, `comment_audit`) share: skip/read/format bookkeeping with a
+//!   per-file visitor, and the human + `--json` report tails for it. Runs on
+//!   [`parallel`]'s pool, like the injection audits.
+//! - [`parallel`] — the stride-chunked worker pool every corpus walk runs on, and
+//!   the `comment_check`-gated arming bracket the ledger-driven ones wrap it in.
 //! - [`vacuity`] — the two-layer guard that refuses to grade nothing: the
 //!   scope-free floor every corpus-walking audit calls on its own denominator,
 //!   and the default-corpus pin above it.
@@ -101,6 +104,13 @@ pub(crate) mod excerpt;
 // both exist in a default build.
 pub(crate) mod repro;
 
+// The worker pool is NOT gated: every corpus-walking audit runs on it, and four of
+// them (`razor_audit`, `census_audit`, `width_audit`, `fabrication_audit`, through
+// [`sweep`]) drive no instrumentation seam and exist in a default build. Only the
+// module's `ArmedRun` — which arms `tsv_lang::comment_ledger` — carries the gate,
+// on the item rather than here.
+pub(crate) mod parallel;
+
 // The injection machinery is only reachable through `gap_audit` / `blank_audit`,
 // both themselves behind the `comment_check` feature (they arm
 // `tsv_lang::comment_ledger`), so gate these too — otherwise they read as dead
@@ -109,8 +119,6 @@ pub(crate) mod repro;
 pub(crate) mod examples;
 #[cfg(feature = "comment_check")]
 pub(crate) mod node_edge;
-#[cfg(feature = "comment_check")]
-pub(crate) mod parallel;
 #[cfg(feature = "comment_check")]
 pub(crate) mod report;
 #[cfg(feature = "comment_check")]

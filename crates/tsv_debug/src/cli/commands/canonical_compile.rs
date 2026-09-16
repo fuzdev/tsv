@@ -7,7 +7,7 @@ use tsv_cli::cli::input::{InputArgs, ParserType};
 /// Compile Svelte with the canonical Svelte compiler (the deterministic oracle).
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "canonical_compile")]
-#[allow(clippy::struct_excessive_bools)] // independent CLI flags
+#[expect(clippy::struct_excessive_bools)] // independent CLI flags
 pub struct CanonicalCompileCommand {
     /// compile target: server | client (default: server)
     #[argh(option, default = "SvelteGenerate::Server")]

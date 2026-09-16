@@ -2,7 +2,7 @@ use argh::FromArgs;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use crate::audit::sweep::{PristineSweep, sweep_pristine_armed};
+use crate::audit::sweep::{PristineSweep, sort_findings_by_path, sweep_pristine_armed};
 use crate::audit::vacuity::check_pinned_min;
 use crate::cli::CliError;
 use tsv_lang::comment_ledger::{self, CommentFinding, CommentFindingKind};
@@ -27,9 +27,24 @@ pub struct CommentAuditCommand {
     #[argh(switch)]
     json: bool,
 
+    /// worker threads (default: available parallelism). Results are `--jobs`-invariant —
+    /// see `audit::sweep`, which restores the serial walk's order exactly
+    #[argh(option)]
+    jobs: Option<usize>,
+
     /// file paths, directories, or glob patterns (default: tests/fixtures)
     #[argh(positional)]
     paths: Vec<String>,
+}
+
+/// One worker's share of the walk: the findings plus the two ledger counters. The findings'
+/// walk order is restored after the merge by `sort_findings_by_path`; the counters are plain
+/// sums, so both halves are order-independent.
+#[derive(Default)]
+struct Tally {
+    violations: Vec<Violation>,
+    registered: usize,
+    unregistered_emits: usize,
 }
 
 /// A finding plus the file it was found in.
@@ -68,39 +83,46 @@ impl CommentAuditCommand {
         let files = resolve_seed_files(&self.paths, 0)?;
 
         // Arm the ledger for the whole run: the format entry points register each
-        // document's comments and the printers' comment seams record each emit.
-        // Single-threaded so the thread-local state collects everything.
+        // document's comments and the printers' comment seams record each emit. The ENABLE
+        // flag is process-global, so arming it once covers every sweep worker; the LEDGER it
+        // feeds is thread-local, and the sweep drains, formats and visits on one thread per
+        // file, so no worker can read another's findings.
         comment_ledger::set_comment_check(true);
 
-        let mut violations: Vec<Violation> = Vec::new();
-        let mut registered = 0usize;
-        let mut unregistered_emits = 0usize;
-        let sweep = sweep_pristine_armed(
+        let (sweep, mut tally) = sweep_pristine_armed(
             &files,
+            self.jobs,
             // Drain before each format, so a ledger left behind by a seed the sweep
             // skipped (rejected, panicked) can't be attributed to the next file.
             || {
                 let _ = comment_ledger::take_comment_ledger();
             },
-            |path, _parser, _source, _output| {
+            |path, _parser, _source, _output, tally: &mut Tally| {
                 let ledger = comment_ledger::take_comment_ledger();
-                registered += ledger.parsed;
-                unregistered_emits += ledger.unregistered_emits;
+                tally.registered += ledger.parsed;
+                tally.unregistered_emits += ledger.unregistered_emits;
                 for finding in ledger.findings {
-                    violations.push(Violation {
+                    tally.violations.push(Violation {
                         path: path.to_path_buf(),
                         finding,
                     });
                 }
             },
-        );
+            |dst, src| {
+                dst.violations.extend(src.violations);
+                dst.registered += src.registered;
+                dst.unregistered_emits += src.unregistered_emits;
+            },
+        )?;
+        sort_findings_by_path(&mut tally.violations, |v| &v.path);
+        let violations = tally.violations;
 
         comment_ledger::set_comment_check(false);
 
         let stats = Stats {
             sweep,
-            registered,
-            unregistered_emits,
+            registered: tally.registered,
+            unregistered_emits: tally.unregistered_emits,
         };
         if self.json {
             print_json(&violations, &stats);
@@ -110,7 +132,7 @@ impl CommentAuditCommand {
         stats.sweep.finish(default_paths)?;
         if default_paths {
             check_pinned_min(
-                registered,
+                stats.registered,
                 REGISTERED_MIN,
                 "registered",
                 "comments",

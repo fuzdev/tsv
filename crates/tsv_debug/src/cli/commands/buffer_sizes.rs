@@ -226,7 +226,7 @@ fn collect_comments(comments: &[Comment], source: &str, comment_lines: &mut Vec<
     }
 }
 
-#[allow(clippy::cast_precision_loss)]
+#[expect(clippy::cast_precision_loss)]
 fn mean(sorted: &[usize]) -> f64 {
     if sorted.is_empty() {
         return 0.0;
@@ -235,7 +235,7 @@ fn mean(sorted: &[usize]) -> f64 {
 }
 
 /// Fraction of samples strictly greater than `n` (the spill rate at inline `N`).
-#[allow(clippy::cast_precision_loss)]
+#[expect(clippy::cast_precision_loss)]
 fn spill_rate(sorted: &[usize], n: usize) -> f64 {
     if sorted.is_empty() {
         return 0.0;

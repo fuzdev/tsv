@@ -86,7 +86,7 @@ impl ProfileCommand {
 
         // Peak resident set (VmHWM), printed once — the checker's memory anchor.
         if self.bind {
-            #[allow(clippy::cast_precision_loss)]
+            #[expect(clippy::cast_precision_loss)]
             match read_vm_hwm_kb() {
                 Some(kb) => eprintln!("peak RSS (VmHWM): {:.1} MiB", kb as f64 / 1024.0),
                 None => eprintln!("peak RSS (VmHWM): unavailable"),
@@ -103,7 +103,7 @@ impl ProfileCommand {
 
 /// Sum and print the deterministic flow-construction counters (`--flow-stats`)
 /// — the standing density / dead-label anchors, machine-invariant unlike wall.
-#[allow(clippy::cast_precision_loss)]
+#[expect(clippy::cast_precision_loss)]
 fn print_flow_stats(results: &[FileResult]) {
     let sum = results
         .iter()
@@ -211,7 +211,7 @@ impl Aggregate {
         us_per_kb(self.size_bytes, us)
     }
 
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     fn us_per_file(&self, us: f64) -> f64 {
         if self.files == 0 {
             return 0.0;
@@ -220,7 +220,7 @@ impl Aggregate {
     }
 }
 
-#[allow(clippy::cast_precision_loss)]
+#[expect(clippy::cast_precision_loss)]
 pub(crate) fn us_per_kb(size_bytes: usize, us: f64) -> f64 {
     if size_bytes == 0 {
         return 0.0;
@@ -408,7 +408,7 @@ pub(crate) fn format_duration(us: f64) -> String {
 /// the recorded baselines in `docs/performance.md` were measured against a binary
 /// KB, so redefining it here would shift every historical comparison without
 /// changing a single measurement. These numbers never sit beside the harness's.
-#[allow(clippy::cast_precision_loss)]
+#[expect(clippy::cast_precision_loss)]
 pub(crate) fn format_size(bytes: usize) -> String {
     if bytes >= 1024 {
         format!("{:.1}KB", bytes as f64 / 1024.0)
@@ -639,7 +639,7 @@ pub(crate) fn percentile<T: Copy + Default>(sorted: &[T], p: usize) -> T {
 }
 
 /// `count / total * 100`, guarding division by zero.
-#[allow(clippy::cast_precision_loss)] // diagnostic counts stay well within f64 precision
+#[expect(clippy::cast_precision_loss)] // diagnostic counts stay well within f64 precision
 pub(crate) fn pct(count: usize, total: usize) -> f64 {
     if total == 0 {
         0.0

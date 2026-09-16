@@ -88,7 +88,9 @@ pub const MAX_WORKERS_PER_LOGICAL_CPU: usize = 4;
 /// Hold an explicit `--jobs` to [`MAX_WORKERS_PER_LOGICAL_CPU`] per logical CPU.
 ///
 /// Here rather than beside either pool because **both** `--jobs` flags ask it — `tsv
-/// format`'s and the injection audits' (`tsv_debug`'s `audit::parallel::run_pool`) — and
+/// format`'s and every corpus-walking audit's (`tsv_debug`'s `audit::parallel::run_pool`,
+/// which the injection audits drive directly and the as-authored ones reach through
+/// `audit::sweep`) — and
 /// a rule with two spellings is the shape that lets them drift. This module already
 /// states how *big* every tsv work thread is; this is how *many* tsv will ask for.
 ///

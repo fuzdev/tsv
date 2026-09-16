@@ -48,6 +48,22 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Compile fixtures](#compile-fixture-validation-compilefixturesvalidate) | `compile:fixtures:validate` | a stale compile expectation (oracle freshness) · tsv-vs-expected compile parity · expected-file idempotence | parity legs in `deno task check` (`cargo test`); freshness in `deno task conformance` |
 | [Fixture validation](./fixture_overview.md) | `fixtures:validate` | a fixture claim no longer holding — parser/formatter parity vs the committed files · the ORACLE itself having moved (freshness, sidecar) | parity in `deno task check` (`cargo test --test fixtures_tests`); freshness in `deno task conformance` (with `bench:pins:suites`, its pin-freshness preflight) |
 
+**How a corpus-walking audit walks.** Every one of them — the injection audits directly, the
+as-authored ones through the shared pristine sweep — runs its per-file loop on
+`audit::parallel::run_pool`: a stride-chunked pool on the stated stack reservation, `--jobs N`
+held to `tsv format`'s own ceiling, folding a per-worker tally through an order-independent
+merge. Two properties follow, and both are load-bearing rather than incidental. A worker that
+panics *outside* the per-file `catch_unwind` **fails the run** rather than losing its tally,
+because a lost tally can silently flip a ratchet verdict (a dropped `new` shape reads as a
+false pass, a dropped sole instance of a pinned one as a false stale). And the reports are
+`--jobs`-invariant **by order, not merely by set**: a ratchet's key set is a `BTreeSet` and so
+is order-free already, while a finding LIST ends on `audit::sweep::sort_findings_by_path`,
+a stable sort that reproduces the serial walk's order byte for byte (the corpus is resolved in
+path order and each file is visited by exactly one worker, so a merged vector is per-file
+blocks in join order and a stable sort by path restores them). Chunking is by stride rather
+than contiguous block because fixture sizes cluster by directory and the per-file work is
+quadratic in file size.
+
 **What the fixture-tree audits format each seed AS.** Every audit that drives
 `tsv_cli::cli::format_source` names no source type, so a TypeScript seed is parsed as a
 **module and retried as a script** if that fails
@@ -86,7 +102,7 @@ whitespace edit across many fixtures, run all four.
 # to audit real code. Exits 1 on any finding.
 cargo run --profile corpus -p tsv_debug --features audits swallow_audit                # audit all fixtures
 cargo run --profile corpus -p tsv_debug --features audits swallow_audit ../corpora/collections/zzz/src  # audit a real codebase
-# Also: --json. The check lives in tsv_lang::doc::swallow behind the `swallow_check`
+# Also: --json, --jobs N. The check lives in tsv_lang::doc::swallow behind the `swallow_check`
 # cargo feature — off by default, so it's compiled out of prod wasm/cli/ffi AND
 # default tsv_debug builds (profile/perf sessions measure production-shaped render
 # code). The `swallow:audit` deno task builds it via the `audits` umbrella feature
@@ -136,7 +152,7 @@ The print-once comment ledger: every comment a document PARSES must be EMITTED e
 # audit real code. Exits 1 on any finding.
 cargo run --profile corpus -p tsv_debug --features audits comment_audit                # audit all fixtures
 cargo run --profile corpus -p tsv_debug --features audits comment_audit ../corpora/collections/zzz/src  # audit a real codebase
-# Also: --json. The ledger lives in tsv_lang::comment_ledger behind the `comment_check`
+# Also: --json, --jobs N. The ledger lives in tsv_lang::comment_ledger behind the `comment_check`
 # cargo feature — off by default, so it's compiled out of prod wasm/cli/ffi AND default
 # tsv_debug builds (profile/perf sessions measure production-shaped code). The
 # `comments:audit` deno task builds it via the `audits` umbrella feature (swallow_check +
@@ -459,7 +475,8 @@ cargo run --profile corpus -p tsv_debug --features audits blank_audit ../corpora
 # false` in --json). A FAST PATH — a blank the formatter ABSORBS reproduces the file's
 # proven-clean pristine output byte-for-byte, so nothing is checked — keeps it near
 # gap_audit's one-format-per-site cost; only a KEPT blank pays the full battery (~22%
-# of injections over tests/fixtures). ~30 s.
+# of injections over tests/fixtures). ~52 s wall over tests/fixtures (2026-09-15, 12-core
+# box) — the figure moves with the fixture tree, so re-date it rather than trusting it.
 #
 # A SECOND snapshot, `blank_absorb_known.txt`, pins the blank-DROP class the six
 # invariants deliberately don't grade (a silently deleted blank is its own fixed point,
@@ -493,7 +510,7 @@ Why it needs its own gate. A fabricated blank is indistinguishable from an autho
 # Pure Rust, no Deno. Defaults to tests/fixtures; pass dirs/files to audit real code.
 cargo run --profile corpus -p tsv_debug --features audits fabrication_audit
 cargo run --profile corpus -p tsv_debug --features audits fabrication_audit ../corpora/collections/zzz/src
-# Also: --json, --update. ~0.2 s over tests/fixtures.
+# Also: --json, --jobs N, --update. ~0.2 s over tests/fixtures.
 #
 # GATED as a RATCHET over `fabrication_audit_known.txt`, keyed by the SHAPE of the two
 # lines bracketing the invented blank (`{:catch` ⇢ blank ⇢ `{/await`), not by path — so
@@ -537,7 +554,7 @@ Why it needs its own gate: every other comment instrument reads a channel the pa
 # merge or interior rewrite shows as a MISSING + EXTRA pair. Pure Rust, no Deno.
 cargo run --profile corpus -p tsv_debug --features audits census_audit                # tests/fixtures
 cargo run --profile corpus -p tsv_debug --features audits census_audit ../corpora/collections/zzz/src  # a real codebase
-# Also: --json, --update. ~0.35 s over tests/fixtures.
+# Also: --json, --jobs N, --update. ~0.35 s over tests/fixtures.
 #
 # GATED as a RATCHET over `census_audit_known.txt`, keyed (path, bucket, direction) —
 # file-level, like the compile validation ratchet (the file IS the reproducer). Born
@@ -585,7 +602,7 @@ Two real bugs (the mid-run comment weld and its leading twin) shipped an over-wi
 # rolled up by shape. Pure Rust, no Deno, no instrumentation feature.
 cargo run --profile corpus -p tsv_debug --features audits width_audit
 cargo run --profile corpus -p tsv_debug --features audits width_audit ../corpora/collections/zzz/src
-# Also: --json, --verbose (every line, not the per-shape rollup), --limit N, --update.
+# Also: --json, --jobs N, --verbose (every line, not the per-shape rollup), --limit N, --update.
 # A narrowed run (explicit paths / --limit) reports and exits 0 without grading — the
 # snapshot pins the full default run — and says so, so it cannot read as a green gate.
 #
@@ -795,8 +812,15 @@ it is a dogfooding tripwire, not a survey — a formatter bug in a construct tsv
 own TS never writes stays invisible here. The injection audits (`gaps:audit`,
 `blanks:audit`) and the corpus gates are the discovery arms.
 
-**Build world.** Runs `tsv_cli` under `--profile corpus`, the single build world
-every `deno task check` audit shares, so it adds no separate compile.
+**Build world.** Runs the `tsv` binary of the shared `--profile corpus` world, which
+`deno task build:check` builds — `tsv_cli` and `tsv_debug` selected in ONE cargo
+invocation, so it adds no separate compile. That is the mechanism, not a happy accident:
+this leg wants the `tsv` BINARY, which the audits' own `-p tsv_debug --features audits`
+selection builds only as a library, and a `-p tsv_cli` selection of its own resolves
+features without `audits` and so compiles the whole stack a second time in the same
+profile (20.5 s of a 30.4 s stack rebuild, on every edit). Reintroducing `cargo run -p
+tsv_cli` here silently restores that second world — the claim above is only true while
+this leg and `discovery:audit` go through `build:check`.
 
 ## Corpus Discovery Parity Audit (`discovery:audit`)
 
@@ -831,7 +855,8 @@ and exit 0 (the CI `check` job has no sibling checkouts). An invariant, not a co
 so a smaller corpus can only cost coverage. A **dirty** checkout is refused rather than
 graded — `git ls-files` describes the commit, the walk describes the disk, and a local
 modification would otherwise read as a tsv finding (`deno task doctor` reports the same
-state). ~0.1 s on the `--profile corpus` `tsv_cli` binary `format:audit` already built.
+state). ~0.1 s on the `--profile corpus` `tsv` binary of the shared build world (`deno task
+build:check`), which `format:audit` has already built.
 
 ## Engine Parity Audit (`engines:audit`)
 
@@ -1349,7 +1374,7 @@ the same corpus that `corpus:compare:format --all` passed clean at the time.
 cargo run --profile corpus -p tsv_debug razor_audit                 # sweep all fixtures
 cargo run --profile corpus -p tsv_debug razor_audit --width 8       # cheaper/narrower sweep
 cargo run --profile corpus -p tsv_debug razor_audit ../corpora/collections/zzz/src   # sweep a real codebase
-# Also: --json, --limit N.
+# Also: --json, --jobs N, --limit N.
 ```
 
 **The dimension no other gate varies.** `authoring:audit` mutates the *spelling* of a
@@ -1395,8 +1420,9 @@ kinds, zero false positives; on the fixed tree it reports **0** across 45,905 gr
 break at every width where the wrapped element lays its own content out block-style — and no
 other gate can see it, because the strayed pass is reachable only at widths no fixture happens
 to sit at; the sweep reaches it past `--width 17` (`inline_sibling_drop_tail_wide_long` pins the
-razor). Green over both the fixture tree and real code, and gated in `deno task check` (~5 s at
-the default width).
+razor). Green over both the fixture tree and real code, and gated in `deno task check` (~2 s at
+the default width on a 12-core box — by far the heaviest as-authored walk, and the one the
+shared sweep's worker pool buys the most: ~14.6 s at `--jobs 1`).
 
 ## Format→Reparse Round-Trip Audit (`roundtrip:audit`)
 

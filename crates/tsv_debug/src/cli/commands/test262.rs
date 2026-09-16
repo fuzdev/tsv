@@ -8,7 +8,7 @@ use std::path::PathBuf;
 /// Validate parser against ECMAScript conformance tests.
 // argh models each flag as an independent `#[argh(switch)]` bool — orthogonal
 // CLI toggles, not a state machine to refactor into an enum.
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "test262")]
 pub struct Test262Command {
@@ -288,7 +288,7 @@ impl Test262Command {
 
         let total = summary.total_run();
         let passed = summary.positive_passed + summary.negative_passed;
-        #[allow(clippy::cast_precision_loss)] // Test counts won't exceed f64 precision
+        #[expect(clippy::cast_precision_loss)] // Test counts won't exceed f64 precision
         let pass_rate = if total > 0 {
             (passed as f64 / total as f64) * 100.0
         } else {

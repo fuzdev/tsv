@@ -85,7 +85,7 @@ use tsv_cli::cli::input::{Input, InputArgs, ParserType};
 /// one pathological file in an arbitrary corpus aborts the sweep instead of reporting
 /// itself. The size is a reservation (lazy commit, ~0 RSS) and spawn cost is flat from
 /// 2 MiB to 32 MiB — measured, see `tsv_cli::cli::stack`, whose constant this is.
-#[allow(clippy::expect_used)]
+#[expect(clippy::expect_used)]
 pub fn create_runtime() -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()

@@ -11,7 +11,7 @@ use tsv_lang::{
 use tsv_svelte::ast::internal::{Element, Fragment, FragmentNode, TextDecoding};
 
 use crate::audit::excerpt::first_line_diff;
-use crate::audit::sweep::{PristineSweep, sweep_pristine};
+use crate::audit::sweep::{PristineSweep, sort_findings_by_path, sweep_pristine};
 use crate::audit::tally::CappedPaths;
 use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
@@ -70,6 +70,11 @@ pub struct RazorAuditCommand {
     /// stop after N seed files (0 = no limit)
     #[argh(option, default = "0")]
     limit: usize,
+
+    /// worker threads (default: available parallelism). Results are `--jobs`-invariant —
+    /// see `audit::sweep`, which restores the serial walk's order exactly
+    #[argh(option)]
+    jobs: Option<usize>,
 
     /// file paths, directories, or glob patterns (default: tests/fixtures)
     #[argh(positional)]
@@ -134,6 +139,18 @@ struct Grades {
     mutant_panics: CappedPaths,
 }
 
+impl Grades {
+    /// Fold one worker's grades into the total — set union, counter addition, and the panic
+    /// bucket's capped merge, all order-independent. `findings` takes its walk order back from
+    /// the stable path sort in [`sweep_files`].
+    fn merge(&mut self, other: Self) {
+        self.findings.extend(other.findings);
+        self.shapes.extend(other.shapes);
+        self.graded += other.graded;
+        self.mutant_panics.merge(other.mutant_panics);
+    }
+}
+
 /// What one corpus walk produced: the grades, beside the shared sweep's seed accounting —
 /// `pristine.formatted` is the count the verdict rests on.
 struct Sweep {
@@ -146,7 +163,7 @@ impl RazorAuditCommand {
         let default_paths = self.paths.is_empty();
         let files =
             resolve_seed_files_named(&self.paths, self.limit, "`.svelte` files", is_svelte)?;
-        let sweep = sweep_files(&files, self.width);
+        let sweep = sweep_files(&files, self.width, self.jobs)?;
 
         if self.json {
             print_json(&sweep);
@@ -188,43 +205,56 @@ fn try_format(source: &str) -> Attempt {
 
 /// Format every seed through the shared pristine sweep, then walk each fixed point across the
 /// razor.
-fn sweep_files(files: &[PathBuf], width: usize) -> Sweep {
-    let mut grades = Grades::default();
+///
+/// By far the heaviest as-authored walk — every seed's every pad site formatted at every width,
+/// each graded by a second format — which is why it runs on the sweep's worker pool rather than
+/// serially.
+///
+/// # Errors
+///
+/// Returns [`CliError::Failed`] when a sweep worker panics outside the per-file catch.
+fn sweep_files(files: &[PathBuf], width: usize, jobs: Option<usize>) -> Result<Sweep, CliError> {
     // The seed is graded from its own FIXED POINT (the sweep's output), not from the bytes on
     // disk: padding a formatted document perturbs one known geometry, where padding an arbitrary
     // authoring would confound the width sweep with whatever reflow the first format performs.
-    let pristine = sweep_pristine(files, |path, _parser, _source, base| {
-        // Width 0 — the seed's natural geometry. Free, and the only width a corpus normally
-        // exercises.
-        grades.grade(
-            Mutant {
-                path,
-                pad: 0,
-                site: 0,
-            },
-            base,
-        );
+    let (pristine, mut grades) = sweep_pristine(
+        files,
+        jobs,
+        |path, _parser, _source, base, grades: &mut Grades| {
+            // Width 0 — the seed's natural geometry. Free, and the only width a corpus normally
+            // exercises.
+            grades.grade(
+                Mutant {
+                    path,
+                    pad: 0,
+                    site: 0,
+                },
+                base,
+            );
 
-        for site in pad_sites(base) {
-            for pad in 1..=width {
-                let mut mutant = String::with_capacity(base.len() + pad);
-                mutant.push_str(&base[..site]);
-                for _ in 0..pad {
-                    mutant.push('x');
-                }
-                mutant.push_str(&base[site..]);
-                match try_format(&mutant) {
-                    Attempt::Formatted(out) => grades.grade(Mutant { path, pad, site }, &out),
-                    // Padding inside a construct can break the parse; nothing to grade.
-                    Attempt::Rejected => {}
-                    Attempt::Panicked(payload) => {
-                        grades.mutant_panics.push_panic(path, payload.as_ref());
+            for site in pad_sites(base) {
+                for pad in 1..=width {
+                    let mut mutant = String::with_capacity(base.len() + pad);
+                    mutant.push_str(&base[..site]);
+                    for _ in 0..pad {
+                        mutant.push('x');
+                    }
+                    mutant.push_str(&base[site..]);
+                    match try_format(&mutant) {
+                        Attempt::Formatted(out) => grades.grade(Mutant { path, pad, site }, &out),
+                        // Padding inside a construct can break the parse; nothing to grade.
+                        Attempt::Rejected => {}
+                        Attempt::Panicked(payload) => {
+                            grades.mutant_panics.push_panic(path, payload.as_ref());
+                        }
                     }
                 }
             }
-        }
-    });
-    Sweep { grades, pristine }
+        },
+        Grades::merge,
+    )?;
+    sort_findings_by_path(&mut grades.findings, |f| &f.path);
+    Ok(Sweep { grades, pristine })
 }
 
 /// The one geometry being graded: which seed, padded by how much, where. Carried as a unit

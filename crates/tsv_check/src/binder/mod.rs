@@ -225,7 +225,6 @@ pub enum NodeKind {
 /// setting [`NODE_FLAGS_UNREACHABLE`] during unreachable tagging). A bind-side
 /// column returns to [`BoundFile`] when a bind-time writer lands (the planned
 /// ambient/context node-identity bits).
-#[allow(clippy::identity_op)] // bit 0 — kept in the `1 << N` idiom for the bits F1 adds
 pub const NODE_FLAGS_UNREACHABLE: u8 = 1 << 0;
 
 /// Whether a file is an external module — tsgo's `externalModuleIndicator`,
@@ -323,13 +322,13 @@ impl BoundFile {
 }
 
 /// The `require_node_id` miss path, isolated so its deliberate panic carries the
-/// one `#[allow(clippy::panic)]` the crate's restriction-lint posture requires
+/// one `#[expect(clippy::panic)]` the crate's restriction-lint posture requires
 /// (panic points need an explicit allow + justification). A miss means the SoA
 /// walk did not id a node a flow consumer reached — an internal invariant break
 /// that must abort, not a recoverable data error.
 #[cold]
 #[inline(never)]
-#[allow(clippy::panic)]
+#[expect(clippy::panic)]
 fn node_id_miss(address: usize, kind: NodeKind) -> ! {
     panic!(
         "require_node_id: ({address:#x}, {kind:?}) not covered by the SoA walk — a flow \

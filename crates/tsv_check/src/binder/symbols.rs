@@ -57,7 +57,6 @@ pub struct SymbolFlags(pub u32);
 // The full flag + `*Excludes` table is ported verbatim from tsgo; some masks are
 // not yet referenced by the family cascade but are kept so the port stays a
 // faithful, auditable mirror of `symbolflags.go`.
-#[allow(clippy::unreadable_literal, dead_code)]
 impl SymbolFlags {
     pub const NONE: SymbolFlags = SymbolFlags(0);
     pub const FUNCTION_SCOPED_VARIABLE: SymbolFlags = SymbolFlags(1 << 0);
@@ -188,7 +187,7 @@ impl SymbolFlags {
 /// the cascade points a diagnostic at (the declaration's *name* node, so the
 /// squiggle sits on the identifier, matching tsgo's `getNameOfDeclaration`).
 #[derive(Clone, Copy, Debug)]
-#[allow(dead_code)] // `node` is the future checker's declaration identity; the family cascade keys on `error_span`.
+#[expect(dead_code)] // `node` is the future checker's declaration identity; the family cascade keys on `error_span`.
 pub struct Decl {
     /// The declaration node's dense id (best-effort via the address map; not yet
     /// consumed by the cascade, which keys on `error_span`).
@@ -210,7 +209,6 @@ pub struct Decl {
 // `parent` mirrors tsgo's `Symbol` shape and is set by the bind but read by nothing
 // yet (hence the allow); the cascade + merge resolution read
 // `flags`/`name`/`decls`/`members`/`exports`.
-#[allow(dead_code)]
 pub struct Symbol {
     /// The accumulated classification flags.
     pub flags: SymbolFlags,

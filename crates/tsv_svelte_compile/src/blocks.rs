@@ -819,7 +819,7 @@ pub(crate) fn emit_each_block<'arena>(
 /// The `{#each}` body: `let CTX = each_array[IDX]` (when `as` is present) then
 /// the body fragment (which gets the text-first `<!---->` marker). `context` is
 /// the **erased** binding pattern.
-#[allow(clippy::too_many_arguments)] // one cohesive each-body emit; splitting would just re-thread the same state
+#[expect(clippy::too_many_arguments)] // one cohesive each-body emit; splitting would just re-thread the same state
 fn emit_each_body<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     each: &'arena EachBlock<'arena>,

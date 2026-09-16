@@ -307,7 +307,7 @@ fn print_table(results: &[CrateMetrics]) {
             .sum();
 
         if group_total > 0 {
-            #[allow(clippy::cast_precision_loss)]
+            #[expect(clippy::cast_precision_loss)]
             let pct = if grand_total > 0 {
                 (group_total as f64 / grand_total as f64) * 100.0
             } else {
@@ -348,7 +348,7 @@ fn print_table(results: &[CrateMetrics]) {
         .sum();
 
     if language_total > 0 {
-        #[allow(clippy::cast_precision_loss)]
+        #[expect(clippy::cast_precision_loss)]
         let printer_pct = (printer_total as f64 / language_total as f64) * 100.0;
         eprintln!();
         eprintln!("printer % of language code: {printer_pct:.0}%");

@@ -6,7 +6,7 @@ use crate::audit::ratchet::{
     Ratchet, SnapshotKey, grade_narrowed_strictly, refuse_narrowed_update,
 };
 use crate::audit::shape::markup_head;
-use crate::audit::sweep::{PristineSweep, sweep_pristine};
+use crate::audit::sweep::{PristineSweep, sort_findings_by_path, sweep_pristine};
 use crate::cli::CliError;
 
 use super::profile::resolve_seed_files;
@@ -43,6 +43,11 @@ pub struct FabricationAuditCommand {
     /// regenerate the ratchet snapshot (refused on a narrowed run)
     #[argh(switch)]
     update: bool,
+
+    /// worker threads (default: available parallelism). Results are `--jobs`-invariant —
+    /// see `audit::sweep`, which restores the serial walk's order exactly
+    #[argh(option)]
+    jobs: Option<usize>,
 
     /// file paths, directories, or glob patterns (default: tests/fixtures)
     #[argh(positional)]
@@ -137,7 +142,7 @@ impl FabricationAuditCommand {
             "SUBSET",
         )?;
         let files = resolve_seed_files(&self.paths, 0)?;
-        let sweep = sweep_files(&files);
+        let sweep = sweep_files(&files, self.jobs)?;
 
         if self.json {
             print_json(&sweep);
@@ -175,7 +180,8 @@ impl FabricationAuditCommand {
 
 /// What one corpus walk produced.
 struct Sweep {
-    /// Files that fabricated, in walk order — the human report.
+    /// Files that fabricated, in walk order (restored after the per-worker merge by
+    /// `sort_findings_by_path`) — the human report.
     fabrications: Vec<Fabrication>,
     /// Every fabrication shape seen, deduped — what the ratchet grades.
     shapes: BTreeSet<FabricationShape>,
@@ -189,27 +195,48 @@ struct Sweep {
 ///
 /// Split out of `run` so that function reads as scope → sweep → report → gate, rather than
 /// interleaving the corpus walk with the ratchet's argument handling.
-fn sweep_files(files: &[PathBuf]) -> Sweep {
-    let mut fabrications = Vec::new();
-    let mut shapes = BTreeSet::new();
-    let pristine = sweep_pristine(files, |path, _parser, source, output| {
-        let input_runs = count_blank_runs(source);
-        let scan = scan_output(output);
-        if scan.invented.len() > input_runs {
-            shapes.extend(scan.invented.iter().map(|i| i.shape.clone()));
-            fabrications.push(Fabrication {
-                path: path.to_path_buf(),
-                input_runs,
-                sanctioned: scan.sanctioned,
-                invented: scan.invented,
-            });
-        }
-    });
-    Sweep {
-        fabrications,
-        shapes,
+///
+/// # Errors
+///
+/// Returns [`CliError::Failed`] when a sweep worker panics outside the per-file catch.
+fn sweep_files(files: &[PathBuf], jobs: Option<usize>) -> Result<Sweep, CliError> {
+    let (pristine, mut tally) = sweep_pristine(
+        files,
+        jobs,
+        |path, _parser, source, output, tally: &mut Tally| {
+            let input_runs = count_blank_runs(source);
+            let scan = scan_output(output);
+            if scan.invented.len() > input_runs {
+                tally
+                    .shapes
+                    .extend(scan.invented.iter().map(|i| i.shape.clone()));
+                tally.fabrications.push(Fabrication {
+                    path: path.to_path_buf(),
+                    input_runs,
+                    sanctioned: scan.sanctioned,
+                    invented: scan.invented,
+                });
+            }
+        },
+        |dst, src| {
+            dst.fabrications.extend(src.fabrications);
+            dst.shapes.extend(src.shapes);
+        },
+    )?;
+    sort_findings_by_path(&mut tally.fabrications, |f| &f.path);
+    Ok(Sweep {
+        fabrications: tally.fabrications,
+        shapes: tally.shapes,
         pristine,
-    }
+    })
+}
+
+/// One worker's share of the walk. `shapes` is a `BTreeSet` (the ratchet's product, order-free);
+/// `fabrications` is the human report's list, re-ordered by the stable path sort above.
+#[derive(Default)]
+struct Tally {
+    fabrications: Vec<Fabrication>,
+    shapes: BTreeSet<FabricationShape>,
 }
 
 /// The ratchet over this audit's colocated snapshot, carrying its header + re-pin hint.

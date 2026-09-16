@@ -56,7 +56,7 @@ use crate::snippet_emit::render_call_expression;
 use crate::{CompileError, Refusal};
 
 /// The accumulating analysis state.
-#[allow(clippy::struct_excessive_bools)] // independent monotonic accumulator flags, not a state machine
+#[expect(clippy::struct_excessive_bools)] // independent monotonic accumulator flags, not a state machine
 struct Nc<'a> {
     source: &'a str,
     /// Prop + import names — the roots whose member/call access is unsafe.

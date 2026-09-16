@@ -2,11 +2,11 @@
 //! and merges beside its shape map (the per-shape side lives in `audit::examples`,
 //! feature-gated where this module is not, hence no intra-doc link).
 //!
-//! Two consumer shapes, which is why `CappedPaths::merge` and `merge_shape_map` are
-//! feature-gated while the rest is not: the injection audits fold one bucket per worker (a
-//! `comment_check` build), while the single-threaded walks keep theirs in one
-//! (every build) — the pristine [`sweep`](crate::audit::sweep)'s panicking
-//! inputs, and the two mutation audits' base-non-idempotent seeds.
+//! `merge_shape_map` is feature-gated and the rest is not: folding a per-shape AGGREGATE is
+//! the injection audits' shape alone (a `comment_check` build), while [`CappedPaths`] and its
+//! merge serve every corpus walk — the pristine [`sweep`](crate::audit::sweep)'s panicking
+//! inputs, the injection audits' ungradable files, and the two mutation audits'
+//! base-non-idempotent seeds.
 
 /// Merge one worker's per-key aggregates into the total's: `merge` folds a key both hold,
 /// and a key only `src` holds moves over whole. The shared body behind every injection
@@ -72,10 +72,8 @@ impl CappedPaths {
 
     /// Fold another tally's bucket in — counts add exactly, the sample stays capped.
     ///
-    /// Gated with its only consumers (the per-worker injection audits): a
-    /// single-threaded walk never merges, so in a default build this would be
-    /// dead code rather than an unused convenience.
-    #[cfg(feature = "comment_check")]
+    /// Feature-free, like the pool it serves: every corpus walk is per-worker now, so the
+    /// pristine [`sweep`](crate::audit::sweep)'s panic bucket merges in a default build too.
     pub(crate) fn merge(&mut self, other: Self) {
         self.count += other.count;
         for p in other.sample {
@@ -166,8 +164,7 @@ mod tests {
         assert_eq!(lines[CappedPaths::CAP], "  … and 3 more");
     }
 
-    /// A merge respects both halves — gated with [`CappedPaths::merge`] itself.
-    #[cfg(feature = "comment_check")]
+    /// A merge respects both halves.
     #[test]
     fn merge_adds_counts_exactly_and_keeps_the_sample_capped() {
         let mut a = CappedPaths::default();

@@ -240,14 +240,25 @@ const samples: Sample[] = [
 	}
 ];
 
+/**
+ * The `tsv` binary of the shared `--profile corpus` build world (deno.json `//build:check`),
+ * which the `check:ast-types` task builds before running this.
+ *
+ * Exec'd directly rather than through `cargo run -p tsv_cli`: arm A fans out over every
+ * curated sample at once, so that form was one cargo invocation PER SAMPLE, each re-resolving
+ * the workspace and contending on the build lock to run a single parse. Inside `check` the
+ * dev-profile binary it wanted was already built (by `cargo test --workspace`, a few legs
+ * earlier), so the cost there was the spawns rather than a compile — but a STANDALONE
+ * `deno task check:ast-types` had to build it, in a profile nothing else about this gate
+ * needs. The wire is the writers' output, identical under either profile and feature set
+ * (the diagnostic seams are inert and touch no `write_*` — verified by diffing the two
+ * binaries' `parse` output).
+ */
+const TSV_BIN = 'target/corpus/tsv';
+
 async function parse(sample: Sample): Promise<string> {
-	const cmd = new Deno.Command('cargo', {
+	const cmd = new Deno.Command(TSV_BIN, {
 		args: [
-			'run',
-			'--quiet',
-			'-p',
-			'tsv_cli',
-			'--',
 			'parse',
 			'--content',
 			sample.source,
@@ -612,7 +623,8 @@ console.log(`Wrote ${gen_path}`);
 
 console.log(`Running \`deno check ${gen_path}\`...`);
 const check = new Deno.Command('deno', {
-	args: ['check', gen_path],
+	// `--no-lock`: the repo is deliberately deno.lock-free, as in `typecheck:scripts`.
+	args: ['check', '--no-lock', gen_path],
 	stdout: 'inherit',
 	stderr: 'inherit'
 });

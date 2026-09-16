@@ -7,7 +7,7 @@ use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 
 use crate::audit::ratchet::{Ratchet, SnapshotKey, print_ratchet_skipped, refuse_narrowed_update};
 use crate::audit::shape::{markup_head, name_run};
-use crate::audit::sweep::{PristineSweep, sweep_pristine};
+use crate::audit::sweep::{PristineSweep, sort_findings_by_path, sweep_pristine};
 use crate::cli::CliError;
 
 use super::profile::{lang_token, resolve_seed_files};
@@ -72,6 +72,11 @@ pub struct WidthAuditCommand {
     /// stop after N seed files (diagnostic; never with --update)
     #[argh(option, default = "0")]
     limit: usize,
+
+    /// worker threads (default: available parallelism). Results are `--jobs`-invariant —
+    /// see `audit::sweep`, which restores the serial walk's order exactly
+    #[argh(option)]
+    jobs: Option<usize>,
 
     /// file paths, directories, or glob patterns (default: tests/fixtures)
     #[argh(positional)]
@@ -203,7 +208,8 @@ struct Overrun {
 
 /// What one corpus walk produced.
 struct Sweep {
-    /// Over-width lines in walk order — the human report.
+    /// Over-width lines in walk order (restored after the per-worker merge by
+    /// `sort_findings_by_path`) — the human report.
     overruns: Vec<Overrun>,
     /// Every shape seen, deduped — what the ratchet grades.
     shapes: BTreeSet<WidthShape>,
@@ -233,7 +239,7 @@ impl WidthAuditCommand {
         )?;
 
         let files = resolve_seed_files(&self.paths, self.limit)?;
-        let sweep = sweep_files(&files);
+        let sweep = sweep_files(&files, self.jobs)?;
 
         if self.json {
             print_json(&sweep);
@@ -269,46 +275,67 @@ impl WidthAuditCommand {
     }
 }
 
+/// One worker's share of the walk. `shapes` is a `BTreeSet` (the ratchet's product, order-free)
+/// and `lines_measured` a counter; `overruns` is the human report's list, re-ordered by the
+/// stable path sort in [`sweep_files`].
+#[derive(Default)]
+struct Tally {
+    overruns: Vec<Overrun>,
+    shapes: BTreeSet<WidthShape>,
+    lines_measured: usize,
+}
+
 /// Format every file (via the shared pristine sweep) and measure every output line.
-fn sweep_files(files: &[PathBuf]) -> Sweep {
-    let mut overruns = Vec::new();
-    let mut shapes = BTreeSet::new();
-    let mut lines_measured = 0;
-    let pristine = sweep_pristine(files, |path, parser, _source, output| {
-        for (i, line) in output.lines().enumerate() {
-            lines_measured += 1;
-            let width = visual_width(line, TAB_WIDTH);
-            if width <= PRINT_WIDTH {
-                continue;
+///
+/// # Errors
+///
+/// Returns [`CliError::Failed`] when a sweep worker panics outside the per-file catch.
+fn sweep_files(files: &[PathBuf], jobs: Option<usize>) -> Result<Sweep, CliError> {
+    let (pristine, mut tally) = sweep_pristine(
+        files,
+        jobs,
+        |path, parser, _source, output, tally: &mut Tally| {
+            for (i, line) in output.lines().enumerate() {
+                tally.lines_measured += 1;
+                let width = visual_width(line, TAB_WIDTH);
+                if width <= PRINT_WIDTH {
+                    continue;
+                }
+                // The measurement is taken on the RAW line; the trim only feeds the key and the
+                // excerpt. That ordering is what makes `str::trim`'s wide Unicode class safe here —
+                // it strips characters the printer treats as content (NBSP, U+FEFF), which would be
+                // a soundness hole in a class that decided a *width*, and is only a coarser key in
+                // one that decides a *shape*. Do not hoist it above the width test.
+                let trimmed = line.trim();
+                let shape = WidthShape {
+                    lang: lang_token(parser),
+                    head: head_shape(trimmed),
+                    inner: inner_shape(trimmed),
+                    tail: tail_shape(trimmed),
+                };
+                tally.shapes.insert(shape.clone());
+                tally.overruns.push(Overrun {
+                    path: path.to_path_buf(),
+                    line: i + 1,
+                    width,
+                    excerpt: excerpt(trimmed),
+                    shape,
+                });
             }
-            // The measurement is taken on the RAW line; the trim only feeds the key and the
-            // excerpt. That ordering is what makes `str::trim`'s wide Unicode class safe here —
-            // it strips characters the printer treats as content (NBSP, U+FEFF), which would be
-            // a soundness hole in a class that decided a *width*, and is only a coarser key in
-            // one that decides a *shape*. Do not hoist it above the width test.
-            let trimmed = line.trim();
-            let shape = WidthShape {
-                lang: lang_token(parser),
-                head: head_shape(trimmed),
-                inner: inner_shape(trimmed),
-                tail: tail_shape(trimmed),
-            };
-            shapes.insert(shape.clone());
-            overruns.push(Overrun {
-                path: path.to_path_buf(),
-                line: i + 1,
-                width,
-                excerpt: excerpt(trimmed),
-                shape,
-            });
-        }
-    });
-    Sweep {
-        overruns,
-        shapes,
+        },
+        |dst, src| {
+            dst.overruns.extend(src.overruns);
+            dst.shapes.extend(src.shapes);
+            dst.lines_measured += src.lines_measured;
+        },
+    )?;
+    sort_findings_by_path(&mut tally.overruns, |o| &o.path);
+    Ok(Sweep {
+        overruns: tally.overruns,
+        shapes: tally.shapes,
         pristine,
-        lines_measured,
-    }
+        lines_measured: tally.lines_measured,
+    })
 }
 
 /// The inverse of [`lang_token`], for reading a snapshot line back.

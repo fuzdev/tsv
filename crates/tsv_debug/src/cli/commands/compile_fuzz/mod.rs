@@ -631,7 +631,7 @@ impl Report {
     }
 
     // Counts are mutant tallies — nowhere near 2^53, so the cast is exact here.
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     fn pass_through_pct(&self) -> f64 {
         if self.total == 0 {
             0.0

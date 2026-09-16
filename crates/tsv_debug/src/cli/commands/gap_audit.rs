@@ -157,7 +157,7 @@ use super::profile::{is_input_invalid_fixture, resolve_seed_files};
 /// finding.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "gap_audit")]
-#[allow(clippy::struct_excessive_bools)] // independent CLI flags
+#[expect(clippy::struct_excessive_bools)] // independent CLI flags
 pub struct GapAuditCommand {
     /// emit JSON
     #[argh(switch)]

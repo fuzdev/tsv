@@ -1210,7 +1210,7 @@ fn refuse(sink: &mut Option<&mut Vec<Refusal>>, reason: Refusal) -> Result<(), C
 /// Whether `element` satisfies the whole chain `sel.relatives[from..to]`, matched
 /// BACKWARD from the rightmost relative (`css-prune.js:243-279`). Marks a matched
 /// relative scoped (unless global) and inserts every touched element's span.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn apply_selector<'a>(
     sel: &ScopedSelector,
     element: CensusNode<'a>,
@@ -1243,7 +1243,7 @@ fn apply_selector<'a>(
 
 /// Resolve the combinator to the left of `relative` (`css-prune.js:291-359`,
 /// BACKWARD only). A snippet-crossing walk refuses.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn apply_combinator<'a>(
     sel: &ScopedSelector,
     relative: &ScopedRelative,
@@ -1417,7 +1417,6 @@ fn is_attribute_whitelisted(element_name: &str, attr_name: &str) -> bool {
 /// `UNKNOWN` chunk (a plain identifier / member / call / template / …) assume-matches
 /// (`Ok(true)`); an un-stringifiable literal inside an otherwise-enumerable set
 /// refuses (`CssDynamicAttributeMatch`) rather than drop a value and under-match.
-#[allow(clippy::too_many_arguments)]
 fn attribute_matches(
     element: CensusNode<'_>,
     name: &str,

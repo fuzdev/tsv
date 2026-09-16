@@ -146,7 +146,7 @@ fn pct_of(n: usize, d: usize) -> usize {
 /// Both operands are finding COUNTS — comfortably under 2^52, so the `f64` cast is exact and the
 /// precision-loss lint (the whole-corpus-scale caveat) does not apply, exactly as
 /// [`metrics`](crate::cli::commands::metrics) allows it for the same reason.
-#[allow(clippy::cast_precision_loss)]
+#[expect(clippy::cast_precision_loss)]
 fn share_of(n: usize, d: usize) -> f64 {
     if d == 0 {
         0.0

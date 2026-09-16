@@ -187,7 +187,7 @@ fn supports_color() -> bool {
 
 /// Diff configuration options
 #[derive(Debug, Clone)]
-#[allow(clippy::struct_excessive_bools)] // Configuration struct with clear field names
+#[expect(clippy::struct_excessive_bools)] // Configuration struct with clear field names
 pub struct DiffOptions {
     /// Number of context lines to show around changes (None = show all)
     pub context_lines: Option<usize>,
@@ -551,7 +551,7 @@ pub fn diff_to_string(expected: &str, actual: &str, options: &DiffOptions) -> St
 }
 
 /// Build a map from line numbers to JSON paths
-#[allow(clippy::expect_used)] // path_stack always has root "$", empty is a bug
+#[expect(clippy::expect_used)] // path_stack always has root "$", empty is a bug
 fn build_json_path_map(json_str: &str) -> std::collections::HashMap<usize, String> {
     let mut map = std::collections::HashMap::new();
     let mut path_stack: Vec<String> = vec!["$".to_string()];

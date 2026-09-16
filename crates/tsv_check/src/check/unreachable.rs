@@ -125,7 +125,7 @@ impl UnreachableCandidates {
     /// A `True` option skips its probe entirely; `False` → error; `Unknown` →
     /// suggestion.
     // `&CheckOptions` mirrors the `check_bound` threading (uniform + future-proof).
-    #[allow(clippy::trivially_copy_pass_by_ref)]
+    #[expect(clippy::trivially_copy_pass_by_ref)]
     pub fn emit(
         &self,
         file: FileId,
@@ -881,7 +881,7 @@ mod tests {
 
     /// Emit both sinks under `options` and return them owned (the arena drops here
     /// — the candidate table and diagnostics borrow nothing from it).
-    #[allow(clippy::trivially_copy_pass_by_ref)]
+    #[expect(clippy::trivially_copy_pass_by_ref)]
     fn emit_both(source: &str, opts: &CheckOptions) -> (Vec<Diagnostic>, Vec<Diagnostic>) {
         let arena = Bump::new();
         let program = tsv_ts::parse(source, &arena).expect("parse");

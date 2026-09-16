@@ -224,7 +224,7 @@ fn print_json(rows: &[TypeRow]) {
 /// Every boarded type, grouped by the module it is defined in — so a group is
 /// a family whose members compete to set each other's width, which is the
 /// question the ladder asks.
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 pub(crate) fn board() -> Vec<TypeRow> {
     use tsv_css::ast::internal as css;
     use tsv_svelte::ast::internal as svelte;

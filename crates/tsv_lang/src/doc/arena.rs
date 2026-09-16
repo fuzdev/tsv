@@ -532,7 +532,7 @@ const _: () = assert!(size_of::<ArenaCommand>() == 8);
 
 // `indent_mode` is printed as the two logical values it packs, so the derived
 // lint's "field is unused" is exactly wrong here: nothing about the value is hidden.
-#[allow(clippy::missing_fields_in_debug)]
+#[expect(clippy::missing_fields_in_debug)]
 impl std::fmt::Debug for ArenaCommand {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ArenaCommand")
@@ -1527,7 +1527,7 @@ impl DocArena {
     // the array is `[const { … }; N]`, so the initializer is materialized in
     // place rather than copied from a temporary. Consumers that park the arena
     // between calls already box it (`tsv_arena::with_doc_arena`).
-    #[allow(clippy::large_stack_arrays)]
+    #[expect(clippy::large_stack_arrays)]
     pub fn new() -> Self {
         let mut arena = Self {
             nodes: RefCell::new(Vec::new()),
@@ -1574,7 +1574,7 @@ impl DocArena {
     /// reservation, and the multi-file `reset()` reuse high-water is bounded by
     /// actual usage, so it can only drop.
     // `large_stack_arrays`: see [`Self::new`].
-    #[allow(clippy::large_stack_arrays)]
+    #[expect(clippy::large_stack_arrays)]
     pub fn with_source_size_hint(source_len: usize) -> Self {
         let estimated_nodes = source_len * 2;
         let estimated_children = estimated_nodes / 2;

@@ -227,7 +227,7 @@ pub fn sort_and_deduplicate(diags: &mut Vec<Diagnostic>, paths: &[&str]) {
 // The inner `while let` can't become a `for`: the iterator is shared with the
 // outer run loop (a non-equal candidate becomes the next run's head), so it must
 // outlive the inner loop.
-#[allow(clippy::while_let_on_iterator)]
+#[expect(clippy::while_let_on_iterator)]
 fn compact_and_merge_related_infos(diags: &mut Vec<Diagnostic>, paths: &[&str]) {
     if diags.len() < 2 {
         return;

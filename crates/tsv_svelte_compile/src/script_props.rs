@@ -70,7 +70,6 @@ fn bindable_default<'arena>(
 /// the guard to refuse (a safe over-refusal, even for a non-identifier-keyed prop
 /// the oracle would compile). A computed key or a nested-pattern value never reaches
 /// here — both already refused as [`Refusal::PropsInvalidPattern`].
-#[allow(clippy::type_complexity)]
 fn bindable_property<'arena>(
     prop: &'arena ObjectPatternProperty<'arena>,
     source: &str,

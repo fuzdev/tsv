@@ -157,7 +157,7 @@ use super::{ResultOrder, spawn_work_stream, task_result};
 /// accepting output the real parser rejects) and both leaf-corruption buckets.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "roundtrip_audit")]
-#[allow(clippy::struct_excessive_bools)] // independent CLI flags
+#[expect(clippy::struct_excessive_bools)] // independent CLI flags
 pub struct RoundtripAuditCommand {
     /// gate mode: report only the gate-fatal buckets — the
     /// {tsv,canonical}_unreparseable, {tsv,canonical}_node_loss and

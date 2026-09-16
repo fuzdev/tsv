@@ -106,7 +106,6 @@ use super::profile::{is_input_invalid_fixture, is_svelte, resolve_seed_files_nam
 /// `tests/fixtures` when no paths are given. Svelte (`.svelte`) only.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "authoring_audit")]
-#[allow(clippy::struct_excessive_bools)] // independent CLI flags
 pub struct AuthoringAuditCommand {
     /// emit JSON
     #[argh(switch)]
@@ -466,7 +465,7 @@ fn recurse_children(node: &FragmentNode<'_>, src: &str, ws_sig: bool, out: &mut 
 
 /// Per-site outcome from the tsv (and optional prettier) passes.
 #[derive(Clone, Debug)]
-#[allow(clippy::struct_excessive_bools)] // flat result record; the bools are independent verdicts
+#[expect(clippy::struct_excessive_bools)] // flat result record; the bools are independent verdicts
 struct Outcome {
     path: String,
     offset: usize,

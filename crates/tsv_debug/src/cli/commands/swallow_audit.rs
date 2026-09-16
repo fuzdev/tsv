@@ -2,7 +2,7 @@ use argh::FromArgs;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use crate::audit::sweep::{PristineSweep, sweep_pristine_armed};
+use crate::audit::sweep::{PristineSweep, sort_findings_by_path, sweep_pristine_armed};
 use crate::cli::CliError;
 use tsv_lang::doc::swallow::{self, SwallowReport};
 
@@ -27,6 +27,11 @@ pub struct SwallowAuditCommand {
     #[argh(switch)]
     json: bool,
 
+    /// worker threads (default: available parallelism). Results are `--jobs`-invariant —
+    /// see `audit::sweep`, which restores the serial walk's order exactly
+    #[argh(option)]
+    jobs: Option<usize>,
+
     /// file paths, directories, or glob patterns (default: tests/fixtures)
     #[argh(positional)]
     paths: Vec<String>,
@@ -43,21 +48,22 @@ impl SwallowAuditCommand {
         let default_paths = self.paths.is_empty();
         let files = resolve_seed_files(&self.paths, 0)?;
 
-        // Enable the check for the whole run; the builder records line-comment
-        // ids and the renderer flags swallows. Single-threaded so the
-        // thread-local report sink collects everything.
+        // Enable the check for the whole run. The ENABLE flag is process-global, so arming it
+        // once covers every sweep worker; the report SINK it feeds is thread-local, and the
+        // sweep drains, formats and visits on one thread per file, so no worker can read
+        // another's reports.
         swallow::set_swallow_check(true);
 
-        let mut violations: Vec<Violation> = Vec::new();
-        let sweep = sweep_pristine_armed(
+        let (sweep, mut violations) = sweep_pristine_armed(
             &files,
+            self.jobs,
             // Drain before each format, so a report left behind by a seed the
             // sweep skipped (rejected, panicked) can't be attributed to the
             // next file.
             || {
                 let _ = swallow::take_swallow_reports();
             },
-            |path, _parser, _source, _output| {
+            |path, _parser, _source, _output, violations: &mut Vec<Violation>| {
                 for report in swallow::take_swallow_reports() {
                     violations.push(Violation {
                         path: path.to_path_buf(),
@@ -65,7 +71,9 @@ impl SwallowAuditCommand {
                     });
                 }
             },
-        );
+            Extend::extend,
+        )?;
+        sort_findings_by_path(&mut violations, |v| &v.path);
 
         swallow::set_swallow_check(false);
 

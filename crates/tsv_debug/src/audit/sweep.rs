@@ -10,6 +10,23 @@
 //! verbatim copy; the conserved-content census v2 (decoded literal values) is
 //! the expected next.
 //!
+//! ## The walk is per-worker, and its output is `--jobs`-invariant BY ORDER, not merely by set
+//!
+//! The loop runs on [`run_pool`], the same stride-chunked pool the injection audits take — so
+//! the consumer's accumulator is a per-worker `T` folded by an order-independent `merge`, and
+//! a thread-local instrumentation sink (`swallow_audit`'s reports, `comment_audit`'s ledger)
+//! is armed once, drained per worker, and read in the thread that filled it.
+//!
+//! What that costs the report is ORDER, and [`sort_findings_by_path`] buys it back exactly.
+//! `resolve_files` sorts the corpus by OS-string bytes; each file is visited by exactly one
+//! worker, which appends that file's findings consecutively; so every worker's vector is a
+//! concatenation of per-file BLOCKS in path order, and the merged vector is those blocks in
+//! join order. A STABLE sort by path reorders the blocks and preserves within-block order —
+//! which is the serial walk's order, byte for byte. So a consumer that ends on that sort
+//! prints what the single-threaded loop printed, rather than something merely equivalent.
+//! A consumer whose product is a `BTreeSet` (every ratchet key set) is order-free already and
+//! needs nothing.
+//!
 //! Every consumer skips the same classes (`razor_audit` walks only the `.svelte` seeds), so
 //! all six pin the same [`FIXTURES_FORMATTED_MIN`] on a default run. `comment_audit` pins a
 //! second number on top of it — a
@@ -25,6 +42,7 @@ use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
 use crate::audit::panic_hook::SuppressedPanicHook;
+use crate::audit::parallel::run_pool;
 use crate::audit::tally::CappedPaths;
 use crate::audit::vacuity::{FIXTURES_FORMATTED_MIN, check_formatted_min, check_graded_nonzero};
 use crate::cli::CliError;
@@ -35,6 +53,7 @@ use crate::cli::commands::profile::is_input_invalid_fixture;
 /// ([`check_graded_nonzero`] at any scope, [`check_formatted_min`] on a default
 /// run); the human report tail reads [`Self::skipped_note`] and the `--json` one
 /// [`Self::json_report`].
+#[derive(Default)]
 pub(crate) struct PristineSweep {
     /// Files successfully formatted (the visitor ran on each).
     pub(crate) formatted: usize,
@@ -138,17 +157,63 @@ impl PristineSweep {
             eprintln!("{line}");
         }
     }
+
+    /// Fold one worker's bookkeeping into the total. Pure counter addition plus the panic
+    /// bucket's own capped merge, so it is order-independent — [`run_pool`]'s requirement.
+    fn merge(&mut self, other: Self) {
+        self.formatted += other.formatted;
+        self.parse_errors += other.parse_errors;
+        self.read_errors += other.read_errors;
+        self.panics.merge(other.panics);
+    }
 }
 
-/// Format every file as authored and hand each `(path, parser, source, output)`
-/// to `visit`. Requires the corpus profile's `panic = "unwind"` for the panic
-/// bucket to catch anything — under `panic = "abort"` a formatter panic still
-/// kills the process.
-pub(crate) fn sweep_pristine(
+/// One worker's tally: this loop's own bookkeeping beside the consumer's accumulator, so the
+/// two ride [`run_pool`]'s single `T` without every consumer having to carry the sweep's five
+/// fields through its own struct.
+struct SweepTally<T> {
+    sweep: PristineSweep,
+    user: T,
+}
+
+impl<T: Default> Default for SweepTally<T> {
+    fn default() -> Self {
+        Self {
+            sweep: PristineSweep::default(),
+            user: T::default(),
+        }
+    }
+}
+
+/// Restore the serial walk's order on a merged finding list: a STABLE sort by path.
+///
+/// Exact, not approximate — see the module doc for why this reproduces the single-threaded
+/// order byte for byte. Every consumer holding a `Vec` of per-file findings ends on this; one
+/// spelling, so no consumer can half-remember it and print a `--jobs`-dependent report.
+pub(crate) fn sort_findings_by_path<T>(findings: &mut [T], path: impl Fn(&T) -> &Path) {
+    findings.sort_by(|a, b| path(a).as_os_str().cmp(path(b).as_os_str()));
+}
+
+/// Format every file as authored and hand each `(path, parser, source, output)` to `visit`,
+/// on [`run_pool`]'s worker pool. Requires the corpus profile's `panic = "unwind"` for the
+/// panic bucket to catch anything — under `panic = "abort"` a formatter panic still kills the
+/// process.
+///
+/// `visit` folds into the worker's own `T`; `merge` folds two workers' `T`s and must be
+/// order-independent (the module doc states what that costs a report's ORDER, and how
+/// [`sort_findings_by_path`] buys it back exactly).
+///
+/// # Errors
+///
+/// Returns [`CliError::Failed`] when a worker panics outside the per-file `catch_unwind` —
+/// [`run_pool`]'s contract, since a lost tally can silently mis-verdict a gate.
+pub(crate) fn sweep_pristine<T: Default + Send>(
     files: &[PathBuf],
-    visit: impl FnMut(&Path, ParserType, &str, &str),
-) -> PristineSweep {
-    sweep_pristine_armed(files, || {}, visit)
+    jobs: Option<usize>,
+    visit: impl Fn(&Path, ParserType, &str, &str, &mut T) + Sync,
+    merge: impl Fn(&mut T, T),
+) -> Result<(PristineSweep, T), CliError> {
+    sweep_pristine_armed(files, jobs, || {}, visit, merge)
 }
 
 /// [`sweep_pristine`] with a per-file **arming** hook, for a consumer whose
@@ -161,6 +226,12 @@ pub(crate) fn sweep_pristine(
 /// Draining ahead of every format makes what the visitor takes provably this
 /// file's.
 ///
+/// ⚠️ It runs **on the worker thread**, which is what makes a thread-local sink sound here:
+/// the drain, the format that fills it, and the visitor that reads it are all the same
+/// thread, so no worker can see another's reports. The consumer still arms the sink's
+/// process-global ENABLE flag once, before calling this — that flag is shared, the buffers
+/// are not.
+///
 /// The hook exists so the audits that interleave drain/collect around the format
 /// (`swallow_audit`'s swallow reports, `comment_audit`'s print-once ledger) share
 /// this loop's SKIP BUCKETING rather than hand-rolling a copy of it — and both
@@ -169,52 +240,60 @@ pub(crate) fn sweep_pristine(
 ///
 /// ⚠️ The DEFAULT PANIC HOOK IS SUPPRESSED for the whole walk, exactly as
 /// `ArmedRun` (`audit::parallel`, gated with the injection audits, hence no
-/// intra-doc link) does for those.  Catching a panic does not stop the hook from running first, so
-/// without this a corpus with N crashing files printed N full backtraces over
+/// intra-doc link) does for those. Catching a panic does not stop the hook from running
+/// first, so without this a corpus with N crashing files printed N full backtraces over
 /// the report — and here, unlike the injection audits, it stays latent until
 /// the sweep is pointed at real code. The panicking input is recorded in
 /// [`PristineSweep::panics`] instead, so the fix costs no information: it lives
 /// in this shared loop rather than in any one consumer, because every consumer
 /// formats under the same `catch_unwind`.
-pub(crate) fn sweep_pristine_armed(
+///
+/// # Errors
+///
+/// Returns [`CliError::Failed`] on a worker panic outside the per-file `catch_unwind`.
+pub(crate) fn sweep_pristine_armed<T: Default + Send>(
     files: &[PathBuf],
-    mut arm: impl FnMut(),
-    mut visit: impl FnMut(&Path, ParserType, &str, &str),
-) -> PristineSweep {
+    jobs: Option<usize>,
+    arm: impl Fn() + Sync,
+    visit: impl Fn(&Path, ParserType, &str, &str, &mut T) + Sync,
+    merge: impl Fn(&mut T, T),
+) -> Result<(PristineSweep, T), CliError> {
     let _hook = SuppressedPanicHook::install();
-    let mut sweep = PristineSweep {
-        formatted: 0,
-        parse_errors: 0,
-        read_errors: 0,
-        panics: CappedPaths::default(),
-    };
-    for path in files {
-        // Skip fixtures expected to fail parsing.
-        if is_input_invalid_fixture(path) {
-            continue;
-        }
-        let Ok(source) = std::fs::read_to_string(path) else {
-            sweep.read_errors += 1;
-            continue;
-        };
-        let parser = ParserType::from_extension(&path.to_string_lossy());
-        arm();
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            format_source(&source, parser)
-        }));
-        let output = match result {
-            Ok(Ok(output)) => output,
-            Ok(Err(_)) => {
-                sweep.parse_errors += 1;
-                continue;
+    let total = run_pool(
+        files,
+        jobs,
+        |path, tally: &mut SweepTally<T>| {
+            // Skip fixtures expected to fail parsing.
+            if is_input_invalid_fixture(path) {
+                return;
             }
-            Err(payload) => {
-                sweep.panics.push_panic(path, payload.as_ref());
-                continue;
-            }
-        };
-        sweep.formatted += 1;
-        visit(path, parser, &source, &output);
-    }
-    sweep
+            let Ok(source) = std::fs::read_to_string(path) else {
+                tally.sweep.read_errors += 1;
+                return;
+            };
+            let parser = ParserType::from_extension(&path.to_string_lossy());
+            arm();
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                format_source(&source, parser)
+            }));
+            let output = match result {
+                Ok(Ok(output)) => output,
+                Ok(Err(_)) => {
+                    tally.sweep.parse_errors += 1;
+                    return;
+                }
+                Err(payload) => {
+                    tally.sweep.panics.push_panic(path, payload.as_ref());
+                    return;
+                }
+            };
+            tally.sweep.formatted += 1;
+            visit(path, parser, &source, &output, &mut tally.user);
+        },
+        |dst, src| {
+            dst.sweep.merge(src.sweep);
+            merge(&mut dst.user, src.user);
+        },
+    )?;
+    Ok((total.sweep, total.user))
 }

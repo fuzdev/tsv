@@ -377,7 +377,7 @@ fn build_mixed_attr_value<'arena>(
                 raw.push_str(&chunk);
                 // Attribute templates carry no HTML escaping — the runtime
                 // escapes; only template metachars are escaped here.
-                #[allow(clippy::unwrap_used)]
+                #[expect(clippy::unwrap_used)]
                 texts
                     .last_mut()
                     .unwrap()
@@ -397,7 +397,7 @@ fn build_mixed_attr_value<'arena>(
                     let text = stringify_value(value)
                         .map_err(|g| unsupported(Refusal::StaticFoldNotPortable(g.0)))?;
                     raw.push_str(&text);
-                    #[allow(clippy::unwrap_used)]
+                    #[expect(clippy::unwrap_used)]
                     texts
                         .last_mut()
                         .unwrap()

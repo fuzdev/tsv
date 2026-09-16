@@ -82,7 +82,7 @@ mod ratchet;
 /// statics and no cross-invocation state. See the [`ratchet`] module docs.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "compile_corpus_compare")]
-#[allow(clippy::struct_excessive_bools)] // independent CLI flags
+#[expect(clippy::struct_excessive_bools)] // independent CLI flags
 pub struct CompileCorpusCompareCommand {
     /// list the discovered in-scope `.svelte` files without comparing
     #[argh(switch)]
