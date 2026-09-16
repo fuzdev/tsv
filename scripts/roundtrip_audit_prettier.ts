@@ -16,9 +16,10 @@
  * nothing in `tests/fixtures` could. The same sweep is a leg of `audit:corpus`, but that
  * runs at release cadence over the sibling snapshot + working trees and takes minutes.
  *
- * Cost is ~0.1 s for ~2,350 files (pure Rust, no sidecar, reparse-only fast path), on a
- * binary the preceding `roundtrip:audit` leg has already built with the same profile and
- * features — so this is close to free in `check` and needs no new machinery.
+ * Cost is ~0.17 s for ~2,350 files (pure Rust, no sidecar, population-only fast path — a
+ * reparse plus the node census, read straight from the wire bytes), on a binary the preceding
+ * `roundtrip:audit` leg has already built with the same profile and features — so this is
+ * close to free in `check` and needs no new machinery.
  *
  * ## Why absence is a warning, not a failure
  *

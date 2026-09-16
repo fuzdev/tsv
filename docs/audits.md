@@ -1431,8 +1431,9 @@ cargo run -p tsv_debug roundtrip_audit ../prettier/tests/format/js ../corpora/co
 # --gate fails on the *_unreparseable, *_node_loss and *_leaf_corruption buckets (divergent
 # is render-model noise over tests/fixtures). Bare --gate runs phase 1 only via a
 # population-only fast path (reparse + the node census, no skeleton / leaves; pure Rust,
-# no sidecar) — the `deno task roundtrip:audit` check gate; a cheap tripwire over
-# tests/fixtures, real yield on external corpora.
+# no sidecar) — which censuses each side's wire BYTES and builds no AST tree at all, since
+# the tree is what the checks it skips wanted — the `deno task roundtrip:audit` check gate;
+# a cheap tripwire over tests/fixtures, real yield on external corpora.
 # --canonical-all confirms every file (also guards canonical_unreparseable: tsv's
 # parser accepting output the real parser rejects).
 cargo run -p tsv_debug roundtrip_audit --gate                       # the check gate (pure Rust, tests/fixtures)
@@ -1448,9 +1449,10 @@ cargo run -p tsv_debug roundtrip_audit --canonical-all --verbose ../prettier/tes
 ### Two scopes in `check`, and why the second one is opportunistic
 
 `deno task check` runs the audit twice: over `tests/fixtures` (`roundtrip:audit`) and over the
-pinned Prettier format suites (`roundtrip:audit:prettier`, ~2,350 files in ~0.65 s on the binary
-the first leg already built; the first leg is ~3.0 s over `tests/fixtures`, nearly all of it
-materializing both wires for the node census — see the command's module doc). The second scope is not redundancy — it is the only corpus in
+pinned Prettier format suites (`roundtrip:audit:prettier`, ~2,350 files in ~0.17 s on the binary
+the first leg already built; the first leg is ~0.9 s over `tests/fixtures`, about two thirds of
+it the format itself and the rest emitting both wires and censusing them — see the command's
+module doc for the measured board). The second scope is not redundancy — it is the only corpus in
 `check` that is **not format-stable**. The fixture tree cannot contain the input shape that
 triggers a valid→unreparseable regression, which is how a statement-head paren strip
 (`for ((let) of foo);` → `for (let of foo);`, output tsv's own parser rejects) sat behind a green

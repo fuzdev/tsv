@@ -92,15 +92,18 @@
 //! surfaces corruption no fixture covers. Kept in `check` as a pure-Rust backstop,
 //! not the primary detector.
 //!
-//! ⚠️ "Fast path" now names what it SKIPS, not what it costs. Asking the node census
-//! means materializing both wires, which the reparse-only path it replaced never did:
-//! ~3.0 s over `tests/fixtures` and ~0.65 s over the prettier suites, against ~0.37 s
-//! for the old reparse-only form and ~4.25 s for the full compare. So the path is ~70%
-//! of the work it is a fast path FOR, and essentially all of the delta is
-//! [`tsv_parse_to_value`] (emit the wire bytes, read them back into a `Value`) rather
-//! than the census walk over it — dropping the census's own per-node allocation moved
-//! ~3%. The lever, if this ever needs to be cheap again, is a census that streams the
-//! wire bytes instead of building a `Value` the gate path otherwise never reads.
+//! The census is asked of the wire **bytes**: the fast path emits each side's wire
+//! ([`tsv_parse_to_wire_bytes`]) and counts straight out of it
+//! ([`streamed_node_census`](crate::audit::properties::streamed_node_census)), so it builds no
+//! `Value` — the tree is what the skeleton and the leaf check need, and this path runs
+//! neither. That is the whole cost of the census, not a detail of it: reading a wire into a
+//! tree costs ~11x streaming the same bytes, and dropping the tree adds a fifth of the read
+//! again, while the emit and the count are ~0.1 s each over the fixture corpus. Measured on the `corpus`
+//! profile, 3 runs, as reparse-only → census-over-a-`Value` → census-over-the-bytes:
+//! `tests/fixtures` (10,171 files) 0.37 → 3.0 → **0.9 s** (peak RSS 12.9 → 19.0 → 13.5 MB),
+//! the prettier suites 0.07 → 0.53 → **0.17 s**, the `../corpora` snapshot (6,702 files)
+//! 1.1 → 17.0 → **4.1 s** (RSS 17 → 83 → 23 MB). So the population census costs ~2.4x the
+//! reparse-only gate it grew out of, rather than the ~8x it cost through a tree.
 
 use argh::FromArgs;
 use std::collections::BTreeMap;
@@ -114,7 +117,8 @@ use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
 use crate::audit::properties::{
-    ReparseCompare, compare_reparsed, node_conservation_diff, tsv_parse_to_value,
+    ReparseCompare, compare_reparsed, streamed_node_conservation_diff, tsv_parse_to_value,
+    tsv_parse_to_wire_bytes,
 };
 use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
@@ -403,7 +407,8 @@ impl RoundtripAuditCommand {
     /// `--gate --canonical-all` and non-gate runs, not by the bare phase-1 `--gate`.
     /// Node conservation does NOT: it is the class that shipped (a glued element
     /// run before a block printed only its last member), so the cheap standing
-    /// gate carries it.
+    /// gate carries it — and cheaply, since the census reads the wire bytes and the
+    /// skipped checks are exactly the ones that wanted a `Value` (see the module doc).
     fn population_only(&self) -> bool {
         !self.runs_canonical()
     }
@@ -572,6 +577,24 @@ fn tsv_self_roundtrip(
         return mk(TsvVerdict::FormatError, None);
     };
 
+    if population_only {
+        // Gate fast path: the output reparses, so the one remaining gate-fatal question
+        // phase 1 alone can answer is whether its node population is conserved. No
+        // normalization, no skeleton, no leaves — the divergent and leaf verdicts are
+        // unused here, and neither is a wire TREE: the census reads the bytes.
+        let Some(wire_in) = tsv_parse_to_wire_bytes(&source, parser) else {
+            // Format parsed it, so this should not happen — treat as a parse gap.
+            return mk(TsvVerdict::FormatError, None);
+        };
+        let Some(wire_out) = tsv_parse_to_wire_bytes(&formatted, parser) else {
+            return mk(TsvVerdict::Unreparseable, None);
+        };
+        return match streamed_node_conservation_diff(&wire_in, &wire_out) {
+            Some(detail) => mk(TsvVerdict::NodeLoss, verbose.then_some(detail)),
+            None => mk(TsvVerdict::Clean, None),
+        };
+    }
+
     let Some(wire_in) = tsv_parse_to_value(&source, parser) else {
         // Format parsed it, so this should not happen — treat as a parse gap.
         return mk(TsvVerdict::FormatError, None);
@@ -579,17 +602,6 @@ fn tsv_self_roundtrip(
     let Some(wire_out) = tsv_parse_to_value(&formatted, parser) else {
         return mk(TsvVerdict::Unreparseable, None);
     };
-
-    if population_only {
-        // Gate fast path: the output reparses, so the one remaining gate-fatal question
-        // phase 1 alone can answer is whether its node population is conserved. No
-        // normalization, no skeleton, no leaves — the divergent and leaf verdicts are
-        // unused here.
-        return match node_conservation_diff(&wire_in, &wire_out) {
-            Some(detail) => mk(TsvVerdict::NodeLoss, verbose.then_some(detail)),
-            None => mk(TsvVerdict::Clean, None),
-        };
-    }
 
     let (verdict, detail) = verdict_of(
         compare_reparsed(wire_in, wire_out, render, verbose),
