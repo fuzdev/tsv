@@ -1,4 +1,10 @@
-//! Paren-authoring independence audit — same-operator logical re-association.
+//! Paren-authoring independence audit — a redundant paren carries no authoring signal, so
+//! the two spellings of one document must reach one fixed point.
+//!
+//! Two site classes, each a rule that reads something the parens change:
+//! **same-operator logical re-association** (§Why this exists) and the **relational
+//! `<`…`>` chain** (§The relational chain). They share the verdict, the containment and
+//! the zero tolerance; only the splice differs.
 //!
 //! ## Why this exists
 //!
@@ -48,6 +54,47 @@
 //!   this keys on the node type and not on an operator list: a `BinaryExpression` (`+`, `&`)
 //!   is NOT re-associable and prettier does not rebalance it.
 //!
+//! ## The relational chain
+//!
+//! A `>` whose left operand is a `<` gets a paren pair around that operand whenever the
+//! `<`…`>` region would re-lex as a type-argument list once printed
+//! (`docs/conformance_prettier_ts.md` §Relational chain type-argument parens). That rule
+//! reads **bytes** — which head the region opens with, and where its scan stops — so a
+//! redundant paren is exactly what can move its answer while leaving the program alone. Two
+//! splices per such node, each a pure insertion around a whole operand:
+//!
+//! - **the chain** — `a < X > c` against `(a < X) > c`, the shell the printer strips, which
+//!   moves where the region's scan stops;
+//! - **the operand** — `a < X > c` against `a < (X) > c`, which moves which HEAD the
+//!   lookahead dispatches on.
+//!
+//! The second is where a byte-reading head test is most exposed: a `(` head arm that grades
+//! nothing commits every parenthesized operand, so `a < (arr[b - 1]) > c` would take a pair
+//! its own paren-free twin does not — and no other standing gate can see that, since each
+//! authoring is idempotent on its own and only a twin shows the two fixed points. Nothing
+//! re-associates here, but that does not make every twin probeable: what the splice
+//! preserves, and what it does not, is stated on
+//! [`ParenAuditCommand::twin_is_same_document`].
+//!
+//! ## Which invocation carries the relational floor
+//!
+//! Both classes share the total vacuity floor (`check_graded_nonzero` over every site), which
+//! holds on any corpus: a logical chain is ordinary code. The relational rows get a **second,
+//! per-class floor** — and it is **opt-in**, spelled `--require-relational`, because a vacuity
+//! floor is a claim about the SEED SET rather than about the audit. Nobody writes `a < b > c`
+//! in real code: over the `../corpora` snapshot both relational rows are legitimately **0**,
+//! and that zero is the corpus's shape, not a class that stopped enumerating. The class lives
+//! in the fixture tree (`tests/fixtures/typescript/expressions/binary/relational_*`), so the
+//! **fixture-tree gate** — `deno task paren:audit`, which `deno task check` runs — is the one
+//! invocation that passes the flag, and the **real-code leg** of `audit:corpus`
+//! (`benches/js/corpus_audit.ts`, publish Step 3c) deliberately does not: it grades every
+//! class it finds and holds only the total floor.
+//!
+//! The flag rather than a `paths`-contains-`tests/fixtures` sniff: an explicit switch is
+//! greppable and cannot silently mean the wrong thing on a subtree run. A **narrowed** run
+//! under the flag fails its floor, like a ratchet's refusal of a narrowed `:update` — the flag
+//! asserts the run covers the relational corpus, so a subtree run drops it.
+//!
 //! ## The verdict, and why it is zero-tolerance
 //!
 //! `format(variant)` must equal the base `F` — byte for byte, at every site. Unlike the
@@ -68,8 +115,12 @@
 //!   same-operator node, each re-associating one level; the fully right-nested composition of
 //!   those steps is not enumerated. One step is what turns `binary.right` from a leaf into a
 //!   `LogicalExpression`, which is the whole signal.
-//! - **Same-operator only**, because that is precisely what prettier rebalances.
-//!   `a || (b && c)` is a different tree in both formatters and its parens are load-bearing.
+//! - **Same-operator only** for the logical class, because that is precisely what prettier
+//!   rebalances. `a || (b && c)` is a different tree in both formatters and its parens are
+//!   load-bearing.
+//! - **The relational class probes `<` under `>` only** — the one join the rule is keyed
+//!   on. A `<` under any other operator, and a `>` over any other operand, take no pair, so
+//!   a shell there is the general redundant-paren question the TODO below names.
 //! - **A seed bearing a format-ignore directive is skipped** (`source_has_ignore_directive`):
 //!   a frozen region reproduces the inserted parens verbatim, which is correct behavior and
 //!   would read as a divergence.
@@ -77,6 +128,13 @@
 //!   ([`splits_forward_binding_comment`]) — the splice would re-bind a JSDoc cast or a bundler
 //!   annotation, making the twin a different document. Counted in the report, not dropped
 //!   silently.
+//! - **A relational site whose twin tsv does not read as the same document is excluded**
+//!   ([`ParenAuditCommand::twin_is_same_document`], which states why a twin can fail to be
+//!   one). Counted in the report, not dropped silently. The divergence itself is a parse
+//!   question, but no parse gate sees these twins — the audit synthesizes them, and no
+//!   fixture or corpus file holds them — so the count printed here is where they surface.
+//!   It is not pinned: it is a function of whichever seed set the invocation was handed, so
+//!   it cannot be held the way a ratchet's snapshot is.
 //! - **CSS has no expression grammar**, so `.css` seeds hold no sites; the audit's subject
 //!   filter is the Svelte + TypeScript families.
 //!
@@ -115,18 +173,20 @@ use crate::audit::properties::{
 };
 use crate::audit::repro::{ReproCase, write_repro_case};
 use crate::audit::tally::CappedPaths;
-use crate::audit::vacuity::check_graded_nonzero;
+use crate::audit::vacuity::{check_graded_nonzero, check_required_nonzero};
 use crate::cli::CliError;
 
 use super::profile::{is_input_invalid_fixture, is_svelte, is_ts_family, resolve_seed_files_named};
 
-/// Audit whether a same-operator logical chain formats identically to its
-/// redundantly-parenthesized twin.
+/// Audit whether a chain formats identically to its redundantly-parenthesized twin.
 ///
-/// Prettier rebalances `a op (b op c)` into `(a op b) op c` at parse time, so the two
-/// authorings are one document; tsv must reach one fixed point from both. Pure Rust — one
-/// format per site, no sidecar. Defaults to `tests/fixtures` when no paths are given;
-/// Svelte and TypeScript-family files (a `.css` seed holds no expressions).
+/// Two classes. A same-operator LOGICAL chain: prettier rebalances `a op (b op c)` into
+/// `(a op b) op c` at parse time, so the two authorings are one document. A RELATIONAL
+/// `<`…`>` chain: the rule that parenthesizes its `<` operand reads bytes, so a shell
+/// around either the chain or the operand can move its answer. tsv must reach one fixed
+/// point from every spelling. Pure Rust — one format per site, no sidecar. Defaults to
+/// `tests/fixtures` when no paths are given; Svelte and TypeScript-family files (a `.css`
+/// seed holds no expressions).
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "paren_audit")]
 pub struct ParenAuditCommand {
@@ -145,6 +205,13 @@ pub struct ParenAuditCommand {
     /// cap the number of findings reported (default 20)
     #[argh(option, default = "20")]
     examples: usize,
+
+    /// require the relational `<`…`>` classes to have graded a site — the seed-set
+    /// vacuity floor, for an invocation whose corpus holds the class (the fixture-tree
+    /// gate). Real code writes no `a < b > c`, so its run drops this; a narrowed run
+    /// drops it too
+    #[argh(switch)]
+    require_relational: bool,
 
     /// file paths, directories, or glob patterns (default: tests/fixtures)
     #[argh(positional)]
@@ -178,25 +245,64 @@ impl LogicalOp {
             Self::Nullish => "??",
         }
     }
-
-    const ALL: [Self; 3] = [Self::And, Self::Or, Self::Nullish];
 }
 
-/// One re-association site in the formatted base: insert `(` at `open`, `)` at `close`.
+/// What a site's spliced pair is a twin OF — the audit's classes, one row each in the
+/// report. A closed set, so a class with zero sites reads as a corpus gap rather than a
+/// pass.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+enum SiteKind {
+    /// Same-operator logical re-association: `a op b op c` against `a op (b op c)`.
+    Logical(LogicalOp),
+    /// A shell around a relational `<`…`>` CHAIN: `a < X > c` against `(a < X) > c`.
+    RelationalChain,
+    /// A shell around the `<` OPERAND of such a chain: `a < X > c` against `a < (X) > c`.
+    /// The direction the region test is most exposed to: a shell there changes which head
+    /// arm the type-argument lookahead dispatches on, where the chain's own shell only
+    /// changes where the scan stops.
+    RelationalOperand,
+}
+
+impl SiteKind {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Logical(op) => op.label(),
+            Self::RelationalChain => "< > chain",
+            Self::RelationalOperand => "< > operand",
+        }
+    }
+
+    const ALL: [Self; 5] = [
+        Self::Logical(LogicalOp::And),
+        Self::Logical(LogicalOp::Or),
+        Self::Logical(LogicalOp::Nullish),
+        Self::RelationalChain,
+        Self::RelationalOperand,
+    ];
+
+    /// Whether this class is a relational one — the two rows whose own vacuity floor the
+    /// run checks, so the class cannot quietly stop enumerating.
+    fn is_relational(self) -> bool {
+        !matches!(self, Self::Logical(_))
+    }
+}
+
+/// One site in the formatted base: insert `(` at `open`, `)` at `close`.
 #[derive(Clone, Copy, Debug)]
 struct Site {
     open: usize,
     close: usize,
-    op: LogicalOp,
+    kind: SiteKind,
 }
 
-/// A file's enumeration: the sites to probe, and a count of the ones excluded as unsound.
-/// The exclusion is counted rather than dropped silently — an audit that quietly stops
+/// A file's enumeration: the sites to probe, and counts of the ones excluded as unsound.
+/// Each exclusion is counted rather than dropped silently — an audit that quietly stops
 /// probing a class reads exactly like one that finds nothing in it.
 #[derive(Default)]
 struct Sites {
     probed: Vec<Site>,
     comment_bound: usize,
+    parse_divergent: usize,
 }
 
 /// Collect every same-operator re-association site in a wire AST.
@@ -214,14 +320,11 @@ fn collect_sites(node: &Value, f: &str, map: &Utf16ToByte, out: &mut Sites) {
             }
         }
         Value::Object(fields) => {
-            if let Some(site) = site_at(fields, map) {
-                // The one unsound splice, excluded rather than reported: see
-                // [`splits_forward_binding_comment`].
-                if splits_forward_binding_comment(f, site.open) {
-                    out.comment_bound += 1;
-                } else {
-                    out.probed.push(site);
-                }
+            if let Some(site) = logical_site_at(fields, map) {
+                push_site(site, f, out);
+            }
+            for site in relational_sites_at(fields, map).into_iter().flatten() {
+                push_site(site, f, out);
             }
             for (key, value) in fields {
                 // `loc` is the only object-valued field that carries no nodes; skipping it
@@ -260,9 +363,71 @@ fn splits_forward_binding_comment(f: &str, at: usize) -> bool {
     f[..at].trim_end().ends_with("*/")
 }
 
-/// The site this node is, if it is one: a `LogicalExpression` whose left operand is a
-/// `LogicalExpression` with the same operator.
-fn site_at(fields: &serde_json::Map<String, Value>, map: &Utf16ToByte) -> Option<Site> {
+/// Record one site, unless splicing it would re-bind a forward-binding comment — the one
+/// unsound splice, excluded rather than reported (see [`splits_forward_binding_comment`]).
+fn push_site(site: Site, f: &str, out: &mut Sites) {
+    if splits_forward_binding_comment(f, site.open) {
+        out.comment_bound += 1;
+    } else {
+        out.probed.push(site);
+    }
+}
+
+/// The two shells a relational `<`…`>` chain is probed with, when this node is one: a
+/// `BinaryExpression` `>` whose left operand is a `BinaryExpression` `<`.
+///
+/// Both splices are pure paren insertions around a whole operand, with none of the logical
+/// splice's re-association argument to make (nothing moves). Whether tsv's own parser reads
+/// each twin as the same document is a separate question, answered per site by
+/// [`ParenAuditCommand::twin_is_same_document`]. The pair is what tsv's own
+/// relational-chain rule synthesizes and retains
+/// (`conformance_prettier_ts.md` §Relational chain type-argument parens), and that rule
+/// reads BYTES — which head the `<` region opens with, where the region's scan stops — so
+/// both authorings have to reach one fixed point or the rule is keyed on the spelling
+/// rather than on the program.
+fn relational_sites_at(
+    fields: &serde_json::Map<String, Value>,
+    map: &Utf16ToByte,
+) -> [Option<Site>; 2] {
+    let none = [None, None];
+    let binary_op = |node: &serde_json::Map<String, Value>| -> Option<String> {
+        (node.get("type")?.as_str()? == "BinaryExpression")
+            .then(|| node.get("operator")?.as_str().map(str::to_string))
+            .flatten()
+    };
+    if binary_op(fields).as_deref() != Some(">") {
+        return none;
+    }
+    let Some(left) = fields.get("left").and_then(Value::as_object) else {
+        return none;
+    };
+    if binary_op(left).as_deref() != Some("<") {
+        return none;
+    }
+    let span = |node: &serde_json::Map<String, Value>| -> Option<Site> {
+        let open = map.byte(node.get("start")?.as_u64()? as usize)?;
+        let close = map.byte(node.get("end")?.as_u64()? as usize)?;
+        (open < close).then_some(Site {
+            open,
+            close,
+            kind: SiteKind::RelationalChain,
+        })
+    };
+    let chain = span(left);
+    let operand = left
+        .get("right")
+        .and_then(Value::as_object)
+        .and_then(span)
+        .map(|site| Site {
+            kind: SiteKind::RelationalOperand,
+            ..site
+        });
+    [chain, operand]
+}
+
+/// The logical site this node is, if it is one: a `LogicalExpression` whose left operand
+/// is a `LogicalExpression` with the same operator.
+fn logical_site_at(fields: &serde_json::Map<String, Value>, map: &Utf16ToByte) -> Option<Site> {
     if fields.get("type")?.as_str()? != "LogicalExpression" {
         return None;
     }
@@ -278,7 +443,24 @@ fn site_at(fields: &serde_json::Map<String, Value>, map: &Utf16ToByte) -> Option
     // parenthesized operand stops before its own `)`.
     let open = map.byte(left.get("right")?.as_object()?.get("start")?.as_u64()? as usize)?;
     let close = map.byte(fields.get("end")?.as_u64()? as usize)?;
-    (open < close).then_some(Site { open, close, op })
+    (open < close).then_some(Site {
+        open,
+        close,
+        kind: SiteKind::Logical(op),
+    })
+}
+
+/// Drop every positional key from a wire AST, in place — what is left is the tree alone,
+/// which is what "the same document" means for a splice that inserts two bytes.
+fn strip_positions(node: &mut Value) {
+    match node {
+        Value::Array(items) => items.iter_mut().for_each(strip_positions),
+        Value::Object(fields) => {
+            fields.retain(|key, _| !matches!(key.as_str(), "start" | "end" | "loc" | "range"));
+            fields.values_mut().for_each(strip_positions);
+        }
+        _ => {}
+    }
 }
 
 /// Splice one site's redundant parens into the formatted base.
@@ -334,7 +516,7 @@ impl Verdict {
 struct Finding {
     path: String,
     offset: usize,
-    op: LogicalOp,
+    kind: SiteKind,
     verdict: Verdict,
     context: String,
     /// The first line at which `format(variant)` departs from the base, as
@@ -365,8 +547,14 @@ struct Report {
     panics: CappedPaths,
     sites: usize,
     sites_comment_bound: usize,
+    /// Relational sites whose twin tsv rejects or reads as a different program — see
+    /// [`ParenAuditCommand::twin_is_same_document`].
+    sites_parse_divergent: usize,
     counts: BTreeMap<Verdict, usize>,
-    op_counts: BTreeMap<(LogicalOp, Verdict), usize>,
+    kind_counts: BTreeMap<(SiteKind, Verdict), usize>,
+    /// Sites enumerated per class, so a class that stops producing them fails its own
+    /// vacuity floor instead of riding the others' counts.
+    kind_sites: BTreeMap<SiteKind, usize>,
     findings: Vec<Finding>,
     /// Sequence number for `--dump-dir` case directories, so two findings in one file do not
     /// collide on a name.
@@ -378,8 +566,18 @@ impl Report {
         self.counts.get(&v).copied().unwrap_or(0)
     }
 
-    fn op_count(&self, op: LogicalOp, v: Verdict) -> usize {
-        self.op_counts.get(&(op, v)).copied().unwrap_or(0)
+    fn kind_count(&self, kind: SiteKind, v: Verdict) -> usize {
+        self.kind_counts.get(&(kind, v)).copied().unwrap_or(0)
+    }
+
+    /// Sites enumerated across the relational classes — the seed-set vacuity floor's
+    /// denominator, read only by a run that asked for it.
+    fn relational_sites(&self) -> usize {
+        self.kind_sites
+            .iter()
+            .filter(|(kind, _)| kind.is_relational())
+            .map(|(_, n)| n)
+            .sum()
     }
 
     fn findings_total(&self) -> usize {
@@ -397,6 +595,17 @@ impl Report {
     /// A panicking file is the same shape one step louder.
     fn failed(&self) -> bool {
         self.findings_total() + self.base_non_idempotent.count() + self.panics.count() > 0
+    }
+
+    /// Whether every vacuity floor THIS run is held to was met — the total always, the
+    /// relational one only when the invocation asked for it.
+    ///
+    /// Stated once because the report's ✓ and the exit code are two readings of it, and a ✓
+    /// keyed on a floor the run was never held to is the same doctrine break as one keyed on
+    /// too few: over real code the relational rows are legitimately zero, and a ✓ withheld
+    /// there reads as a failure the run did not have.
+    fn floors_met(&self, require_relational: bool) -> bool {
+        self.sites > 0 && (!require_relational || self.relational_sites() > 0)
     }
 }
 
@@ -427,9 +636,9 @@ impl ParenAuditCommand {
         }
 
         if self.json {
-            print_json(&report);
+            print_json(&report, self.require_relational);
         } else {
-            print_human(&report, self.examples);
+            print_human(&report, self.examples, self.require_relational);
         }
 
         // A base-non-idempotent file is excluded from the re-association analysis (its fixed
@@ -441,7 +650,51 @@ impl ParenAuditCommand {
         // The floor UNDER the non-empty resolution: this audit's product is per-SITE, so a
         // corpus of files that hold no same-operator chain renders exactly the tables a
         // clean run does. The resolution's non-empty file list cannot see that.
-        check_graded_nonzero(report.sites, "logical re-association sites")
+        check_graded_nonzero(report.sites, "paren-authoring sites")?;
+        // A second floor, per CLASS — and an OPT-IN one, because it is a claim about the
+        // SEED SET rather than about the audit. Logical chains are everywhere, so the total
+        // above holds on any corpus; a relational `a < b > c` chain is written in the fixture
+        // tree and essentially nowhere else, so over real code zero relational sites is the
+        // correct reading. Only the invocation whose corpus holds the class asks for it.
+        if self.require_relational {
+            check_required_nonzero(
+                report.relational_sites(),
+                "relational chain sites",
+                "--require-relational",
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Whether a site's twin is the SAME DOCUMENT to tsv's own parser — its precondition,
+    /// since a formatter cannot be asked to reach one fixed point from two programs.
+    ///
+    /// The relational splice is tree-preserving **in the language**: parenthesizing a whole
+    /// operand changes no program. It is **not** guaranteed to be tree-preserving under tsv's
+    /// `Parse`, so the twin may fail to parse there, or parse as a different tree.
+    ///
+    /// Checked only for the relational classes, and only because a paren around a `<`
+    /// operand genuinely can move tsv's PARSE: the type-argument lookahead's `(` head arm
+    /// grades bracket matching and the follow token alone, never the content, so a shell can
+    /// turn the comparison into a type-argument list. Where that list's body is no type, tsv
+    /// then REJECTS the twin — `x < (1 + 2) > (t, u)`, which acorn reads as the comparison
+    /// chain its paren-free twin is. Where the body happens to parse as one, the twin is a
+    /// DIFFERENT TREE — `p < (readonly.a) > (t, u)`, a call with type arguments to tsv and a
+    /// comparison chain to acorn. Either way it is a PARSER divergence against tsv's parse
+    /// oracle rather than a formatting question, so this audit excludes the site and counts
+    /// it, the way it does a comment-bound one.
+    ///
+    /// The logical class asks nothing of the kind: its splice re-associates a tree acorn
+    /// builds the same either way, so a twin that fails to parse there stays the loud
+    /// `VariantParseError` finding it always was.
+    fn twin_is_same_document(f: &str, site: &Site, base: &Value, parser: ParserType) -> bool {
+        let Some(mut twin) = tsv_parse_to_value(&splice(f, site), parser) else {
+            return false;
+        };
+        let mut base = base.clone();
+        strip_positions(&mut twin);
+        strip_positions(&mut base);
+        twin == base
     }
 
     fn scan_file(&self, path: &Path, report: &mut Report) {
@@ -482,8 +735,19 @@ impl ParenAuditCommand {
         let map = Utf16ToByte::new(&f);
         let mut sites = Sites::default();
         collect_sites(&wire, &f, &map, &mut sites);
+        sites.probed.retain(|site| {
+            if site.kind.is_relational() && !Self::twin_is_same_document(&f, site, &wire, parser) {
+                sites.parse_divergent += 1;
+                return false;
+            }
+            true
+        });
         report.sites += sites.probed.len();
         report.sites_comment_bound += sites.comment_bound;
+        report.sites_parse_divergent += sites.parse_divergent;
+        for site in &sites.probed {
+            *report.kind_sites.entry(site.kind).or_default() += 1;
+        }
         for site in &sites.probed {
             self.probe(path, &f, site, parser, report);
         }
@@ -506,7 +770,7 @@ impl ParenAuditCommand {
             }
         };
         *report.counts.entry(verdict).or_default() += 1;
-        *report.op_counts.entry((site.op, verdict)).or_default() += 1;
+        *report.kind_counts.entry((site.kind, verdict)).or_default() += 1;
         if verdict.is_finding() {
             if let Some(dir) = &self.dump_dir {
                 report.dump_seq += 1;
@@ -527,7 +791,7 @@ impl ParenAuditCommand {
             report.findings.push(Finding {
                 path: path.display().to_string(),
                 offset: site.open,
-                op: site.op,
+                kind: site.kind,
                 verdict,
                 context: line_context(f, site.open),
                 first_diff,
@@ -544,8 +808,8 @@ fn describe_first_diff(base: &str, variant: &str) -> Option<(usize, String, Stri
     })
 }
 
-fn print_human(report: &Report, examples: usize) {
-    println!("Paren-authoring independence audit (same-operator logical re-association)");
+fn print_human(report: &Report, examples: usize, require_relational: bool) {
+    println!("Paren-authoring independence audit (logical re-association + relational chain)");
     println!(
         "  files: {} scanned, {} parse-error, {} read-error, {} output-reparse-error, {} ignore-directive (skipped), {} base-non-idempotent",
         report.files_scanned,
@@ -556,8 +820,10 @@ fn print_human(report: &Report, examples: usize) {
         report.base_non_idempotent.count(),
     );
     println!(
-        "  sites probed: {} ({} excluded — a `(` there would re-bind a forward-binding comment)",
-        report.sites, report.sites_comment_bound,
+        "  sites probed: {} ({} excluded — a `(` there would re-bind a forward-binding comment; \
+{} relational excluded — tsv rejects the twin or parses it as a different program, a \
+parse-oracle question, not this gate's)",
+        report.sites, report.sites_comment_bound, report.sites_parse_divergent,
     );
     println!();
     println!("  verdicts:");
@@ -579,16 +845,16 @@ fn print_human(report: &Report, examples: usize) {
     );
 
     println!();
-    println!("  by operator (a zero row is a corpus gap, not a pass):");
-    print!("    {:<10}", "operator");
+    println!("  by site class (a zero row is a corpus gap, not a pass):");
+    print!("    {:<14}", "class");
     for v in Verdict::ALL {
         print!("{:>24}", v.key());
     }
     println!();
-    for op in LogicalOp::ALL {
-        print!("    {:<10}", op.label());
+    for kind in SiteKind::ALL {
+        print!("    {:<14}", kind.label());
         for v in Verdict::ALL {
-            print!("{:>24}", report.op_count(op, v));
+            print!("{:>24}", report.kind_count(kind, v));
         }
         println!();
     }
@@ -618,9 +884,14 @@ fn print_human(report: &Report, examples: usize) {
         // the run: a run that graded no site is about to fail the vacuity floor, and one
         // holding a base-non-idempotent file has already printed the ✗ list above and exits
         // 1. A ✓ over either reads as a pass the run is not entitled to.
-        if report.sites > 0 && !report.failed() {
+        //
+        // Every floor the run is HELD TO is read here, which is what `floors_met` states: a
+        // ✓ keyed on the total alone would print over a `--require-relational` run that then
+        // exits 1, and one that read the relational rows without the flag would withhold the
+        // ✓ from a real-code run that legitimately holds no relational chain and exits 0.
+        if report.floors_met(require_relational) && !report.failed() {
             println!();
-            println!("  ✓ every same-operator chain formats identically to its parenthesized twin");
+            println!("  ✓ every chain formats identically to its redundantly-parenthesized twin");
         }
         return;
     }
@@ -633,7 +904,7 @@ fn print_human(report: &Report, examples: usize) {
             "    {}:{}  {}  [{}]",
             finding.path,
             finding.offset,
-            finding.op.label(),
+            finding.kind.label(),
             finding.verdict.key(),
         );
         println!("      «{}»", finding.context);
@@ -653,24 +924,24 @@ fn print_human(report: &Report, examples: usize) {
     }
 }
 
-fn print_json(report: &Report) {
+fn print_json(report: &Report, require_relational: bool) {
     let counts: serde_json::Map<String, Value> = Verdict::ALL
         .iter()
         .map(|v| (v.key().to_string(), serde_json::json!(report.count(*v))))
         .collect();
-    let op_counts: serde_json::Map<String, Value> = LogicalOp::ALL
+    let kind_counts: serde_json::Map<String, Value> = SiteKind::ALL
         .iter()
-        .map(|op| {
+        .map(|kind| {
             let per: serde_json::Map<String, Value> = Verdict::ALL
                 .iter()
                 .map(|v| {
                     (
                         v.key().to_string(),
-                        serde_json::json!(report.op_count(*op, *v)),
+                        serde_json::json!(report.kind_count(*kind, *v)),
                     )
                 })
                 .collect();
-            (op.label().to_string(), Value::Object(per))
+            (kind.label().to_string(), Value::Object(per))
         })
         .collect();
     let findings: Vec<Value> = report
@@ -680,7 +951,7 @@ fn print_json(report: &Report) {
             serde_json::json!({
                 "path": f.path,
                 "offset": f.offset,
-                "operator": f.op.label(),
+                "class": f.kind.label(),
                 "verdict": f.verdict.key(),
                 "context": f.context,
                 "first_diff": f.first_diff.as_ref().map(|(line, base, variant)| serde_json::json!({
@@ -701,8 +972,11 @@ fn print_json(report: &Report) {
         "files_panicked": report.panics.count(),
         "sites": report.sites,
         "sites_comment_bound": report.sites_comment_bound,
+        "sites_parse_divergent": report.sites_parse_divergent,
         "counts": counts,
-        "op_counts": op_counts,
+        "kind_counts": kind_counts,
+        "relational_sites": report.relational_sites(),
+        "require_relational": require_relational,
         "findings": findings,
         "base_non_idempotent_sample": report.base_non_idempotent.sample(),
         "panicked_sample": report.panics.sample(),
@@ -725,6 +999,25 @@ mod tests {
         assert!(!report.failed());
         report.panics.push("seed.ts: boom".to_string());
         assert!(report.failed());
+    }
+
+    /// The relational floor is a claim about the SEED SET, so it is read only by a run that
+    /// asked for it: a real-code corpus holds logical chains and no relational one, and
+    /// withholding the ✓ there reads as a failure the run does not have.
+    #[test]
+    fn the_relational_floor_is_read_only_when_required() {
+        let logical_only = Report {
+            sites: 2530,
+            ..Report::default()
+        };
+        assert_eq!(logical_only.relational_sites(), 0);
+        assert!(logical_only.floors_met(false));
+        assert!(!logical_only.floors_met(true));
+
+        // The total floor stays unconditional — a run that graded nothing meets neither.
+        let empty = Report::default();
+        assert!(!empty.floors_met(false));
+        assert!(!empty.floors_met(true));
     }
 
     /// Enumerate the sites of a TypeScript snippet, as the audit does.
@@ -849,8 +1142,23 @@ mod tests {
         let map = Utf16ToByte::new(source);
         let mut out = Sites::default();
         collect_sites(&wire, source, &map, &mut out);
-        let mut ops: Vec<&str> = out.probed.iter().map(|s| s.op.label()).collect();
+        let mut ops: Vec<&str> = out.probed.iter().map(|s| s.kind.label()).collect();
         ops.sort_unstable();
         assert_eq!(ops, ["&&", "??", "||"]);
+    }
+
+    /// A relational `<`…`>` chain contributes BOTH shells — around the chain and around the
+    /// `<` operand — and a `<` under any other operator contributes neither, since the rule
+    /// the class grades is keyed on that one join.
+    #[test]
+    fn a_relational_chain_enumerates_both_shells() {
+        let mut kinds: Vec<&str> = sites_of("const x = (a < b) > c;")
+            .iter()
+            .map(|s| s.kind.label())
+            .collect();
+        kinds.sort_unstable();
+        assert_eq!(kinds, ["< > chain", "< > operand"]);
+        assert!(sites_of("const x = a < b;").is_empty());
+        assert!(sites_of("const x = a > b > c;").is_empty());
     }
 }
