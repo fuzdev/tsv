@@ -451,7 +451,7 @@ fn compile_unwraps_a_jsdoc_cast() {
     // `/** @type {T} */ (expr)` is an internal-only wrapper for the cast's
     // parens. The oracle has no such node — it prints the JSDoc as a detached
     // leading comment, drops the parens, and FOLDS the inner value. Valid
-    // JavaScript, so it must not trip the `lang="ts"` gate either.
+    // JS, so it must not trip the `lang="ts"` gate either.
     assert_eq!(
         compile_js("<script>\n\tconst x = /** @type {number} */ (1);\n</script>\n<p>{x}</p>"),
         "import * as $ from 'svelte/internal/server';\nexport default function Input($$renderer) {\n\tconst x = /** @type {number} */ 1;\n\t$$renderer.push(`<p>1</p>`);\n}\n"

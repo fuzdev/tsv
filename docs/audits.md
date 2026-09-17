@@ -367,7 +367,7 @@ the canonical parser, so it is conformance-tier at best). Standing findings:
   `read_pattern` deletes one blank from its prefix; a run that reaches `read_script`'s body
   carries on into the body's own whitespace; and `read_type_annotation`'s `_ as ` is spliced
   OVER five document bytes, so a `\n` among them is one acorn never sees. The blanks are
-  built in **JavaScript's** units at that — `\S` complements JS `\s`, not Rust's
+  built in **JS's** units at that — `\S` complements JS `\s`, not Rust's
   `White_Space`, and `String.replace` walks UTF-16 code units, so an astral character blanks
   to two columns. Pinned by
   [comment_dedent_manufactured_source.rs](../tests/comment_dedent_manufactured_source.rs)

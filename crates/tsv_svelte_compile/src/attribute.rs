@@ -256,7 +256,7 @@ pub(crate) fn class_needs_clsx(expr: &Expression<'_>, quoted: bool) -> bool {
 /// **Two different whitespace classes, in this order.** The collapse is the
 /// NARROW `regex_whitespaces_strict = /[ \t\n\r\f]+/g` (`phases/patterns.js:11`)
 /// — deliberately not `\s+`, so an explicit `&nbsp;` inside the value survives.
-/// The trim is then JavaScript's WIDE `String.prototype.trim`
+/// The trim is then JS's WIDE `String.prototype.trim`
 /// ([`js_trim`]). Fusing the two into one narrow-class pass — collapsing and
 /// dropping the edge runs together — is not the same function: a boundary
 /// character that is JS whitespace but not in the narrow class (`U+00A0`,

@@ -28,7 +28,7 @@ pub const HEURISTIC_DIRS: [&str; 3] = ["dist", "build", "target"];
 
 /// The file extensions tsv formats — the discovery filter behind
 /// [`is_formattable`]. The whole JS/TS family (`ts`/`mts`/`cts`/`js`/`mjs`/`cjs`)
-/// parses as TypeScript, a syntactic superset of JavaScript — the same dispatch
+/// parses as TypeScript, a syntactic superset of JS — the same dispatch
 /// an explicitly named file gets from `ParserType::from_extension`, so a walk and
 /// a named path agree on every extension. JSX/TSX is out of tsv's scope, so `jsx`
 /// and `tsx` are deliberately absent; JSX inside a `.js` file is a parse error

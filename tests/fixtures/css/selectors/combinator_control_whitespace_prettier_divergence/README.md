@@ -2,7 +2,7 @@
 
 A descendant combinator authored with a C0 control character that Svelte's
 `parseCss` counts as whitespace — U+000B LINE TABULATION (VT) or U+000C FORM
-FEED (FF). Svelte's selector reader uses JavaScript `\s` regexes, and JS `\s`
+FEED (FF). Svelte's selector reader uses JS `\s` regexes, and JS `\s`
 includes both, so `div<VT>p` and `div<FF>p` tokenize exactly like `div p`: one
 descendant combinator between the two type selectors. tsv's parser matches
 Svelte byte-for-byte here (`Combinator " "`, span 3–4), so `expected.json` is the

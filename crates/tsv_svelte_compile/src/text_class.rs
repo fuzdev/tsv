@@ -25,7 +25,7 @@
 //! `whitespace.rs`, beside the shared predicate this file re-exports. Read that before
 //! adding a class here.
 
-/// ECMAScript `WhiteSpace` ∪ `LineTerminator` — the class JavaScript's `\s` matches.
+/// ECMAScript `WhiteSpace` ∪ `LineTerminator` — the class JS's `\s` matches.
 ///
 /// Re-exported from [`tsv_lang`] rather than enumerated here: five crates in this workspace
 /// need the same 25 code points ([`tsv_svelte`]'s tokenizer class, the class `parseCss` skips

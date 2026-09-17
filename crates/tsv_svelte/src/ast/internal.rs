@@ -2276,7 +2276,7 @@ mod lang_attribute_tests {
 
     /// `<script>` takes the whole JS/TS family — the bare language names plus the living
     /// JavaScript MIME essences. The set is drawn where tsv's PRINTER stops, not where
-    /// Svelte's parser switches grammars, and `type="module"` names JavaScript rather than a
+    /// Svelte's parser switches grammars, and `type="module"` names JS rather than a
     /// language of its own.
     #[test]
     fn the_script_set_is_the_js_ts_family() {

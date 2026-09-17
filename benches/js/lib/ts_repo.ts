@@ -185,7 +185,7 @@ export function split_test_units(content: string): TestUnit[] {
  * What a virtual file's name says it holds — the extension class a consumer keys
  * its scope on. `ts` is the JS/TS family tsv formats as TypeScript minus `.tsx`
  * (`.ts`, `.mts`, `.cts`, and the `.d.*` spellings of each); `tsx` is JSX grammar,
- * out of tsv's scope; `js` is JavaScript, which tsc parses under its own JS rules
+ * out of tsv's scope; `js` is plain JS, which tsc parses under its own JS rules
  * (JSDoc types, no TS syntax) and so is not graded by a tsc-baseline oracle keyed
  * on TS; `other` is everything a compile reads without parsing as code —
  * `package.json`, `tsconfig.json`, `.css`, `.md`.

@@ -409,7 +409,7 @@ fn analyze<'arena>(
             // `ts` flag: without it, a `: T` / `as T` / `x!` is a plain-JS parse
             // error. tsv's parser is TS-permissive and would silently accept —
             // an over-acceptance the refusal contract forbids. (The eraser also
-            // unwraps `JsdocCast`, which is valid JavaScript, so the gate reads
+            // unwraps `JsdocCast`, which is valid JS, so the gate reads
             // `typescript`, not `changed`.)
             if erased.typescript && !ts_document {
                 return Err(unsupported(Refusal::TypeScriptWithoutLangTs));

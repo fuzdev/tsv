@@ -138,7 +138,7 @@ switches grammars.** Those are different lines and must not be conflated: Svelte
 (`1-parse/index.js`) recognizes the single raw value `ts` and answers "should acorn accept
 TypeScript syntax here?", while this rule asks "can tsv print this body?" — and tsv's printer
 takes the whole family, since it parses every body under the TS grammar regardless of the name
-on the tag. `module` is in the set because `type="module"` names JavaScript: on a `<script>`,
+on the tag. `module` is in the set because `type="module"` names JS: on a `<script>`,
 `type` is a loading and MIME attribute, so the value it carries need not be a language at all
 — and for the same reason the set takes the **living JavaScript MIME essences** beside the
 bare names, since `text/javascript` and `application/javascript` name one language and the
@@ -203,7 +203,7 @@ rule that decides which side a value lands on:
   [foreign_lang_frozen](../tests/fixtures/svelte/script/foreign_lang_frozen_prettier_divergence/)
   (`lang="foo"` at the top level, `application/json` and `importmap` nested). The unknown
   name is the case where prettier's fallthrough is least defensible — it hands a body it
-  knows nothing about to a JavaScript printer on the strength of having no entry in a
+  knows nothing about to a JS printer on the strength of having no entry in a
   hand-maintained list — and the JSON one is where prettier's own answer is a hard
   **error** on a body that is not JSON, landing on its degraded error-swallow path. A body
   prettier freezes too agrees and is the plain

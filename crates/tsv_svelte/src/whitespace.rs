@@ -67,9 +67,9 @@
 /// Whether `c` is whitespace to **Svelte's parser** — the class that separates tokens,
 /// ends a tag-name or attribute-name run, and satisfies a block keyword's required space.
 ///
-/// This is exactly JavaScript's `\s` ([`tsv_lang::is_js_whitespace`], which owns the set and
+/// This is exactly JS's `\s` ([`tsv_lang::is_js_whitespace`], which owns the set and
 /// its exhaustive test), because every place Svelte asks the question is spelled in
-/// JavaScript: `is_whitespace(cc)` (`1-parse/index.js`, backing `allow_whitespace` /
+/// JS: `is_whitespace(cc)` (`1-parse/index.js`, backing `allow_whitespace` /
 /// `require_whitespace`) enumerates these code points by hand, and the name-run regexes match
 /// the same set through `\s` — `regex_whitespace_or_slash_or_closing_tag = /(\s|\/|>)/` for
 /// tag names and `regex_token_ending_character = /[\s=/>"']/` for attribute and directive

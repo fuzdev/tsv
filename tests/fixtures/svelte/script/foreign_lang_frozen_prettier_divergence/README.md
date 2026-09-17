@@ -20,7 +20,7 @@ let  a  =  1                        	let a = 1;
 
 Three cells, one rule. `lang="foo"` is the **unknown-name** case, where reflowing is least
 defensible: the name tsv has never heard of is exactly the one whose body it knows nothing
-about, and prettier's fallthrough would hand it to a JavaScript printer on the strength of
+about, and prettier's fallthrough would hand it to a JS printer on the strength of
 having no entry in a hand-maintained list. The two JSON cells are the **can't-print** case:
 prettier reaches for its JSON parser there and hard-**errors** on a body that is not JSON
 (landing on its degraded error-swallow path), so freezing is the better answer rather than

@@ -1,9 +1,9 @@
-//! Svelte-to-JS compiler and JavaScript canonicalizer.
+//! Svelte-to-JS compiler and JS canonicalizer.
 //!
-//! This crate compiles Svelte components to JavaScript, pinned to Svelte's own
+//! This crate compiles Svelte components to JS, pinned to Svelte's own
 //! `compile()` as the correctness oracle. Parity is judged not on raw output
 //! bytes but on the *canonical reprint* of both sides: [`canonicalize_js`] parses
-//! JavaScript and reprints it with newline-derived authoring intent erased, so a
+//! JS and reprints it with newline-derived authoring intent erased, so a
 //! diff between two canonical forms reflects only a real code difference, never
 //! incidental whitespace.
 //!
@@ -144,7 +144,7 @@ pub struct CompileWarning {
 /// The product of a successful [`compile`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompileOutput {
-    /// The generated JavaScript module.
+    /// The generated JS module.
     pub js: String,
     /// The extracted, scoped CSS, if the component had a `<style>`.
     pub css: Option<String>,
@@ -165,7 +165,7 @@ pub enum CompileError {
     #[error("not yet supported by the Svelte compiler: {0}")]
     Unsupported(Refusal),
     /// The generated JS failed to reparse — a divergent shape slipped every
-    /// guard and the transform emitted invalid JavaScript. Always a compiler
+    /// guard and the transform emitted invalid JS. Always a compiler
     /// bug; surfaced loudly instead of returning the corrupt module (the same
     /// contract as [`CanonicalizeError::CorruptOutput`]).
     #[error("generated JS failed to reparse (compiler bug): {0}")]
@@ -191,8 +191,8 @@ pub enum CompileError {
 /// An error from [`canonicalize_js`].
 #[derive(Debug, thiserror::Error)]
 pub enum CanonicalizeError {
-    /// The input did not parse as a JavaScript/TypeScript module.
-    #[error("failed to parse JavaScript for canonicalization: {0}")]
+    /// The input did not parse as a TypeScript/JS module.
+    #[error("failed to parse JS for canonicalization: {0}")]
     Parse(#[from] tsv_lang::ParseError),
     /// The canonical reprint itself failed to reparse — the canonicalizer
     /// corrupted the program (e.g. content trailed onto a `//` comment's line).
@@ -202,7 +202,7 @@ pub enum CanonicalizeError {
     CorruptOutput(tsv_lang::ParseError),
 }
 
-/// Compile a Svelte component to JavaScript.
+/// Compile a Svelte component to JS.
 ///
 /// Parses `source` (surfacing any real parse error as [`CompileError::Parse`])
 /// and runs the server transform. The generated JS is already in canonical form
@@ -241,7 +241,7 @@ fn validate_output_js(js: &str) -> Result<(), CompileError> {
     }
 }
 
-/// Reprint JavaScript with newline-derived authoring intent erased — the
+/// Reprint JS with newline-derived authoring intent erased — the
 /// canonical form used for parity comparison.
 ///
 /// Parses `source` as a strict module ([`Goal::Module`]) and reprints it via

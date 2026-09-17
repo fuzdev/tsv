@@ -1,6 +1,6 @@
 # tsv_svelte_compile
 
-> Svelte-to-JS compiler (pinned to Svelte's `compile()` as oracle) plus the JavaScript canonicalizer that makes oracle comparison meaningful.
+> Svelte-to-JS compiler (pinned to Svelte's `compile()` as oracle) plus the JS canonicalizer that makes oracle comparison meaningful.
 
 ## Architecture Position
 
@@ -237,7 +237,7 @@ project-wide conventions.
   the `None` contract is the whole safety argument: re-running the eraser over the
   *finished* program and getting no change PROVES no TypeScript survived — the one
   check that catches a missed erase, which the output reparse cannot (a surviving
-  annotation still parses). Besides TypeScript it applies two JavaScript
+  annotation still parses). Besides TypeScript it applies two JS
   normalizations the oracle's printer makes: a `JsdocCast` unwraps, and a same-name
   longhand property (`{ a: a }`) collapses to the shorthand esrap prints
   (`Eraser::same_name_shorthand`, recording the dropped `a:` gap as a comment
@@ -1446,7 +1446,7 @@ non-dev), `CompileOutput { js, css, warnings }`, `CompileWarning { code, message
 
 ## The Canonicalizer Contract
 
-`canonicalize_js` parses JavaScript as a strict module (`tsv_ts::Goal::Module`)
+`canonicalize_js` parses JS as a strict module (`tsv_ts::Goal::Module`)
 and reprints it through `tsv_ts::format_canonical`, which erases newline-derived
 *authoring intent*:
 

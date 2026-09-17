@@ -24,7 +24,7 @@ typed snippet head (`{#snippet fn<T>(a: T)}`), a typed `{#each}` binding
 ## Why this fixture exists
 
 This is **not** a sanctioned correction: Svelte's verdict is the drop-in target, and a
-document with no `ts` flag is JavaScript. tsv's Svelte parser simply does not carry the
+document with no `ts` flag is JS. tsv's Svelte parser simply does not carry the
 document's TypeScript flag today (`component_is_typescript` lives in the wire-JSON convert
 layer, so it can shape the AST but not gate the parse), which makes this **one class across
 every TS-bearing island**, not a snippet bug — the parser-level twin of the over-acceptance

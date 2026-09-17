@@ -45,7 +45,7 @@
  * ⚠ **The reduced row is NOT payload-matched to tsv's `no-locations` wire**, which
  * is why it is named for the option it passes rather than for tsv's. tsv drops
  * per-node `loc` throughout; `skipExpressionLoc` drops only the nested `loc`
- * blocks on embedded JavaScript expressions and keeps top-level `start`/`end`, so
+ * blocks on embedded JS expressions and keeps top-level `start`/`end`, so
  * it reduces strictly less. Two different reductions — read the pair as "each
  * tool's own lighter wire", never as one payload measured twice.
  *

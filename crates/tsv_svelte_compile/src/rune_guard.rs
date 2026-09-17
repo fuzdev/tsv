@@ -373,7 +373,7 @@ fn collect_nested_declared(pattern: &Expression<'_>, ctx: &mut WalkCtx<'_>) {
 /// `ExpressionKind::Identifier` arm sound: a `$$slots` *reference* is the real
 /// runtime value the transform injects, while a `$$slots` *declaration* is a
 /// compile error. The rule is Svelte-domain, not a JS early error — `let $$slots
-/// = 1` is valid JavaScript.
+/// = 1` is valid JS.
 ///
 /// **The oracle reaches `validate_identifier_name` from FOUR sites, and only two
 /// of them pass `function_depth`** — so "oracle-rejected" is not one answer for
