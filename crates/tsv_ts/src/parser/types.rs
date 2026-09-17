@@ -83,7 +83,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Returns the type **arena-allocated**, as does every builder on the ladder below
     /// it (`parse_union_type` → `parse_intersection_type` → `parse_array_type` →
     /// `parse_primary_type` and each leaf it dispatches to), each boxing at its own
-    /// tail — the `ParsedExpr` rule applied to types: no `parse_*` reached from a
+    /// tail — the expression ladder's rule applied to types: no `parse_*` reached from a
     /// dispatcher returns the bare `TSType` enum. A by-value `TSType` (80 B) comes back
     /// through a caller stack slot at every level of this deep ladder, and a dispatcher
     /// reserves one such slot per arm in every frame; an `&'arena TSType` return is a

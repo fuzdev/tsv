@@ -2123,8 +2123,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // later token boundary are unchanged — so a cached peek (lexed
                 // from `current.end`) stays valid and MUST be kept: clearing
                 // it would desync the cache from the lexer's cursor (the next
-                // fill would silently skip the peeked token).
+                // fill would silently skip the peeked token). `prev_end` moves to
+                // the consumed `>`'s end, as `advance` would have set it.
                 self.current.start += 1;
+                self.prev_end = self.current.start as usize;
                 self.current.kind = TokenKind::GreaterThan;
                 Ok(())
             }
@@ -2133,6 +2135,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Consume first `>` by advancing start position; the cached
                 // peek stays valid (see the `>>` arm).
                 self.current.start += 1;
+                self.prev_end = self.current.start as usize;
                 self.current.kind = TokenKind::RightShift;
                 Ok(())
             }
@@ -2142,6 +2145,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // `>=`, `>>=`, `>>>=` - consume `>`, re-lex from next position
                 // The remainder might combine with subsequent chars (e.g., `>=` -> `=>`)
                 let new_start = self.current.start as usize + 1;
+                self.prev_end = new_start;
                 // Drop comments drained by a discarded peek — the seek below
                 // re-lexes that region, and they'd be collected twice.
                 let relex_from = self.span_pos(new_start);
@@ -2187,8 +2191,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::LeftShift => {
                 // Consume the first `<` by advancing the token start; the
                 // remainder is the inner `<`. The cached peek stays valid
-                // (see `expect_greater_than_in_type`'s `>>` arm).
+                // (see `expect_greater_than_in_type`'s `>>` arm), and `prev_end`
+                // moves to the consumed `<`'s end, as `advance` would have set it.
                 self.current.start += 1;
+                self.prev_end = self.current.start as usize;
                 self.current.kind = TokenKind::LessThan;
                 Ok(())
             }

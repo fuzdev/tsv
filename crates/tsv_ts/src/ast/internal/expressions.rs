@@ -39,8 +39,8 @@ pub enum Expression<'arena> {
     // the ladder stops here: boxing it would tax the common path.
     //
     // The pointer chase this adds is on the rare read, and the parser's recursion is
-    // unaffected either way — it threads expressions by reference already (its
-    // transient `ParsedExpr` holds an `&'arena Expression`).
+    // unaffected either way — it threads expressions by reference already (every
+    // `parse_*` on its ladder returns an `&'arena Expression`).
     ArrowFunctionExpression(&'arena ArrowFunctionExpression<'arena>),
     FunctionExpression(&'arena FunctionExpression<'arena>),
     ClassExpression(&'arena ClassExpression<'arena>),
@@ -813,7 +813,7 @@ impl PropertyKind {
 /// Both slots are `&'arena` references rather than inline `Expression`s, which
 /// takes the element every object literal and every object pattern moves from
 /// 160 B to 32. It costs no allocation: the parser's expression spine already
-/// returns an arena-allocated `&Expression` (`ParsedExpr`), so an inline slot
+/// returns an arena-allocated `&Expression`, so an inline slot
 /// was a copy *out of* the arena rather than the place the node lives — see the
 /// density note in `internal::mod` and `Parser::parse_assignment_expression_ref`.
 #[derive(Debug, Clone)]

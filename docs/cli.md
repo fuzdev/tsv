@@ -203,30 +203,29 @@ host and the platform:
   `tsv parse` has no pool at all, so it took the inherited stack on every platform.
 - which recursion binds **depends on the shape**, and on parens — the shape the flat
   figure below is quoted on — the two sides are level: `parse` reaches the same depth as
-  `format` on the same input (37,329 parens at 32 MiB on both). ⚠️ That does **not**
+  `format` on the same input (~41,700 parens at 32 MiB on both). ⚠️ That does **not**
   generalize. Wherever a **member chain** is involved the printer binds, and by a wide
-  margin: a nested memberish call (`a.f(a.f(…))`) parses to 27,506 levels and formats to
-  9,208, and a nested computed subscript (`a[a[…]]`) parses to 34,270 and formats to
-  11,613 — the chain printer's own frames set the ceiling at ~⅓ of the parser's. **Svelte
+  margin: a nested memberish call (`a.f(a.f(…))`) parses to 30,296 levels and formats to
+  10,384, and a nested computed subscript (`a[a[…]]`) parses to 40,989 and formats to
+  12,135 — the chain printer's own frames set the ceiling at ~⅓ of the parser's. **Svelte
   elements** split too, by less: nested elements parse to 34,270 levels and format to
   24,849. The wire-JSON writer adds nothing on top of the parser on any shape measured.
 
-Measured on `const x = ((((…1…))));`, one nesting level costs ~0.88 KiB of stack in a
-release build (~16 KiB in a debug build, where frames are much larger), so the shipped
-CLI reaches ~37,300 levels on every route and every platform. For scale: the parsers tsv
+Measured on `const x = ((((…1…))));`, one nesting level costs ~0.78 KiB of stack in a
+release build (~17 KiB in a debug build, where frames are much larger), so the shipped
+CLI reaches ~41,700 levels on every route and every platform. For scale: the parsers tsv
 stands in for stop earlier and on the same input — acorn + `@sveltejs/acorn-typescript`
 at 497 levels and prettier at 805, both through V8's own checked stack limit, which is
 why theirs is a catchable `RangeError` and tsv's is not. The deepest file in the tsc
 corpus nests 69 levels; the exposure is generated and minified code.
 
-Parens are not the tightest shape, only the easiest to state. Per nesting level, in a
-release build: **nested arrow bodies (`() => {…}`) and nested memberish calls
-(`a.f(a.f(…))`) ~3.56 KiB** (the two worst measured, level with each other at
-~9,200 levels — the depth every shape clears), nested computed subscripts
-(`a[a[…]]`) ~2.8, TS object literals ~2.4, statement nesting ~2.0, nested binary chains
-~1.5, TS *types* ~1.32, Svelte elements ~1.3 (formatting; ~0.96 to parse), unary
-chains ~1.25, calls ~1.2, array literals ~1.14, parens ~0.88, ternary / assignment
-chains ~0.50, CSS rules ~0.4.
+Parens are not the tightest shape, only the easiest to state. Per nesting level, formatting
+in a release build: **nested arrow bodies (`() => {…}`) ~3.41 KiB** (the worst measured, at
+~9,600 levels — the depth every shape clears), nested memberish calls (`a.f(a.f(…))`)
+~3.16, nested computed subscripts (`a[a[…]]`) ~2.7, TS object literals ~2.4, statement
+nesting ~1.9, calls ~1.44, Svelte elements ~1.32 (~0.96 to parse), TS *types* ~1.32,
+unary chains ~1.24, nested binary operands (`1 + (1 + …)`) ~1.16, array literals ~1.05,
+parens ~0.78, CSS rules ~0.42, ternary / assignment chains ~0.38.
 
 The two chain shapes used to head that list, because a member chain is printed from a
 *grouped* view of a linearized chain and those frames sit on the expression cycle: they
@@ -243,13 +242,17 @@ each dropped 0.39, and so did unary chains (1.64 → 1.25 — nearly a quarter o
 there had cost). The two chain shapes are also the ones on which the printer, not the
 parser, sets the ceiling — see the bullet above. ⚠️ And they are the only two shapes the
 `Expression` enum's own width does *not* reach: every other row above moved when it went
-from 176 bytes to 72 (Svelte elements 3.1 → 1.7, calls 1.9 → 1.25, parens 1.2 → 0.94),
+from 176 bytes to 72 (Svelte elements 3.1 → 1.7, parens 1.2 → 0.94),
 while these two stayed put, because the chain printer's frames — not an `Expression`
 slot — are what sets them. The `TSType` enum's width reaches a different subset again:
-narrowing it 112 → 80 moved TS types 3.2 → 2.35, ternary 0.56 → 0.50, parens 0.94 → 0.88,
-calls 1.25 → 1.2 and array literals 1.2 → 1.14, and left Svelte elements, TS object
+narrowing it 112 → 80 moved TS types 3.2 → 2.35, ternary 0.56 → 0.50, parens 0.94 → 0.88
+and array literals 1.2 → 1.14, and left Svelte elements, TS object
 literals and both chain shapes exactly where they were. Returning `&'arena TSType` rather
 than `TSType` from the type parser's precedence ladder moved TS types 2.35 → 1.32 (below).
+The expression ladder likewise returns a bare `&'arena Expression` rather than a reference
+plus two paren-bound positions, which would come back through a stack slot; that is what
+holds ternary chains at 0.38, parens at 0.78 and array literals at 1.05, and it sets the
+parse-side cost of every expression shape with them (computed subscripts parse at 0.80).
 
 What sets a shape's cost is the stack slots its cycle's functions **reserve**, not the
 work they do: a frame is sized once for the widest arm, and every level pays all of it
@@ -257,7 +260,7 @@ whichever arm it takes — so a dispatcher that holds one by-value AST node per 
 multiplies that node's size by its arm count, at every level, forever. This is why no
 `parse_*` on the expression cycle hands its caller a bare `Expression` by value, and no
 `parse_*` on the type ladder a bare `TSType`: a node builder either boxes into the arena at
-its own tail (`ParsedExpr::from_expr` for expressions, `Parser::alloc` for types, leaving
+its own tail (`alloc_expr` for expressions, `Parser::alloc` for types, leaving
 the caller an 8-byte reference) or returns its own concrete node struct — an
 `ObjectExpression` is 32 B, and the dispatcher arm that wraps one back into an
 `Expression` builds a temporary the compiler merges with its sibling arms' rather than a
@@ -314,11 +317,20 @@ Svelte's parser and prettier each stop only at V8's stack (1,023 nested arrays f
 of the wire left is `tsv_debug`'s `json` module (the fixture gate, the sidecar
 transport, every audit's `Value` walk), which reads with the limit disabled on the same
 `STACK_SIZE` reservation: a `Value` read costs ~0.6 KiB of stack per JSON level
-(measured, and the same for the drop, `==` and pretty-print walks), so ~1.2 KiB per
-nested array against the parser's ~1.14 — the read reaches ~27,500 arrays where the
-parse reaches ~28,000, a 2% band on adversarial input where a *dev tool* would overflow
-instead of erroring, and ~1.8 KiB per nested object against the parser's ~2.4, where
-the parser binds. Fixture
+(measured, and the same for the drop, `==` and pretty-print walks), so it binds, not the
+parse, wherever the parser spends less per source level than ~0.6 KiB times the JSON
+levels that level adds to the wire — which is **most nesting shapes**. A nested array
+adds two (~1.2 KiB against the parser's ~1.05) and reads to ~27,500 where the parse
+reaches ~31,200; a nested object literal adds three (~1.8 KiB against ~1.68) and reads to
+~18,300 where the parse reaches ~19,500. Where the parser is cheap the gap is wide:
+left-nested binary, unary and ternary chains add one JSON level each and read to
+~55,000, far under their parse ceilings, and CSS rules (three JSON levels a rule, ~0.42
+KiB to parse) read to a fraction of theirs; calls and statement nesting bind in the read
+too. The parser binds only where a level adds no wire level at all (parens) or costs more
+than the levels it adds (computed subscripts: one JSON level at ~0.80 KiB to parse, so the
+parse stops near ~41,000 where the read would reach ~55,000). All of it is input hundreds
+of times deeper than any corpus, on which a *dev tool* overflows instead of
+erroring. Fixture
 [`typescript/expressions/objects/nested_deep`](../tests/fixtures/typescript/expressions/objects/nested_deep/)
 (45 nested object literals, 145 wire levels) pins the pipeline past the old ceiling.
 
@@ -327,7 +339,7 @@ reservation does not reach them:**
 
 | surface | stack | depth |
 | --- | --- | --- |
-| `tsv` (this CLI), every route | `STACK_SIZE`, explicit | ~37,300 |
+| `tsv` (this CLI), every route | `STACK_SIZE`, explicit | ~41,700 |
 | N-API addon on the host's main thread | the host process's `RLIMIT_STACK` | ~7,810 at 8 MiB |
 | N-API addon on a `worker_threads` worker | Node's 4 MiB `stackSizeMb` default | ~3,880 |
 | WASM, any host | the wasm shadow stack, 1 MiB by link default | ~2,510 |

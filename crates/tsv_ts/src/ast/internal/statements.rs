@@ -124,7 +124,7 @@ impl<'arena> Statement<'arena> {
 ///
 /// The expression is an arena reference, not an inline value, and this is where
 /// every `Expression`-holding statement head takes the same shape. The expression
-/// parser threads a `ParsedExpr`, which already holds an `&'arena Expression` — so
+/// parser's recursion already returns an `&'arena Expression` — so
 /// an inline slot is a 72-byte copy OUT of that allocation, leaving the arena copy
 /// dead. Naming the slot by reference removes the copy and adds nothing; it is not
 /// the rare-variant boxing trade above, and needs no rarity argument
