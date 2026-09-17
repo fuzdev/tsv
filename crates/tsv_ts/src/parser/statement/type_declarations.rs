@@ -73,7 +73,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::Equals)?;
 
         // Parse the type
-        let type_annotation = self.parse_type()?;
+        let type_annotation = self.parse_type()?.clone();
         let end = self.semicolon_end()?;
 
         Ok(TSTypeAliasDeclaration {
@@ -542,7 +542,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 let predicate = TSTypePredicate {
                     parameter_name,
-                    type_annotation: Some(self.alloc(type_node)),
+                    type_annotation: Some(type_node),
                     asserts,
                     span: Span::new(predicate_start, end),
                 };
@@ -587,7 +587,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let end = type_node.span().end;
 
         Ok(TSTypeAnnotation {
-            type_annotation: self.alloc(type_node),
+            type_annotation: type_node,
             span: Span::new(start, end),
         })
     }

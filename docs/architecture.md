@@ -1014,9 +1014,12 @@ payload by `&'arena` reference:
   next-widest variant is `CallExpression` at 64 B and it is 14–21% of expressions,
   which is where the ladder stops.
 - `TSType` is **80 B**, not 112 — `TSImportType`, `TSConstructorType` and
-  `TSInferType` are boxed. Here the width is paid less on slice elements than on the
-  `?`-propagation up the type parser's deep precedence ladder, which is why the rung
-  outperformed its slot-count estimate.
+  `TSInferType` are boxed. The width is paid on slice elements (union and
+  intersection members, tuple elements, type arguments, template-literal types) and
+  the few by-value holders; the type parser's deep precedence ladder does not pay it,
+  because every level returns an `&'arena TSType` allocated at its builder's tail
+  (`Parser::parse_type`) — the second rule below, applied to a return instead of a
+  field.
 - `Statement`'s rare declaration heads are boxed for the same reason
   (`TSTypeAliasDeclaration`, `ExportDefaultDeclaration`, `ClassDeclaration`,
   `FunctionDeclaration`, `TSInterfaceDeclaration`, `TSDeclareFunction`,

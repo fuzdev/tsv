@@ -27,7 +27,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let extra: &'arena IdentifierParamExtra<'arena> = self.alloc(IdentifierParamExtra {
             type_annotation: Some(TSTypeAnnotation {
-                type_annotation: self.alloc(param_type),
+                type_annotation: param_type,
                 span: Span::new(param_colon_start as u32, param_type_end),
             }),
             decorators: None,

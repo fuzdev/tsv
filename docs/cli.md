@@ -223,8 +223,8 @@ Parens are not the tightest shape, only the easiest to state. Per nesting level,
 release build: **nested arrow bodies (`() => {…}`) and nested memberish calls
 (`a.f(a.f(…))`) ~3.56 KiB** (the two worst measured, level with each other at
 ~9,200 levels — the depth every shape clears), nested computed subscripts
-(`a[a[…]]`) ~2.8, TS object literals ~2.4, TS *types* ~2.35, statement nesting ~2.0,
-nested binary chains ~1.5, Svelte elements ~1.3 (formatting; ~0.96 to parse), unary
+(`a[a[…]]`) ~2.8, TS object literals ~2.4, statement nesting ~2.0, nested binary chains
+~1.5, TS *types* ~1.32, Svelte elements ~1.3 (formatting; ~0.96 to parse), unary
 chains ~1.25, calls ~1.2, array literals ~1.14, parens ~0.88, ternary / assignment
 chains ~0.50, CSS rules ~0.4.
 
@@ -248,15 +248,17 @@ while these two stayed put, because the chain printer's frames — not an `Expre
 slot — are what sets them. The `TSType` enum's width reaches a different subset again:
 narrowing it 112 → 80 moved TS types 3.2 → 2.35, ternary 0.56 → 0.50, parens 0.94 → 0.88,
 calls 1.25 → 1.2 and array literals 1.2 → 1.14, and left Svelte elements, TS object
-literals and both chain shapes exactly where they were.
+literals and both chain shapes exactly where they were. Returning `&'arena TSType` rather
+than `TSType` from the type parser's precedence ladder moved TS types 2.35 → 1.32 (below).
 
 What sets a shape's cost is the stack slots its cycle's functions **reserve**, not the
 work they do: a frame is sized once for the widest arm, and every level pays all of it
 whichever arm it takes — so a dispatcher that holds one by-value AST node per arm
 multiplies that node's size by its arm count, at every level, forever. This is why no
-`parse_*` on the expression cycle hands its caller a bare `Expression` by value: a node
-builder either boxes into the arena at its own tail (`ParsedExpr::from_expr`, leaving the
-caller an 8-byte reference) or returns its own concrete node struct — an
+`parse_*` on the expression cycle hands its caller a bare `Expression` by value, and no
+`parse_*` on the type ladder a bare `TSType`: a node builder either boxes into the arena at
+its own tail (`ParsedExpr::from_expr` for expressions, `Parser::alloc` for types, leaving
+the caller an 8-byte reference) or returns its own concrete node struct — an
 `ObjectExpression` is 32 B, and the dispatcher arm that wraps one back into an
 `Expression` builds a temporary the compiler merges with its sibling arms' rather than a
 return slot it cannot. The printer answers the same pressure with the same move on its own

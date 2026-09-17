@@ -92,7 +92,8 @@ pub(in crate::parser) struct ParsedExpr<'arena> {
     /// `ObjectExpression` / `ArrayExpression` / `TemplateLiteral` is 32–40 B and
     /// niche-packs into its `Result`, so the arm that wraps one in `Expression::…`
     /// inline builds a temporary LLVM *does* merge with its sibling arms'. A new
-    /// builder handing back an `Expression` puts the slot back.
+    /// builder handing back an `Expression` puts the slot back. The type parser keeps
+    /// the same rule for `TSType` (`Parser::parse_type`).
     expr: &'arena Expression<'arena>,
     /// Actual start position before any opening parentheses.
     ///
@@ -535,7 +536,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let arena = self.arena;
         self.advance()?; // consume `as` / `satisfies`
-        let type_annotation = arena.alloc(self.parse_type()?);
+        let type_annotation = self.parse_type()?;
         let span = Span::new(expr_start as u32, type_annotation.span().end);
         let expr = if is_as {
             Expression::TSAsExpression(TSAsExpression {
@@ -2166,7 +2167,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(ParsedExpr::from_expr(
             arena,
             Expression::TSTypeAssertion(TSTypeAssertion {
-                type_annotation: arena.alloc(type_annotation),
+                type_annotation,
                 expression: parsed.expr,
                 span: Span::new(start as u32, end),
             }),
