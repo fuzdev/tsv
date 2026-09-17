@@ -38,19 +38,18 @@ Feedback is welcome to help navigate these tradeoffs.
 
 See the [benchmarks](https://tsv.fuz.dev/docs/benchmarks) for measurements.
 Compared to Oxc and Biome, tsv is smaller and faster
-at parsing and formatting its supported languages
-(parsing compared on the same AST payload),
+at parsing and formatting its supported languages,
 but lacks their features and broad language support.
 One reason for tsv to exist is to help find the performance bonuses
 left on the table in the Web ecosystem's increasingly-native implementations.
 
 tsv is near production-ready, with a long tail of rare bugs
-(and numerous fixes to bugs in Prettier and prettier-plugin-svelte).
+(and numerous fixes to bugs in acorn-typescript/Prettier/prettier-plugin-svelte).
 Reports and feedback are appreciated.
 See the [issues](https://github.com/fuzdev/tsv/issues)
 and [discussions](https://github.com/fuzdev/tsv/discussions).
 
-The only hand-written `unsafe` is in `tsv_ffi`, where the C boundary requires it;
+The only first-party `unsafe` is in `tsv_ffi`, where the C boundary requires it;
 `tsv_napi` relaxes the lint only to `deny` so napi-derive's generated code compiles —
 it hand-writes none. Otherwise `unsafe_code = "forbid"`.
 
