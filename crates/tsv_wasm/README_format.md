@@ -85,7 +85,7 @@ stack.is_ignored('keep.log', false); // → false (the tsv layer re-includes it)
 
 ## Status
 
-Pre-alpha — not for production use. The published packages are for feedback; expect bugs and API changes.
+Near production-ready. A long tail of rare bugs remains and APIs may still change; reports are appreciated.
 
 ## License
 
