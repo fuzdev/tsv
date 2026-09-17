@@ -1041,7 +1041,7 @@ and paid).
 **The second rule needs no rarity, because it adds no allocation at all: an inline
 slot whose value the producer already arena-allocated is a COPY OUT of the arena, not
 the place the node lives.** The expression parser threads `&'arena Expression`
-(`ParsedExpr`) all the way up its Pratt ladder, so a container field spelled
+all the way up its Pratt ladder, so a container field spelled
 `Expression` by value made the parser copy 72 B *out* of the node's own allocation
 into the container's slot — while an `&'arena Expression` field simply keeps the
 allocation the parser already made. Naming the slot by reference therefore *removes*
@@ -1098,16 +1098,20 @@ measurement rather than by argument; measured, the parse-side copies removed and
 
 The fat inline nodes carry no by-value-return penalty in the **expression**
 recursion, either: each node is built in the arena and threaded up the recursive
-descent **by reference** (the expression parser's transient `ParsedExpr` wrapper
-holds an `&'arena Expression`, not the node), so the recursion moves pointers
-regardless of node size. The wrapper is kept register-returnable end to end — an
-8-byte reference plus two `u32` paren-bound positions (16 bytes), with `ParseError`
-boxing its own payload so the fallible `Result<ParsedExpr, ParseError>` is the same
-16 bytes and returns in registers rather than through an sret stack slot. What that
-buys is the *caller's frame* as much as the return: an arm that holds a node by
-value reserves its bytes at every recursion level, whichever arm the dispatcher
-takes, so the choice sets nesting depth rather than throughput — the per-construct
-ceilings are in [cli.md §Recursion Depth](./cli.md#recursion-depth). The two
+descent **by reference** (every `parse_*` on the expression ladder returns an
+`&'arena Expression`, not the node), so the recursion moves pointers regardless of
+node size. The return is kept to two scalars end to end: with `ParseError` boxing its
+own payload, `Result<&Expression, ParseError>` is two words, which x86-64 returns in
+two registers. Nothing rides beside the reference — a paren-stripped operand's
+paren-inclusive extent is not a field but the tokens its parse consumed (it starts at
+the token current when the parse begins and ends at the previous token's end when it
+returns), because even a narrow `{&Expression, u32, u32}` is a three-field aggregate
+that comes back through an sret stack slot. (wasm32 returns every `Result` through a
+slot either way.) What the reference buys is the *caller's frame* as much as the
+return: an arm that holds a node by value reserves its bytes at every recursion level,
+whichever arm the dispatcher takes, so the choice sets nesting depth rather than
+throughput — the per-construct ceilings are in
+[cli.md §Recursion Depth](./cli.md#recursion-depth). The two
 concerns are decoupled — node *layout* is tuned for the format traversal, while the
 parse-time recursion cost is paid in pointer moves — so the *parse recursion* is
 never the reason to box a fat inline variant. The density rule above is; and because

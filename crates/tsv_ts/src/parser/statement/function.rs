@@ -5,7 +5,7 @@ use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
-use super::super::expression::ParsedExpr;
+use super::super::expression::alloc_expr;
 
 impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_return_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
@@ -258,7 +258,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - They appear in expression position
     pub(in crate::parser) fn parse_function_expression(
         &mut self,
-    ) -> Result<ParsedExpr<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
         let (start, _) = self.current_pos();
         self.parse_function_expression_inner(start, false)
     }
@@ -269,7 +269,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(in crate::parser) fn parse_async_function_expression(
         &mut self,
         start: usize,
-    ) -> Result<ParsedExpr<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
         self.parse_function_expression_inner(start, true)
     }
 
@@ -278,7 +278,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: usize,
         is_async: bool,
-    ) -> Result<ParsedExpr<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
         // Consume 'function' keyword
         debug_assert!(matches!(
             self.current_kind(),
@@ -340,7 +340,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         })?;
         let end = body.span.end;
 
-        Ok(ParsedExpr::from_expr(
+        Ok(alloc_expr(
             self.arena,
             Expression::FunctionExpression(self.arena.alloc(FunctionExpression {
                 id,

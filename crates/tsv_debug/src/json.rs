@@ -7,9 +7,9 @@
 //! (the node object and its `elements` array), a nested object literal three
 //! (`ObjectExpression` → `properties` → `Property` → `value`) — so the default
 //! refused a wire past ~60 nested arrays or ~40 nested objects while `tsv parse`
-//! itself reaches ~25,000, and the deepest file in the tsc corpus (208 wire
-//! levels of minified asm.js) was unreadable by every audit built on the
-//! `Value` tree. No oracle bounds depth by choice: `JSON.parse` in V8 and JSC is
+//! itself reaches ~31,200 nested arrays, and the deepest file in the tsc corpus
+//! (208 wire levels of minified asm.js) was unreadable by every audit built on
+//! the `Value` tree. No oracle bounds depth by choice: `JSON.parse` in V8 and JSC is
 //! iterative and takes a million levels, and acorn, Svelte's parser and prettier
 //! each stop only at V8's stack (acorn + acorn-typescript at 1,023 nested
 //! arrays, prettier's `typescript` parser at 767), so a tsv reader bounded at 60
@@ -20,15 +20,25 @@
 //! runtime through `thread_stack_size`, the audit pools through
 //! `sized_thread`), and a `Value` read costs ~0.6 KiB of stack per JSON level
 //! (measured: 0.595, the same for the deserialize, drop, `==` and pretty-print
-//! walks). Per SOURCE level that is ~1.2 KiB on a nested array against the
-//! parser's ~1.14 and ~1.8 KiB on a nested object against the parser's ~2.4, so
-//! on the 32 MiB reservation the read reaches ~27,500 nested arrays where the
-//! parse reaches ~28,000: a 2% band, on input 400× deeper than any corpus, in
-//! which a dev tool would overflow instead of erroring. Everywhere else the
-//! parser is the binding ceiling, which is the ceiling tsv documents
-//! (`docs/cli.md` §Recursion Depth). The shipped CLI's `--pretty` does not read
-//! at all — it re-indents the wire bytes in one pass (`tsv_cli::json_utils`) —
-//! and no other shipped artifact deserializes.
+//! walks). A source level costs the read ~0.6 KiB times the JSON levels it adds
+//! to the wire, so the read, not the parse, binds on the 32 MiB reservation
+//! wherever the parser spends less than that per level — which is most nesting
+//! shapes. A nested array adds two JSON levels (~1.2 KiB against the parser's
+//! ~1.05) and reads to ~27,500 where the parse reaches ~31,200; a nested object
+//! adds three (~1.8 KiB against ~1.68) and reads to ~18,300 where the parse
+//! reaches ~19,500. The margin is wide where the parser is cheap: left-nested
+//! binary, unary and ternary chains add one JSON level each and read to
+//! ~55,000, under a parse ceiling of 87,000 and up; calls and statement nesting
+//! bind in the read too, and CSS rules read to a fraction of the parse's depth
+//! (three JSON levels a rule against a parser that spends ~0.42 KiB). The
+//! parser binds only where a source level adds no wire level (parens) or costs
+//! more than the levels it adds (computed subscripts: one JSON level at ~0.80
+//! KiB to parse, so the parse stops near ~41,000 where the read would reach
+//! ~55,000). Either way this is input hundreds of times deeper than any corpus,
+//! on which a dev tool overflows instead of erroring. The parser's own ceilings
+//! are in `docs/cli.md` §Recursion Depth. The shipped CLI's `--pretty` does not
+//! read at all — it re-indents the wire bytes in one pass
+//! (`tsv_cli::json_utils`) — and no other shipped artifact deserializes.
 
 use serde::Serialize;
 use serde::de::DeserializeOwned;

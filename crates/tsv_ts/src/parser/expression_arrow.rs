@@ -7,7 +7,7 @@ use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
 
 use super::Parser;
-use super::expression::ParsedExpr;
+use super::expression::alloc_expr;
 use super::expression_lookahead::{ArrowHead, scan_angle_brackets, scan_arrow_after_identifier};
 use super::scan::skip_whitespace_and_comments;
 
@@ -92,8 +92,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_arrow_or_rewind(
         &mut self,
         head: ArrowHead,
-        parse: fn(&mut Self) -> Result<ParsedExpr<'arena>, ParseError>,
-    ) -> Result<Option<ParsedExpr<'arena>>, ParseError> {
+        parse: fn(&mut Self) -> Result<&'arena Expression<'arena>, ParseError>,
+    ) -> Result<Option<&'arena Expression<'arena>>, ParseError> {
         if !self.arrow_return_type_barred() || !head.has_return_type(self.source.as_bytes()) {
             return parse(self).map(Some);
         }
@@ -108,8 +108,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_annotated_arrow_in_consequent(
         &mut self,
         head: ArrowHead,
-        parse: fn(&mut Self) -> Result<ParsedExpr<'arena>, ParseError>,
-    ) -> Result<Option<ParsedExpr<'arena>>, ParseError> {
+        parse: fn(&mut Self) -> Result<&'arena Expression<'arena>, ParseError>,
+    ) -> Result<Option<&'arena Expression<'arena>>, ParseError> {
         if head.commits_to_signature(self.source.as_bytes()) {
             return self.with_arrow_return_type_allowed(parse).map(Some);
         }
@@ -174,7 +174,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse generic arrow function: `<T>() => ...`, `<T, U extends V>() => ...`
     pub(super) fn parse_generic_arrow_function(
         &mut self,
-    ) -> Result<ParsedExpr<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Parse type parameters: <T, U extends V, ...>
@@ -195,8 +195,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             Ok((params, return_type, body, arrow_token))
         })?;
         let end = self.prev_token_end() as u32;
+        debug_assert!(
+            body.span().end <= end,
+            "an arrow's extent encloses its body"
+        );
 
-        Ok(ParsedExpr::from_expr(
+        Ok(alloc_expr(
             self.arena,
             Expression::ArrowFunctionExpression(self.arena.alloc(ArrowFunctionExpression {
                 type_parameters: Some(type_parameters),
@@ -242,7 +246,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Note: Single parameter without parens (`x => expr`) is handled by
     /// `parse_single_param_arrow_function()`.
-    pub(super) fn parse_arrow_function(&mut self) -> Result<ParsedExpr<'arena>, ParseError> {
+    pub(super) fn parse_arrow_function(
+        &mut self,
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Capture paren position before parsing params
@@ -259,8 +265,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             Ok((params, return_type, body, arrow_token))
         })?;
         let end = self.prev_token_end() as u32;
+        debug_assert!(
+            body.span().end <= end,
+            "an arrow's extent encloses its body"
+        );
 
-        Ok(ParsedExpr::from_expr(
+        Ok(alloc_expr(
             self.arena,
             Expression::ArrowFunctionExpression(self.arena.alloc(ArrowFunctionExpression {
                 type_parameters: None, // Generic arrows like <T>() => {} are handled by parse_generic_arrow_function()
@@ -278,7 +288,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse single-parameter arrow function without parentheses: `x => expr`
     pub(super) fn parse_single_param_arrow_function(
         &mut self,
-    ) -> Result<ParsedExpr<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Parse the single parameter: a plain identifier, a contextual type keyword
@@ -302,8 +312,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Non-async single-param arrow body is `[~Await]`.
         let body = self.with_fn_context(false, false, Self::parse_arrow_body)?;
         let end = self.prev_token_end() as u32;
+        debug_assert!(
+            body.span().end <= end,
+            "an arrow's extent encloses its body"
+        );
 
-        Ok(ParsedExpr::from_expr(
+        Ok(alloc_expr(
             self.arena,
             Expression::ArrowFunctionExpression(self.arena.alloc(ArrowFunctionExpression {
                 type_parameters: None,
@@ -322,7 +336,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_async_arrow_function_after_async(
         &mut self,
         start: usize,
-    ) -> Result<ParsedExpr<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
         // Check for type parameters: `async <T>() => ...`
         let type_parameters = self.parse_optional_type_parameters()?;
 
@@ -363,8 +377,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Async arrow body is `[+Await]`.
         let body = self.with_fn_context(true, false, Self::parse_arrow_body)?;
         let end = self.prev_token_end() as u32;
+        debug_assert!(
+            body.span().end <= end,
+            "an arrow's extent encloses its body"
+        );
 
-        Ok(ParsedExpr::from_expr(
+        Ok(alloc_expr(
             self.arena,
             Expression::ArrowFunctionExpression(self.arena.alloc(ArrowFunctionExpression {
                 type_parameters,

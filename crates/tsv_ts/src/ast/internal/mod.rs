@@ -99,8 +99,8 @@ pub use expressions::{
 // call is a stack-depth decision, not a style one: a frame is sized once for its
 // widest arm, so a dispatcher with N arms that each hold one reserves N times these
 // bytes at every recursion level. `docs/cli.md` §Recursion Depth states the byte
-// counts and the per-construct depths they produce, and `ParsedExpr` (the parser's
-// expression return) exists to keep `Expression` out of those frames.
+// counts and the per-construct depths they produce, and the parser's expression ladder
+// returns `&'arena Expression` to keep `Expression` out of those frames.
 //
 // Both enums are also the ELEMENT WIDTH of the containers that hold them, which is
 // the larger cost: an `Expression` slot is paid on every element of every
@@ -126,7 +126,7 @@ pub use expressions::{
 // `WhileStatement` / `DoWhileStatement` / `WithStatement` 24,
 // `ReturnStatement` / `ThrowStatement` 16)
 // — instead hold those slots by reference, which is not the same trade: the parser's
-// expression spine (`ParsedExpr`) already returns an arena-allocated `&Expression`,
+// expression spine already returns an arena-allocated `&Expression`,
 // so an inline slot is a COPY OUT of the arena rather than a place the node lives.
 // Naming the slots by reference removes that copy instead of adding an allocation,
 // and takes the element every object-literal and declarator list moves from 160 B to

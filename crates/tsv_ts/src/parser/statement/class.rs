@@ -11,7 +11,7 @@ use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
-use super::super::expression::ParsedExpr;
+use super::super::expression::alloc_expr;
 use super::ModuleItemContext;
 
 /// Whose `DecoratorList` is being parsed — the axis that decides whether the run
@@ -318,7 +318,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// declaration-only, so neither appears here.
     pub(in crate::parser) fn parse_decorated_class_expression(
         &mut self,
-    ) -> Result<ParsedExpr<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
         let start = self.current_pos().0;
 
         let decorators = self.parse_decorators(DecoratorListKind::Class)?;
@@ -466,7 +466,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - No `declare` field
     pub(in crate::parser) fn parse_class_expression(
         &mut self,
-    ) -> Result<ParsedExpr<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
         let (start, _) = self.current_pos();
         self.parse_class_expression_from(start, None)
     }
@@ -478,7 +478,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// The decorators are a parameter rather than a post-hoc patch so the node is
     /// built once, in place: a builder that hands a bare `Expression` back for its
     /// caller to fix up makes that caller hold the 72 B value across the boxing
-    /// call — see `ParsedExpr::from_expr`.
+    /// call — see `alloc_expr`.
     ///
     /// `None` and `Some(&[])` are **different wire shapes** — the field is omitted
     /// for the first and emitted as `[]` for the second (`write_decorators_field`) —
@@ -489,7 +489,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: usize,
         decorators: Option<&'arena [Decorator<'arena>]>,
-    ) -> Result<ParsedExpr<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
         // Consume 'class' keyword
         debug_assert!(matches!(
             self.current_kind(),
@@ -509,7 +509,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         } = self.parse_class_head_and_body(false)?;
         let end = body.span.end;
 
-        Ok(ParsedExpr::from_expr(
+        Ok(alloc_expr(
             self.arena,
             Expression::ClassExpression(self.arena.alloc(ClassExpression {
                 decorators,
