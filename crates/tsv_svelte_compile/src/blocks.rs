@@ -204,8 +204,8 @@ const BOUNDARY_VALID_ATTRIBUTES: [&str; 3] = ["onerror", "failed", "pending"];
 /// - **no snippet** — the three statements go straight into the enclosing body.
 ///   Not a passthrough: the anchors are real SSR output.
 /// - **`failed`** — the snippet becomes a `function failed($$renderer, …)`
-///   declaration in the enclosing block, and the anchors move inside the
-///   `$$renderer.boundary` arrow.
+///   declaration in a block of its own beside the `$$renderer.boundary` call, and
+///   the anchors move inside the call's arrow.
 /// - **`pending`** — the snippet's body REPLACES the children entirely, under the
 ///   `<!--[!-->` opener. The children are still compiled and thrown away, which is
 ///   load-bearing rather than wasteful: the oracle visits the children fragment
@@ -320,11 +320,6 @@ pub(crate) fn emit_boundary<'arena>(
         return Ok(());
     };
     let (fn_decl, name) = build_snippet_function(env, failed)?;
-    // The oracle's `SnippetBlock` visitor pushes the declaration to `state.init`,
-    // and a block is `[...init, ...template]` — so the function lands ABOVE every
-    // push of the enclosing block, not beside the boundary. Emitting it inline here
-    // reorders it past any preceding sibling text (six corpus mismatches).
-    out.push_init_statement(fn_decl);
 
     // `$$renderer.boundary({ failed }, ($$renderer) => { … })`.
     let props = boundary_props(env, &name);
@@ -338,7 +333,14 @@ pub(crate) fn emit_boundary<'arena>(
     let call = env
         .b
         .member_call("$$renderer", "boundary", args.into_bump_slice());
-    out.push_expression_statement(&mut env.b, arena, call);
+    // The oracle visits the snippet with an `init` of the boundary's own and pushes
+    // `{ ...init, boundary }` as one block, so the function is scoped to its boundary:
+    // two sibling boundaries each declare their own `failed` without colliding.
+    let mut scoped: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
+    scoped.push(fn_decl);
+    scoped.push(env.b.expression_statement(call));
+    let scoped_block = (*block_stmt(&env.b, scoped.into_bump_slice())).clone();
+    out.push_statement(&mut env.b, arena, scoped_block);
     Ok(())
 }
 
@@ -430,6 +432,56 @@ pub(crate) fn declaration_stmt<'arena>(
         declare: false,
         span,
     })
+}
+
+/// Fold a branch's hydration marker into the branch's first push — the oracle's
+/// `prepend_block_marker` (`server/visitors/shared/utils.js`). `body[0]` is the
+/// marker's own `$$renderer.push('<marker>')`; when the statement after it is a
+/// `$$renderer.push` of a template literal, the marker joins that template's first
+/// chunk and its own push is dropped. Anything else first (a declaration, a nested
+/// block, an empty branch) keeps the separate marker push.
+fn fold_block_marker<'arena>(
+    b: &mut Builder<'arena>,
+    marker: &str,
+    body: &'arena [Statement<'arena>],
+) -> &'arena [Statement<'arena>] {
+    let Some(Statement::ExpressionStatement(first)) = body.get(1) else {
+        return body;
+    };
+    let Expression::CallExpression(call) = first.expression else {
+        return body;
+    };
+    let (Expression::MemberExpression(member), [Expression::TemplateLiteral(template)]) =
+        (call.callee, call.arguments)
+    else {
+        return body;
+    };
+    let (Expression::Identifier(object), Expression::Identifier(property)) =
+        (member.object, member.property)
+    else {
+        return body;
+    };
+    if member.computed
+        || object.name(&b.buffer) != "$$renderer"
+        || property.name(&b.buffer) != "push"
+    {
+        return body;
+    }
+    // Markers hold no character a template literal escapes, so the chunk's raw text
+    // takes the marker as-is.
+    let mut texts: Vec<String> = template
+        .quasis
+        .iter()
+        .map(|quasi| quasi.raw(&b.buffer).to_string())
+        .collect();
+    texts[0].insert_str(0, marker);
+    let folded = b.template_literal(&texts, template.expressions);
+    let folded = b.arena.alloc(folded);
+    let push = b.member_call("$$renderer", "push", std::slice::from_ref(folded));
+    let mut stmts: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(b.arena);
+    stmts.push(b.expression_statement(push));
+    stmts.extend(body[2..].iter().cloned());
+    stmts.into_bump_slice()
 }
 
 /// Wrap a finished statement slice in a `Statement::BlockStatement` (`{ … }`).
@@ -546,7 +598,8 @@ pub(crate) fn emit_if_block<'arena>(
     for (i, &(test, frag)) in branches.iter().enumerate() {
         let test = env.erase(test)?;
         let test_expr = wrap_single(env, test)?;
-        let anchor = env.b.push_string_stmt(&format!("<!--[{i}-->"));
+        let marker = format!("<!--[{i}-->");
+        let anchor = env.b.push_string_stmt(&marker);
         let body = emit_child_body(
             env,
             frag,
@@ -556,6 +609,7 @@ pub(crate) fn emit_if_block<'arena>(
             block_child_ns(ctx),
             HashMap::new(),
         )?;
+        let body = fold_block_marker(&mut env.b, &marker, body);
         let block = block_stmt(&env.b, body);
         cons_blocks.push((test_expr, block));
     }
@@ -563,15 +617,18 @@ pub(crate) fn emit_if_block<'arena>(
     // Terminal else (document order: after every consequent).
     let else_anchor = env.b.push_string_stmt("<!--[-1-->");
     let else_body = match final_else {
-        Some(frag) => emit_child_body(
-            env,
-            frag,
-            std::slice::from_ref(&else_anchor),
-            false,
-            preserve,
-            block_child_ns(ctx),
-            HashMap::new(),
-        )?,
+        Some(frag) => {
+            let body = emit_child_body(
+                env,
+                frag,
+                std::slice::from_ref(&else_anchor),
+                false,
+                preserve,
+                block_child_ns(ctx),
+                HashMap::new(),
+            )?;
+            fold_block_marker(&mut env.b, "<!--[-1-->", body)
+        }
         None => {
             let mut v: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
             v.push(else_anchor);
@@ -790,6 +847,7 @@ pub(crate) fn emit_each_block<'arena>(
             block_child_ns(ctx),
             HashMap::new(),
         )?;
+        let fallback_stmts = fold_block_marker(&mut env.b, "<!--[!-->", fallback_stmts);
         let else_branch = block_stmt(&env.b, fallback_stmts);
         // condition: `each_array.length !== 0`.
         let arr_cond = env.b.ident_expr(&array_name);

@@ -197,7 +197,8 @@ Spec: `selectors-4` (core features are REC via CSS2.1)
 
 - Qualified name (`svg|rect`)
 - Universal namespace (`*|div`)
-- No namespace (`|div`) - Svelte doesn't support (divergence)
+- Namespaced universal selector (`svg|*`, `*|*`)
+- No namespace (`|div`, `|*`) - Svelte doesn't support (divergence)
 
 ### Structural Pseudo-Classes
 

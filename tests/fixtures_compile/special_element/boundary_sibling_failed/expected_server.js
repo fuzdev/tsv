@@ -1,6 +1,5 @@
 import * as $ from 'svelte/internal/server';
 export default function Input($$renderer) {
-	$$renderer.push(`<button>go</button> `);
 	{
 		function failed($$renderer, e) {
 			$$renderer.push(`<b>x</b>`);
@@ -9,6 +8,19 @@ export default function Input($$renderer) {
 			$$renderer.push(`<!--[-->`);
 			{
 				$$renderer.push(`<p>a</p>`);
+			}
+			$$renderer.push(`<!--]-->`);
+		});
+	}
+	$$renderer.push(` `);
+	{
+		function failed($$renderer, e) {
+			$$renderer.push(`<i>y</i>`);
+		}
+		$$renderer.boundary({ failed }, ($$renderer) => {
+			$$renderer.push(`<!--[-->`);
+			{
+				$$renderer.push(`<p>b</p>`);
 			}
 			$$renderer.push(`<!--]-->`);
 		});

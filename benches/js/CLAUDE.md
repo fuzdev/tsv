@@ -771,7 +771,7 @@ through `load_pinned_language_corpus` (`lib/corpus.ts`), which takes the
 `{ complete_for: <language> }` missing-entry policy: an absent entry that could hold
 that language throws — **`optional` ones included**, since `optional` says only that
 an ordinary run may proceed without it — while one that cannot hold it warns and is
-skipped. That is what lets the svelte-rejects leg harvest its full 145 on a machine
+skipped. That is what lets the svelte-rejects leg harvest its full 142 on a machine
 with no wpt/test262 caches (css/js — no Svelte) and still refuse, warn-skippably, when
 `../prettier-plugin-svelte` is gone. Spelling the tolerance as a plain "allow
 missing" instead is the bug this shape exists to prevent: the leg then grades a
@@ -785,7 +785,7 @@ Both reject pins are measured over THREE, and neither list is guessable from the
 name: `CSS_REJECTS_PIN` over `../svelte` + `../prettier` + `../wpt`, and
 `SVELTE_REJECTS_PIN` over `../svelte` + `../prettier` + `../prettier-plugin-svelte`
 — both prettier suites ship `.html`, which the loader reads as Svelte, and they
-contribute 40 and 7 of its 145 rejects. A contributor left out is the whole failure
+contribute 40 and 7 of its 142 rejects. A contributor left out is the whole failure
 mode: its pull leaves the stamp reading fresh over a corpus that moved under it,
 and `GATE_CHECKOUT_IDS.pins` then records a provenance the grade doesn't have.
 `gate_counts_test.ts` grades that each pin names AT LEAST one checkout, which

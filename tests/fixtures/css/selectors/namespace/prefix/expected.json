@@ -24,6 +24,7 @@
 										{
 											"type": "TypeSelector",
 											"name": "rect",
+											"namespace": "svg",
 											"start": 46,
 											"end": 54
 										}
@@ -71,6 +72,7 @@
 										{
 											"type": "TypeSelector",
 											"name": "circle",
+											"namespace": "svg",
 											"start": 75,
 											"end": 85
 										}
@@ -118,6 +120,7 @@
 										{
 											"type": "TypeSelector",
 											"name": "mi",
+											"namespace": "math",
 											"start": 109,
 											"end": 116
 										}
@@ -165,6 +168,7 @@
 										{
 											"type": "TypeSelector",
 											"name": "div",
+											"namespace": "*",
 											"start": 192,
 											"end": 197
 										}
@@ -212,6 +216,7 @@
 										{
 											"type": "TypeSelector",
 											"name": "rect",
+											"namespace": "svg",
 											"start": 246,
 											"end": 254
 										},
@@ -265,6 +270,7 @@
 										{
 											"type": "TypeSelector",
 											"name": "text",
+											"namespace": "svg",
 											"start": 294,
 											"end": 302
 										},
@@ -319,6 +325,7 @@
 										{
 											"type": "TypeSelector",
 											"name": "rect",
+											"namespace": "\\|",
 											"start": 499,
 											"end": 506
 										}
@@ -366,6 +373,7 @@
 										{
 											"type": "TypeSelector",
 											"name": "circle",
+											"namespace": "a|b",
 											"start": 530,
 											"end": 543
 										}

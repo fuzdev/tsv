@@ -3,11 +3,9 @@ export default function Input($$renderer) {
 	let a = 1;
 	let b = a;
 	if (b) {
-		$$renderer.push('<!--[0-->');
-		$$renderer.push(`<p>yes</p>`);
+		$$renderer.push(`<!--[0--><p>yes</p>`);
 	} else {
-		$$renderer.push('<!--[-1-->');
-		$$renderer.push(`<p>no</p>`);
+		$$renderer.push(`<!--[-1--><p>no</p>`);
 	}
 	$$renderer.push(`<!--]-->`);
 }

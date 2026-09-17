@@ -28,6 +28,19 @@
 //! JSDoc casts are NOT a hazard here: the compiler's erase pass unwraps every
 //! `JsdocCast` to its inner expression, so a cast survives into the emitted program
 //! as a plain comment with no node to bind — cosmetic, like any other comment.
+//!
+//! ## JSDoc-cast parens are comment position
+//!
+//! The oracle's printer (esrap) re-adds the parens acorn strips from a JSDoc cast by
+//! guessing: a `/** @type {…} */` comment its per-node hook flushes before an
+//! expression gets `(`…`)` around that expression. Whether the hook is what flushes
+//! the comment depends on source LAYOUT, not code — a comment starting on the line an
+//! array element, argument or statement ended on is written as that item's trailing
+//! comment first, and one before an arrow's expression body is flushed into the
+//! parameter list — so `f(a, /** @type {T} */ b)` gets no parens on one line and
+//! `(b)` with `b` on its own. The parens are a function of where the comment sat, so
+//! the code comparison erases every `JsdocCast` on both sides and they compare as
+//! comment position.
 
 use bumpalo::Bump;
 use tsv_ts::Goal;
@@ -104,9 +117,12 @@ pub fn compare_canonical(ours: &str, oracle: &str) -> Parity {
 
     // The CODE must be identical: reprint both with comments cleared and byte-compare.
     // A comment-forced line break vanishes with its comment, so two same-code programs
-    // reprint identically here regardless of where their comments sat.
+    // reprint identically here regardless of where their comments sat. A JSDoc cast's
+    // parens go with it (see the module docs): the erase pass unwraps every `JsdocCast`.
     ours_program.comments = &[];
     oracle_program.comments = &[];
+    ours_program.body = without_jsdoc_casts(&ours_arena, ours, ours_program.body);
+    oracle_program.body = without_jsdoc_casts(&oracle_arena, oracle, oracle_program.body);
     let ours_code = tsv_ts::format_canonical(&ours_program, ours);
     let oracle_code = tsv_ts::format_canonical(&oracle_program, oracle);
     if ours_code == oracle_code {
@@ -114,6 +130,18 @@ pub fn compare_canonical(ours: &str, oracle: &str) -> Parity {
     } else {
         Parity::Divergent
     }
+}
+
+/// `body` with every `JsdocCast` unwrapped to its inner expression, through the
+/// compiler's erase pass. Canonical JS carries no TypeScript for it to erase, so a
+/// refusal cannot come from a cast; should one come from anything else, the body is
+/// compared as it stands.
+fn without_jsdoc_casts<'arena>(
+    arena: &'arena Bump,
+    source: &str,
+    body: &'arena [tsv_ts::ast::internal::Statement<'arena>],
+) -> &'arena [tsv_ts::ast::internal::Statement<'arena>] {
+    crate::erase::erase_statements(arena, source, body).map_or(body, |erased| erased.body)
 }
 
 /// A bundler annotation whose placement is semantic (moving it changes
@@ -179,6 +207,22 @@ mod tests {
         let ours = "let a = `x `; // c\n";
         let oracle = "let a = `x`; // c\n";
         assert_eq!(compare_canonical(ours, oracle), Parity::Divergent);
+    }
+
+    #[test]
+    fn jsdoc_cast_parens_are_comment_position() {
+        // esrap's guessed cast parens, present on one side only.
+        let ours = "const a = /** @type {number} */ b;\n";
+        let oracle = "const a = /** @type {number} */ (b);\n";
+        assert_eq!(compare_canonical(ours, oracle), Parity::CommentPosition);
+        // The parens are transparent, the code inside them is not.
+        let oracle_other = "const a = /** @type {number} */ (c);\n";
+        assert_eq!(compare_canonical(ours, oracle_other), Parity::Divergent);
+        // A cast comment that only one side carries is still a comment difference.
+        assert_eq!(
+            compare_canonical("const a = b;\n", oracle),
+            Parity::Divergent
+        );
     }
 
     #[test]

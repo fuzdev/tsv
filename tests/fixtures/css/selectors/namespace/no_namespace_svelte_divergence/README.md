@@ -18,6 +18,11 @@ tsv correctly parses no-namespace selectors per the CSS spec:
 - `|div` - type selector with explicit no namespace
 - `|*` - universal selector with explicit no namespace
 
+Both emit a `TypeSelector` with `namespace: ""`. Svelte writes `namespace` only for a
+prefix the source spells (`svg|div` → `"svg"`, `*|div` → `"*"`), so the empty prefix gets
+the empty string rather than no key: an absent key is a bare `div`, which the spec reads
+as any namespace (or the default one), not as no namespace.
+
 ## Reason for Divergence
 Svelte's CSS parser has incomplete namespace selector support. tsv follows the CSS spec.
 

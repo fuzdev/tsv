@@ -214,14 +214,19 @@ function get_at_path(root: unknown, path: string): unknown {
 	return node;
 }
 
+/** Svelte's `Nth.value` tell for an `of S` argument — see `subtree_has_nth_of`. */
+const NTH_OF_TELL = /\sof\s*$/;
+
 /**
- * True if `node`'s subtree contains an `Nth` whose value carries Svelte's ` of `
+ * True if `node`'s subtree contains an `Nth` whose value ends in Svelte's `of` word
  * (a normal Nth value never does) — the tell of a `:nth-child(An+B of S)` argument.
+ * The word is followed by a space when the source spaces it (`2n of `) and by nothing
+ * when the selector is glued to it (`2n of.a` → `2n of`).
  */
 function subtree_has_nth_of(node: unknown): boolean {
 	if (node == null || typeof node !== 'object') return false;
 	const n = node as Record<string, unknown>;
-	if (n.type === 'Nth' && typeof n.value === 'string' && n.value.includes(' of ')) return true;
+	if (n.type === 'Nth' && typeof n.value === 'string' && NTH_OF_TELL.test(n.value)) return true;
 	for (const v of Object.values(n)) {
 		if (Array.isArray(v)) {
 			if (v.some(subtree_has_nth_of)) return true;
@@ -588,7 +593,7 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 		// "2n"` with `S` nested under a tsv-only `Nth.selector` field. The whole args
 		// subtree reshapes: the `Nth.value`/`.selector`, the sibling-count lengths, and
 		// the container span ends all differ. Anchor on Svelte's unambiguous tell — a
-		// canonical `Nth` whose value contains " of " — and absorb only the
+		// canonical `Nth` whose value ends in the `of` word — and absorb only the
 		// reshape-shaped fields, so a genuine content bug inside `S` (a wrong
 		// `.name`/`.type`) still surfaces as undocumented.
 		name: 'nth_of_structure',

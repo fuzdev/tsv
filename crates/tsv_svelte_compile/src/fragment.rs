@@ -354,13 +354,6 @@ pub(crate) fn emit_fragment<'arena>(
     for snippet in &hoisted_snippets {
         emit_snippet(env, snippet, out)?;
     }
-    // Everything above is the oracle's `init` list; everything below is its
-    // template stream. Only a block scope owns that split — an element-child
-    // fragment shares the enclosing block's builder and leaves the mark alone.
-    if ctx.hoist_snippets {
-        out.mark_init_end();
-    }
-
     if !ctx.preserve_whitespace {
         normalize_whitespace(&mut list, ctx.parent_name, ctx.namespace, ctx.in_svg_text);
     }

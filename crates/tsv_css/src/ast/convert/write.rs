@@ -295,7 +295,10 @@ fn write_atrule(
     w.raw(",\"end\":");
     w.u32(ctx.pos(atrule.span.end));
     w.raw(",\"name\":");
-    w.string(atrule.name);
+    // Half-decoded from source, like a selector name: parseCss reads both with
+    // `read_identifier`, so an identity escape keeps its backslash (`@a\?b` → `a\?b`)
+    // where the internal `name` is fully decoded.
+    w.string(&raw_selector_name(ctx.source, atrule.name_span, 0));
     w.raw(",\"prelude\":");
     let prelude = convert_prelude_to_string(&atrule.prelude, ctx.source);
     w.string(&prelude);
@@ -577,13 +580,13 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
                     raw_selector_name(ctx.source, *span, name_start - span.start as usize)
                 }
             };
-            write_named_selector(w, "TypeSelector", &name, *span, ctx);
+            write_type_selector(w, &name, *namespace_span, *span, ctx);
         }
         internal::SimpleSelector::Universal {
-            namespace_span: _,
+            namespace_span,
             span,
         } => {
-            write_named_selector(w, "TypeSelector", "*", *span, ctx);
+            write_type_selector(w, "*", *namespace_span, *span, ctx);
         }
         internal::SimpleSelector::Class { span } => {
             // Past the `.` AND any comment glued to it (`./* c */cls`) — never a bare `1`.
@@ -741,7 +744,37 @@ fn wq_name_start(source: &str, prefix: Span, limit: u32) -> usize {
     crate::comments::skip_trivia_forward(bytes, (pipe + 1).min(limit), limit)
 }
 
-/// The shared `{type, name, start, end}` shape (Type/Universal/Class/Id/Nesting).
+/// A `TypeSelector` (a type or universal selector): the [`write_named_selector`] shape
+/// with Svelte's `namespace` between `name` and `start`, present only when the source
+/// has a `<ns-prefix>`. The prefix is half-decoded like every selector name, so `*|a`
+/// gives `"*"` and the no-namespace `|a` gives `""` — distinct from an absent key, which
+/// is a bare `a` (any namespace, or the default one).
+fn write_type_selector(
+    w: &mut JsonWriter,
+    name: &str,
+    namespace_span: Option<Span>,
+    span: Span,
+    ctx: &Ctx<'_>,
+) {
+    let Some(prefix) = namespace_span else {
+        write_named_selector(w, "TypeSelector", name, span, ctx);
+        return;
+    };
+    w.raw("{\"type\":\"TypeSelector\",\"name\":");
+    w.string(name);
+    w.raw(",\"namespace\":");
+    w.string(&raw_selector_name(ctx.source, prefix, 0));
+    w.stage_begin();
+    w.stage_raw(",\"start\":");
+    w.stage_u32(ctx.pos(span.start));
+    w.stage_raw(",\"end\":");
+    w.stage_u32(ctx.pos(span.end));
+    w.stage_raw("}");
+    w.stage_flush();
+}
+
+/// The shared `{type, name, start, end}` shape (Class/Id/Nesting, and a `TypeSelector`
+/// with no namespace).
 ///
 /// The trailing `start`/`end`/`}` burst is a staged run (module doc, §Staged
 /// runs) — this node carries no `metadata`, so the closing brace joins it.

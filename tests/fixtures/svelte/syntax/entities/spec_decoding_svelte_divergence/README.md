@@ -1,18 +1,12 @@
 # Spec-conformant character reference decoding
 
-Four character references that HTML5 decodes and Svelte's decoder
+Three character references that HTML5 decodes and Svelte's decoder
 (`1-parse/utils/html.js`) does not. Each is a slip in the implementation rather
 than a choice Svelte made, so tsv decodes them. See
 [conformance_svelte.md §Entity Decoding Corrections](../../../../../../docs/conformance_svelte.md#entity-decoding-corrections)
 for the catalog entry.
 
-## The four cases
-
-**Uppercase hex** (`&#X41;` → `A`). The
-[numeric character reference state](https://html.spec.whatwg.org/multipage/parsing.html#numeric-character-reference-state)
-opens a hex reference on either `U+0078 x` or `U+0058 X` — the two are adjacent
-entries in one switch. Svelte's pattern, `#(?:x[a-fA-F\d]+|\d+)(?:;)?`, spells only
-the lowercase one.
+## The three cases
 
 **A zero code** (`&#0;` → NUL). Svelte's `if (!code) return match` guards the decode
 against an unknown or unparseable reference; a code of `0` is merely the other falsy
@@ -47,9 +41,9 @@ pinned by
 
 ## Contrast cases
 
-The second half of the fixture is the same four questions asked where both decoders
-agree: a lowercase hex marker, a nonzero code, a plane Svelte admits, and a
-semicolon-less reference before `-` (decodes) and before `=` (does not).
+The second half of the fixture is the same questions asked where both decoders agree: a
+nonzero code, a plane Svelte admits, and a semicolon-less reference before `-` (decodes)
+and before `=` (does not).
 
 Formatting is unaffected throughout — the printer emits the source text of a
 reference verbatim, so this is a parse-side divergence only.

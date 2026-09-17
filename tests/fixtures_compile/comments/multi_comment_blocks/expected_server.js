@@ -5,8 +5,7 @@ export default function Input($$renderer) {
 	// second
 	let b = 2;
 	if (a) {
-		$$renderer.push('<!--[0-->');
-		$$renderer.push(`<p>1</p>`);
+		$$renderer.push(`<!--[0--><p>1</p>`);
 	} else {
 		$$renderer.push('<!--[-1-->');
 	}

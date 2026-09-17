@@ -17,8 +17,8 @@ tsv always emits single spaces around the `of` keyword; prettier collapses
 whitespace runs there but never inserts an absent space, so the glued
 `of.class1` form is prettier-stable (`prettier_variant_of_compact` pins it;
 gluing the other side, `2n of`/`of div`, would merge the idents, so only the
-`of.class` side can glue). Svelte's `parseCss` also rejects the glued form
-(`css_expected_identifier`), but only `input.svelte` is parse-checked. See
+`of.class` side can glue). Svelte's `parseCss` reads the glued form with the same
+`Nth.value` divergence as the spaced one, but only `input.svelte` is parse-checked. See
 [conformance_prettier_css.md §CSS: Selectors](../../../../../../docs/conformance_prettier_css.md#css-selectors).
 
 ## Fixture Structure

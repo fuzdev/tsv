@@ -99,7 +99,6 @@ const ALLOWED_NONDIVERGENCE_READMES: &[&str] = &[
     "typescript/calls/arrow_jsdoc_cast_body_long",
     "typescript/syntax/comments/jsdoc_type_cast_svelte",
     // Parser-behavior note about content deliberately *excluded* from the fixture.
-    "svelte/syntax/entities/numeric_hex",
     "css/tokens/escapes/type_selector_escaped",
     // CSS spec edge cases (digit-count truncation boundary).
     "css/tokens/escapes/unicode_6_digits",

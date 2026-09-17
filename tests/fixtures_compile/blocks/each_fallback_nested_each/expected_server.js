@@ -8,8 +8,7 @@ export default function Input($$renderer) {
 			$$renderer.push(`<p>${$.escape(a)}</p>`);
 		}
 	} else {
-		$$renderer.push('<!--[!-->');
-		$$renderer.push(`<!--[-->`);
+		$$renderer.push(`<!--[!--><!--[-->`);
 		const each_array_1 = $.ensure_array_like([2]);
 		for (let $$index = 0, $$length = each_array_1.length; $$index < $$length; $$index++) {
 			let b = each_array_1[$$index];

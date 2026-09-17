@@ -9,8 +9,7 @@ export default function Input($$renderer, $$props) {
 			$$renderer.push(`<li>${$.escape(i)}: ${$.escape(item)}</li>`);
 		}
 	} else {
-		$$renderer.push('<!--[!-->');
-		$$renderer.push(`<p>empty</p>`);
+		$$renderer.push(`<!--[!--><p>empty</p>`);
 	}
 	$$renderer.push(`<!--]-->`);
 }

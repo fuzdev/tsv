@@ -3,8 +3,7 @@ export default function Input($$renderer) {
 	let x = false;
 	$$renderer.push(`<div>`);
 	if (x) {
-		$$renderer.push('<!--[0-->');
-		$$renderer.push(`<circle></circle><rect></rect>`);
+		$$renderer.push(`<!--[0--><circle></circle><rect></rect>`);
 	} else {
 		$$renderer.push('<!--[-1-->');
 	}

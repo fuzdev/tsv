@@ -982,10 +982,7 @@ independent. They are listed here in dependency order, walk first.
   emitter imports it, making it the most depended-on module in the emission layer.
   (Deliberately stated as that invariant rather than as a consumer list — an
   enumerated list here went stale at each of the emitter splits, since every new
-  emitter module inherits the dependency.) Single home of the oracle's
-  `b.block([...state.init, ...build_template(state.template)])` shape — the
-  init/template split `mark_init_end` / `push_init_statement` model — so no emitter
-  reconstructs that ordering itself.
+  emitter module inherits the dependency.)
 - `template_value.rs` — the **item-6 template-value substitution walk**
   (`wrap_value_expr` / `wrap_single` over the `rewrite_template_value` core), the
   single home every template value position routes through. It rewrites every read
@@ -1052,8 +1049,11 @@ Both recurse back into `fragment.rs` through `emit_child_body`.
   multiple `$$renderer.push(…)` statements, each block emitting its own
   statements between flushes and merging its closer/opener into the adjacent
   template: `{#if}` is a flat `if … else if … else` chain with per-branch
-  single-quote-string anchor pushes (`<!--[N-->`, terminal `<!--[-1-->`,
-  synthesized when `{:else}` is absent) and a merge-forward `<!--]-->` closer;
+  anchors (`<!--[N-->`, terminal `<!--[-1-->`, synthesized when `{:else}` is absent)
+  and a merge-forward `<!--]-->` closer. A branch anchor — and an `{:else}`
+  fallback's `<!--[!-->` — folds into the branch's first push when that push is a
+  template literal, and is otherwise a single-quote-string push of its own
+  (`fold_block_marker`, the oracle's `prepend_block_marker`);
   `{#each}` is `const each_array = $.ensure_array_like(expr)` + a `for` loop
   binding `let CTX = each_array[IDX]` (both `each_array`/`$$index` names
   advance once per each block but in **different orders**, so they are allocated by
@@ -1077,7 +1077,8 @@ Both recurse back into `fragment.rs` through `emit_child_body`.
   fresh `BodyBuilder` flushes before each statement, so unlike `{#key}`'s marker the
   anchors never merge into an adjacent sibling's template. A `failed` snippet moves
   those three statements inside `$$renderer.boundary({ failed }, ($$renderer) => …)`
-  with the snippet's `function` declaration emitted just above; a `pending` snippet's
+  and wraps that call and the snippet's `function` declaration in a `{ … }` block of
+  their own, so sibling boundaries' `failed` functions never share a scope; a `pending` snippet's
   body REPLACES them under the `<!--[!-->` opener while the children are still
   compiled into a DISCARDED builder — load-bearing, not wasteful, since the oracle
   visits that fragment unconditionally and its `{#each}` consumes an `each_array`
@@ -1477,7 +1478,11 @@ fast `==`):
 1. **Same code** — clear `program.comments` on both parses and byte-compare the
    comment-free reprints (a comment-forced break vanishes with its comment, so
    same-code programs reprint identically). Soundness reduces to canonicalizer
-   injectivity-on-code, which `canonicalize:audit` gates independently.
+   injectivity-on-code, which `canonicalize:audit` gates independently. Both sides
+   are also run through the erase pass first, so a JSDoc cast's parens compare as
+   transparent: esrap guesses those parens from where its comment flush lands, which
+   depends on source line layout (`f(a, /** @type {T} */ b)` gets none on one line,
+   `(b)` with `b` on its own), so they are comment position, not code.
 2. **Same comments** — the comment *sequence* (output order, exact content) must
    match, so a drop / double-print / reorder / content change is `Divergent`.
 3. **Annotation guard** — a bundler annotation (`/* @__PURE__ */`, `@__NO_SIDE_EFFECTS__`,
