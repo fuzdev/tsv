@@ -79,15 +79,15 @@ const ALLOW: &[Allow] = &[
     ),
     (
         "src/check/duplicate_members.rs",
-        "Expression::Literal(lit) => literal_key(ctx, lit).map(|k| (k.clone(), k, lit.span)),",
+        "ExpressionKind::Literal(lit) => literal_key(ctx, lit).map(|k| (k.clone(), k, lit.span)),",
         "the literal's owned key `String`, returned as both key and display; the AST \
          literal itself is only read (`.span`)",
     ),
     (
         "src/check/duplicate_members.rs",
-        "Some((keyed.clone(), keyed, pid.span))",
+        "Some((keyed.clone(), keyed, key.span))",
         "the `#name` key `String` built by `format!`, returned as both key and display; \
-         the AST private identifier is only read (`.span`)",
+         the AST key expression is only read (`.span`)",
     ),
     // ── diag ─────────────────────────────────────────────────────────────────
     (

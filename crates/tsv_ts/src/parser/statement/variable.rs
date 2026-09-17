@@ -281,7 +281,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let extra = type_annotation.map(|ta| self.typed_extra(ta));
 
         Ok((
-            Expression::Identifier(Identifier {
+            Expression::from_identifier(Identifier {
                 escaped_name: name.escaped,
                 name_len: name.raw_len,
                 name_plain_ascii: name.plain_ascii,

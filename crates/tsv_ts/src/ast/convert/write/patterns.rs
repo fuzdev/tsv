@@ -82,15 +82,10 @@ pub(super) fn write_template_element(
 pub(super) fn write_object_pattern(
     w: &mut JsonWriter,
     obj: &internal::ObjectPattern<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
 ) {
-    pattern_header(
-        w,
-        "ObjectPattern",
-        obj.span,
-        obj.type_annotation.as_ref(),
-        ctx,
-    );
+    pattern_header(w, "ObjectPattern", span, obj.type_annotation.as_ref(), ctx);
     w.raw(",\"properties\":");
     write_array(w, obj.properties, |w, p| match p {
         internal::ObjectPatternProperty::Property(p) => write_property(w, p, ctx),
@@ -101,7 +96,7 @@ pub(super) fn write_object_pattern(
     }
     write_type_annotation_field(w, obj.type_annotation.as_ref(), ctx);
     write_decorators_field(w, obj.decorators, ctx);
-    close_node(w, "ObjectPattern", obj.span, ctx);
+    close_node(w, "ObjectPattern", span, ctx);
 }
 
 /// Emits a `RestElement` node.
@@ -140,7 +135,7 @@ pub(super) fn write_property(w: &mut JsonWriter, prop: &internal::Property<'_>, 
     write_expression(w, prop.key, ctx);
     let getset = !matches!(prop.kind, internal::PropertyKind::Init);
     let generic_method = prop.method
-        && matches!(&prop.value, internal::Expression::FunctionExpression(f)
+        && matches!(&prop.value.kind, internal::ExpressionKind::FunctionExpression(f)
             if f.type_parameters.is_some());
     if (getset || generic_method) && !ctx.vanilla_acorn {
         w.raw(",\"kind\":\"");
@@ -162,7 +157,13 @@ pub(super) fn write_property(w: &mut JsonWriter, prop: &internal::Property<'_>, 
 fn write_property_value(w: &mut JsonWriter, prop: &internal::Property<'_>, ctx: &Ctx<'_>) {
     let method_value = prop.method || !matches!(prop.kind, internal::PropertyKind::Init);
     match (&prop.value, method_value) {
-        (internal::Expression::FunctionExpression(f), true) => {
+        (
+            internal::Expression {
+                kind: internal::ExpressionKind::FunctionExpression(f),
+                ..
+            },
+            true,
+        ) => {
             write_function_expression(w, f, ctx, true);
         }
         _ => write_expression(w, prop.value, ctx),

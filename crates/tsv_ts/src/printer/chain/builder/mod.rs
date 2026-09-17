@@ -35,7 +35,7 @@ use super::printing::{
     print_group_expanded, print_node_inner,
 };
 use super::types::{ChainGroup, ChainNode, ChainNodeVec};
-use crate::ast::internal::{ArrowFunctionBody, CallExpression, Expression};
+use crate::ast::internal::{ArrowFunctionBody, CallExpression, Expression, ExpressionKind};
 use crate::printer::Printer;
 
 use smallvec::SmallVec;
@@ -71,8 +71,8 @@ fn call_has_breaking_single_arg(call: &CallExpression<'_>, printer: &Printer<'_>
         return false;
     }
     let d = printer.arena();
-    match &call.arguments[0] {
-        Expression::ObjectExpression(_) | Expression::ArrayExpression(_) => {
+    match &call.arguments[0].kind {
+        ExpressionKind::ObjectExpression(_) | ExpressionKind::ArrayExpression(_) => {
             let arg_doc = printer.build_expression_doc(&call.arguments[0]);
             d.will_break(arg_doc)
         }
@@ -209,7 +209,7 @@ fn build_chain_doc_impl<'a>(
                 needs_parens: true,
                 expr,
                 ..
-            } => !matches!(expr, Expression::BinaryExpression(_)),
+            } => !matches!(expr.kind, ExpressionKind::BinaryExpression(_)),
             _ => false,
         });
 
@@ -707,9 +707,13 @@ fn groups_exceed_cutoff(
 /// The comment half of the label — `nodeHasComment`, which sends a short chain down the
 /// long path — is not asked here; the poorly-breakable walk's own member-gap comment gate
 /// answers it, scoped the way that walk needs (a same-line gap comment only).
-pub fn call_prints_as_member_chain(call: &CallExpression<'_>, printer: &Printer<'_>) -> bool {
+pub fn call_prints_as_member_chain(
+    call: &CallExpression<'_>,
+    span: Span,
+    printer: &Printer<'_>,
+) -> bool {
     let mut nodes = ChainNodeVec::new();
-    linearize_chain_from_call_into(call, printer.linearize_input(), &mut nodes);
+    linearize_chain_from_call_into(call, span, printer.linearize_input(), &mut nodes);
     let groups = group_chain_nodes(&nodes, printer);
     groups_exceed_cutoff(&groups, false, printer)
 }
@@ -971,11 +975,11 @@ fn build_breaking_object_chain_doc<'a>(
     // truncation. Other callbacks (block bodies, non-object bodies) stay excluded.
     let last_group_will_break_object = last_group_single_argument(rest_groups).is_some_and(|arg| {
         (matches!(
-            arg,
-            Expression::ObjectExpression(_)
-                | Expression::ArrayExpression(_)
-                | Expression::NewExpression(_)
-                | Expression::CallExpression(_)
+            arg.kind,
+            ExpressionKind::ObjectExpression(_)
+                | ExpressionKind::ArrayExpression(_)
+                | ExpressionKind::NewExpression(_)
+                | ExpressionKind::CallExpression(_)
         ) || is_arrow_with_paren_object_body(arg))
             && d.will_break(printer.build_expression_doc(arg))
     });
@@ -1074,8 +1078,8 @@ fn build_flat_object_hug_state<'a>(
     // TODO: widen to a `new`/call wrapper whose own last argument is an object —
     // the settled form there is the args-expanded shape, not this hug state, so it
     // needs a second state rather than a wider kind test (`last_arg_wrapped_object`).
-    let object_rooted =
-        matches!(arg, Expression::ObjectExpression(_)) || is_arrow_with_paren_object_body(arg);
+    let object_rooted = matches!(arg.kind, ExpressionKind::ObjectExpression(_))
+        || is_arrow_with_paren_object_body(arg);
     if !object_rooted {
         return None;
     }
@@ -1112,11 +1116,11 @@ fn last_group_single_argument<'a>(rest_groups: &[ChainGroup<'a>]) -> Option<&'a 
 /// kind set.
 fn is_arrow_with_paren_object_body(arg: &Expression<'_>) -> bool {
     matches!(
-        arg,
-        Expression::ArrowFunctionExpression(arrow) if matches!(
+        &arg.kind,
+        ExpressionKind::ArrowFunctionExpression(arrow) if matches!(
             &arrow.body,
             ArrowFunctionBody::Expression(body)
-                if matches!(&**body, Expression::ObjectExpression(_))
+                if matches!(body.kind, ExpressionKind::ObjectExpression(_))
         )
     )
 }
@@ -1135,8 +1139,8 @@ fn other_calls_have_function_arguments<'a>(
     let takes_function_argument = |call: &CallExpression<'_>| {
         call.arguments.iter().any(|a| {
             matches!(
-                a,
-                Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_)
+                a.kind,
+                ExpressionKind::FunctionExpression(_) | ExpressionKind::ArrowFunctionExpression(_)
             )
         })
     };

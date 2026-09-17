@@ -27,7 +27,8 @@ use tsv_svelte::ast::internal::{
     Attribute, AttributeValue, ClassDirective, StyleDirective, StyleDirectiveValue,
 };
 use tsv_ts::ast::internal::{
-    ArrayExpression, Expression, LiteralValue, ObjectExpression, ObjectProperty, Property,
+    ArrayExpression, Expression, ExpressionKind, LiteralValue, ObjectExpression, ObjectProperty,
+    Property,
 };
 
 use crate::attribute::{
@@ -86,7 +87,7 @@ fn build_class_base<'arena>(
             // path (`emit_dynamic_attribute`).
             let quoted = preceded_by_quote(env.source, tag.span.start);
             let expr = env.erase(tag.expression)?;
-            if matches!(expr, Expression::Literal(lit)
+            if matches!(&expr.kind, ExpressionKind::Literal(lit)
                 if matches!(lit.value, LiteralValue::String(_)))
             {
                 return Err(unsupported(Refusal::StringLiteralExprAttribute));
@@ -133,11 +134,13 @@ fn build_class_directives_object<'arena>(
         )));
     }
     let cbrace = env.b.mint("}").end;
-    Ok(Expression::ObjectExpression(ObjectExpression {
-        properties: properties.into_bump_slice(),
-        spread_trailing_comma: false,
+    Ok(Expression {
         span: Span::new(obrace, cbrace),
-    }))
+        kind: ExpressionKind::ObjectExpression(ObjectExpression {
+            properties: properties.into_bump_slice(),
+            spread_trailing_comma: false,
+        }),
+    })
 }
 
 /// Build the `classes` (3rd) argument of a spread element's `$.attributes(…)` call
@@ -165,10 +168,10 @@ pub(crate) fn build_spread_class_object<'arena>(
         // The oracle's same-named-identifier shorthand fork, read on the RAW node:
         // the value is the bare `b.id(directive.name)` (no transform / derived
         // rewrite), exactly like a `style:` shorthand.
-        let same_named = matches!(directive.expression, Expression::Identifier(id)
+        let same_named = matches!(&directive.expression.kind, ExpressionKind::Identifier(id)
             if plain_identifier_name(id, env.source).as_deref() == Some(name.as_str()));
         let (value, is_shorthand_id) = if same_named {
-            (Expression::Identifier(env.b.ident(&name)), true)
+            (Expression::from_identifier(env.b.ident(&name)), true)
         } else {
             // The template borrow point: erase once, then guard + rewrite a bare
             // derived read to `d()`.
@@ -180,7 +183,7 @@ pub(crate) fn build_spread_class_object<'arena>(
         let (key, key_span) = if key_is_ident {
             let id = env.b.ident(&name);
             let span = id.span;
-            (Expression::Identifier(id), span)
+            (Expression::from_identifier(id), span)
         } else {
             let key = env.b.string_literal_expr(&name);
             let span = key.span();
@@ -195,11 +198,13 @@ pub(crate) fn build_spread_class_object<'arena>(
         )));
     }
     let cbrace = env.b.mint("}").end;
-    Ok(Expression::ObjectExpression(ObjectExpression {
-        properties: properties.into_bump_slice(),
-        spread_trailing_comma: false,
+    Ok(Expression {
         span: Span::new(obrace, cbrace),
-    }))
+        kind: ExpressionKind::ObjectExpression(ObjectExpression {
+            properties: properties.into_bump_slice(),
+            spread_trailing_comma: false,
+        }),
+    })
 }
 
 /// Build the `styles` (4th) argument of a spread element's `$.attributes(…)` call
@@ -226,11 +231,13 @@ pub(crate) fn build_spread_style_object<'arena>(
         )?));
     }
     let cbrace = env.b.mint("}").end;
-    Ok(Expression::ObjectExpression(ObjectExpression {
-        properties: properties.into_bump_slice(),
-        spread_trailing_comma: false,
+    Ok(Expression {
         span: Span::new(obrace, cbrace),
-    }))
+        kind: ExpressionKind::ObjectExpression(ObjectExpression {
+            properties: properties.into_bump_slice(),
+            spread_trailing_comma: false,
+        }),
+    })
 }
 
 /// Emit the fused `$.attr_class(base, css_hash, { name: expr, … })` call for a
@@ -341,7 +348,7 @@ fn build_style_base<'arena>(
             // oracle's inline-literal path we don't reproduce — refuse, matching the
             // standalone dynamic-attribute path (`emit_dynamic_attribute`).
             let expr = env.erase(tag.expression)?;
-            if matches!(expr, Expression::Literal(lit)
+            if matches!(&expr.kind, ExpressionKind::Literal(lit)
                 if matches!(lit.value, LiteralValue::String(_)))
             {
                 return Err(unsupported(Refusal::StringLiteralExprAttribute));
@@ -374,7 +381,7 @@ fn build_style_property<'arena>(
     let (value, is_shorthand_id) = match &directive.value {
         StyleDirectiveValue::True => {
             // Shorthand `style:color` → `b.id(directive.name)` (RAW name).
-            (Expression::Identifier(env.b.ident(&raw_name)), true)
+            (Expression::from_identifier(env.b.ident(&raw_name)), true)
         }
         StyleDirectiveValue::ExpressionTag(tag) => {
             // The template borrow point: erase once, then guard + rewrite a bare
@@ -407,7 +414,7 @@ fn build_style_property<'arena>(
     let (key, key_span) = if shorthand {
         let id = env.b.ident(&key_name);
         let span = id.span;
-        (Expression::Identifier(id), span)
+        (Expression::from_identifier(id), span)
     } else {
         let key = env.b.string_literal_expr(&key_name);
         let span = key.span();
@@ -444,11 +451,13 @@ fn build_style_directives_arg<'arena>(
     // properties render from their own key/value spans, so the normal span
     // enclosing the (source-order-interleaved) important property text is harmless.
     let cbrace = env.b.mint("}").end;
-    let normal_obj = Expression::ObjectExpression(ObjectExpression {
-        properties: normal.into_bump_slice(),
-        spread_trailing_comma: false,
+    let normal_obj = Expression {
         span: Span::new(obrace, cbrace),
-    });
+        kind: ExpressionKind::ObjectExpression(ObjectExpression {
+            properties: normal.into_bump_slice(),
+            spread_trailing_comma: false,
+        }),
+    };
     if important.is_empty() {
         return Ok(normal_obj);
     }
@@ -456,22 +465,26 @@ fn build_style_directives_arg<'arena>(
     let normal_alloc = arena.alloc(normal_obj);
     let iobrace = env.b.mint("{").start;
     let icbrace = env.b.mint("}").end;
-    let important_obj = Expression::ObjectExpression(ObjectExpression {
-        properties: important.into_bump_slice(),
-        spread_trailing_comma: false,
+    let important_obj = Expression {
         span: Span::new(iobrace, icbrace),
-    });
+        kind: ExpressionKind::ObjectExpression(ObjectExpression {
+            properties: important.into_bump_slice(),
+            spread_trailing_comma: false,
+        }),
+    };
     let important_alloc = arena.alloc(important_obj);
     let lbracket = env.b.mint("[").start;
     let rbracket = env.b.mint("]").end;
     let mut elements: BumpVec<'arena, Option<Expression<'arena>>> = BumpVec::new_in(arena);
     elements.push(Some(normal_alloc.clone()));
     elements.push(Some(important_alloc.clone()));
-    Ok(Expression::ArrayExpression(ArrayExpression {
-        elements: elements.into_bump_slice(),
-        spread_trailing_comma: false,
+    Ok(Expression {
         span: Span::new(lbracket, rbracket),
-    }))
+        kind: ExpressionKind::ArrayExpression(ArrayExpression {
+            elements: elements.into_bump_slice(),
+            spread_trailing_comma: false,
+        }),
+    })
 }
 
 /// Emit the fused `$.attr_style(base, { name: value, … })` call for a regular

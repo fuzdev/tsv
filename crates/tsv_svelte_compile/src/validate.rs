@@ -57,7 +57,7 @@ use tsv_svelte::ast::internal::{
     SpecialElementKind,
 };
 use tsv_ts::ast::internal::{
-    ExportNamedDeclaration, Expression, LiteralValue, ModuleExportName, Statement,
+    ExportNamedDeclaration, Expression, ExpressionKind, LiteralValue, ModuleExportName, Statement,
 };
 
 /// The oracle's `root_only_meta_tags` (`phases/1-parse/state/element.js:45`) —
@@ -104,8 +104,8 @@ fn refuse_each_key_without_as(each: &EachBlock<'_>, source: &str) -> Result<(), 
     if each.context.is_some() {
         return Ok(());
     }
-    let keyed = match key.expression {
-        Expression::Identifier(id) => match (each.index, plain_identifier_name(id, source)) {
+    let keyed = match &key.expression.kind {
+        ExpressionKind::Identifier(id) => match (each.index, plain_identifier_name(id, source)) {
             (Some(index), Some(name)) => index != name,
             // No index, or an escaped key name this port can't compare — keyed.
             _ => true,
@@ -1067,14 +1067,14 @@ fn refuse_unparenthesized_sequence(
     expression: &Expression<'_>,
     source: &str,
 ) -> Result<(), CompileError> {
-    let Expression::SequenceExpression(sequence) = expression else {
+    let ExpressionKind::SequenceExpression(_) = &expression.kind else {
         return Ok(());
     };
     // The oracle's `while (--i > 0)`: start one byte before the sequence and stop
     // before index 0, so byte 0 is never examined. A `{` can never sit at byte 0 of
     // a component that reached here anyway.
     let bytes = source.as_bytes();
-    let mut i = sequence.span.start as usize;
+    let mut i = expression.span.start as usize;
     while i > 1 {
         i -= 1;
         match bytes[i] {

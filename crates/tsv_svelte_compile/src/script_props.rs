@@ -8,7 +8,8 @@
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
 use tsv_ts::ast::internal::{
-    AssignmentPattern, Expression, ObjectPattern, ObjectPatternProperty, Property, RestElement,
+    AssignmentPattern, Expression, ExpressionKind, ObjectPattern, ObjectPatternProperty, Property,
+    RestElement,
 };
 
 use crate::build::{Builder, init_property};
@@ -44,10 +45,10 @@ fn bindable_default<'arena>(
     right: &'arena Expression<'arena>,
     source: &str,
 ) -> Option<BindableDefault<'arena>> {
-    let Expression::CallExpression(call) = right else {
+    let ExpressionKind::CallExpression(call) = &right.kind else {
         return None;
     };
-    let Expression::Identifier(callee) = call.callee else {
+    let ExpressionKind::Identifier(callee) = &call.callee.kind else {
         return None;
     };
     if plain_identifier_name(callee, source).as_deref() != Some("$bindable") {
@@ -85,15 +86,15 @@ fn bindable_property<'arena>(
     if p.computed {
         return None;
     }
-    let Expression::AssignmentPattern(assign) = &p.value else {
+    let ExpressionKind::AssignmentPattern(assign) = &p.value.kind else {
         return None;
     };
     let default = bindable_default(assign.right, source)?;
-    let Expression::Identifier(key_id) = &p.key else {
+    let ExpressionKind::Identifier(key_id) = &p.key.kind else {
         return None;
     };
     let key = plain_identifier_name(key_id, source)?;
-    let Expression::Identifier(left_id) = assign.left else {
+    let ExpressionKind::Identifier(left_id) = &assign.left.kind else {
         return None;
     };
     let local = plain_identifier_name(left_id, source)?;
@@ -108,18 +109,21 @@ fn rewrite_bindable_default<'arena>(
     b: &Builder<'arena>,
     p: &'arena Property<'arena>,
     assign: &'arena AssignmentPattern<'arena>,
+    assign_span: Span,
     default: BindableDefault<'arena>,
 ) -> ObjectPatternProperty<'arena> {
     let new_right: &'arena Expression<'arena> = match default {
         BindableDefault::Arg(arg) => arg,
         BindableDefault::ArgLess => b.arena.alloc(b.void_zero_at(assign.right.span().end)),
     };
-    let new_value = Expression::AssignmentPattern(AssignmentPattern {
-        left: assign.left,
-        right: new_right,
-        decorators: assign.decorators,
-        span: assign.span,
-    });
+    let new_value = Expression {
+        span: assign_span,
+        kind: ExpressionKind::AssignmentPattern(AssignmentPattern {
+            left: assign.left,
+            right: new_right,
+            decorators: assign.decorators,
+        }),
+    };
     ObjectPatternProperty::Property(Property {
         key: p.key,
         value: b.arena.alloc(new_value),
@@ -169,8 +173,8 @@ pub(crate) fn rewrite_props_pattern<'arena>(
     uses_slots: bool,
 ) -> Result<(Option<Expression<'arena>>, Vec<BindableEntry>), CompileError> {
     let arena = b.arena;
-    match id {
-        Expression::ObjectPattern(obj) => {
+    match &id.kind {
+        ExpressionKind::ObjectPattern(obj) => {
             // The oracle's per-property validation of a `$props()` destructure
             // (`2-analyze/visitors/VariableDeclarator.js:97-110`): three checks in
             // source order, first-wins (the oracle's `e.*` throws). Runs BEFORE the
@@ -194,7 +198,7 @@ pub(crate) fn rewrite_props_pattern<'arena>(
                 //    `{ $$foo = 1 }` — is refused upstream as `DollarPrefixedBinding`
                 //    (`script_rewrite.rs`, the oracle's `dollar_prefix_invalid`, which fires
                 //    first), so only `{ $$key: value }` reaches here.
-                if let Expression::Identifier(key_id) = &p.key
+                if let ExpressionKind::Identifier(key_id) = &p.key.kind
                     && key_id.name(source).starts_with("$$")
                 {
                     return Err(unsupported(Refusal::PropsIllegalName));
@@ -205,10 +209,13 @@ pub(crate) fn rewrite_props_pattern<'arena>(
                 //    `$bindable()` default's value is still checked here, so a nested
                 //    `{ a: { b } = $bindable() }` refuses BEFORE the guard sees `$bindable`.
                 let value = match &p.value {
-                    Expression::AssignmentPattern(assign) => assign.left,
+                    Expression {
+                        kind: ExpressionKind::AssignmentPattern(assign),
+                        ..
+                    } => assign.left,
                     other => other,
                 };
-                if !matches!(value, Expression::Identifier(_)) {
+                if !matches!(value.kind, ExpressionKind::Identifier(_)) {
                     return Err(unsupported(Refusal::PropsInvalidPattern));
                 }
             }
@@ -234,23 +241,31 @@ pub(crate) fn rewrite_props_pattern<'arena>(
                     properties.push(prop.clone());
                 } else if let Some((entry, p, assign, default)) = bindable_property(prop, source) {
                     entries.push(entry);
-                    properties.push(rewrite_bindable_default(b, p, assign, default));
+                    properties.push(rewrite_bindable_default(
+                        b,
+                        p,
+                        assign,
+                        p.value.span,
+                        default,
+                    ));
                 } else {
                     properties.push(prop.clone());
                 }
             }
             Ok((
-                Some(Expression::ObjectPattern(ObjectPattern {
-                    properties: properties.into_bump_slice(),
-                    optional: obj.optional,
-                    type_annotation: obj.type_annotation.clone(),
-                    decorators: obj.decorators,
-                    span: obj.span,
-                })),
+                Some(Expression {
+                    span: id.span,
+                    kind: ExpressionKind::ObjectPattern(ObjectPattern {
+                        properties: properties.into_bump_slice(),
+                        optional: obj.optional,
+                        type_annotation: obj.type_annotation.clone(),
+                        decorators: obj.decorators,
+                    }),
+                }),
                 entries,
             ))
         }
-        Expression::Identifier(_) => {
+        ExpressionKind::Identifier(_) => {
             let mut properties: BumpVec<'arena, ObjectPatternProperty<'arena>> =
                 BumpVec::new_in(arena);
             let at = id.span().start;
@@ -263,13 +278,15 @@ pub(crate) fn rewrite_props_pattern<'arena>(
                 span: id.span(),
             }));
             Ok((
-                Some(Expression::ObjectPattern(ObjectPattern {
-                    properties: properties.into_bump_slice(),
-                    optional: false,
-                    type_annotation: None,
-                    decorators: None,
+                Some(Expression {
                     span: id.span(),
-                })),
+                    kind: ExpressionKind::ObjectPattern(ObjectPattern {
+                        properties: properties.into_bump_slice(),
+                        optional: false,
+                        type_annotation: None,
+                        decorators: None,
+                    }),
+                }),
                 Vec::new(),
             ))
         }
@@ -292,8 +309,8 @@ fn slots_pattern_prop<'arena>(
     let span = Span::new(at, at);
     ObjectPatternProperty::Property(init_property(
         b.arena,
-        Expression::Identifier(b.ident_at("$$slots", span)),
-        Expression::Identifier(b.ident_at("$$slots_", span)),
+        Expression::from_identifier(b.ident_at("$$slots", span)),
+        Expression::from_identifier(b.ident_at("$$slots_", span)),
         false,
         span,
     ))
@@ -313,8 +330,8 @@ fn shorthand_pattern_prop<'arena>(
     let ident = b.ident_at(name, span);
     ObjectPatternProperty::Property(init_property(
         b.arena,
-        Expression::Identifier(ident.clone()),
-        Expression::Identifier(ident),
+        Expression::from_identifier(ident.clone()),
+        Expression::from_identifier(ident),
         true,
         span,
     ))

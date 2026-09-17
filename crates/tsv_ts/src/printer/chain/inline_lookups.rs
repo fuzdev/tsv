@@ -27,7 +27,7 @@
 // has a different span and keeps its width-driven break points.
 
 use super::types::{ChainGroup, ChainNode};
-use crate::ast::internal::Expression;
+use crate::ast::internal::{Expression, ExpressionKind};
 use crate::printer::Printer;
 use std::cell::Cell;
 use tsv_lang::Span;
@@ -108,8 +108,8 @@ impl<'a> Printer<'a> {
     /// Prettier declines it too, one step earlier — the member's `firstNonMemberParent` is
     /// the pattern, not the assignment.
     pub(in crate::printer) fn mark_assignment_target_member_lookups(&self, left: &Expression<'_>) {
-        self.mark_inline_every_member_lookup(match left {
-            Expression::Identifier(_) => None,
+        self.mark_inline_every_member_lookup(match &left.kind {
+            ExpressionKind::Identifier(_) => None,
             _ => Some(left.span()),
         });
     }

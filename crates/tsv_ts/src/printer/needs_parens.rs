@@ -18,7 +18,7 @@
 // - `printPathNoParens`'s caller (`print/index.js`, the application layer)
 
 use crate::ast::internal::{
-    BinaryOperator, Expression, LiteralValue, UnaryOperator, UpdateOperator,
+    BinaryOperator, Expression, ExpressionKind, LiteralValue, UnaryOperator, UpdateOperator,
 };
 use crate::printer::class_expr_has_decorators;
 
@@ -156,7 +156,7 @@ pub enum ParenContext {
 /// surgical `in`-wrap at positions that build an expression without a
 /// `needs_parens` check.
 pub(crate) fn is_in_binary(expr: &Expression<'_>) -> bool {
-    matches!(expr, Expression::BinaryExpression(b) if b.operator == BinaryOperator::In)
+    matches!(&expr.kind, ExpressionKind::BinaryExpression(b) if b.operator == BinaryOperator::In)
 }
 
 /// Determines if an expression needs parentheses in a given context.
@@ -204,7 +204,7 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         ParenContext::Callee | ParenContext::NewCallee | ParenContext::TaggedTemplateTag => {
             if matches!(ctx, ParenContext::NewCallee) {
                 // ClassExpression only needs parens in `new` context
-                if matches!(expr, Expression::ClassExpression(_)) {
+                if matches!(expr.kind, ExpressionKind::ClassExpression(_)) {
                     return true;
                 }
                 // A `new` callee containing a call needs parens so the arguments
@@ -234,10 +234,10 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
                 || is_function_like(expr)
                 || is_unary_or_update(expr)
                 || matches!(
-                    expr,
-                    Expression::ConditionalExpression(_)
-                        | Expression::BinaryExpression(_)
-                        | Expression::AssignmentExpression(_)
+                    expr.kind,
+                    ExpressionKind::ConditionalExpression(_)
+                        | ExpressionKind::BinaryExpression(_)
+                        | ExpressionKind::AssignmentExpression(_)
                 )
         }
 
@@ -265,9 +265,9 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
                 || is_numeric_literal(expr)
                 || is_unary_or_update(expr)
                 || matches!(
-                    expr,
-                    Expression::ArrowFunctionExpression(_)
-                        | Expression::TSInstantiationExpression(_)
+                    expr.kind,
+                    ExpressionKind::ArrowFunctionExpression(_)
+                        | ExpressionKind::TSInstantiationExpression(_)
                 )
         }
 
@@ -288,9 +288,9 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
             is_lower_precedence(expr)
                 || is_unary_or_update(expr)
                 || matches!(
-                    expr,
-                    Expression::ArrowFunctionExpression(_)
-                        | Expression::TSInstantiationExpression(_)
+                    expr.kind,
+                    ExpressionKind::ArrowFunctionExpression(_)
+                        | ExpressionKind::TSInstantiationExpression(_)
                 )
         }
 
@@ -301,12 +301,12 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         ParenContext::TypeAssertion => {
             is_await_or_yield(expr)
                 || matches!(
-                    expr,
-                    Expression::BinaryExpression(_)
-                        | Expression::ConditionalExpression(_)
-                        | Expression::AssignmentExpression(_)
-                        | Expression::ArrowFunctionExpression(_)
-                        | Expression::TSTypeAssertion(_)
+                    expr.kind,
+                    ExpressionKind::BinaryExpression(_)
+                        | ExpressionKind::ConditionalExpression(_)
+                        | ExpressionKind::AssignmentExpression(_)
+                        | ExpressionKind::ArrowFunctionExpression(_)
+                        | ExpressionKind::TSTypeAssertion(_)
                 )
         }
 
@@ -355,8 +355,8 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         ParenContext::UpdateArgument { postfix } => {
             is_lower_precedence(expr)
                 || is_unary_or_update(expr)
-                || matches!(expr, Expression::ArrowFunctionExpression(_))
-                || (postfix && matches!(expr, Expression::TSInstantiationExpression(_)))
+                || matches!(expr.kind, ExpressionKind::ArrowFunctionExpression(_))
+                || (postfix && matches!(expr.kind, ExpressionKind::TSInstantiationExpression(_)))
         }
 
         // Instantiation: `(<T>() => {})<U>`, `(x as A)<T>`, `(<T>x)<U>`, `(await x)<T>`, `(a = b)<T>`
@@ -367,10 +367,10 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
                 || is_type_assertion(expr)
                 || is_function_like(expr)
                 || matches!(
-                    expr,
-                    Expression::ConditionalExpression(_)
-                        | Expression::AssignmentExpression(_)
-                        | Expression::BinaryExpression(_)
+                    expr.kind,
+                    ExpressionKind::ConditionalExpression(_)
+                        | ExpressionKind::AssignmentExpression(_)
+                        | ExpressionKind::BinaryExpression(_)
                 )
         }
 
@@ -383,40 +383,42 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         ParenContext::AwaitArgument => {
             is_type_assertion(expr)
                 || matches!(
-                    expr,
-                    Expression::BinaryExpression(_)
-                        | Expression::ConditionalExpression(_)
-                        | Expression::AssignmentExpression(_)
-                        | Expression::YieldExpression(_)
-                        | Expression::ArrowFunctionExpression(_)
+                    expr.kind,
+                    ExpressionKind::BinaryExpression(_)
+                        | ExpressionKind::ConditionalExpression(_)
+                        | ExpressionKind::AssignmentExpression(_)
+                        | ExpressionKind::YieldExpression(_)
+                        | ExpressionKind::ArrowFunctionExpression(_)
                 )
         }
 
         // Yield argument: `yield (x ??= y)` — assignment needs parens for clarity
         // Unlike await, yield has lower precedence than binary/conditional, so those don't need parens
-        ParenContext::YieldArgument => matches!(expr, Expression::AssignmentExpression(_)),
+        ParenContext::YieldArgument => matches!(expr.kind, ExpressionKind::AssignmentExpression(_)),
 
         // Arrow body: `() => ({})`, `() => (x = y)`, `() => (@dec class {})`
         // Note: ConditionalExpression is handled specially in build_arrow_body_doc
         // using if_break - parens only when inline, not when on new line
-        ParenContext::ArrowBody => match expr {
-            Expression::ObjectExpression(_) | Expression::AssignmentExpression(_) => true,
+        ParenContext::ArrowBody => match &expr.kind {
+            ExpressionKind::ObjectExpression(_) | ExpressionKind::AssignmentExpression(_) => true,
             // A DECORATED class expression cannot open a concise body: `@` is not a token
             // `ConciseBody` admits, so `() => @dec class {}` does not reparse. An
             // undecorated `class {}` opens one fine and stays bare, as prettier keeps it.
             // The same leftmost-token question a composite body asks through
             // `leftmost_arrow_body_parens_span`, at the body's own root.
-            Expression::ClassExpression(c) => class_expr_has_decorators(c),
+            ExpressionKind::ClassExpression(c) => class_expr_has_decorators(c),
             _ => false,
         },
 
         // Object property value: `{key: (a = b)}`
         // Assignment expressions need parens in object literals (not in ObjectPattern)
-        ParenContext::ObjectPropertyValue => matches!(expr, Expression::AssignmentExpression(_)),
+        ParenContext::ObjectPropertyValue => {
+            matches!(expr.kind, ExpressionKind::AssignmentExpression(_))
+        }
 
         // Assignment as a default/class-property value keeps its parens:
         // `(a = (b = c)) =>`, `a = (this.a = b);`
-        ParenContext::DefaultValue => matches!(expr, Expression::AssignmentExpression(_)),
+        ParenContext::DefaultValue => matches!(expr.kind, ExpressionKind::AssignmentExpression(_)),
 
         // These contexts all need parens around assignment expressions for clarity:
         // - Call/array/new argument: `fn((a = b))`, `[(a = b)]`, `new Fn((a = b))`
@@ -425,12 +427,12 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         ParenContext::Argument
         | ParenContext::TemplateLiteralExpression
         | ParenContext::ComputedPropertyKey => {
-            matches!(expr, Expression::AssignmentExpression(_))
+            matches!(expr.kind, ExpressionKind::AssignmentExpression(_))
         }
 
         // Statement test: `while ((x = y))`, `if ((x = getValue()))`, `for (;(x = y);)`
         // Double-parens signal intentional assignment (not a typo for ==)
-        ParenContext::StatementTest => matches!(expr, Expression::AssignmentExpression(_)),
+        ParenContext::StatementTest => matches!(expr.kind, ExpressionKind::AssignmentExpression(_)),
 
         // Superclass: `extends (a + b)`, `extends (a ? b : c)`, `extends (await x)`,
         // `extends ((a) => b)`, `extends (x as T)`, `extends (-x)`. The
@@ -452,11 +454,11 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
             is_lower_precedence(stripped)
                 || is_unary_or_update(stripped)
                 || matches!(
-                    stripped,
-                    Expression::ArrowFunctionExpression(_)
-                        | Expression::NewExpression(_)
-                        | Expression::TaggedTemplateExpression(_)
-                        | Expression::ObjectExpression(_)
+                    stripped.kind,
+                    ExpressionKind::ArrowFunctionExpression(_)
+                        | ExpressionKind::NewExpression(_)
+                        | ExpressionKind::TaggedTemplateExpression(_)
+                        | ExpressionKind::ObjectExpression(_)
                 )
                 // A *decorated* class expression must be parenthesized —
                 // `extends @deco class {}` reads the `@deco` as decorating the
@@ -464,18 +466,18 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
                 // producing unreparseable output. A bare (undecorated) class
                 // expression stays unwrapped (prettier keeps `extends class {}`).
                 || matches!(
-                    stripped,
-                    Expression::ClassExpression(c) if class_expr_has_decorators(c)
+                    &stripped.kind,
+                    ExpressionKind::ClassExpression(c) if class_expr_has_decorators(c)
                 )
         }
 
         // A type-assertion target needs parens to round-trip (`(x as T) = …`);
         // non-null `x!` is a valid bare assignment target, so it isn't wrapped.
         ParenContext::AssignmentTarget => matches!(
-            expr,
-            Expression::TSAsExpression(_)
-                | Expression::TSSatisfiesExpression(_)
-                | Expression::TSTypeAssertion(_)
+            expr.kind,
+            ExpressionKind::TSAsExpression(_)
+                | ExpressionKind::TSSatisfiesExpression(_)
+                | ExpressionKind::TSTypeAssertion(_)
         ),
     }
 }
@@ -497,7 +499,7 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
 pub(in crate::printer) fn strip_non_null_wrappers<'a>(
     mut expr: &'a Expression<'a>,
 ) -> &'a Expression<'a> {
-    while let Expression::TSNonNullExpression(non_null) = expr {
+    while let ExpressionKind::TSNonNullExpression(non_null) = &expr.kind {
         expr = non_null.expression;
     }
     expr
@@ -506,8 +508,8 @@ pub(in crate::printer) fn strip_non_null_wrappers<'a>(
 /// `await x` or `yield x` - always need parens together in most contexts
 fn is_await_or_yield(expr: &Expression<'_>) -> bool {
     matches!(
-        expr,
-        Expression::AwaitExpression(_) | Expression::YieldExpression(_)
+        expr.kind,
+        ExpressionKind::AwaitExpression(_) | ExpressionKind::YieldExpression(_)
     )
 }
 
@@ -517,20 +519,20 @@ fn is_lower_precedence(expr: &Expression<'_>) -> bool {
     is_await_or_yield(expr)
         || is_type_assertion(expr)
         || matches!(
-            expr,
-            Expression::BinaryExpression(_)
-                | Expression::ConditionalExpression(_)
-                | Expression::AssignmentExpression(_)
+            expr.kind,
+            ExpressionKind::BinaryExpression(_)
+                | ExpressionKind::ConditionalExpression(_)
+                | ExpressionKind::AssignmentExpression(_)
         )
 }
 
 /// `x as T`, `x satisfies T`, or `<T>x` - TypeScript type assertions
 fn is_type_assertion(expr: &Expression<'_>) -> bool {
     matches!(
-        expr,
-        Expression::TSAsExpression(_)
-            | Expression::TSSatisfiesExpression(_)
-            | Expression::TSTypeAssertion(_)
+        expr.kind,
+        ExpressionKind::TSAsExpression(_)
+            | ExpressionKind::TSSatisfiesExpression(_)
+            | ExpressionKind::TSTypeAssertion(_)
     )
 }
 
@@ -542,11 +544,11 @@ fn needs_parens_unary_arg_common(expr: &Expression<'_>) -> bool {
     is_await_or_yield(expr)
         || is_type_assertion(expr)
         || matches!(
-            expr,
-            Expression::BinaryExpression(_)
-                | Expression::ConditionalExpression(_)
-                | Expression::AssignmentExpression(_)
-                | Expression::ArrowFunctionExpression(_)
+            expr.kind,
+            ExpressionKind::BinaryExpression(_)
+                | ExpressionKind::ConditionalExpression(_)
+                | ExpressionKind::AssignmentExpression(_)
+                | ExpressionKind::ArrowFunctionExpression(_)
         )
 }
 
@@ -563,9 +565,9 @@ fn needs_parens_unary_same_sign(expr: &Expression<'_>, parent_op: UnaryOperator)
         UnaryOperator::Minus => (UnaryOperator::Minus, UpdateOperator::Decrement),
         _ => return false,
     };
-    match expr {
-        Expression::UnaryExpression(u) => u.operator == unary_sign,
-        Expression::UpdateExpression(u) => u.prefix && u.operator == update_sign,
+    match &expr.kind {
+        ExpressionKind::UnaryExpression(u) => u.operator == unary_sign,
+        ExpressionKind::UpdateExpression(u) => u.prefix && u.operator == update_sign,
         _ => false,
     }
 }
@@ -573,8 +575,8 @@ fn needs_parens_unary_same_sign(expr: &Expression<'_>, parent_op: UnaryOperator)
 /// Arrow function or function expression
 fn is_function_like(expr: &Expression<'_>) -> bool {
     matches!(
-        expr,
-        Expression::ArrowFunctionExpression(_) | Expression::FunctionExpression(_)
+        expr.kind,
+        ExpressionKind::ArrowFunctionExpression(_) | ExpressionKind::FunctionExpression(_)
     )
 }
 
@@ -588,8 +590,8 @@ fn is_function_like(expr: &Expression<'_>) -> bool {
 /// postfix/access-precedence arm through this predicate keeps them in lockstep.
 fn is_unary_or_update(expr: &Expression<'_>) -> bool {
     matches!(
-        expr,
-        Expression::UnaryExpression(_) | Expression::UpdateExpression(_)
+        expr.kind,
+        ExpressionKind::UnaryExpression(_) | ExpressionKind::UpdateExpression(_)
     )
 }
 
@@ -651,28 +653,28 @@ pub(in crate::printer) const fn joins_a_trailing_angle_bracket(op: BinaryOperato
 /// the class, and `as` / `satisfies` end on a TYPE rather than on an expression, so
 /// nothing can re-lex their tail.
 fn ends_with_instantiation_close(expr: &Expression<'_>, in_for_init: bool) -> bool {
-    match expr {
-        Expression::TSInstantiationExpression(_) => true,
-        Expression::BinaryExpression(binary) => {
+    match &expr.kind {
+        ExpressionKind::TSInstantiationExpression(_) => true,
+        ExpressionKind::BinaryExpression(binary) => {
             let ctx = ParenContext::BinaryRight {
                 parent_op: binary.operator,
             };
             !needs_parens(binary.right, ctx, in_for_init)
                 && ends_with_instantiation_close(binary.right, in_for_init)
         }
-        Expression::UnaryExpression(unary) => {
+        ExpressionKind::UnaryExpression(unary) => {
             let ctx = ParenContext::UnaryArgument {
                 parent_op: unary.operator,
             };
             !needs_parens(unary.argument, ctx, in_for_init)
                 && ends_with_instantiation_close(unary.argument, in_for_init)
         }
-        Expression::UpdateExpression(update) if update.prefix => {
+        ExpressionKind::UpdateExpression(update) if update.prefix => {
             let ctx = ParenContext::UpdateArgument { postfix: false };
             !needs_parens(update.argument, ctx, in_for_init)
                 && ends_with_instantiation_close(update.argument, in_for_init)
         }
-        Expression::TSTypeAssertion(assertion) => {
+        ExpressionKind::TSTypeAssertion(assertion) => {
             let ctx = ParenContext::AngleBracketAssertion;
             !needs_parens(assertion.expression, ctx, in_for_init)
                 && ends_with_instantiation_close(assertion.expression, in_for_init)
@@ -689,10 +691,10 @@ fn ends_with_instantiation_close(expr: &Expression<'_>, in_for_init: bool) -> bo
 /// object (the call must be to the left of `new`'s argument list to be
 /// captured), so `new a[b]()` — no inner call — stays unparenthesized.
 fn new_callee_has_call(expr: &Expression<'_>) -> bool {
-    match expr {
-        Expression::CallExpression(_) => true,
-        Expression::MemberExpression(member) => new_callee_has_call(member.object),
-        Expression::TSNonNullExpression(non_null) => new_callee_has_call(non_null.expression),
+    match &expr.kind {
+        ExpressionKind::CallExpression(_) => true,
+        ExpressionKind::MemberExpression(member) => new_callee_has_call(member.object),
+        ExpressionKind::TSNonNullExpression(non_null) => new_callee_has_call(non_null.expression),
         _ => false,
     }
 }
@@ -701,8 +703,8 @@ fn new_callee_has_call(expr: &Expression<'_>) -> bool {
 /// Prettier normalizes `0..toString()` to `(0).toString()`.
 fn is_numeric_literal(expr: &Expression<'_>) -> bool {
     matches!(
-        expr,
-        Expression::Literal(lit) if matches!(lit.value, LiteralValue::Number(_))
+        &expr.kind,
+        ExpressionKind::Literal(lit) if matches!(lit.value, LiteralValue::Number(_))
     )
 }
 
@@ -717,19 +719,19 @@ fn is_numeric_literal(expr: &Expression<'_>) -> bool {
 /// `(class {});` — matches prettier's "statement starts with `{`/`function`/`class`"
 /// rule (parentheses/needs-parentheses.js).
 fn needs_parens_expression_statement(expr: &Expression<'_>) -> bool {
-    match expr {
+    match &expr.kind {
         // Object expression: `({...});` needs parens to avoid being parsed as a block
-        Expression::ObjectExpression(_) => true,
+        ExpressionKind::ObjectExpression(_) => true,
         // Function/class expression: `(function () {});` / `(class {});` need parens
         // to avoid being reparsed as a declaration (which also changes meaning —
         // an anonymous declaration is a syntax error).
-        Expression::FunctionExpression(_) | Expression::ClassExpression(_) => true,
+        ExpressionKind::FunctionExpression(_) | ExpressionKind::ClassExpression(_) => true,
         // Object pattern assignment: `({a, b} = obj);` needs parens
-        Expression::AssignmentExpression(assign) => {
-            matches!(assign.left, Expression::ObjectPattern(_))
+        ExpressionKind::AssignmentExpression(assign) => {
+            matches!(assign.left.kind, ExpressionKind::ObjectPattern(_))
         }
         // Sequence: check the first expression
-        Expression::SequenceExpression(seq) => seq
+        ExpressionKind::SequenceExpression(seq) => seq
             .expressions
             .first()
             .is_some_and(needs_parens_expression_statement),
@@ -763,38 +765,38 @@ pub(crate) fn leftmost_no_lookahead_reached<'a>(
         expr: &'a Expression<'a>,
         computed_member_object: bool,
     ) -> (&'a Expression<'a>, bool) {
-        match expr {
+        match &expr.kind {
             // Binary and logical share `BinaryExpression` here — recurse into `.left`.
-            Expression::BinaryExpression(b) => walk(b.left, false),
-            Expression::AssignmentExpression(a) => walk(a.left, false),
-            Expression::MemberExpression(m) => walk(m.object, m.computed && !m.optional),
-            Expression::ConditionalExpression(c) => walk(c.test, false),
-            Expression::SequenceExpression(s) => s
+            ExpressionKind::BinaryExpression(b) => walk(b.left, false),
+            ExpressionKind::AssignmentExpression(a) => walk(a.left, false),
+            ExpressionKind::MemberExpression(m) => walk(m.object, m.computed && !m.optional),
+            ExpressionKind::ConditionalExpression(c) => walk(c.test, false),
+            ExpressionKind::SequenceExpression(s) => s
                 .expressions
                 .first()
                 .map_or((expr, computed_member_object), |first| walk(first, false)),
             // IIFEs (`(function () {})()` / `` (function () {})`x` ``) are already
             // parenthesized by their callee/tag, so prettier stops the walk there.
-            Expression::CallExpression(call) => {
-                if matches!(call.callee, Expression::FunctionExpression(_)) {
+            ExpressionKind::CallExpression(call) => {
+                if matches!(call.callee.kind, ExpressionKind::FunctionExpression(_)) {
                     (expr, computed_member_object)
                 } else {
                     walk(call.callee, false)
                 }
             }
-            Expression::TaggedTemplateExpression(t) => {
-                if matches!(t.tag, Expression::FunctionExpression(_)) {
+            ExpressionKind::TaggedTemplateExpression(t) => {
+                if matches!(t.tag.kind, ExpressionKind::FunctionExpression(_)) {
                     (expr, computed_member_object)
                 } else {
                     walk(t.tag, false)
                 }
             }
             // Postfix update (`x++`) prints its argument first; prefix (`++x`) does not.
-            Expression::UpdateExpression(u) if !u.prefix => walk(u.argument, false),
-            Expression::TSAsExpression(e) => walk(e.expression, false),
-            Expression::TSSatisfiesExpression(e) => walk(e.expression, false),
-            Expression::TSNonNullExpression(e) => walk(e.expression, false),
-            Expression::TSInstantiationExpression(e) => walk(e.expression, false),
+            ExpressionKind::UpdateExpression(u) if !u.prefix => walk(u.argument, false),
+            ExpressionKind::TSAsExpression(e) => walk(e.expression, false),
+            ExpressionKind::TSSatisfiesExpression(e) => walk(e.expression, false),
+            ExpressionKind::TSNonNullExpression(e) => walk(e.expression, false),
+            ExpressionKind::TSInstantiationExpression(e) => walk(e.expression, false),
             _ => (expr, computed_member_object),
         }
     }
@@ -830,8 +832,8 @@ pub(crate) fn export_default_needs_parens(expr: &Expression<'_>) -> bool {
     // and the leftmost-token rule this function is named for.
     assignment_value_needs_parens(expr)
         || matches!(
-            export_default_leftmost(expr),
-            Expression::FunctionExpression(_) | Expression::ClassExpression(_)
+            export_default_leftmost(expr).kind,
+            ExpressionKind::FunctionExpression(_) | ExpressionKind::ClassExpression(_)
         )
 }
 
@@ -848,38 +850,38 @@ pub(crate) fn export_default_needs_parens(expr: &Expression<'_>) -> bool {
 /// answers, and three of them were missing (`for (let i = (a = b); ;)`,
 /// `for (const x of (a = b))`, `export = (a = b)` all dropped the pair).
 fn assignment_value_needs_parens(expr: &Expression<'_>) -> bool {
-    matches!(expr, Expression::AssignmentExpression(_))
+    matches!(expr.kind, ExpressionKind::AssignmentExpression(_))
 }
 
 fn export_default_leftmost<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
-    match expr {
-        Expression::BinaryExpression(b) => export_default_leftmost(b.left),
-        Expression::AssignmentExpression(a) => export_default_leftmost(a.left),
-        Expression::ConditionalExpression(c) => export_default_leftmost(c.test),
+    match &expr.kind {
+        ExpressionKind::BinaryExpression(b) => export_default_leftmost(b.left),
+        ExpressionKind::AssignmentExpression(a) => export_default_leftmost(a.left),
+        ExpressionKind::ConditionalExpression(c) => export_default_leftmost(c.test),
         // A `SequenceExpression` self-parenthesizes in `build_sequence_doc` (its printed
         // form always starts with `(`), so — like the paren-aware member/call/tag descents
         // below — the walk stops here instead of recursing to the leftmost operand.
         // Recursing would double-wrap a class/function-leftmost sequence:
         // `export default ((class {}, x))` instead of prettier's `(class {}, x)`.
-        Expression::SequenceExpression(_) => expr,
-        Expression::UpdateExpression(u) if !u.prefix => export_default_leftmost(u.argument),
-        Expression::TSAsExpression(e) => export_default_leftmost(e.expression),
-        Expression::TSSatisfiesExpression(e) => export_default_leftmost(e.expression),
-        Expression::TSNonNullExpression(e) => export_default_leftmost(e.expression),
-        Expression::TSInstantiationExpression(e) => export_default_leftmost(e.expression),
+        ExpressionKind::SequenceExpression(_) => expr,
+        ExpressionKind::UpdateExpression(u) if !u.prefix => export_default_leftmost(u.argument),
+        ExpressionKind::TSAsExpression(e) => export_default_leftmost(e.expression),
+        ExpressionKind::TSSatisfiesExpression(e) => export_default_leftmost(e.expression),
+        ExpressionKind::TSNonNullExpression(e) => export_default_leftmost(e.expression),
+        ExpressionKind::TSInstantiationExpression(e) => export_default_leftmost(e.expression),
         // Descents that cross a would-be-parenthesized child: stop there, since its
         // leading `(` already guards any inner keyword.
-        Expression::MemberExpression(m)
+        ExpressionKind::MemberExpression(m)
             if !needs_parens(m.object, ParenContext::ChainBase, false) =>
         {
             export_default_leftmost(m.object)
         }
-        Expression::CallExpression(call)
+        ExpressionKind::CallExpression(call)
             if !needs_parens(call.callee, ParenContext::Callee, false) =>
         {
             export_default_leftmost(call.callee)
         }
-        Expression::TaggedTemplateExpression(t)
+        ExpressionKind::TaggedTemplateExpression(t)
             if !needs_parens(t.tag, ParenContext::TaggedTemplateTag, false) =>
         {
             export_default_leftmost(t.tag)
@@ -904,14 +906,14 @@ fn needs_parens_binary_operand(
     // e.g., `b || ((fn) => fn)` - without parens it becomes `(b || fn) => fn` (syntax error)
     // e.g., `a && (await b)` - parens for clarity (Prettier style)
     if matches!(
-        expr,
-        Expression::ConditionalExpression(_)
-            | Expression::AssignmentExpression(_)
-            | Expression::TSAsExpression(_)
-            | Expression::TSSatisfiesExpression(_)
-            | Expression::ArrowFunctionExpression(_)
-            | Expression::AwaitExpression(_)
-            | Expression::YieldExpression(_)
+        expr.kind,
+        ExpressionKind::ConditionalExpression(_)
+            | ExpressionKind::AssignmentExpression(_)
+            | ExpressionKind::TSAsExpression(_)
+            | ExpressionKind::TSSatisfiesExpression(_)
+            | ExpressionKind::ArrowFunctionExpression(_)
+            | ExpressionKind::AwaitExpression(_)
+            | ExpressionKind::YieldExpression(_)
     ) {
         return true;
     }
@@ -920,7 +922,7 @@ fn needs_parens_binary_operand(
     // `-2 ** 3` is a syntax error; must be `(-2) ** 3` or `-(2 ** 3)`
     if !is_right
         && parent_op == BinaryOperator::StarStar
-        && matches!(expr, Expression::UnaryExpression(_))
+        && matches!(expr.kind, ExpressionKind::UnaryExpression(_))
     {
         return true;
     }
@@ -934,7 +936,7 @@ fn needs_parens_binary_operand(
     // `a++ in b` stays bare.
     if !is_right
         && matches!(parent_op, BinaryOperator::In | BinaryOperator::Instanceof)
-        && matches!(expr, Expression::UnaryExpression(_))
+        && matches!(expr.kind, ExpressionKind::UnaryExpression(_))
     {
         return true;
     }
@@ -979,8 +981,8 @@ fn needs_parens_binary_operand(
     if !is_right
         && parent_op == BinaryOperator::GreaterThan
         && matches!(
-            expr,
-            Expression::BinaryExpression(child)
+            &expr.kind,
+            ExpressionKind::BinaryExpression(child)
                 if child.operator == BinaryOperator::LessThan
                     && child.relexes_as_type_arguments
         )
@@ -988,7 +990,7 @@ fn needs_parens_binary_operand(
         return true;
     }
 
-    let Expression::BinaryExpression(child) = expr else {
+    let ExpressionKind::BinaryExpression(child) = &expr.kind else {
         return false;
     };
     let child_op = child.operator;

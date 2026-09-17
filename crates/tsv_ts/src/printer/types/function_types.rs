@@ -35,8 +35,8 @@ fn get_type_literal_from_identifier<'a>(
     &'a internal::TSTypeAnnotation<'a>,
     &'a internal::TSTypeLiteral<'a>,
 )> {
-    match expr {
-        internal::Expression::Identifier(id) => {
+    match &expr.kind {
+        internal::ExpressionKind::Identifier(id) => {
             id.type_annotation()
                 .and_then(|ann| match unwrap_parenthesized(ann.type_annotation) {
                     TSType::TypeLiteral(t) => Some((id, ann, t)),
@@ -1076,11 +1076,11 @@ impl<'a> Printer<'a> {
         expr: &internal::Expression<'_>,
     ) -> DocId {
         let d = self.d();
-        match expr {
-            internal::Expression::Identifier(id) => {
+        match &expr.kind {
+            internal::ExpressionKind::Identifier(id) => {
                 self.build_identifier_doc_with_wrapping_type(id)
             }
-            internal::Expression::RestElement(rest) => {
+            internal::ExpressionKind::RestElement(rest) => {
                 // Comments between `...` and the argument (e.g., `.../* c */ args`); a
                 // line comment breaks so it can't swallow the rest parameter.
                 let dots_end = rest.span.start + "...".len() as u32;

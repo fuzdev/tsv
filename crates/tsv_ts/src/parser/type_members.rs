@@ -200,11 +200,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         } else if self.current_is_identifier_or_keyword() {
             (
                 false,
-                Expression::Identifier(self.parse_identifier_name_node()?),
+                Expression::from_identifier(self.parse_identifier_name_node()?),
             )
         } else if self.check(&TokenKind::String) {
             // String literal key: {'multi-word': number}
-            (false, Expression::Literal(self.parse_string_literal()?))
+            (
+                false,
+                Expression::from_literal(self.parse_string_literal()?),
+            )
         } else if self.check(&TokenKind::Number) {
             // Number literal key: {0: string, 1: number}. Routed through the one
             // numeric-literal reader so this key reads its radix prefixes, separators
@@ -212,7 +215,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // strict-mode leading-zero gate.
             let literal = self.parse_number_or_bigint_literal()?;
             self.advance()?;
-            (false, Expression::Literal(literal))
+            (false, Expression::from_literal(literal))
         } else {
             return Err(self.error_expected("property name"));
         };

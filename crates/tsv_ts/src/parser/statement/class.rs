@@ -3,9 +3,10 @@
 use crate::ast::internal::{
     Accessibility, BlockStatement, ClassBody, ClassDeclaration, ClassExpression, ClassMember,
     Decorator, ExportDefaultDeclaration, ExportDefaultValue, ExportKind, ExportNamedDeclaration,
-    Expression, FunctionExpression, Identifier, Literal, LiteralValue, MethodDefinition,
-    MethodKind, PropertyDefinition, PropertyModifier, Statement, StaticBlock, TSIndexSignature,
-    TSInterfaceHeritage, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
+    Expression, ExpressionKind, FunctionExpression, Identifier, Literal, LiteralValue,
+    MethodDefinition, MethodKind, PropertyDefinition, PropertyModifier, Statement, StaticBlock,
+    TSIndexSignature, TSInterfaceHeritage, TSTypeParameterDeclaration,
+    TSTypeParameterInstantiation,
 };
 use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
@@ -511,17 +512,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(alloc_expr(
             self.arena,
-            Expression::ClassExpression(self.arena.alloc(ClassExpression {
-                decorators,
-                id,
-                super_class,
-                super_type_parameters,
-                implements,
-                body,
-                r#abstract: false,
-                type_parameters,
+            Expression {
                 span: Span::new(start as u32, end),
-            })),
+                kind: ExpressionKind::ClassExpression(self.arena.alloc(ClassExpression {
+                    decorators,
+                    id,
+                    super_class,
+                    super_type_parameters,
+                    implements,
+                    body,
+                    r#abstract: false,
+                    type_parameters,
+                })),
+            },
         ))
     }
 
@@ -914,18 +917,25 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 (true, self.parse_computed_member_key()?, false)
             } else if matches!(self.current_kind(), TokenKind::Hash) {
                 // Private identifier key: #name
-                let private_id = self.parse_private_identifier()?;
+                let (private_id, private_span) = self.parse_private_identifier()?;
                 // A class element named `#constructor` is illegal in every context
                 // (ecma262 Static Semantics: Early Errors for ClassElementName) —
                 // acorn rejects at parse, so tsv matches for drop-in parity. This
                 // shared private-key branch covers every member kind (method /
                 // field / get / set / static / accessor).
-                if self.private_name_is(&private_id, "constructor") {
+                if self.private_name_is(&private_id, private_span, "constructor") {
                     return Err(
                         self.error_msg("Classes can't have an element named '#constructor'")
                     );
                 }
-                (false, Expression::PrivateIdentifier(private_id), false)
+                (
+                    false,
+                    Expression {
+                        span: private_span,
+                        kind: ExpressionKind::PrivateIdentifier(private_id),
+                    },
+                    false,
+                )
             } else if self.current_is_identifier_or_keyword() {
                 // Identifier or keyword as key - keywords are valid as class member names.
                 // The constructor is matched by decoded StringValue, so an escaped
@@ -936,7 +946,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     == "constructor";
                 (
                     false,
-                    Expression::Identifier(self.parse_identifier_name_node()?),
+                    Expression::from_identifier(self.parse_identifier_name_node()?),
                     name_is_constructor,
                 )
             } else if matches!(self.current_kind(), TokenKind::String) {
@@ -955,7 +965,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let name_is_constructor = self.resolve_cooked(&cooked, span) == "constructor";
                 (
                     false,
-                    Expression::Literal(Literal {
+                    Expression::from_literal(Literal {
                         value: LiteralValue::String(cooked),
                         span,
                     }),
@@ -966,7 +976,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // numeric decode (radix, separators, bigint)
                 let literal = self.parse_number_or_bigint_literal()?;
                 self.advance()?;
-                (false, Expression::Literal(literal), false)
+                (false, Expression::from_literal(literal), false)
             } else {
                 return Err(self.error_expected("class member name"));
             };

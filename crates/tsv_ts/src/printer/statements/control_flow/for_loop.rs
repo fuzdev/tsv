@@ -4,7 +4,7 @@
 // for-in/for-of left/right printing.
 
 use super::HeadChainGrouping;
-use crate::ast::internal::{self, Expression, Statement};
+use crate::ast::internal::{self, Expression, ExpressionKind, Statement};
 use crate::printer::expressions::operators::SeqLayout;
 use crate::printer::statements::StatementContext;
 use crate::printer::statements::variable::{DeclaratorEqGap, DeclaratorInitInputs};
@@ -1032,6 +1032,7 @@ impl<'a> Printer<'a> {
     fn build_for_sequence_clause_doc(
         &self,
         seq: &internal::SequenceExpression<'_>,
+        seq_span: Span,
         build_elem: impl Fn(&Expression<'_>) -> DocId,
     ) -> DocId {
         // A MULTI-LINE block the FIRST operand OWNS prints ahead of the run, outside the
@@ -1041,7 +1042,7 @@ impl<'a> Printer<'a> {
         // a for header, so the comment simply leads the clause, which is where prettier
         // prints it too. Only the BREAK differs, and the two agree once it is gone.
         self.build_doc_with_outermost_owned_comment_at(
-            seq.span.start,
+            seq_span.start,
             seq.expressions.first(),
             || {
                 let d = self.d();
@@ -1069,10 +1070,10 @@ impl<'a> Printer<'a> {
                 // [`Printer::wrap_frozen_position_pair`] to what it builds, and a `for`
                 // header's operand needs the header's own `[~In]` pair instead
                 // ([`Printer::wrap_frozen_for_init_in`]) — the run itself is the same one.
-                if first_start != seq.span.start {
+                if first_start != seq_span.start {
                     self.push_leading_comment_run(
                         &mut parts,
-                        self.comments_to_emit_between(seq.span.start, first_start),
+                        self.comments_to_emit_between(seq_span.start, first_start),
                         first_start,
                         LeadingGlue::Adjacent,
                     );
@@ -1100,11 +1101,11 @@ impl<'a> Printer<'a> {
                         // printer applies to its first operand
                         // ([`Printer::left_spine_operand_frozen_span`]): an own-line directive
                         // inside the erased shell freezes THAT operand, Rule A's child scope.
-                        self.left_spine_operand_frozen_span(seq.span.start, e)
+                        self.left_spine_operand_frozen_span(seq_span.start, e)
                     };
                     docs.push(if i == last {
                         // The TRAILING EDGE: the last operand's own erased shell closes at the
-                        // sequence's span end, so `[operand.end, seq.span.end)` is its gap —
+                        // sequence's span end, so `[operand.end, seq_span.end)` is its gap —
                         // and, unlike every earlier operand's, no comma gap follows to claim
                         // it. Handed to the header's own shell builder, which owns the
                         // question at every other `for`-clause position: the block strips
@@ -1116,7 +1117,7 @@ impl<'a> Printer<'a> {
                         // update clause does not — and places it INSIDE the trailing comment
                         // (`(aaa in bbb) /* c */`), which is why the operand is built there
                         // rather than wrapped here.
-                        self.build_for_clause_operand_doc(e, seq.span.end, frozen)
+                        self.build_for_clause_operand_doc(e, seq_span.end, frozen)
                     } else {
                         frozen.map_or_else(
                             || build_elem(e),
@@ -1158,12 +1159,12 @@ impl<'a> Printer<'a> {
         expr: &Expression<'_>,
         build_elem: impl Fn(&Expression<'_>) -> DocId,
     ) -> DocId {
-        if let Expression::SequenceExpression(seq) = expr {
+        if let ExpressionKind::SequenceExpression(seq) = &expr.kind {
             // A sequence's ELEMENTS are not `shouldNotIndent`: their parent is the
             // sequence, not the `for`, so a binary element keeps the continuation-indent
             // default — which is why the mark below is on the clause and not inside
             // `build_elem`.
-            return self.build_for_sequence_clause_doc(seq, build_elem);
+            return self.build_for_sequence_clause_doc(seq, expr.span, build_elem);
         }
         // The clause itself is `shouldNotIndent`'s own `ForStatement` term (`node !==
         // parent.body && parent.type === "ForStatement"`, `shouldNotIndent` in `print/binaryish.js`), so a binary
@@ -2254,7 +2255,7 @@ impl<'a> Printer<'a> {
             && !is_await
             && matches!(
                 left,
-                internal::ForInOfLeft::Pattern(Expression::Identifier(id))
+                internal::ForInOfLeft::Pattern(Expression { kind: ExpressionKind::Identifier(id), .. })
                     if self.with_ident_name(id, |s| s == "async")
             )
     }

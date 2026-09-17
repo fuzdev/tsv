@@ -8,7 +8,7 @@
 use super::builder::build_chain_doc;
 use super::printing::chain_gap_any;
 use super::types::{ChainGroup, ChainGroupVec, ChainNode, ChainNodeVec};
-use crate::ast::internal::{self, Expression, IdentName};
+use crate::ast::internal::{self, Expression, ExpressionKind, IdentName};
 use crate::printer::calls::is_memberish;
 use crate::printer::comments::{paren_pair_keeps_leading_run, paren_shell_close_after};
 use crate::printer::{ParenContext, Printer, is_multiline_template_expression, needs_parens};
@@ -90,6 +90,7 @@ fn linearize_chain<'a>(expr: &'a Expression<'_>, input: LinearizeInput<'_>) -> C
 /// Linearize starting from a CallExpression (avoids cloning to wrap in Expression)
 pub fn linearize_chain_from_call_into<'a>(
     call: &'a internal::CallExpression<'_>,
+    span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
 ) {
@@ -98,14 +99,15 @@ pub fn linearize_chain_from_call_into<'a>(
         "the linearizer fills its buffer, never appends"
     );
     let mut paren_gaps = Vec::new();
-    linearize_call_callee(call, input, nodes, &mut paren_gaps);
-    nodes.push(ChainNode::call(call));
+    linearize_call_callee(call, span, input, nodes, &mut paren_gaps);
+    nodes.push(ChainNode::call(call, span));
     finalize_chain_nodes(nodes, &paren_gaps, input.source);
 }
 
 /// Linearize starting from a MemberExpression (avoids cloning to wrap in Expression)
 pub fn linearize_chain_from_member_into<'a>(
     member: &'a internal::MemberExpression<'_>,
+    span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
 ) {
@@ -114,8 +116,8 @@ pub fn linearize_chain_from_member_into<'a>(
         "the linearizer fills its buffer, never appends"
     );
     let mut paren_gaps = Vec::new();
-    linearize_member_object(member, input, nodes, &mut paren_gaps);
-    linearize_member_node(member, input.source, nodes, &mut paren_gaps);
+    linearize_member_object(member, span, input, nodes, &mut paren_gaps);
+    linearize_member_node(member, span, input.source, nodes, &mut paren_gaps);
     finalize_chain_nodes(nodes, &paren_gaps, input.source);
 }
 
@@ -128,6 +130,7 @@ pub fn linearize_chain_from_member_into<'a>(
 /// non-nulls go through `linearize_recursive`'s own arm, which does gate.
 pub fn linearize_chain_from_non_null_into<'a>(
     non_null: &'a internal::TSNonNullExpression<'_>,
+    span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
 ) {
@@ -137,7 +140,7 @@ pub fn linearize_chain_from_non_null_into<'a>(
     );
     let mut paren_gaps = Vec::new();
     linearize_recursive(non_null.expression, input, nodes, &mut paren_gaps);
-    nodes.push(ChainNode::non_null(non_null));
+    nodes.push(ChainNode::non_null(non_null, span));
     finalize_chain_nodes(nodes, &paren_gaps, input.source);
 }
 
@@ -223,15 +226,15 @@ fn finalize_chain_nodes(nodes: &mut [ChainNode<'_>], paren_gaps: &[ParenGap], so
 fn mark_own_call_layout(nodes: &mut [ChainNode<'_>], source: &str) {
     let mut entered = false;
     for node in nodes.iter_mut().rev() {
-        let ChainNode::Call { call, facts } = node else {
+        let ChainNode::Call { call, facts, .. } = node else {
             continue;
         };
         if entered {
             // `rec` swallows a memberish-or-call callee and stops at anything else, printing
             // that one with `print()` — a fresh `printCallExpression` context for everything
             // below it.
-            let swallowed =
-                is_memberish(call.callee) || matches!(call.callee, Expression::CallExpression(_));
+            let swallowed = is_memberish(call.callee)
+                || matches!(call.callee.kind, ExpressionKind::CallExpression(_));
             facts.own_call_layout = !swallowed;
             entered = swallowed;
         } else {
@@ -332,14 +335,15 @@ pub(crate) fn child_stops_optional_chain(
 /// double-prints; the reverse DROPS. It answered differently with and without a `!`
 /// for as long as the trailing half was keyed on the operand's KIND instead.
 pub fn chain_paren_leading_gap(expr: &Expression<'_>, comments: &[Comment]) -> Option<(u32, u32)> {
-    match expr {
-        Expression::MemberExpression(member) => member_object_paren_leading_start(member)
-            .map(|start| (start, member.object.span().start)),
-        Expression::CallExpression(call) => {
-            call_callee_paren_leading_start(call).map(|start| (start, call.callee.span().start))
+    match &expr.kind {
+        ExpressionKind::MemberExpression(member) => {
+            member_object_paren_leading_start(member, expr.span)
+                .map(|start| (start, member.object.span().start))
         }
-        Expression::TSNonNullExpression(non_null) => {
-            non_null_operand_paren_leading_start(non_null, comments)
+        ExpressionKind::CallExpression(call) => call_callee_paren_leading_start(call, expr.span)
+            .map(|start| (start, call.callee.span().start)),
+        ExpressionKind::TSNonNullExpression(non_null) => {
+            non_null_operand_paren_leading_start(non_null, expr.span, comments)
                 .map(|start| (start, non_null.expression.span().start))
         }
         _ => None,
@@ -350,19 +354,21 @@ pub fn chain_paren_leading_gap(expr: &Expression<'_>, comments: &[Comment]) -> O
 /// is a parenthesized optional chain this access seals (`( // c⏎a?.b).ddd`).
 pub(crate) fn member_object_paren_leading_start(
     member: &internal::MemberExpression<'_>,
+    span: Span,
 ) -> Option<u32> {
-    child_stops_optional_chain(member.span.start, member.optional, member.object)
-        .then_some(member.span.start)
+    child_stops_optional_chain(span.start, member.optional, member.object).then_some(span.start)
 }
 
 /// A callee keeps the pair two ways: the sealed optional chain (`( // c⏎a?.b)()`),
 /// and the IIFE — a function or arrow, the one callee kind prettier prints the run
 /// inside the parens for ([`paren_pair_keeps_leading_run`]).
-pub(crate) fn call_callee_paren_leading_start(call: &internal::CallExpression<'_>) -> Option<u32> {
-    (child_stops_optional_chain(call.span.start, call.optional, call.callee)
-        || (call.span.start < call.callee.span().start
-            && paren_pair_keeps_leading_run(call.callee)))
-    .then_some(call.span.start)
+pub(crate) fn call_callee_paren_leading_start(
+    call: &internal::CallExpression<'_>,
+    span: Span,
+) -> Option<u32> {
+    (child_stops_optional_chain(span.start, call.optional, call.callee)
+        || (span.start < call.callee.span().start && paren_pair_keeps_leading_run(call.callee)))
+    .then_some(span.start)
 }
 
 /// The tagged-template analog of [`call_callee_paren_leading_start`]: a tag's REQUIRED
@@ -375,11 +381,11 @@ pub(crate) fn call_callee_paren_leading_start(call: &internal::CallExpression<'_
 /// family answering it in one place is the point ([`chain_paren_leading_gap`]).
 pub(crate) fn tag_paren_leading_start(
     tagged: &internal::TaggedTemplateExpression<'_>,
+    span: Span,
 ) -> Option<u32> {
-    (child_stops_optional_chain(tagged.span.start, false, tagged.tag)
-        || (tagged.span.start < tagged.tag.span().start
-            && paren_pair_keeps_leading_run(tagged.tag)))
-    .then_some(tagged.span.start)
+    (child_stops_optional_chain(span.start, false, tagged.tag)
+        || (span.start < tagged.tag.span().start && paren_pair_keeps_leading_run(tagged.tag)))
+    .then_some(span.start)
 }
 
 /// The two authorings that keep a non-null's operand a parenthesized base: a sealed
@@ -387,15 +393,16 @@ pub(crate) fn tag_paren_leading_start(
 /// linearizer's arm, whose condition this is.
 fn non_null_operand_paren_leading_start(
     non_null: &internal::TSNonNullExpression<'_>,
+    span: Span,
     comments: &[Comment],
 ) -> Option<u32> {
-    (non_null.seals_optional_chain()
+    (non_null.seals_optional_chain(span)
         || has_line_spanning_comments_to_emit_in_range(
             comments,
             non_null.expression.span().end,
-            non_null.span.end,
+            span.end,
         ))
-    .then_some(non_null.span.start)
+    .then_some(span.start)
 }
 
 /// Push a sealed parenthesized-optional-chain object/callee as a base node.
@@ -428,21 +435,21 @@ fn linearize_recursive<'a>(
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
-    match expr {
+    match &expr.kind {
         // CallExpression: recurse into callee, then add Call node
-        Expression::CallExpression(call) => {
-            linearize_call_callee(call, input, nodes, paren_gaps);
-            nodes.push(ChainNode::call(call));
+        ExpressionKind::CallExpression(call) => {
+            linearize_call_callee(call, expr.span, input, nodes, paren_gaps);
+            nodes.push(ChainNode::call(call, expr.span));
         }
 
         // MemberExpression: recurse into object, then add Member node
-        Expression::MemberExpression(member) => {
-            linearize_member_object(member, input, nodes, paren_gaps);
-            linearize_member_node(member, input.source, nodes, paren_gaps);
+        ExpressionKind::MemberExpression(member) => {
+            linearize_member_object(member, expr.span, input, nodes, paren_gaps);
+            linearize_member_node(member, expr.span, input.source, nodes, paren_gaps);
         }
 
         // TSNonNullExpression: recurse into expression, then add NonNull node
-        Expression::TSNonNullExpression(non_null) => {
+        ExpressionKind::TSNonNullExpression(non_null) => {
             // Two authorings keep the whole operand a parenthesized base + `!` instead
             // of flattening it into the chain:
             // - a sealed parenthesized optional chain (`(a?.b)!.c`): the trailing
@@ -459,11 +466,13 @@ fn linearize_recursive<'a>(
             //   would be dropped and the block inlined into a dead output, with nothing
             //   left to parenthesize at print time.
             let inner = &non_null.expression;
-            if let Some(start) = non_null_operand_paren_leading_start(non_null, input.comments) {
+            if let Some(start) =
+                non_null_operand_paren_leading_start(non_null, expr.span, input.comments)
+            {
                 nodes.push(ChainNode::paren_base_before_non_null(
                     inner,
                     start,
-                    non_null.span.end,
+                    expr.span.end,
                 ));
                 nodes.push(ChainNode::non_null_after_paren_operand());
             } else {
@@ -479,11 +488,11 @@ fn linearize_recursive<'a>(
                     ..
                 }) = nodes.last_mut()
                 {
-                    *paren_comment_end = Some(non_null.span.end);
+                    *paren_comment_end = Some(expr.span.end);
                     *followed_by_non_null = true;
                     nodes.push(ChainNode::non_null_after_paren_operand());
                 } else {
-                    nodes.push(ChainNode::non_null(non_null));
+                    nodes.push(ChainNode::non_null(non_null, expr.span));
                 }
             }
         }
@@ -512,12 +521,13 @@ fn linearize_recursive<'a>(
 /// `ChainBase` rule, its type args kept.
 fn linearize_member_object<'a>(
     member: &'a internal::MemberExpression<'_>,
+    span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
     let object: &Expression<'_> = member.object;
-    if let Some(start) = member_object_paren_leading_start(member) {
+    if let Some(start) = member_object_paren_leading_start(member, span) {
         push_sealed_chain_base(object, start, nodes);
     } else {
         linearize_recursive(object, input, nodes, paren_gaps);
@@ -531,12 +541,13 @@ fn linearize_member_object<'a>(
 /// other callees recurse normally.
 fn linearize_call_callee<'a>(
     call: &'a internal::CallExpression<'_>,
+    span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
-    if child_stops_optional_chain(call.span.start, call.optional, call.callee) {
-        push_sealed_chain_base(call.callee, call.span.start, nodes);
+    if child_stops_optional_chain(span.start, call.optional, call.callee) {
+        push_sealed_chain_base(call.callee, span.start, nodes);
         return;
     }
     // A `TSInstantiationExpression` callee (`expr<T>(args)`) is transparent: the Call
@@ -544,7 +555,10 @@ fn linearize_call_callee<'a>(
     // the instantiation itself emits nothing. This is the one position where it is —
     // reached as a member object or a `!` operand it is a parenthesized base.
     let callee = match call.callee {
-        Expression::TSInstantiationExpression(inst) => inst.expression,
+        Expression {
+            kind: ExpressionKind::TSInstantiationExpression(inst),
+            ..
+        } => inst.expression,
         callee => callee,
     };
     linearize_recursive(callee, input, nodes, paren_gaps);
@@ -553,7 +567,7 @@ fn linearize_call_callee<'a>(
     // prettier keeps the run inside it. A function or arrow is never itself a chain,
     // so `linearize_recursive` pushed exactly one node for it and that node is the
     // base this call's `(` belongs to.
-    if let Some(start) = call_callee_paren_leading_start(call)
+    if let Some(start) = call_callee_paren_leading_start(call, span)
         && let Some(ChainNode::Base {
             paren_leading_start,
             ..
@@ -569,6 +583,7 @@ fn linearize_call_callee<'a>(
 /// `linearize_chain_from_member_into`.
 fn linearize_member_node<'a>(
     member: &'a internal::MemberExpression<'_>,
+    member_span: Span,
     source: &str,
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
@@ -577,7 +592,7 @@ fn linearize_member_node<'a>(
     // the MemberExpression span extends earlier than its object span, creating a gap
     // where comments from the stripped parens live. Record the gap so we can extend
     // the last member node's comment range (only applied for call chains).
-    let member_start = member.span.start;
+    let member_start = member_span.start;
     let object_start = member.object.span().start;
     if member_start < object_start {
         // Find the last member node in the sub-chain
@@ -604,7 +619,7 @@ fn linearize_member_node<'a>(
     let operand_end = member.object.span().end;
     let object_end = Printer::gap_start_after_owned_pair(
         operand_end,
-        member_object_paren_leading_start(member)
+        member_object_paren_leading_start(member, member_span)
             .and_then(|_| paren_shell_close_after(source, operand_end))
             .map(|close| (operand_end, close)),
     );
@@ -614,22 +629,22 @@ fn linearize_member_node<'a>(
             member.property,
             member.optional,
             object_end,
-            member.span.end,
+            member_span.end,
         ));
-    } else if let Expression::Identifier(id) = member.property {
+    } else if let ExpressionKind::Identifier(id) = &member.property.kind {
         nodes.push(ChainNode::member(
             id.ident_name(),
             member.optional,
             object_end,
             property_start,
         ));
-    } else if let Expression::PrivateIdentifier(pid) = member.property {
+    } else if let ExpressionKind::PrivateIdentifier(pid) = &member.property.kind {
         nodes.push(ChainNode::private_member(
             pid.name,
             member.optional,
             object_end,
             property_start,
-            pid.name_span().start,
+            pid.name_span(member.property.span).start,
         ));
     } else {
         // Non-identifier property (shouldn't happen for non-computed)
@@ -637,7 +652,7 @@ fn linearize_member_node<'a>(
             member.property,
             member.optional,
             object_end,
-            member.span.end,
+            member_span.end,
         ));
     }
 }
@@ -872,16 +887,16 @@ fn should_not_wrap<'a>(
             return false;
         };
 
-        match expr {
+        match &expr.kind {
             // super.method() → merge
-            Expression::Super(_) => true,
+            ExpressionKind::Super(_) => true,
 
             // this.method() → merge
-            Expression::ThisExpression(_) => true,
+            ExpressionKind::ThisExpression(_) => true,
 
             // Object.keys() → merge (capital letter = factory)
             // d3.scale() → merge (short name ≤ tabWidth in expression statement context only)
-            Expression::Identifier(id) => {
+            ExpressionKind::Identifier(id) => {
                 is_factory_name(id.ident_name(), id.span.start, printer)
                     || has_computed
                     || (in_expression_statement
@@ -1046,10 +1061,10 @@ fn chain_head_comment_window(
 /// [`chain_head_comment_window`] reads this off the linearized base node instead and
 /// keeps the walk as its debug oracle (and the fallback for a node list without one).
 fn get_chain_base_start(expr: &Expression<'_>) -> u32 {
-    match expr {
-        Expression::MemberExpression(member) => get_chain_base_start(member.object),
-        Expression::CallExpression(call) => get_chain_base_start(call.callee),
-        Expression::TSNonNullExpression(non_null) => get_chain_base_start(non_null.expression),
+    match &expr.kind {
+        ExpressionKind::MemberExpression(member) => get_chain_base_start(member.object),
+        ExpressionKind::CallExpression(call) => get_chain_base_start(call.callee),
+        ExpressionKind::TSNonNullExpression(non_null) => get_chain_base_start(non_null.expression),
         // Note: TaggedTemplateExpression is NOT traversed here because its own
         // build_tagged_template_doc handles comments from removed parentheses
         _ => expr.span().start,
@@ -1097,7 +1112,7 @@ mod tests {
             raw_len: 0,
             plain_ascii: false,
         };
-        Expression::Identifier(Identifier::simple(ident_name, Span::new(0, len)))
+        Expression::from_identifier(Identifier::simple(ident_name, Span::new(0, len)))
     }
 
     /// Helper to create a member expression: object.property
@@ -1114,16 +1129,18 @@ mod tests {
         };
         let property_start = object_end + 1; // after the dot
         let span_end = property_start + property_name.len() as u32;
-        Expression::MemberExpression(MemberExpression {
-            object: arena.alloc(object),
-            property: arena.alloc(Expression::Identifier(Identifier::simple(
-                prop_name,
-                Span::new(property_start, span_end),
-            ))),
-            computed: false,
-            optional: false,
+        Expression {
             span: Span::new(0, span_end),
-        })
+            kind: ExpressionKind::MemberExpression(MemberExpression {
+                object: arena.alloc(object),
+                property: arena.alloc(Expression::from_identifier(Identifier::simple(
+                    prop_name,
+                    Span::new(property_start, span_end),
+                ))),
+                computed: false,
+                optional: false,
+            }),
+        }
     }
 
     /// Helper to create a call expression: callee()
@@ -1132,13 +1149,15 @@ mod tests {
         callee: Expression<'arena>,
         callee_end: u32,
     ) -> Expression<'arena> {
-        Expression::CallExpression(CallExpression {
-            callee: arena.alloc(callee),
-            arguments: &[],
-            type_arguments: None,
-            optional: false,
+        Expression {
+            kind: ExpressionKind::CallExpression(CallExpression {
+                callee: arena.alloc(callee),
+                arguments: &[],
+                type_arguments: None,
+                optional: false,
+            }),
             span: Span::new(0, callee_end + "()".len() as u32),
-        })
+        }
     }
 
     #[test]
@@ -1329,8 +1348,8 @@ mod tests {
     fn test_group_splits_at_a_member_whose_gap_holds_a_line_comment() {
         let arena = Bump::new();
         let base = make_identifier("a");
-        let call = make_call(&arena, make_identifier("a"), 1);
-        let Expression::CallExpression(call) = &call else {
+        let call_expr = make_call(&arena, make_identifier("a"), 1);
+        let ExpressionKind::CallExpression(call) = &call_expr.kind else {
             panic!("make_call builds a CallExpression")
         };
 
@@ -1346,7 +1365,10 @@ mod tests {
                 v
             }),
             ("after a call", {
-                let mut v = vec![ChainNode::base(&base, false), ChainNode::call(call)];
+                let mut v = vec![
+                    ChainNode::base(&base, false),
+                    ChainNode::call(call, call_expr.span),
+                ];
                 v.extend(members.iter().copied());
                 v
             }),

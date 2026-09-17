@@ -12,8 +12,8 @@
 //! rather than silently escaping the table.
 
 use tsv_ts::ast::internal::{
-    Expression, ImportDeclaration, ImportSpecifier, LiteralValue, ModuleExportName, Statement,
-    VariableDeclarator,
+    Expression, ExpressionKind, ImportDeclaration, ImportSpecifier, LiteralValue, ModuleExportName,
+    Statement, VariableDeclarator,
 };
 
 use crate::analyze::{
@@ -415,8 +415,8 @@ fn analyze_declarator<'arena>(
             // arrow's body (a block-bodied arrow is UNKNOWN). A destructured leaf
             // folds through that same body.
             use tsv_ts::ast::internal::ArrowFunctionBody;
-            let initial = match f {
-                Expression::ArrowFunctionExpression(arrow) => match &arrow.body {
+            let initial = match &f.kind {
+                ExpressionKind::ArrowFunctionExpression(arrow) => match &arrow.body {
                     ArrowFunctionBody::Expression(body) => Initial::Expr(body),
                     ArrowFunctionBody::BlockStatement(_) => Initial::None,
                 },

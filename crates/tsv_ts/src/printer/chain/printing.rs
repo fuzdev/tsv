@@ -5,7 +5,7 @@
 // - print_group: Group printing (with optional expansion and comment skipping)
 
 use super::types::{ChainGroup, ChainNode, NonNullGap, is_numeric_index};
-use crate::ast::internal::{self, Expression};
+use crate::ast::internal::{self, Expression, ExpressionKind};
 use crate::printer::expressions::ChainBaseTernary;
 use crate::printer::ignore::FrozenOperandPair;
 use crate::printer::{LeadingGlue, ParenContext, Printer, needs_parens};
@@ -56,15 +56,15 @@ fn shaped_base_doc<'a>(
         }
         return body;
     }
-    match expr {
-        Expression::ArrowFunctionExpression(_) | Expression::FunctionExpression(_) => {
+    match &expr.kind {
+        ExpressionKind::ArrowFunctionExpression(_) | ExpressionKind::FunctionExpression(_) => {
             // IIFE / function callee or arrow member-object: the parens hug the function —
             // its own body drives breaking, prettier never breaks after the `(` here.
             // `(() => {...})().catch()`, `(function () {})().p`. Matches the bare-callee path
             // (`call_formatting.rs`), which wraps with hugging parens.
             inner()
         }
-        Expression::BinaryExpression(binary) => {
+        ExpressionKind::BinaryExpression(binary) => {
             // The chain-for-parens operand doc, so the whole operand chain is what stays
             // flat. Every operator family — arithmetic, logical (`&&`/`||`), and nullish
             // (`??`) — is laid out identically. A logical base skipping this wrapper would
@@ -72,7 +72,7 @@ fn shaped_base_doc<'a>(
             // last operand — a third layout matching neither tsv's arithmetic shape nor
             // prettier's. See conformance_prettier_ts.md §TypeScript (Parenthesized binary
             // member base).
-            hang(printer.build_binary_chain_for_parens(binary))
+            hang(printer.build_binary_chain_for_parens(binary, expr.span))
         }
         // Every other base kind, and a ternary base that DOES expand.
         _ => hang(inner()),
@@ -228,11 +228,11 @@ pub(crate) fn print_node_inner<'a>(
             }
         }
 
-        ChainNode::Call { call, facts } => {
+        ChainNode::Call { call, span, facts } => {
             if expanded {
-                printer.print_call_args_expanded(call, *facts)
+                printer.print_call_args_expanded(call, *span, *facts)
             } else {
-                printer.print_call_args(call, *facts)
+                printer.print_call_args(call, *span, *facts)
             }
         }
 

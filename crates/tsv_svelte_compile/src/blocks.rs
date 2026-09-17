@@ -15,7 +15,7 @@ use tsv_svelte::ast::internal::{
     FragmentNode, IfBlock, KeyBlock, SnippetBlock, SpecialElement,
 };
 use tsv_ts::ast::internal::{
-    BinaryOperator, BlockStatement, Expression, ForInit, ForStatement, IfStatement,
+    BinaryOperator, BlockStatement, Expression, ExpressionKind, ForInit, ForStatement, IfStatement,
     ObjectExpression, ObjectProperty, Statement, UpdateOperator, VariableDeclaration,
     VariableDeclarationKind, VariableDeclarator,
 };
@@ -169,14 +169,14 @@ pub(crate) fn emit_svelte_head<'arena>(
         HashMap::new(),
     )?;
     let here = env.b.here();
-    let renderer_param = Expression::Identifier(env.b.ident("$$renderer"));
+    let renderer_param = Expression::from_identifier(env.b.ident("$$renderer"));
     let params = std::slice::from_ref(arena.alloc(renderer_param));
     let arrow = env.b.arrow_block(params, body, here);
 
     // `$.head('<hash>', $$renderer, arrow)`.
     let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
     args.push(env.b.string_literal_expr(&svelte_hash(COMPILE_FILENAME)));
-    args.push(Expression::Identifier(env.b.ident("$$renderer")));
+    args.push(Expression::from_identifier(env.b.ident("$$renderer")));
     args.push(arrow);
     let call = env.b.member_call("$", "head", args.into_bump_slice());
     out.push_expression_statement(&mut env.b, arena, call);
@@ -323,7 +323,7 @@ pub(crate) fn emit_boundary<'arena>(
 
     // `$$renderer.boundary({ failed }, ($$renderer) => { … })`.
     let props = boundary_props(env, &name);
-    let renderer_param = Expression::Identifier(env.b.ident("$$renderer"));
+    let renderer_param = Expression::from_identifier(env.b.ident("$$renderer"));
     let params = std::slice::from_ref(arena.alloc(renderer_param));
     let here = env.b.here();
     let arrow = env.b.arrow_block(params, inner_stmts, here);
@@ -353,18 +353,20 @@ fn boundary_props<'arena>(env: &mut EmitEnv<'arena, '_>, name: &str) -> Expressi
     let key_span = key.span;
     let property = init_property(
         env.b.arena,
-        Expression::Identifier(key),
-        Expression::Identifier(env.b.ident(name)),
+        Expression::from_identifier(key),
+        Expression::from_identifier(env.b.ident(name)),
         true,
         key_span,
     );
     let properties = std::slice::from_ref(env.b.arena.alloc(ObjectProperty::Property(property)));
     let cbrace = env.b.mint("}").end;
-    Expression::ObjectExpression(ObjectExpression {
-        properties,
-        spread_trailing_comma: false,
+    Expression {
         span: Span::new(obrace, cbrace),
-    })
+        kind: ExpressionKind::ObjectExpression(ObjectExpression {
+            properties,
+            spread_trailing_comma: false,
+        }),
+    }
 }
 
 /// Validate a `<svelte:boundary>`'s attributes against the oracle's phase-2
@@ -448,16 +450,34 @@ fn fold_block_marker<'arena>(
     let Some(Statement::ExpressionStatement(first)) = body.get(1) else {
         return body;
     };
-    let Expression::CallExpression(call) = first.expression else {
+    let ExpressionKind::CallExpression(call) = &first.expression.kind else {
         return body;
     };
-    let (Expression::MemberExpression(member), [Expression::TemplateLiteral(template)]) =
-        (call.callee, call.arguments)
+    let (
+        Expression {
+            kind: ExpressionKind::MemberExpression(member),
+            ..
+        },
+        [
+            Expression {
+                kind: ExpressionKind::TemplateLiteral(template),
+                ..
+            },
+        ],
+    ) = (call.callee, call.arguments)
     else {
         return body;
     };
-    let (Expression::Identifier(object), Expression::Identifier(property)) =
-        (member.object, member.property)
+    let (
+        Expression {
+            kind: ExpressionKind::Identifier(object),
+            ..
+        },
+        Expression {
+            kind: ExpressionKind::Identifier(property),
+            ..
+        },
+    ) = (member.object, member.property)
     else {
         return body;
     };
@@ -510,7 +530,7 @@ pub(crate) fn emit_const_tag<'arena>(
     // Only a plain-identifier binding is modeled: a destructured `{@const}`
     // whose init folds would have the oracle fold each read, which this port
     // can't reproduce per-binding — refuse rather than risk a silent mismatch.
-    let Expression::Identifier(ident) = id else {
+    let ExpressionKind::Identifier(ident) = &id.kind else {
         return Err(unsupported(Refusal::DestructuredConstTag));
     };
     let Some(name) = plain_identifier_name(ident, env.source) else {
@@ -741,7 +761,7 @@ pub(crate) fn emit_each_block<'arena>(
     // Mint the `each_array` id BEFORE the call so the declaration span runs
     // forward (id.start < init.end) — the printer's call-head width math
     // subtracts the two and would underflow on an inverted span.
-    let array_id = Expression::Identifier(env.b.ident(&array_name));
+    let array_id = Expression::from_identifier(env.b.ident(&array_name));
     let coll_alloc = arena.alloc(collection);
     let ensure = env
         .b
@@ -749,7 +769,7 @@ pub(crate) fn emit_each_block<'arena>(
     let const_each = declaration_stmt(&env.b, VariableDeclarationKind::Const, array_id, ensure);
 
     // for-loop init: `let IDX = 0, $$length = each_array.length`.
-    let index_id = Expression::Identifier(env.b.ident(&index_name));
+    let index_id = Expression::from_identifier(env.b.ident(&index_name));
     let zero = env.b.number(0.0);
     let index_span = Span::new(index_id.span().start, zero.span().end);
     let index_declarator = VariableDeclarator {
@@ -758,7 +778,7 @@ pub(crate) fn emit_each_block<'arena>(
         definite: false,
         span: index_span,
     };
-    let length_id = Expression::Identifier(env.b.ident("$$length"));
+    let length_id = Expression::from_identifier(env.b.ident("$$length"));
     let arr_for_length = env.b.ident_expr(&array_name);
     let length_member = env.b.member_prop(arr_for_length, "length");
     let length_span = Span::new(length_id.span().start, length_member.span().end);
@@ -999,7 +1019,7 @@ pub(crate) fn emit_await_block<'arena>(
 
     // `$.await($$renderer, expr, pending, then)`.
     let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
-    args.push(Expression::Identifier(env.b.ident("$$renderer")));
+    args.push(Expression::from_identifier(env.b.ident("$$renderer")));
     args.push(expr);
     args.push(pending_arrow);
     args.push(then_arrow);

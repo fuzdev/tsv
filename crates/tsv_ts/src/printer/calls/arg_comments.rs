@@ -9,6 +9,7 @@ use smallvec::SmallVec;
 
 use super::super::{LeadingGlue, Printer};
 use crate::ast::internal;
+use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -444,10 +445,11 @@ pub(super) fn any_arg_gap_has_comment_on_page(
 /// not inline with either neighbor). Inline block comments do not force expansion.
 pub(super) fn any_comment_forces_expansion(
     call: &internal::CallExpression<'_>,
+    span: Span,
     printer: &Printer<'_>,
     paren_open: u32,
 ) -> bool {
-    any_comment_forces_expansion_slice(call.arguments, printer, paren_open, call.span.end)
+    any_comment_forces_expansion_slice(call.arguments, printer, paren_open, span.end)
 }
 
 /// [`any_comment_forces_expansion`] over an argument slice, for the builder that holds a
@@ -624,9 +626,10 @@ pub(super) fn first_arg_has_any_comments(
 /// Example: `fn(a && b, // trailing)` - the `// trailing` is a trailing comment on `a && b`
 pub(super) fn has_trailing_comments_on_args(
     call: &internal::CallExpression<'_>,
+    span: Span,
     printer: &Printer<'_>,
 ) -> bool {
-    has_trailing_line_comments_slice(call.arguments, call.span.end, printer)
+    has_trailing_line_comments_slice(call.arguments, span.end, printer)
 }
 
 /// Check if there are trailing line comments on any arguments (generic version)

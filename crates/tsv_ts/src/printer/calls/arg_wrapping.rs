@@ -23,6 +23,7 @@ use crate::printer::expressions::functions::{
     prepend_leading,
 };
 use smallvec::{SmallVec, smallvec};
+use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::source_scan::has_newline_before_position;
@@ -106,12 +107,17 @@ pub(super) fn build_printed_argument_doc(
 pub(super) fn build_arrow_sig_doc(
     printer: &Printer<'_>,
     arrow: &internal::ArrowFunctionExpression<'_>,
+    span: Span,
 ) -> DocId {
     let d = printer.d();
     // The signature→`=>` gap rides inside the group, exactly as the plain arrow path
     // composes it. Without it this reassembly drops every comment there — the states
     // below emit `" =>"` themselves, so no other emitter can reach the gap.
-    let sig = printer.append_pre_arrow_comments(arrow, printer.build_arrow_signature_doc(arrow));
+    let sig = printer.append_pre_arrow_comments(
+        arrow,
+        span,
+        printer.build_arrow_signature_doc(arrow, span),
+    );
     // ⚠️ The two arms are NOT interchangeable, and a green fixture suite does not say they
     // are: `remove_lines` and `group` differ inside an outer FLAT `fits` walk, which no
     // fixture here reaches (the TODO records two such "equivalent" deletions that had to be
@@ -127,7 +133,7 @@ pub(super) fn build_arrow_sig_doc(
     // the only place its owned leading comment can be claimed. An owned comment nothing
     // prints is a *dropped* comment (`f(/** @param {any} n */ (n) => g(n))`), so the
     // claim must live on the same seam the reassembly does. See `comments/owned.rs`.
-    printer.prepend_owned_leading_comment_at(arrow.span.start, sig)
+    printer.prepend_owned_leading_comment_at(span.start, sig)
 }
 
 /// Prepend any comments between arrow `=>` and body expression to `body_doc`, for a state
@@ -241,13 +247,13 @@ pub(super) fn wrap_call_with_will_break_guard(d: &DocArena, callee: DocId, args:
 /// rather than keeping "(cond" hugged and breaking the ternary at ? and :.
 pub(super) fn arg_needs_soft_wrap(arg: &internal::Expression<'_>) -> bool {
     matches!(
-        arg,
-        internal::Expression::CallExpression(_)
-            | internal::Expression::MemberExpression(_)
-            | internal::Expression::NewExpression(_)
-            | internal::Expression::Identifier(_)
-            | internal::Expression::ThisExpression(_)
-            | internal::Expression::ConditionalExpression(_)
+        arg.kind,
+        internal::ExpressionKind::CallExpression(_)
+            | internal::ExpressionKind::MemberExpression(_)
+            | internal::ExpressionKind::NewExpression(_)
+            | internal::ExpressionKind::Identifier(_)
+            | internal::ExpressionKind::ThisExpression(_)
+            | internal::ExpressionKind::ConditionalExpression(_)
     )
 }
 
@@ -269,23 +275,23 @@ pub(super) enum ChainArgKind {
 /// including when wrapped in TS type assertions (`{...} as T`, `[...] satisfies T`).
 /// Arrow functions are classified by their body type.
 pub(super) fn classify_chain_arg(arg: &internal::Expression<'_>) -> ChainArgKind {
-    match arg {
+    match &arg.kind {
         // Block-like expressions hug the call parens naturally
-        internal::Expression::ObjectExpression(_)
-        | internal::Expression::ArrayExpression(_)
-        | internal::Expression::FunctionExpression(_)
-        | internal::Expression::ClassExpression(_) => ChainArgKind::HugsNaturally,
+        internal::ExpressionKind::ObjectExpression(_)
+        | internal::ExpressionKind::ArrayExpression(_)
+        | internal::ExpressionKind::FunctionExpression(_)
+        | internal::ExpressionKind::ClassExpression(_) => ChainArgKind::HugsNaturally,
         // TS cast wrappers: classify based on the inner expression
         // e.g., `{...} as any` hugs, `longExpr as T` soft-wraps. Mirrors prettier's
         // couldExpandArg, which looks through `as`/`satisfies`/`<T>` but NOT a
         // non-null assertion, so `{...}!` / `[...]!` soft-wraps rather than hugging.
-        internal::Expression::TSAsExpression(e) => classify_chain_arg(e.expression),
-        internal::Expression::TSSatisfiesExpression(e) => classify_chain_arg(e.expression),
-        internal::Expression::TSTypeAssertion(e) => classify_chain_arg(e.expression),
+        internal::ExpressionKind::TSAsExpression(e) => classify_chain_arg(e.expression),
+        internal::ExpressionKind::TSSatisfiesExpression(e) => classify_chain_arg(e.expression),
+        internal::ExpressionKind::TSTypeAssertion(e) => classify_chain_arg(e.expression),
         // Arrow functions: prettier's couldExpandArg keys on the body type and
         // looks through the return-type annotation, so arrows are classified by
         // their body regardless of any return type.
-        internal::Expression::ArrowFunctionExpression(arrow) => classify_arrow_body(arrow),
+        internal::ExpressionKind::ArrowFunctionExpression(arrow) => classify_arrow_body(arrow),
         // Everything else needs soft wrapping so the call can break
         // before the argument, giving the argument a fresh line to fit on
         _ => ChainArgKind::NeedsSoftWrap,
@@ -329,8 +335,9 @@ fn classify_arrow_body(arrow: &internal::ArrowFunctionExpression<'_>) -> ChainAr
 pub(super) fn could_expand_arrow_chain(arrow: &internal::ArrowFunctionExpression<'_>) -> bool {
     arrow_terminal_expression_body(arrow).is_none_or(|body| {
         matches!(
-            body,
-            internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_)
+            body.kind,
+            internal::ExpressionKind::ObjectExpression(_)
+                | internal::ExpressionKind::ArrayExpression(_)
         )
     })
 }
@@ -367,15 +374,14 @@ fn could_expand_arrow_arg(arrow: &internal::ArrowFunctionExpression<'_>) -> bool
 /// HugsNaturally classification is primarily reached for arrows with
 /// TSTypeReference returns (which bypass that path) and nested arrow chains.
 fn classify_expression_body(expr: &internal::Expression<'_>) -> ChainArgKind {
-    match expr {
+    match &expr.kind {
         // Objects and arrays hug naturally (reached mainly for typed-return arrows)
-        internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_) => {
-            ChainArgKind::HugsNaturally
-        }
+        internal::ExpressionKind::ObjectExpression(_)
+        | internal::ExpressionKind::ArrayExpression(_) => ChainArgKind::HugsNaturally,
         // Ternaries hug but need trailing comma wrapper
-        internal::Expression::ConditionalExpression(_) => ChainArgKind::NeedsWrapper,
+        internal::ExpressionKind::ConditionalExpression(_) => ChainArgKind::NeedsWrapper,
         // Nested arrows inherit their body's classification
-        internal::Expression::ArrowFunctionExpression(inner) => classify_arrow_body(inner),
+        internal::ExpressionKind::ArrowFunctionExpression(inner) => classify_arrow_body(inner),
         // Everything else needs soft wrap
         _ => ChainArgKind::NeedsSoftWrap,
     }
@@ -435,11 +441,16 @@ pub(super) fn prebuild_expand_last_break_body(
     if call_has_comments {
         return None;
     }
-    if let Some(internal::Expression::ArrowFunctionExpression(arrow)) = last_arg
+    if let Some(internal::Expression {
+        kind: internal::ExpressionKind::ArrowFunctionExpression(arrow),
+        ..
+    }) = last_arg
         && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
         && (arrow_body_is_call_through_non_null(body_expr)
-            || (matches!(&**body_expr, internal::Expression::ConditionalExpression(_))
-                && !has_leftmost_arrow_body_parens(body_expr)))
+            || (matches!(
+                body_expr.kind,
+                internal::ExpressionKind::ConditionalExpression(_)
+            ) && !has_leftmost_arrow_body_parens(body_expr)))
     {
         let body_doc = build_arrow_body_like_arrow(printer, body_expr);
         return Some((body_expr.span().start, body_doc));
@@ -456,7 +467,10 @@ pub(super) fn prebuild_expand_last_break_body(
 /// comment gate were blind to it — only a prettier compare could see it. One site, so the
 /// inject doc and the hug doc cannot drift apart on it.
 fn arrow_hug_body_needs_parens(body_expr: &internal::Expression<'_>) -> bool {
-    matches!(body_expr, internal::Expression::ObjectExpression(_))
+    matches!(
+        body_expr.kind,
+        internal::ExpressionKind::ObjectExpression(_)
+    )
 }
 
 /// The **terminal** arrow of a curried run (`(a) => (b) => X`) — the innermost `=>`, whose
@@ -471,18 +485,27 @@ fn arrow_hug_body_needs_parens(body_expr: &internal::Expression<'_>) -> bool {
 /// One walk, because three call sites had hand-rolled it into three spellings that agreed
 /// only by luck — and "how deep does a chain reach" is exactly the kind of question a second
 /// spelling answers differently the first time a shape is added.
+///
+/// The span is walked with it: an arrow node holds no span of its own, so the terminal's
+/// span is the one on the body `Expression` that holds it — `None` when `arrow` is its own
+/// terminal, whose span only the caller holds. A span-keyed question about the terminal must
+/// read this one, never the chain head's: the head's span ends past every stripped `)` of
+/// the chain (`x => (y => …)`), so a gap scan over it reads the shell's comments as the
+/// terminal's.
 fn terminal_arrow<'a, 'arena>(
     arrow: &'a internal::ArrowFunctionExpression<'arena>,
-) -> &'a internal::ArrowFunctionExpression<'arena> {
+) -> (&'a internal::ArrowFunctionExpression<'arena>, Option<Span>) {
     let mut current = arrow;
+    let mut span = None;
     loop {
         let internal::ArrowFunctionBody::Expression(body) = &current.body else {
-            return current;
+            return (current, span);
         };
-        let internal::Expression::ArrowFunctionExpression(inner) = &**body else {
-            return current;
+        let internal::ExpressionKind::ArrowFunctionExpression(inner) = &body.kind else {
+            return (current, span);
         };
         current = inner;
+        span = Some(body.span);
     }
 }
 
@@ -493,7 +516,7 @@ fn terminal_arrow<'a, 'arena>(
 fn arrow_terminal_expression_body<'arena>(
     arrow: &internal::ArrowFunctionExpression<'arena>,
 ) -> Option<&'arena internal::Expression<'arena>> {
-    match &terminal_arrow(arrow).body {
+    match &terminal_arrow(arrow).0.body {
         internal::ArrowFunctionBody::Expression(body) => Some(body),
         internal::ArrowFunctionBody::BlockStatement(_) => None,
     }
@@ -515,8 +538,9 @@ fn arrow_terminal_expression_body<'arena>(
 pub(super) fn arrow_body_expands_internally(arrow: &internal::ArrowFunctionExpression<'_>) -> bool {
     arrow_terminal_expression_body(arrow).is_some_and(|body| {
         matches!(
-            body,
-            internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_)
+            body.kind,
+            internal::ExpressionKind::ObjectExpression(_)
+                | internal::ExpressionKind::ArrayExpression(_)
         )
     })
 }
@@ -545,13 +569,14 @@ pub(super) fn prebuild_expand_last_obj_array_body(
     last_arg: Option<&internal::Expression<'_>>,
 ) -> Option<(u32, DocId)> {
     let d = printer.d();
-    let internal::Expression::ArrowFunctionExpression(arrow) = last_arg? else {
+    let internal::ExpressionKind::ArrowFunctionExpression(arrow) = &(last_arg?).kind else {
         return None;
     };
     let body_expr = arrow_terminal_expression_body(arrow)?;
     if !matches!(
-        body_expr,
-        internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_)
+        body_expr.kind,
+        internal::ExpressionKind::ObjectExpression(_)
+            | internal::ExpressionKind::ArrayExpression(_)
     ) {
         return None;
     }
@@ -778,7 +803,7 @@ pub(super) fn last_arg_arrow_gap_break(
     printer: &Printer<'_>,
     last_arg: &internal::Expression<'_>,
 ) -> Option<ArrowGapBreak> {
-    let internal::Expression::ArrowFunctionExpression(arrow) = last_arg else {
+    let internal::ExpressionKind::ArrowFunctionExpression(arrow) = &last_arg.kind else {
         return None;
     };
     // The softline is appended for every body KIND, but only inside a printing prettier
@@ -792,7 +817,8 @@ pub(super) fn last_arg_arrow_gap_break(
     if !could_expand_arrow_arg(arrow) {
         return None;
     }
-    let arrow = terminal_arrow(arrow);
+    let (arrow, terminal_span) = terminal_arrow(arrow);
+    let arrow_span = terminal_span.unwrap_or(last_arg.span);
     let sig_end = arrow_token_end(arrow);
     let body_start = arrow.body.span().start;
     if printer.has_own_line_post_arrow_comment(sig_end, body_start) {
@@ -803,7 +829,7 @@ pub(super) fn last_arg_arrow_gap_break(
     // The broke-after arm costs a body doc, so it is asked last and behind its own cheap
     // geometry: the injection IS that body, and `will_break` on it is the same question
     // the hug arm asks of the same DocId once the caller arms it.
-    printer.arrow_gap_broke_after_run(arrow, sig_end, body_start)?;
+    printer.arrow_gap_broke_after_run(arrow, arrow_span, sig_end, body_start)?;
     let inject = prebuild_arrow_gap_break_body(printer, Some(last_arg))?;
     printer.d().will_break(inject.1).then_some(ArrowGapBreak {
         inject: Some(inject),
@@ -839,10 +865,10 @@ pub(super) fn last_arg_arrow_gap_break(
 /// arm pays no comment lookup.
 pub(super) fn arrow_body_tail_has_comments(
     printer: &Printer<'_>,
-    arrow: &internal::ArrowFunctionExpression<'_>,
+    span: Span,
     body_expr: &internal::Expression<'_>,
 ) -> bool {
-    printer.has_comments_on_page_between(body_expr.span().end, arrow.span.end)
+    printer.has_comments_on_page_between(body_expr.span().end, span.end)
 }
 
 /// Does a comment make an expression-body arrow unusable by a **reassembling hug arm** —
@@ -874,10 +900,11 @@ pub(super) fn arrow_body_tail_has_comments(
 pub(super) fn arrow_hug_refused_by_comments(
     printer: &Printer<'_>,
     arrow: &internal::ArrowFunctionExpression<'_>,
+    span: Span,
     body_expr: &internal::Expression<'_>,
 ) -> bool {
-    arrow_signature_has_breaking_comments(printer, arrow)
-        || arrow_body_tail_has_comments(printer, arrow, body_expr)
+    arrow_signature_has_breaking_comments(printer, arrow, span)
+        || arrow_body_tail_has_comments(printer, span, body_expr)
 }
 
 /// Assemble the single `expandLastArg` state
@@ -1086,12 +1113,12 @@ fn prebuild_arrow_gap_break_body(
     if let Some(obj) = prebuild_expand_last_obj_array_body(printer, last_arg) {
         return Some(obj);
     }
-    let internal::Expression::ArrowFunctionExpression(arrow) = last_arg? else {
+    let internal::ExpressionKind::ArrowFunctionExpression(arrow) = &(last_arg?).kind else {
         return None;
     };
     // The TERMINAL arrow's body, for the same reason every other hug question walks there:
     // under `expandLastArg` a curried argument is a plain run of signatures ending in it.
-    match &terminal_arrow(arrow).body {
+    match &terminal_arrow(arrow).0.body {
         internal::ArrowFunctionBody::BlockStatement(block) => {
             Some((block.span.start, printer.arrow_block_body_doc(block)))
         }
@@ -1813,7 +1840,7 @@ pub(super) fn build_expand_first_arg_doc(
 pub(super) fn last_two_args_same_type(args: &[internal::Expression<'_>]) -> bool {
     let last = &args[args.len() - 1];
     let penultimate = &args[args.len() - 2];
-    std::mem::discriminant(last) == std::mem::discriminant(penultimate)
+    std::mem::discriminant(&last.kind) == std::mem::discriminant(&penultimate.kind)
 }
 
 /// Build the "break body" state for expand-last-arg with an expression arrow.
@@ -2243,8 +2270,8 @@ pub(super) fn first_arg_signature_refuses_expand_first(
 ) -> bool {
     matches!(
         args.first(),
-        Some(internal::Expression::ArrowFunctionExpression(arrow))
-            if arrow_signature_has_breaking_comments(printer, arrow)
+        Some(internal::Expression { span, kind: internal::ExpressionKind::ArrowFunctionExpression(arrow) })
+            if arrow_signature_has_breaking_comments(printer, arrow, *span)
     )
 }
 

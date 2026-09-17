@@ -12,7 +12,9 @@
 //! Target-independent: this is a fact about the script's scope, not about what
 //! any transform emits.
 
-use tsv_ts::ast::internal::{Expression, ImportDeclaration, ImportSpecifier, Statement};
+use tsv_ts::ast::internal::{
+    Expression, ExpressionKind, ImportDeclaration, ImportSpecifier, Statement,
+};
 
 /// Which of a script's `var` declarations [`each_script_declaration`] reports.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -321,7 +323,7 @@ pub(crate) fn plain_identifier_name(
 }
 
 pub(crate) fn identifier_binding_name(id: &Expression<'_>, source: &str) -> Option<String> {
-    let Expression::Identifier(ident) = id else {
+    let ExpressionKind::Identifier(ident) = &id.kind else {
         return None;
     };
     plain_identifier_name(ident, source)

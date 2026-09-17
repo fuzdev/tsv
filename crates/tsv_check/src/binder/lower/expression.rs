@@ -8,13 +8,13 @@ use super::super::*;
 use tsv_ts::ast::internal::{
     ArrayExpression, ArrayPattern, ArrowFunctionBody, ArrowFunctionExpression,
     AssignmentExpression, AssignmentPattern, AwaitExpression, BinaryExpression, CallExpression,
-    ClassExpression, ConditionalExpression, Decorator, Expression, FunctionExpression, Identifier,
-    ImportExpression, JsdocCast, MemberExpression, MetaProperty, NewExpression, ObjectExpression,
-    ObjectPattern, ObjectPatternProperty, ObjectProperty, ParenthesizedExpression, Property,
-    RestElement, SequenceExpression, SpreadElement, TSAsExpression, TSInstantiationExpression,
-    TSNonNullExpression, TSParameterProperty, TSSatisfiesExpression, TSTypeAssertion,
-    TaggedTemplateExpression, TemplateElement, TemplateLiteral, UnaryExpression, UpdateExpression,
-    YieldExpression,
+    ClassExpression, ConditionalExpression, Decorator, Expression, ExpressionKind,
+    FunctionExpression, Identifier, ImportExpression, JsdocCast, MemberExpression, MetaProperty,
+    NewExpression, ObjectExpression, ObjectPattern, ObjectPatternProperty, ObjectProperty,
+    ParenthesizedExpression, Property, RestElement, SequenceExpression, SpreadElement,
+    TSAsExpression, TSInstantiationExpression, TSNonNullExpression, TSParameterProperty,
+    TSSatisfiesExpression, TSTypeAssertion, TaggedTemplateExpression, TemplateElement,
+    TemplateLiteral, UnaryExpression, UpdateExpression, YieldExpression,
 };
 
 impl SoaWalk {
@@ -31,49 +31,59 @@ impl SoaWalk {
     /// parameter decorators — `None` outside those positions, so descending them
     /// unconditionally lets this one method serve every expression slot.
     pub(super) fn visit_expression(&mut self, expr: &Expression<'_>, parent: NodeId) {
-        use Expression as E;
-        match expr {
+        use ExpressionKind as E;
+        match &expr.kind {
             E::Identifier(idn) => self.visit_identifier(idn, parent),
             E::Literal(lit) => self.leaf(NodeKind::Literal, lit.span, addr_of(lit), parent),
             E::PrivateIdentifier(pid) => {
-                self.leaf(NodeKind::PrivateIdentifier, pid.span, addr_of(pid), parent);
+                self.leaf(NodeKind::PrivateIdentifier, expr.span, addr_of(pid), parent);
             }
-            E::RegexLiteral(r) => self.leaf(NodeKind::RegexLiteral, r.span, addr_of(r), parent),
-            E::ThisExpression(t) => self.leaf(NodeKind::ThisExpression, t.span, addr_of(t), parent),
-            E::Super(s) => self.leaf(NodeKind::Super, s.span, addr_of(s), parent),
-            E::ObjectExpression(o) => self.visit_object_expression(o, parent),
-            E::ArrayExpression(a) => self.visit_array_expression(a, parent),
+            E::RegexLiteral(r) => self.leaf(NodeKind::RegexLiteral, expr.span, addr_of(r), parent),
+            E::ThisExpression(t) => {
+                self.leaf(NodeKind::ThisExpression, expr.span, addr_of(t), parent);
+            }
+            E::Super(s) => self.leaf(NodeKind::Super, expr.span, addr_of(s), parent),
+            E::ObjectExpression(o) => self.visit_object_expression(o, expr.span, parent),
+            E::ArrayExpression(a) => self.visit_array_expression(a, expr.span, parent),
             E::UnaryExpression(u) => self.visit_unary_expression(u, parent),
-            E::UpdateExpression(u) => self.visit_update_expression(u, parent),
-            E::BinaryExpression(b) => self.visit_binary_expression(b, parent),
-            E::CallExpression(c) => self.visit_call_expression(c, parent),
-            E::NewExpression(n) => self.visit_new_expression(n, parent),
-            E::MemberExpression(m) => self.visit_member_expression(m, parent),
-            E::ConditionalExpression(c) => self.visit_conditional_expression(c, parent),
-            E::ArrowFunctionExpression(a) => self.visit_arrow_function_expression(a, parent),
+            E::UpdateExpression(u) => self.visit_update_expression(u, expr.span, parent),
+            E::BinaryExpression(b) => self.visit_binary_expression(b, expr.span, parent),
+            E::CallExpression(c) => self.visit_call_expression(c, expr.span, parent),
+            E::NewExpression(n) => self.visit_new_expression(n, expr.span, parent),
+            E::MemberExpression(m) => self.visit_member_expression(m, expr.span, parent),
+            E::ConditionalExpression(c) => self.visit_conditional_expression(c, expr.span, parent),
+            E::ArrowFunctionExpression(a) => {
+                self.visit_arrow_function_expression(a, expr.span, parent);
+            }
             E::FunctionExpression(f) => self.visit_function_expression(f, parent),
-            E::ClassExpression(c) => self.visit_class_expression(c, parent),
+            E::ClassExpression(c) => self.visit_class_expression(c, expr.span, parent),
             E::SpreadElement(s) => self.visit_spread(s, parent),
             E::TemplateLiteral(t) => self.visit_template_literal(t, parent),
-            E::TaggedTemplateExpression(t) => self.visit_tagged_template_expression(t, parent),
-            E::AwaitExpression(a) => self.visit_await_expression(a, parent),
-            E::YieldExpression(y) => self.visit_yield_expression(y, parent),
-            E::SequenceExpression(s) => self.visit_sequence_expression(s, parent),
-            E::AssignmentExpression(a) => self.visit_assignment_expression(a, parent),
-            E::ObjectPattern(op) => self.visit_object_pattern(op, parent),
-            E::ArrayPattern(ap) => self.visit_array_pattern(ap, parent),
-            E::AssignmentPattern(a) => self.visit_assignment_pattern(a, parent),
+            E::TaggedTemplateExpression(t) => {
+                self.visit_tagged_template_expression(t, expr.span, parent);
+            }
+            E::AwaitExpression(a) => self.visit_await_expression(a, expr.span, parent),
+            E::YieldExpression(y) => self.visit_yield_expression(y, expr.span, parent),
+            E::SequenceExpression(s) => self.visit_sequence_expression(s, expr.span, parent),
+            E::AssignmentExpression(a) => self.visit_assignment_expression(a, expr.span, parent),
+            E::ObjectPattern(op) => self.visit_object_pattern(op, expr.span, parent),
+            E::ArrayPattern(ap) => self.visit_array_pattern(ap, expr.span, parent),
+            E::AssignmentPattern(a) => self.visit_assignment_pattern(a, expr.span, parent),
             E::RestElement(r) => self.visit_rest_element(r, parent),
-            E::TSTypeAssertion(t) => self.visit_ts_type_assertion(t, parent),
-            E::TSAsExpression(t) => self.visit_ts_as_expression(t, parent),
-            E::TSSatisfiesExpression(t) => self.visit_ts_satisfies_expression(t, parent),
-            E::TSInstantiationExpression(t) => self.visit_ts_instantiation_expression(t, parent),
-            E::TSNonNullExpression(t) => self.visit_ts_non_null_expression(t, parent),
-            E::TSParameterProperty(pp) => self.visit_ts_parameter_property(pp, parent),
-            E::ImportExpression(i) => self.visit_import_expression(i, parent),
-            E::MetaProperty(m) => self.visit_meta_property(m, parent),
-            E::JsdocCast(c) => self.visit_jsdoc_cast(c, parent),
-            E::ParenthesizedExpression(p) => self.visit_parenthesized_expression(p, parent),
+            E::TSTypeAssertion(t) => self.visit_ts_type_assertion(t, expr.span, parent),
+            E::TSAsExpression(t) => self.visit_ts_as_expression(t, expr.span, parent),
+            E::TSSatisfiesExpression(t) => self.visit_ts_satisfies_expression(t, expr.span, parent),
+            E::TSInstantiationExpression(t) => {
+                self.visit_ts_instantiation_expression(t, expr.span, parent);
+            }
+            E::TSNonNullExpression(t) => self.visit_ts_non_null_expression(t, expr.span, parent),
+            E::TSParameterProperty(pp) => self.visit_ts_parameter_property(pp, expr.span, parent),
+            E::ImportExpression(i) => self.visit_import_expression(i, expr.span, parent),
+            E::MetaProperty(m) => self.visit_meta_property(m, expr.span, parent),
+            E::JsdocCast(c) => self.visit_jsdoc_cast(c, expr.span, parent),
+            E::ParenthesizedExpression(p) => {
+                self.visit_parenthesized_expression(p, expr.span, parent);
+            }
         }
         // Lockstep guard: the arm above must have registered this expression
         // under the `(address, kind)` key the shared `expression_addr_kind`
@@ -87,8 +97,8 @@ impl SoaWalk {
     }
 
     #[inline]
-    fn visit_object_expression(&mut self, o: &ObjectExpression<'_>, parent: NodeId) {
-        let id = self.add(NodeKind::ObjectExpression, o.span, Some(parent), addr_of(o));
+    fn visit_object_expression(&mut self, o: &ObjectExpression<'_>, span: Span, parent: NodeId) {
+        let id = self.add(NodeKind::ObjectExpression, span, Some(parent), addr_of(o));
         for prop in o.properties {
             self.visit_object_property(prop, id);
         }
@@ -96,8 +106,8 @@ impl SoaWalk {
     }
 
     #[inline]
-    fn visit_array_expression(&mut self, a: &ArrayExpression<'_>, parent: NodeId) {
-        let id = self.add(NodeKind::ArrayExpression, a.span, Some(parent), addr_of(a));
+    fn visit_array_expression(&mut self, a: &ArrayExpression<'_>, span: Span, parent: NodeId) {
+        let id = self.add(NodeKind::ArrayExpression, span, Some(parent), addr_of(a));
         for el in a.elements.iter().flatten() {
             self.visit_expression(el, id);
         }
@@ -112,23 +122,23 @@ impl SoaWalk {
     }
 
     #[inline]
-    fn visit_update_expression(&mut self, u: &UpdateExpression<'_>, parent: NodeId) {
-        let id = self.add(NodeKind::UpdateExpression, u.span, Some(parent), addr_of(u));
+    fn visit_update_expression(&mut self, u: &UpdateExpression<'_>, span: Span, parent: NodeId) {
+        let id = self.add(NodeKind::UpdateExpression, span, Some(parent), addr_of(u));
         self.visit_expression(u.argument, id);
         self.close(id);
     }
 
     #[inline]
-    fn visit_binary_expression(&mut self, b: &BinaryExpression<'_>, parent: NodeId) {
-        let id = self.add(NodeKind::BinaryExpression, b.span, Some(parent), addr_of(b));
+    fn visit_binary_expression(&mut self, b: &BinaryExpression<'_>, span: Span, parent: NodeId) {
+        let id = self.add(NodeKind::BinaryExpression, span, Some(parent), addr_of(b));
         self.visit_expression(b.left, id);
         self.visit_expression(b.right, id);
         self.close(id);
     }
 
     #[inline]
-    fn visit_call_expression(&mut self, c: &CallExpression<'_>, parent: NodeId) {
-        let id = self.add(NodeKind::CallExpression, c.span, Some(parent), addr_of(c));
+    fn visit_call_expression(&mut self, c: &CallExpression<'_>, span: Span, parent: NodeId) {
+        let id = self.add(NodeKind::CallExpression, span, Some(parent), addr_of(c));
         self.visit_expression(c.callee, id);
         if let Some(ta) = &c.type_arguments {
             self.visit_type_args(ta, id);
@@ -140,8 +150,8 @@ impl SoaWalk {
     }
 
     #[inline]
-    fn visit_new_expression(&mut self, n: &NewExpression<'_>, parent: NodeId) {
-        let id = self.add(NodeKind::NewExpression, n.span, Some(parent), addr_of(n));
+    fn visit_new_expression(&mut self, n: &NewExpression<'_>, span: Span, parent: NodeId) {
+        let id = self.add(NodeKind::NewExpression, span, Some(parent), addr_of(n));
         self.visit_expression(n.callee, id);
         if let Some(ta) = &n.type_arguments {
             self.visit_type_args(ta, id);
@@ -153,18 +163,23 @@ impl SoaWalk {
     }
 
     #[inline]
-    fn visit_member_expression(&mut self, m: &MemberExpression<'_>, parent: NodeId) {
-        let id = self.add(NodeKind::MemberExpression, m.span, Some(parent), addr_of(m));
+    fn visit_member_expression(&mut self, m: &MemberExpression<'_>, span: Span, parent: NodeId) {
+        let id = self.add(NodeKind::MemberExpression, span, Some(parent), addr_of(m));
         self.visit_expression(m.object, id);
         self.visit_expression(m.property, id);
         self.close(id);
     }
 
     #[inline]
-    fn visit_conditional_expression(&mut self, c: &ConditionalExpression<'_>, parent: NodeId) {
+    fn visit_conditional_expression(
+        &mut self,
+        c: &ConditionalExpression<'_>,
+        span: Span,
+        parent: NodeId,
+    ) {
         let id = self.add(
             NodeKind::ConditionalExpression,
-            c.span,
+            span,
             Some(parent),
             addr_of(c),
         );
@@ -175,10 +190,15 @@ impl SoaWalk {
     }
 
     #[inline]
-    fn visit_arrow_function_expression(&mut self, a: &ArrowFunctionExpression<'_>, parent: NodeId) {
+    fn visit_arrow_function_expression(
+        &mut self,
+        a: &ArrowFunctionExpression<'_>,
+        span: Span,
+        parent: NodeId,
+    ) {
         let id = self.add(
             NodeKind::ArrowFunctionExpression,
-            a.span,
+            span,
             Some(parent),
             addr_of(a),
         );
@@ -193,8 +213,8 @@ impl SoaWalk {
     }
 
     #[inline]
-    fn visit_class_expression(&mut self, c: &ClassExpression<'_>, parent: NodeId) {
-        let id = self.add(NodeKind::ClassExpression, c.span, Some(parent), addr_of(c));
+    fn visit_class_expression(&mut self, c: &ClassExpression<'_>, span: Span, parent: NodeId) {
+        let id = self.add(NodeKind::ClassExpression, span, Some(parent), addr_of(c));
         if let Some(name) = &c.id {
             self.visit_identifier(name, id);
         }
@@ -215,11 +235,12 @@ impl SoaWalk {
     fn visit_tagged_template_expression(
         &mut self,
         t: &TaggedTemplateExpression<'_>,
+        span: Span,
         parent: NodeId,
     ) {
         let id = self.add(
             NodeKind::TaggedTemplateExpression,
-            t.span,
+            span,
             Some(parent),
             addr_of(t),
         );
@@ -232,15 +253,15 @@ impl SoaWalk {
     }
 
     #[inline]
-    fn visit_await_expression(&mut self, a: &AwaitExpression<'_>, parent: NodeId) {
-        let id = self.add(NodeKind::AwaitExpression, a.span, Some(parent), addr_of(a));
+    fn visit_await_expression(&mut self, a: &AwaitExpression<'_>, span: Span, parent: NodeId) {
+        let id = self.add(NodeKind::AwaitExpression, span, Some(parent), addr_of(a));
         self.visit_expression(a.argument, id);
         self.close(id);
     }
 
     #[inline]
-    fn visit_yield_expression(&mut self, y: &YieldExpression<'_>, parent: NodeId) {
-        let id = self.add(NodeKind::YieldExpression, y.span, Some(parent), addr_of(y));
+    fn visit_yield_expression(&mut self, y: &YieldExpression<'_>, span: Span, parent: NodeId) {
+        let id = self.add(NodeKind::YieldExpression, span, Some(parent), addr_of(y));
         if let Some(a) = y.argument {
             self.visit_expression(a, id);
         }
@@ -248,13 +269,13 @@ impl SoaWalk {
     }
 
     #[inline]
-    fn visit_sequence_expression(&mut self, s: &SequenceExpression<'_>, parent: NodeId) {
-        let id = self.add(
-            NodeKind::SequenceExpression,
-            s.span,
-            Some(parent),
-            addr_of(s),
-        );
+    fn visit_sequence_expression(
+        &mut self,
+        s: &SequenceExpression<'_>,
+        span: Span,
+        parent: NodeId,
+    ) {
+        let id = self.add(NodeKind::SequenceExpression, span, Some(parent), addr_of(s));
         for e in s.expressions {
             self.visit_expression(e, id);
         }
@@ -262,10 +283,15 @@ impl SoaWalk {
     }
 
     #[inline]
-    fn visit_assignment_expression(&mut self, a: &AssignmentExpression<'_>, parent: NodeId) {
+    fn visit_assignment_expression(
+        &mut self,
+        a: &AssignmentExpression<'_>,
+        span: Span,
+        parent: NodeId,
+    ) {
         let id = self.add(
             NodeKind::AssignmentExpression,
-            a.span,
+            span,
             Some(parent),
             addr_of(a),
         );
@@ -277,8 +303,8 @@ impl SoaWalk {
     }
 
     #[inline]
-    fn visit_object_pattern(&mut self, op: &ObjectPattern<'_>, parent: NodeId) {
-        let id = self.add(NodeKind::ObjectPattern, op.span, Some(parent), addr_of(op));
+    fn visit_object_pattern(&mut self, op: &ObjectPattern<'_>, span: Span, parent: NodeId) {
+        let id = self.add(NodeKind::ObjectPattern, span, Some(parent), addr_of(op));
         if let Some(decs) = op.decorators {
             self.visit_decorators(decs, id);
         }
@@ -290,8 +316,8 @@ impl SoaWalk {
     }
 
     #[inline]
-    fn visit_array_pattern(&mut self, ap: &ArrayPattern<'_>, parent: NodeId) {
-        let id = self.add(NodeKind::ArrayPattern, ap.span, Some(parent), addr_of(ap));
+    fn visit_array_pattern(&mut self, ap: &ArrayPattern<'_>, span: Span, parent: NodeId) {
+        let id = self.add(NodeKind::ArrayPattern, span, Some(parent), addr_of(ap));
         if let Some(decs) = ap.decorators {
             self.visit_decorators(decs, id);
         }
@@ -303,13 +329,8 @@ impl SoaWalk {
     }
 
     #[inline]
-    fn visit_assignment_pattern(&mut self, a: &AssignmentPattern<'_>, parent: NodeId) {
-        let id = self.add(
-            NodeKind::AssignmentPattern,
-            a.span,
-            Some(parent),
-            addr_of(a),
-        );
+    fn visit_assignment_pattern(&mut self, a: &AssignmentPattern<'_>, span: Span, parent: NodeId) {
+        let id = self.add(NodeKind::AssignmentPattern, span, Some(parent), addr_of(a));
         if let Some(decs) = a.decorators {
             self.visit_decorators(decs, id);
         }
@@ -319,26 +340,31 @@ impl SoaWalk {
     }
 
     #[inline]
-    fn visit_ts_type_assertion(&mut self, t: &TSTypeAssertion<'_>, parent: NodeId) {
-        let id = self.add(NodeKind::TSTypeAssertion, t.span, Some(parent), addr_of(t));
+    fn visit_ts_type_assertion(&mut self, t: &TSTypeAssertion<'_>, span: Span, parent: NodeId) {
+        let id = self.add(NodeKind::TSTypeAssertion, span, Some(parent), addr_of(t));
         self.visit_type(t.type_annotation, id);
         self.visit_expression(t.expression, id);
         self.close(id);
     }
 
     #[inline]
-    fn visit_ts_as_expression(&mut self, t: &TSAsExpression<'_>, parent: NodeId) {
-        let id = self.add(NodeKind::TSAsExpression, t.span, Some(parent), addr_of(t));
+    fn visit_ts_as_expression(&mut self, t: &TSAsExpression<'_>, span: Span, parent: NodeId) {
+        let id = self.add(NodeKind::TSAsExpression, span, Some(parent), addr_of(t));
         self.visit_expression(t.expression, id);
         self.visit_type(t.type_annotation, id);
         self.close(id);
     }
 
     #[inline]
-    fn visit_ts_satisfies_expression(&mut self, t: &TSSatisfiesExpression<'_>, parent: NodeId) {
+    fn visit_ts_satisfies_expression(
+        &mut self,
+        t: &TSSatisfiesExpression<'_>,
+        span: Span,
+        parent: NodeId,
+    ) {
         let id = self.add(
             NodeKind::TSSatisfiesExpression,
-            t.span,
+            span,
             Some(parent),
             addr_of(t),
         );
@@ -351,11 +377,12 @@ impl SoaWalk {
     fn visit_ts_instantiation_expression(
         &mut self,
         t: &TSInstantiationExpression<'_>,
+        span: Span,
         parent: NodeId,
     ) {
         let id = self.add(
             NodeKind::TSInstantiationExpression,
-            t.span,
+            span,
             Some(parent),
             addr_of(t),
         );
@@ -365,10 +392,15 @@ impl SoaWalk {
     }
 
     #[inline]
-    fn visit_ts_non_null_expression(&mut self, t: &TSNonNullExpression<'_>, parent: NodeId) {
+    fn visit_ts_non_null_expression(
+        &mut self,
+        t: &TSNonNullExpression<'_>,
+        span: Span,
+        parent: NodeId,
+    ) {
         let id = self.add(
             NodeKind::TSNonNullExpression,
-            t.span,
+            span,
             Some(parent),
             addr_of(t),
         );
@@ -377,10 +409,15 @@ impl SoaWalk {
     }
 
     #[inline]
-    fn visit_ts_parameter_property(&mut self, pp: &TSParameterProperty<'_>, parent: NodeId) {
+    fn visit_ts_parameter_property(
+        &mut self,
+        pp: &TSParameterProperty<'_>,
+        span: Span,
+        parent: NodeId,
+    ) {
         let id = self.add(
             NodeKind::TSParameterProperty,
-            pp.span,
+            span,
             Some(parent),
             addr_of(pp),
         );
@@ -389,8 +426,8 @@ impl SoaWalk {
     }
 
     #[inline]
-    fn visit_import_expression(&mut self, i: &ImportExpression<'_>, parent: NodeId) {
-        let id = self.add(NodeKind::ImportExpression, i.span, Some(parent), addr_of(i));
+    fn visit_import_expression(&mut self, i: &ImportExpression<'_>, span: Span, parent: NodeId) {
+        let id = self.add(NodeKind::ImportExpression, span, Some(parent), addr_of(i));
         self.visit_expression(i.source, id);
         if let Some(o) = i.options {
             self.visit_expression(o, id);
@@ -399,25 +436,30 @@ impl SoaWalk {
     }
 
     #[inline]
-    fn visit_meta_property(&mut self, m: &MetaProperty<'_>, parent: NodeId) {
-        let id = self.add(NodeKind::MetaProperty, m.span, Some(parent), addr_of(m));
+    fn visit_meta_property(&mut self, m: &MetaProperty<'_>, span: Span, parent: NodeId) {
+        let id = self.add(NodeKind::MetaProperty, span, Some(parent), addr_of(m));
         self.visit_identifier(&m.meta, id);
         self.visit_identifier(&m.property, id);
         self.close(id);
     }
 
     #[inline]
-    fn visit_jsdoc_cast(&mut self, c: &JsdocCast<'_>, parent: NodeId) {
-        let id = self.add(NodeKind::JsdocCast, c.span, Some(parent), addr_of(c));
+    fn visit_jsdoc_cast(&mut self, c: &JsdocCast<'_>, span: Span, parent: NodeId) {
+        let id = self.add(NodeKind::JsdocCast, span, Some(parent), addr_of(c));
         self.visit_expression(c.inner, id);
         self.close(id);
     }
 
     #[inline]
-    fn visit_parenthesized_expression(&mut self, p: &ParenthesizedExpression<'_>, parent: NodeId) {
+    fn visit_parenthesized_expression(
+        &mut self,
+        p: &ParenthesizedExpression<'_>,
+        span: Span,
+        parent: NodeId,
+    ) {
         let id = self.add(
             NodeKind::ParenthesizedExpression,
-            p.span,
+            span,
             Some(parent),
             addr_of(p),
         );

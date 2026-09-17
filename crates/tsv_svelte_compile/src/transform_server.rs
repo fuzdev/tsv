@@ -53,9 +53,9 @@ use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{Comment, Span};
 use tsv_svelte::ast::internal::{Element, Root, SpecialElement};
 use tsv_ts::ast::internal::{
-    BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, Expression, ExpressionStatement,
-    FunctionDeclaration, ObjectExpression, ObjectProperty, Statement, VariableDeclaration,
-    VariableDeclarationKind,
+    BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, Expression, ExpressionKind,
+    ExpressionStatement, FunctionDeclaration, ObjectExpression, ObjectProperty, Statement,
+    VariableDeclaration, VariableDeclarationKind,
 };
 
 use crate::analyze::{Bindings, NameSet, RuneInit, Scope, ScopeEntry, classify_rune_init};
@@ -945,11 +945,11 @@ pub(crate) fn compile_server<'arena>(
     let params_start = 0;
     let mut params: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
     let renderer = env.b.ident_at("$$renderer", Span::new(0, 0));
-    params.push(Expression::Identifier(renderer));
+    params.push(Expression::from_identifier(renderer));
     if uses_props {
         env.b.mint(", ");
         let props = env.b.ident_at("$$props", Span::new(0, 0));
-        params.push(Expression::Identifier(props));
+        params.push(Expression::from_identifier(props));
     }
     let lbrace = env.b.mint(") {").end - 1;
     let block_start = root
@@ -1067,7 +1067,7 @@ pub(crate) fn compile_server<'arena>(
         let inner_span = Span::new(block_start, env.b.buffer.len() as u32);
         let wrapper_renderer = env.b.ident("$$renderer");
         let mut wrapper_params: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
-        wrapper_params.push(Expression::Identifier(wrapper_renderer));
+        wrapper_params.push(Expression::from_identifier(wrapper_renderer));
         let arrow = env
             .b
             .arrow_block(wrapper_params.into_bump_slice(), body, inner_span);
@@ -1282,7 +1282,7 @@ fn build_bind_props_stmt<'arena>(
     entries: &[BindableEntry],
 ) -> Statement<'arena> {
     let object = build_bindable_object(b, arena, entries);
-    let props_ident = Expression::Identifier(b.ident("$$props"));
+    let props_ident = Expression::from_identifier(b.ident("$$props"));
     let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
     args.push(props_ident);
     args.push(object);
@@ -1311,25 +1311,27 @@ fn build_bindable_object<'arena>(
         // Object-shorthand `{ value }` when the key equals the local; otherwise
         // `{ value: v }` with a distinct value identifier.
         let value = if shorthand {
-            Expression::Identifier(b.ident(&entry.local))
+            Expression::from_identifier(b.ident(&entry.local))
         } else {
             b.mint(": ");
-            Expression::Identifier(b.ident(&entry.local))
+            Expression::from_identifier(b.ident(&entry.local))
         };
         properties.push(ObjectProperty::Property(init_property(
             b.arena,
-            Expression::Identifier(key),
+            Expression::from_identifier(key),
             value,
             shorthand,
             key_span,
         )));
     }
     let cbrace = b.mint(" }").end;
-    Expression::ObjectExpression(ObjectExpression {
-        properties: properties.into_bump_slice(),
-        spread_trailing_comma: false,
+    Expression {
         span: Span::new(obrace, cbrace),
-    })
+        kind: ExpressionKind::ObjectExpression(ObjectExpression {
+            properties: properties.into_bump_slice(),
+            spread_trailing_comma: false,
+        }),
+    }
 }
 
 /// `const <name> = $.props_id($$renderer);` — the oracle's hoisted `$props.id()`
@@ -1343,7 +1345,7 @@ fn build_bindable_object<'arena>(
 /// window is the authored one.
 fn build_props_id_decl<'arena>(b: &Builder<'arena>, name: &str, at: u32) -> Statement<'arena> {
     let span = Span::new(at, at);
-    let id = Expression::Identifier(b.ident_at(name, span));
+    let id = Expression::from_identifier(b.ident_at(name, span));
     let renderer_arg = b.ident_expr_at("$$renderer", span);
     let init = b.member_call_at("$", "props_id", std::slice::from_ref(renderer_arg), span);
     declaration_stmt(b, VariableDeclarationKind::Const, id, init)
@@ -1354,7 +1356,7 @@ fn build_props_id_decl<'arena>(b: &Builder<'arena>, name: &str, at: u32) -> Stat
 /// [`build_props_id_decl`].
 fn build_sanitize_slots_decl<'arena>(b: &Builder<'arena>, at: u32) -> Statement<'arena> {
     let span = Span::new(at, at);
-    let slots_id = Expression::Identifier(b.ident_at("$$slots", span));
+    let slots_id = Expression::from_identifier(b.ident_at("$$slots", span));
     let props_arg = b.ident_expr_at("$$props", span);
     let init = b.member_call_at("$", "sanitize_slots", std::slice::from_ref(props_arg), span);
     declaration_stmt(b, VariableDeclarationKind::Const, slots_id, init)

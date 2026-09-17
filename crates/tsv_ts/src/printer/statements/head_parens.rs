@@ -13,7 +13,7 @@
 // source paren is still stripped and any number collapse to exactly one.
 
 use super::Printer;
-use crate::ast::internal::{self, Expression};
+use crate::ast::internal::{self, Expression, ExpressionKind};
 use crate::printer::is_string_literal;
 use crate::printer::needs_parens::{leftmost_no_lookahead, leftmost_no_lookahead_reached};
 use tsv_lang::Span;
@@ -28,9 +28,9 @@ fn strip_statement_casts<'a>(expr: &'a Expression<'a>) -> Option<&'a Expression<
     let mut cur = expr;
     let mut stripped = false;
     loop {
-        cur = match cur {
-            Expression::TSAsExpression(e) => e.expression,
-            Expression::TSSatisfiesExpression(e) => e.expression,
+        cur = match &cur.kind {
+            ExpressionKind::TSAsExpression(e) => e.expression,
+            ExpressionKind::TSSatisfiesExpression(e) => e.expression,
             _ => break,
         };
         stripped = true;
@@ -104,10 +104,10 @@ impl<'a> Printer<'a> {
     ) -> Option<Span> {
         let leftmost = leftmost_no_lookahead(expression);
         if matches!(
-            leftmost,
-            Expression::ObjectExpression(_)
-                | Expression::FunctionExpression(_)
-                | Expression::ClassExpression(_)
+            leftmost.kind,
+            ExpressionKind::ObjectExpression(_)
+                | ExpressionKind::FunctionExpression(_)
+                | ExpressionKind::ClassExpression(_)
         ) {
             return Some(leftmost.span());
         }
@@ -115,11 +115,10 @@ impl<'a> Printer<'a> {
             return Some(span);
         }
         match strip_statement_casts(expression) {
-            Some(Expression::Identifier(id))
-                if self.with_ident_name(id, is_statement_ambiguous_keyword) =>
-            {
-                Some(id.span)
-            }
+            Some(Expression {
+                kind: ExpressionKind::Identifier(id),
+                ..
+            }) if self.with_ident_name(id, is_statement_ambiguous_keyword) => Some(id.span),
             _ => None,
         }
     }
@@ -147,7 +146,7 @@ impl<'a> Printer<'a> {
         expression: &Expression<'_>,
     ) -> Option<Span> {
         let (leftmost, is_computed_member_object) = leftmost_no_lookahead_reached(expression);
-        let Expression::Identifier(id) = leftmost else {
+        let ExpressionKind::Identifier(id) = &leftmost.kind else {
             return None;
         };
         (is_computed_member_object && self.with_ident_name(id, |name| name == "let"))
@@ -166,8 +165,8 @@ impl<'a> Printer<'a> {
         &self,
         expression: &Expression<'_>,
     ) -> Option<Span> {
-        match leftmost_no_lookahead(expression) {
-            Expression::Identifier(id) if self.with_ident_name(id, |name| name == "let") => {
+        match &leftmost_no_lookahead(expression).kind {
+            ExpressionKind::Identifier(id) if self.with_ident_name(id, |name| name == "let") => {
                 Some(id.span)
             }
             _ => None,

@@ -10,7 +10,7 @@ use super::predicates::*;
 use crate::binder::{NodeKind, addr_of, expression_addr_kind};
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, AssignmentOperator, BinaryExpression, BinaryOperator, ClassExpression,
-    ConditionalExpression, Decorator, Expression, FunctionExpression, Identifier,
+    ConditionalExpression, Decorator, Expression, ExpressionKind, FunctionExpression, Identifier,
     ObjectPatternProperty, ObjectProperty, Property, UnaryOperator,
 };
 
@@ -18,8 +18,8 @@ impl<'a> FlowBuilder<'a> {
     /// `maybeBindExpressionFlowIfCall` (binder.go:2143): a top-level dotted-name
     /// (non-`super`) call is a potential assertion → `createFlowCall`.
     pub(super) fn maybe_bind_expression_flow_if_call(&mut self, expr: &Expression<'_>) {
-        if let Expression::CallExpression(c) = expr
-            && !matches!(c.callee, Expression::Super(_))
+        if let ExpressionKind::CallExpression(c) = &expr.kind
+            && !matches!(c.callee.kind, ExpressionKind::Super(_))
             && is_dotted_name(c.callee)
         {
             let call_id = self.require(addr_of(c), NodeKind::CallExpression);
@@ -313,7 +313,7 @@ impl<'a> FlowBuilder<'a> {
     // --- expressions ------------------------------------------------------
 
     pub(super) fn visit_expression(&mut self, expr: &Expression<'_>) {
-        use Expression as E;
+        use ExpressionKind as E;
         // A **value** sub-position resets the condition targets, so a logical
         // expression nested inside one (`if (f(x && y))`, `if (c ? x && y : z)`,
         // `if (g([x && y]))`) is classified top-level — a value with its own
@@ -331,7 +331,7 @@ impl<'a> FlowBuilder<'a> {
                 self.current_false_target.take(),
             ))
         };
-        match expr {
+        match &expr.kind {
             E::Identifier(idn) => self.visit_identifier(idn),
             E::ThisExpression(t) => {
                 let id = self.require(addr_of(t), NodeKind::ThisExpression);
@@ -473,7 +473,7 @@ impl<'a> FlowBuilder<'a> {
 
     #[inline]
     fn bind_call_expression_flow(&mut self, c: &tsv_ts::ast::internal::CallExpression<'_>) {
-        use Expression as E;
+        use ExpressionKind as E;
         // IIFE detection (`GetImmediatelyInvokedFunctionExpression`,
         // utilities.go:1834; `bindCallExpressionFlow`, binder.go:2419):
         // a non-async (non-generator) function/arrow callee — through any
@@ -481,10 +481,10 @@ impl<'a> FlowBuilder<'a> {
         // arguments bind FIRST so the callee's flow write captures the
         // post-argument flow.
         let mut unwrapped = c.callee;
-        while let E::ParenthesizedExpression(p) = unwrapped {
+        while let E::ParenthesizedExpression(p) = &unwrapped.kind {
             unwrapped = p.expression;
         }
-        match unwrapped {
+        match &unwrapped.kind {
             E::ArrowFunctionExpression(a) if !a.r#async => {
                 for arg in c.arguments {
                     self.visit_expression(arg);
@@ -627,7 +627,14 @@ impl<'a> FlowBuilder<'a> {
     fn visit_object_expr_property(&mut self, pr: &Property<'_>) {
         let is_method_or_accessor =
             pr.method || pr.kind != tsv_ts::ast::internal::PropertyKind::Init;
-        if let (true, Expression::FunctionExpression(f)) = (is_method_or_accessor, &pr.value) {
+        if let (
+            true,
+            Expression {
+                kind: ExpressionKind::FunctionExpression(f),
+                ..
+            },
+        ) = (is_method_or_accessor, &pr.value)
+        {
             // An object-literal method/accessor is a control-flow container
             // anchored on its value FunctionExpression — the body-bearing node
             // (unlike `MethodDefinition`, a `Property` does NOT share its value's

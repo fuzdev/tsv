@@ -11,9 +11,10 @@ use crate::binder::{NodeKind, addr_of, statement_kind};
 use smallvec::SmallVec;
 use tsv_ts::ast::internal::{
     BreakStatement, ClassDeclaration, ClassMember, ContinueStatement, Decorator, DoWhileStatement,
-    Expression, ForInOfLeft, ForInit, ForStatement, FunctionDeclaration, Identifier, IfStatement,
-    LabeledStatement, MethodDefinition, MethodKind, ObjectPatternProperty, Statement, SwitchCase,
-    SwitchStatement, TSModuleDeclarationBody, TryStatement, VariableDeclarator, WhileStatement,
+    Expression, ExpressionKind, ForInOfLeft, ForInit, ForStatement, FunctionDeclaration,
+    Identifier, IfStatement, LabeledStatement, MethodDefinition, MethodKind, ObjectPatternProperty,
+    Statement, SwitchCase, SwitchStatement, TSModuleDeclarationBody, TryStatement,
+    VariableDeclarator, WhileStatement,
 };
 
 impl<'a> FlowBuilder<'a> {
@@ -770,8 +771,8 @@ impl<'a> FlowBuilder<'a> {
     /// assignment-target destructuring recursion — a separate deferred item —
     /// stays untouched; for a non-defaulted target the two are equivalent.
     fn bind_binding_target(&mut self, node: &Expression<'_>) {
-        use Expression as E;
-        match node {
+        use ExpressionKind as E;
+        match &node.kind {
             E::AssignmentPattern(a) => {
                 self.visit_decorators(a.decorators);
                 self.bind_initializer(a.right);

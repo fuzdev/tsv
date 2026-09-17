@@ -48,11 +48,11 @@ use tsv_lang::source_scan::{TriviaProfile, skip_trivia, skip_trivia_run};
 use tsv_ts::ast::internal::{
     ArrayPattern, ArrowFunctionBody, ArrowFunctionExpression, AssignmentPattern, BlockStatement,
     CatchClause, ClassBody, ClassDeclaration, ClassExpression, ClassMember, EmptyStatement,
-    ExportDefaultValue, ExportKind, Expression, ForInOfLeft, ForInit, FunctionDeclaration,
-    FunctionExpression, Identifier, ImportKind, ImportSpecifier, MethodDefinition, MethodKind,
-    ObjectPattern, ObjectPatternProperty, ObjectProperty, Property, PropertyDefinition,
-    PropertyKind, PropertyModifier, RestElement, Statement, StaticBlock, SwitchCase,
-    TSModuleDeclarationBody, TemplateLiteral, VariableDeclaration, VariableDeclarator,
+    ExportDefaultValue, ExportKind, Expression, ExpressionKind, ForInOfLeft, ForInit,
+    FunctionDeclaration, FunctionExpression, Identifier, ImportKind, ImportSpecifier,
+    MethodDefinition, MethodKind, ObjectPattern, ObjectPatternProperty, ObjectProperty, Property,
+    PropertyDefinition, PropertyKind, PropertyModifier, RestElement, Statement, StaticBlock,
+    SwitchCase, TSModuleDeclarationBody, TemplateLiteral, VariableDeclaration, VariableDeclarator,
 };
 
 use crate::CompileError;
@@ -1002,7 +1002,7 @@ impl<'arena> Eraser<'arena, '_> {
         // nothing, so record the `!` here.
         if declarator.definite
             && id.is_none()
-            && let Expression::Identifier(ident) = &declarator.id
+            && let ExpressionKind::Identifier(ident) = &declarator.id.kind
         {
             self.drop_region(Span::new(ident.name_span().end, ident.span.end));
         }
@@ -1072,7 +1072,7 @@ impl<'arena> Eraser<'arena, '_> {
     /// The TypeScript `this` pseudo-parameter: a bare `this` identifier binding
     /// (acorn's `isThisParam`, mirrored by `tsv_ts`'s parser).
     fn is_this_param(&self, param: &Expression<'arena>) -> bool {
-        let Expression::Identifier(id) = param else {
+        let ExpressionKind::Identifier(id) = &param.kind else {
             return false;
         };
         id.name_span().extract(self.source) == "this"
@@ -1138,10 +1138,11 @@ impl<'arena> Eraser<'arena, '_> {
     fn arrow(
         &mut self,
         arrow: &ArrowFunctionExpression<'arena>,
+        span: Span,
     ) -> Result<Option<ArrowFunctionExpression<'arena>>, CompileError> {
-        let params_start = arrow.params_start.unwrap_or(arrow.span.start);
+        let params_start = arrow.params_start.unwrap_or(span.start);
         if let Some(type_parameters) = &arrow.type_parameters {
-            self.drop_region_from(arrow.span.start, type_parameters.span);
+            self.drop_region_from(span.start, type_parameters.span);
         }
         if let Some(return_type) = &arrow.return_type {
             self.drop_region_from(params_start, return_type.span);
@@ -1240,9 +1241,10 @@ impl<'arena> Eraser<'arena, '_> {
     fn class_expression(
         &mut self,
         class: &ClassExpression<'arena>,
+        class_span: Span,
     ) -> Result<Option<ClassExpression<'arena>>, CompileError> {
         let head = ClassHead {
-            span: class.span,
+            span: class_span,
             r#abstract: class.r#abstract,
             id_end: class.id.as_ref().map(|id| id.span.end),
             type_parameters: class.type_parameters.as_ref().map(|tp| tp.span),
@@ -1502,54 +1504,56 @@ impl<'arena> Eraser<'arena, '_> {
         &mut self,
         expr: &Expression<'arena>,
     ) -> Result<Option<Expression<'arena>>, CompileError> {
-        Ok(match expr {
+        Ok(match &expr.kind {
             // ── The five TypeScript wrappers: unwrap to inner ──────────────
-            Expression::TSAsExpression(node) => {
-                self.drop_region(Span::new(node.expression.span().end, node.span.end));
+            ExpressionKind::TSAsExpression(node) => {
+                self.drop_region(Span::new(node.expression.span().end, expr.span.end));
                 Some(
                     self.expr(node.expression)?
                         .unwrap_or_else(|| node.expression.clone()),
                 )
             }
-            Expression::TSSatisfiesExpression(node) => {
-                self.drop_region(Span::new(node.expression.span().end, node.span.end));
+            ExpressionKind::TSSatisfiesExpression(node) => {
+                self.drop_region(Span::new(node.expression.span().end, expr.span.end));
                 Some(
                     self.expr(node.expression)?
                         .unwrap_or_else(|| node.expression.clone()),
                 )
             }
-            Expression::TSNonNullExpression(node) => {
-                self.drop_region(Span::new(node.expression.span().end, node.span.end));
+            ExpressionKind::TSNonNullExpression(node) => {
+                self.drop_region(Span::new(node.expression.span().end, expr.span.end));
                 Some(
                     self.expr(node.expression)?
                         .unwrap_or_else(|| node.expression.clone()),
                 )
             }
-            Expression::TSInstantiationExpression(node) => {
-                self.drop_region(Span::new(node.expression.span().end, node.span.end));
+            ExpressionKind::TSInstantiationExpression(node) => {
+                self.drop_region(Span::new(node.expression.span().end, expr.span.end));
                 Some(
                     self.expr(node.expression)?
                         .unwrap_or_else(|| node.expression.clone()),
                 )
             }
-            Expression::TSTypeAssertion(node) => {
-                self.drop_region(Span::new(node.span.start, node.expression.span().start));
+            ExpressionKind::TSTypeAssertion(node) => {
+                self.drop_region(Span::new(expr.span.start, node.expression.span().start));
                 Some(
                     self.expr(node.expression)?
                         .unwrap_or_else(|| node.expression.clone()),
                 )
             }
 
-            Expression::TSParameterProperty(node) => Some(self.parameter_property(node)?),
+            ExpressionKind::TSParameterProperty(node) => {
+                Some(self.parameter_property(node, expr.span)?)
+            }
 
             // ── Binding identifiers ────────────────────────────────────────
-            Expression::Identifier(id) => self.identifier(id)?.map(Expression::Identifier),
+            ExpressionKind::Identifier(id) => self.identifier(id)?.map(Expression::from_identifier),
 
             // ── Patterns ───────────────────────────────────────────────────
-            Expression::ObjectPattern(pattern) => {
+            ExpressionKind::ObjectPattern(pattern) => {
                 self.refuse_decorators(pattern.decorators)?;
                 self.pattern_tail(
-                    pattern.span,
+                    expr.span,
                     pattern.optional,
                     pattern.type_annotation.as_ref(),
                 );
@@ -1558,18 +1562,21 @@ impl<'arena> Eraser<'arena, '_> {
                 if !erased && properties.is_none() {
                     None
                 } else {
-                    Some(Expression::ObjectPattern(ObjectPattern {
-                        properties: properties.unwrap_or(pattern.properties),
-                        optional: false,
-                        type_annotation: None,
-                        ..pattern.clone()
-                    }))
+                    Some(Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::ObjectPattern(ObjectPattern {
+                            properties: properties.unwrap_or(pattern.properties),
+                            optional: false,
+                            type_annotation: None,
+                            ..pattern.clone()
+                        }),
+                    })
                 }
             }
-            Expression::ArrayPattern(pattern) => {
+            ExpressionKind::ArrayPattern(pattern) => {
                 self.refuse_decorators(pattern.decorators)?;
                 self.pattern_tail(
-                    pattern.span,
+                    expr.span,
                     pattern.optional,
                     pattern.type_annotation.as_ref(),
                 );
@@ -1578,32 +1585,40 @@ impl<'arena> Eraser<'arena, '_> {
                 if !erased && elements.is_none() {
                     None
                 } else {
-                    Some(Expression::ArrayPattern(ArrayPattern {
-                        elements: elements.unwrap_or(pattern.elements),
-                        optional: false,
-                        type_annotation: None,
-                        ..pattern.clone()
-                    }))
+                    Some(Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::ArrayPattern(ArrayPattern {
+                            elements: elements.unwrap_or(pattern.elements),
+                            optional: false,
+                            type_annotation: None,
+                            ..pattern.clone()
+                        }),
+                    })
                 }
             }
-            Expression::AssignmentPattern(pattern) => {
+            ExpressionKind::AssignmentPattern(pattern) => {
                 self.refuse_decorators(pattern.decorators)?;
                 let left = self.expr_ref(pattern.left)?;
                 let right = self.expr_ref(pattern.right)?;
                 if left.is_none() && right.is_none() {
                     None
                 } else {
-                    Some(Expression::AssignmentPattern(AssignmentPattern {
-                        left: left.unwrap_or(pattern.left),
-                        right: right.unwrap_or(pattern.right),
-                        ..pattern.clone()
-                    }))
+                    Some(Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::AssignmentPattern(AssignmentPattern {
+                            left: left.unwrap_or(pattern.left),
+                            right: right.unwrap_or(pattern.right),
+                            ..pattern.clone()
+                        }),
+                    })
                 }
             }
-            Expression::RestElement(rest) => self.rest_element(rest)?.map(Expression::RestElement),
+            ExpressionKind::RestElement(rest) => {
+                self.rest_element(rest)?.map(Expression::from_rest_element)
+            }
 
             // ── Calls carry type arguments ─────────────────────────────────
-            Expression::CallExpression(call) => {
+            ExpressionKind::CallExpression(call) => {
                 if let Some(type_arguments) = &call.type_arguments {
                     // `f /* c */ <T>(x)` — the `<T>` list is detached from the
                     // callee, so the window reaches back to it.
@@ -1614,17 +1629,20 @@ impl<'arena> Eraser<'arena, '_> {
                 if call.type_arguments.is_none() && callee.is_none() && arguments.is_none() {
                     None
                 } else {
-                    Some(Expression::CallExpression(
-                        tsv_ts::ast::internal::CallExpression {
-                            callee: callee.unwrap_or(call.callee),
-                            type_arguments: None,
-                            arguments: arguments.unwrap_or(call.arguments),
-                            ..call.clone()
-                        },
-                    ))
+                    Some(Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::CallExpression(
+                            tsv_ts::ast::internal::CallExpression {
+                                callee: callee.unwrap_or(call.callee),
+                                type_arguments: None,
+                                arguments: arguments.unwrap_or(call.arguments),
+                                ..call.clone()
+                            },
+                        ),
+                    })
                 }
             }
-            Expression::NewExpression(new) => {
+            ExpressionKind::NewExpression(new) => {
                 if let Some(type_arguments) = &new.type_arguments {
                     self.drop_region_from(new.callee.span().start, type_arguments.span);
                 }
@@ -1633,17 +1651,17 @@ impl<'arena> Eraser<'arena, '_> {
                 if new.type_arguments.is_none() && callee.is_none() && arguments.is_none() {
                     None
                 } else {
-                    Some(Expression::NewExpression(
-                        tsv_ts::ast::internal::NewExpression {
+                    Some(Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::NewExpression(tsv_ts::ast::internal::NewExpression {
                             callee: callee.unwrap_or(new.callee),
                             type_arguments: None,
                             arguments: arguments.unwrap_or(new.arguments),
-                            span: new.span,
-                        },
-                    ))
+                        }),
+                    })
                 }
             }
-            Expression::TaggedTemplateExpression(tagged) => {
+            ExpressionKind::TaggedTemplateExpression(tagged) => {
                 if let Some(type_arguments) = &tagged.type_arguments {
                     self.drop_region_from(tagged.tag.span().start, type_arguments.span);
                 }
@@ -1652,157 +1670,192 @@ impl<'arena> Eraser<'arena, '_> {
                 if tagged.type_arguments.is_none() && tag.is_none() && quasi.is_none() {
                     None
                 } else {
-                    Some(Expression::TaggedTemplateExpression(self.arena.alloc(
-                        tsv_ts::ast::internal::TaggedTemplateExpression {
-                            tag: tag.unwrap_or(tagged.tag),
-                            type_arguments: None,
-                            quasi: quasi.unwrap_or_else(|| tagged.quasi.clone()),
-                            span: tagged.span,
-                        },
-                    )))
+                    Some(Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::TaggedTemplateExpression(self.arena.alloc(
+                            tsv_ts::ast::internal::TaggedTemplateExpression {
+                                tag: tag.unwrap_or(tagged.tag),
+                                type_arguments: None,
+                                quasi: quasi.unwrap_or_else(|| tagged.quasi.clone()),
+                            },
+                        )),
+                    })
                 }
             }
 
             // ── Functions and classes ──────────────────────────────────────
-            Expression::ArrowFunctionExpression(arrow) => self
-                .arrow(arrow)?
-                .map(|a| Expression::ArrowFunctionExpression(self.arena.alloc(a))),
-            Expression::FunctionExpression(func) => self
+            ExpressionKind::ArrowFunctionExpression(arrow) => {
+                self.arrow(arrow, expr.span)?.map(|a| Expression {
+                    span: expr.span,
+                    kind: ExpressionKind::ArrowFunctionExpression(self.arena.alloc(a)),
+                })
+            }
+            ExpressionKind::FunctionExpression(func) => self
                 .function_expression(func, false)?
-                .map(|f| Expression::FunctionExpression(self.arena.alloc(f))),
-            Expression::ClassExpression(class) => self
-                .class_expression(class)?
-                .map(|c| Expression::ClassExpression(self.arena.alloc(c))),
+                .map(|f| Expression::from_function_expression(self.arena.alloc(f))),
+            ExpressionKind::ClassExpression(class) => {
+                self.class_expression(class, expr.span)?
+                    .map(|c| Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::ClassExpression(self.arena.alloc(c)),
+                    })
+            }
 
             // ── Plain recursion ────────────────────────────────────────────
-            Expression::ObjectExpression(obj) => map_slice!(self, obj.properties, object_property)
-                .map(|properties| {
-                    Expression::ObjectExpression(tsv_ts::ast::internal::ObjectExpression {
-                        properties,
-                        ..obj.clone()
-                    })
-                }),
-            Expression::ArrayExpression(arr) => {
-                map_slice!(self, arr.elements, opt_expr).map(|elements| {
-                    Expression::ArrayExpression(tsv_ts::ast::internal::ArrayExpression {
+            ExpressionKind::ObjectExpression(obj) => {
+                map_slice!(self, obj.properties, object_property).map(|properties| Expression {
+                    span: expr.span,
+                    kind: ExpressionKind::ObjectExpression(
+                        tsv_ts::ast::internal::ObjectExpression {
+                            properties,
+                            ..obj.clone()
+                        },
+                    ),
+                })
+            }
+            ExpressionKind::ArrayExpression(arr) => {
+                map_slice!(self, arr.elements, opt_expr).map(|elements| Expression {
+                    span: expr.span,
+                    kind: ExpressionKind::ArrayExpression(tsv_ts::ast::internal::ArrayExpression {
                         elements,
                         ..arr.clone()
-                    })
+                    }),
                 })
             }
-            Expression::UnaryExpression(unary) => self.expr_ref(unary.argument)?.map(|argument| {
-                Expression::UnaryExpression(tsv_ts::ast::internal::UnaryExpression {
-                    argument,
-                    ..unary.clone()
-                })
-            }),
-            Expression::UpdateExpression(update) => {
-                self.expr_ref(update.argument)?.map(|argument| {
-                    Expression::UpdateExpression(tsv_ts::ast::internal::UpdateExpression {
+            ExpressionKind::UnaryExpression(unary) => {
+                self.expr_ref(unary.argument)?.map(|argument| {
+                    Expression::from_unary_expression(tsv_ts::ast::internal::UnaryExpression {
                         argument,
-                        ..update.clone()
+                        ..unary.clone()
                     })
                 })
             }
-            Expression::BinaryExpression(binary) => {
+            ExpressionKind::UpdateExpression(update) => {
+                self.expr_ref(update.argument)?.map(|argument| Expression {
+                    span: expr.span,
+                    kind: ExpressionKind::UpdateExpression(
+                        tsv_ts::ast::internal::UpdateExpression {
+                            argument,
+                            ..update.clone()
+                        },
+                    ),
+                })
+            }
+            ExpressionKind::BinaryExpression(binary) => {
                 let left = self.expr_ref(binary.left)?;
                 let right = self.expr_ref(binary.right)?;
                 if left.is_none() && right.is_none() {
                     None
                 } else {
-                    Some(Expression::BinaryExpression(
-                        tsv_ts::ast::internal::BinaryExpression {
-                            left: left.unwrap_or(binary.left),
-                            right: right.unwrap_or(binary.right),
-                            // `relexes_as_type_arguments` rides along: it is a claim about the SOURCE
-                            // bytes this rewrite invalidates, and inheriting is the SAFE direction — a
-                            // stale `true` costs a redundant paren pair, a stale `false` an output
-                            // nothing reparses.
-                            ..binary.clone()
-                        },
-                    ))
+                    Some(Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::BinaryExpression(
+                            tsv_ts::ast::internal::BinaryExpression {
+                                left: left.unwrap_or(binary.left),
+                                right: right.unwrap_or(binary.right),
+                                // `relexes_as_type_arguments` rides along: it is a claim about
+                                // the SOURCE bytes this rewrite invalidates, and inheriting is the
+                                // SAFE direction — a stale `true` costs a redundant paren pair, a
+                                // stale `false` an output nothing reparses.
+                                ..binary.clone()
+                            },
+                        ),
+                    })
                 }
             }
-            Expression::MemberExpression(member) => {
+            ExpressionKind::MemberExpression(member) => {
                 let object = self.expr_ref(member.object)?;
                 let property = self.expr_ref(member.property)?;
                 if object.is_none() && property.is_none() {
                     None
                 } else {
-                    Some(Expression::MemberExpression(
-                        tsv_ts::ast::internal::MemberExpression {
-                            object: object.unwrap_or(member.object),
-                            property: property.unwrap_or(member.property),
-                            ..member.clone()
-                        },
-                    ))
+                    Some(Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::MemberExpression(
+                            tsv_ts::ast::internal::MemberExpression {
+                                object: object.unwrap_or(member.object),
+                                property: property.unwrap_or(member.property),
+                                ..member.clone()
+                            },
+                        ),
+                    })
                 }
             }
-            Expression::ConditionalExpression(cond) => {
+            ExpressionKind::ConditionalExpression(cond) => {
                 let test = self.expr_ref(cond.test)?;
                 let consequent = self.expr_ref(cond.consequent)?;
                 let alternate = self.expr_ref(cond.alternate)?;
                 if test.is_none() && consequent.is_none() && alternate.is_none() {
                     None
                 } else {
-                    Some(Expression::ConditionalExpression(
-                        tsv_ts::ast::internal::ConditionalExpression {
-                            test: test.unwrap_or(cond.test),
-                            consequent: consequent.unwrap_or(cond.consequent),
-                            alternate: alternate.unwrap_or(cond.alternate),
-                            span: cond.span,
-                        },
-                    ))
+                    Some(Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::ConditionalExpression(
+                            tsv_ts::ast::internal::ConditionalExpression {
+                                test: test.unwrap_or(cond.test),
+                                consequent: consequent.unwrap_or(cond.consequent),
+                                alternate: alternate.unwrap_or(cond.alternate),
+                            },
+                        ),
+                    })
                 }
             }
-            Expression::SpreadElement(spread) => self.expr_ref(spread.argument)?.map(|argument| {
-                Expression::SpreadElement(tsv_ts::ast::internal::SpreadElement {
-                    argument,
-                    span: spread.span,
+            ExpressionKind::SpreadElement(spread) => {
+                self.expr_ref(spread.argument)?.map(|argument| {
+                    Expression::from_spread_element(tsv_ts::ast::internal::SpreadElement {
+                        argument,
+                        span: spread.span,
+                    })
                 })
-            }),
-            Expression::TemplateLiteral(template) => self
+            }
+            ExpressionKind::TemplateLiteral(template) => self
                 .template_literal(template)?
-                .map(Expression::TemplateLiteral),
-            Expression::AwaitExpression(node) => self.expr_ref(node.argument)?.map(|argument| {
-                Expression::AwaitExpression(tsv_ts::ast::internal::AwaitExpression {
-                    argument,
-                    span: node.span,
+                .map(Expression::from_template_literal),
+            ExpressionKind::AwaitExpression(node) => {
+                self.expr_ref(node.argument)?.map(|argument| Expression {
+                    span: expr.span,
+                    kind: ExpressionKind::AwaitExpression(tsv_ts::ast::internal::AwaitExpression {
+                        argument,
+                    }),
                 })
-            }),
-            Expression::YieldExpression(node) => match node.argument {
-                Some(argument) => self.expr_ref(argument)?.map(|argument| {
-                    Expression::YieldExpression(tsv_ts::ast::internal::YieldExpression {
+            }
+            ExpressionKind::YieldExpression(node) => match node.argument {
+                Some(argument) => self.expr_ref(argument)?.map(|argument| Expression {
+                    span: expr.span,
+                    kind: ExpressionKind::YieldExpression(tsv_ts::ast::internal::YieldExpression {
                         argument: Some(argument),
                         ..node.clone()
-                    })
+                    }),
                 }),
                 None => None,
             },
-            Expression::SequenceExpression(seq) => {
-                map_slice!(self, seq.expressions, expr).map(|expressions| {
-                    Expression::SequenceExpression(tsv_ts::ast::internal::SequenceExpression {
-                        expressions,
-                        span: seq.span,
-                    })
+            ExpressionKind::SequenceExpression(seq) => {
+                map_slice!(self, seq.expressions, expr).map(|expressions| Expression {
+                    span: expr.span,
+                    kind: ExpressionKind::SequenceExpression(
+                        tsv_ts::ast::internal::SequenceExpression { expressions },
+                    ),
                 })
             }
-            Expression::AssignmentExpression(assign) => {
+            ExpressionKind::AssignmentExpression(assign) => {
                 let left = self.expr_ref(assign.left)?;
                 let right = self.expr_ref(assign.right)?;
                 if left.is_none() && right.is_none() {
                     None
                 } else {
-                    Some(Expression::AssignmentExpression(
-                        tsv_ts::ast::internal::AssignmentExpression {
-                            left: left.unwrap_or(assign.left),
-                            right: right.unwrap_or(assign.right),
-                            ..assign.clone()
-                        },
-                    ))
+                    Some(Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::AssignmentExpression(
+                            tsv_ts::ast::internal::AssignmentExpression {
+                                left: left.unwrap_or(assign.left),
+                                right: right.unwrap_or(assign.right),
+                                ..assign.clone()
+                            },
+                        ),
+                    })
                 }
             }
-            Expression::ImportExpression(import) => {
+            ExpressionKind::ImportExpression(import) => {
                 let source = self.expr_ref(import.source)?;
                 let options = match import.options {
                     Some(options) => self.expr_ref(options)?.map(Some),
@@ -1811,13 +1864,16 @@ impl<'arena> Eraser<'arena, '_> {
                 if source.is_none() && options.is_none() {
                     None
                 } else {
-                    Some(Expression::ImportExpression(
-                        tsv_ts::ast::internal::ImportExpression {
-                            source: source.unwrap_or(import.source),
-                            options: options.unwrap_or(import.options),
-                            ..import.clone()
-                        },
-                    ))
+                    Some(Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::ImportExpression(
+                            tsv_ts::ast::internal::ImportExpression {
+                                source: source.unwrap_or(import.source),
+                                options: options.unwrap_or(import.options),
+                                ..import.clone()
+                            },
+                        ),
+                    })
                 }
             }
             // `/** @type {T} */ (expr)` — an internal-only wrapper recording the
@@ -1832,27 +1888,26 @@ impl<'arena> Eraser<'arena, '_> {
             // dropping the wrapper leaves that comment printed by nothing. The
             // compile path releases it back to the positional machinery — see
             // `transform_server::collect_script_comments`.
-            Expression::JsdocCast(cast) => {
+            ExpressionKind::JsdocCast(cast) => {
                 Some(self.expr(cast.inner)?.unwrap_or_else(|| cast.inner.clone()))
             }
-            Expression::ParenthesizedExpression(paren) => {
-                self.expr_ref(paren.expression)?.map(|expression| {
-                    Expression::ParenthesizedExpression(
-                        tsv_ts::ast::internal::ParenthesizedExpression {
-                            expression,
-                            span: paren.span,
-                        },
-                    )
-                })
+            ExpressionKind::ParenthesizedExpression(paren) => {
+                self.expr_ref(paren.expression)?
+                    .map(|expression| Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::ParenthesizedExpression(
+                            tsv_ts::ast::internal::ParenthesizedExpression { expression },
+                        ),
+                    })
             }
 
             // ── Leaves ─────────────────────────────────────────────────────
-            Expression::Literal(_)
-            | Expression::PrivateIdentifier(_)
-            | Expression::RegexLiteral(_)
-            | Expression::ThisExpression(_)
-            | Expression::Super(_)
-            | Expression::MetaProperty(_) => None,
+            ExpressionKind::Literal(_)
+            | ExpressionKind::PrivateIdentifier(_)
+            | ExpressionKind::RegexLiteral(_)
+            | ExpressionKind::ThisExpression(_)
+            | ExpressionKind::Super(_)
+            | ExpressionKind::MetaProperty(_) => None,
         })
     }
 
@@ -1922,11 +1977,12 @@ impl<'arena> Eraser<'arena, '_> {
     fn parameter_property(
         &mut self,
         node: &tsv_ts::ast::internal::TSParameterProperty<'arena>,
+        span: Span,
     ) -> Result<Expression<'arena>, CompileError> {
         if self.constructor_params && (node.readonly || node.accessibility.is_some()) {
             return unsupported(Refusal::TsParameterProperty);
         }
-        self.drop_region(Span::new(node.span.start, node.parameter.span().start));
+        self.drop_region(Span::new(span.start, node.parameter.span().start));
         Ok(self
             .expr(node.parameter)?
             .unwrap_or_else(|| node.parameter.clone()))
@@ -2032,14 +2088,17 @@ impl<'arena> Eraser<'arena, '_> {
         if prop.shorthand || prop.computed || prop.method || prop.kind != PropertyKind::Init {
             return None;
         }
-        let Expression::Identifier(key_id) = key else {
+        let ExpressionKind::Identifier(key_id) = &key.kind else {
             return None;
         };
         let base = match value {
-            Expression::AssignmentPattern(assign) => assign.left,
+            Expression {
+                kind: ExpressionKind::AssignmentPattern(assign),
+                ..
+            } => assign.left,
             other => other,
         };
-        let Expression::Identifier(base_id) = base else {
+        let ExpressionKind::Identifier(base_id) = &base.kind else {
             return None;
         };
         if key_id.name(self.source) != base_id.name(self.source) {

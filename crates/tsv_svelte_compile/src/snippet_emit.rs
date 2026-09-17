@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 use bumpalo::collections::Vec as BumpVec;
 use tsv_svelte::ast::internal::{RenderTag, SnippetBlock};
-use tsv_ts::ast::internal::{CallExpression, Expression, Statement};
+use tsv_ts::ast::internal::{CallExpression, Expression, ExpressionKind, Statement};
 
 use crate::analyze::{ScopeEntry, pattern_binding_names};
 use crate::body_builder::BodyBuilder;
@@ -64,7 +64,7 @@ pub(crate) fn build_snippet_function<'arena>(
     if snippet
         .parameters
         .iter()
-        .any(|param| matches!(param, Expression::RestElement(_)))
+        .any(|param| matches!(param.kind, ExpressionKind::RestElement(_)))
     {
         return Err(unsupported(Refusal::SnippetRestParameter));
     }
@@ -123,7 +123,7 @@ pub(crate) fn build_snippet_function<'arena>(
     // `($$renderer, ...params)` — the synthetic renderer first, then the erased
     // parameter patterns.
     let mut all_params: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
-    all_params.push(Expression::Identifier(env.b.ident("$$renderer")));
+    all_params.push(Expression::from_identifier(env.b.ident("$$renderer")));
     all_params.extend_from_slice(params);
     let block_span = env.b.here();
     let fn_decl = env
@@ -152,10 +152,10 @@ pub(crate) fn build_snippet_function<'arena>(
 pub(crate) fn render_call_expression<'a, 'arena>(
     expr: &'a Expression<'arena>,
 ) -> Option<&'a CallExpression<'arena>> {
-    match expr {
-        Expression::CallExpression(call) => Some(call),
-        Expression::ParenthesizedExpression(paren) => match paren.expression {
-            Expression::CallExpression(call) => Some(call),
+    match &expr.kind {
+        ExpressionKind::CallExpression(call) => Some(call),
+        ExpressionKind::ParenthesizedExpression(paren) => match &paren.expression.kind {
+            ExpressionKind::CallExpression(call) => Some(call),
             _ => None,
         },
         _ => None,
@@ -167,8 +167,8 @@ pub(crate) fn render_call_expression<'a, 'arena>(
 /// callee, a non-call, or an escaped identifier.
 pub(crate) fn render_callee_name<'s>(expr: &Expression<'_>, source: &'s str) -> Option<&'s str> {
     let call = render_call_expression(expr)?;
-    match call.callee {
-        Expression::Identifier(id) => plain_identifier_str(id, source),
+    match &call.callee.kind {
+        ExpressionKind::Identifier(id) => plain_identifier_str(id, source),
         _ => None,
     }
 }
@@ -224,7 +224,7 @@ pub(crate) fn emit_render_tag<'arena>(
     // `callee($$renderer, ...args)`. Arguments go through the value machinery so
     // a bare derived read becomes `d()` and runes/mutations refuse.
     let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
-    args.push(Expression::Identifier(env.b.ident("$$renderer")));
+    args.push(Expression::from_identifier(env.b.ident("$$renderer")));
     for arg in call.arguments {
         args.push(wrap_single(env, arg)?);
     }

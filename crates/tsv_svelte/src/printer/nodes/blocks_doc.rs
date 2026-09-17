@@ -122,18 +122,18 @@ fn build_await_section_body(printer: &Printer<'_>, fragment: &Fragment<'_>, expa
 /// `.method(...)` segment, not a bare `)`), a sequence (its `)` is glued to the last operand
 /// one indent in, not at base), and an `as` / `satisfies` cast (ends on the type).
 fn ends_at_base_closer(expr: &tsv_ts::Expression<'_>) -> bool {
-    use tsv_ts::Expression as E;
+    use tsv_ts::ExpressionKind as E;
     use tsv_ts::ast::internal::ArrowFunctionBody;
     // A callee with no nested call means the only `(` belongs to this call, so its
     // `)` lands at the tag base when the args wrap (vs. a chain, whose segments indent).
-    fn callee_has_no_call(e: &E<'_>) -> bool {
-        match e {
+    fn callee_has_no_call(e: &tsv_ts::Expression<'_>) -> bool {
+        match &e.kind {
             E::Identifier(_) | E::ThisExpression(_) | E::Super(_) => true,
             E::MemberExpression(m) => callee_has_no_call(m.object),
             _ => false,
         }
     }
-    match expr {
+    match &expr.kind {
         E::CallExpression(c) => callee_has_no_call(c.callee),
         E::NewExpression(n) => callee_has_no_call(n.callee),
         // `import(…)` owns its parens outright, so it always ends at `)` — the plain

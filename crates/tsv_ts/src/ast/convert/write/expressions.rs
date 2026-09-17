@@ -101,11 +101,11 @@ pub(super) fn write_expression_inner(
     ctx: &Ctx<'_>,
     flags: ExprFlags,
 ) {
-    match expr {
+    match &expr.kind {
         // JSDoc cast is internal-only: emit the inner expression (paren-free
         // public AST). `in_chain = false` — the cast's parens seal any chain;
         // force/strip pass through (they act on the converted inner).
-        internal::Expression::JsdocCast(cast) => {
+        internal::ExpressionKind::JsdocCast(cast) => {
             write_expression_inner(
                 w,
                 cast.inner,
@@ -122,14 +122,14 @@ pub(super) fn write_expression_inner(
         // Preserved grouping parens (snippet parameters): emit the wrapper with
         // its paren-covering span, then the inner expression. Only produced under
         // the parser's `preserve_parens` mode, so it never appears elsewhere.
-        internal::Expression::ParenthesizedExpression(paren) => {
-            node_header(w, "ParenthesizedExpression", paren.span, ctx);
+        internal::ExpressionKind::ParenthesizedExpression(paren) => {
+            node_header(w, "ParenthesizedExpression", expr.span, ctx);
             w.raw(",\"expression\":");
             write_expression(w, paren.expression, ctx);
-            close_node(w, "ParenthesizedExpression", paren.span, ctx);
+            close_node(w, "ParenthesizedExpression", expr.span, ctx);
         }
-        internal::Expression::Literal(lit) => write_literal(w, lit, ctx),
-        internal::Expression::Identifier(id) => {
+        internal::ExpressionKind::Literal(lit) => write_literal(w, lit, ctx),
+        internal::ExpressionKind::Identifier(id) => {
             write_identifier_parts(
                 w,
                 id.span,
@@ -140,31 +140,31 @@ pub(super) fn write_expression_inner(
                 ctx,
             );
         }
-        internal::Expression::PrivateIdentifier(pid) => {
-            node_header(w, "PrivateIdentifier", pid.span, ctx);
+        internal::ExpressionKind::PrivateIdentifier(pid) => {
+            node_header(w, "PrivateIdentifier", expr.span, ctx);
             w.raw(",\"name\":");
             // The name excludes the leading `#` (the public shape): the
             // trailing `raw_len` bytes of the span.
-            write_name(w, pid.name, pid.span.end - pid.name.raw_len as u32, ctx);
-            close_node(w, "PrivateIdentifier", pid.span, ctx);
+            write_name(w, pid.name, expr.span.end - pid.name.raw_len as u32, ctx);
+            close_node(w, "PrivateIdentifier", expr.span, ctx);
         }
-        internal::Expression::ObjectExpression(obj) => {
-            node_header(w, "ObjectExpression", obj.span, ctx);
+        internal::ExpressionKind::ObjectExpression(obj) => {
+            node_header(w, "ObjectExpression", expr.span, ctx);
             w.raw(",\"properties\":");
             super::write_body_array(w, obj.properties, ctx, |w, p| {
                 write_object_property(w, p, ctx);
             });
-            close_node(w, "ObjectExpression", obj.span, ctx);
+            close_node(w, "ObjectExpression", expr.span, ctx);
         }
-        internal::Expression::ArrayExpression(arr) => {
-            node_header(w, "ArrayExpression", arr.span, ctx);
+        internal::ExpressionKind::ArrayExpression(arr) => {
+            node_header(w, "ArrayExpression", expr.span, ctx);
             w.raw(",\"elements\":");
             super::write_body_array_holes(w, arr.elements, ctx, |w, e| {
                 write_expression(w, e, ctx);
             });
-            close_node(w, "ArrayExpression", arr.span, ctx);
+            close_node(w, "ArrayExpression", expr.span, ctx);
         }
-        internal::Expression::UnaryExpression(unary) => {
+        internal::ExpressionKind::UnaryExpression(unary) => {
             node_header(w, "UnaryExpression", unary.span, ctx);
             w.raw(",\"operator\":\"");
             w.raw(unary.operator.as_str());
@@ -174,17 +174,17 @@ pub(super) fn write_expression_inner(
             write_expression(w, unary.argument, ctx);
             close_node(w, "UnaryExpression", unary.span, ctx);
         }
-        internal::Expression::UpdateExpression(update) => {
-            node_header(w, "UpdateExpression", update.span, ctx);
+        internal::ExpressionKind::UpdateExpression(update) => {
+            node_header(w, "UpdateExpression", expr.span, ctx);
             w.raw(",\"operator\":\"");
             w.raw(update.operator.as_str());
             w.raw("\",\"prefix\":");
             w.bool(update.prefix);
             w.raw(",\"argument\":");
             write_expression(w, update.argument, ctx);
-            close_node(w, "UpdateExpression", update.span, ctx);
+            close_node(w, "UpdateExpression", expr.span, ctx);
         }
-        internal::Expression::BinaryExpression(binary) => {
+        internal::ExpressionKind::BinaryExpression(binary) => {
             // LogicalExpression for `&&`/`||`/`??`, BinaryExpression otherwise.
             let node_type = match binary.operator {
                 internal::BinaryOperator::AmpersandAmpersand
@@ -192,127 +192,127 @@ pub(super) fn write_expression_inner(
                 | internal::BinaryOperator::QuestionQuestion => "LogicalExpression",
                 _ => "BinaryExpression",
             };
-            node_header(w, node_type, binary.span, ctx);
+            node_header(w, node_type, expr.span, ctx);
             w.raw(",\"left\":");
             write_expression(w, binary.left, ctx);
             w.raw(",\"operator\":\"");
             w.raw(binary.operator.as_str());
             w.raw("\",\"right\":");
             write_expression(w, binary.right, ctx);
-            close_node(w, node_type, binary.span, ctx);
+            close_node(w, node_type, expr.span, ctx);
         }
-        internal::Expression::ArrowFunctionExpression(arrow) => {
-            write_arrow_function_expression(w, arrow, ctx);
+        internal::ExpressionKind::ArrowFunctionExpression(arrow) => {
+            write_arrow_function_expression(w, arrow, expr.span, ctx);
         }
-        internal::Expression::FunctionExpression(func) => {
+        internal::ExpressionKind::FunctionExpression(func) => {
             write_function_expression(w, func, ctx, false);
         }
-        internal::Expression::ClassExpression(class_expr) => {
-            write_class_expression(w, class_expr, ctx);
+        internal::ExpressionKind::ClassExpression(class_expr) => {
+            write_class_expression(w, class_expr, expr.span, ctx);
         }
-        internal::Expression::SpreadElement(spread) => {
+        internal::ExpressionKind::SpreadElement(spread) => {
             node_header(w, "SpreadElement", spread.span, ctx);
             w.raw(",\"argument\":");
             write_expression(w, spread.argument, ctx);
             close_node(w, "SpreadElement", spread.span, ctx);
         }
-        internal::Expression::CallExpression(call) => {
+        internal::ExpressionKind::CallExpression(call) => {
             let needs_chain = needs_chain_wrap(expr, flags);
             let callee_chain = child_chain(
-                call.span.start,
+                expr.span.start,
                 call.callee.span().start,
                 needs_chain,
                 flags,
             );
             let (force, strip) = flags_after_wrap(flags, needs_chain);
-            maybe_wrap_chain(w, needs_chain, call.span, ctx, |w| {
-                write_call_expression(w, call, ctx, callee_chain, force, strip);
+            maybe_wrap_chain(w, needs_chain, expr.span, ctx, |w| {
+                write_call_expression(w, call, expr.span, ctx, callee_chain, force, strip);
             });
         }
-        internal::Expression::NewExpression(new_expr) => {
-            write_new_expression(w, new_expr, ctx);
+        internal::ExpressionKind::NewExpression(new_expr) => {
+            write_new_expression(w, new_expr, expr.span, ctx);
         }
-        internal::Expression::MemberExpression(member) => {
+        internal::ExpressionKind::MemberExpression(member) => {
             let needs_chain = needs_chain_wrap(expr, flags);
             let object_chain = child_chain(
-                member.span.start,
+                expr.span.start,
                 member.object.span().start,
                 needs_chain,
                 flags,
             );
             let (force, strip) = flags_after_wrap(flags, needs_chain);
-            maybe_wrap_chain(w, needs_chain, member.span, ctx, |w| {
-                write_member_expression(w, member, ctx, object_chain, force, strip);
+            maybe_wrap_chain(w, needs_chain, expr.span, ctx, |w| {
+                write_member_expression(w, member, expr.span, ctx, object_chain, force, strip);
             });
         }
-        internal::Expression::ConditionalExpression(cond) => {
-            write_conditional_expression(w, cond, ctx);
+        internal::ExpressionKind::ConditionalExpression(cond) => {
+            write_conditional_expression(w, cond, expr.span, ctx);
         }
-        internal::Expression::TemplateLiteral(template) => {
+        internal::ExpressionKind::TemplateLiteral(template) => {
             write_template_literal(w, template, ctx);
         }
-        internal::Expression::TaggedTemplateExpression(tagged) => {
-            node_header(w, "TaggedTemplateExpression", tagged.span, ctx);
+        internal::ExpressionKind::TaggedTemplateExpression(tagged) => {
+            node_header(w, "TaggedTemplateExpression", expr.span, ctx);
             w.raw(",\"tag\":");
             write_expression(w, tagged.tag, ctx);
             w.raw(",\"quasi\":");
             write_template_literal(w, &tagged.quasi, ctx);
             write_type_arguments_field(w, tagged.type_arguments.as_ref(), ctx);
-            close_node(w, "TaggedTemplateExpression", tagged.span, ctx);
+            close_node(w, "TaggedTemplateExpression", expr.span, ctx);
         }
-        internal::Expression::AwaitExpression(await_expr) => {
-            write_await_expression(w, await_expr, ctx);
+        internal::ExpressionKind::AwaitExpression(await_expr) => {
+            write_await_expression(w, await_expr, expr.span, ctx);
         }
-        internal::Expression::YieldExpression(yield_expr) => {
-            write_yield_expression(w, yield_expr, ctx);
+        internal::ExpressionKind::YieldExpression(yield_expr) => {
+            write_yield_expression(w, yield_expr, expr.span, ctx);
         }
-        internal::Expression::SequenceExpression(seq) => {
-            node_header(w, "SequenceExpression", seq.span, ctx);
+        internal::ExpressionKind::SequenceExpression(seq) => {
+            node_header(w, "SequenceExpression", expr.span, ctx);
             w.raw(",\"expressions\":");
             write_expressions(w, seq.expressions, ctx);
-            close_node(w, "SequenceExpression", seq.span, ctx);
+            close_node(w, "SequenceExpression", expr.span, ctx);
         }
-        internal::Expression::RegexLiteral(regex) => {
+        internal::ExpressionKind::RegexLiteral(regex) => {
             // Regex uses "Literal" type in acorn/Svelte AST; `value` is `{}`.
-            node_header(w, "Literal", regex.span, ctx);
+            node_header(w, "Literal", expr.span, ctx);
             w.raw(",\"value\":{},\"raw\":");
-            w.string(regex.span.extract(ctx.source));
+            w.string(expr.span.extract(ctx.source));
             w.raw(",\"regex\":{\"pattern\":");
             w.string(regex.pattern(ctx.source));
             w.raw(",\"flags\":");
             w.string(regex.flags(ctx.source));
             // Close the inner `regex` object, then the `Literal` node.
             w.raw("}");
-            close_node(w, "Literal", regex.span, ctx);
+            close_node(w, "Literal", expr.span, ctx);
         }
-        internal::Expression::ThisExpression(t) => {
-            write_bare_node(w, "ThisExpression", t.span, ctx);
+        internal::ExpressionKind::ThisExpression(_) => {
+            write_bare_node(w, "ThisExpression", expr.span, ctx);
         }
-        internal::Expression::Super(s) => {
-            write_bare_node(w, "Super", s.span, ctx);
+        internal::ExpressionKind::Super(_) => {
+            write_bare_node(w, "Super", expr.span, ctx);
         }
-        internal::Expression::AssignmentExpression(assign) => {
+        internal::ExpressionKind::AssignmentExpression(assign) => {
             // The `=` left keeps its type-assertion wrapper (`(x as T) = 1` →
             // `TSAsExpression`): acorn-typescript's `toAssignable` validates through the
             // assertion but preserves the node. A JSDoc cast is not an assertion node at
             // all in the public AST, and `write_expression` already peels it.
-            node_header(w, "AssignmentExpression", assign.span, ctx);
+            node_header(w, "AssignmentExpression", expr.span, ctx);
             w.raw(",\"operator\":\"");
             w.raw(assign.operator.as_str());
             w.raw("\",\"left\":");
             write_expression(w, assign.left, ctx);
             w.raw(",\"right\":");
             write_expression(w, assign.right, ctx);
-            close_node(w, "AssignmentExpression", assign.span, ctx);
+            close_node(w, "AssignmentExpression", expr.span, ctx);
         }
-        internal::Expression::ObjectPattern(obj) => {
-            write_object_pattern(w, obj, ctx);
+        internal::ExpressionKind::ObjectPattern(obj) => {
+            write_object_pattern(w, obj, expr.span, ctx);
         }
-        internal::Expression::ArrayPattern(arr) => {
+        internal::ExpressionKind::ArrayPattern(arr) => {
             super::patterns::pattern_header(
                 w,
                 "ArrayPattern",
-                arr.span,
+                expr.span,
                 arr.type_annotation.as_ref(),
                 ctx,
             );
@@ -323,40 +323,40 @@ pub(super) fn write_expression_inner(
             }
             write_type_annotation_field(w, arr.type_annotation.as_ref(), ctx);
             super::declarations::write_decorators_field(w, arr.decorators, ctx);
-            close_node(w, "ArrayPattern", arr.span, ctx);
+            close_node(w, "ArrayPattern", expr.span, ctx);
         }
-        internal::Expression::AssignmentPattern(pattern) => {
-            write_assignment_pattern(w, pattern, ctx, pattern.span);
+        internal::ExpressionKind::AssignmentPattern(pattern) => {
+            write_assignment_pattern(w, pattern, ctx, expr.span);
         }
-        internal::Expression::RestElement(rest) => {
+        internal::ExpressionKind::RestElement(rest) => {
             write_rest_element(w, rest, ctx);
         }
-        internal::Expression::TSTypeAssertion(type_assert) => {
-            node_header(w, "TSTypeAssertion", type_assert.span, ctx);
+        internal::ExpressionKind::TSTypeAssertion(type_assert) => {
+            node_header(w, "TSTypeAssertion", expr.span, ctx);
             w.raw(",\"typeAnnotation\":");
             write_type(w, type_assert.type_annotation, ctx);
             w.raw(",\"expression\":");
             write_expression(w, type_assert.expression, ctx);
-            close_node(w, "TSTypeAssertion", type_assert.span, ctx);
+            close_node(w, "TSTypeAssertion", expr.span, ctx);
         }
-        internal::Expression::TSAsExpression(as_expr) => {
-            node_header(w, "TSAsExpression", as_expr.span, ctx);
+        internal::ExpressionKind::TSAsExpression(as_expr) => {
+            node_header(w, "TSAsExpression", expr.span, ctx);
             w.raw(",\"expression\":");
             write_expression(w, as_expr.expression, ctx);
             w.raw(",\"typeAnnotation\":");
             write_type(w, as_expr.type_annotation, ctx);
-            close_node(w, "TSAsExpression", as_expr.span, ctx);
+            close_node(w, "TSAsExpression", expr.span, ctx);
         }
-        internal::Expression::TSSatisfiesExpression(sat_expr) => {
-            node_header(w, "TSSatisfiesExpression", sat_expr.span, ctx);
+        internal::ExpressionKind::TSSatisfiesExpression(sat_expr) => {
+            node_header(w, "TSSatisfiesExpression", expr.span, ctx);
             w.raw(",\"expression\":");
             write_expression(w, sat_expr.expression, ctx);
             w.raw(",\"typeAnnotation\":");
             write_type(w, sat_expr.type_annotation, ctx);
-            close_node(w, "TSSatisfiesExpression", sat_expr.span, ctx);
+            close_node(w, "TSSatisfiesExpression", expr.span, ctx);
         }
-        internal::Expression::TSInstantiationExpression(inst_expr) => {
-            node_header(w, "TSInstantiationExpression", inst_expr.span, ctx);
+        internal::ExpressionKind::TSInstantiationExpression(inst_expr) => {
+            node_header(w, "TSInstantiationExpression", expr.span, ctx);
             w.raw(",\"expression\":");
             write_expression_inner(
                 w,
@@ -372,20 +372,20 @@ pub(super) fn write_expression_inner(
             );
             w.raw(",\"typeArguments\":");
             write_type_parameter_instantiation(w, &inst_expr.type_arguments, ctx);
-            close_node(w, "TSInstantiationExpression", inst_expr.span, ctx);
+            close_node(w, "TSInstantiationExpression", expr.span, ctx);
         }
-        internal::Expression::TSNonNullExpression(non_null_expr) => {
+        internal::ExpressionKind::TSNonNullExpression(non_null_expr) => {
             let needs_chain = needs_chain_wrap(expr, flags);
             // A parenthesized inner chain seals at the parens, so the
             // paren-aware child check applies like it does for calls/members.
             let inner_chain = child_chain(
-                non_null_expr.span.start,
+                expr.span.start,
                 non_null_expr.expression.span().start,
                 needs_chain,
                 flags,
             );
-            maybe_wrap_chain(w, needs_chain, non_null_expr.span, ctx, |w| {
-                node_header(w, "TSNonNullExpression", non_null_expr.span, ctx);
+            maybe_wrap_chain(w, needs_chain, expr.span, ctx, |w| {
+                node_header(w, "TSNonNullExpression", expr.span, ctx);
                 w.raw(",\"expression\":");
                 // force/strip die here: TSNonNullExpression is not a
                 // call/member spine node.
@@ -398,11 +398,11 @@ pub(super) fn write_expression_inner(
                         ..ExprFlags::default()
                     },
                 );
-                close_node(w, "TSNonNullExpression", non_null_expr.span, ctx);
+                close_node(w, "TSNonNullExpression", expr.span, ctx);
             });
         }
-        internal::Expression::ImportExpression(import_expr) => {
-            node_header(w, "ImportExpression", import_expr.span, ctx);
+        internal::ExpressionKind::ImportExpression(import_expr) => {
+            node_header(w, "ImportExpression", expr.span, ctx);
             w.raw(",\"source\":");
             write_expression(w, import_expr.source, ctx);
             if let Some(phase) = import_expr.phase.as_str() {
@@ -426,33 +426,33 @@ pub(super) fn write_expression_inner(
                 write_expression(w, opts, ctx);
                 w.raw("]");
             }
-            close_node(w, "ImportExpression", import_expr.span, ctx);
+            close_node(w, "ImportExpression", expr.span, ctx);
         }
-        internal::Expression::MetaProperty(meta) => {
-            node_header(w, "MetaProperty", meta.span, ctx);
+        internal::ExpressionKind::MetaProperty(meta) => {
+            node_header(w, "MetaProperty", expr.span, ctx);
             w.raw(",\"meta\":");
             write_identifier_plain(w, &meta.meta, ctx);
             w.raw(",\"property\":");
             write_identifier_plain(w, &meta.property, ctx);
-            close_node(w, "MetaProperty", meta.span, ctx);
+            close_node(w, "MetaProperty", expr.span, ctx);
         }
-        internal::Expression::TSParameterProperty(param_prop) => {
+        internal::ExpressionKind::TSParameterProperty(param_prop) => {
             // acorn quirk: when the parameter is an AssignmentPattern whose left
             // has no type annotation, its span/loc expand to include the
             // accessibility modifier keyword (the whole parameter property).
             let param = param_prop.parameter.unwrap_jsdoc_casts();
-            let override_ap = if let internal::Expression::AssignmentPattern(ap) = param {
-                let has_type_ann = match ap.left.unwrap_jsdoc_casts() {
-                    internal::Expression::Identifier(id) => id.type_annotation().is_some(),
-                    internal::Expression::ArrayPattern(arr) => arr.type_annotation.is_some(),
-                    internal::Expression::ObjectPattern(obj) => obj.type_annotation.is_some(),
+            let override_ap = if let internal::ExpressionKind::AssignmentPattern(ap) = &param.kind {
+                let has_type_ann = match &ap.left.unwrap_jsdoc_casts().kind {
+                    internal::ExpressionKind::Identifier(id) => id.type_annotation().is_some(),
+                    internal::ExpressionKind::ArrayPattern(arr) => arr.type_annotation.is_some(),
+                    internal::ExpressionKind::ObjectPattern(obj) => obj.type_annotation.is_some(),
                     _ => false,
                 };
                 (!has_type_ann).then_some(ap)
             } else {
                 None
             };
-            node_header(w, "TSParameterProperty", param_prop.span, ctx);
+            node_header(w, "TSParameterProperty", expr.span, ctx);
             if let Some(acc) = param_prop.accessibility {
                 w.raw(",\"accessibility\":");
                 w.token(acc.as_str());
@@ -465,11 +465,11 @@ pub(super) fn write_expression_inner(
             }
             w.raw(",\"parameter\":");
             if let Some(ap) = override_ap {
-                write_assignment_pattern(w, ap, ctx, param_prop.span);
+                write_assignment_pattern(w, ap, ctx, expr.span);
             } else {
                 write_expression(w, param_prop.parameter, ctx);
             }
-            close_node(w, "TSParameterProperty", param_prop.span, ctx);
+            close_node(w, "TSParameterProperty", expr.span, ctx);
         }
     }
 }

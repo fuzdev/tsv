@@ -6,7 +6,7 @@
 // - Complex argument detection
 // - Callback analysis
 
-use crate::ast::internal::{ArrowFunctionBody, Expression};
+use crate::ast::internal::{ArrowFunctionBody, ExpressionKind};
 use crate::printer::calls::arg_predicates::is_simple_call_argument;
 
 use super::super::printing::{chain_gap_any, node_comment_gap};
@@ -225,8 +225,8 @@ pub(super) fn call_callback_status<'a>(
     let mut will_break = false;
 
     for arg in call.arguments {
-        match arg {
-            Expression::ArrowFunctionExpression(arrow) => {
+        match &arg.kind {
+            ExpressionKind::ArrowFunctionExpression(arrow) => {
                 has_callback = true;
                 if !will_break {
                     will_break = match &arrow.body {
@@ -244,7 +244,7 @@ pub(super) fn call_callback_status<'a>(
                     };
                 }
             }
-            Expression::FunctionExpression(func) => {
+            ExpressionKind::FunctionExpression(func) => {
                 // Function expressions break if body has statements or contains comments
                 has_callback = true;
                 if !will_break {

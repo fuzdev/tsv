@@ -751,7 +751,7 @@ pub enum SpecialThis<'arena> {
     /// `this="value"` — the plain HTML-attribute form. No braces (so no gap a comment could
     /// occupy) and **no expression parse at all**: the value is the attribute's decoded
     /// text, held as such. Svelte's wire reports it as a `Literal`, which the writer emits
-    /// from these two fields directly — synthesizing an `Expression::Literal` here only to
+    /// from these two fields directly — synthesizing an `ExpressionKind::Literal` here only to
     /// take it apart again at every consumer bought nothing but an unreachable arm in each
     /// of their matches.
     Plain {

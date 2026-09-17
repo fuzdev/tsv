@@ -11,6 +11,7 @@ use super::arg_predicates::{is_expandable_object, is_hook_callback_with_deps};
 use super::arg_wrapping::try_hug_multiline_template_arg;
 use crate::ast::internal;
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 
@@ -46,9 +47,10 @@ fn import_phase_word(phase: internal::ImportPhase) -> Option<&'static str> {
 fn build_import_head_doc(
     printer: &Printer<'_>,
     import_expr: &internal::ImportExpression<'_>,
+    import_expr_span: Span,
 ) -> (DocId, u32) {
     let d = printer.d();
-    let start = import_expr.span.start;
+    let start = import_expr_span.start;
     let import_end = start + "import".len() as u32;
     // Bounds every scan below: the first argument is the next real token, and no `(` or
     // phase word of this import's own lies past it.
@@ -281,6 +283,7 @@ pub(in crate::printer) fn build_import_args_comment_layout(
 pub(super) fn build_import_expression_doc(
     printer: &Printer<'_>,
     import_expr: &internal::ImportExpression<'_>,
+    span: Span,
 ) -> DocId {
     let d = printer.d();
 
@@ -289,7 +292,7 @@ pub(super) fn build_import_expression_doc(
     // leading-comment scan starts: the head's end, so the scan spans the `(` and catches a
     // comment on either side of it (`import /* c */ ('m')`, `import(/* @vite-ignore */ m)`).
     // Own-line comments force the parens to break; `leading_forces_break` drives that below.
-    let (head, leading_scan_start) = build_import_head_doc(printer, import_expr);
+    let (head, leading_scan_start) = build_import_head_doc(printer, import_expr, span);
 
     // The head→`(` gap's pre-paren half ([`super::CalleeGap::paren_split`]) — a `//` written
     // there trails the head and the whole argument list hangs under it, exactly as at a call
@@ -305,10 +308,10 @@ pub(super) fn build_import_expression_doc(
     ) {
         // The argument side opens AT the `(`, so its scans no longer see the half the head
         // has taken.
-        let args = build_import_args_doc(printer, import_expr, d.empty(), paren);
+        let args = build_import_args_doc(printer, import_expr, span, d.empty(), paren);
         return super::hang_args_under_split(printer, head, (split_start, paren), args);
     }
-    build_import_args_doc(printer, import_expr, head, leading_scan_start)
+    build_import_args_doc(printer, import_expr, span, head, leading_scan_start)
 }
 
 /// The argument half of [`build_import_expression_doc`] — `head` is what it hangs off, an
@@ -316,6 +319,7 @@ pub(super) fn build_import_expression_doc(
 fn build_import_args_doc(
     printer: &Printer<'_>,
     import_expr: &internal::ImportExpression<'_>,
+    span: Span,
     head: DocId,
     leading_scan_start: u32,
 ) -> DocId {
@@ -335,7 +339,7 @@ fn build_import_args_doc(
             head,
             std::slice::from_ref(import_expr.source),
             leading_scan_start,
-            import_expr.span.end,
+            span.end,
         )
     {
         return doc;
@@ -369,7 +373,7 @@ fn build_import_args_doc(
     let source_doc = leading.value;
 
     let source_end = import_expr.source.span().end;
-    let paren_close = import_expr.span.end;
+    let paren_close = span.end;
 
     let options_arg = import_expr
         .options

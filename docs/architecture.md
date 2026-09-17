@@ -1011,8 +1011,19 @@ payload by `&'arena` reference:
 - `Expression` is **72 B**, not 176 — `ClassExpression`, `FunctionExpression`,
   `ArrowFunctionExpression`, `MetaProperty` and `TaggedTemplateExpression` are boxed.
   Together they are ~3% of expressions in real source (the two widest, ~0.02%). The
-  next-widest variant is `CallExpression` at 64 B and it is 14–21% of expressions,
-  which is where the ladder stops.
+  next-widest variant is `CallExpression`, and it is 14–21% of expressions, which is
+  where the ladder stops. `Expression` is a header over its variant —
+  `struct Expression { span, kind: ExpressionKind }` (`ExpressionKind` 64 B) — so reading
+  an expression's span is a field load rather than a dispatch over the variants. A
+  variant struct carries no span of its own unless some node also holds that type
+  outside an `Expression` (`Identifier`, `Literal`, `TemplateLiteral`, `RestElement`,
+  `SpreadElement`, `UnaryExpression`, `FunctionExpression`); those are wrapped only
+  through the `Expression::from_*` constructors, which take the header's span from the
+  node's own. Both spans are `pub` and nothing asserts they agree; they stay equal because
+  that is the only way the wrapped form is built and no span is written after construction
+  but the pattern wrapper's (an optional or annotated parameter's `?` / `: T` extension in
+  the parameter parser), which lands on array and object patterns, carrying no second span.
+  On wasm32 `Expression` is 48 B.
 - `TSType` is **80 B**, not 112 — `TSImportType`, `TSConstructorType` and
   `TSInferType` are boxed. The width is paid on slice elements (union and
   intersection members, tuple elements, type arguments, template-literal types) and

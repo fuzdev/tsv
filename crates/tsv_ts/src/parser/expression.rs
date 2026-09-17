@@ -2,13 +2,13 @@
 
 use crate::ast::internal::{
     AssignmentExpression, AwaitExpression, BinaryExpression, BinaryOperator, BlockStatement,
-    CallExpression, ConditionalExpression, Expression, IdentName, Identifier, ImportExpression,
-    ImportPhase, JsdocCast, Literal, LiteralValue, MemberExpression, MetaProperty, NewExpression,
-    ParenthesizedExpression, RegexLiteral, SequenceExpression, SpreadElement, Statement, Super,
-    TSAsExpression, TSInstantiationExpression, TSNonNullExpression, TSSatisfiesExpression,
-    TSTypeAssertion, TSTypeParameterInstantiation, TaggedTemplateExpression, TemplateLiteral,
-    ThisExpression, UnaryExpression, UnaryOperator, UpdateExpression, UpdateOperator,
-    YieldExpression,
+    CallExpression, ConditionalExpression, Expression, ExpressionKind, IdentName, Identifier,
+    ImportExpression, ImportPhase, JsdocCast, Literal, LiteralValue, MemberExpression,
+    MetaProperty, NewExpression, ParenthesizedExpression, RegexLiteral, SequenceExpression,
+    SpreadElement, Statement, Super, TSAsExpression, TSInstantiationExpression,
+    TSNonNullExpression, TSSatisfiesExpression, TSTypeAssertion, TSTypeParameterInstantiation,
+    TaggedTemplateExpression, TemplateLiteral, ThisExpression, UnaryExpression, UnaryOperator,
+    UpdateExpression, UpdateOperator, YieldExpression,
 };
 use crate::lexer::{KeywordKind, TokenKind};
 use crate::parser::expression_assignable::AssignableContext;
@@ -145,8 +145,8 @@ pub(in crate::parser) fn debug_assert_encloses(
 /// (deferred) reserved-word identifier that prettier accepts as an operand, so the guard
 /// must not fire there — hence the `in_yield` gate. See the parser's `in_yield` field.
 fn is_bare_assignment_head(expr: &Expression<'_>, start: usize, in_yield: bool) -> bool {
-    let is_head = matches!(expr, Expression::ArrowFunctionExpression(_))
-        || (in_yield && matches!(expr, Expression::YieldExpression(_)));
+    let is_head = matches!(expr.kind, ExpressionKind::ArrowFunctionExpression(_))
+        || (in_yield && matches!(expr.kind, ExpressionKind::YieldExpression(_)));
     is_head && start == expr.span().start as usize
 }
 
@@ -486,17 +486,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let type_annotation = self.parse_type()?;
         let span = Span::new(expr_start as u32, type_annotation.span().end);
         let expr = if is_as {
-            Expression::TSAsExpression(TSAsExpression {
-                expression: left,
-                type_annotation,
+            Expression {
                 span,
-            })
+                kind: ExpressionKind::TSAsExpression(TSAsExpression {
+                    expression: left,
+                    type_annotation,
+                }),
+            }
         } else {
-            Expression::TSSatisfiesExpression(TSSatisfiesExpression {
-                expression: left,
-                type_annotation,
+            Expression {
                 span,
-            })
+                kind: ExpressionKind::TSSatisfiesExpression(TSSatisfiesExpression {
+                    expression: left,
+                    type_annotation,
+                }),
+            }
         };
         *left = arena.alloc(expr);
         Ok(true)
@@ -579,8 +583,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Detect unparenthesized unary: the operand's parse began at its own span start
             if operator == BinaryOperator::StarStar
                 && matches!(
-                    left,
-                    Expression::UnaryExpression(_) | Expression::AwaitExpression(_)
+                    left.kind,
+                    ExpressionKind::UnaryExpression(_) | ExpressionKind::AwaitExpression(_)
                 )
                 && expr_start == left.span().start as usize
             {
@@ -605,7 +609,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // is not there. The bit rides the `<` node, already in the arena, so setting it
             // re-allocates that one node; only a chain that takes the pair pays for it.
             if operator == BinaryOperator::GreaterThan
-                && let Expression::BinaryExpression(child) = left
+                && let ExpressionKind::BinaryExpression(child) = &left.kind
                 && child.operator == BinaryOperator::LessThan
                 && let Some(lt) = infix_operator_offset(
                     self.source.as_bytes(),
@@ -614,10 +618,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 )
                 && self.is_type_arguments_start_at(lt, TypeArgScan::Relex)
             {
-                left = arena.alloc(Expression::BinaryExpression(BinaryExpression {
-                    relexes_as_type_arguments: true,
-                    ..child.clone()
-                }));
+                left = arena.alloc(Expression {
+                    span: left.span,
+                    kind: ExpressionKind::BinaryExpression(BinaryExpression {
+                        relexes_as_type_arguments: true,
+                        ..child.clone()
+                    }),
+                });
             }
 
             self.advance()?; // consume operator
@@ -630,14 +637,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // consumed token (which includes any closing paren)
             let span = Span::new(expr_start as u32, self.prev_token_end() as u32);
             debug_assert_encloses(span.start, span.end, left, right);
-            left = arena.alloc(Expression::BinaryExpression(BinaryExpression {
-                left,
-                operator,
-                right,
+            left = arena.alloc(Expression {
                 span,
-                // Set only by the lazy `>` reading above, which re-allocates the node.
-                relexes_as_type_arguments: false,
-            }));
+                kind: ExpressionKind::BinaryExpression(BinaryExpression {
+                    left,
+                    operator,
+                    right,
+                    // Set only by the lazy `>` reading above, which re-allocates the node.
+                    relexes_as_type_arguments: false,
+                }),
+            });
         }
 
         // Handle assignment operator (after binary ops, before ternary)
@@ -666,12 +675,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
             let span = Span::new(expr_start as u32, end);
             debug_assert_encloses(span.start, span.end, left, right);
-            left = arena.alloc(Expression::AssignmentExpression(AssignmentExpression {
-                left: arena.alloc(left_pattern),
-                operator,
-                right,
+            left = arena.alloc(Expression {
                 span,
-            }));
+                kind: ExpressionKind::AssignmentExpression(AssignmentExpression {
+                    left: arena.alloc(left_pattern),
+                    operator,
+                    right,
+                }),
+            });
         }
 
         // Handle ternary operator (lowest precedence among binary-like ops, above comma)
@@ -707,12 +718,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
             let span = Span::new(expr_start as u32, self.prev_token_end() as u32);
             debug_assert_encloses(span.start, span.end, left, alternate);
-            left = arena.alloc(Expression::ConditionalExpression(ConditionalExpression {
-                test: left,
-                consequent,
-                alternate,
+            left = arena.alloc(Expression {
                 span,
-            }));
+                kind: ExpressionKind::ConditionalExpression(ConditionalExpression {
+                    test: left,
+                    consequent,
+                    alternate,
+                }),
+            });
         }
 
         // Handle comma operator (lowest precedence, after ternary)
@@ -735,10 +748,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             if let (Some(first), Some(last)) = (expressions.first(), expressions.last()) {
                 debug_assert_encloses(span.start, span.end, first, last);
             }
-            left = arena.alloc(Expression::SequenceExpression(SequenceExpression {
-                expressions: expressions.into_bump_slice(),
+            left = arena.alloc(Expression {
                 span,
-            }));
+                kind: ExpressionKind::SequenceExpression(SequenceExpression {
+                    expressions: expressions.into_bump_slice(),
+                }),
+            });
         }
 
         Ok(left)
@@ -1021,7 +1036,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // `await` at `Script` goal), never `this`/`super`/a literal/`new`.
         let mut expr = self.parse_primary_expression()?;
         if !is_parenthesized {
-            if !matches!(expr, Expression::Identifier(_)) {
+            if !matches!(expr.kind, ExpressionKind::Identifier(_)) {
                 // `parse_primary_expression` has already consumed the head, so
                 // anchor the error at its start, not the now-current token.
                 return Err(ParseError::invalid_syntax(
@@ -1046,13 +1061,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         let span = Span::new(head_start as u32, prop_end as u32);
                         expr = alloc_expr(
                             self.arena,
-                            Expression::MemberExpression(MemberExpression {
-                                object: expr,
-                                property: self.arena.alloc(property),
-                                computed: false,
-                                optional: false,
+                            Expression {
                                 span,
-                            }),
+                                kind: ExpressionKind::MemberExpression(MemberExpression {
+                                    object: expr,
+                                    property: self.arena.alloc(property),
+                                    computed: false,
+                                    optional: false,
+                                }),
+                            },
                         );
                     }
                     // same ASI gate as every other `wrap_non_null_assertion` caller:
@@ -1093,13 +1110,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let span = Span::new(start, paren_end as u32);
             expr = alloc_expr(
                 self.arena,
-                Expression::CallExpression(CallExpression {
-                    callee: expr,
-                    type_arguments,
-                    arguments,
-                    optional: false,
+                Expression {
                     span,
-                }),
+                    kind: ExpressionKind::CallExpression(CallExpression {
+                        callee: expr,
+                        type_arguments,
+                        arguments,
+                        optional: false,
+                    }),
+                },
             );
         } else if let Some(type_arguments) = type_arguments {
             // Type arguments with no call — `@a.b<number>` ahead of the class. The
@@ -1109,11 +1128,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let end = type_arguments.span.end;
             expr = alloc_expr(
                 self.arena,
-                Expression::TSInstantiationExpression(TSInstantiationExpression {
-                    expression: expr,
-                    type_arguments,
+                Expression {
                     span: Span::new(start, end),
-                }),
+                    kind: ExpressionKind::TSInstantiationExpression(TSInstantiationExpression {
+                        expression: expr,
+                        type_arguments,
+                    }),
+                },
             );
         }
 
@@ -1158,10 +1179,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let span = Span::new(start, op_end as u32);
         Ok(alloc_expr(
             self.arena,
-            Expression::TSNonNullExpression(TSNonNullExpression {
-                expression: expr,
+            Expression {
                 span,
-            }),
+                kind: ExpressionKind::TSNonNullExpression(TSNonNullExpression { expression: expr }),
+            },
         ))
     }
 
@@ -1171,13 +1192,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// expression and its end position; errors when neither follows.
     fn parse_dot_property(&mut self) -> Result<(Expression<'arena>, usize), ParseError> {
         if *self.current_kind() == TokenKind::Hash {
-            let private_id = self.parse_private_identifier()?;
-            let end = private_id.span.end_usize();
-            Ok((Expression::PrivateIdentifier(private_id), end))
+            let (private_id, span) = self.parse_private_identifier()?;
+            Ok((
+                Expression {
+                    span,
+                    kind: ExpressionKind::PrivateIdentifier(private_id),
+                },
+                span.end_usize(),
+            ))
         } else if self.current_is_identifier_or_keyword() {
             let property = self.parse_identifier_name_node()?;
             let prop_end = property.span.end_usize();
-            Ok((Expression::Identifier(property), prop_end))
+            Ok((Expression::from_identifier(property), prop_end))
         } else {
             Err(self.error_expected_after("property name", "."))
         }
@@ -1209,13 +1235,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let span = Span::new(start, prop_end as u32);
                     left = alloc_expr(
                         self.arena,
-                        Expression::MemberExpression(MemberExpression {
-                            object: left,
-                            property: arena.alloc(property),
-                            computed: false,
-                            optional: false,
+                        Expression {
                             span,
-                        }),
+                            kind: ExpressionKind::MemberExpression(MemberExpression {
+                                object: left,
+                                property: arena.alloc(property),
+                                computed: false,
+                                optional: false,
+                            }),
+                        },
                     );
                 }
                 TokenKind::QuestionDot => {
@@ -1231,13 +1259,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             let span = Span::new(start, prop_end as u32);
                             left = alloc_expr(
                                 self.arena,
-                                Expression::MemberExpression(MemberExpression {
-                                    object: left,
-                                    property: arena.alloc(property),
-                                    computed: false,
-                                    optional: true,
+                                Expression {
                                     span,
-                                }),
+                                    kind: ExpressionKind::MemberExpression(MemberExpression {
+                                        object: left,
+                                        property: arena.alloc(property),
+                                        computed: false,
+                                        optional: true,
+                                    }),
+                                },
                             );
                         }
                         TokenKind::BracketOpen => {
@@ -1254,13 +1284,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             let span = Span::new(start, bracket_end as u32);
                             left = alloc_expr(
                                 self.arena,
-                                Expression::MemberExpression(MemberExpression {
-                                    object: left,
-                                    property: index,
-                                    computed: true,
-                                    optional: true,
+                                Expression {
                                     span,
-                                }),
+                                    kind: ExpressionKind::MemberExpression(MemberExpression {
+                                        object: left,
+                                        property: index,
+                                        computed: true,
+                                        optional: true,
+                                    }),
+                                },
                             );
                         }
                         TokenKind::ParenOpen => {
@@ -1272,13 +1304,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             let span = Span::new(start, paren_end as u32);
                             left = alloc_expr(
                                 self.arena,
-                                Expression::CallExpression(CallExpression {
-                                    callee: left,
-                                    type_arguments: None,
-                                    arguments,
-                                    optional: true,
+                                Expression {
                                     span,
-                                }),
+                                    kind: ExpressionKind::CallExpression(CallExpression {
+                                        callee: left,
+                                        type_arguments: None,
+                                        arguments,
+                                        optional: true,
+                                    }),
+                                },
                             );
                         }
                         TokenKind::LessThan | TokenKind::LeftShift
@@ -1294,13 +1328,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             let span = Span::new(start, paren_end as u32);
                             left = alloc_expr(
                                 self.arena,
-                                Expression::CallExpression(CallExpression {
-                                    callee: left,
-                                    type_arguments: Some(type_args),
-                                    arguments,
-                                    optional: true,
+                                Expression {
                                     span,
-                                }),
+                                    kind: ExpressionKind::CallExpression(CallExpression {
+                                        callee: left,
+                                        type_arguments: Some(type_args),
+                                        arguments,
+                                        optional: true,
+                                    }),
+                                },
                             );
                         }
                         _ => {
@@ -1324,13 +1360,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let span = Span::new(start, bracket_end as u32);
                     left = alloc_expr(
                         self.arena,
-                        Expression::MemberExpression(MemberExpression {
-                            object: left,
-                            property: index,
-                            computed: true,
-                            optional: false,
+                        Expression {
                             span,
-                        }),
+                            kind: ExpressionKind::MemberExpression(MemberExpression {
+                                object: left,
+                                property: index,
+                                computed: true,
+                                optional: false,
+                            }),
+                        },
                     );
                 }
                 TokenKind::ParenOpen => {
@@ -1345,13 +1383,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let (callee, type_arguments) = self.flatten_instantiation(left);
                     left = alloc_expr(
                         self.arena,
-                        Expression::CallExpression(CallExpression {
-                            callee,
-                            type_arguments,
-                            arguments,
-                            optional: false,
+                        Expression {
                             span,
-                        }),
+                            kind: ExpressionKind::CallExpression(CallExpression {
+                                callee,
+                                type_arguments,
+                                arguments,
+                                optional: false,
+                            }),
+                        },
                     );
                 }
                 TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead => {
@@ -1390,12 +1430,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let span = Span::new(start, op_end as u32);
                     left = alloc_expr(
                         self.arena,
-                        Expression::UpdateExpression(UpdateExpression {
-                            operator,
-                            argument: left,
-                            prefix: false,
+                        Expression {
                             span,
-                        }),
+                            kind: ExpressionKind::UpdateExpression(UpdateExpression {
+                                operator,
+                                argument: left,
+                                prefix: false,
+                            }),
+                        },
                     );
                     // A postfix `++`/`--` yields an UpdateExpression, which is not a
                     // `LeftHandSideExpression` — no further member/call subscript can
@@ -1498,7 +1540,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // (`extends (a => b) {}`) is fine — there the arrow's own span starts
                 // past the `(`, so it differs from where the atom's parse began. Same test
                 // the prefix layer uses to seal parenthesized arrows.
-                if matches!(parsed, Expression::ArrowFunctionExpression(_))
+                if matches!(parsed.kind, ExpressionKind::ArrowFunctionExpression(_))
                     && start == parsed.span().start as usize
                 {
                     return Err(self.error_msg(
@@ -1584,11 +1626,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Number => {
                 let literal = self.parse_number_or_bigint_literal()?;
                 self.advance()?;
-                Ok(alloc_expr(self.arena, Expression::Literal(literal)))
+                Ok(alloc_expr(self.arena, Expression::from_literal(literal)))
             }
             TokenKind::String => {
                 let literal = self.parse_string_literal()?;
-                Ok(alloc_expr(self.arena, Expression::Literal(literal)))
+                Ok(alloc_expr(self.arena, Expression::from_literal(literal)))
             }
             TokenKind::Identifier => {
                 let (start, end) = self.current_pos();
@@ -1596,7 +1638,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.advance()?;
                 Ok(alloc_expr(
                     self.arena,
-                    Expression::Identifier(Identifier::simple(
+                    Expression::from_identifier(Identifier::simple(
                         name,
                         Span::new(start as u32, end as u32),
                     )),
@@ -1612,20 +1654,32 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.parse_keyword_identifier_reference()
             }
             TokenKind::Keyword(KeywordKind::Let) => self.parse_keyword_identifier_reference(),
-            TokenKind::BraceOpen => Ok(alloc_expr(
-                self.arena,
-                Expression::ObjectExpression(self.parse_object_expression()?),
-            )),
-            TokenKind::BracketOpen => Ok(alloc_expr(
-                self.arena,
-                Expression::ArrayExpression(self.parse_array_expression()?),
-            )),
+            TokenKind::BraceOpen => {
+                let (object, span) = self.parse_object_expression()?;
+                Ok(alloc_expr(
+                    self.arena,
+                    Expression {
+                        span,
+                        kind: ExpressionKind::ObjectExpression(object),
+                    },
+                ))
+            }
+            TokenKind::BracketOpen => {
+                let (array, span) = self.parse_array_expression()?;
+                Ok(alloc_expr(
+                    self.arena,
+                    Expression {
+                        span,
+                        kind: ExpressionKind::ArrayExpression(array),
+                    },
+                ))
+            }
             TokenKind::Keyword(KeywordKind::True) => {
                 let (start, end) = self.current_pos();
                 self.advance()?;
                 Ok(alloc_expr(
                     self.arena,
-                    Expression::Literal(Literal {
+                    Expression::from_literal(Literal {
                         value: LiteralValue::Boolean(true),
                         span: Span::new(start as u32, end as u32),
                     }),
@@ -1636,7 +1690,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.advance()?;
                 Ok(alloc_expr(
                     self.arena,
-                    Expression::Literal(Literal {
+                    Expression::from_literal(Literal {
                         value: LiteralValue::Boolean(false),
                         span: Span::new(start as u32, end as u32),
                     }),
@@ -1647,7 +1701,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.advance()?;
                 Ok(alloc_expr(
                     self.arena,
-                    Expression::Literal(Literal {
+                    Expression::from_literal(Literal {
                         value: LiteralValue::Null,
                         span: Span::new(start as u32, end as u32),
                     }),
@@ -1658,9 +1712,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.advance()?;
                 Ok(alloc_expr(
                     self.arena,
-                    Expression::ThisExpression(ThisExpression {
-                        span: Span::new(start as u32, end as u32),
-                    }),
+                    Expression { span: Span::new(start as u32, end as u32), kind: ExpressionKind::ThisExpression(ThisExpression {
+                    }) },
                 ))
             }
             TokenKind::Keyword(KeywordKind::Super) => {
@@ -1668,9 +1721,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.advance()?;
                 Ok(alloc_expr(
                     self.arena,
-                    Expression::Super(Super {
-                        span: Span::new(start as u32, end as u32),
-                    }),
+                    Expression { span: Span::new(start as u32, end as u32), kind: ExpressionKind::Super(Super {
+                    }) },
                 ))
             }
             TokenKind::ParenOpen => {
@@ -1682,7 +1734,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // are a syntax error (only tagged templates tolerate them).
                 Ok(alloc_expr(
                     self.arena,
-                    Expression::TemplateLiteral(self.parse_template_literal(false)?),
+                    Expression::from_template_literal(self.parse_template_literal(false)?),
                 ))
             }
             TokenKind::Slash | TokenKind::SlashEquals => {
@@ -1738,12 +1790,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 Ok(alloc_expr(
                     self.arena,
-                    Expression::RegexLiteral(RegexLiteral {
+                    Expression { kind: ExpressionKind::RegexLiteral(RegexLiteral {
                         pattern_span,
                         flags_span,
                         pattern_width,
-                        span: Span::new(self.span_pos(lexer_start), self.span_pos(lexer_end)),
-                    }),
+                    }), span: Span::new(self.span_pos(lexer_start), self.span_pos(lexer_end)) },
                 ))
             }
             TokenKind::Hash => {
@@ -1754,13 +1805,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // handing a bare `#a` to the binary-expression machinery. Without the guard
                 // tsv over-accepted; in a Svelte attribute value that surfaced as `{#a}`
                 // parsing as an expression the canonical parser refuses.
-                let private_id = self.parse_private_identifier()?;
+                let (private_id, span) = self.parse_private_identifier()?;
                 if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::In)) {
                     return Err(self.error_expected_after("'in'", "private name"));
                 }
                 Ok(alloc_expr(
                     self.arena,
-                    Expression::PrivateIdentifier(private_id),
+                    Expression {
+                        span,
+                        kind: ExpressionKind::PrivateIdentifier(private_id),
+                    },
                 ))
             }
             // TypeScript type keywords and contextual keywords are valid identifiers in expression context
@@ -1789,7 +1843,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.advance()?;
                 Ok(alloc_expr(
                     self.arena,
-                    Expression::Identifier(Identifier::simple(
+                    Expression::from_identifier(Identifier::simple(
                         name,
                         Span::new(start as u32, end as u32),
                     )),
@@ -1863,18 +1917,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let expr = if let Some(idx) = cast_comment_idx {
             self.comments[idx].owned_by_node = true;
             let comment = self.comments[idx];
-            self.alloc(Expression::JsdocCast(JsdocCast {
-                inner: parsed,
+            self.alloc(Expression {
                 span: paren_span,
-                comment,
-            }))
+                kind: ExpressionKind::JsdocCast(JsdocCast {
+                    inner: parsed,
+                    comment,
+                }),
+            })
         } else if self.preserve_parens {
-            self.alloc(Expression::ParenthesizedExpression(
-                ParenthesizedExpression {
+            self.alloc(Expression {
+                span: paren_span,
+                kind: ExpressionKind::ParenthesizedExpression(ParenthesizedExpression {
                     expression: parsed,
-                    span: paren_span,
-                },
-            ))
+                }),
+            })
         } else {
             parsed
         };
@@ -2035,7 +2091,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // conformance_svelte.md §Type assertion vs. generic arrow). A
         // *parenthesized* arrow (`<T>(() => {})`) stays a valid operand — same
         // span-gap test the prefix layer uses to seal parenthesized arrows.
-        if matches!(parsed, Expression::ArrowFunctionExpression(_))
+        if matches!(parsed.kind, ExpressionKind::ArrowFunctionExpression(_))
             && operand_start == parsed.span().start as usize
         {
             return Err(
@@ -2045,11 +2101,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(alloc_expr(
             arena,
-            Expression::TSTypeAssertion(TSTypeAssertion {
-                type_annotation,
-                expression: parsed,
+            Expression {
                 span: Span::new(start as u32, end),
-            }),
+                kind: ExpressionKind::TSTypeAssertion(TSTypeAssertion {
+                    type_annotation,
+                    expression: parsed,
+                }),
+            },
         ))
     }
 
@@ -2068,15 +2126,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let type_args = self.parse_type_parameter_instantiation()?;
         let end = type_args.span.end;
 
-        let inst = TSInstantiationExpression {
-            expression: left,
-            type_arguments: type_args,
-            span: Span::new(start, end),
-        };
-
         Ok(alloc_expr(
             self.arena,
-            Expression::TSInstantiationExpression(inst),
+            Expression {
+                span: Span::new(start, end),
+                kind: ExpressionKind::TSInstantiationExpression(TSInstantiationExpression {
+                    expression: left,
+                    type_arguments: type_args,
+                }),
+            },
         ))
     }
 
@@ -2096,9 +2154,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Option<TSTypeParameterInstantiation<'arena>>,
     ) {
         match expr {
-            Expression::TSInstantiationExpression(inst) => {
-                (inst.expression, Some(inst.type_arguments.clone()))
-            }
+            Expression {
+                kind: ExpressionKind::TSInstantiationExpression(inst),
+                ..
+            } => (inst.expression, Some(inst.type_arguments.clone())),
             other => (other, None),
         }
     }
@@ -2151,7 +2210,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(alloc_expr(
             self.arena,
-            Expression::UnaryExpression(UnaryExpression {
+            Expression::from_unary_expression(UnaryExpression {
                 operator,
                 argument: parsed,
                 prefix: true,
@@ -2183,7 +2242,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(alloc_expr(
             self.arena,
-            Expression::UnaryExpression(UnaryExpression {
+            Expression::from_unary_expression(UnaryExpression {
                 operator,
                 argument: parsed,
                 prefix: true,
@@ -2206,10 +2265,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(alloc_expr(
             self.arena,
-            Expression::AwaitExpression(AwaitExpression {
-                argument: parsed,
+            Expression {
                 span: Span::new(start as u32, end),
-            }),
+                kind: ExpressionKind::AwaitExpression(AwaitExpression { argument: parsed }),
+            },
         ))
     }
 
@@ -2230,7 +2289,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?;
         Ok(alloc_expr(
             self.arena,
-            Expression::Identifier(Identifier::simple(
+            Expression::from_identifier(Identifier::simple(
                 name,
                 Span::new(start as u32, end as u32),
             )),
@@ -2316,11 +2375,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(alloc_expr(
             self.arena,
-            Expression::YieldExpression(YieldExpression {
-                argument,
-                delegate,
+            Expression {
                 span: Span::new(start as u32, end),
-            }),
+                kind: ExpressionKind::YieldExpression(YieldExpression { argument, delegate }),
+            },
         ))
     }
 
@@ -2414,12 +2472,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(alloc_expr(
             self.arena,
-            Expression::UpdateExpression(UpdateExpression {
-                operator,
-                argument: parsed,
-                prefix: true,
+            Expression {
                 span: Span::new(start as u32, end),
-            }),
+                kind: ExpressionKind::UpdateExpression(UpdateExpression {
+                    operator,
+                    argument: parsed,
+                    prefix: true,
+                }),
+            },
         ))
     }
 
@@ -2445,11 +2505,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let prop_span = Span::new(prop_start as u32, prop_end as u32);
                 return Ok(alloc_expr(
                     arena,
-                    Expression::MetaProperty(arena.alloc(MetaProperty {
-                        meta: Identifier::simple(IdentName::from_span(meta_span), meta_span),
-                        property: Identifier::simple(IdentName::from_span(prop_span), prop_span),
+                    Expression {
                         span: Span::new(start as u32, prop_end as u32),
-                    })),
+                        kind: ExpressionKind::MetaProperty(arena.alloc(MetaProperty {
+                            meta: Identifier::simple(IdentName::from_span(meta_span), meta_span),
+                            property: Identifier::simple(
+                                IdentName::from_span(prop_span),
+                                prop_span,
+                            ),
+                        })),
+                    },
                 ));
             }
             return Err(self.error_expected_after("'target'", "new."));
@@ -2486,7 +2551,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // import()").
                     let (import_start, _) = self.current_pos();
                     let parsed = self.parse_import_or_meta_property()?;
-                    if matches!(parsed, Expression::ImportExpression(_)) {
+                    if matches!(parsed.kind, ExpressionKind::ImportExpression(_)) {
                         return Err(self.error_msg_at("Cannot use new with import()", import_start));
                     }
                     parsed
@@ -2518,13 +2583,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let span = Span::new(callee_start, prop_end as u32);
                     callee = alloc_expr(
                         self.arena,
-                        Expression::MemberExpression(MemberExpression {
-                            object: callee,
-                            property: arena.alloc(property),
-                            computed: false,
-                            optional: false,
+                        Expression {
                             span,
-                        }),
+                            kind: ExpressionKind::MemberExpression(MemberExpression {
+                                object: callee,
+                                property: arena.alloc(property),
+                                computed: false,
+                                optional: false,
+                            }),
+                        },
                     );
                 }
                 TokenKind::BracketOpen => {
@@ -2536,13 +2603,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let span = Span::new(callee_start, bracket_end as u32);
                     callee = alloc_expr(
                         self.arena,
-                        Expression::MemberExpression(MemberExpression {
-                            object: callee,
-                            property: index,
-                            computed: true,
-                            optional: false,
+                        Expression {
                             span,
-                        }),
+                            kind: ExpressionKind::MemberExpression(MemberExpression {
+                                object: callee,
+                                property: index,
+                                computed: true,
+                                optional: false,
+                            }),
+                        },
                     );
                 }
                 TokenKind::QuestionDot => {
@@ -2616,12 +2685,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(alloc_expr(
             arena,
-            Expression::NewExpression(NewExpression {
-                callee,
-                type_arguments,
-                arguments,
+            Expression {
                 span: Span::new(start as u32, end),
-            }),
+                kind: ExpressionKind::NewExpression(NewExpression {
+                    callee,
+                    type_arguments,
+                    arguments,
+                }),
+            },
         ))
     }
 
@@ -2659,12 +2730,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let end = quasi.span.end;
         alloc_expr(
             self.arena,
-            Expression::TaggedTemplateExpression(self.arena.alloc(TaggedTemplateExpression {
-                tag,
-                type_arguments,
-                quasi,
+            Expression {
                 span: Span::new(tag_start, end),
-            })),
+                kind: ExpressionKind::TaggedTemplateExpression(self.arena.alloc(
+                    TaggedTemplateExpression {
+                        tag,
+                        type_arguments,
+                        quasi,
+                    },
+                )),
+            },
         )
     }
 
@@ -2710,11 +2785,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let prop_span = Span::new(prop_start as u32, prop_end as u32);
                 return Ok(alloc_expr(
                     self.arena,
-                    Expression::MetaProperty(self.arena.alloc(MetaProperty {
-                        meta: Identifier::simple(IdentName::from_span(meta_span), meta_span),
-                        property: Identifier::simple(IdentName::from_span(prop_span), prop_span),
+                    Expression {
                         span: Span::new(start as u32, prop_end as u32),
-                    })),
+                        kind: ExpressionKind::MetaProperty(self.arena.alloc(MetaProperty {
+                            meta: Identifier::simple(IdentName::from_span(meta_span), meta_span),
+                            property: Identifier::simple(
+                                IdentName::from_span(prop_span),
+                                prop_span,
+                            ),
+                        })),
+                    },
                 ));
             }
             // `import.source(…)` / `import.defer(…)` — the import-phase proposals.
@@ -2770,12 +2850,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(alloc_expr(
             self.arena,
-            Expression::ImportExpression(ImportExpression {
-                source,
-                options,
-                phase,
+            Expression {
                 span: Span::new(start as u32, paren_end as u32),
-            }),
+                kind: ExpressionKind::ImportExpression(ImportExpression {
+                    source,
+                    options,
+                    phase,
+                }),
+            },
         ))
     }
 
@@ -2870,7 +2952,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let end = self.prev_token_end() as u32;
         debug_assert_encloses(start as u32, end, argument, argument);
 
-        Ok(Expression::SpreadElement(SpreadElement {
+        Ok(Expression::from_spread_element(SpreadElement {
             argument,
             span: Span::new(start as u32, end),
         }))

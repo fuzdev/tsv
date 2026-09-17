@@ -216,9 +216,10 @@ pub(super) fn write_class_declaration(
 pub(super) fn write_class_expression(
     w: &mut JsonWriter,
     class_expr: &internal::ClassExpression<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "ClassExpression", class_expr.span, ctx);
+    node_header(w, "ClassExpression", span, ctx);
     write_decorators_field(w, class_expr.decorators, ctx);
     if class_expr.r#abstract {
         w.raw(",\"abstract\":true");
@@ -238,7 +239,7 @@ pub(super) fn write_class_expression(
     write_implements_field(w, class_expr.implements, ctx);
     w.raw(",\"body\":");
     write_class_body(w, &class_expr.body, ctx);
-    close_node(w, "ClassExpression", class_expr.span, ctx);
+    close_node(w, "ClassExpression", span, ctx);
 }
 
 /// The `implements` field is skip-if-empty — an empty internal list emits no

@@ -372,11 +372,12 @@ impl<'a> Printer<'a> {
     pub(super) fn build_private_identifier_doc(
         &self,
         pid: &internal::PrivateIdentifier<'_>,
+        span: Span,
     ) -> DocId {
         let d = self.d();
         d.concat(&[
             d.text("#"),
-            self.ident_name_doc(pid.name, pid.name_span().start),
+            self.ident_name_doc(pid.name, pid.name_span(span).start),
         ])
     }
 

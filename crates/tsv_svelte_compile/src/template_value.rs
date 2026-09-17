@@ -24,8 +24,8 @@
 use bumpalo::collections::Vec as BumpVec;
 use tsv_ts::ast::internal::{
     ArrayExpression, BinaryExpression, CallExpression, ConditionalExpression, Expression,
-    MemberExpression, NewExpression, ParenthesizedExpression, SequenceExpression, SpreadElement,
-    TemplateLiteral, UnaryExpression,
+    ExpressionKind, MemberExpression, NewExpression, ParenthesizedExpression, SequenceExpression,
+    SpreadElement, TemplateLiteral, UnaryExpression,
 };
 
 use crate::analyze::NameSet;
@@ -78,7 +78,7 @@ pub(crate) fn is_bare_derived_read(
     derived_names: &NameSet,
     expr: &Expression<'_>,
 ) -> bool {
-    if let Expression::Identifier(id) = expr
+    if let ExpressionKind::Identifier(id) = &expr.kind
         && id.escaped_name.is_none()
     {
         let start = id.span.start as usize;
@@ -103,7 +103,7 @@ pub(crate) fn is_bare_derived_read(
 /// the guard's span-identity `dollar_identifier_name` can't read — is emitted
 /// verbatim, a pre-existing over-acceptance in the escaped-reference residual.
 fn bare_store_read(source: &str, store_names: &NameSet, expr: &Expression<'_>) -> Option<String> {
-    let Expression::Identifier(id) = expr else {
+    let ExpressionKind::Identifier(id) = &expr.kind else {
         return None;
     };
     if id.escaped_name.is_some() {
@@ -196,7 +196,7 @@ fn snapshot_call_arg<'arena>(
     source: &str,
     expr: &'arena Expression<'arena>,
 ) -> Option<&'arena Expression<'arena>> {
-    let Expression::CallExpression(call) = expr else {
+    let ExpressionKind::CallExpression(call) = &expr.kind else {
         return None;
     };
     if call.arguments.len() != 1
@@ -230,24 +230,26 @@ fn contains_rewrite_target(
     }
     let contains =
         |e: &Expression<'_>| contains_rewrite_target(source, derived_names, store_names, e);
-    match expr {
-        Expression::CallExpression(c) => contains(c.callee) || c.arguments.iter().any(&contains),
-        Expression::NewExpression(n) => contains(n.callee) || n.arguments.iter().any(&contains),
-        Expression::BinaryExpression(b) => contains(b.left) || contains(b.right),
-        Expression::MemberExpression(m) => {
+    match &expr.kind {
+        ExpressionKind::CallExpression(c) => {
+            contains(c.callee) || c.arguments.iter().any(&contains)
+        }
+        ExpressionKind::NewExpression(n) => contains(n.callee) || n.arguments.iter().any(&contains),
+        ExpressionKind::BinaryExpression(b) => contains(b.left) || contains(b.right),
+        ExpressionKind::MemberExpression(m) => {
             contains(m.object) || (m.computed && contains(m.property))
         }
-        Expression::ConditionalExpression(c) => {
+        ExpressionKind::ConditionalExpression(c) => {
             contains(c.test) || contains(c.consequent) || contains(c.alternate)
         }
-        Expression::UnaryExpression(u) => contains(u.argument),
-        Expression::ParenthesizedExpression(p) => contains(p.expression),
-        Expression::SequenceExpression(s) => s.expressions.iter().any(&contains),
-        Expression::SpreadElement(s) => contains(s.argument),
-        Expression::ArrayExpression(a) => {
+        ExpressionKind::UnaryExpression(u) => contains(u.argument),
+        ExpressionKind::ParenthesizedExpression(p) => contains(p.expression),
+        ExpressionKind::SequenceExpression(s) => s.expressions.iter().any(&contains),
+        ExpressionKind::SpreadElement(s) => contains(s.argument),
+        ExpressionKind::ArrayExpression(a) => {
             a.elements.iter().any(|e| e.as_ref().is_some_and(&contains))
         }
-        Expression::TemplateLiteral(t) => t.expressions.iter().any(&contains),
+        ExpressionKind::TemplateLiteral(t) => t.expressions.iter().any(&contains),
         _ => false,
     }
 }
@@ -262,43 +264,51 @@ fn rebuild_value<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     expr: &'arena Expression<'arena>,
 ) -> Result<&'arena Expression<'arena>, CompileError> {
-    let rebuilt = match expr {
+    let rebuilt = match &expr.kind {
         // A `$`-rooted (non-snapshot) callee refuses via the recursive guard on the
         // callee itself, so no explicit rune check is needed here.
-        Expression::CallExpression(call) => {
+        ExpressionKind::CallExpression(call) => {
             let callee = rewrite_template_value(env, call.callee)?;
             let arguments = rewrite_value_slice(env, call.arguments)?;
-            Expression::CallExpression(CallExpression {
-                callee,
-                type_arguments: None,
-                arguments,
-                ..call.clone()
-            })
+            Expression {
+                span: expr.span,
+                kind: ExpressionKind::CallExpression(CallExpression {
+                    callee,
+                    type_arguments: None,
+                    arguments,
+                    ..call.clone()
+                }),
+            }
         }
-        Expression::NewExpression(new) => {
+        ExpressionKind::NewExpression(new) => {
             let callee = rewrite_template_value(env, new.callee)?;
             let arguments = rewrite_value_slice(env, new.arguments)?;
-            Expression::NewExpression(NewExpression {
-                callee,
-                type_arguments: None,
-                arguments,
-                span: new.span,
-            })
+            Expression {
+                span: expr.span,
+                kind: ExpressionKind::NewExpression(NewExpression {
+                    callee,
+                    type_arguments: None,
+                    arguments,
+                }),
+            }
         }
-        Expression::BinaryExpression(b) => {
+        ExpressionKind::BinaryExpression(b) => {
             let left = rewrite_template_value(env, b.left)?;
             let right = rewrite_template_value(env, b.right)?;
-            Expression::BinaryExpression(BinaryExpression {
-                left,
-                right,
-                // `relexes_as_type_arguments` rides along: it is a claim about the SOURCE
-                // bytes this rewrite invalidates, and inheriting is the SAFE direction — a
-                // stale `true` costs a redundant paren pair, a stale `false` an output
-                // nothing reparses.
-                ..b.clone()
-            })
+            Expression {
+                span: expr.span,
+                kind: ExpressionKind::BinaryExpression(BinaryExpression {
+                    left,
+                    right,
+                    // `relexes_as_type_arguments` rides along: it is a claim about the SOURCE
+                    // bytes this rewrite invalidates, and inheriting is the SAFE direction — a
+                    // stale `true` costs a redundant paren pair, a stale `false` an output
+                    // nothing reparses.
+                    ..b.clone()
+                }),
+            }
         }
-        Expression::MemberExpression(m) => {
+        ExpressionKind::MemberExpression(m) => {
             let object = rewrite_template_value(env, m.object)?;
             // A non-computed property is a NAME, never a value read — leave it.
             let property = if m.computed {
@@ -306,61 +316,71 @@ fn rebuild_value<'arena>(
             } else {
                 m.property
             };
-            Expression::MemberExpression(MemberExpression {
-                object,
-                property,
-                ..m.clone()
-            })
+            Expression {
+                span: expr.span,
+                kind: ExpressionKind::MemberExpression(MemberExpression {
+                    object,
+                    property,
+                    ..m.clone()
+                }),
+            }
         }
-        Expression::ConditionalExpression(c) => {
+        ExpressionKind::ConditionalExpression(c) => {
             let test = rewrite_template_value(env, c.test)?;
             let consequent = rewrite_template_value(env, c.consequent)?;
             let alternate = rewrite_template_value(env, c.alternate)?;
-            Expression::ConditionalExpression(ConditionalExpression {
-                test,
-                consequent,
-                alternate,
-                span: c.span,
-            })
+            Expression {
+                span: expr.span,
+                kind: ExpressionKind::ConditionalExpression(ConditionalExpression {
+                    test,
+                    consequent,
+                    alternate,
+                }),
+            }
         }
-        Expression::UnaryExpression(u) => {
+        ExpressionKind::UnaryExpression(u) => {
             let argument = rewrite_template_value(env, u.argument)?;
-            Expression::UnaryExpression(UnaryExpression {
+            Expression::from_unary_expression(UnaryExpression {
                 argument,
                 ..u.clone()
             })
         }
-        Expression::ParenthesizedExpression(p) => {
+        ExpressionKind::ParenthesizedExpression(p) => {
             let expression = rewrite_template_value(env, p.expression)?;
-            Expression::ParenthesizedExpression(ParenthesizedExpression {
-                expression,
-                span: p.span,
-            })
+            Expression {
+                span: expr.span,
+                kind: ExpressionKind::ParenthesizedExpression(ParenthesizedExpression {
+                    expression,
+                }),
+            }
         }
-        Expression::SequenceExpression(s) => {
+        ExpressionKind::SequenceExpression(s) => {
             let expressions = rewrite_value_slice(env, s.expressions)?;
-            Expression::SequenceExpression(SequenceExpression {
-                expressions,
-                span: s.span,
-            })
+            Expression {
+                span: expr.span,
+                kind: ExpressionKind::SequenceExpression(SequenceExpression { expressions }),
+            }
         }
-        Expression::SpreadElement(s) => {
+        ExpressionKind::SpreadElement(s) => {
             let argument = rewrite_template_value(env, s.argument)?;
-            Expression::SpreadElement(SpreadElement {
+            Expression::from_spread_element(SpreadElement {
                 argument,
                 span: s.span,
             })
         }
-        Expression::ArrayExpression(a) => {
+        ExpressionKind::ArrayExpression(a) => {
             let elements = rewrite_opt_slice(env, a.elements)?;
-            Expression::ArrayExpression(ArrayExpression {
-                elements,
-                ..a.clone()
-            })
+            Expression {
+                span: expr.span,
+                kind: ExpressionKind::ArrayExpression(ArrayExpression {
+                    elements,
+                    ..a.clone()
+                }),
+            }
         }
-        Expression::TemplateLiteral(t) => {
+        ExpressionKind::TemplateLiteral(t) => {
             let expressions = rewrite_value_slice(env, t.expressions)?;
-            Expression::TemplateLiteral(TemplateLiteral {
+            Expression::from_template_literal(TemplateLiteral {
                 expressions,
                 ..t.clone()
             })

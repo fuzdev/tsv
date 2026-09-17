@@ -1,6 +1,6 @@
 //! Call-argument and arrow shape predicates shared by the call, new, and chain printers.
 
-use crate::ast::internal::{self, Expression, TSType};
+use crate::ast::internal::{self, Expression, ExpressionKind, TSType};
 use crate::printer::Printer;
 use crate::printer::needs_parens::strip_non_null_wrappers;
 use crate::printer::types::helpers::{is_simple_type, unwrap_parenthesized};
@@ -26,7 +26,7 @@ fn is_boolean_type_coercion(call: &internal::CallExpression<'_>, printer: &Print
     if call.optional || call.arguments.len() != 1 {
         return false;
     }
-    let Expression::Identifier(id) = call.callee else {
+    let ExpressionKind::Identifier(id) = &call.callee.kind else {
         return false;
     };
     printer.with_ident_name(id, |s| s == "Boolean")
@@ -69,21 +69,21 @@ pub(super) fn mark_boolean_coercion_argument(
 ///
 /// Used to determine if tail args can stay inline after a function callback.
 fn is_hopefully_short_arg(expr: &Expression<'_>) -> bool {
-    match expr {
+    match &expr.kind {
         // Prettier: if (node.type === "ParenthesizedExpression") recurse into node.expression.
         // A JSDoc cast is prettier's retained `ParenthesizedExpression` — its annotation
         // attaches to the INNER expression, so the wrapper is transparent here and the
         // shortness question is asked of what it wraps. The recursion is one level deep on
         // purpose: `is_simple_call_argument` has no paren case, so a cast nested inside
         // another argument stays opaque, matching prettier.
-        Expression::JsdocCast(cast) => is_hopefully_short_arg(cast.inner),
+        ExpressionKind::JsdocCast(cast) => is_hopefully_short_arg(cast.inner),
 
         // Prettier: `isBinaryCastExpression(node) || node.type === "TypeCastExpression"` —
         // the `as` / `satisfies` pair (the Flow spellings have no tsv equivalent).
-        Expression::TSAsExpression(cast) => {
+        ExpressionKind::TSAsExpression(cast) => {
             cast_is_hopefully_short(cast.type_annotation, cast.expression)
         }
-        Expression::TSSatisfiesExpression(cast) => {
+        ExpressionKind::TSSatisfiesExpression(cast) => {
             cast_is_hopefully_short(cast.type_annotation, cast.expression)
         }
 
@@ -93,21 +93,21 @@ fn is_hopefully_short_arg(expr: &Expression<'_>) -> bool {
         // rather than left to the fallthrough (which now answers the same) because the
         // asymmetry with the two arms above IS the rule, and it is asked about exactly here:
         // `<T>{}` and `{} as T` are one seed written two ways, and only one of them hugs.
-        Expression::TSTypeAssertion(_) => false,
+        ExpressionKind::TSTypeAssertion(_) => false,
 
         // Prettier: if (isCallLikeExpression(node) && getCallArguments(node).length > 1) return false
         _ if CallLikeArguments::of(expr).is_some_and(|arguments| arguments.len() > 1) => false,
 
         // Prettier: if (isBinaryish(node)) check both sides with depth=1
         // Note: Our AST uses BinaryExpression for logical ops (&&, ||, ??) too
-        Expression::BinaryExpression(bin) => {
+        ExpressionKind::BinaryExpression(bin) => {
             is_simple_call_argument(bin.left, 1) && is_simple_call_argument(bin.right, 1)
         }
 
         // Prettier: return isRegExpLiteral(node) || isSimpleCallArgument(node)
         // All regex is "hopefully short" regardless of pattern length — the pattern
         // length check in is_simple_call_argument only matters for chain 3+ calls.
-        Expression::RegexLiteral(_) => true,
+        ExpressionKind::RegexLiteral(_) => true,
         _ => is_simple_call_argument(expr, 2),
     }
 }
@@ -169,16 +169,16 @@ enum CallLikeArguments<'a> {
 impl<'a> CallLikeArguments<'a> {
     /// The call-like reading of `expr`, or `None` when it is not call-like.
     fn of(expr: &'a Expression<'a>) -> Option<Self> {
-        match expr {
-            Expression::CallExpression(call) => Some(Self::Called {
+        match &expr.kind {
+            ExpressionKind::CallExpression(call) => Some(Self::Called {
                 callee: call.callee,
                 arguments: call.arguments,
             }),
-            Expression::NewExpression(new_expr) => Some(Self::Called {
+            ExpressionKind::NewExpression(new_expr) => Some(Self::Called {
                 callee: new_expr.callee,
                 arguments: new_expr.arguments,
             }),
-            Expression::ImportExpression(import_expr) => Some(Self::Imported {
+            ExpressionKind::ImportExpression(import_expr) => Some(Self::Imported {
                 source: import_expr.source,
                 options: import_expr.options,
             }),
@@ -232,13 +232,13 @@ pub(super) fn is_short_second_arg_for_expand_first<F>(
 where
     F: Fn(u32, u32) -> bool,
 {
-    match arg {
+    match &arg.kind {
         // The three kinds prettier's `shouldExpandFirstArg` names outright. A spread needs
         // no arm of its own: `isSimpleCallArgument` has no case for one either, so it is
         // refused below exactly as prettier refuses it.
-        Expression::ArrowFunctionExpression(_)
-        | Expression::FunctionExpression(_)
-        | Expression::ConditionalExpression(_) => false,
+        ExpressionKind::ArrowFunctionExpression(_)
+        | ExpressionKind::FunctionExpression(_)
+        | ExpressionKind::ConditionalExpression(_) => false,
         // `!couldExpandArg(secondArg)`
         _ if could_expand_collection_arg(arg, leading_gap_start, &has_comments) => false,
         // `isHopefullyShortCallArgument(secondArg)`. A truly empty, uncommented `{}` / `[]`
@@ -271,22 +271,22 @@ fn could_expand_collection_arg<F>(
 where
     F: Fn(u32, u32) -> bool,
 {
-    let (collection, comments_from) = match arg {
-        Expression::ObjectExpression(_) | Expression::ArrayExpression(_) => {
+    let (collection, comments_from) = match &arg.kind {
+        ExpressionKind::ObjectExpression(_) | ExpressionKind::ArrayExpression(_) => {
             (arg, leading_gap_start)
         }
-        Expression::TSAsExpression(_)
-        | Expression::TSSatisfiesExpression(_)
-        | Expression::TSTypeAssertion(_) => unwrap_ts_type_wrappers(arg),
+        ExpressionKind::TSAsExpression(_)
+        | ExpressionKind::TSSatisfiesExpression(_)
+        | ExpressionKind::TSTypeAssertion(_) => unwrap_ts_type_wrappers(arg),
         _ => return false,
     };
 
-    match collection {
-        Expression::ObjectExpression(obj) => {
-            !obj.properties.is_empty() || has_comments(comments_from, obj.span.end)
+    match &collection.kind {
+        ExpressionKind::ObjectExpression(obj) => {
+            !obj.properties.is_empty() || has_comments(comments_from, collection.span.end)
         }
-        Expression::ArrayExpression(arr) => {
-            !arr.elements.is_empty() || has_comments(comments_from, arr.span.end)
+        ExpressionKind::ArrayExpression(arr) => {
+            !arr.elements.is_empty() || has_comments(comments_from, collection.span.end)
         }
         _ => false,
     }
@@ -298,7 +298,10 @@ where
 /// `couldExpandArg`: `(x) => fn()` and `(x) => fn()!` are both call bodies, so the
 /// arrow hugs the call's open paren rather than breaking at it.
 pub(super) fn arrow_body_is_call_through_non_null(body: &Expression<'_>) -> bool {
-    matches!(strip_non_null_wrappers(body), Expression::CallExpression(_))
+    matches!(
+        strip_non_null_wrappers(body).kind,
+        ExpressionKind::CallExpression(_)
+    )
 }
 
 /// Check if an arrow function body is a ternary expression
@@ -311,7 +314,7 @@ pub(super) fn arrow_body_is_call_through_non_null(body: &Expression<'_>) -> bool
 ///
 /// Call expressions, objects, and arrays are handled by other code paths.
 pub(super) fn is_ternary_arrow_body(body: &Expression<'_>) -> bool {
-    matches!(body, Expression::ConditionalExpression(_))
+    matches!(body.kind, ExpressionKind::ConditionalExpression(_))
 }
 
 /// Whether an expression is an object literal with properties — the narrow
@@ -320,7 +323,7 @@ pub(super) fn is_ternary_arrow_body(body: &Expression<'_>) -> bool {
 /// question, which looks through casts and counts comments; this one is a plain shape test
 /// on the last argument.
 pub(super) fn is_expandable_object(expr: &Expression<'_>) -> bool {
-    matches!(expr, Expression::ObjectExpression(obj) if !obj.properties.is_empty())
+    matches!(&expr.kind, ExpressionKind::ObjectExpression(obj) if !obj.properties.is_empty())
 }
 
 /// Check if the last argument is an array or object expression (unwrapping type assertions)
@@ -357,9 +360,9 @@ pub(super) fn last_arg_is_array_or_object(
 /// ([`could_expand_collection_arg`]).
 pub(super) fn is_array_or_object_unwrapped(expr: &Expression<'_>, printer: &Printer<'_>) -> bool {
     let (inner, leading_from) = unwrap_ts_type_wrappers(expr);
-    let non_empty = match inner {
-        Expression::ArrayExpression(arr) => !arr.elements.is_empty(),
-        Expression::ObjectExpression(obj) => !obj.properties.is_empty(),
+    let non_empty = match &inner.kind {
+        ExpressionKind::ArrayExpression(arr) => !arr.elements.is_empty(),
+        ExpressionKind::ObjectExpression(obj) => !obj.properties.is_empty(),
         _ => return false,
     };
     non_empty || printer.has_comments_on_page_between(leading_from, inner.span().end)
@@ -389,10 +392,10 @@ pub(super) fn is_array_or_object_unwrapped(expr: &Expression<'_>, printer: &Prin
 fn unwrap_ts_type_wrappers<'a>(mut expr: &'a Expression<'a>) -> (&'a Expression<'a>, u32) {
     let mut leading_from = expr.span().start;
     loop {
-        expr = match expr {
-            Expression::TSAsExpression(cast) => cast.expression,
-            Expression::TSSatisfiesExpression(cast) => cast.expression,
-            Expression::TSTypeAssertion(cast) => {
+        expr = match &expr.kind {
+            ExpressionKind::TSAsExpression(cast) => cast.expression,
+            ExpressionKind::TSSatisfiesExpression(cast) => cast.expression,
+            ExpressionKind::TSTypeAssertion(cast) => {
                 leading_from = cast.type_annotation.span().end;
                 cast.expression
             }
@@ -408,10 +411,10 @@ fn unwrap_ts_type_wrappers<'a>(mut expr: &'a Expression<'a>) -> (&'a Expression<
 #[inline]
 pub(super) fn is_block_function(expr: &Expression<'_>) -> bool {
     matches!(
-        expr,
-        Expression::ArrowFunctionExpression(arrow)
+        &expr.kind,
+        ExpressionKind::ArrowFunctionExpression(arrow)
             if matches!(arrow.body, internal::ArrowFunctionBody::BlockStatement(_))
-    ) || matches!(expr, Expression::FunctionExpression(_))
+    ) || matches!(expr.kind, ExpressionKind::FunctionExpression(_))
 }
 
 /// Prettier's **`isReactHookCallWithDepsArray`** (`print/call-arguments.js`): a
@@ -442,7 +445,7 @@ where
 {
     let base = match args.len() {
         2 => 0,
-        3 if matches!(&args[0], Expression::Identifier(_)) => 1,
+        3 if matches!(args[0].kind, ExpressionKind::Identifier(_)) => 1,
         _ => return false,
     };
 
@@ -458,11 +461,11 @@ where
 /// that printer's header list), so the shape question must have one answer for both.
 pub(super) fn is_hook_callback_with_deps(callback: &Expression<'_>, deps: &Expression<'_>) -> bool {
     matches!(
-        callback,
-        Expression::ArrowFunctionExpression(arrow)
+        &callback.kind,
+        ExpressionKind::ArrowFunctionExpression(arrow)
             if arrow.params.is_empty()
                 && matches!(arrow.body, internal::ArrowFunctionBody::BlockStatement(_))
-    ) && matches!(deps, Expression::ArrayExpression(_))
+    ) && matches!(deps.kind, ExpressionKind::ArrayExpression(_))
 }
 
 /// Check if an expression is a "simple" call argument (Prettier's `isSimpleCallArgument`)
@@ -511,13 +514,13 @@ pub(crate) fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bo
             && arguments.all(|argument| is_simple_call_argument(argument, depth - 1));
     }
 
-    match expr {
+    match &expr.kind {
         // Simple literals are always simple (Prettier: isLiteral)
-        Expression::Literal(_) => true,
+        ExpressionKind::Literal(_) => true,
 
         // Regex: simple only if pattern is short (Prettier: getStringWidth(pattern) <= 5).
         // Uses the precomputed pattern width so this stays source-free.
-        Expression::RegexLiteral(regex) => usize::from(regex.pattern_width) <= 5,
+        ExpressionKind::RegexLiteral(regex) => usize::from(regex.pattern_width) <= 5,
 
         // Single-word types are simple (Prettier: `isSingleWordType`). A meta property
         // (`import.meta`, `new.target`) is deliberately NOT one — prettier lists neither it
@@ -525,10 +528,12 @@ pub(crate) fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bo
         // closing `_ => false`. `PrivateIdentifier` is on prettier's list but unreachable
         // here: a bare `#x` is only ever the left side of `#x in o`, and `a.#b` is answered
         // by the member arm's non-computed short-circuit before it asks.
-        Expression::Identifier(_) | Expression::ThisExpression(_) | Expression::Super(_) => true,
+        ExpressionKind::Identifier(_)
+        | ExpressionKind::ThisExpression(_)
+        | ExpressionKind::Super(_) => true,
 
         // Template literals: simple if no newlines and expressions are simple
-        Expression::TemplateLiteral(template) => {
+        ExpressionKind::TemplateLiteral(template) => {
             // Check both raw and cooked for newlines (Prettier checks both).
             // `has_newline` covers the raw side (and the no-escape `Verbatim`
             // cooked, which equals raw); only a `Decoded` cooked can introduce a
@@ -549,7 +554,7 @@ pub(crate) fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bo
         }
 
         // Objects: simple if all properties are non-computed and values are simple
-        Expression::ObjectExpression(obj) => obj.properties.iter().all(|prop| match prop {
+        ExpressionKind::ObjectExpression(obj) => obj.properties.iter().all(|prop| match prop {
             internal::ObjectProperty::Property(p) => {
                 !p.computed && (p.shorthand || is_simple_call_argument(p.value, depth - 1))
             }
@@ -558,14 +563,14 @@ pub(crate) fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bo
         }),
 
         // Arrays: simple if all elements are simple (None = hole, which is simple)
-        Expression::ArrayExpression(arr) => arr.elements.iter().all(|elem| {
+        ExpressionKind::ArrayExpression(arr) => arr.elements.iter().all(|elem| {
             elem.as_ref()
                 .is_none_or(|e| is_simple_call_argument(e, depth - 1))
         }),
 
         // Member expressions: object must be simple, property is simple if not computed
         // (or if computed with a simple expression)
-        Expression::MemberExpression(member) => {
+        ExpressionKind::MemberExpression(member) => {
             is_simple_call_argument(member.object, depth)
                 && (
                     // Non-computed properties (identifiers) are always simple
@@ -578,7 +583,7 @@ pub(crate) fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bo
         // Unary expressions with simple operands. Prettier's
         // `simpleCallArgumentUnaryOperators` is exactly these four — `typeof`, `void` and
         // `delete` are all absent, so a `typeof x` argument is NOT simple.
-        Expression::UnaryExpression(unary) => {
+        ExpressionKind::UnaryExpression(unary) => {
             matches!(
                 unary.operator,
                 internal::UnaryOperator::Minus
@@ -589,7 +594,7 @@ pub(crate) fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bo
         }
 
         // Update expressions (++x, x++)
-        Expression::UpdateExpression(update) => is_simple_call_argument(update.argument, depth),
+        ExpressionKind::UpdateExpression(update) => is_simple_call_argument(update.argument, depth),
 
         // Everything else is not simple: arrow functions, function expressions, and
         // spread elements (matches prettier — no SpreadElement case), etc.
@@ -615,8 +620,8 @@ pub(crate) fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bo
 /// which a `new` is not — so the `new` printer passes `false` to
 /// [`super::arg_wrapping::ArgOpener::lone_hug_ladder`] rather than asking this.
 pub(super) fn lone_arg_params_render_flat(arg: &Expression<'_>) -> bool {
-    matches!(arg, Expression::FunctionExpression(func) if func.params.iter().all(|param| {
-        matches!(param, Expression::Identifier(id) if id.type_annotation().is_none())
+    matches!(&arg.kind, ExpressionKind::FunctionExpression(func) if func.params.iter().all(|param| {
+        matches!(&param.kind, ExpressionKind::Identifier(id) if id.type_annotation().is_none())
     }))
 }
 
@@ -637,19 +642,20 @@ pub(super) fn is_function_composition_args(arguments: &[Expression<'_>]) -> bool
 
     for arg in arguments {
         if matches!(
-            arg,
-            Expression::ArrowFunctionExpression(_) | Expression::FunctionExpression(_)
+            arg.kind,
+            ExpressionKind::ArrowFunctionExpression(_) | ExpressionKind::FunctionExpression(_)
         ) {
             function_count += 1;
             if function_count > 1 {
                 return true;
             }
-        } else if let Expression::CallExpression(call) = arg {
+        } else if let ExpressionKind::CallExpression(call) = &arg.kind {
             // Check if this call has any function/arrow arguments
             if call.arguments.iter().any(|child_arg| {
                 matches!(
-                    child_arg,
-                    Expression::ArrowFunctionExpression(_) | Expression::FunctionExpression(_)
+                    child_arg.kind,
+                    ExpressionKind::ArrowFunctionExpression(_)
+                        | ExpressionKind::FunctionExpression(_)
                 )
             }) {
                 return true;
@@ -676,7 +682,10 @@ mod tests {
     /// Parse a call expression and return its argument list.
     fn args_of<'a>(arena: &'a Bump, src: &str) -> &'a [Expression<'a>] {
         match parse_expr(arena, src) {
-            Expression::CallExpression(call) => call.arguments,
+            Expression {
+                kind: ExpressionKind::CallExpression(call),
+                ..
+            } => call.arguments,
             other => panic!("expected a call expression, got: {other:?}"),
         }
     }

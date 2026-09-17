@@ -534,10 +534,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             start: start as u32,
             end: end as u32,
         };
-        self.arena.alloc(Expression::Identifier(Identifier::simple(
-            self.synthesized_ident_name(name, span),
-            span,
-        )))
+        self.arena
+            .alloc(Expression::from_identifier(Identifier::simple(
+                self.synthesized_ident_name(name, span),
+                span,
+            )))
     }
 
     /// Name channel for a synthesized TS `Identifier` covering `span`:
@@ -865,7 +866,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             Identifier::simple(self.synthesized_ident_name(name, ident_span), ident_span);
 
         let expression_tag = ExpressionTag {
-            expression: self.arena.alloc(Expression::Identifier(identifier)),
+            expression: self.arena.alloc(Expression::from_identifier(identifier)),
             span: ident_span,
         };
 

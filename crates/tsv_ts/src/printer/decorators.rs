@@ -623,12 +623,12 @@ impl<'a> Printer<'a> {
 fn param_decorators<'arena>(
     expr: &internal::Expression<'arena>,
 ) -> Option<&'arena [internal::Decorator<'arena>]> {
-    let decorators = match expr {
-        internal::Expression::Identifier(id) => id.decorators(),
-        internal::Expression::ObjectPattern(obj) => obj.decorators,
-        internal::Expression::ArrayPattern(arr) => arr.decorators,
-        internal::Expression::AssignmentPattern(ap) => ap.decorators,
-        internal::Expression::TSParameterProperty(pp) => param_decorators(pp.parameter),
+    let decorators = match &expr.kind {
+        internal::ExpressionKind::Identifier(id) => id.decorators(),
+        internal::ExpressionKind::ObjectPattern(obj) => obj.decorators,
+        internal::ExpressionKind::ArrayPattern(arr) => arr.decorators,
+        internal::ExpressionKind::AssignmentPattern(ap) => ap.decorators,
+        internal::ExpressionKind::TSParameterProperty(pp) => param_decorators(pp.parameter),
         _ => None,
     };
     non_empty_decorators(decorators)
@@ -668,12 +668,15 @@ pub(in crate::printer) fn class_expr_has_decorators(c: &internal::ClassExpressio
 /// Whether `expr` is a bare-decorator member chain: an identifier, or a
 /// non-computed, non-optional member chain of identifiers down to one.
 fn is_decorator_member_expression(expr: &internal::Expression<'_>) -> bool {
-    match expr {
-        internal::Expression::Identifier(_) => true,
-        internal::Expression::MemberExpression(member) => {
+    match &expr.kind {
+        internal::ExpressionKind::Identifier(_) => true,
+        internal::ExpressionKind::MemberExpression(member) => {
             !member.computed
                 && !member.optional
-                && matches!(member.property, internal::Expression::Identifier(_))
+                && matches!(
+                    member.property.kind,
+                    internal::ExpressionKind::Identifier(_)
+                )
                 && is_decorator_member_expression(member.object)
         }
         _ => false,
@@ -683,8 +686,8 @@ fn is_decorator_member_expression(expr: &internal::Expression<'_>) -> bool {
 /// Whether a decorator expression is valid without parens (see
 /// `Printer::build_decorator_expression_doc`).
 fn can_decorator_expression_unparenthesized(expr: &internal::Expression<'_>) -> bool {
-    match expr {
-        internal::Expression::CallExpression(call) => {
+    match &expr.kind {
+        internal::ExpressionKind::CallExpression(call) => {
             !call.optional && is_decorator_member_expression(call.callee)
         }
         _ => is_decorator_member_expression(expr),

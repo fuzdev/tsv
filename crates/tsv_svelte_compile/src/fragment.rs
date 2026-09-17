@@ -605,7 +605,7 @@ fn emit_title_element<'arena>(
     // Wrap in `$$renderer.title(($$renderer) => { … })` — the closure receives a
     // `$$renderer` parameter (like `$.head`'s closure), not the enclosing one.
     let here = env.b.here();
-    let renderer_param = Expression::Identifier(env.b.ident("$$renderer"));
+    let renderer_param = Expression::from_identifier(env.b.ident("$$renderer"));
     let params = std::slice::from_ref(arena.alloc(renderer_param));
     let arrow = env.b.arrow_block(params, body_stmts, here);
     let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);

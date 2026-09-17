@@ -28,7 +28,7 @@ use super::RunLeadingBlank;
 use super::class_expr_has_decorators;
 use super::expressions::literals::format_directive;
 use super::expressions::operators::SeqLayout;
-use crate::ast::internal::{self, Expression, Statement};
+use crate::ast::internal::{self, Expression, ExpressionKind, Statement};
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
@@ -439,9 +439,10 @@ impl<'a> Printer<'a> {
                     // indent. Claimed here rather than in the expression dispatch because
                     // that is where the parent is known — a sequence nested deeper inside
                     // this statement is an ordinary operand and keeps the default layout.
-                    Expression::SequenceExpression(seq) => {
-                        self.build_sequence_doc(seq, SeqLayout::Indented)
-                    }
+                    Expression {
+                        span,
+                        kind: ExpressionKind::SequenceExpression(seq),
+                    } => self.build_sequence_doc(seq, *span, SeqLayout::Indented),
                     // Everything else takes the ordinary dispatch, which is where a
                     // binary picks up the continuation indent an `ExpressionStatement`
                     // parent gets from prettier's fall-through (a labeled statement's
@@ -460,8 +461,8 @@ impl<'a> Printer<'a> {
         // inline (flat `else` below).
         let decorated_class_expr = needs_parens
             && matches!(
-                &stmt.expression,
-                Expression::ClassExpression(c) if class_expr_has_decorators(c)
+                &stmt.expression.kind,
+                ExpressionKind::ClassExpression(c) if class_expr_has_decorators(c)
             );
 
         // Which grouping `)` this print retains and emits the expression→`)` gap inside.

@@ -28,7 +28,7 @@ use tsv_svelte::ast::internal::{
     SpecialElementKind,
 };
 use tsv_ts::ast::internal::{
-    ArrowFunctionBody, ClassBody, ClassMember, Expression, ForInOfLeft, ForInit,
+    ArrowFunctionBody, ClassBody, ClassMember, Expression, ExpressionKind, ForInOfLeft, ForInit,
     FunctionExpression, Identifier, ObjectPatternProperty, ObjectProperty, Statement,
     VariableDeclaration,
 };
@@ -80,8 +80,8 @@ impl SnippetAnalysis {
 
 /// The plain (non-escaped) name of a snippet's `expression` identifier.
 pub(crate) fn snippet_name<'s>(snippet: &SnippetBlock<'_>, source: &'s str) -> Option<&'s str> {
-    match snippet.expression {
-        Expression::Identifier(id) => plain_name(id, source),
+    match &snippet.expression.kind {
+        ExpressionKind::Identifier(id) => plain_name(id, source),
         _ => None,
     }
 }
@@ -330,16 +330,16 @@ impl<'s> Collector<'s> {
     /// Walk a parameter pattern for its reference-bearing default expressions
     /// (`{a = expr}`).
     fn param_defaults(&mut self, pattern: &Expression<'_>) {
-        match pattern {
-            Expression::AssignmentPattern(p) => self.expr(p.right),
-            Expression::ObjectPattern(p) => {
+        match &pattern.kind {
+            ExpressionKind::AssignmentPattern(p) => self.expr(p.right),
+            ExpressionKind::ObjectPattern(p) => {
                 for prop in p.properties {
                     if let ObjectPatternProperty::Property(prop) = prop {
                         self.param_defaults(prop.value);
                     }
                 }
             }
-            Expression::ArrayPattern(p) => {
+            ExpressionKind::ArrayPattern(p) => {
                 for element in p.elements.iter().flatten() {
                     self.param_defaults(element);
                 }
@@ -572,23 +572,23 @@ impl<'s> Collector<'s> {
     }
 
     fn expr(&mut self, expr: &Expression<'_>) {
-        match expr {
-            Expression::Identifier(id) => self.ident_ref(id),
-            Expression::MemberExpression(m) => {
+        match &expr.kind {
+            ExpressionKind::Identifier(id) => self.ident_ref(id),
+            ExpressionKind::MemberExpression(m) => {
                 self.expr(m.object);
                 if m.computed {
                     self.expr(m.property);
                 }
             }
-            Expression::CallExpression(c) => {
+            ExpressionKind::CallExpression(c) => {
                 self.expr(c.callee);
                 self.exprs(c.arguments);
             }
-            Expression::NewExpression(n) => {
+            ExpressionKind::NewExpression(n) => {
                 self.expr(n.callee);
                 self.exprs(n.arguments);
             }
-            Expression::ArrowFunctionExpression(a) => {
+            ExpressionKind::ArrowFunctionExpression(a) => {
                 for param in a.params {
                     self.bind_pattern(param);
                     self.param_defaults(param);
@@ -598,9 +598,9 @@ impl<'s> Collector<'s> {
                     ArrowFunctionBody::BlockStatement(b) => self.stmts(b.body),
                 }
             }
-            Expression::FunctionExpression(f) => self.function_expr(f),
-            Expression::ClassExpression(c) => self.class_body(&c.body),
-            Expression::ObjectExpression(obj) => {
+            ExpressionKind::FunctionExpression(f) => self.function_expr(f),
+            ExpressionKind::ClassExpression(c) => self.class_body(&c.body),
+            ExpressionKind::ObjectExpression(obj) => {
                 for prop in obj.properties {
                     match prop {
                         ObjectProperty::Property(p) => {
@@ -613,40 +613,40 @@ impl<'s> Collector<'s> {
                     }
                 }
             }
-            Expression::ArrayExpression(arr) => {
+            ExpressionKind::ArrayExpression(arr) => {
                 for element in arr.elements.iter().flatten() {
                     self.expr(element);
                 }
             }
-            Expression::UnaryExpression(u) => self.expr(u.argument),
-            Expression::UpdateExpression(u) => self.expr(u.argument),
-            Expression::BinaryExpression(b) => {
+            ExpressionKind::UnaryExpression(u) => self.expr(u.argument),
+            ExpressionKind::UpdateExpression(u) => self.expr(u.argument),
+            ExpressionKind::BinaryExpression(b) => {
                 self.expr(b.left);
                 self.expr(b.right);
             }
-            Expression::ConditionalExpression(c) => {
+            ExpressionKind::ConditionalExpression(c) => {
                 self.expr(c.test);
                 self.expr(c.consequent);
                 self.expr(c.alternate);
             }
-            Expression::SpreadElement(s) => self.expr(s.argument),
-            Expression::TemplateLiteral(t) => self.exprs(t.expressions),
-            Expression::TaggedTemplateExpression(t) => {
+            ExpressionKind::SpreadElement(s) => self.expr(s.argument),
+            ExpressionKind::TemplateLiteral(t) => self.exprs(t.expressions),
+            ExpressionKind::TaggedTemplateExpression(t) => {
                 self.expr(t.tag);
                 self.exprs(t.quasi.expressions);
             }
-            Expression::AwaitExpression(a) => self.expr(a.argument),
-            Expression::YieldExpression(y) => {
+            ExpressionKind::AwaitExpression(a) => self.expr(a.argument),
+            ExpressionKind::YieldExpression(y) => {
                 if let Some(arg) = &y.argument {
                     self.expr(arg);
                 }
             }
-            Expression::SequenceExpression(s) => self.exprs(s.expressions),
-            Expression::AssignmentExpression(a) => {
+            ExpressionKind::SequenceExpression(s) => self.exprs(s.expressions),
+            ExpressionKind::AssignmentExpression(a) => {
                 self.expr(a.left);
                 self.expr(a.right);
             }
-            Expression::ObjectPattern(p) => {
+            ExpressionKind::ObjectPattern(p) => {
                 for prop in p.properties {
                     match prop {
                         ObjectPatternProperty::Property(prop) => {
@@ -659,36 +659,36 @@ impl<'s> Collector<'s> {
                     }
                 }
             }
-            Expression::ArrayPattern(p) => {
+            ExpressionKind::ArrayPattern(p) => {
                 for element in p.elements.iter().flatten() {
                     self.expr(element);
                 }
             }
-            Expression::AssignmentPattern(p) => {
+            ExpressionKind::AssignmentPattern(p) => {
                 self.expr(p.left);
                 self.expr(p.right);
             }
-            Expression::RestElement(r) => self.expr(r.argument),
-            Expression::TSTypeAssertion(t) => self.expr(t.expression),
-            Expression::TSAsExpression(t) => self.expr(t.expression),
-            Expression::TSSatisfiesExpression(t) => self.expr(t.expression),
-            Expression::TSInstantiationExpression(t) => self.expr(t.expression),
-            Expression::TSNonNullExpression(t) => self.expr(t.expression),
-            Expression::TSParameterProperty(t) => self.expr(t.parameter),
-            Expression::ImportExpression(i) => {
+            ExpressionKind::RestElement(r) => self.expr(r.argument),
+            ExpressionKind::TSTypeAssertion(t) => self.expr(t.expression),
+            ExpressionKind::TSAsExpression(t) => self.expr(t.expression),
+            ExpressionKind::TSSatisfiesExpression(t) => self.expr(t.expression),
+            ExpressionKind::TSInstantiationExpression(t) => self.expr(t.expression),
+            ExpressionKind::TSNonNullExpression(t) => self.expr(t.expression),
+            ExpressionKind::TSParameterProperty(t) => self.expr(t.parameter),
+            ExpressionKind::ImportExpression(i) => {
                 self.expr(i.source);
                 if let Some(options) = &i.options {
                     self.expr(options);
                 }
             }
-            Expression::JsdocCast(j) => self.expr(j.inner),
-            Expression::ParenthesizedExpression(p) => self.expr(p.expression),
-            Expression::Literal(_)
-            | Expression::PrivateIdentifier(_)
-            | Expression::RegexLiteral(_)
-            | Expression::ThisExpression(_)
-            | Expression::Super(_)
-            | Expression::MetaProperty(_) => {}
+            ExpressionKind::JsdocCast(j) => self.expr(j.inner),
+            ExpressionKind::ParenthesizedExpression(p) => self.expr(p.expression),
+            ExpressionKind::Literal(_)
+            | ExpressionKind::PrivateIdentifier(_)
+            | ExpressionKind::RegexLiteral(_)
+            | ExpressionKind::ThisExpression(_)
+            | ExpressionKind::Super(_)
+            | ExpressionKind::MetaProperty(_) => {}
         }
     }
 

@@ -241,7 +241,7 @@ the expression cycle pays. Both chain shapes, nested arrow bodies and TS object 
 each dropped 0.39, and so did unary chains (1.64 → 1.25 — nearly a quarter of what a level
 there had cost). The two chain shapes are also the ones on which the printer, not the
 parser, sets the ceiling — see the bullet above. ⚠️ And they are the only two shapes the
-`Expression` enum's own width does *not* reach: every other row above moved when it went
+`Expression`'s own width does *not* reach: every other row above moved when it went
 from 176 bytes to 72 (Svelte elements 3.1 → 1.7, parens 1.2 → 0.94),
 while these two stayed put, because the chain printer's frames — not an `Expression`
 slot — are what sets them. The `TSType` enum's width reaches a different subset again:

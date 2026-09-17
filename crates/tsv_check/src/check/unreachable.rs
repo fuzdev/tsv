@@ -48,8 +48,8 @@ use smallvec::SmallVec;
 use tsv_lang::{Comment, Span};
 use tsv_ts::ast::Program;
 use tsv_ts::ast::internal::{
-    ArrowFunctionBody, ClassMember, Decorator, ExportDefaultValue, Expression, ForInOfLeft,
-    ForInit, ObjectPatternProperty, ObjectProperty, Statement, TSModuleDeclaration,
+    ArrowFunctionBody, ClassMember, Decorator, ExportDefaultValue, Expression, ExpressionKind,
+    ForInOfLeft, ForInit, ObjectPatternProperty, ObjectProperty, Statement, TSModuleDeclaration,
     TSModuleDeclarationBody,
 };
 
@@ -641,8 +641,8 @@ impl CandidateWalk<'_> {
     }
 
     fn visit_param(&mut self, param: &Expression<'_>) {
-        use Expression as E;
-        match param {
+        use ExpressionKind as E;
+        match &param.kind {
             E::AssignmentPattern(a) => {
                 self.visit_param(a.left);
                 self.visit_expr(a.right);
@@ -669,8 +669,8 @@ impl CandidateWalk<'_> {
     /// Descend a value expression, looking for embedded function/arrow/class
     /// bodies (which hold their own statement lists / dead code).
     fn visit_expr(&mut self, expr: &Expression<'_>) {
-        use Expression as E;
-        match expr {
+        use ExpressionKind as E;
+        match &expr.kind {
             E::FunctionExpression(f) => {
                 self.visit_params(f.params);
                 self.visit_list(f.body.body);

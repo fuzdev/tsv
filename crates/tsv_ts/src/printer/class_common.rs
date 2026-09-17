@@ -279,7 +279,10 @@ impl<'a> Printer<'a> {
         }
         if let Some(super_class) = super_class
             && super_type_parameters.is_none()
-            && matches!(super_class, internal::Expression::MemberExpression(_))
+            && matches!(
+                super_class.kind,
+                internal::ExpressionKind::MemberExpression(_)
+            )
         {
             return true;
         }
@@ -373,8 +376,8 @@ impl<'a> Printer<'a> {
             // `extends (⏎\t@deco⏎\tclass {}⏎)`. Every other wrapped heritage form
             // stays inline in flat parens.
             if matches!(
-                super_class,
-                internal::Expression::ClassExpression(c) if class_expr_has_decorators(c)
+                &super_class.kind,
+                internal::ExpressionKind::ClassExpression(c) if class_expr_has_decorators(c)
             ) {
                 self.build_break_open_parens(doc)
             } else {

@@ -50,13 +50,14 @@
 //! through the synthetic arrow and rewritten too.
 
 use bumpalo::collections::Vec as BumpVec;
+use tsv_lang::Span;
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ArrowFunctionExpression, AssignmentExpression, AssignmentOperator,
     AssignmentPattern, BinaryOperator, BlockStatement, CatchClause, ClassBody, ClassDeclaration,
-    ClassExpression, ClassMember, Expression, ForInOfLeft, ForInit, FunctionDeclaration,
-    FunctionExpression, Identifier, MemberExpression, MethodDefinition, ObjectPattern,
-    ObjectPatternProperty, ObjectProperty, Property, PropertyDefinition, RestElement, Statement,
-    StaticBlock, SwitchCase, UpdateOperator,
+    ClassExpression, ClassMember, Expression, ExpressionKind, ForInOfLeft, ForInit,
+    FunctionDeclaration, FunctionExpression, Identifier, MemberExpression, MethodDefinition,
+    ObjectPattern, ObjectPatternProperty, ObjectProperty, Property, PropertyDefinition,
+    RestElement, Statement, StaticBlock, SwitchCase, UpdateOperator,
 };
 
 use crate::CompileError;
@@ -139,9 +140,9 @@ fn compound_binary_op(op: AssignmentOperator) -> BinaryOperator {
 fn member_root<'e>(expr: &'e Expression<'e>) -> &'e Expression<'e> {
     let mut node = expr;
     loop {
-        match node {
-            Expression::MemberExpression(m) => node = m.object,
-            Expression::ParenthesizedExpression(p) => node = p.expression,
+        match &node.kind {
+            ExpressionKind::MemberExpression(m) => node = m.object,
+            ExpressionKind::ParenthesizedExpression(p) => node = p.expression,
             _ => return node,
         }
     }
@@ -226,23 +227,23 @@ impl<'arena> StoreRewriter<'_, 'arena> {
     /// The TypeScript assignment-target wrappers are absent here (this pass runs
     /// over the post-erase body), so they need no arm.
     fn pattern_targets_store(&self, left: &Expression<'_>) -> bool {
-        match left {
-            Expression::Identifier(id) => self.store_base(id).is_some(),
-            Expression::MemberExpression(m) => self.pattern_targets_store(m.object),
-            Expression::ParenthesizedExpression(p) => self.pattern_targets_store(p.expression),
-            Expression::ObjectPattern(obj) => obj.properties.iter().any(|prop| match prop {
+        match &left.kind {
+            ExpressionKind::Identifier(id) => self.store_base(id).is_some(),
+            ExpressionKind::MemberExpression(m) => self.pattern_targets_store(m.object),
+            ExpressionKind::ParenthesizedExpression(p) => self.pattern_targets_store(p.expression),
+            ExpressionKind::ObjectPattern(obj) => obj.properties.iter().any(|prop| match prop {
                 ObjectPatternProperty::Property(p) => self.pattern_targets_store(p.value),
                 ObjectPatternProperty::RestElement(rest) => {
                     self.pattern_targets_store(rest.argument)
                 }
             }),
-            Expression::ArrayPattern(arr) => arr
+            ExpressionKind::ArrayPattern(arr) => arr
                 .elements
                 .iter()
                 .flatten()
                 .any(|element| self.pattern_targets_store(element)),
-            Expression::AssignmentPattern(a) => self.pattern_targets_store(a.left),
-            Expression::RestElement(r) => self.pattern_targets_store(r.argument),
+            ExpressionKind::AssignmentPattern(a) => self.pattern_targets_store(a.left),
+            ExpressionKind::RestElement(r) => self.pattern_targets_store(r.argument),
             _ => false,
         }
     }
@@ -620,7 +621,10 @@ impl<'arena> StoreRewriter<'_, 'arena> {
         // is a top-level declarator id.) A `$name` never appears in binding
         // position, so this is a no-op for the store rewrite.
         let id = match &declarator.id {
-            Expression::Identifier(_) => None,
+            Expression {
+                kind: ExpressionKind::Identifier(_),
+                ..
+            } => None,
             other => self.expr(other)?,
         };
         let init = match &declarator.init {
@@ -797,9 +801,9 @@ impl<'arena> StoreRewriter<'_, 'arena> {
         expr: &Expression<'arena>,
     ) -> Result<Option<Expression<'arena>>, CompileError> {
         use tsv_ts::ast::internal as ast;
-        Ok(match expr {
+        Ok(match &expr.kind {
             // ── The store / derived leaves ─────────────────────────────────
-            Expression::Identifier(id) => match self.store_base(id) {
+            ExpressionKind::Identifier(id) => match self.store_base(id) {
                 Some(base) => {
                     if self.store_shadowed.contains(&base) {
                         return unsupported(Refusal::StoreScopedSubscription);
@@ -815,42 +819,48 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                 None if self.derived_read(id) => {
                     let arena = self.b.arena;
                     let callee: &'arena Expression<'arena> =
-                        arena.alloc(Expression::Identifier(id.clone()));
+                        arena.alloc(Expression::from_identifier(id.clone()));
                     Some(self.b.call_expr(callee, &[]))
                 }
                 None => None,
             },
-            Expression::AssignmentExpression(assign) => self.assignment(assign)?,
-            Expression::UpdateExpression(update) => self.update(update)?,
+            ExpressionKind::AssignmentExpression(assign) => self.assignment(assign, expr.span)?,
+            ExpressionKind::UpdateExpression(update) => self.update(update, expr.span)?,
 
             // ── Recursion ──────────────────────────────────────────────────
-            Expression::CallExpression(call) => {
+            ExpressionKind::CallExpression(call) => {
                 let callee = self.expr_ref(call.callee)?;
                 let arguments = map_slice!(self, call.arguments, expr);
                 if callee.is_none() && arguments.is_none() {
                     None
                 } else {
-                    Some(Expression::CallExpression(ast::CallExpression {
-                        callee: callee.unwrap_or(call.callee),
-                        arguments: arguments.unwrap_or(call.arguments),
-                        ..call.clone()
-                    }))
+                    Some(Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::CallExpression(ast::CallExpression {
+                            callee: callee.unwrap_or(call.callee),
+                            arguments: arguments.unwrap_or(call.arguments),
+                            ..call.clone()
+                        }),
+                    })
                 }
             }
-            Expression::NewExpression(new) => {
+            ExpressionKind::NewExpression(new) => {
                 let callee = self.expr_ref(new.callee)?;
                 let arguments = map_slice!(self, new.arguments, expr);
                 if callee.is_none() && arguments.is_none() {
                     None
                 } else {
-                    Some(Expression::NewExpression(ast::NewExpression {
-                        callee: callee.unwrap_or(new.callee),
-                        arguments: arguments.unwrap_or(new.arguments),
-                        ..new.clone()
-                    }))
+                    Some(Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::NewExpression(ast::NewExpression {
+                            callee: callee.unwrap_or(new.callee),
+                            arguments: arguments.unwrap_or(new.arguments),
+                            ..new.clone()
+                        }),
+                    })
                 }
             }
-            Expression::MemberExpression(member) => {
+            ExpressionKind::MemberExpression(member) => {
                 let object = self.expr_ref(member.object)?;
                 // A non-computed property is a NAME, never a store read.
                 let property = if member.computed {
@@ -861,135 +871,159 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                 if object.is_none() && property.is_none() {
                     None
                 } else {
-                    Some(Expression::MemberExpression(MemberExpression {
-                        object: object.unwrap_or(member.object),
-                        property: property.unwrap_or(member.property),
-                        ..member.clone()
-                    }))
+                    Some(Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::MemberExpression(MemberExpression {
+                            object: object.unwrap_or(member.object),
+                            property: property.unwrap_or(member.property),
+                            ..member.clone()
+                        }),
+                    })
                 }
             }
-            Expression::BinaryExpression(binary) => {
+            ExpressionKind::BinaryExpression(binary) => {
                 let left = self.expr_ref(binary.left)?;
                 let right = self.expr_ref(binary.right)?;
                 if left.is_none() && right.is_none() {
                     None
                 } else {
-                    Some(Expression::BinaryExpression(ast::BinaryExpression {
-                        left: left.unwrap_or(binary.left),
-                        right: right.unwrap_or(binary.right),
-                        // `relexes_as_type_arguments` rides along: it is a claim about the SOURCE
-                        // bytes this rewrite invalidates, and inheriting is the SAFE direction — a
-                        // stale `true` costs a redundant paren pair, a stale `false` an output
-                        // nothing reparses.
-                        ..binary.clone()
-                    }))
+                    Some(Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::BinaryExpression(ast::BinaryExpression {
+                            left: left.unwrap_or(binary.left),
+                            right: right.unwrap_or(binary.right),
+                            // `relexes_as_type_arguments` rides along: it is a claim about
+                            // the SOURCE bytes this rewrite invalidates, and inheriting is the
+                            // SAFE direction — a stale `true` costs a redundant paren pair, a
+                            // stale `false` an output nothing reparses.
+                            ..binary.clone()
+                        }),
+                    })
                 }
             }
-            Expression::ConditionalExpression(cond) => {
+            ExpressionKind::ConditionalExpression(cond) => {
                 let test = self.expr_ref(cond.test)?;
                 let consequent = self.expr_ref(cond.consequent)?;
                 let alternate = self.expr_ref(cond.alternate)?;
                 if test.is_none() && consequent.is_none() && alternate.is_none() {
                     None
                 } else {
-                    Some(Expression::ConditionalExpression(
-                        ast::ConditionalExpression {
+                    Some(Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::ConditionalExpression(ast::ConditionalExpression {
                             test: test.unwrap_or(cond.test),
                             consequent: consequent.unwrap_or(cond.consequent),
                             alternate: alternate.unwrap_or(cond.alternate),
-                            span: cond.span,
-                        },
-                    ))
+                        }),
+                    })
                 }
             }
-            Expression::UnaryExpression(unary) => self.expr_ref(unary.argument)?.map(|argument| {
-                Expression::UnaryExpression(ast::UnaryExpression {
-                    argument,
-                    ..unary.clone()
-                })
-            }),
-            Expression::ArrayExpression(arr) => {
-                map_slice!(self, arr.elements, opt_expr).map(|elements| {
-                    Expression::ArrayExpression(ast::ArrayExpression {
-                        elements,
-                        ..arr.clone()
+            ExpressionKind::UnaryExpression(unary) => {
+                self.expr_ref(unary.argument)?.map(|argument| {
+                    Expression::from_unary_expression(ast::UnaryExpression {
+                        argument,
+                        ..unary.clone()
                     })
                 })
             }
-            Expression::ObjectExpression(obj) => map_slice!(self, obj.properties, object_property)
-                .map(|properties| {
-                    Expression::ObjectExpression(ast::ObjectExpression {
+            ExpressionKind::ArrayExpression(arr) => {
+                map_slice!(self, arr.elements, opt_expr).map(|elements| Expression {
+                    span: expr.span,
+                    kind: ExpressionKind::ArrayExpression(ast::ArrayExpression {
+                        elements,
+                        ..arr.clone()
+                    }),
+                })
+            }
+            ExpressionKind::ObjectExpression(obj) => {
+                map_slice!(self, obj.properties, object_property).map(|properties| Expression {
+                    span: expr.span,
+                    kind: ExpressionKind::ObjectExpression(ast::ObjectExpression {
                         properties,
                         ..obj.clone()
-                    })
-                }),
-            Expression::ArrowFunctionExpression(arrow) => self
-                .arrow(arrow)?
-                .map(|a| Expression::ArrowFunctionExpression(self.b.arena.alloc(a))),
-            Expression::FunctionExpression(func) => self
-                .function_expression(func)?
-                .map(|f| Expression::FunctionExpression(self.b.arena.alloc(f))),
-            Expression::ClassExpression(class) => self
-                .class_expression(class)?
-                .map(|c| Expression::ClassExpression(self.b.arena.alloc(c))),
-            Expression::SpreadElement(spread) => self.expr_ref(spread.argument)?.map(|argument| {
-                Expression::SpreadElement(ast::SpreadElement {
-                    argument,
-                    span: spread.span,
+                    }),
                 })
-            }),
-            Expression::TemplateLiteral(template) => map_slice!(self, template.expressions, expr)
-                .map(|expressions| {
-                    Expression::TemplateLiteral(ast::TemplateLiteral {
+            }
+            ExpressionKind::ArrowFunctionExpression(arrow) => {
+                self.arrow(arrow)?.map(|a| Expression {
+                    span: expr.span,
+                    kind: ExpressionKind::ArrowFunctionExpression(self.b.arena.alloc(a)),
+                })
+            }
+            ExpressionKind::FunctionExpression(func) => self
+                .function_expression(func)?
+                .map(|f| Expression::from_function_expression(self.b.arena.alloc(f))),
+            ExpressionKind::ClassExpression(class) => {
+                self.class_expression(class)?.map(|c| Expression {
+                    span: expr.span,
+                    kind: ExpressionKind::ClassExpression(self.b.arena.alloc(c)),
+                })
+            }
+            ExpressionKind::SpreadElement(spread) => {
+                self.expr_ref(spread.argument)?.map(|argument| {
+                    Expression::from_spread_element(ast::SpreadElement {
+                        argument,
+                        span: spread.span,
+                    })
+                })
+            }
+            ExpressionKind::TemplateLiteral(template) => {
+                map_slice!(self, template.expressions, expr).map(|expressions| {
+                    Expression::from_template_literal(ast::TemplateLiteral {
                         expressions,
                         ..template.clone()
                     })
-                }),
-            Expression::TaggedTemplateExpression(tagged) => {
+                })
+            }
+            ExpressionKind::TaggedTemplateExpression(tagged) => {
                 let tag = self.expr_ref(tagged.tag)?;
                 let quasi = map_slice!(self, tagged.quasi.expressions, expr);
                 if tag.is_none() && quasi.is_none() {
                     None
                 } else {
-                    Some(Expression::TaggedTemplateExpression(self.b.arena.alloc(
-                        ast::TaggedTemplateExpression {
-                            tag: tag.unwrap_or(tagged.tag),
-                            quasi: quasi.map_or_else(
-                                || tagged.quasi.clone(),
-                                |expressions| ast::TemplateLiteral {
-                                    expressions,
-                                    ..tagged.quasi.clone()
-                                },
-                            ),
-                            ..(*tagged).clone()
-                        },
-                    )))
+                    Some(Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::TaggedTemplateExpression(self.b.arena.alloc(
+                            ast::TaggedTemplateExpression {
+                                tag: tag.unwrap_or(tagged.tag),
+                                quasi: quasi.map_or_else(
+                                    || tagged.quasi.clone(),
+                                    |expressions| ast::TemplateLiteral {
+                                        expressions,
+                                        ..tagged.quasi.clone()
+                                    },
+                                ),
+                                ..(*tagged).clone()
+                            },
+                        )),
+                    })
                 }
             }
-            Expression::AwaitExpression(node) => self.expr_ref(node.argument)?.map(|argument| {
-                Expression::AwaitExpression(ast::AwaitExpression {
-                    argument,
-                    span: node.span,
+            ExpressionKind::AwaitExpression(node) => {
+                self.expr_ref(node.argument)?.map(|argument| Expression {
+                    span: expr.span,
+                    kind: ExpressionKind::AwaitExpression(ast::AwaitExpression { argument }),
                 })
-            }),
-            Expression::YieldExpression(node) => match node.argument {
-                Some(argument) => self.expr_ref(argument)?.map(|argument| {
-                    Expression::YieldExpression(ast::YieldExpression {
+            }
+            ExpressionKind::YieldExpression(node) => match node.argument {
+                Some(argument) => self.expr_ref(argument)?.map(|argument| Expression {
+                    span: expr.span,
+                    kind: ExpressionKind::YieldExpression(ast::YieldExpression {
                         argument: Some(argument),
                         ..node.clone()
-                    })
+                    }),
                 }),
                 None => None,
             },
-            Expression::SequenceExpression(seq) => {
-                map_slice!(self, seq.expressions, expr).map(|expressions| {
-                    Expression::SequenceExpression(ast::SequenceExpression {
+            ExpressionKind::SequenceExpression(seq) => {
+                map_slice!(self, seq.expressions, expr).map(|expressions| Expression {
+                    span: expr.span,
+                    kind: ExpressionKind::SequenceExpression(ast::SequenceExpression {
                         expressions,
-                        span: seq.span,
-                    })
+                    }),
                 })
             }
-            Expression::ImportExpression(import) => {
+            ExpressionKind::ImportExpression(import) => {
                 let source = self.expr_ref(import.source)?;
                 let options = match import.options {
                     Some(options) => self.expr_ref(options)?.map(Some),
@@ -998,55 +1032,65 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                 if source.is_none() && options.is_none() {
                     None
                 } else {
-                    Some(Expression::ImportExpression(ast::ImportExpression {
-                        source: source.unwrap_or(import.source),
-                        options: options.unwrap_or(import.options),
-                        ..import.clone()
-                    }))
+                    Some(Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::ImportExpression(ast::ImportExpression {
+                            source: source.unwrap_or(import.source),
+                            options: options.unwrap_or(import.options),
+                            ..import.clone()
+                        }),
+                    })
                 }
             }
-            Expression::ParenthesizedExpression(paren) => {
-                self.expr_ref(paren.expression)?.map(|expression| {
-                    Expression::ParenthesizedExpression(ast::ParenthesizedExpression {
-                        expression,
-                        span: paren.span,
+            ExpressionKind::ParenthesizedExpression(paren) => {
+                self.expr_ref(paren.expression)?
+                    .map(|expression| Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::ParenthesizedExpression(
+                            ast::ParenthesizedExpression { expression },
+                        ),
                     })
-                })
             }
 
             // ── Patterns (their DEFAULTS are reads) ────────────────────────
-            Expression::ObjectPattern(pattern) => {
+            ExpressionKind::ObjectPattern(pattern) => {
                 map_slice!(self, pattern.properties, object_pattern_property).map(|properties| {
-                    Expression::ObjectPattern(ObjectPattern {
-                        properties,
-                        ..pattern.clone()
-                    })
+                    Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::ObjectPattern(ObjectPattern {
+                            properties,
+                            ..pattern.clone()
+                        }),
+                    }
                 })
             }
-            Expression::ArrayPattern(pattern) => {
-                map_slice!(self, pattern.elements, opt_expr).map(|elements| {
-                    Expression::ArrayPattern(tsv_ts::ast::internal::ArrayPattern {
+            ExpressionKind::ArrayPattern(pattern) => map_slice!(self, pattern.elements, opt_expr)
+                .map(|elements| Expression {
+                    span: expr.span,
+                    kind: ExpressionKind::ArrayPattern(tsv_ts::ast::internal::ArrayPattern {
                         elements,
                         ..pattern.clone()
-                    })
-                })
-            }
-            Expression::AssignmentPattern(pattern) => {
+                    }),
+                }),
+            ExpressionKind::AssignmentPattern(pattern) => {
                 // `left` is a binding pattern (not a read); `right` is the default.
                 let left = self.expr_ref(pattern.left)?;
                 let right = self.expr_ref(pattern.right)?;
                 if left.is_none() && right.is_none() {
                     None
                 } else {
-                    Some(Expression::AssignmentPattern(AssignmentPattern {
-                        left: left.unwrap_or(pattern.left),
-                        right: right.unwrap_or(pattern.right),
-                        ..pattern.clone()
-                    }))
+                    Some(Expression {
+                        span: expr.span,
+                        kind: ExpressionKind::AssignmentPattern(AssignmentPattern {
+                            left: left.unwrap_or(pattern.left),
+                            right: right.unwrap_or(pattern.right),
+                            ..pattern.clone()
+                        }),
+                    })
                 }
             }
-            Expression::RestElement(rest) => self.expr_ref(rest.argument)?.map(|argument| {
-                Expression::RestElement(RestElement {
+            ExpressionKind::RestElement(rest) => self.expr_ref(rest.argument)?.map(|argument| {
+                Expression::from_rest_element(RestElement {
                     argument,
                     ..rest.clone()
                 })
@@ -1058,19 +1102,19 @@ impl<'arena> StoreRewriter<'_, 'arena> {
             // `erase` before this pass; a survivor is caught by the erase
             // self-check on the finished program, never a silent store miss here.
             // Exhaustive on purpose — a NEW expression variant fails compilation.
-            Expression::Literal(_)
-            | Expression::PrivateIdentifier(_)
-            | Expression::RegexLiteral(_)
-            | Expression::ThisExpression(_)
-            | Expression::Super(_)
-            | Expression::MetaProperty(_)
-            | Expression::TSTypeAssertion(_)
-            | Expression::TSAsExpression(_)
-            | Expression::TSSatisfiesExpression(_)
-            | Expression::TSInstantiationExpression(_)
-            | Expression::TSNonNullExpression(_)
-            | Expression::TSParameterProperty(_)
-            | Expression::JsdocCast(_) => None,
+            ExpressionKind::Literal(_)
+            | ExpressionKind::PrivateIdentifier(_)
+            | ExpressionKind::RegexLiteral(_)
+            | ExpressionKind::ThisExpression(_)
+            | ExpressionKind::Super(_)
+            | ExpressionKind::MetaProperty(_)
+            | ExpressionKind::TSTypeAssertion(_)
+            | ExpressionKind::TSAsExpression(_)
+            | ExpressionKind::TSSatisfiesExpression(_)
+            | ExpressionKind::TSInstantiationExpression(_)
+            | ExpressionKind::TSNonNullExpression(_)
+            | ExpressionKind::TSParameterProperty(_)
+            | ExpressionKind::JsdocCast(_) => None,
         })
     }
 
@@ -1168,7 +1212,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
     /// write), a member/destructuring write over a store (refused), or a plain
     /// lvalue (recurse for reads).
     fn classify_target(&self, left: &Expression<'_>) -> Result<StoreTarget, CompileError> {
-        if let Expression::Identifier(id) = left {
+        if let ExpressionKind::Identifier(id) = &left.kind {
             return Ok(match self.store_base(id) {
                 Some(base) => StoreTarget::Bare(base),
                 None => StoreTarget::NotStore,
@@ -1177,8 +1221,8 @@ impl<'arena> StoreRewriter<'_, 'arena> {
         // A member chain rooted at a store `$obj.foo = …` → `$.store_mutate` (not
         // implemented). A member rooted at a plain lvalue (`x[$c] = …`) is not a
         // store write — its store lives in a read position, so recurse instead.
-        if matches!(left, Expression::MemberExpression(_)) {
-            if let Expression::Identifier(root) = member_root(left)
+        if matches!(left.kind, ExpressionKind::MemberExpression(_)) {
+            if let ExpressionKind::Identifier(root) = &member_root(left).kind
                 && self.store_base(root).is_some()
             {
                 return unsupported(Refusal::StoreMemberWrite);
@@ -1197,6 +1241,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
     fn assignment(
         &mut self,
         assign: &AssignmentExpression<'arena>,
+        span: Span,
     ) -> Result<Option<Expression<'arena>>, CompileError> {
         match self.classify_target(assign.left)? {
             StoreTarget::Bare(base) => {
@@ -1214,7 +1259,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                     let bin_ref: &'arena Expression<'arena> = self.b.arena.alloc(bin);
                     self.rewrite_value(bin_ref)?
                 };
-                Ok(Some(self.b.store_set(&base, value, assign.span)))
+                Ok(Some(self.b.store_set(&base, value, span)))
             }
             StoreTarget::NotStore => {
                 let left = self.expr_ref(assign.left)?;
@@ -1222,13 +1267,14 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                 if left.is_none() && right.is_none() {
                     Ok(None)
                 } else {
-                    Ok(Some(Expression::AssignmentExpression(
-                        AssignmentExpression {
+                    Ok(Some(Expression {
+                        span,
+                        kind: ExpressionKind::AssignmentExpression(AssignmentExpression {
                             left: left.unwrap_or(assign.left),
                             right: right.unwrap_or(assign.right),
                             ..assign.clone()
-                        },
-                    )))
+                        }),
+                    }))
                 }
             }
         }
@@ -1237,9 +1283,10 @@ impl<'arena> StoreRewriter<'_, 'arena> {
     fn update(
         &mut self,
         update: &tsv_ts::ast::internal::UpdateExpression<'arena>,
+        span: Span,
     ) -> Result<Option<Expression<'arena>>, CompileError> {
         // A bare `$name++` / `++$name` store update.
-        if let Expression::Identifier(id) = update.argument
+        if let ExpressionKind::Identifier(id) = &update.argument.kind
             && let Some(base) = self.store_base(id)
         {
             if self.store_shadowed.contains(&base) {
@@ -1250,22 +1297,23 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                 &base,
                 update.prefix,
                 decrement,
-                update.span,
+                span,
             )));
         }
         // A member update rooted at a store (`$obj.x++`) → `$.store_mutate` (not
         // implemented). A member over a plain lvalue recurses (its store is a read).
-        if matches!(update.argument, Expression::MemberExpression(_))
-            && let Expression::Identifier(root) = member_root(update.argument)
+        if matches!(update.argument.kind, ExpressionKind::MemberExpression(_))
+            && let ExpressionKind::Identifier(root) = &member_root(update.argument).kind
             && self.store_base(root).is_some()
         {
             return unsupported(Refusal::StoreMemberWrite);
         }
-        Ok(self.expr_ref(update.argument)?.map(|argument| {
-            Expression::UpdateExpression(tsv_ts::ast::internal::UpdateExpression {
+        Ok(self.expr_ref(update.argument)?.map(|argument| Expression {
+            span,
+            kind: ExpressionKind::UpdateExpression(tsv_ts::ast::internal::UpdateExpression {
                 argument,
                 ..update.clone()
-            })
+            }),
         }))
     }
 }

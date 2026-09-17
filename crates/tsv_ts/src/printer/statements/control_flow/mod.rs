@@ -18,7 +18,7 @@ mod try_jump;
 
 use smallvec::SmallVec;
 
-use crate::ast::internal::{Expression, Statement, UnaryOperator};
+use crate::ast::internal::{Expression, ExpressionKind, Statement, UnaryOperator};
 use crate::printer::statements::StatementContext;
 use crate::printer::{CommentVec, LeadingGlue, Printer};
 use tsv_lang::Comment;
@@ -1128,7 +1128,7 @@ impl<'a> Printer<'a> {
     /// disable inlining upstream — the caller only reaches the bare-doc path when the
     /// condition parens hold no comments.
     fn condition_should_inline_negation(&self, test: &Expression<'_>) -> bool {
-        let Expression::UnaryExpression(outer) = test else {
+        let ExpressionKind::UnaryExpression(outer) = &test.kind else {
             return false;
         };
         if outer.operator != UnaryOperator::Bang {
@@ -1137,10 +1137,13 @@ impl<'a> Printer<'a> {
         // Peel one optional inner `!` (so `!` and `!!` qualify; a third `!` leaves a
         // UnaryExpression here and fails the logical-binary check below).
         let inner = match outer.argument {
-            Expression::UnaryExpression(u) if u.operator == UnaryOperator::Bang => u.argument,
+            Expression {
+                kind: ExpressionKind::UnaryExpression(u),
+                ..
+            } if u.operator == UnaryOperator::Bang => u.argument,
             other => other,
         };
-        matches!(inner, Expression::BinaryExpression(b) if b.operator.is_logical())
+        matches!(&inner.kind, ExpressionKind::BinaryExpression(b) if b.operator.is_logical())
     }
 
     /// Build the condition doc for `if` / `while` / do-while, honoring the
@@ -1560,11 +1563,11 @@ impl<'a> Printer<'a> {
     /// (e.g., `for (i = 0; i < len; i++)` — the `i < len` stays flat).
     /// Assignment expressions get double-parens for clarity: `while ((x = y))`
     fn build_condition_doc(&self, expr: &Expression<'_>, grouping: HeadChainGrouping) -> DocId {
-        let inner = self.build_value_with_outermost_owned_comment(expr, || match expr {
-            Expression::BinaryExpression(binary)
+        let inner = self.build_value_with_outermost_owned_comment(expr, || match &expr.kind {
+            ExpressionKind::BinaryExpression(binary)
                 if grouping == HeadChainGrouping::ParenGroupDrives =>
             {
-                self.build_binary_chain_doc_ungrouped_condition(binary)
+                self.build_binary_chain_doc_ungrouped_condition(binary, expr.span)
             }
             _ => self.build_expression_doc(expr),
         });

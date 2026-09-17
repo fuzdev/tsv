@@ -8,7 +8,9 @@
 // - Rest elements: `...rest`
 
 use super::assignment::{AssignmentLeft, RhsCommentInfo};
-use crate::ast::internal::{self, ArrowFunctionBody, Expression, ObjectPatternProperty};
+use crate::ast::internal::{
+    self, ArrowFunctionBody, Expression, ExpressionKind, ObjectPatternProperty,
+};
 use crate::printer::comments::ValueGap;
 use crate::printer::comments::next_real_element_start;
 use crate::printer::layout::hang_after_operator;
@@ -49,10 +51,10 @@ fn array_pattern_gap_end(arr: &internal::ArrayPattern<'_>, i: usize, body_end: u
 /// Check if an arrow function has a nested arrow function as its body
 /// Used for chain-tail-arrow-chain detection: `(x) => (y) => x + y`
 fn is_nested_arrow_function(expr: &Expression<'_>) -> bool {
-    if let Expression::ArrowFunctionExpression(arrow) = expr
+    if let ExpressionKind::ArrowFunctionExpression(arrow) = &expr.kind
         && let ArrowFunctionBody::Expression(body_expr) = &arrow.body
     {
-        return matches!(body_expr, Expression::ArrowFunctionExpression(_));
+        return matches!(body_expr.kind, ExpressionKind::ArrowFunctionExpression(_));
     }
     false
 }
@@ -124,22 +126,25 @@ impl<'a> Printer<'a> {
     pub(super) fn build_assignment_doc(
         &self,
         assign: &internal::AssignmentExpression<'_>,
+        span: Span,
     ) -> DocId {
         // Assignment RHS — an `ancestorNameMap` value position.
         self.mark_ternary_extra_indent(assign.right);
         // Every parent that reaches this entry point is a NON-assignment one: the chain
         // context is set by exactly one caller, the recursive one below.
-        self.build_assignment_doc_with_context(assign, AssignmentContext::None)
+        self.build_assignment_doc_with_context(assign, span, AssignmentContext::None)
     }
 
     /// Build a Doc for an assignment expression with chain context
     fn build_assignment_doc_with_context(
         &self,
         assign: &internal::AssignmentExpression<'_>,
+        assign_span: Span,
         context: AssignmentContext,
     ) -> DocId {
         let d = self.d();
-        let rhs_is_assignment = matches!(assign.right, Expression::AssignmentExpression(_));
+        let rhs_is_assignment =
+            matches!(assign.right.kind, ExpressionKind::AssignmentExpression(_));
         // A type-assertion target (`as` / `satisfies` / `<T>`) must be parenthesized
         // to round-trip (`(x as T) = …`); non-null `x!` stays bare. The cast is kept
         // in the internal AST so the formatter reproduces prettier's output, even
@@ -153,7 +158,7 @@ impl<'a> Printer<'a> {
         // [`Printer::mark_assignment_target_member_lookups`].
         self.mark_assignment_target_member_lookups(assign.left);
         let left_doc = self.build_shell_operand_doc(
-            assign.span.start,
+            assign_span.start,
             assign.left,
             ParenContext::AssignmentTarget,
         );
@@ -223,12 +228,12 @@ impl<'a> Printer<'a> {
                             Some(frozen) => self.build_frozen_value_shell_doc(
                                 assign.right,
                                 frozen,
-                                assign.span.end,
+                                assign_span.end,
                                 false,
                             ),
                             None => self.build_expression_doc_with_paren_comments(
                                 assign.right,
-                                assign.span.end,
+                                assign_span.end,
                                 false,
                             ),
                         };
@@ -282,7 +287,7 @@ impl<'a> Printer<'a> {
                 start: effective_rhs_start,
                 indentable_leads_value: rhs_indentable_leads_value,
             }),
-            boundary: Some(assign.span.end),
+            boundary: Some(assign_span.end),
             frozen: rhs_frozen,
         };
         // What the LEFT is, for the layout's own arm ([`AssignmentLeft`]). A complex
@@ -298,10 +303,10 @@ impl<'a> Printer<'a> {
         // A 2-segment chain has rhs_is_assignment=true but the inner RHS is NOT an assignment.
         if !matches!(context, AssignmentContext::Chain)
             && rhs_is_assignment
-            && let Expression::AssignmentExpression(inner) = assign.right
+            && let ExpressionKind::AssignmentExpression(inner) = &assign.right.kind
         {
             let inner_rhs_is_assignment =
-                matches!(inner.right, Expression::AssignmentExpression(_));
+                matches!(inner.right.kind, ExpressionKind::AssignmentExpression(_));
             if !inner_rhs_is_assignment {
                 return self.build_assignment_layout(
                     left_doc,
@@ -360,7 +365,7 @@ impl<'a> Printer<'a> {
                         self.build_value_with_outermost_owned_comment(assign.right, || {
                             self.build_expression_doc_with_paren_comments(
                                 assign.right,
-                                assign.span.end,
+                                assign_span.end,
                                 false,
                             )
                         })
@@ -376,7 +381,7 @@ impl<'a> Printer<'a> {
                         self.build_value_with_outermost_owned_comment(assign.right, || {
                             self.build_expression_doc_with_paren_comments(
                                 assign.right,
-                                assign.span.end,
+                                assign_span.end,
                                 false,
                             )
                         })
@@ -405,11 +410,15 @@ impl<'a> Printer<'a> {
             // The same shell the unfrozen arm two lines down builds, over the slice — the
             // RHS's grouping `)` sits past the slice's end, so its interior comment has no
             // other emitter (`Printer::build_frozen_value_shell_doc`).
-            self.build_frozen_value_shell_doc(assign.right, frozen, assign.span.end, false)
-        } else if let Expression::AssignmentExpression(rhs_assign) = assign.right {
-            self.build_assignment_doc_with_context(rhs_assign, AssignmentContext::Chain)
+            self.build_frozen_value_shell_doc(assign.right, frozen, assign_span.end, false)
+        } else if let ExpressionKind::AssignmentExpression(rhs_assign) = &assign.right.kind {
+            self.build_assignment_doc_with_context(
+                rhs_assign,
+                assign.right.span,
+                AssignmentContext::Chain,
+            )
         } else {
-            self.build_expression_doc_with_paren_comments(assign.right, assign.span.end, false)
+            self.build_expression_doc_with_paren_comments(assign.right, assign_span.end, false)
         };
 
         // Prepend inline comments to right doc if present
@@ -490,16 +499,20 @@ impl<'a> Printer<'a> {
 
     /// The object pattern's [`PatternTail`] — [`Self::pattern_body_end`] in its brace
     /// spelling, paired with the tail it bounds.
-    fn object_pattern_tail<'t>(&self, obj: &'t internal::ObjectPattern<'_>) -> PatternTail<'t> {
+    fn object_pattern_tail<'t>(
+        &self,
+        obj: &'t internal::ObjectPattern<'_>,
+        span: Span,
+    ) -> PatternTail<'t> {
         let optional = obj.optional;
         let type_annotation = obj.type_annotation.as_ref();
         let last_content_end = obj
             .properties
             .last()
-            .map_or(obj.span.start + 1, |p| p.span().end);
+            .map_or(span.start + 1, |p| p.span().end);
         PatternTail {
             body_end: self.pattern_body_end(
-                obj.span,
+                span,
                 optional,
                 type_annotation,
                 last_content_end,
@@ -512,7 +525,11 @@ impl<'a> Printer<'a> {
 
     /// The array pattern's [`PatternTail`]. A trailing hole carries no span, so the scan
     /// starts at the last REAL element — the commas past it are structure.
-    fn array_pattern_tail<'t>(&self, arr: &'t internal::ArrayPattern<'_>) -> PatternTail<'t> {
+    fn array_pattern_tail<'t>(
+        &self,
+        arr: &'t internal::ArrayPattern<'_>,
+        span: Span,
+    ) -> PatternTail<'t> {
         let optional = arr.optional;
         let type_annotation = arr.type_annotation.as_ref();
         let last_content_end = arr
@@ -521,10 +538,10 @@ impl<'a> Printer<'a> {
             .rev()
             .flatten()
             .next()
-            .map_or(arr.span.start + 1, |e| e.span().end);
+            .map_or(span.start + 1, |e| e.span().end);
         PatternTail {
             body_end: self.pattern_body_end(
-                arr.span,
+                span,
                 optional,
                 type_annotation,
                 last_content_end,
@@ -566,19 +583,24 @@ impl<'a> Printer<'a> {
     /// Prettier expands object patterns when:
     /// 1. Any property has a nested pattern value (always expand)
     /// 2. The pattern exceeds print width (width-based expansion)
-    pub(super) fn build_object_pattern_doc(&self, obj: &internal::ObjectPattern<'_>) -> DocId {
-        self.build_object_pattern_doc_with_context(obj, PatternContext::Standalone)
+    pub(super) fn build_object_pattern_doc(
+        &self,
+        obj: &internal::ObjectPattern<'_>,
+        span: Span,
+    ) -> DocId {
+        self.build_object_pattern_doc_with_context(obj, span, PatternContext::Standalone)
     }
 
     /// Build object pattern doc with explicit context
     pub(super) fn build_object_pattern_doc_with_context(
         &self,
         obj: &internal::ObjectPattern<'_>,
+        obj_span: Span,
         context: PatternContext,
     ) -> DocId {
         let d = self.d();
         if obj.properties.is_empty() {
-            self.build_empty_object_pattern_doc(obj)
+            self.build_empty_object_pattern_doc(obj, obj_span)
         } else {
             // Expand if: nested patterns, line comments, blank lines BETWEEN
             // properties, or own-line block comments between/around properties.
@@ -588,23 +610,23 @@ impl<'a> Printer<'a> {
             // a blank after the `{` is not a reason to expand, and acting on one made
             // the expanded output its own second fixed point (`collection_formatting_hints`).
             let should_expand = object_pattern_should_expand(obj, context);
-            let tail = self.object_pattern_tail(obj);
+            let tail = self.object_pattern_tail(obj, obj_span);
             let boundary = tail.body_end;
-            let has_comments = self.has_comments_on_page_between(obj.span.start, boundary);
+            let has_comments = self.has_comments_on_page_between(obj_span.start, boundary);
             let (has_line_comments, has_blank_lines) =
-                self.object_pattern_formatting_hints(obj, boundary, has_comments);
-            let has_own_line_block =
-                has_comments && self.object_pattern_has_own_line_block_comments(obj, boundary);
+                self.object_pattern_formatting_hints(obj, obj_span, boundary, has_comments);
+            let has_own_line_block = has_comments
+                && self.object_pattern_has_own_line_block_comments(obj, obj_span, boundary);
 
             if should_expand || has_line_comments || has_blank_lines || has_own_line_block {
-                self.build_expanded_object_pattern_doc(obj, tail)
+                self.build_expanded_object_pattern_doc(obj, obj_span, tail)
             } else {
                 // Use group with line breaks for width-based expansion
                 // Include type annotation in the group so its width is considered
                 let mut parts = d.pooled_docbuf();
 
                 // Track previous end for comment detection (start after `{`)
-                let mut prev_end = obj.span.start + 1;
+                let mut prev_end = obj_span.start + 1;
 
                 for (i, prop) in obj.properties.iter().enumerate() {
                     // Check for leading comments before this property. Gated on the
@@ -857,11 +879,12 @@ impl<'a> Printer<'a> {
     fn object_pattern_formatting_hints(
         &self,
         obj: &internal::ObjectPattern<'_>,
+        obj_span: Span,
         boundary: u32,
         has_comments: bool,
     ) -> (bool, bool) {
         self.collection_formatting_hints(
-            obj.span.start,
+            obj_span.start,
             boundary,
             obj.properties,
             has_comments,
@@ -879,9 +902,10 @@ impl<'a> Printer<'a> {
     fn object_pattern_has_own_line_block_comments(
         &self,
         obj: &internal::ObjectPattern<'_>,
+        obj_span: Span,
         boundary: u32,
     ) -> bool {
-        let span = Span::new(obj.span.start, boundary);
+        let span = Span::new(obj_span.start, boundary);
         self.has_own_line_block_comments_in_bracket_list(span, obj.properties, |prop| {
             // The property's PRINTED span — see the array pattern's twin.
             Span::new(prop.span().start, prop.value_end())
@@ -889,13 +913,17 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for empty object pattern: `{}` with optional `?` + type annotation
-    fn build_empty_object_pattern_doc(&self, obj: &internal::ObjectPattern<'_>) -> DocId {
+    fn build_empty_object_pattern_doc(
+        &self,
+        obj: &internal::ObjectPattern<'_>,
+        obj_span: Span,
+    ) -> DocId {
         // Bound the comment scan to the braces (before any `?`/`: Type`), mirroring
         // `build_empty_array_pattern_doc`. Scanning the full span would pull a
         // comment out of the type annotation into the empty `{}` and duplicate it.
-        let tail = self.object_pattern_tail(obj);
+        let tail = self.object_pattern_tail(obj, obj_span);
         let body_doc = self
-            .build_empty_braces_inline_with_comments_doc(Span::new(obj.span.start, tail.body_end));
+            .build_empty_braces_inline_with_comments_doc(Span::new(obj_span.start, tail.body_end));
         self.append_opt(body_doc, self.build_pattern_tail_doc(tail))
     }
 
@@ -903,6 +931,7 @@ impl<'a> Printer<'a> {
     fn build_expanded_object_pattern_doc(
         &self,
         obj: &internal::ObjectPattern<'_>,
+        span: Span,
         tail: PatternTail<'_>,
     ) -> DocId {
         let d = self.d();
@@ -920,7 +949,7 @@ impl<'a> Printer<'a> {
         // reach this branch via nesting with no line comment, and the loop must
         // still emit it. The expansion decision itself runs earlier and is
         // unaffected. Canonical reference: build_params_doc_with_comments.
-        let has_comments = self.has_comments_to_emit_between(obj.span.start, boundary);
+        let has_comments = self.has_comments_to_emit_between(span.start, boundary);
 
         // A comment trailing the opening `{` on its own line is kept on the `{`
         // line when the pattern expands (divergence from prettier, which relocates
@@ -928,13 +957,13 @@ impl<'a> Printer<'a> {
         // conformance_prettier_ts_comments.md §Comment relocation (Object destructuring `{`).
         let first_prop_start = obj.properties[0].span().start;
         let (brace_line_prefix, brace_pull_pos) = if has_comments {
-            self.delimiter_line_comment_prefix(obj.span.start, first_prop_start)
+            self.delimiter_line_comment_prefix(span.start, first_prop_start)
         } else {
             (None, None)
         };
 
         // Track previous end for comment detection (start after `{`)
-        let mut prev_end = obj.span.start + 1;
+        let mut prev_end = span.start + 1;
 
         let mut prop_parts = DocBuf::new();
         for (i, prop) in obj.properties.iter().enumerate() {
@@ -1045,12 +1074,12 @@ impl<'a> Printer<'a> {
                     // `to_assignable`, and that converts every `AssignmentExpression`
                     // into an `AssignmentPattern`.
                     debug_assert!(
-                        !matches!(&p.value, Expression::AssignmentExpression(_)),
+                        !matches!(p.value.kind, ExpressionKind::AssignmentExpression(_)),
                         "a pattern property's value is converted to an AssignmentPattern"
                     );
-                    match &p.value {
+                    match &p.value.kind {
                         // Simple shorthand: `{k}` — the value repeats the key.
-                        Expression::Identifier(_) => self.build_expression_doc(p.key),
+                        ExpressionKind::Identifier(_) => self.build_expression_doc(p.key),
                         _ => self.build_expression_doc(p.value),
                     }
                 } else {
@@ -1148,9 +1177,13 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an array pattern
-    pub(super) fn build_array_pattern_doc(&self, arr: &internal::ArrayPattern<'_>) -> DocId {
+    pub(super) fn build_array_pattern_doc(
+        &self,
+        arr: &internal::ArrayPattern<'_>,
+        arr_span: Span,
+    ) -> DocId {
         if arr.elements.is_empty() {
-            return self.build_empty_array_pattern_doc(arr);
+            return self.build_empty_array_pattern_doc(arr, arr_span);
         }
 
         // Expand if line comments, multi-line block comments, or own-line block comments.
@@ -1166,9 +1199,9 @@ impl<'a> Printer<'a> {
         // DROPPED outright (fixture `array_own_line_multiline_comment_expand`).
         // `has_own_line_block_comments_in_bracket_list` deliberately skips multi-line
         // comments — the multi-line question is this separate predicate's, not its.
-        let tail = self.array_pattern_tail(arr);
+        let tail = self.array_pattern_tail(arr, arr_span);
         let boundary = tail.body_end;
-        let has_comments = self.has_comments_on_page_between(arr.span.start, boundary);
+        let has_comments = self.has_comments_on_page_between(arr_span.start, boundary);
         let (has_line_comments, has_multiline_block, has_own_line_block) = if has_comments {
             // Flatten once (skip holes) and share across the scans.
             let non_null: SmallVec<[_; 8]> = arr.elements.iter().flatten().collect();
@@ -1178,7 +1211,7 @@ impl<'a> Printer<'a> {
             // than this caller asks.
             let has_line_comments = self
                 .collection_formatting_hints(
-                    arr.span.start,
+                    arr_span.start,
                     boundary,
                     &non_null,
                     true,
@@ -1187,9 +1220,9 @@ impl<'a> Printer<'a> {
                 )
                 .0;
             let has_multiline_block =
-                self.has_multiline_block_comments_on_page_between(arr.span.start, boundary);
+                self.has_multiline_block_comments_on_page_between(arr_span.start, boundary);
             let has_own_line_block = self.has_own_line_block_comments_in_bracket_list(
-                Span::new(arr.span.start, boundary),
+                Span::new(arr_span.start, boundary),
                 &non_null,
                 // The element's PRINTED span: a comment in a stripped shell's interior is
                 // NOT "inside the element" for this gate, because the element's doc does
@@ -1202,19 +1235,19 @@ impl<'a> Printer<'a> {
         };
 
         if has_line_comments || has_multiline_block || has_own_line_block {
-            self.build_expanded_array_pattern_doc(arr, tail)
+            self.build_expanded_array_pattern_doc(arr, arr_span, tail)
         } else {
-            self.build_grouped_array_pattern_doc(arr, tail, has_comments)
+            self.build_grouped_array_pattern_doc(arr, arr_span, tail, has_comments)
         }
     }
 
     /// Build doc for empty array pattern: `[]` with optional type annotation
-    fn build_empty_array_pattern_doc(&self, arr: &internal::ArrayPattern<'_>) -> DocId {
+    fn build_empty_array_pattern_doc(&self, arr: &internal::ArrayPattern<'_>, span: Span) -> DocId {
         // For array patterns with a `?` / type annotation, the body ends at the `]`
-        let tail = self.array_pattern_tail(arr);
+        let tail = self.array_pattern_tail(arr, span);
 
         let body_doc =
-            self.build_empty_brackets_inline_with_comments_doc_range(arr.span.start, tail.body_end);
+            self.build_empty_brackets_inline_with_comments_doc_range(span.start, tail.body_end);
 
         self.append_opt(body_doc, self.build_pattern_tail_doc(tail))
     }
@@ -1226,13 +1259,14 @@ impl<'a> Printer<'a> {
     fn build_grouped_array_pattern_doc(
         &self,
         arr: &internal::ArrayPattern<'_>,
+        span: Span,
         tail: PatternTail<'_>,
         has_comments: bool,
     ) -> DocId {
         let d = self.d();
         let boundary = tail.body_end;
         let mut parts = d.pooled_docbuf();
-        let mut prev_end = arr.span.start + 1;
+        let mut prev_end = span.start + 1;
 
         for (i, elem) in arr.elements.iter().enumerate() {
             let is_last = i == arr.elements.len() - 1;
@@ -1316,12 +1350,13 @@ impl<'a> Printer<'a> {
     fn build_expanded_array_pattern_doc(
         &self,
         arr: &internal::ArrayPattern<'_>,
+        arr_span: Span,
         tail: PatternTail<'_>,
     ) -> DocId {
         let d = self.d();
         let boundary = tail.body_end;
         let mut parts = DocBuf::new();
-        let mut prev_end = arr.span.start + 1;
+        let mut prev_end = arr_span.start + 1;
 
         // A comment trailing the opening `[` on its own line is kept on the `[`
         // line when the pattern expands (divergence from prettier, which relocates
@@ -1332,7 +1367,7 @@ impl<'a> Printer<'a> {
         let (bracket_line_prefix, bracket_pull_pos) =
             match arr.elements.first().and_then(|opt| opt.as_ref()) {
                 Some(first) => {
-                    self.delimiter_line_comment_prefix(arr.span.start, first.span().start)
+                    self.delimiter_line_comment_prefix(arr_span.start, first.span().start)
                 }
                 None => (None, None),
             };
@@ -1354,7 +1389,7 @@ impl<'a> Printer<'a> {
                 // format-ignore directive in the element's gap freezes it verbatim
                 // (Rule A) — the array literal's expanding printer does the same, and
                 // either spelling of an own-line comment routes the pattern here.
-                let frozen_span = self.element_frozen_span(arr.span.start + 1, arr.elements, i);
+                let frozen_span = self.element_frozen_span(arr_span.start + 1, arr.elements, i);
                 let element_doc = match frozen_span {
                     Some(frozen) => self.build_frozen_arg_doc(e, frozen),
                     None => self.build_expression_doc(e),
@@ -1457,6 +1492,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_assignment_pattern_doc(
         &self,
         pattern: &internal::AssignmentPattern<'_>,
+        span: Span,
     ) -> DocId {
         let d = self.d();
         // A type-assertion target keeps its required parens (`{ a: (b as T) =
@@ -1466,7 +1502,7 @@ impl<'a> Printer<'a> {
         // The object-pattern arm is asked first: it never takes the pair
         // (`needs_parens` matches only the three type assertions), and its
         // reassembled doc keeps its own owned-comment claim below.
-        let left_doc = if let Expression::ObjectPattern(obj) = pattern.left {
+        let left_doc = if let ExpressionKind::ObjectPattern(obj) = &pattern.left.kind {
             // A destructuring default's left object pattern does NOT expand on nesting
             // — prettier's shouldBreak excludes an AssignmentPattern parent (object.js),
             // so `{ a: { b } = {} }` (and deeper) stays inline. Width-based breaking
@@ -1477,15 +1513,14 @@ impl<'a> Printer<'a> {
             // `docs/comments.md` hazard 1. The `AssignmentPattern` above it hands the claim
             // down (`left_spine_child`), and with nothing catching it here
             // `[/* c */ {a} = 1]` DROPS the comment outright.
-            let obj_doc =
-                self.build_object_pattern_doc_with_context(obj, PatternContext::AssignmentDefault);
-            self.prepend_owned_leading_comment_at(obj.span.start, obj_doc)
+            let obj_doc = self.build_object_pattern_doc_with_context(
+                obj,
+                pattern.left.span,
+                PatternContext::AssignmentDefault,
+            );
+            self.prepend_owned_leading_comment_at(pattern.left.span.start, obj_doc)
         } else {
-            self.build_shell_operand_doc(
-                pattern.span.start,
-                pattern.left,
-                ParenContext::AssignmentTarget,
-            )
+            self.build_shell_operand_doc(span.start, pattern.left, ParenContext::AssignmentTarget)
         };
 
         let left_end = pattern.left.span().end;

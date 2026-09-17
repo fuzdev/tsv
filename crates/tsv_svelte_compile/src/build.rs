@@ -44,7 +44,7 @@ use bumpalo::Bump;
 use tsv_lang::Span;
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ArrowFunctionExpression, AssignmentExpression, AssignmentOperator,
-    BinaryExpression, BinaryOperator, BlockStatement, CallExpression, Expression,
+    BinaryExpression, BinaryOperator, BlockStatement, CallExpression, Expression, ExpressionKind,
     ExpressionStatement, FunctionDeclaration, IdentName, Identifier, IfStatement,
     ImportDeclaration, ImportKind, ImportNamespaceSpecifier, ImportPhase, ImportSpecifier, Literal,
     LiteralValue, MemberExpression, ObjectExpression, Property, PropertyKind, Statement,
@@ -93,7 +93,7 @@ impl<'arena> Builder<'arena> {
     /// A synthetic identifier as an arena-allocated expression.
     pub fn ident_expr(&mut self, name: &str) -> &'arena Expression<'arena> {
         let ident = self.ident(name);
-        self.arena.alloc(Expression::Identifier(ident))
+        self.arena.alloc(Expression::from_identifier(ident))
     }
 
     /// A synthetic identifier at a caller-chosen span (no minting). The
@@ -116,7 +116,7 @@ impl<'arena> Builder<'arena> {
     /// windows only).
     pub fn ident_expr_at(&self, name: &str, span: Span) -> &'arena Expression<'arena> {
         self.arena
-            .alloc(Expression::Identifier(self.ident_at(name, span)))
+            .alloc(Expression::from_identifier(self.ident_at(name, span)))
     }
 
     /// A single-quoted string literal minted into the appendix. `content` must
@@ -187,22 +187,24 @@ impl<'arena> Builder<'arena> {
         let member_span = Span::new(obj.span().start, prop.span().end);
         self.mint("(");
         let end = self.mint(")").end;
-        let callee = self
-            .arena
-            .alloc(Expression::MemberExpression(MemberExpression {
+        let callee = self.arena.alloc(Expression {
+            span: member_span,
+            kind: ExpressionKind::MemberExpression(MemberExpression {
                 object: obj,
                 property: prop,
                 computed: false,
                 optional: false,
-                span: member_span,
-            }));
-        Expression::CallExpression(CallExpression {
-            callee,
-            type_arguments: None,
-            arguments,
-            optional: false,
+            }),
+        });
+        Expression {
             span: Span::new(member_span.start, end),
-        })
+            kind: ExpressionKind::CallExpression(CallExpression {
+                callee,
+                type_arguments: None,
+                arguments,
+                optional: false,
+            }),
+        }
     }
 
     /// A template literal from alternating static parts and expressions
@@ -238,7 +240,7 @@ impl<'arena> Builder<'arena> {
             }
         }
         let end = self.mint("`").end;
-        Expression::TemplateLiteral(TemplateLiteral {
+        Expression::from_template_literal(TemplateLiteral {
             quasis: quasis.into_bump_slice(),
             expressions,
             span: Span::new(start, end),
@@ -259,13 +261,15 @@ impl<'arena> Builder<'arena> {
         arguments: &'arena [Expression<'arena>],
     ) -> Expression<'arena> {
         self.mint("()");
-        Expression::CallExpression(CallExpression {
-            callee,
-            type_arguments: None,
-            arguments,
-            optional: false,
+        Expression {
             span: callee.span(),
-        })
+            kind: ExpressionKind::CallExpression(CallExpression {
+                callee,
+                type_arguments: None,
+                arguments,
+                optional: false,
+            }),
+        }
     }
 
     /// A call on a borrowed callee with an argument list (`foo($$renderer, x)`
@@ -280,13 +284,15 @@ impl<'arena> Builder<'arena> {
     ) -> Expression<'arena> {
         self.mint(if optional { "?.(" } else { "(" });
         let end = self.mint(")").end;
-        Expression::CallExpression(CallExpression {
-            callee,
-            type_arguments: None,
-            arguments,
-            optional,
+        Expression {
             span: Span::new(callee.span().start, end),
-        })
+            kind: ExpressionKind::CallExpression(CallExpression {
+                callee,
+                type_arguments: None,
+                arguments,
+                optional,
+            }),
+        }
     }
 
     /// `() => <body>` — the `$derived` thunk (and the destructured-`$derived`
@@ -301,16 +307,20 @@ impl<'arena> Builder<'arena> {
     /// print the argument's comments a second time inside `()`.
     pub fn thunk_on_body(&self, body: &'arena Expression<'arena>) -> Expression<'arena> {
         let span = body.span();
-        Expression::ArrowFunctionExpression(self.arena.alloc(ArrowFunctionExpression {
-            type_parameters: None,
-            params: &[],
-            body: ArrowFunctionBody::Expression(body),
-            return_type: None,
-            r#async: false,
-            params_start: None,
-            arrow_token: span.start,
+        Expression {
             span,
-        }))
+            kind: ExpressionKind::ArrowFunctionExpression(self.arena.alloc(
+                ArrowFunctionExpression {
+                    type_parameters: None,
+                    params: &[],
+                    body: ArrowFunctionBody::Expression(body),
+                    return_type: None,
+                    r#async: false,
+                    params_start: None,
+                    arrow_token: span.start,
+                },
+            )),
+        }
     }
 
     /// `<object>.<property>(<arguments>)` — the fictional-span form of
@@ -333,22 +343,24 @@ impl<'arena> Builder<'arena> {
         let low = Span::new(anchor.start, anchor.start);
         let object = self.ident_expr_at(object, low);
         let property = self.ident_expr_at(property, low);
-        let callee = self
-            .arena
-            .alloc(Expression::MemberExpression(MemberExpression {
+        let callee = self.arena.alloc(Expression {
+            span: low,
+            kind: ExpressionKind::MemberExpression(MemberExpression {
                 object,
                 property,
                 computed: false,
                 optional: false,
-                span: low,
-            }));
-        Expression::CallExpression(CallExpression {
-            callee,
-            type_arguments: None,
-            arguments,
-            optional: false,
+            }),
+        });
+        Expression {
             span: anchor,
-        })
+            kind: ExpressionKind::CallExpression(CallExpression {
+                callee,
+                type_arguments: None,
+                arguments,
+                optional: false,
+            }),
+        }
     }
 
     /// `void 0` as a zero-width fictional node at host position `at`, for a
@@ -360,7 +372,7 @@ impl<'arena> Builder<'arena> {
     /// and reads no source, so the node can sit at `at` — the end of the replaced
     /// call, leaving a comment inside the empty call to the window before it.
     pub fn void_zero_at(&self, at: u32) -> Expression<'arena> {
-        Expression::Identifier(self.ident_at("void 0", Span::new(at, at)))
+        Expression::from_identifier(self.ident_at("void 0", Span::new(at, at)))
     }
 
     /// `(<params>) => { <stmts> }` — a block-bodied arrow (the
@@ -379,19 +391,23 @@ impl<'arena> Builder<'arena> {
         let params_start = start;
         self.mint(") => {");
         let end = self.mint("}").end;
-        Expression::ArrowFunctionExpression(self.arena.alloc(ArrowFunctionExpression {
-            type_parameters: None,
-            params,
-            body: ArrowFunctionBody::BlockStatement(BlockStatement {
-                body,
-                span: block_span,
-            }),
-            return_type: None,
-            r#async: false,
-            params_start: Some(params_start),
-            arrow_token: block_span.start,
+        Expression {
             span: Span::new(start, end),
-        }))
+            kind: ExpressionKind::ArrowFunctionExpression(self.arena.alloc(
+                ArrowFunctionExpression {
+                    type_parameters: None,
+                    params,
+                    body: ArrowFunctionBody::BlockStatement(BlockStatement {
+                        body,
+                        span: block_span,
+                    }),
+                    return_type: None,
+                    r#async: false,
+                    params_start: Some(params_start),
+                    arrow_token: block_span.start,
+                },
+            )),
+        }
     }
 
     /// A zero-width synthetic span at the current appendix end. For a wrapper
@@ -413,13 +429,15 @@ impl<'arena> Builder<'arena> {
         self.mint(".");
         let prop = self.ident_expr(name);
         let span = Span::new(object.span().start, prop.span().end);
-        Expression::MemberExpression(MemberExpression {
-            object,
-            property: prop,
-            computed: false,
-            optional: false,
+        Expression {
             span,
-        })
+            kind: ExpressionKind::MemberExpression(MemberExpression {
+                object,
+                property: prop,
+                computed: false,
+                optional: false,
+            }),
+        }
     }
 
     /// `<object>[<index>]` — a computed member (`each_array[$$index]`).
@@ -431,13 +449,15 @@ impl<'arena> Builder<'arena> {
         self.mint("[");
         let end = self.mint("]").end;
         let span = Span::new(object.span().start, end);
-        Expression::MemberExpression(MemberExpression {
-            object,
-            property: index,
-            computed: true,
-            optional: false,
+        Expression {
             span,
-        })
+            kind: ExpressionKind::MemberExpression(MemberExpression {
+                object,
+                property: index,
+                computed: true,
+                optional: false,
+            }),
+        }
     }
 
     /// `<left> <op> <right>` — a binary expression (`$$index < $$length`,
@@ -450,15 +470,17 @@ impl<'arena> Builder<'arena> {
     ) -> Expression<'arena> {
         self.mint(&format!(" {} ", op.as_str()));
         let span = Span::new(left.span().start, right.span().end);
-        Expression::BinaryExpression(BinaryExpression {
-            left,
-            operator: op,
-            right,
+        Expression {
             span,
-            // Minted code, not source the printer will re-lex: the builder emits its own
-            // spelling, and no shape it mints opens a type-argument region.
-            relexes_as_type_arguments: false,
-        })
+            kind: ExpressionKind::BinaryExpression(BinaryExpression {
+                left,
+                operator: op,
+                right,
+                // Minted code, not source the printer will re-lex: the builder emits its own
+                // spelling, and no shape it mints opens a type-argument region.
+                relexes_as_type_arguments: false,
+            }),
+        }
     }
 
     /// `<argument>++` / `<argument>--` (postfix) — an update expression.
@@ -474,12 +496,14 @@ impl<'arena> Builder<'arena> {
         };
         let end = self.mint(text).end;
         let span = Span::new(argument.span().start, end);
-        Expression::UpdateExpression(UpdateExpression {
-            operator: op,
-            argument,
-            prefix: false,
+        Expression {
             span,
-        })
+            kind: ExpressionKind::UpdateExpression(UpdateExpression {
+                operator: op,
+                argument,
+                prefix: false,
+            }),
+        }
     }
 
     /// `[<elements>]` — an array literal. The `[`/`]` are minted for span bounds;
@@ -492,17 +516,19 @@ impl<'arena> Builder<'arena> {
     ) -> Expression<'arena> {
         let start = self.mint("[").start;
         let end = self.mint("]").end;
-        Expression::ArrayExpression(tsv_ts::ast::internal::ArrayExpression {
-            elements,
-            spread_trailing_comma: false,
+        Expression {
             span: Span::new(start, end),
-        })
+            kind: ExpressionKind::ArrayExpression(tsv_ts::ast::internal::ArrayExpression {
+                elements,
+                spread_trailing_comma: false,
+            }),
+        }
     }
 
     /// A numeric literal expression (`0`).
     pub fn number(&mut self, value: f64) -> Expression<'arena> {
         let span = self.mint(&format!("{value}"));
-        Expression::Literal(Literal {
+        Expression::from_literal(Literal {
             value: LiteralValue::Number(value),
             span,
         })
@@ -544,11 +570,11 @@ impl<'arena> Builder<'arena> {
     /// `void 0` — the oracle's spelling of an absent rune argument.
     pub fn void_zero(&mut self) -> Expression<'arena> {
         let span = self.mint("void 0");
-        let zero = self.arena.alloc(Expression::Literal(Literal {
+        let zero = self.arena.alloc(Expression::from_literal(Literal {
             value: LiteralValue::Number(0.0),
             span: Span::new(span.end - 1, span.end),
         }));
-        Expression::UnaryExpression(UnaryExpression {
+        Expression::from_unary_expression(UnaryExpression {
             operator: UnaryOperator::Void,
             argument: zero,
             prefix: true,
@@ -559,7 +585,7 @@ impl<'arena> Builder<'arena> {
     /// A `true` literal (the `$.attr(name, value, true)` boolean-attribute arg).
     pub fn true_literal(&mut self) -> Expression<'arena> {
         let span = self.mint("true");
-        Expression::Literal(Literal {
+        Expression::from_literal(Literal {
             value: LiteralValue::Boolean(true),
             span,
         })
@@ -567,7 +593,7 @@ impl<'arena> Builder<'arena> {
 
     /// A single-quoted string literal expression.
     pub fn string_literal_expr(&mut self, content: &str) -> Expression<'arena> {
-        Expression::Literal(self.string_literal(content))
+        Expression::from_literal(self.string_literal(content))
     }
 
     /// `$.store_get(($$store_subs ??= {}), '$<base>', <base>)` — the oracle's SSR
@@ -590,7 +616,7 @@ impl<'arena> Builder<'arena> {
         let mut args: bumpalo::collections::Vec<'arena, Expression<'arena>> =
             bumpalo::collections::Vec::new_in(self.arena);
         args.push(self.store_subs_assign(at));
-        args.push(Expression::Identifier(
+        args.push(Expression::from_identifier(
             self.ident_at(&format!("'${base}'"), at),
         ));
         args.push(self.store_base_value(base, base_is_derived, at));
@@ -599,34 +625,38 @@ impl<'arena> Builder<'arena> {
 
     /// `($$store_subs ??= {})` zero-width at `at` ([`Self::store_get`]).
     fn store_subs_assign(&self, at: Span) -> Expression<'arena> {
-        let obj = self
-            .arena
-            .alloc(Expression::ObjectExpression(ObjectExpression {
+        let obj = self.arena.alloc(Expression {
+            span: at,
+            kind: ExpressionKind::ObjectExpression(ObjectExpression {
                 properties: &[],
                 spread_trailing_comma: false,
-                span: at,
-            }));
-        Expression::AssignmentExpression(AssignmentExpression {
-            left: self.ident_expr_at("$$store_subs", at),
-            operator: AssignmentOperator::NullishAssign,
-            right: obj,
+            }),
+        });
+        Expression {
             span: at,
-        })
+            kind: ExpressionKind::AssignmentExpression(AssignmentExpression {
+                left: self.ident_expr_at("$$store_subs", at),
+                operator: AssignmentOperator::NullishAssign,
+                right: obj,
+            }),
+        }
     }
 
     /// The store's value expression — `<base>()` when `base` is a `$derived` binding,
     /// else the bare `<base>` identifier — zero-width at `at` ([`Self::store_get`]).
     fn store_base_value(&self, base: &str, base_is_derived: bool, at: Span) -> Expression<'arena> {
         if base_is_derived {
-            Expression::CallExpression(CallExpression {
-                callee: self.ident_expr_at(base, at),
-                type_arguments: None,
-                arguments: &[],
-                optional: false,
+            Expression {
                 span: at,
-            })
+                kind: ExpressionKind::CallExpression(CallExpression {
+                    callee: self.ident_expr_at(base, at),
+                    type_arguments: None,
+                    arguments: &[],
+                    optional: false,
+                }),
+            }
         } else {
-            Expression::Identifier(self.ident_at(base, at))
+            Expression::from_identifier(self.ident_at(base, at))
         }
     }
 
@@ -651,7 +681,7 @@ impl<'arena> Builder<'arena> {
         assign: Span,
     ) -> Expression<'arena> {
         let at = value.span().start;
-        let base_ident = Expression::Identifier(self.ident_at(base, Span::new(at, at)));
+        let base_ident = Expression::from_identifier(self.ident_at(base, Span::new(at, at)));
         let mut args: bumpalo::collections::Vec<'arena, Expression<'arena>> =
             bumpalo::collections::Vec::new_in(self.arena);
         args.push(base_ident);
@@ -680,12 +710,12 @@ impl<'arena> Builder<'arena> {
         let mut args: bumpalo::collections::Vec<'arena, Expression<'arena>> =
             bumpalo::collections::Vec::new_in(self.arena);
         args.push(self.store_subs_assign(at));
-        args.push(Expression::Identifier(
+        args.push(Expression::from_identifier(
             self.ident_at(&format!("'${base}'"), at),
         ));
-        args.push(Expression::Identifier(self.ident_at(base, at)));
+        args.push(Expression::from_identifier(self.ident_at(base, at)));
         if decrement {
-            args.push(Expression::Identifier(self.ident_at("-1", at)));
+            args.push(Expression::from_identifier(self.ident_at("-1", at)));
         }
         let property = if prefix {
             "update_store_pre"
@@ -701,7 +731,7 @@ impl<'arena> Builder<'arena> {
     /// gives.
     pub fn store_subs_var_at(&self, at: u32) -> Statement<'arena> {
         let span = Span::new(at, at);
-        let id = Expression::Identifier(self.ident_at("$$store_subs", span));
+        let id = Expression::from_identifier(self.ident_at("$$store_subs", span));
         let declarator = VariableDeclarator {
             id: self.arena.alloc(id),
             init: None,
@@ -721,7 +751,7 @@ impl<'arena> Builder<'arena> {
     /// cleanup, injected as the component body's last statement (before any
     /// `$.bind_props`).
     pub fn unsubscribe_stores_stmt(&mut self) -> Statement<'arena> {
-        let test = Expression::Identifier(self.ident("$$store_subs"));
+        let test = Expression::from_identifier(self.ident("$$store_subs"));
         let test_start = test.span().start;
         let subs_arg = self.ident_expr("$$store_subs");
         let call = self.member_call("$", "unsubscribe_stores", std::slice::from_ref(subs_arg));

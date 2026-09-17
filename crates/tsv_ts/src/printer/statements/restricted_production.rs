@@ -12,10 +12,11 @@
 // production asking the same question, and answering it twice would let the two drift.
 
 use super::Printer;
-use crate::ast::internal::{self, Expression};
+use crate::ast::internal::{self, Expression, ExpressionKind};
 use crate::printer::expressions::operators::SeqLayout;
 use crate::printer::statements::TerminatorGap;
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{
@@ -141,7 +142,7 @@ impl<'a> Printer<'a> {
         // Note: own-line comment check above takes priority — when there's a line
         // comment, the whole thing wraps in outer parens with build_comment_paren_doc
         // (which adds inner assignment parens separately).
-        if matches!(arg, Expression::AssignmentExpression(_)) {
+        if matches!(arg.kind, ExpressionKind::AssignmentExpression(_)) {
             let expr_doc = self.build_expression_doc(arg);
             let mut parts: DocBuf = if let Some(comments_doc) = inline_comments {
                 smallvec![
@@ -193,7 +194,7 @@ impl<'a> Printer<'a> {
         // built via the value-position sequence printer. `throw` floats it out, so it
         // falls through to the generic path (which uses the default `build_sequence_doc`).
         if keyword == "return"
-            && let Expression::SequenceExpression(seq) = arg
+            && let ExpressionKind::SequenceExpression(seq) = &arg.kind
         {
             // The grouping `)` sits outside `seq.span` (the parens aren't part of the
             // node); a trailing comment before it stays inside the parens. Scan to the
@@ -205,7 +206,8 @@ impl<'a> Printer<'a> {
             let grouping_close = self
                 .collapsed_grouping_close(argument_end, span_end)
                 .unwrap_or(argument_end);
-            let seq_doc = self.build_sequence_doc_value(seq, grouping_close, SeqLayout::Hanging);
+            let seq_doc =
+                self.build_sequence_doc_value(seq, arg.span, grouping_close, SeqLayout::Hanging);
             let mut parts: DocBuf = if let Some(comments_doc) = inline_comments {
                 smallvec![d.text(keyword), d.text(" "), comments_doc, seq_doc]
             } else {
@@ -231,21 +233,28 @@ impl<'a> Printer<'a> {
             return d.concat(&parts);
         }
 
-        if let Expression::BinaryExpression(binary) = arg {
-            return self.build_binary_paren_doc(keyword, binary, span_end, inline_comments, gap);
+        if let ExpressionKind::BinaryExpression(binary) = &arg.kind {
+            return self.build_binary_paren_doc(
+                keyword,
+                binary,
+                arg.span,
+                span_end,
+                inline_comments,
+                gap,
+            );
         }
 
         // Ternary in return/throw: binary test expressions need continuation indent.
         // Matches Prettier's `shouldNotIndent` (`print/binaryish.js`) — when the binary's
         // grandparent is ReturnStatement/ThrowStatement, shouldNotIndent = false.
-        let expr_doc = if let Expression::ConditionalExpression(cond) = arg {
-            self.build_conditional_doc_with_binary_test_indent(cond)
-        } else if let Expression::SequenceExpression(seq) = arg {
+        let expr_doc = if let ExpressionKind::ConditionalExpression(cond) = &arg.kind {
+            self.build_conditional_doc_with_binary_test_indent(cond, arg.span)
+        } else if let ExpressionKind::SequenceExpression(seq) = &arg.kind {
             // `throw` — the `return` arm above claimed its own sequence. Prettier's
             // `shouldIndentSequenceExpression` covers both keywords, so the operands hang
             // inside the parens; only the trailing-comment side differs, and `throw` floats
             // it out, which is the default paren mode.
-            self.build_sequence_doc(seq, SeqLayout::Hanging)
+            self.build_sequence_doc(seq, arg.span, SeqLayout::Hanging)
         } else {
             self.build_expression_doc(arg)
         };
@@ -320,7 +329,7 @@ impl<'a> Printer<'a> {
     /// [`Printer::hoisted_left_side_child`]'s, stated once for this walk and the assignment
     /// layout's.
     fn chain_has_own_line_comment(&self, expr: &Expression<'_>) -> bool {
-        if let Expression::MemberExpression(member) = expr {
+        if let ExpressionKind::MemberExpression(member) = &expr.kind {
             // Leading own-line comment between object and property.
             let obj_end = member.object.span().end;
             let prop_start = member.property.span().start;
@@ -434,8 +443,8 @@ impl<'a> Printer<'a> {
         // leading edge — the `(` the parser stripped from that operand, and any comment
         // inside it (`return (⏎// c⏎a), b`) — is this gap's to print too; the sequence's
         // own span opens at that `(`, where the bare builder's scans do not reach.
-        let arg_start = match arg {
-            Expression::SequenceExpression(seq) => seq.expressions[0].span().start,
+        let arg_start = match &arg.kind {
+            ExpressionKind::SequenceExpression(seq) => seq.expressions[0].span().start,
             _ => arg.span().start,
         };
 
@@ -463,9 +472,9 @@ impl<'a> Printer<'a> {
         let frozen = self.value_head_frozen_span(paren_gap, arg.span());
         let expr_doc = match frozen {
             Some(frozen) => self.build_frozen_node_doc(frozen),
-            None => match arg {
-                Expression::SequenceExpression(seq) => {
-                    self.build_sequence_doc_bare(seq, seq.span.end)
+            None => match &arg.kind {
+                ExpressionKind::SequenceExpression(seq) => {
+                    self.build_sequence_doc_bare(seq, arg.span, arg.span.end)
                 }
                 // A return/throw argument is `shouldNotIndent` (`print/binaryish.js`) whichever
                 // form it takes: these hanging parens supply the one level, exactly as the
@@ -589,9 +598,9 @@ impl<'a> Printer<'a> {
         keyword: &'static str,
         arg: &Expression<'_>,
     ) -> bool {
-        match arg {
-            Expression::BinaryExpression(_) => true,
-            Expression::SequenceExpression(_) => keyword == "return",
+        match &arg.kind {
+            ExpressionKind::BinaryExpression(_) => true,
+            ExpressionKind::SequenceExpression(_) => keyword == "return",
             _ => false,
         }
     }
@@ -677,12 +686,13 @@ impl<'a> Printer<'a> {
         &self,
         keyword: &'static str,
         binary: &internal::BinaryExpression<'_>,
+        span: Span,
         span_end: u32,
         inline_comments: Option<DocId>,
         gap: TerminatorGap,
     ) -> DocId {
         let d = self.d();
-        let raw_expr_doc = self.build_binary_chain_doc_ungrouped(binary);
+        let raw_expr_doc = self.build_binary_chain_doc_ungrouped(binary, span);
         let expr_doc = if let Some(comments_doc) = inline_comments {
             d.concat(&[comments_doc, raw_expr_doc])
         } else {
@@ -698,7 +708,7 @@ impl<'a> Printer<'a> {
         // literal's `};`, the next statement's `;`) — that would pull the
         // statement's own trailing comment into this gap AND leave it for the
         // block's trailing-comment emitter too, printing it twice.
-        let expr_end = binary.span.end;
+        let expr_end = span.end;
         let semicolon_pos = find_char_skipping_comments(
             self.source.as_bytes(),
             expr_end as usize,

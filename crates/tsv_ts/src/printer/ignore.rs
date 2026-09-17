@@ -818,8 +818,8 @@ impl<'a> Printer<'a> {
             ParenContext::BinaryLeft { parent_op } => {
                 joins_a_trailing_angle_bracket(parent_op)
                     && matches!(
-                        operand,
-                        internal::Expression::NewExpression(new_expr)
+                        &operand.kind,
+                        internal::ExpressionKind::NewExpression(new_expr)
                             if new_expr.type_arguments.is_some()
                     )
             }
@@ -845,7 +845,7 @@ impl<'a> Printer<'a> {
         &self,
         expr: &internal::Expression<'_>,
     ) -> bool {
-        let internal::Expression::NewExpression(new_expr) = expr else {
+        let internal::ExpressionKind::NewExpression(new_expr) = &expr.kind else {
             return false;
         };
         let head_end = new_expr
@@ -853,7 +853,7 @@ impl<'a> Printer<'a> {
             .as_ref()
             .map_or_else(|| new_expr.callee.span().end, |args| args.span.end);
         let mut pos = head_end;
-        while let Some(i) = next_significant_byte(self.source, pos, new_expr.span.end) {
+        while let Some(i) = next_significant_byte(self.source, pos, expr.span.end) {
             if self.source.as_bytes()[i] == b'(' {
                 return false;
             }
@@ -1658,7 +1658,7 @@ impl<'a> Printer<'a> {
         frozen: Span,
     ) -> DocId {
         let doc = self.build_frozen_node_doc(frozen);
-        if matches!(expr, internal::Expression::SequenceExpression(_)) {
+        if matches!(expr.kind, internal::ExpressionKind::SequenceExpression(_)) {
             self.d().parens(doc)
         } else {
             doc

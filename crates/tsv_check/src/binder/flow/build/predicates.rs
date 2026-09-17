@@ -3,8 +3,8 @@
 //! out of the visitor modules. Purely a locality split — no behavior change.
 
 use tsv_ts::ast::internal::{
-    AssignmentOperator, BinaryExpression, BinaryOperator, Expression, LiteralValue, Statement,
-    UnaryOperator,
+    AssignmentOperator, BinaryExpression, BinaryOperator, Expression, ExpressionKind, LiteralValue,
+    Statement, UnaryOperator,
 };
 
 /// `is_potentially_executable` (utilities.go:4210) — the statement range (minus
@@ -67,8 +67,8 @@ pub(super) fn is_statement_range(stmt: &Statement<'_>) -> bool {
 
 /// `IsDottedName` (utilities.go:1613).
 pub(super) fn is_dotted_name(expr: &Expression<'_>) -> bool {
-    use Expression as E;
-    match expr {
+    use ExpressionKind as E;
+    match &expr.kind {
         E::Identifier(_) | E::ThisExpression(_) | E::Super(_) | E::MetaProperty(_) => true,
         E::MemberExpression(m) if !m.computed => is_dotted_name(m.object),
         E::ParenthesizedExpression(p) => is_dotted_name(p.expression),
@@ -80,8 +80,8 @@ pub(super) fn is_dotted_name(expr: &Expression<'_>) -> bool {
 /// Adapted to tsv's AST (tsc's comma/assignment `BinaryExpression` cases are
 /// tsv's `SequenceExpression` / `AssignmentExpression`).
 pub(in crate::binder::flow) fn is_narrowable_reference(node: &Expression<'_>) -> bool {
-    use Expression as E;
-    match node {
+    use ExpressionKind as E;
+    match &node.kind {
         E::Identifier(_) | E::ThisExpression(_) | E::Super(_) | E::MetaProperty(_) => true,
         E::MemberExpression(m) if !m.computed => is_narrowable_reference(m.object),
         E::ParenthesizedExpression(p) => is_narrowable_reference(p.expression),
@@ -99,19 +99,19 @@ pub(in crate::binder::flow) fn is_narrowable_reference(node: &Expression<'_>) ->
 
 fn is_string_or_numeric_literal_like(node: &Expression<'_>) -> bool {
     matches!(
-        node,
-        Expression::Literal(l) if matches!(l.value, LiteralValue::String(_) | LiteralValue::Number(_))
+        &node.kind,
+        ExpressionKind::Literal(l) if matches!(l.value, LiteralValue::String(_) | LiteralValue::Number(_))
     )
 }
 
 /// `IsEntityNameExpression` (utilities.go:1595) — an identifier or a dotted
 /// property-access chain bottoming in one.
 fn is_entity_name_expression(node: &Expression<'_>) -> bool {
-    use Expression as E;
-    match node {
+    use ExpressionKind as E;
+    match &node.kind {
         E::Identifier(_) => true,
         E::MemberExpression(m) if !m.computed => {
-            matches!(m.property, E::Identifier(_)) && is_entity_name_expression(m.object)
+            matches!(m.property.kind, E::Identifier(_)) && is_entity_name_expression(m.object)
         }
         _ => false,
     }
@@ -120,9 +120,9 @@ fn is_entity_name_expression(node: &Expression<'_>) -> bool {
 /// `isLeftHandSideExpressionKind` (utilities.go:396) — the postfix/primary
 /// expression forms. Reached only via the rare `(x = y).z` narrowable case.
 fn is_left_hand_side_expression(node: &Expression<'_>) -> bool {
-    use Expression as E;
+    use ExpressionKind as E;
     matches!(
-        node,
+        node.kind,
         E::MemberExpression(_)
             | E::NewExpression(_)
             | E::CallExpression(_)
@@ -146,11 +146,11 @@ fn is_left_hand_side_expression(node: &Expression<'_>) -> bool {
 }
 
 pub(super) fn is_true_keyword(expr: &Expression<'_>) -> bool {
-    matches!(expr, Expression::Literal(l) if matches!(l.value, LiteralValue::Boolean(true)))
+    matches!(&expr.kind, ExpressionKind::Literal(l) if matches!(l.value, LiteralValue::Boolean(true)))
 }
 
 pub(super) fn is_false_keyword(expr: &Expression<'_>) -> bool {
-    matches!(expr, Expression::Literal(l) if matches!(l.value, LiteralValue::Boolean(false)))
+    matches!(&expr.kind, ExpressionKind::Literal(l) if matches!(l.value, LiteralValue::Boolean(false)))
 }
 
 /// Whether a condition node is a logical `&&`/`||`/`??` or a logical
@@ -159,9 +159,9 @@ pub(super) fn is_false_keyword(expr: &Expression<'_>) -> bool {
 /// Such a node's sub-binder already wired the true/false targets, so
 /// `bindCondition` must NOT re-add the atomic true/false conditions.
 pub(super) fn is_logical_condition(e: &Expression<'_>) -> bool {
-    match e {
-        Expression::BinaryExpression(b) => b.operator.is_logical(),
-        Expression::AssignmentExpression(a) => is_logical_assign_op(a.operator),
+    match &e.kind {
+        ExpressionKind::BinaryExpression(b) => b.operator.is_logical(),
+        ExpressionKind::AssignmentExpression(a) => is_logical_assign_op(a.operator),
         _ => false,
     }
 }
@@ -173,9 +173,9 @@ pub(super) fn is_logical_condition(e: &Expression<'_>) -> bool {
 /// (binder.go:2782) ascends through. Every other expression is a value
 /// sub-position (see the reset in `visit_expression`).
 pub(super) fn is_condition_threading(e: &Expression<'_>) -> bool {
-    match e {
-        Expression::UnaryExpression(u) => u.operator == UnaryOperator::Bang,
-        Expression::ParenthesizedExpression(_) => true,
+    match &e.kind {
+        ExpressionKind::UnaryExpression(u) => u.operator == UnaryOperator::Bang,
+        ExpressionKind::ParenthesizedExpression(_) => true,
         _ => is_logical_condition(e),
     }
 }
@@ -196,13 +196,13 @@ pub(super) fn is_logical_assign_op(op: AssignmentOperator) -> bool {
 /// `AssignmentExpression` nodes (tsc folds them into `BinaryExpression`), so their
 /// `isNarrowingBinaryExpression` cases move here.
 pub(super) fn is_narrowing_expression(expr: &Expression<'_>) -> bool {
-    use Expression as E;
-    match expr {
+    use ExpressionKind as E;
+    match &expr.kind {
         E::Identifier(_) | E::ThisExpression(_) => true,
         E::MemberExpression(_) => contains_narrowable_reference(expr),
         E::CallExpression(c) => {
             c.arguments.iter().any(contains_narrowable_reference)
-                || matches!(c.callee, E::MemberExpression(m)
+                || matches!(&c.callee.kind, E::MemberExpression(m)
                     if !m.computed && contains_narrowable_reference(m.object))
         }
         E::ParenthesizedExpression(p) => is_narrowing_expression(p.expression),
@@ -238,14 +238,14 @@ fn contains_narrowable_reference(expr: &Expression<'_>) -> bool {
     if is_narrowable_reference(expr) {
         return true;
     }
-    match expr {
-        Expression::MemberExpression(m) if expr.has_optional_in_chain() => {
+    match &expr.kind {
+        ExpressionKind::MemberExpression(m) if expr.has_optional_in_chain() => {
             contains_narrowable_reference(m.object)
         }
-        Expression::CallExpression(c) if expr.has_optional_in_chain() => {
+        ExpressionKind::CallExpression(c) if expr.has_optional_in_chain() => {
             contains_narrowable_reference(c.callee)
         }
-        Expression::TSNonNullExpression(n) if expr.has_optional_in_chain() => {
+        ExpressionKind::TSNonNullExpression(n) if expr.has_optional_in_chain() => {
             contains_narrowable_reference(n.expression)
         }
         _ => false,
@@ -276,12 +276,12 @@ fn is_narrowing_binary_expression(b: &BinaryExpression<'_>) -> bool {
 
 /// `isNarrowableOperand` (binder.go:2686).
 fn is_narrowable_operand(expr: &Expression<'_>) -> bool {
-    match expr {
-        Expression::ParenthesizedExpression(p) => is_narrowable_operand(p.expression),
-        Expression::AssignmentExpression(a) if a.operator == AssignmentOperator::Assign => {
+    match &expr.kind {
+        ExpressionKind::ParenthesizedExpression(p) => is_narrowable_operand(p.expression),
+        ExpressionKind::AssignmentExpression(a) if a.operator == AssignmentOperator::Assign => {
             is_narrowable_operand(a.left)
         }
-        Expression::SequenceExpression(s) => {
+        ExpressionKind::SequenceExpression(s) => {
             s.expressions.last().is_some_and(is_narrowable_operand)
         }
         _ => contains_narrowable_reference(expr),
@@ -290,30 +290,30 @@ fn is_narrowable_operand(expr: &Expression<'_>) -> bool {
 
 /// `isNarrowingTypeOfOperands` (binder.go:2702) — `typeof <operand> === <string>`.
 fn is_narrowing_typeof_operands(expr1: &Expression<'_>, expr2: &Expression<'_>) -> bool {
-    matches!(expr1, Expression::UnaryExpression(u)
+    matches!(&expr1.kind, ExpressionKind::UnaryExpression(u)
         if u.operator == UnaryOperator::Typeof && is_narrowable_operand(u.argument))
         && is_string_literal_like(expr2)
 }
 
 /// `IsStringLiteralLike` — a string literal or a no-substitution template.
 fn is_string_literal_like(e: &Expression<'_>) -> bool {
-    match e {
-        Expression::Literal(l) => matches!(l.value, LiteralValue::String(_)),
-        Expression::TemplateLiteral(t) => t.expressions.is_empty(),
+    match &e.kind {
+        ExpressionKind::Literal(l) => matches!(l.value, LiteralValue::String(_)),
+        ExpressionKind::TemplateLiteral(t) => t.expressions.is_empty(),
         _ => false,
     }
 }
 
 /// `IsBooleanLiteral` — a `true` / `false` keyword literal.
 fn is_boolean_literal(e: &Expression<'_>) -> bool {
-    matches!(e, Expression::Literal(l) if matches!(l.value, LiteralValue::Boolean(_)))
+    matches!(&e.kind, ExpressionKind::Literal(l) if matches!(l.value, LiteralValue::Boolean(_)))
 }
 
 /// `SkipParentheses` — strip grouping `ParenthesizedExpression` wrappers (rare in
 /// tsv, which discards grouping parens except under `preserve_parens`).
 fn skip_parens<'a, 'arena>(e: &'a Expression<'arena>) -> &'a Expression<'arena> {
     let mut e = e;
-    while let Expression::ParenthesizedExpression(p) = e {
+    while let ExpressionKind::ParenthesizedExpression(p) = &e.kind {
         e = p.expression;
     }
     e

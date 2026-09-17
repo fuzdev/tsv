@@ -11,9 +11,20 @@ use super::{
     TSTypeParameterDeclaration, TSTypeParameterInstantiation,
 };
 
-/// Expression node type
+/// Expression node: the span every variant shares, beside the variant itself.
+///
+/// The span is hoisted out of the variants so reading it is a field load rather than a
+/// dispatch over [`ExpressionKind`]; a variant struct carries no span of its own unless
+/// some node also holds that type outside an `Expression` (see [`ExpressionKind`]).
 #[derive(Debug, Clone)]
-pub enum Expression<'arena> {
+pub struct Expression<'arena> {
+    pub span: Span,
+    pub kind: ExpressionKind<'arena>,
+}
+
+/// The variant half of an [`Expression`].
+#[derive(Debug, Clone)]
+pub enum ExpressionKind<'arena> {
     Literal(Literal<'arena>),
     Identifier(Identifier<'arena>),
     PrivateIdentifier(PrivateIdentifier<'arena>),
@@ -82,47 +93,78 @@ pub enum Expression<'arena> {
 }
 
 impl<'arena> Expression<'arena> {
+    #[inline]
     pub fn span(&self) -> Span {
-        match self {
-            Expression::Literal(lit) => lit.span,
-            Expression::Identifier(id) => id.span,
-            Expression::PrivateIdentifier(pid) => pid.span,
-            Expression::ObjectExpression(obj) => obj.span,
-            Expression::ArrayExpression(arr) => arr.span,
-            Expression::UnaryExpression(unary) => unary.span,
-            Expression::UpdateExpression(update) => update.span,
-            Expression::BinaryExpression(binary) => binary.span,
-            Expression::CallExpression(call) => call.span,
-            Expression::NewExpression(new) => new.span,
-            Expression::MemberExpression(member) => member.span,
-            Expression::ConditionalExpression(cond) => cond.span,
-            Expression::ArrowFunctionExpression(arrow) => arrow.span,
-            Expression::FunctionExpression(func) => func.span,
-            Expression::ClassExpression(class_expr) => class_expr.span,
-            Expression::SpreadElement(spread) => spread.span,
-            Expression::TemplateLiteral(template) => template.span,
-            Expression::TaggedTemplateExpression(tagged) => tagged.span,
-            Expression::AwaitExpression(await_expr) => await_expr.span,
-            Expression::YieldExpression(yield_expr) => yield_expr.span,
-            Expression::SequenceExpression(seq) => seq.span,
-            Expression::RegexLiteral(regex) => regex.span,
-            Expression::ThisExpression(t) => t.span,
-            Expression::Super(s) => s.span,
-            Expression::AssignmentExpression(assign) => assign.span,
-            Expression::ObjectPattern(obj) => obj.span,
-            Expression::ArrayPattern(arr) => arr.span,
-            Expression::AssignmentPattern(assign) => assign.span,
-            Expression::RestElement(rest) => rest.span,
-            Expression::TSTypeAssertion(type_assert) => type_assert.span,
-            Expression::TSAsExpression(as_expr) => as_expr.span,
-            Expression::TSSatisfiesExpression(sat_expr) => sat_expr.span,
-            Expression::TSInstantiationExpression(inst) => inst.span,
-            Expression::TSNonNullExpression(non_null) => non_null.span,
-            Expression::TSParameterProperty(param_prop) => param_prop.span,
-            Expression::ImportExpression(import) => import.span,
-            Expression::MetaProperty(meta) => meta.span,
-            Expression::JsdocCast(cast) => cast.span,
-            Expression::ParenthesizedExpression(paren) => paren.span,
+        self.span
+    }
+
+    /// Wrap an [`Identifier`], taking the wrapper's span from the node's own.
+    ///
+    /// The seven variant types some node also holds OUTSIDE an `Expression` keep a span
+    /// of their own, so their wrapped form carries it twice. Nothing asserts the two agree
+    /// (both are `pub`); they start equal because the wrapped form is built only through
+    /// these constructors, and no later span write reaches one of these seven — the
+    /// parameter parser's `?` / `: T` extension writes the wrapper span of an array or
+    /// object pattern, which has no second span to leave behind.
+    #[inline]
+    pub fn from_identifier(id: Identifier<'arena>) -> Self {
+        Self {
+            span: id.span,
+            kind: ExpressionKind::Identifier(id),
+        }
+    }
+
+    /// Wrap a [`Literal`] (see [`Expression::from_identifier`]).
+    #[inline]
+    pub fn from_literal(lit: Literal<'arena>) -> Self {
+        Self {
+            span: lit.span,
+            kind: ExpressionKind::Literal(lit),
+        }
+    }
+
+    /// Wrap a [`TemplateLiteral`] (see [`Expression::from_identifier`]).
+    #[inline]
+    pub fn from_template_literal(template: TemplateLiteral<'arena>) -> Self {
+        Self {
+            span: template.span,
+            kind: ExpressionKind::TemplateLiteral(template),
+        }
+    }
+
+    /// Wrap a [`RestElement`] (see [`Expression::from_identifier`]).
+    #[inline]
+    pub fn from_rest_element(rest: RestElement<'arena>) -> Self {
+        Self {
+            span: rest.span,
+            kind: ExpressionKind::RestElement(rest),
+        }
+    }
+
+    /// Wrap a [`SpreadElement`] (see [`Expression::from_identifier`]).
+    #[inline]
+    pub fn from_spread_element(spread: SpreadElement<'arena>) -> Self {
+        Self {
+            span: spread.span,
+            kind: ExpressionKind::SpreadElement(spread),
+        }
+    }
+
+    /// Wrap a [`UnaryExpression`] (see [`Expression::from_identifier`]).
+    #[inline]
+    pub fn from_unary_expression(unary: UnaryExpression<'arena>) -> Self {
+        Self {
+            span: unary.span,
+            kind: ExpressionKind::UnaryExpression(unary),
+        }
+    }
+
+    /// Wrap an arena-allocated [`FunctionExpression`] (see [`Expression::from_identifier`]).
+    #[inline]
+    pub fn from_function_expression(func: &'arena FunctionExpression<'arena>) -> Self {
+        Self {
+            span: func.span,
+            kind: ExpressionKind::FunctionExpression(func),
         }
     }
 
@@ -150,10 +192,10 @@ impl<'arena> Expression<'arena> {
     /// interior is its own doc's share to print (§A stripped-paren interior is a partition
     /// too), so its span end is already its printed end.
     pub fn printed_end(&self) -> u32 {
-        match self {
-            Expression::AssignmentPattern(assign) => assign.right.printed_end(),
-            Expression::TSParameterProperty(param_prop) => param_prop.parameter.printed_end(),
-            _ => self.span().end,
+        match &self.kind {
+            ExpressionKind::AssignmentPattern(assign) => assign.right.printed_end(),
+            ExpressionKind::TSParameterProperty(param_prop) => param_prop.parameter.printed_end(),
+            _ => self.span.end,
         }
     }
 
@@ -165,14 +207,14 @@ impl<'arena> Expression<'arena> {
     /// an assertion. Peeling is a QUESTION here, never an emission: the wire keeps the
     /// assertion node, and only convert's `unwrap_jsdoc_casts` drops anything.
     pub fn skip_type_assertions(&self) -> &Expression<'arena> {
-        match self {
-            Expression::TSAsExpression(e) => e.expression.skip_type_assertions(),
-            Expression::TSSatisfiesExpression(e) => e.expression.skip_type_assertions(),
-            Expression::TSNonNullExpression(e) => e.expression.skip_type_assertions(),
-            Expression::TSTypeAssertion(e) => e.expression.skip_type_assertions(),
+        match &self.kind {
+            ExpressionKind::TSAsExpression(e) => e.expression.skip_type_assertions(),
+            ExpressionKind::TSSatisfiesExpression(e) => e.expression.skip_type_assertions(),
+            ExpressionKind::TSNonNullExpression(e) => e.expression.skip_type_assertions(),
+            ExpressionKind::TSTypeAssertion(e) => e.expression.skip_type_assertions(),
             // A JSDoc `/** @type {T} */ (expr)` cast is a type assertion too —
             // peel it to its inner target like the others.
-            Expression::JsdocCast(e) => e.inner.skip_type_assertions(),
+            ExpressionKind::JsdocCast(e) => e.inner.skip_type_assertions(),
             _ => self,
         }
     }
@@ -185,7 +227,7 @@ impl<'arena> Expression<'arena> {
     /// unwrapped inner's.
     pub fn unwrap_jsdoc_casts(&self) -> &Expression<'arena> {
         let mut e = self;
-        while let Expression::JsdocCast(cast) = e {
+        while let ExpressionKind::JsdocCast(cast) = &e.kind {
             e = cast.inner;
         }
         e
@@ -195,8 +237,8 @@ impl<'arena> Expression<'arena> {
     /// spread-interior helpers unwrap to reach their `SpreadElement` core.
     /// `ObjectProperty::as_spread` is the property-list counterpart.
     pub fn as_spread(&self) -> Option<&SpreadElement<'arena>> {
-        match self {
-            Expression::SpreadElement(s) => Some(s),
+        match &self.kind {
+            ExpressionKind::SpreadElement(s) => Some(s),
             _ => None,
         }
     }
@@ -223,17 +265,17 @@ impl<'arena> Expression<'arena> {
     /// answer down instead of re-deriving it — see the convert layer's
     /// `ChainState`.
     pub fn has_optional_in_chain(&self) -> bool {
-        match self {
-            Expression::MemberExpression(m) => {
+        match &self.kind {
+            ExpressionKind::MemberExpression(m) => {
                 m.optional
-                    || (m.span.start >= m.object.span().start && m.object.has_optional_in_chain())
+                    || (self.span.start >= m.object.span.start && m.object.has_optional_in_chain())
             }
-            Expression::CallExpression(c) => {
+            ExpressionKind::CallExpression(c) => {
                 c.optional
-                    || (c.span.start >= c.callee.span().start && c.callee.has_optional_in_chain())
+                    || (self.span.start >= c.callee.span.start && c.callee.has_optional_in_chain())
             }
-            Expression::TSNonNullExpression(n) => {
-                n.span.start >= n.expression.span().start && n.expression.has_optional_in_chain()
+            ExpressionKind::TSNonNullExpression(n) => {
+                self.span.start >= n.expression.span.start && n.expression.has_optional_in_chain()
             }
             _ => false,
         }
@@ -248,8 +290,8 @@ impl<'arena> Expression<'arena> {
 /// them the assertion is dropped). Ordinary grouping parens are discarded at
 /// parse time; cast parens are preserved here so the printer can re-emit them.
 ///
-/// `span` covers the parentheses (`(`…`)`); `inner` keeps its own paren-free
-/// span. **Never serialized** — the convert layer unwraps to `inner`, so the
+/// The holding `Expression`'s span covers the parentheses (`(`…`)`); `inner` keeps its
+/// own paren-free span. **Never serialized** — the convert layer unwraps to `inner`, so the
 /// public AST stays paren-free, matching acorn/Svelte (which carry no
 /// `ParenthesizedExpression`). Distinct from a bare grouping paren, the wrapper
 /// is opaque to layout heuristics (expand-last etc.), mirroring how acorn's
@@ -257,9 +299,6 @@ impl<'arena> Expression<'arena> {
 #[derive(Debug, Clone)]
 pub struct JsdocCast<'arena> {
     pub inner: &'arena Expression<'arena>,
-    /// The `(`…`)` of the cast — the comment is **not** included, so enclosing nodes
-    /// keep taking their paren-inclusive bounds from here (matching acorn's spans).
-    pub span: Span,
     /// The `@type`/`@satisfies` comment glued to `span.start`. The cast owns it
     /// (`Comment::owned_by_node`), so the generic comment machinery skips it and this
     /// node is the only thing that prints it — which is what keeps a paren synthesized
@@ -278,8 +317,8 @@ pub struct JsdocCast<'arena> {
 /// `remove_parens` (`1-parse/state/tag.js`). The public AST then keeps the
 /// `ParenthesizedExpression` node, matching Svelte's output.
 ///
-/// `span` covers the parentheses (`(`…`)`); `expression` keeps its own
-/// paren-free span. Unlike [`JsdocCast`], the parens are **not** semantically
+/// The holding `Expression`'s span covers the parentheses (`(`…`)`); `expression`
+/// keeps its own paren-free span. Unlike [`JsdocCast`], the parens are **not** semantically
 /// required — prettier re-derives them (`(b)`→`b`, but keeps `(2, 3)` because a
 /// sequence needs them), so the printer is **transparent**: it renders the
 /// inner, which re-derives whatever parens it needs. The wrapper only affects
@@ -287,7 +326,6 @@ pub struct JsdocCast<'arena> {
 #[derive(Debug, Clone)]
 pub struct ParenthesizedExpression<'arena> {
     pub expression: &'arena Expression<'arena>,
-    pub span: Span,
 }
 
 #[derive(Debug, Clone)]
@@ -299,7 +337,6 @@ pub struct ObjectExpression<'arena> {
     /// trailing comma. The literal parser discards the comma, so this flag is
     /// the only surviving record of it for `to_assignable` to consult.
     pub spread_trailing_comma: bool,
-    pub span: Span,
 }
 
 /// Object property - either a regular property or a spread element
@@ -365,7 +402,6 @@ pub struct ArrayExpression<'arena> {
     /// trailing comma. The literal parser discards the comma, so this flag is
     /// the only surviving record of it for `to_assignable` to consult.
     pub spread_trailing_comma: bool,
-    pub span: Span,
 }
 
 /// Update expression operator: `++` or `--`
@@ -396,7 +432,6 @@ pub struct UpdateExpression<'arena> {
     pub operator: UpdateOperator,
     pub argument: &'arena Expression<'arena>,
     pub prefix: bool, // true for `++x`/`--x`, false for `x++`/`x--`
-    pub span: Span,
 }
 
 /// Unary expression operator
@@ -577,7 +612,6 @@ pub struct BinaryExpression<'arena> {
     pub left: &'arena Expression<'arena>,
     pub operator: BinaryOperator,
     pub right: &'arena Expression<'arena>,
-    pub span: Span,
     /// For a `<` node UNDER A `>` only: whether the region this `<` opens would re-lex as a
     /// TYPE-ARGUMENT LIST once printed — the parser's own relaxed reading of the same
     /// lookahead that decided this `<` is the less-than operator, recorded here because the
@@ -626,7 +660,7 @@ impl<'arena> BinaryExpression<'arena> {
     #[must_use]
     pub fn rebalanced_right(&self) -> &'arena Expression<'arena> {
         let mut right = self.right;
-        while let Expression::BinaryExpression(inner) = right {
+        while let ExpressionKind::BinaryExpression(inner) = &right.kind {
             if !self.operator.rebalances_with(inner.operator) {
                 break;
             }
@@ -643,7 +677,6 @@ pub struct CallExpression<'arena> {
     pub type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
     pub arguments: &'arena [Expression<'arena>],
     pub optional: bool, // true for `foo?.()` (optional chaining)
-    pub span: Span,
 }
 
 /// New expression: `new Date()`, `new Map()`
@@ -656,7 +689,6 @@ pub struct NewExpression<'arena> {
     pub callee: &'arena Expression<'arena>,
     pub type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
     pub arguments: &'arena [Expression<'arena>],
-    pub span: Span,
 }
 
 /// Dynamic import expression: `import('module')` or `import('module', options)`,
@@ -668,7 +700,6 @@ pub struct ImportExpression<'arena> {
     pub options: Option<&'arena Expression<'arena>>,
     /// Import phase: `Source`/`Defer` for `import.source(…)` / `import.defer(…)`.
     pub phase: super::modules::ImportPhase,
-    pub span: Span,
 }
 
 /// Meta property: `import.meta`, `new.target`
@@ -678,7 +709,6 @@ pub struct MetaProperty<'arena> {
     pub meta: Identifier<'arena>,
     /// The property: "meta" or "target"
     pub property: Identifier<'arena>,
-    pub span: Span,
 }
 
 /// Member expression: `obj.prop`, `arr[0]`
@@ -688,7 +718,6 @@ pub struct MemberExpression<'arena> {
     pub property: &'arena Expression<'arena>,
     pub computed: bool, // true for `arr[0]`, false for `obj.prop`
     pub optional: bool, // true for `obj?.prop` (optional chaining)
-    pub span: Span,
 }
 
 /// Conditional (ternary) expression: `a ? b : c`
@@ -697,7 +726,6 @@ pub struct ConditionalExpression<'arena> {
     pub test: &'arena Expression<'arena>,
     pub consequent: &'arena Expression<'arena>,
     pub alternate: &'arena Expression<'arena>,
-    pub span: Span,
 }
 
 /// Arrow function expression: `() => expr` or `() => { stmts }`
@@ -724,7 +752,6 @@ pub struct ArrowFunctionExpression<'arena> {
     /// not emitted to the wire). Lets the printer split comments around `=>` without
     /// re-scanning source for it.
     pub arrow_token: u32,
-    pub span: Span,
 }
 
 /// Arrow function body - either an expression or a block statement
@@ -945,7 +972,6 @@ pub struct TaggedTemplateExpression<'arena> {
     pub tag: &'arena Expression<'arena>,
     pub type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
     pub quasi: TemplateLiteral<'arena>,
-    pub span: Span,
 }
 
 /// Await expression: `await promise`
@@ -955,7 +981,6 @@ pub struct TaggedTemplateExpression<'arena> {
 #[derive(Debug, Clone)]
 pub struct AwaitExpression<'arena> {
     pub argument: &'arena Expression<'arena>,
-    pub span: Span,
 }
 
 /// Yield expression: `yield value` or `yield* iterable`
@@ -970,7 +995,6 @@ pub struct YieldExpression<'arena> {
     pub argument: Option<&'arena Expression<'arena>>,
     /// Whether this is a delegating yield: `yield*`
     pub delegate: bool,
-    pub span: Span,
 }
 
 /// Sequence expression: `a, b, c`
@@ -980,7 +1004,6 @@ pub struct YieldExpression<'arena> {
 #[derive(Debug, Clone)]
 pub struct SequenceExpression<'arena> {
     pub expressions: &'arena [Expression<'arena>],
-    pub span: Span,
 }
 
 /// Regular expression literal: `/pattern/flags`
@@ -1001,7 +1024,6 @@ pub struct RegexLiteral {
     /// Visual width of the pattern (tab width 2), precomputed so the "simple
     /// call argument" width check stays source-free. Saturates at `u16::MAX`.
     pub pattern_width: u16,
-    pub span: Span,
 }
 
 impl RegexLiteral {
@@ -1020,9 +1042,7 @@ impl RegexLiteral {
 
 /// This expression: `this`
 #[derive(Debug, Clone)]
-pub struct ThisExpression {
-    pub span: Span,
-}
+pub struct ThisExpression;
 
 /// Super expression: `super`
 ///
@@ -1032,9 +1052,7 @@ pub struct ThisExpression {
 /// - `super.prop` accesses a parent property
 /// - `super[expr]` computed property access on parent
 #[derive(Debug, Clone)]
-pub struct Super {
-    pub span: Span,
-}
+pub struct Super;
 
 /// TypeScript angle-bracket type assertion: `<Type>expr`
 ///
@@ -1048,7 +1066,6 @@ pub struct TSTypeAssertion<'arena> {
     pub type_annotation: &'arena TSType<'arena>,
     /// The expression being type-asserted
     pub expression: &'arena Expression<'arena>,
-    pub span: Span,
 }
 
 /// TypeScript `as` type assertion: `expr as Type` or `expr as const`
@@ -1063,7 +1080,6 @@ pub struct TSAsExpression<'arena> {
     pub expression: &'arena Expression<'arena>,
     /// The target type
     pub type_annotation: &'arena TSType<'arena>,
-    pub span: Span,
 }
 
 /// TypeScript `satisfies` expression: `expr satisfies Type`
@@ -1079,7 +1095,6 @@ pub struct TSSatisfiesExpression<'arena> {
     pub expression: &'arena Expression<'arena>,
     /// The type to satisfy
     pub type_annotation: &'arena TSType<'arena>,
-    pub span: Span,
 }
 
 /// TypeScript instantiation expression: `f<T>`, `SomeClass<number>`
@@ -1095,7 +1110,6 @@ pub struct TSInstantiationExpression<'arena> {
     pub expression: &'arena Expression<'arena>,
     /// The type arguments: <T, U>
     pub type_arguments: TSTypeParameterInstantiation<'arena>,
-    pub span: Span,
 }
 
 /// TypeScript non-null assertion expression: `expr!`
@@ -1108,7 +1122,6 @@ pub struct TSInstantiationExpression<'arena> {
 pub struct TSNonNullExpression<'arena> {
     /// The expression being asserted non-null
     pub expression: &'arena Expression<'arena>,
-    pub span: Span,
 }
 
 impl<'arena> TSNonNullExpression<'arena> {
@@ -1121,8 +1134,10 @@ impl<'arena> TSNonNullExpression<'arena> {
     /// must keep the parens. Complements [`Expression::has_optional_in_chain`]'s
     /// non-null arm, which detects the opposite (`>=` — the chain *continues* through
     /// the `!`, no sealing parens).
-    pub fn seals_optional_chain(&self) -> bool {
-        self.span.start < self.expression.span().start && self.expression.has_optional_in_chain()
+    ///
+    /// `span` is the span of the `Expression` holding this node.
+    pub fn seals_optional_chain(&self, span: Span) -> bool {
+        span.start < self.expression.span.start && self.expression.has_optional_in_chain()
     }
 }
 
@@ -1141,7 +1156,6 @@ pub struct AssignmentExpression<'arena> {
     pub operator: AssignmentOperator,
     /// The value being assigned
     pub right: &'arena Expression<'arena>,
-    pub span: Span,
 }
 
 /// Assignment operator: `=`, `+=`, `-=`, etc.

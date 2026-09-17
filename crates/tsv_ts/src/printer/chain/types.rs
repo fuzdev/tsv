@@ -99,6 +99,8 @@ pub enum ChainNode<'a> {
     /// Call expression: ()
     Call {
         call: &'a internal::CallExpression<'a>,
+        /// The call's span (the span of the `Expression` holding `call`).
+        span: Span,
         /// The facts about this call that only the CHAIN knows — see [`ChainCall`].
         facts: ChainCall,
     },
@@ -178,7 +180,7 @@ pub enum NonNullGap {
 /// ride along in the current group where a non-numeric one opens a new one
 /// (`is_numeric_accessor`, used by `group_chain_nodes`).
 pub fn is_numeric_index(expr: &internal::Expression<'_>) -> bool {
-    matches!(expr, internal::Expression::Literal(lit) if matches!(lit.value, LiteralValue::Number(_)))
+    matches!(&expr.kind, internal::ExpressionKind::Literal(lit) if matches!(lit.value, LiteralValue::Number(_)))
 }
 
 impl<'a> ChainNode<'a> {
@@ -229,9 +231,10 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Create a new call node
-    pub fn call(call: &'a internal::CallExpression<'a>) -> Self {
+    pub fn call(call: &'a internal::CallExpression<'a>, span: Span) -> Self {
         Self::Call {
             call,
+            span,
             facts: ChainCall::new(),
         }
     }
@@ -290,11 +293,11 @@ impl<'a> ChainNode<'a> {
     ///
     /// The bounds are derived here rather than at the call sites, so the two
     /// linearization entry points cannot hand the node different ones.
-    pub fn non_null(non_null: &internal::TSNonNullExpression<'_>) -> Self {
+    pub fn non_null(non_null: &internal::TSNonNullExpression<'_>, span: Span) -> Self {
         Self::NonNull {
             gap: NonNullGap::Bang {
                 operand_end: non_null.expression.span().end,
-                bang_end: non_null.span.end,
+                bang_end: span.end,
             },
         }
     }

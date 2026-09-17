@@ -36,7 +36,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // if any, are attached later by the parameter-list caller).
         let extra = type_annotation.map(|ta| self.typed_extra(ta));
 
-        let mut param = Expression::Identifier(Identifier {
+        let mut param = Expression::from_identifier(Identifier {
             escaped_name: name.escaped,
             name_len: name.raw_len,
             name_plain_ascii: name.plain_ascii,
@@ -50,12 +50,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let default_value = self.parse_assignment_expression_ref()?;
             // prev_token_end covers a parenthesized default's closing `)`
             let assign_end = self.prev_token_end() as u32;
-            param = Expression::AssignmentPattern(AssignmentPattern {
-                left: self.alloc(param),
-                right: default_value,
-                decorators: None,
+            param = Expression {
                 span: Span::new(param_start as u32, assign_end),
-            });
+                kind: ExpressionKind::AssignmentPattern(AssignmentPattern {
+                    left: self.alloc(param),
+                    right: default_value,
+                    decorators: None,
+                }),
+            };
         }
         Ok(param)
     }
@@ -73,16 +75,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         decorators: &'arena [Decorator<'arena>],
     ) -> Expression<'arena> {
         let arena = self.arena;
-        match &mut param {
+        match &mut param.kind {
             // `@dec private a` — decorators ride the inner binding, not the
             // property wrapper. Recurse (the inner is an Identifier or, for
             // `@dec private a = 1`, an AssignmentPattern).
-            Expression::TSParameterProperty(pp) => {
+            ExpressionKind::TSParameterProperty(pp) => {
                 let inner = self.attach_param_decorators((*pp.parameter).clone(), decorators);
                 pp.parameter = arena.alloc(inner);
                 param
             }
-            Expression::Identifier(id) => {
+            ExpressionKind::Identifier(id) => {
                 let type_annotation = id.type_annotation().cloned();
                 id.extra = Some(arena.alloc(IdentifierParamExtra {
                     type_annotation,
@@ -90,15 +92,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }));
                 param
             }
-            Expression::AssignmentPattern(ap) => {
+            ExpressionKind::AssignmentPattern(ap) => {
                 ap.decorators = Some(decorators);
                 param
             }
-            Expression::ObjectPattern(op) => {
+            ExpressionKind::ObjectPattern(op) => {
                 op.decorators = Some(decorators);
                 param
             }
-            Expression::ArrayPattern(arr) => {
+            ExpressionKind::ArrayPattern(arr) => {
                 arr.decorators = Some(decorators);
                 param
             }
@@ -114,9 +116,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// the enclosing `RestElement` (`...[a, b]: T`), matching acorn.
     pub(super) fn parse_binding_pattern(&mut self) -> Result<Expression<'arena>, ParseError> {
         let expr = if self.check(&TokenKind::BracketOpen) {
-            Expression::ArrayExpression(self.parse_array_expression()?)
+            let (array, span) = self.parse_array_expression()?;
+            Expression {
+                span,
+                kind: ExpressionKind::ArrayExpression(array),
+            }
         } else {
-            Expression::ObjectExpression(self.parse_object_expression()?)
+            let (object, span) = self.parse_object_expression()?;
+            Expression {
+                span,
+                kind: ExpressionKind::ObjectExpression(object),
+            }
         };
         // Binding context: a type assertion is not a valid binding target
         // (`let [x as T] = …` / `function f([x as T])` reject, matching acorn).
@@ -148,14 +158,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // any type annotation; extends the span to the `?` end (matching acorn).
         if allow_optional && self.eat(TokenKind::Question) {
             let q_end = self.prev_token_end() as u32;
-            match &mut pattern {
-                Expression::ArrayPattern(p) => {
+            match &mut pattern.kind {
+                ExpressionKind::ArrayPattern(p) => {
                     p.optional = true;
-                    p.span.end = q_end;
+                    pattern.span.end = q_end;
                 }
-                Expression::ObjectPattern(p) => {
+                ExpressionKind::ObjectPattern(p) => {
                     p.optional = true;
-                    p.span.end = q_end;
+                    pattern.span.end = q_end;
                 }
                 _ => {}
             }
@@ -165,14 +175,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if self.check(&TokenKind::Colon) {
             let type_annotation = self.parse_type_annotation()?;
             let end = type_annotation.span.end;
-            match &mut pattern {
-                Expression::ArrayPattern(p) => {
+            match &mut pattern.kind {
+                ExpressionKind::ArrayPattern(p) => {
                     p.type_annotation = Some(type_annotation);
-                    p.span.end = end;
+                    pattern.span.end = end;
                 }
-                Expression::ObjectPattern(p) => {
+                ExpressionKind::ObjectPattern(p) => {
                     p.type_annotation = Some(type_annotation);
-                    p.span.end = end;
+                    pattern.span.end = end;
                 }
                 _ => {}
             }
@@ -332,13 +342,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         if accessibility.is_some() || is_override || readonly {
                             let parameter = self.parse_simple_param()?;
                             let param_end = parameter.span().end;
-                            Expression::TSParameterProperty(TSParameterProperty {
-                                accessibility,
-                                readonly,
-                                r#override: is_override,
-                                parameter: self.alloc(parameter),
+                            Expression {
                                 span: Span::new(param_start as u32, param_end),
-                            })
+                                kind: ExpressionKind::TSParameterProperty(TSParameterProperty {
+                                    accessibility,
+                                    readonly,
+                                    r#override: is_override,
+                                    parameter: self.alloc(parameter),
+                                }),
+                            }
                         } else {
                             // Simple identifier parameter (no modifiers)
                             self.parse_simple_param()?
@@ -373,12 +385,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             let default_value = self.parse_assignment_expression_ref()?;
                             // prev_token_end covers a parenthesized default's closing `)`
                             let assign_end = self.prev_token_end() as u32;
-                            Expression::AssignmentPattern(AssignmentPattern {
-                                left: self.alloc(pattern),
-                                right: default_value,
-                                decorators: None,
+                            Expression {
                                 span: Span::new(pattern_start, assign_end),
-                            })
+                                kind: ExpressionKind::AssignmentPattern(AssignmentPattern {
+                                    left: self.alloc(pattern),
+                                    right: default_value,
+                                    decorators: None,
+                                }),
+                            }
                         } else {
                             pattern
                         }
@@ -406,7 +420,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             // shape), never to the inner pattern.
                             let (optional, type_annotation, arg_end) =
                                 self.parse_rest_param_tail(pattern.span().end)?;
-                            Expression::RestElement(RestElement {
+                            Expression::from_rest_element(RestElement {
                                 argument: self.alloc(pattern),
                                 optional,
                                 type_annotation,
@@ -425,13 +439,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                                 return Err(self.error_expected("parameter name"));
                             };
                             self.advance()?;
-                            let argument = Expression::Identifier(Identifier::simple(
+                            let argument = Expression::from_identifier(Identifier::simple(
                                 name,
                                 Span::new(id_start as u32, id_end as u32),
                             ));
                             let (optional, type_annotation, arg_end) =
                                 self.parse_rest_param_tail(id_end as u32)?;
-                            Expression::RestElement(RestElement {
+                            Expression::from_rest_element(RestElement {
                                 argument: self.alloc(argument),
                                 optional,
                                 type_annotation,
@@ -453,7 +467,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     self.attach_param_decorators(param, decorators)
                 };
 
-                let is_rest = matches!(&param, Expression::RestElement(_));
+                let is_rest = matches!(param.kind, ExpressionKind::RestElement(_));
                 params.push(param);
 
                 // A rest parameter must be the last in the list. Per the grammar
@@ -525,7 +539,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 "setter should have exactly one param"
             }));
         }
-        if !is_getter && matches!(params.first(), Some(Expression::RestElement(_))) {
+        if !is_getter
+            && matches!(
+                params.first(),
+                Some(Expression {
+                    kind: ExpressionKind::RestElement(_),
+                    ..
+                })
+            )
+        {
             return Err(self.error_msg("Setter cannot use rest params"));
         }
         Ok(())
@@ -553,7 +575,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     self.error_msg("'get' and 'set' accessors cannot declare 'this' parameters")
                 );
             }
-            if let Expression::Identifier(id) = &params[0]
+            if let ExpressionKind::Identifier(id) = &params[0].kind
                 && id.optional
             {
                 return Err(self.error_msg("A 'set' accessor cannot have an optional parameter"));
@@ -579,11 +601,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<(), ParseError> {
         for param in params {
             if !matches!(
-                param,
-                Expression::Identifier(_)
-                    | Expression::RestElement(_)
-                    | Expression::ObjectPattern(_)
-                    | Expression::ArrayPattern(_)
+                param.kind,
+                ExpressionKind::Identifier(_)
+                    | ExpressionKind::RestElement(_)
+                    | ExpressionKind::ObjectPattern(_)
+                    | ExpressionKind::ArrayPattern(_)
             ) {
                 return Err(self.error_msg(
                     "Name in a signature must be an Identifier, ObjectPattern or ArrayPattern",
@@ -601,7 +623,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// local, possibly Svelte-embedded slice) — same discipline as
     /// `resolve_cooked`; `.get` keeps a stray span from panicking.
     pub(super) fn is_this_param(&self, param: &Expression<'arena>) -> bool {
-        let Expression::Identifier(id) = param else {
+        let ExpressionKind::Identifier(id) = &param.kind else {
             return false;
         };
         let name = id.name_span();

@@ -13,7 +13,7 @@
 //
 // - prettier/src/language-js/print/assignment.js
 
-use crate::ast::internal::{self, AssignmentOperator, Expression, JsdocCast};
+use crate::ast::internal::{self, AssignmentOperator, Expression, ExpressionKind};
 use crate::printer::ArrowChainContext;
 use crate::printer::Printer;
 use crate::printer::calls::chain_has_calls;
@@ -123,8 +123,8 @@ impl<'a> Printer<'a> {
     /// BEFORE building the inner — a cast's own value gaps mark themselves while that inner
     /// is built, overwriting the mark that was meant for it.
     pub(in crate::printer) fn mark_jsdoc_cast_value_gap(&self, value: &Expression<'_>) {
-        self.jsdoc_cast_value_gap_target.set(match value {
-            Expression::JsdocCast(cast) => Some(cast.span),
+        self.jsdoc_cast_value_gap_target.set(match &value.kind {
+            ExpressionKind::JsdocCast(_) => Some(value.span),
             _ => None,
         });
     }
@@ -136,8 +136,8 @@ impl<'a> Printer<'a> {
     /// answers `false` and keeps the width-decided soft `line`. That is the intent: the
     /// reflow rule is about the break between the gap's head and its value, and a cast in
     /// an argument list sits in a list that keeps lines.
-    pub(in crate::printer) fn jsdoc_cast_in_value_gap(&self, cast: &JsdocCast<'_>) -> bool {
-        self.jsdoc_cast_value_gap_target.get() == Some(cast.span)
+    pub(in crate::printer) fn jsdoc_cast_in_value_gap(&self, span: Span) -> bool {
+        self.jsdoc_cast_value_gap_target.get() == Some(span)
     }
 }
 
@@ -204,19 +204,19 @@ pub fn choose_layout(
     //
     // Prettier ref: `shouldBreakAfterOperator` (`print/assignment.js`)
     //   `isBinaryish(rightNode) && !shouldInlineLogicalExpression(rightNode)`
-    if let Expression::BinaryExpression(binary) = right_expr
+    if let ExpressionKind::BinaryExpression(binary) = &right_expr.kind
         && !should_inline_logical_expression(binary)
     {
         return AssignmentLayout::BreakAfterOperator;
     }
 
     // Sequence expressions → break after operator
-    if matches!(right_expr, Expression::SequenceExpression(_)) {
+    if matches!(right_expr.kind, ExpressionKind::SequenceExpression(_)) {
         return AssignmentLayout::BreakAfterOperator;
     }
 
     // Decorated class expression → break after operator (`const C =\n\t@dec\n\tclass {}`).
-    if let Expression::ClassExpression(c) = right_expr
+    if let ExpressionKind::ClassExpression(c) = &right_expr.kind
         && class_expr_has_decorators(c)
     {
         return AssignmentLayout::BreakAfterOperator;
@@ -278,9 +278,9 @@ pub fn should_inline_logical_expression(binary: &internal::BinaryExpression<'_>)
         return false;
     }
 
-    match binary.rebalanced_right() {
-        Expression::ObjectExpression(obj) => !obj.properties.is_empty(),
-        Expression::ArrayExpression(arr) => !arr.elements.is_empty(),
+    match &binary.rebalanced_right().kind {
+        ExpressionKind::ObjectExpression(obj) => !obj.properties.is_empty(),
+        ExpressionKind::ArrayExpression(arr) => !arr.elements.is_empty(),
         // Note: Prettier also checks isJsxElement, but JSX is not supported in tsv
         _ => false,
     }
@@ -299,7 +299,7 @@ pub fn should_inline_logical_expression(binary: &internal::BinaryExpression<'_>)
 ///   const f = (): H => (y) => expr        // a return type with no parameters
 pub fn is_curried_arrow_chain_that_breaks(expr: &Expression<'_>) -> bool {
     is_curried_arrow_chain(expr)
-        && matches!(expr, Expression::ArrowFunctionExpression(arrow) if arrow_chain_should_break(arrow))
+        && matches!(&expr.kind, ExpressionKind::ArrowFunctionExpression(arrow) if arrow_chain_should_break(arrow))
 }
 
 /// Check if an expression is a curried arrow function (its body is another
@@ -307,11 +307,11 @@ pub fn is_curried_arrow_chain_that_breaks(expr: &Expression<'_>) -> bool {
 /// assignment RHS through the arrow-chain layout regardless of whether any head
 /// triggers the chain break.
 pub fn is_curried_arrow_chain(expr: &Expression<'_>) -> bool {
-    if let Expression::ArrowFunctionExpression(arrow) = expr {
+    if let ExpressionKind::ArrowFunctionExpression(arrow) = &expr.kind {
         matches!(
             &arrow.body,
             internal::ArrowFunctionBody::Expression(body)
-                if matches!(&**body, Expression::ArrowFunctionExpression(_))
+                if matches!(body.kind, ExpressionKind::ArrowFunctionExpression(_))
         )
     } else {
         false
@@ -341,7 +341,7 @@ pub fn arrow_chain_should_break(arrow: &internal::ArrowFunctionExpression<'_>) -
     let has_non_identifier_param = arrow
         .params
         .iter()
-        .any(|p| !matches!(p, Expression::Identifier(_)));
+        .any(|p| !matches!(p.kind, ExpressionKind::Identifier(_)));
 
     let should_break = (arrow.return_type.is_some() && !arrow.params.is_empty())
         || arrow.type_parameters.is_some()
@@ -353,7 +353,7 @@ pub fn arrow_chain_should_break(arrow: &internal::ArrowFunctionExpression<'_>) -
 
     // Check inner arrow if body is an arrow
     if let internal::ArrowFunctionBody::Expression(body) = &arrow.body
-        && let Expression::ArrowFunctionExpression(inner) = &**body
+        && let ExpressionKind::ArrowFunctionExpression(inner) = &body.kind
     {
         return arrow_chain_should_break(inner);
     }
@@ -393,11 +393,11 @@ pub fn should_break_after_operator(expr: &Expression<'_>, printer: &Printer<'_>)
 
 /// Unwrap wrapper expressions (TSNonNullExpression, await, unary, yield, parenthesized)
 fn unwrap_expression<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
-    match expr {
-        Expression::TSNonNullExpression(non_null) => unwrap_expression(non_null.expression),
-        Expression::AwaitExpression(await_expr) => unwrap_expression(await_expr.argument),
-        Expression::UnaryExpression(unary) => unwrap_expression(unary.argument),
-        Expression::YieldExpression(yield_expr) => {
+    match &expr.kind {
+        ExpressionKind::TSNonNullExpression(non_null) => unwrap_expression(non_null.expression),
+        ExpressionKind::AwaitExpression(await_expr) => unwrap_expression(await_expr.argument),
+        ExpressionKind::UnaryExpression(unary) => unwrap_expression(unary.argument),
+        ExpressionKind::YieldExpression(yield_expr) => {
             if let Some(arg) = yield_expr.argument {
                 unwrap_expression(arg)
             } else {
@@ -530,9 +530,9 @@ fn is_poorly_breakable_chain_recursive(
     walk: &PoorlyBreakableWalk<'_, '_>,
 ) -> bool {
     let printer = walk.printer;
-    match expr {
+    match &expr.kind {
         // TSNonNullExpression is transparent - continue checking
-        Expression::TSNonNullExpression(non_null) => {
+        ExpressionKind::TSNonNullExpression(non_null) => {
             is_poorly_breakable_chain_recursive(non_null.expression, deep, walk)
         }
         // Note: TSAsExpression and TSSatisfiesExpression are NOT included here.
@@ -542,7 +542,7 @@ fn is_poorly_breakable_chain_recursive(
         // member-chain printer LABELS (it prints past the cutoff and breaks itself), a
         // non-trivial argument list, complex type arguments — then `goDeeper` on the
         // callee. The label is asked last here because it is the one that walks the chain.
-        Expression::CallExpression(call) => {
+        ExpressionKind::CallExpression(call) => {
             // Check if this call has trivial args (empty or single short arg without comments)
             // Matches Prettier: args.length === 0 || (args.length === 1 && isLoneShortArgument)
             // Arrow functions, objects, arrays are NOT "lone short arguments" - they should
@@ -556,7 +556,7 @@ fn is_poorly_breakable_chain_recursive(
             let is_trivial_call = call.arguments.is_empty()
                 || (call.arguments.len() == 1
                     && is_short_arg(&call.arguments[0], printer.source)
-                    && !call_arg_has_comments(call, printer));
+                    && !call_arg_has_comments(call, expr.span, printer));
 
             if !is_trivial_call {
                 return false;
@@ -580,9 +580,9 @@ fn is_poorly_breakable_chain_recursive(
             // name it and prints such a call as an opaque base instead.
             // TODO: mirror that opaque-base grouping for a `!`-wrapped callee (`a.b!().c()`).
             if matches!(
-                call.callee,
-                Expression::MemberExpression(_) | Expression::TSNonNullExpression(_)
-            ) && crate::printer::chain::call_prints_as_member_chain(call, printer)
+                call.callee.kind,
+                ExpressionKind::MemberExpression(_) | ExpressionKind::TSNonNullExpression(_)
+            ) && crate::printer::chain::call_prints_as_member_chain(call, expr.span, printer)
             {
                 return false;
             }
@@ -613,7 +613,7 @@ fn is_poorly_breakable_chain_recursive(
         // belongs HERE, not in a caller: a second predicate that answers `true` for the
         // call-free chain and is OR-ed in from outside cancels this gate only where it is
         // spelled — and carries a second copy of the chain-root test, which then drifts.
-        Expression::MemberExpression(member) => {
+        ExpressionKind::MemberExpression(member) => {
             if walk.chain_has_calls {
                 let object_end = member.object.span().end;
                 let gap_end = if member.computed {
@@ -657,7 +657,7 @@ fn is_poorly_breakable_chain_recursive(
         // (The chain grouping's `should_not_wrap` merges on a lone `super` head as it does
         // on `this` — that is prettier's `printMemberChain`, a different function, and a
         // `Super`-rooted chain bottoms out false here regardless.)
-        Expression::Identifier(_) | Expression::ThisExpression(_) => deep,
+        ExpressionKind::Identifier(_) | ExpressionKind::ThisExpression(_) => deep,
 
         // Everything else breaks the chain
         _ => false,
@@ -676,25 +676,27 @@ fn is_short_arg(expr: &Expression<'_>, source: &str) -> bool {
     // (`utilities/is-lone-short-argument.js`)
     let threshold = PRINT_WIDTH / 4;
 
-    match expr {
+    match &expr.kind {
         // Prettier: node.type === "Identifier" && node.name.length <= threshold
-        Expression::Identifier(id) => id.span.extract(source).len() <= threshold,
+        ExpressionKind::Identifier(id) => id.span.extract(source).len() <= threshold,
 
         // Prettier: isSignedNumericLiteral(node) && !hasComment(node.argument)
         // + general UnaryExpression recursion (line 471-472)
         // We combine both: recurse into all unary arguments.
-        Expression::UnaryExpression(unary) => is_short_arg(unary.argument, source),
+        ExpressionKind::UnaryExpression(unary) => is_short_arg(unary.argument, source),
 
         // Prettier: regexpPattern.length <= threshold (line 456)
-        Expression::RegexLiteral(regex) => regex.pattern(source).len() <= threshold,
+        ExpressionKind::RegexLiteral(regex) => regex.pattern(source).len() <= threshold,
 
         // Prettier: printString(getRaw(node), options).length <= threshold (line 460)
-        Expression::Literal(lit) if matches!(lit.value, internal::LiteralValue::String { .. }) => {
+        ExpressionKind::Literal(lit)
+            if matches!(lit.value, internal::LiteralValue::String { .. }) =>
+        {
             format_string_literal_from_ast(lit, source).len() <= threshold
         }
 
         // Prettier: node.quasis[0].value.raw.length <= threshold && !includes("\n") (line 464-468)
-        Expression::TemplateLiteral(template) => {
+        ExpressionKind::TemplateLiteral(template) => {
             template.expressions.is_empty()
                 && !template.quasis.is_empty()
                 && template.quasis[0].raw(source).len() <= threshold
@@ -703,17 +705,17 @@ fn is_short_arg(expr: &Expression<'_>, source: &str) -> bool {
 
         // Prettier: CallExpression with 0 args + Identifier callee (line 475-481)
         // callee.name.length <= threshold - 2 (accounts for "()")
-        Expression::CallExpression(call) => {
+        ExpressionKind::CallExpression(call) => {
             call.arguments.is_empty()
-                && matches!(call.callee, Expression::Identifier(id)
+                && matches!(&call.callee.kind, ExpressionKind::Identifier(id)
                     if id.span.extract(source).len() <= threshold.saturating_sub(2))
         }
 
         // Prettier: isLiteral(node) — numbers, booleans, null, bigint (line 483)
-        Expression::Literal(_) => true,
+        ExpressionKind::Literal(_) => true,
 
         // this / super — trivially short
-        Expression::ThisExpression(_) | Expression::Super(_) => true,
+        ExpressionKind::ThisExpression(_) | ExpressionKind::Super(_) => true,
 
         _ => false,
     }
@@ -734,17 +736,17 @@ fn is_short_arg(expr: &Expression<'_>, source: &str) -> bool {
 /// `is_multiline_string_literal` (a *layout* predicate, continuation-only — widening that
 /// one would change fluid-layout behavior for the over-accepted raw form).
 fn chain_has_multiline_string_arg(expr: &Expression<'_>, source: &str) -> bool {
-    match expr {
-        Expression::CallExpression(call) => {
+    match &expr.kind {
+        ExpressionKind::CallExpression(call) => {
             call.arguments
                 .iter()
                 .any(|arg| arg_is_multiline_string(arg, source))
                 || chain_has_multiline_string_arg(call.callee, source)
         }
-        Expression::MemberExpression(member) => {
+        ExpressionKind::MemberExpression(member) => {
             chain_has_multiline_string_arg(member.object, source)
         }
-        Expression::TSNonNullExpression(non_null) => {
+        ExpressionKind::TSNonNullExpression(non_null) => {
             chain_has_multiline_string_arg(non_null.expression, source)
         }
         _ => false,
@@ -754,9 +756,11 @@ fn chain_has_multiline_string_arg(expr: &Expression<'_>, source: &str) -> bool {
 /// Whether an argument is a string literal whose raw span contains a newline —
 /// unwrapping unary operators like `is_short_arg` does.
 fn arg_is_multiline_string(expr: &Expression<'_>, source: &str) -> bool {
-    match expr {
-        Expression::UnaryExpression(unary) => arg_is_multiline_string(unary.argument, source),
-        Expression::Literal(lit) if matches!(lit.value, internal::LiteralValue::String { .. }) => {
+    match &expr.kind {
+        ExpressionKind::UnaryExpression(unary) => arg_is_multiline_string(unary.argument, source),
+        ExpressionKind::Literal(lit)
+            if matches!(lit.value, internal::LiteralValue::String { .. }) =>
+        {
             let raw = lit.span.extract(source);
             raw.contains('\n') || raw.contains('\r')
         }
@@ -774,13 +778,17 @@ fn arg_is_multiline_string(expr: &Expression<'_>, source: &str) -> bool {
 ///
 /// Uses the comment region between the callee end and call span end to find any comments
 /// in the argument area (covers leading, trailing, and inter-argument comments).
-fn call_arg_has_comments(call: &internal::CallExpression<'_>, printer: &Printer<'_>) -> bool {
+fn call_arg_has_comments(
+    call: &internal::CallExpression<'_>,
+    span: Span,
+    printer: &Printer<'_>,
+) -> bool {
     if call.arguments.is_empty() {
         return false;
     }
     // Check for any comments in the argument region (between callee end and closing paren)
     let args_region_start = call.callee.span().end;
-    let args_region_end = call.span.end;
+    let args_region_end = span.end;
     printer.has_comments_on_page_between(args_region_start, args_region_end)
 }
 
@@ -793,13 +801,13 @@ fn call_arg_has_comments(call: &internal::CallExpression<'_>, printer: &Printer<
 /// we break after `=` instead of inside the call. If the call has short/trivial args, the
 /// type annotation can break instead.
 pub fn is_type_assertion_call(expr: &Expression<'_>, source: &str) -> bool {
-    let call = match expr {
-        Expression::TSAsExpression(as_expr) => match as_expr.expression {
-            Expression::CallExpression(call) => call,
+    let call = match &expr.kind {
+        ExpressionKind::TSAsExpression(as_expr) => match &as_expr.expression.kind {
+            ExpressionKind::CallExpression(call) => call,
             _ => return false,
         },
-        Expression::TSSatisfiesExpression(sat_expr) => match sat_expr.expression {
-            Expression::CallExpression(call) => call,
+        ExpressionKind::TSSatisfiesExpression(sat_expr) => match &sat_expr.expression.kind {
+            ExpressionKind::CallExpression(call) => call,
             _ => return false,
         },
         _ => return false,
@@ -813,10 +821,12 @@ pub fn is_type_assertion_call(expr: &Expression<'_>, source: &str) -> bool {
 
 /// Check if an expression is a member-only chain (no calls).
 fn is_member_only_chain(expr: &Expression<'_>) -> bool {
-    match expr {
-        Expression::MemberExpression(member) => is_member_only_chain(member.object),
-        Expression::TSNonNullExpression(non_null) => is_member_only_chain(non_null.expression),
-        Expression::Identifier(_) | Expression::ThisExpression(_) | Expression::Super(_) => true,
+    match &expr.kind {
+        ExpressionKind::MemberExpression(member) => is_member_only_chain(member.object),
+        ExpressionKind::TSNonNullExpression(non_null) => is_member_only_chain(non_null.expression),
+        ExpressionKind::Identifier(_)
+        | ExpressionKind::ThisExpression(_)
+        | ExpressionKind::Super(_) => true,
         _ => false,
     }
 }
@@ -832,16 +842,16 @@ fn is_member_only_chain(expr: &Expression<'_>) -> bool {
 /// (`class_expr_has_decorators`).
 pub fn is_simple_value(expr: &Expression<'_>) -> bool {
     matches!(
-        expr,
-        Expression::Literal(lit) if matches!(
+        &expr.kind,
+        ExpressionKind::Literal(lit) if matches!(
             lit.value,
             internal::LiteralValue::Boolean(_)
             | internal::LiteralValue::Number(_)
         )
     ) || matches!(
-        expr,
-        Expression::TemplateLiteral(_) | Expression::TaggedTemplateExpression(_)
-    ) || matches!(expr, Expression::ClassExpression(c) if !class_expr_has_decorators(c))
+        expr.kind,
+        ExpressionKind::TemplateLiteral(_) | ExpressionKind::TaggedTemplateExpression(_)
+    ) || matches!(&expr.kind, ExpressionKind::ClassExpression(c) if !class_expr_has_decorators(c))
 }
 
 /// The RHS comment / freeze / stripped-paren-boundary controls for
@@ -1315,9 +1325,9 @@ impl<'a> Printer<'a> {
     /// its own expansion, so the assignment should use default layout.
     /// Handles both direct imports and `await import(...)`.
     pub(crate) fn has_import_with_trailing_comments(&self, expr: &Expression<'_>) -> bool {
-        match expr {
-            Expression::ImportExpression(import) => {
-                let paren_close = import.span.end;
+        match &expr.kind {
+            ExpressionKind::ImportExpression(import) => {
+                let paren_close = expr.span.end;
                 // Check for comments after the last argument (source or options)
                 let last_arg_end = import
                     .options
@@ -1325,7 +1335,7 @@ impl<'a> Printer<'a> {
                     .map_or_else(|| import.source.span().end, |opts| opts.span().end);
                 self.has_comments_to_emit_between(last_arg_end, paren_close)
             }
-            Expression::AwaitExpression(await_expr) => {
+            ExpressionKind::AwaitExpression(await_expr) => {
                 self.has_import_with_trailing_comments(await_expr.argument)
             }
             _ => false,
@@ -1347,8 +1357,8 @@ impl<'a> Printer<'a> {
         {
             return true;
         }
-        match expr {
-            Expression::CallExpression(call) => {
+        match &expr.kind {
+            ExpressionKind::CallExpression(call) => {
                 // A line comment between the callee (or its type arguments) and the
                 // arguments forces the break too: the `//` must end its line before the
                 // `(`, so the argument list drops to an indented continuation
@@ -1361,11 +1371,11 @@ impl<'a> Printer<'a> {
                 let args_gap_end = call
                     .arguments
                     .first()
-                    .map_or(call.span.end, |arg| arg.span().start);
+                    .map_or(expr.span.end, |arg| arg.span().start);
                 self.has_line_comments_between(args_gap_start, args_gap_end)
                     || self.has_line_comments_in_chain(call.callee)
             }
-            Expression::MemberExpression(member) => {
+            ExpressionKind::MemberExpression(member) => {
                 // Check for line comments between object and property. For a computed
                 // member this range deliberately includes the bracket INTERIOR: a
                 // comment inside `[...]` makes the brackets break around it, so the
@@ -1392,14 +1402,14 @@ impl<'a> Printer<'a> {
                 }
                 self.has_line_comments_in_chain(member.object)
             }
-            Expression::TSNonNullExpression(non_null) => {
+            ExpressionKind::TSNonNullExpression(non_null) => {
                 // The operand→`!` gap: a comment that spans a line in a retained paren
                 // shell (`(a?.b // c⏎)!`, `(a?.b /* c⏎d */)!`) opens the shell — the chain
                 // breaks at the comment like any other chain gap, so the `=` hugs it. The
                 // same reading the non-null's retain gate takes (`build_ts_non_null_doc`),
                 // so the layout and the emitter cannot disagree about which shell opens.
                 let operand_end = non_null.expression.span().end;
-                if self.has_line_spanning_comments_to_emit_between(operand_end, non_null.span.end) {
+                if self.has_line_spanning_comments_to_emit_between(operand_end, expr.span.end) {
                     return true;
                 }
                 self.has_line_comments_in_chain(non_null.expression)

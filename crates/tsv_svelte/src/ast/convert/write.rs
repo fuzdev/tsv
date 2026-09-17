@@ -1266,14 +1266,14 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
     // slice untouched.
     let spliced = if tag.identifiers.iter().any(|entry| {
         matches!(
-            entry.unwrap_jsdoc_casts(),
-            tsv_ts::Expression::SequenceExpression(_)
+            entry.unwrap_jsdoc_casts().kind,
+            tsv_ts::ExpressionKind::SequenceExpression(_)
         )
     }) {
         let mut flat = Vec::with_capacity(tag.identifiers.len() + 1);
         for entry in tag.identifiers {
-            match entry.unwrap_jsdoc_casts() {
-                tsv_ts::Expression::SequenceExpression(seq) => {
+            match &entry.unwrap_jsdoc_casts().kind {
+                tsv_ts::ExpressionKind::SequenceExpression(seq) => {
                     flat.extend(seq.expressions.iter().cloned());
                 }
                 _ => flat.push(entry.clone()),
@@ -1541,7 +1541,7 @@ fn write_attribute_value_field(
         // and its identifier share a span) injects `character`.
         match &values[0] {
             internal::AttributeValue::ExpressionTag(tag)
-                if matches!(tag.expression, tsv_ts::ast::internal::Expression::Identifier(id)
+                if matches!(&tag.expression.kind, tsv_ts::ast::internal::ExpressionKind::Identifier(id)
                     if tag.span == id.span) =>
             {
                 write_shorthand_expression_tag(w, tag, ctx);
@@ -1707,7 +1707,7 @@ fn write_directive_value_expression(
     } else {
         // Shorthand: the parser builds this as a synthetic `Identifier`.
         #[expect(clippy::unreachable)]
-        let tsv_ts::ast::internal::Expression::Identifier(id) = expr else {
+        let tsv_ts::ast::internal::ExpressionKind::Identifier(id) = &expr.kind else {
             unreachable!("shorthand directive expression is always an Identifier");
         };
         w.raw("{\"start\":");
@@ -1991,14 +1991,23 @@ fn write_custom_element_props(
     props_obj: &tsv_ts::ast::internal::ObjectExpression<'_>,
     ctx: &Ctx<'_>,
 ) {
-    use tsv_ts::ast::internal::{Expression, LiteralValue, ObjectProperty};
+    use tsv_ts::ast::internal::{Expression, ExpressionKind, LiteralValue, ObjectProperty};
     w.raw("{");
     let mut first_prop = true;
     for prop in props_obj.properties {
         let ObjectProperty::Property(p) = prop else {
             continue;
         };
-        let (Expression::Identifier(key), Expression::ObjectExpression(inner)) = (&p.key, &p.value)
+        let (
+            Expression {
+                kind: ExpressionKind::Identifier(key),
+                ..
+            },
+            Expression {
+                kind: ExpressionKind::ObjectExpression(inner),
+                ..
+            },
+        ) = (&p.key, &p.value)
         else {
             continue;
         };
@@ -2010,7 +2019,16 @@ fn write_custom_element_props(
             let ObjectProperty::Property(ip) = inner_prop else {
                 continue;
             };
-            let (Expression::Identifier(ikey), Expression::Literal(lit)) = (&ip.key, &ip.value)
+            let (
+                Expression {
+                    kind: ExpressionKind::Identifier(ikey),
+                    ..
+                },
+                Expression {
+                    kind: ExpressionKind::Literal(lit),
+                    ..
+                },
+            ) = (&ip.key, &ip.value)
             else {
                 continue;
             };
@@ -2050,14 +2068,14 @@ fn write_custom_element_field(
     attrs: &[internal::AttributeNode<'_>],
     ctx: &Ctx<'_>,
 ) {
-    use tsv_ts::ast::internal::{Expression, LiteralValue, ObjectProperty};
+    use tsv_ts::ast::internal::{Expression, ExpressionKind, LiteralValue, ObjectProperty};
     let Some(values) = find_option_values(attrs, "customElement", ctx.source) else {
         return;
     };
     for v in values {
         // `customElement={{ tag: '…', props: {…}, shadow: …, extend: … }}`
         if let internal::AttributeValue::ExpressionTag(expr) = v
-            && let Expression::ObjectExpression(obj) = expr.expression
+            && let ExpressionKind::ObjectExpression(obj) = &expr.expression.kind
         {
             let mut tag: Option<&Expression<'_>> = None;
             let mut props: Option<&Expression<'_>> = None;
@@ -2065,7 +2083,7 @@ fn write_custom_element_field(
             let mut extend: Option<&Expression<'_>> = None;
             for prop in obj.properties {
                 if let ObjectProperty::Property(p) = prop
-                    && let Expression::Identifier(key) = &p.key
+                    && let ExpressionKind::Identifier(key) = &p.key.kind
                 {
                     let slot = match key.name(ctx.source) {
                         "tag" => &mut tag,
@@ -2083,7 +2101,10 @@ fn write_custom_element_field(
             w.raw(",\"customElement\":{");
             let mut first = true;
             // `tag`: the string-literal value.
-            if let Some(Expression::Literal(lit)) = tag
+            if let Some(Expression {
+                kind: ExpressionKind::Literal(lit),
+                ..
+            }) = tag
                 && let LiteralValue::String(cooked) = &lit.value
             {
                 json_comma(w, &mut first);
@@ -2091,21 +2112,33 @@ fn write_custom_element_field(
                 w.string(cooked.resolve(lit.span, ctx.source));
             }
             // `props`: statically-evaluated plain object.
-            if let Some(Expression::ObjectExpression(props_obj)) = props {
+            if let Some(Expression {
+                kind: ExpressionKind::ObjectExpression(props_obj),
+                ..
+            }) = props
+            {
                 json_comma(w, &mut first);
                 w.raw("\"props\":");
                 write_custom_element_props(w, props_obj, ctx);
             }
             // `shadow`: the string `'open'`/`'none'`, or the raw `ObjectExpression` AST.
             match shadow {
-                Some(Expression::Literal(lit)) => {
+                Some(Expression {
+                    kind: ExpressionKind::Literal(lit),
+                    ..
+                }) => {
                     if let LiteralValue::String(cooked) = &lit.value {
                         json_comma(w, &mut first);
                         w.raw("\"shadow\":");
                         w.string(cooked.resolve(lit.span, ctx.source));
                     }
                 }
-                Some(shadow_expr @ Expression::ObjectExpression(_)) => {
+                Some(
+                    shadow_expr @ Expression {
+                        kind: ExpressionKind::ObjectExpression(_),
+                        ..
+                    },
+                ) => {
                     json_comma(w, &mut first);
                     w.raw("\"shadow\":");
                     write_expression_embedded(
@@ -2133,7 +2166,7 @@ fn write_custom_element_field(
         let tag_str = match v {
             internal::AttributeValue::Text(text) => Some(text.data(ctx.source)),
             internal::AttributeValue::ExpressionTag(expr) => {
-                if let Expression::Literal(lit) = expr.expression
+                if let ExpressionKind::Literal(lit) = &expr.expression.kind
                     && let LiteralValue::String(cooked) = &lit.value
                 {
                     Some(std::borrow::Cow::Borrowed(

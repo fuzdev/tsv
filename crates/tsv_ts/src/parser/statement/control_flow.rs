@@ -202,7 +202,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let (id_start, id_end) = self.current_pos();
             let name = self.current_ident_name();
             self.advance()?; // consume 'async'
-            let async_ident = Expression::Identifier(Identifier::simple(
+            let async_ident = Expression::from_identifier(Identifier::simple(
                 name,
                 Span::new(id_start as u32, id_end as u32),
             ));
@@ -656,7 +656,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     (None, id_end)
                 };
 
-                Expression::Identifier(Identifier {
+                Expression::from_identifier(Identifier {
                     escaped_name: name.escaped,
                     name_len: name.raw_len,
                     name_plain_ascii: name.plain_ascii,

@@ -9,7 +9,7 @@ use crate::whitespace::is_svelte_ws;
 use bumpalo::Bump;
 use tsv_lang::source_scan::{TriviaProfile, skip_trivia_run};
 use tsv_lang::{ParseError, Span};
-use tsv_ts::{Expression, TopLevelAs};
+use tsv_ts::{Expression, ExpressionKind, TopLevelAs};
 
 use super::expression_tag::scan_to_matching_brace;
 use super::parser_impl::{EmbeddedParseMark, SvelteParser};
@@ -1288,7 +1288,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // `ThisExpression`, a `Literal`, a `Super`, none of which the wire's
         // `SnippetBlock.expression` may hold. Stated rather than assumed, so the filter and
         // the node shape can never drift apart silently.
-        if !matches!(expression, Expression::Identifier(_)) {
+        if !matches!(expression.kind, ExpressionKind::Identifier(_)) {
             return Err(self.error_expected_at("snippet name", content_offset));
         }
 

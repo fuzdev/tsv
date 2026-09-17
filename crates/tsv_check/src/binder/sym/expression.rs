@@ -7,14 +7,16 @@
 use super::super::symbols::SymbolFlags;
 use super::{DeclInput, SymbolBinder};
 use crate::ids::NodeId;
-use tsv_ts::ast::internal::{Expression, ObjectExpression, ObjectProperty, PropertyKind};
+use tsv_ts::ast::internal::{
+    Expression, ExpressionKind, ObjectExpression, ObjectProperty, PropertyKind,
+};
 
 impl<'a> SymbolBinder<'a> {
     // --- expressions (nested scopes) -----------------------------------------
 
     pub(super) fn visit_expression(&mut self, expr: &Expression<'a>) {
-        use Expression as E;
-        match expr {
+        use ExpressionKind as E;
+        match &expr.kind {
             E::FunctionExpression(f) => {
                 self.with_function_scope(f.type_parameters.as_ref(), |b| {
                     b.bind_params(f.params);

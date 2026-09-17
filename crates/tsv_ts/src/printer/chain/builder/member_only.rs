@@ -10,7 +10,7 @@ use super::super::printing::{
 use super::super::types::{ChainGroup, ChainNode, ChainNodeRefVec};
 use crate::printer::Printer;
 
-use crate::ast::internal::Expression;
+use crate::ast::internal::{Expression, ExpressionKind};
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
 /// True if a member-only chain has a line comment in any inter-member gap.
@@ -151,7 +151,7 @@ fn lone_lookup_off_bare_base(nodes: &[&ChainNode<'_>]) -> bool {
         nodes,
         [
             ChainNode::Base {
-                expr: Expression::Identifier(_),
+                expr: Expression { kind: ExpressionKind::Identifier(_), .. },
                 ..
             },
             ChainNode::Member { .. },

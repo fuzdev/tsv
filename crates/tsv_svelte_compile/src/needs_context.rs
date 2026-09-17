@@ -40,8 +40,8 @@ use tsv_svelte::ast::internal::{
     IfBlock, KeyBlock, RenderTag, Root, SnippetBlock, SpecialElement, SpecialElementKind,
 };
 use tsv_ts::ast::internal::{
-    ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ForInOfLeft,
-    ForInit, FunctionExpression, ObjectPatternProperty, ObjectProperty, Statement,
+    ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ExpressionKind,
+    ForInOfLeft, ForInit, FunctionExpression, ObjectPatternProperty, ObjectProperty, Statement,
     VariableDeclaration, VariableDeclarationKind,
 };
 
@@ -394,16 +394,16 @@ fn collect_rest_prop_names(instance_body: &[Statement<'_>], source: &str, out: &
             if !is_props {
                 continue;
             }
-            match &declarator.id {
-                Expression::Identifier(id) => {
+            match &declarator.id.kind {
+                ExpressionKind::Identifier(id) => {
                     if let Some(name) = plain_name(id, source) {
                         out.insert(name.to_string());
                     }
                 }
-                Expression::ObjectPattern(obj) => {
+                ExpressionKind::ObjectPattern(obj) => {
                     for prop in obj.properties {
                         if let ObjectPatternProperty::RestElement(rest) = prop
-                            && let Expression::Identifier(id) = rest.argument
+                            && let ExpressionKind::Identifier(id) = &rest.argument.kind
                             && let Some(name) = plain_name(id, source)
                         {
                             out.insert(name.to_string());
@@ -571,8 +571,8 @@ pub(crate) fn collect_constant_names(
 /// raises, it is resolved late so the script-loop refusals keep winning for an
 /// input that trips both.
 fn refuse_invalid_assign_target(target: &Expression<'_>, nc: &mut Nc<'_>, top: bool) {
-    match target {
-        Expression::Identifier(id) => {
+    match &target.kind {
+        ExpressionKind::Identifier(id) => {
             let Some(name) = plain_name(id, nc.source) else {
                 return;
             };
@@ -614,25 +614,29 @@ fn refuse_invalid_assign_target(target: &Expression<'_>, nc: &mut Nc<'_>, top: b
                 nc.refuse = Some(Refusal::InvalidAssignmentTarget { target });
             }
         }
-        Expression::ArrayPattern(pattern) => {
+        ExpressionKind::ArrayPattern(pattern) => {
             for element in pattern.elements.iter().flatten() {
                 refuse_invalid_assign_target(element, nc, false);
             }
         }
-        Expression::ObjectPattern(pattern) => {
+        ExpressionKind::ObjectPattern(pattern) => {
             for prop in pattern.properties {
                 if let ObjectPatternProperty::Property(p) = prop {
                     refuse_invalid_assign_target(p.value, nc, false);
                 }
             }
         }
-        Expression::ParenthesizedExpression(p) => {
+        ExpressionKind::ParenthesizedExpression(p) => {
             refuse_invalid_assign_target(p.expression, nc, top);
         }
-        Expression::TSNonNullExpression(t) => refuse_invalid_assign_target(t.expression, nc, top),
-        Expression::TSAsExpression(t) => refuse_invalid_assign_target(t.expression, nc, top),
-        Expression::TSSatisfiesExpression(t) => refuse_invalid_assign_target(t.expression, nc, top),
-        Expression::TSTypeAssertion(t) => refuse_invalid_assign_target(t.expression, nc, top),
+        ExpressionKind::TSNonNullExpression(t) => {
+            refuse_invalid_assign_target(t.expression, nc, top);
+        }
+        ExpressionKind::TSAsExpression(t) => refuse_invalid_assign_target(t.expression, nc, top),
+        ExpressionKind::TSSatisfiesExpression(t) => {
+            refuse_invalid_assign_target(t.expression, nc, top);
+        }
+        ExpressionKind::TSTypeAssertion(t) => refuse_invalid_assign_target(t.expression, nc, top),
         // A `MemberExpression` target (and everything else) matches no oracle
         // branch — it writes THROUGH the binding, never rebinds it.
         _ => {}
@@ -825,15 +829,15 @@ fn declare_ident(id: &tsv_ts::ast::internal::Identifier<'_>, nc: &mut Nc<'_>) {
 fn root_of<'e>(expr: &'e Expression<'e>) -> &'e Expression<'e> {
     let mut node = expr;
     loop {
-        match node {
-            Expression::MemberExpression(m) => node = m.object,
-            Expression::ParenthesizedExpression(p) => node = p.expression,
-            Expression::TSAsExpression(t) => node = t.expression,
-            Expression::TSSatisfiesExpression(t) => node = t.expression,
-            Expression::TSNonNullExpression(t) => node = t.expression,
-            Expression::TSTypeAssertion(t) => node = t.expression,
-            Expression::TSInstantiationExpression(t) => node = t.expression,
-            Expression::JsdocCast(j) => node = j.inner,
+        match &node.kind {
+            ExpressionKind::MemberExpression(m) => node = m.object,
+            ExpressionKind::ParenthesizedExpression(p) => node = p.expression,
+            ExpressionKind::TSAsExpression(t) => node = t.expression,
+            ExpressionKind::TSSatisfiesExpression(t) => node = t.expression,
+            ExpressionKind::TSNonNullExpression(t) => node = t.expression,
+            ExpressionKind::TSTypeAssertion(t) => node = t.expression,
+            ExpressionKind::TSInstantiationExpression(t) => node = t.expression,
+            ExpressionKind::JsdocCast(j) => node = j.inner,
             _ => return node,
         }
     }
@@ -844,8 +848,8 @@ fn root_of<'e>(expr: &'e Expression<'e>) -> &'e Expression<'e> {
 /// context-root is recorded (resolved against `shadowed` at the end); an escaped
 /// root can't be classified (→ refuse).
 fn check_root(access: &Expression<'_>, nc: &mut Nc<'_>) {
-    match root_of(access) {
-        Expression::Identifier(id) => match plain_name(id, nc.source) {
+    match &root_of(access).kind {
+        ExpressionKind::Identifier(id) => match plain_name(id, nc.source) {
             Some(name) => {
                 // A `$name` store read roots at its base binding `name` (the
                 // subscription reads `store`), so a member/call on a store whose
@@ -883,13 +887,13 @@ fn walk_opt(expr: Option<&Expression<'_>>, nc: &mut Nc<'_>) {
 /// Walk an expression: detect `new`/unsafe-member/unsafe-call triggers, and
 /// collect any nested function/arrow/class bindings into `shadowed`.
 fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
-    match expr {
-        Expression::NewExpression(new_expr) => {
+    match &expr.kind {
+        ExpressionKind::NewExpression(new_expr) => {
             nc.needs = true;
             walk_expr(new_expr.callee, nc);
             walk_exprs(new_expr.arguments, nc);
         }
-        Expression::CallExpression(call) => {
+        ExpressionKind::CallExpression(call) => {
             // The oracle's `rune_invalid_spread` (`CallExpression.js:24`), checked
             // on every rune call BEFORE its dispatch and before recursing — so the
             // outer rune call's spread wins, matching the oracle's visit order. Any
@@ -904,7 +908,7 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
             walk_expr(call.callee, nc);
             walk_exprs(call.arguments, nc);
         }
-        Expression::MemberExpression(member) => {
+        ExpressionKind::MemberExpression(member) => {
             // The oracle's `props_illegal_name` REFERENCE-site rule
             // (`MemberExpression.js:11-16`): a `rest_prop.$$…` access — a plain
             // Identifier object bound to a `$props()` rest_prop, and an
@@ -925,7 +929,7 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
             // reference), so gating on `!computed` here would suppress this rule
             // and nothing else would fire → an OVER-ACCEPTANCE. A computed STRING
             // key (`rest['$$slots']`) is excluded on its own: its property is a
-            // Literal, not an Identifier, so the `Expression::Identifier(prop)`
+            // Literal, not an Identifier, so the `ExpressionKind::Identifier(prop)`
             // arm fails — matching the oracle, which also compiles it.
             //
             // The property NAME is DECODED via `Identifier::name`,
@@ -935,10 +939,10 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
             // plain-name set, so an escaped rest-prop ROOT binding is a separate,
             // narrower residual left by `collect_rest_prop_names`.
             if nc.refuse.is_none()
-                && let Expression::Identifier(obj) = member.object
+                && let ExpressionKind::Identifier(obj) = &member.object.kind
                 && let Some(obj_name) = plain_name(obj, nc.source)
                 && nc.rest_prop_names.contains(obj_name)
-                && let Expression::Identifier(prop) = member.property
+                && let ExpressionKind::Identifier(prop) = &member.property.kind
                 && prop.name(nc.source).starts_with("$$")
             {
                 nc.refuse = Some(Refusal::PropsIllegalName);
@@ -952,7 +956,7 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
 
         // Nested function scopes: their params/bindings shadow the component
         // scope, so record them and walk the body (always nested).
-        Expression::ArrowFunctionExpression(a) => {
+        ExpressionKind::ArrowFunctionExpression(a) => {
             nc.fn_depth += 1;
             let mark = js_scope_mark(nc);
             for param in a.params {
@@ -966,13 +970,13 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
             js_scope_restore(nc, mark);
             nc.fn_depth -= 1;
         }
-        Expression::FunctionExpression(f) => walk_function_expression(f, nc),
-        Expression::ClassExpression(c) => walk_class_body(&c.body, nc),
+        ExpressionKind::FunctionExpression(f) => walk_function_expression(f, nc),
+        ExpressionKind::ClassExpression(c) => walk_class_body(&c.body, nc),
 
         // A bare identifier reference: detect `$$slots` (the oracle's
         // `uses_slots`) and a `$name` store access (the store-subscription gate),
         // otherwise a leaf.
-        Expression::Identifier(id) => {
+        ExpressionKind::Identifier(id) => {
             // The oracle's `invalid_arguments_usage` (`Identifier.js:27-32`): a
             // REFERENCE to `arguments` with no
             // `FunctionDeclaration`/`FunctionExpression` ancestor. This arm is
@@ -1009,14 +1013,14 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
             }
         }
         // Leaves — no children, no bindings.
-        Expression::Literal(_)
-        | Expression::PrivateIdentifier(_)
-        | Expression::RegexLiteral(_)
-        | Expression::ThisExpression(_)
-        | Expression::Super(_)
-        | Expression::MetaProperty(_) => {}
+        ExpressionKind::Literal(_)
+        | ExpressionKind::PrivateIdentifier(_)
+        | ExpressionKind::RegexLiteral(_)
+        | ExpressionKind::ThisExpression(_)
+        | ExpressionKind::Super(_)
+        | ExpressionKind::MetaProperty(_) => {}
 
-        Expression::ObjectExpression(obj) => {
+        ExpressionKind::ObjectExpression(obj) => {
             for prop in obj.properties {
                 match prop {
                     ObjectProperty::Property(p) => {
@@ -1029,42 +1033,42 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
                 }
             }
         }
-        Expression::ArrayExpression(arr) => {
+        ExpressionKind::ArrayExpression(arr) => {
             for element in arr.elements {
                 walk_opt(element.as_ref(), nc);
             }
         }
-        Expression::UnaryExpression(u) => walk_expr(u.argument, nc),
-        Expression::UpdateExpression(u) => {
+        ExpressionKind::UnaryExpression(u) => walk_expr(u.argument, nc),
+        ExpressionKind::UpdateExpression(u) => {
             crate::rune_guard::assign_target_roots(u.argument, nc.source, &mut nc.reassigned);
             refuse_invalid_assign_target(u.argument, nc, true);
             walk_expr(u.argument, nc);
         }
-        Expression::BinaryExpression(b) => {
+        ExpressionKind::BinaryExpression(b) => {
             walk_expr(b.left, nc);
             walk_expr(b.right, nc);
         }
-        Expression::ConditionalExpression(c) => {
+        ExpressionKind::ConditionalExpression(c) => {
             walk_expr(c.test, nc);
             walk_expr(c.consequent, nc);
             walk_expr(c.alternate, nc);
         }
-        Expression::SpreadElement(s) => walk_expr(s.argument, nc),
-        Expression::TemplateLiteral(t) => walk_exprs(t.expressions, nc),
-        Expression::TaggedTemplateExpression(t) => {
+        ExpressionKind::SpreadElement(s) => walk_expr(s.argument, nc),
+        ExpressionKind::TemplateLiteral(t) => walk_exprs(t.expressions, nc),
+        ExpressionKind::TaggedTemplateExpression(t) => {
             walk_expr(t.tag, nc);
             walk_exprs(t.quasi.expressions, nc);
         }
-        Expression::AwaitExpression(a) => walk_expr(a.argument, nc),
-        Expression::YieldExpression(y) => walk_opt(y.argument, nc),
-        Expression::SequenceExpression(s) => walk_exprs(s.expressions, nc),
-        Expression::AssignmentExpression(a) => {
+        ExpressionKind::AwaitExpression(a) => walk_expr(a.argument, nc),
+        ExpressionKind::YieldExpression(y) => walk_opt(y.argument, nc),
+        ExpressionKind::SequenceExpression(s) => walk_exprs(s.expressions, nc),
+        ExpressionKind::AssignmentExpression(a) => {
             crate::rune_guard::assign_target_roots(a.left, nc.source, &mut nc.reassigned);
             refuse_invalid_assign_target(a.left, nc, true);
             walk_expr(a.left, nc);
             walk_expr(a.right, nc);
         }
-        Expression::ObjectPattern(p) => {
+        ExpressionKind::ObjectPattern(p) => {
             for prop in p.properties {
                 match prop {
                     ObjectPatternProperty::Property(prop) => {
@@ -1077,28 +1081,28 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
                 }
             }
         }
-        Expression::ArrayPattern(p) => {
+        ExpressionKind::ArrayPattern(p) => {
             for element in p.elements {
                 walk_opt(element.as_ref(), nc);
             }
         }
-        Expression::AssignmentPattern(p) => {
+        ExpressionKind::AssignmentPattern(p) => {
             walk_expr(p.left, nc);
             walk_expr(p.right, nc);
         }
-        Expression::RestElement(r) => walk_expr(r.argument, nc),
-        Expression::TSTypeAssertion(t) => walk_expr(t.expression, nc),
-        Expression::TSAsExpression(t) => walk_expr(t.expression, nc),
-        Expression::TSSatisfiesExpression(t) => walk_expr(t.expression, nc),
-        Expression::TSInstantiationExpression(t) => walk_expr(t.expression, nc),
-        Expression::TSNonNullExpression(t) => walk_expr(t.expression, nc),
-        Expression::TSParameterProperty(t) => walk_expr(t.parameter, nc),
-        Expression::ImportExpression(i) => {
+        ExpressionKind::RestElement(r) => walk_expr(r.argument, nc),
+        ExpressionKind::TSTypeAssertion(t) => walk_expr(t.expression, nc),
+        ExpressionKind::TSAsExpression(t) => walk_expr(t.expression, nc),
+        ExpressionKind::TSSatisfiesExpression(t) => walk_expr(t.expression, nc),
+        ExpressionKind::TSInstantiationExpression(t) => walk_expr(t.expression, nc),
+        ExpressionKind::TSNonNullExpression(t) => walk_expr(t.expression, nc),
+        ExpressionKind::TSParameterProperty(t) => walk_expr(t.parameter, nc),
+        ExpressionKind::ImportExpression(i) => {
             walk_expr(i.source, nc);
             walk_opt(i.options, nc);
         }
-        Expression::JsdocCast(j) => walk_expr(j.inner, nc),
-        Expression::ParenthesizedExpression(p) => walk_expr(p.expression, nc),
+        ExpressionKind::JsdocCast(j) => walk_expr(j.inner, nc),
+        ExpressionKind::ParenthesizedExpression(p) => walk_expr(p.expression, nc),
     }
 }
 
