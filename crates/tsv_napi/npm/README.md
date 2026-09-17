@@ -64,7 +64,7 @@ Errors: parse errors and engine errors are thrown JS errors. A Rust panic — al
 
 ## Status
 
-Pre-alpha — not for production use. The published packages are for feedback; expect bugs and API changes.
+Near production-ready. A long tail of rare bugs remains and APIs may still change; reports are appreciated.
 
 ## License
 

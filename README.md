@@ -28,7 +28,7 @@ and rsvelte additionally has a compiler and linter/typechecker integration
 
 tsv prioritizes, in order:
 
-1. correctness (spec conformance for HTML/CSS/JS, Svelte and TypeScript adherence)
+1. correctness (spec conformance for HTML/CSS/JS, fidelity to Svelte and TypeScript)
 2. speed
 3. binary size and memory usage
 4. extensibility, modularity, reusability
@@ -38,14 +38,15 @@ Feedback is welcome to help navigate these tradeoffs.
 
 See the [benchmarks](https://tsv.fuz.dev/docs/benchmarks) for measurements.
 Compared to Oxc and Biome, tsv is smaller and faster
-at formatting its supported languages, and faster at parsing
-for the same AST payload (the like-for-like rows in the report),
+at parsing and formatting its supported languages
+(parsing compared on the same AST payload),
 but lacks their features and broad language support.
 One reason for tsv to exist is to help find the performance bonuses
 left on the table in the Web ecosystem's increasingly-native implementations.
 
-This is an early release with many bugs (and fixes to bugs in Prettier and
-prettier-plugin-svelte), and reports and feedback are appreciated.
+tsv is near production-ready, with a long tail of rare bugs
+(and numerous fixes to bugs in Prettier and prettier-plugin-svelte).
+Reports and feedback are appreciated.
 See the [issues](https://github.com/fuzdev/tsv/issues)
 and [discussions](https://github.com/fuzdev/tsv/discussions).
 
@@ -58,7 +59,7 @@ It's a high-effort project that prioritizes quality.
 
 ## About
 
-> **status**: pre-alpha - not for production use; the published packages are for feedback
+> **status**: near production-ready - a long tail of rare bugs remains, and APIs may still change
 
 tsv derives its tools from:
 
@@ -72,7 +73,7 @@ tsv's features:
 - [x] parsers for TypeScript/JS, CSS, and Svelte, drop-in for Svelte+acorn+acorn-typescript
 - [x] formatter following Prettier + prettier-plugin-svelte + Svelte's prettier config
       (with intentional divergences and no supported style config)
-- [ ] [vscode formatter plugin](https://github.com/fuzdev/vscode-extension-tsv-format) - `fuzdev.tsv-format`
+- [x] [VSCode formatter extension](https://github.com/fuzdev/vscode-extension-tsv-format) - [`fuzdev.tsv-format`](https://marketplace.visualstudio.com/items?itemName=fuzdev.tsv-format) on the Marketplace and [Open VSX](https://open-vsx.org/extension/fuzdev/tsv-format) (WASM-only, works in desktop VSCode and the browser host)
 - [ ] ts-to-js conversion (types-to-whitespace only)
 - [ ] module lexer
 

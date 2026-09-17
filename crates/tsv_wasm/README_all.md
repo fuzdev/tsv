@@ -79,7 +79,7 @@ For tooling that needs tsv's exact file scoping, the package also exports the `I
 
 ## Status
 
-Pre-alpha — not for production use. The published packages are for feedback; expect bugs and API changes.
+Near production-ready. A long tail of rare bugs remains and APIs may still change; reports are appreciated.
 
 ## License
 
