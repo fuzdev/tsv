@@ -34,7 +34,7 @@ use tsv_ts::Expression;
 /// the head does the expression's comment range reach, without spanning text someone else
 /// prints.
 pub(super) fn each_expr_comment_end(block: &EachBlock<'_>) -> u32 {
-    match &block.context {
+    match block.context {
         Some(context) => context.span().start,
         None => block.expression.span().end,
     }
@@ -800,7 +800,7 @@ impl<'a> Printer<'a> {
     /// element's inline form).
     pub(super) fn build_each_key_expr(&self, key: &EachKey<'_>, wrapping: bool) -> HeadExpr {
         self.build_expression_doc_for_block(
-            &key.expression,
+            key.expression,
             key.span.start + 1, // after "("
             key.span.end - 1,   // before ")"
             1,                  // "(" = 1 char (key is inside parens)

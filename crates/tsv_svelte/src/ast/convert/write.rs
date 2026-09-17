@@ -884,7 +884,7 @@ fn write_special_element(w: &mut JsonWriter, elem: &internal::SpecialElement<'_>
     // `<svelte:component this={…}>` expression — a generic island.
     if let Some(tag) = elem.kind.expression() {
         w.raw(",\"expression\":");
-        write_braced_island(w, &tag.expression, tag.span, ctx);
+        write_braced_island(w, tag.expression, tag.span, ctx);
     }
     w.raw("}");
 }
@@ -920,7 +920,7 @@ fn write_special_tag(w: &mut JsonWriter, this: &internal::SpecialThis<'_>, ctx: 
             w.raw("}");
         }
         internal::SpecialThis::Braced(tag) => {
-            write_braced_island(w, &tag.expression, tag.span, ctx);
+            write_braced_island(w, tag.expression, tag.span, ctx);
         }
     }
 }
@@ -932,7 +932,7 @@ fn write_expression_tag(w: &mut JsonWriter, tag: &internal::ExpressionTag<'_>, c
     w.raw(",\"end\":");
     w.u32(ctx.pos(tag.span.end));
     w.raw(",\"expression\":");
-    write_braced_island(w, &tag.expression, tag.span, ctx);
+    write_braced_island(w, tag.expression, tag.span, ctx);
     w.raw("}");
 }
 
@@ -952,7 +952,7 @@ fn write_shorthand_expression_tag(
     w.raw(",\"expression\":");
     write_identifier_expression_with_character(
         w,
-        &tag.expression,
+        tag.expression,
         ctx.embed_locator(CommentMode::Off),
     );
     w.raw("}");
@@ -1043,7 +1043,7 @@ fn write_if_block(w: &mut JsonWriter, block: &internal::IfBlock<'_>, ctx: &Ctx<'
     }
     let range_end = fragment_first_start(&block.consequent).unwrap_or(block.span.end);
     w.raw(",\"test\":");
-    write_generic_island(w, &block.test, block.span.start, range_end, ctx);
+    write_generic_island(w, block.test, block.span.start, range_end, ctx);
     w.raw(",\"consequent\":");
     write_fragment(w, &block.consequent, ctx);
     w.raw(",\"alternate\":");
@@ -1061,7 +1061,7 @@ fn write_each_block(w: &mut JsonWriter, block: &internal::EachBlock<'_>, ctx: &C
     w.u32(ctx.pos(block.span.end));
     let range_end = fragment_first_start(&block.body).unwrap_or(block.span.end);
     w.raw(",\"expression\":");
-    write_generic_island(w, &block.expression, block.span.start, range_end, ctx);
+    write_generic_island(w, block.expression, block.span.start, range_end, ctx);
     w.raw(",\"body\":");
     write_fragment(w, &block.body, ctx);
     w.raw(",\"context\":");
@@ -1079,7 +1079,7 @@ fn write_each_block(w: &mut JsonWriter, block: &internal::EachBlock<'_>, ctx: &C
         // `read_expression` begins after the paren (only whitespace can sit between).
         // Anchored on the head, this window reaches back over the CONTEXT PATTERN and
         // claims a comment written inside it, which the pattern island also attaches.
-        write_generic_island(w, &key.expression, key.span.start, range_end, ctx);
+        write_generic_island(w, key.expression, key.span.start, range_end, ctx);
     }
     if let Some(fallback) = &block.fallback {
         w.raw(",\"fallback\":");
@@ -1106,7 +1106,7 @@ fn write_await_block(w: &mut JsonWriter, block: &internal::AwaitBlock<'_>, ctx: 
     .min()
     .unwrap_or(block.span.end);
     w.raw(",\"expression\":");
-    write_generic_island(w, &block.expression, block.span.start, range_end, ctx);
+    write_generic_island(w, block.expression, block.span.start, range_end, ctx);
     w.raw(",\"value\":");
     write_or_null(w, block.value.as_ref(), |w, v| {
         write_pattern_island(w, v, ctx);
@@ -1140,7 +1140,7 @@ fn write_key_block(w: &mut JsonWriter, block: &internal::KeyBlock<'_>, ctx: &Ctx
     w.u32(ctx.pos(block.span.end));
     let range_end = fragment_first_start(&block.fragment).unwrap_or(block.span.end);
     w.raw(",\"expression\":");
-    write_generic_island(w, &block.expression, block.span.start, range_end, ctx);
+    write_generic_island(w, block.expression, block.span.start, range_end, ctx);
     w.raw(",\"fragment\":");
     write_fragment(w, &block.fragment, ctx);
     w.raw("}");
@@ -1156,7 +1156,7 @@ fn write_snippet_block(w: &mut JsonWriter, block: &internal::SnippetBlock<'_>, c
     w.u32(ctx.pos(block.span.end));
     let range_end = fragment_first_start(&block.body).unwrap_or(block.span.end);
     w.raw(",\"expression\":");
-    write_snippet_name(w, &block.expression, block.span.start, range_end, ctx);
+    write_snippet_name(w, block.expression, block.span.start, range_end, ctx);
     if let Some(type_params) = block.type_params_raw {
         w.raw(",\"typeParams\":");
         w.string(type_params);
@@ -1227,7 +1227,7 @@ fn write_html_tag(w: &mut JsonWriter, tag: &internal::HtmlTag<'_>, ctx: &Ctx<'_>
     w.raw(",\"end\":");
     w.u32(ctx.pos(tag.span.end));
     w.raw(",\"expression\":");
-    write_braced_island(w, &tag.expression, tag.span, ctx);
+    write_braced_island(w, tag.expression, tag.span, ctx);
     w.raw("}");
 }
 
@@ -1238,7 +1238,7 @@ fn write_render_tag(w: &mut JsonWriter, tag: &internal::RenderTag<'_>, ctx: &Ctx
     w.raw(",\"end\":");
     w.u32(ctx.pos(tag.span.end));
     w.raw(",\"expression\":");
-    write_braced_island(w, &tag.expression, tag.span, ctx);
+    write_braced_island(w, tag.expression, tag.span, ctx);
     w.raw("}");
 }
 
@@ -1344,7 +1344,7 @@ fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'
     } else {
         // The document has template comments: the tag's TWO acorn parses take
         // two attaches, split at the end of the binding (see `attach_const_tag_init`).
-        let id_attach = attach_binding_pattern(&tag.id, ctx.attach_inputs());
+        let id_attach = attach_binding_pattern(tag.id, ctx.attach_inputs());
         let init_attach = attach_const_tag_init(tag, ctx.attach_inputs());
         write_const_declaration(
             w,
@@ -1421,9 +1421,9 @@ fn write_const_declaration(
     w.raw(
         "{\"type\":\"VariableDeclaration\",\"kind\":\"const\",\"declarations\":[{\"type\":\"VariableDeclarator\",\"id\":",
     );
-    write_pattern_embedded(w, &tag.id, ctx.embed_pattern(id_mode, &tag.id));
+    write_pattern_embedded(w, tag.id, ctx.embed_pattern(id_mode, tag.id));
     w.raw(",\"init\":");
-    write_expression_embedded(w, &tag.init, ctx.embed_expr(init_mode, &tag.init));
+    write_expression_embedded(w, tag.init, ctx.embed_expr(init_mode, tag.init));
     w.raw(",\"start\":");
     w.u32(ctx.pos(tag.id.span().start));
     w.raw(",\"end\":");
@@ -1541,7 +1541,7 @@ fn write_attribute_value_field(
         // and its identifier share a span) injects `character`.
         match &values[0] {
             internal::AttributeValue::ExpressionTag(tag)
-                if matches!(&tag.expression, tsv_ts::ast::internal::Expression::Identifier(id)
+                if matches!(tag.expression, tsv_ts::ast::internal::Expression::Identifier(id)
                     if tag.span == id.span) =>
             {
                 write_shorthand_expression_tag(w, tag, ctx);
@@ -1586,7 +1586,7 @@ fn write_spread_attribute(
     w.raw(",\"end\":");
     w.u32(ctx.pos(spread.span.end));
     w.raw(",\"expression\":");
-    write_braced_island(w, &spread.expression, spread.span, ctx);
+    write_braced_island(w, spread.expression, spread.span, ctx);
     w.raw("}");
 }
 
@@ -1597,7 +1597,7 @@ fn write_attach_tag(w: &mut JsonWriter, tag: &internal::AttachTag<'_>, ctx: &Ctx
     w.raw(",\"end\":");
     w.u32(ctx.pos(tag.span.end));
     w.raw(",\"expression\":");
-    write_braced_island(w, &tag.expression, tag.span, ctx);
+    write_braced_island(w, tag.expression, tag.span, ctx);
     w.raw("}");
 }
 
@@ -1653,7 +1653,7 @@ macro_rules! expression_directive_writer {
         fn $fn_name(w: &mut JsonWriter, d: &internal::$ty<'_>, ctx: &Ctx<'_>) {
             write_directive_head(w, stringify!($ty), d.span, d.name_span, d.head_span, ctx);
             w.raw(",\"expression\":");
-            write_optional_directive_expression(w, d.expression.as_ref(), d.span, ctx);
+            write_optional_directive_expression(w, d.expression, d.span, ctx);
             w.raw(",\"modifiers\":");
             write_modifiers(w, d.modifiers);
             w.raw("}");
@@ -1680,7 +1680,7 @@ fn write_transition_directive(
         ctx,
     );
     w.raw(",\"expression\":");
-    write_optional_directive_expression(w, d.expression.as_ref(), d.span, ctx);
+    write_optional_directive_expression(w, d.expression, d.span, ctx);
     w.raw(",\"modifiers\":");
     write_modifiers(w, d.modifiers);
     w.raw(",\"intro\":");
@@ -1725,7 +1725,7 @@ fn write_bind_directive(w: &mut JsonWriter, d: &internal::BindDirective<'_>, ctx
     w.raw(",\"expression\":");
     write_directive_value_expression(
         w,
-        &d.expression,
+        d.expression,
         d.expression_tag_span.is_some(),
         d.span,
         ctx,
@@ -1740,7 +1740,7 @@ fn write_class_directive(w: &mut JsonWriter, d: &internal::ClassDirective<'_>, c
     w.raw(",\"expression\":");
     write_directive_value_expression(
         w,
-        &d.expression,
+        d.expression,
         d.expression_tag_span.is_some(),
         d.span,
         ctx,
@@ -2057,7 +2057,7 @@ fn write_custom_element_field(
     for v in values {
         // `customElement={{ tag: '…', props: {…}, shadow: …, extend: … }}`
         if let internal::AttributeValue::ExpressionTag(expr) = v
-            && let Expression::ObjectExpression(obj) = &expr.expression
+            && let Expression::ObjectExpression(obj) = expr.expression
         {
             let mut tag: Option<&Expression<'_>> = None;
             let mut props: Option<&Expression<'_>> = None;
@@ -2133,7 +2133,7 @@ fn write_custom_element_field(
         let tag_str = match v {
             internal::AttributeValue::Text(text) => Some(text.data(ctx.source)),
             internal::AttributeValue::ExpressionTag(expr) => {
-                if let Expression::Literal(lit) = &expr.expression
+                if let Expression::Literal(lit) = expr.expression
                     && let LiteralValue::String(cooked) = &lit.value
                 {
                     Some(std::borrow::Cow::Borrowed(

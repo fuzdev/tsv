@@ -203,7 +203,7 @@ fn emitted_bind_target<'arena>(
 ) -> Result<Expression<'arena>, CompileError> {
     // The template borrow point: erase the bind target once, then gate its erased
     // shape (an `x as T` target is `x`, an assignable lvalue).
-    let expr = env.erase(&directive.expression)?;
+    let expr = env.erase(directive.expression)?;
     match reassignable_bind_target_root(env, expr) {
         Some(name) if env.state_names.contains(&name) => {}
         _ => return refuse_bind(bind_name),
@@ -247,7 +247,7 @@ pub(crate) fn validate_inert_bind_target<'arena>(
     let bind_name = directive.name_span.extract(env.source).to_string();
     // Erase a TypeScript wrapper (`bind:this={x as T}`) first, exactly as the
     // regular fork does before gating the target's shape.
-    let expr = env.erase(&directive.expression)?;
+    let expr = env.erase(directive.expression)?;
     if bind_name == "this" {
         if reassignable_bind_target_root(env, expr).is_some() || is_get_set_pair(expr) {
             return Ok(());
@@ -279,7 +279,7 @@ pub(crate) fn validate_dynamic_bind<'arena>(
 ) -> Result<(), CompileError> {
     let bind_name = directive.name_span.extract(env.source).to_string();
     if bind_name == "this" {
-        let expr = env.erase(&directive.expression)?;
+        let expr = env.erase(directive.expression)?;
         if reassignable_bind_target_root(env, expr).is_some() || is_get_set_pair(expr) {
             return Ok(());
         }
@@ -339,7 +339,7 @@ fn build_companion_value<'arena>(
             Ok(env.b.string_literal_expr(&escape_html_attr(&decoded)))
         }
         [AttributeValue::ExpressionTag(tag)] => {
-            let expr = env.erase(&tag.expression)?;
+            let expr = env.erase(tag.expression)?;
             Ok(wrap_value_expr(env, expr)?[0].clone())
         }
         _ => refuse_bind("group"),
@@ -409,7 +409,7 @@ fn resolve_bind_directive<'arena>(
     // validation and a skip — not a refusal — on the inline path too). Erase a
     // `bind:this={x as T}` TS wrapper first.
     if bind_name == "this" {
-        let expr = env.erase(&directive.expression)?;
+        let expr = env.erase(directive.expression)?;
         if reassignable_bind_target_root(env, expr).is_some() || is_get_set_pair(expr) {
             return Ok(BindEmission::Omit);
         }

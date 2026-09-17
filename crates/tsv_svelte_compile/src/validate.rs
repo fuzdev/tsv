@@ -104,7 +104,7 @@ fn refuse_each_key_without_as(each: &EachBlock<'_>, source: &str) -> Result<(), 
     if each.context.is_some() {
         return Ok(());
     }
-    let keyed = match &key.expression {
+    let keyed = match key.expression {
         Expression::Identifier(id) => match (each.index, plain_identifier_name(id, source)) {
             (Some(index), Some(name)) => index != name,
             // No index, or an escaped key name this port can't compare — keyed.
@@ -415,7 +415,7 @@ impl<'s> Validator<'s> {
                     }
                 }
                 AttributeNode::AttachTag(attach) => {
-                    refuse_unparenthesized_sequence(&attach.expression, self.source)?;
+                    refuse_unparenthesized_sequence(attach.expression, self.source)?;
                 }
                 _ => {}
             }
@@ -1023,7 +1023,7 @@ fn refuse_unquoted_attribute_sequence(
 /// rather than testing for a text value.
 fn expression_attribute_value<'a>(attribute: &'a Attribute<'a>) -> Option<&'a Expression<'a>> {
     match attribute.value {
-        Some([AttributeValue::ExpressionTag(tag)]) => Some(&tag.expression),
+        Some([AttributeValue::ExpressionTag(tag)]) => Some(tag.expression),
         _ => None,
     }
 }

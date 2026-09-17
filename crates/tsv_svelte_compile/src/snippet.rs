@@ -80,7 +80,7 @@ impl SnippetAnalysis {
 
 /// The plain (non-escaped) name of a snippet's `expression` identifier.
 pub(crate) fn snippet_name<'s>(snippet: &SnippetBlock<'_>, source: &'s str) -> Option<&'s str> {
-    match &snippet.expression {
+    match snippet.expression {
         Expression::Identifier(id) => plain_name(id, source),
         _ => None,
     }
@@ -377,7 +377,7 @@ impl<'s> Collector<'s> {
             FragmentNode::Text(_) | FragmentNode::Comment(_) => {}
             FragmentNode::Element(e) => self.element(e),
             FragmentNode::SpecialElement(se) => self.special_element(se),
-            FragmentNode::ExpressionTag(t) => self.expr(&t.expression),
+            FragmentNode::ExpressionTag(t) => self.expr(t.expression),
             FragmentNode::HtmlTag(t) => self.html_tag(t),
             FragmentNode::IfBlock(b) => self.if_block(b),
             FragmentNode::EachBlock(b) => self.each_block(b),
@@ -467,11 +467,11 @@ impl<'s> Collector<'s> {
     }
 
     fn html_tag(&mut self, tag: &HtmlTag<'_>) {
-        self.expr(&tag.expression);
+        self.expr(tag.expression);
     }
 
     fn if_block(&mut self, block: &IfBlock<'_>) {
-        self.expr(&block.test);
+        self.expr(block.test);
         self.fragment(&block.consequent);
         if let Some(alt) = &block.alternate {
             self.fragment(alt);
@@ -479,11 +479,11 @@ impl<'s> Collector<'s> {
     }
 
     fn each_block(&mut self, block: &EachBlock<'_>) {
-        self.expr(&block.expression);
+        self.expr(block.expression);
         if let Some(key) = &block.key {
-            self.expr(&key.expression);
+            self.expr(key.expression);
         }
-        if let Some(context) = &block.context {
+        if let Some(context) = block.context {
             self.bind_pattern(context);
         }
         if let Some(index) = block.index {
@@ -496,11 +496,11 @@ impl<'s> Collector<'s> {
     }
 
     fn await_block(&mut self, block: &AwaitBlock<'_>) {
-        self.expr(&block.expression);
-        if let Some(value) = &block.value {
+        self.expr(block.expression);
+        if let Some(value) = block.value {
             self.bind_pattern(value);
         }
-        if let Some(error) = &block.error {
+        if let Some(error) = block.error {
             self.bind_pattern(error);
         }
         // Pending/then are emitted (so their skipped attribute positions refuse at
@@ -518,17 +518,17 @@ impl<'s> Collector<'s> {
     }
 
     fn key_block(&mut self, block: &KeyBlock<'_>) {
-        self.expr(&block.expression);
+        self.expr(block.expression);
         self.fragment(&block.fragment);
     }
 
     fn const_tag(&mut self, tag: &ConstTag<'_>) {
-        self.bind_pattern(&tag.id);
-        self.expr(&tag.init);
+        self.bind_pattern(tag.id);
+        self.expr(tag.init);
     }
 
     fn render_tag(&mut self, tag: &RenderTag<'_>) {
-        self.expr(&tag.expression);
+        self.expr(tag.expression);
     }
 
     fn nested_snippet(&mut self, snippet: &SnippetBlock<'_>) {

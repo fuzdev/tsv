@@ -166,7 +166,7 @@ impl<'a> Printer<'a> {
             let is_simple_content = element.fragment.nodes.len() == 1
                 && matches!(
                     &element.fragment.nodes[0],
-                    FragmentNode::ExpressionTag(expr) if !Self::expression_has_break_points(&expr.expression)
+                    FragmentNode::ExpressionTag(expr) if !Self::expression_has_break_points(expr.expression)
                 );
 
             if is_simple_content {
@@ -497,7 +497,7 @@ impl<'a> Printer<'a> {
         let head = self.build_block_head_expr(
             IF_BLOCK_OPEN,
             block.opening_tag_span,
-            &block.test,
+            block.test,
             block.opening_tag_span.end - 1,
             false,
         );
@@ -555,7 +555,7 @@ impl<'a> Printer<'a> {
         let head = self.build_block_head_expr(
             EACH_BLOCK_OPEN,
             block.opening_tag_span,
-            &block.expression,
+            block.expression,
             expr_comment_end,
             false,
         );
@@ -563,7 +563,7 @@ impl<'a> Printer<'a> {
         let open_doc = self.head_open_doc(EACH_BLOCK_OPEN, head.layout.opens_own_line());
         let mut opening: DocBuf = smallvec![open_doc, head.doc];
 
-        if let Some(context) = &block.context {
+        if let Some(context) = block.context {
             opening.push(d.text(" as "));
             let pattern_doc = self.build_pattern_doc(context);
             opening.push(pattern_doc);

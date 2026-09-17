@@ -114,7 +114,7 @@ const AWAIT_BODY_STOPS: &[&str] = &["then", "catch", "await"];
 
 /// What one `{#await}` clause holds: its fragment and its binding pattern, kept together
 /// so filling a clause and asking whether it is filled cannot name different slots.
-type AwaitSlot<'arena> = (Option<Fragment<'arena>>, Option<Expression<'arena>>);
+type AwaitSlot<'arena> = (Option<Fragment<'arena>>, Option<&'arena Expression<'arena>>);
 
 /// The TypeScript assertion keywords, each paired with whether it can BE a `{#each}`
 /// binding separator. Both continue an assertion chain; only `as` is spelled the way
@@ -250,7 +250,7 @@ fn each_binding_separator(s: &str, s_offset: usize, arena: &Bump) -> EachHeadSpl
 /// `consumed_end` is the absolute source offset just past the last token the binding
 /// consumed — the caller rejects any non-whitespace between it and the closing `}`.
 type EachBindingResult<'arena> = (
-    Expression<'arena>,
+    &'arena Expression<'arena>,
     Option<&'arena str>,
     Option<EachKey<'arena>>,
     usize,
@@ -421,7 +421,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         iterable: &str,
         expr_offset: usize,
         mark: EmbeddedParseMark,
-    ) -> Result<Expression<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
         self.rewind_embedded_parses(mark);
         // Leading whitespace only, and `expr_offset` is already the first non-whitespace byte:
         // this slice ends at the head's SECOND `as`, so its trailing run may be a line
@@ -648,7 +648,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         input: &str,
         offset: usize,
-    ) -> Result<(Expression<'arena>, usize), ParseError> {
+    ) -> Result<(&'arena Expression<'arena>, usize), ParseError> {
         let trimmed = input.trim_start_matches(is_svelte_ws);
         let ws_len = input.len() - trimmed.len();
         let adjusted = offset + ws_len;
@@ -669,7 +669,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         };
         // `parse_ts_pattern` yields ObjectPattern/ArrayPattern (not the Object/Array
         // *Expression* the plain expression parser would).
-        let mut expr = self.parse_ts_pattern(&trimmed[..end], adjusted)?;
+        let expr = self.parse_ts_pattern(&trimmed[..end], adjusted)?;
 
         let after_pattern = trimmed[end..].trim_start_matches(is_svelte_ws);
         if !after_pattern.starts_with(':') {
@@ -691,7 +691,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // (`{#each xs as x: T /* c */}` → `expected_token`), and accepting it here
         // would drop the comment.
         let annotation_end = ta.span.end as usize;
-        tsv_ts::attach_pattern_type_annotation(&mut expr, ta, self.arena)?;
+        tsv_ts::attach_pattern_type_annotation(expr, ta, self.arena)?;
         Ok((expr, annotation_end))
     }
 
@@ -982,7 +982,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         keyword: &str,
         stop_keywords: &[&str],
-    ) -> Result<(Option<Fragment<'arena>>, Option<Expression<'arena>>), ParseError> {
+    ) -> Result<(Option<Fragment<'arena>>, Option<&'arena Expression<'arena>>), ParseError> {
         let tag_start = self.current_end;
         let (tag_content, content_start) = self.scan_block_tag_content(tag_start)?;
         let binding_str = self
@@ -1124,7 +1124,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         region: &str,
         region_offset: usize,
-    ) -> Result<Expression<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
         let lead = region.len() - region.trim_start_matches(is_svelte_ws).len();
         let value_start = region_offset + lead;
         // The trailing trim is safe here for the reason the doc below gives: a comment at
@@ -1161,7 +1161,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // wire `end` widens, at emit time — so only the far end needs `pattern_binding_end`.
         for edge in [
             span.end as usize,
-            tsv_ts::pattern_binding_end(&pattern) as usize,
+            tsv_ts::pattern_binding_end(pattern) as usize,
         ] {
             let tail = trimmed[edge - value_start..].trim_start_matches(is_svelte_ws);
             if tail.starts_with("/*") || tail.starts_with("//") {

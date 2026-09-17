@@ -114,17 +114,17 @@ fn each_node_item<'a, 'arena>(
             each_attribute_item(special.attributes, f)?;
             each_template_item(&special.fragment, f)?;
         }
-        FragmentNode::ExpressionTag(tag) => expr(&tag.expression)?,
-        FragmentNode::HtmlTag(tag) => expr(&tag.expression)?,
-        FragmentNode::RenderTag(tag) => expr(&tag.expression)?,
+        FragmentNode::ExpressionTag(tag) => expr(tag.expression)?,
+        FragmentNode::HtmlTag(tag) => expr(tag.expression)?,
+        FragmentNode::RenderTag(tag) => expr(tag.expression)?,
         FragmentNode::DebugTag(tag) => {
             for identifier in tag.identifiers {
                 expr(identifier)?;
             }
         }
         FragmentNode::ConstTag(tag) => {
-            expr(&tag.id)?;
-            expr(&tag.init)?;
+            expr(tag.id)?;
+            expr(tag.init)?;
         }
         FragmentNode::DeclarationTag(tag) => {
             for declarator in tag.declaration.declarations {
@@ -135,14 +135,14 @@ fn each_node_item<'a, 'arena>(
             }
         }
         FragmentNode::IfBlock(block) => {
-            expr(&block.test)?;
+            expr(block.test)?;
             each_template_item(&block.consequent, f)?;
             if let Some(alternate) = &block.alternate {
                 each_template_item(alternate, f)?;
             }
         }
         FragmentNode::EachBlock(block) => {
-            expr(&block.expression)?;
+            expr(block.expression)?;
             for e in block
                 .context
                 .iter()
@@ -156,7 +156,7 @@ fn each_node_item<'a, 'arena>(
             }
         }
         FragmentNode::AwaitBlock(block) => {
-            expr(&block.expression)?;
+            expr(block.expression)?;
             for e in block.value.iter().chain(block.error.iter()) {
                 expr(e)?;
             }
@@ -168,7 +168,7 @@ fn each_node_item<'a, 'arena>(
             }
         }
         FragmentNode::KeyBlock(block) => {
-            expr(&block.expression)?;
+            expr(block.expression)?;
             each_template_item(&block.fragment, f)?;
         }
         FragmentNode::SnippetBlock(snippet) => {
@@ -310,7 +310,7 @@ pub(crate) fn each_attribute_expression<'a, 'arena>(
                 if let Some(values) = attr.value {
                     for value in values {
                         if let AttributeValue::ExpressionTag(tag) = value {
-                            f(&tag.expression);
+                            f(tag.expression);
                         }
                     }
                 }
@@ -322,7 +322,7 @@ pub(crate) fn each_attribute_expression<'a, 'arena>(
             // `$$renderer.component` wrapper; a snippet whose only instance-binding
             // reference sits in a spread must not module-hoist).
             AttributeNode::SpreadAttribute(spread) => {
-                f(&spread.expression);
+                f(spread.expression);
             }
             // A `class:` directive on a regular element is emitted (`$.attr_class`),
             // so its expression reaches output — every analysis must see it. A
@@ -330,18 +330,18 @@ pub(crate) fn each_attribute_expression<'a, 'arena>(
             // the class *name* is a CSS token, not a binding reference. On a
             // component `class:` refuses at emission (a `ComponentDirective`), so it
             // is skipped there.
-            AttributeNode::ClassDirective(d) if is_html => f(&d.expression),
+            AttributeNode::ClassDirective(d) if is_html => f(d.expression),
             // A `style:` directive on a regular element is emitted (`$.attr_style`),
             // so its expression-bearing values reach output. The `True` shorthand
             // (`style:color`) carries NO expression node — its same-name binding
             // reference rides `each_emitted_directive_name` instead. On a component
             // `style:` refuses at emission (a `ComponentDirective`), so it is skipped.
             AttributeNode::StyleDirective(d) if is_html => match &d.value {
-                StyleDirectiveValue::ExpressionTag(tag) => f(&tag.expression),
+                StyleDirectiveValue::ExpressionTag(tag) => f(tag.expression),
                 StyleDirectiveValue::Parts(parts) => {
                     for value in *parts {
                         if let AttributeValue::ExpressionTag(tag) = value {
-                            f(&tag.expression);
+                            f(tag.expression);
                         }
                     }
                 }
@@ -357,21 +357,21 @@ pub(crate) fn each_attribute_expression<'a, 'arena>(
             // makes the whole component refuse, so visiting it is harmless there. On a
             // component `bind:` refuses at emission (a `ComponentBindDirective`), so it
             // is skipped.
-            AttributeNode::BindDirective(d) if is_html => f(&d.expression),
+            AttributeNode::BindDirective(d) if is_html => f(d.expression),
             // The no-op drop family: dropped-but-analyzed on a regular element.
-            AttributeNode::AttachTag(attach) if is_html => f(&attach.expression),
+            AttributeNode::AttachTag(attach) if is_html => f(attach.expression),
             AttributeNode::UseDirective(d) if is_html => {
-                if let Some(expr) = &d.expression {
+                if let Some(expr) = d.expression {
                     f(expr);
                 }
             }
             AttributeNode::TransitionDirective(d) if is_html => {
-                if let Some(expr) = &d.expression {
+                if let Some(expr) = d.expression {
                     f(expr);
                 }
             }
             AttributeNode::AnimateDirective(d) if is_html => {
-                if let Some(expr) = &d.expression {
+                if let Some(expr) = d.expression {
                     f(expr);
                 }
             }
@@ -457,43 +457,43 @@ pub(crate) fn each_reference_bearing_attribute_expression<'a, 'arena>(
                 if let Some(values) = attr.value {
                     for value in values {
                         if let AttributeValue::ExpressionTag(tag) = value {
-                            f(&tag.expression);
+                            f(tag.expression);
                         }
                     }
                 }
             }
-            AttributeNode::SpreadAttribute(spread) => f(&spread.expression),
-            AttributeNode::AttachTag(attach) => f(&attach.expression),
+            AttributeNode::SpreadAttribute(spread) => f(spread.expression),
+            AttributeNode::AttachTag(attach) => f(attach.expression),
             AttributeNode::OnDirective(d) => {
-                if let Some(expr) = &d.expression {
+                if let Some(expr) = d.expression {
                     f(expr);
                 }
             }
-            AttributeNode::BindDirective(d) => f(&d.expression),
-            AttributeNode::ClassDirective(d) => f(&d.expression),
+            AttributeNode::BindDirective(d) => f(d.expression),
+            AttributeNode::ClassDirective(d) => f(d.expression),
             AttributeNode::StyleDirective(d) => match &d.value {
-                StyleDirectiveValue::ExpressionTag(tag) => f(&tag.expression),
+                StyleDirectiveValue::ExpressionTag(tag) => f(tag.expression),
                 StyleDirectiveValue::Parts(parts) => {
                     for value in *parts {
                         if let AttributeValue::ExpressionTag(tag) = value {
-                            f(&tag.expression);
+                            f(tag.expression);
                         }
                     }
                 }
                 StyleDirectiveValue::True => {}
             },
             AttributeNode::UseDirective(d) => {
-                if let Some(expr) = &d.expression {
+                if let Some(expr) = d.expression {
                     f(expr);
                 }
             }
             AttributeNode::TransitionDirective(d) => {
-                if let Some(expr) = &d.expression {
+                if let Some(expr) = d.expression {
                     f(expr);
                 }
             }
             AttributeNode::AnimateDirective(d) => {
-                if let Some(expr) = &d.expression {
+                if let Some(expr) = d.expression {
                     f(expr);
                 }
             }
@@ -555,8 +555,8 @@ pub(crate) fn special_element_reference_expression<'a, 'arena>(
     match &se.kind {
         SpecialElementKind::SvelteElement {
             tag: SpecialThis::Braced(tag),
-        } => Some(&tag.expression),
-        SpecialElementKind::SvelteComponent { expression } => Some(&expression.expression),
+        } => Some(tag.expression),
+        SpecialElementKind::SvelteComponent { expression } => Some(expression.expression),
         _ => None,
     }
 }

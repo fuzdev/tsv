@@ -600,7 +600,7 @@ pub fn parse_expression_with_comments<'arena>(
     source: &str,
     base_offset: usize,
     arena: &'arena bumpalo::Bump,
-) -> Result<(Expression<'arena>, &'arena [ast::Comment])> {
+) -> Result<(&'arena Expression<'arena>, &'arena [ast::Comment])> {
     with_embedding_parser(source, base_offset, arena, |parser| {
         parser.parse_expression_with_comments()
     })
@@ -818,7 +818,7 @@ pub fn parse_expression_partial_with_comments<'arena>(
     base_offset: usize,
     arena: &'arena bumpalo::Bump,
     top_level_as: TopLevelAs,
-) -> Result<(Expression<'arena>, usize, &'arena [ast::Comment])> {
+) -> Result<(&'arena Expression<'arena>, usize, &'arena [ast::Comment])> {
     with_embedding_parser(source, base_offset, arena, |parser| {
         let (expr, end_pos) = parser.parse_assignment_expression_partial(top_level_as)?;
         Ok((expr, end_pos, parser.take_comments()))

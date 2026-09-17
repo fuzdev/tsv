@@ -683,7 +683,7 @@ impl<'a> Printer<'a> {
     fn build_spread_attribute_doc(&self, spread: &internal::SpreadAttribute<'_>) -> DocId {
         self.build_braced_expression_doc(
             SPREAD_OPEN,
-            &spread.expression,
+            spread.expression,
             spread.span.start,
             spread.span.end,
         )
@@ -693,7 +693,7 @@ impl<'a> Printer<'a> {
     fn build_attach_tag_doc(&self, tag: &internal::AttachTag<'_>) -> DocId {
         self.build_braced_expression_doc(
             ATTACH_TAG_OPEN,
-            &tag.expression,
+            tag.expression,
             tag.span.start,
             tag.span.end,
         )
@@ -790,7 +790,7 @@ impl<'a> Printer<'a> {
             self.d().text("on:"),
             dir.name_span,
             dir.modifiers,
-            dir.expression.as_ref(),
+            dir.expression,
             dir.expression_tag_span,
             DirectiveValue::Always,
         )
@@ -802,7 +802,7 @@ impl<'a> Printer<'a> {
             self.d().text("bind:"),
             dir.name_span,
             dir.modifiers,
-            Some(&dir.expression),
+            Some(dir.expression),
             dir.expression_tag_span,
             DirectiveValue::ShorthandBind,
         )
@@ -814,7 +814,7 @@ impl<'a> Printer<'a> {
             self.d().text("class:"),
             dir.name_span,
             dir.modifiers,
-            Some(&dir.expression),
+            Some(dir.expression),
             dir.expression_tag_span,
             DirectiveValue::Shorthand,
         )
@@ -829,7 +829,7 @@ impl<'a> Printer<'a> {
             internal::StyleDirectiveValue::True => {}
             internal::StyleDirectiveValue::ExpressionTag(tag) => {
                 // Only include expression if not shorthand (style:color={color} → style:color)
-                if !self.value_collapses_to_shorthand(&tag.expression, name, Some(tag.span)) {
+                if !self.value_collapses_to_shorthand(tag.expression, name, Some(tag.span)) {
                     parts.push(d.text("="));
                     parts.push(self.build_expression_tag_doc(tag));
                 }
@@ -854,7 +854,7 @@ impl<'a> Printer<'a> {
             self.d().text("use:"),
             dir.name_span,
             dir.modifiers,
-            dir.expression.as_ref(),
+            dir.expression,
             dir.expression_tag_span,
             DirectiveValue::Always,
         )
@@ -866,7 +866,7 @@ impl<'a> Printer<'a> {
             self.d().text(dir.direction.prefix_with_colon()),
             dir.name_span,
             dir.modifiers,
-            dir.expression.as_ref(),
+            dir.expression,
             dir.expression_tag_span,
             DirectiveValue::Always,
         )
@@ -878,7 +878,7 @@ impl<'a> Printer<'a> {
             self.d().text("animate:"),
             dir.name_span,
             dir.modifiers,
-            dir.expression.as_ref(),
+            dir.expression,
             dir.expression_tag_span,
             DirectiveValue::Always,
         )
@@ -890,7 +890,7 @@ impl<'a> Printer<'a> {
             self.d().text("let:"),
             dir.name_span,
             dir.modifiers,
-            dir.expression.as_ref(),
+            dir.expression,
             dir.expression_tag_span,
             DirectiveValue::Shorthand,
         )
@@ -1400,7 +1400,7 @@ impl<'a> Printer<'a> {
         // hugs its braces where an attribute value chooses between hug and block — which is
         // why a leading cast cannot hang here (`UnprefixedHost::Tag`, the reflow).
         let head = self.build_expression_content_with_comments(
-            &tag.expression,
+            tag.expression,
             Some(tag.span),
             UnprefixedHost::Tag,
         );
@@ -1431,7 +1431,7 @@ impl<'a> Printer<'a> {
         };
 
         self.value_collapses_to_shorthand(
-            &expr_tag.expression,
+            expr_tag.expression,
             attr.name(self.source),
             Some(expr_tag.span),
         )

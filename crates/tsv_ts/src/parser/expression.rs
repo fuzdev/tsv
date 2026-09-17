@@ -357,8 +357,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// the comma operator (sequence expression). Use `parse_assignment_expression()`
     /// for contexts where comma is a separator (function args, array elements, etc.)
     pub(super) fn parse_expression(&mut self) -> Result<Expression<'arena>, ParseError> {
-        // The spine returns an arena ref; the public boundary hands back an owned
-        // `Expression` (shallow clone — children are refs) for by-value AST fields.
+        // The spine returns an arena ref; this owned form (shallow clone — children are
+        // refs) serves the callers that store the value: a template literal's expression
+        // slice, the by-value `export =` / `export default` fields, and the pattern path
+        // (`parse_expression_unbounded`), which converts it to a binding pattern.
         Ok(self.parse_expression_bp(BP_COMMA)?.expr.clone())
     }
 

@@ -165,7 +165,7 @@ pub(super) fn attach_const_tag_init<'a>(
     tag: &internal::ConstTag<'_>,
     attach: AttachInputs<'a>,
 ) -> CommentAttach<'a> {
-    let binding_end = pattern_comment_window(&tag.id).end;
+    let binding_end = pattern_comment_window(tag.id).end;
     attach_expression(attach, binding_end, tag.init.span().end, tag.span.end)
 }
 

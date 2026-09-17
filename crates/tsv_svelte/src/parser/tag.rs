@@ -45,7 +45,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         start: usize,
         keyword: &str,
-    ) -> Result<(Expression<'arena>, Span), ParseError> {
+    ) -> Result<(&'arena Expression<'arena>, Span), ParseError> {
         let tag_content_start = self.current_end;
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
@@ -201,7 +201,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         decl_str: &'a str,
         decl_offset: usize,
         eq_pos: usize,
-    ) -> Result<(Expression<'arena>, Expression<'arena>), ParseError> {
+    ) -> Result<(&'arena Expression<'arena>, &'arena Expression<'arena>), ParseError> {
         // The id side ends at the `=`, so its trailing run is the head's; the init side ends
         // at the tag's `}` and its may be a line comment's own text
         // (`Parser::parse_ts_expression`).
@@ -222,7 +222,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // converts ObjectExpression/ArrayExpression to patterns), init an expression.
         let id = self.parse_ts_pattern(id_str, id_offset)?;
         let init = self.parse_ts_expression(init_str, init_offset)?;
-        self.reject_multi_declarator(&init, init_str, init_offset)?;
+        self.reject_multi_declarator(init, init_str, init_offset)?;
         Ok((id, init))
     }
 
@@ -459,9 +459,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                             self.require_debug_identifier(element)?;
                         }
                     } else {
-                        self.require_debug_identifier(&expr)?;
+                        self.require_debug_identifier(expr)?;
                     }
-                    identifiers.push(expr);
+                    identifiers.push(expr.clone());
                 }
             }
         }

@@ -2255,7 +2255,7 @@ mod tests {
             .expect("expression should parse")
             .0;
         match expr {
-            Expression::BinaryExpression(b) => Printer::should_group_binary_continuation(&b),
+            Expression::BinaryExpression(b) => Printer::should_group_binary_continuation(b),
             other => panic!("expected a binary expression, got: {other:?}"),
         }
     }

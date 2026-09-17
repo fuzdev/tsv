@@ -556,7 +556,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         source: &str,
         base_offset: usize,
-    ) -> Result<Expression<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
         self.record_acorn_region(base_offset, source, AcornPrefixText::Document);
         let (expr, comments) =
             tsv_ts::parse_expression_with_comments(source, base_offset, self.arena)?;
@@ -581,7 +581,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
         top_level_as: TopLevelAs,
-    ) -> Result<(Expression<'arena>, usize), ParseError> {
+    ) -> Result<(&'arena Expression<'arena>, usize), ParseError> {
         self.record_acorn_region(base_offset, source, AcornPrefixText::Document);
         let (expr, end_pos, comments) = tsv_ts::parse_expression_partial_with_comments(
             source,
@@ -621,11 +621,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     /// Parse a TypeScript pattern (destructuring) and collect any comments.
     /// Also handles optional type annotations (`: Type`) after the pattern.
+    ///
+    /// The pattern is arena-allocated here and handed back `&mut`, so the `{#each}` head can
+    /// still attach its separately-parsed annotation in place before storing the reference.
     pub(crate) fn parse_ts_pattern(
         &mut self,
         source: &str,
         base_offset: usize,
-    ) -> Result<Expression<'arena>, ParseError> {
+    ) -> Result<&'arena mut Expression<'arena>, ParseError> {
         // Svelte's `read_pattern` branches on the same byte: a name is `read_identifier`,
         // which builds the binding itself and hands acorn nothing, and only a `{` / `[` is
         // wrapped into the synthetic `(pattern = 1)` expression. The region is recorded
@@ -673,7 +676,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 }
                 c
             }));
-        Ok(pattern)
+        Ok(self.arena.alloc(pattern))
     }
 
     /// Record the embedded **acorn parse** Svelte runs over this component

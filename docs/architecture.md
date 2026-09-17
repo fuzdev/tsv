@@ -1057,6 +1057,24 @@ whose own width was two such slots take it:
   reference there would add an allocation instead of removing a copy — and
   `CatchClause` is reached only through `Option<&CatchClause>`, so its width sets
   nothing.
+- the Svelte AST's embedded expressions take it too: a template `{expr}`, every block head
+  (`{#if}`'s test, `{#each}`'s iterable, context and key, `{#await}`'s expression and its
+  `{:then}` / `{:catch}` bindings, `{#key}`, `{#snippet}`'s name), the `{@html}` /
+  `{@render}` / `{@const}` / `{@attach}` tags, every directive's expression and a spread
+  attribute hold `&'arena Expression` (`Option<&'arena Expression>` where it may be absent).
+  So `ExpressionTag` — the element of every attribute value — is **16 B**, `AttributeNode`
+  **72** and `FragmentNode` **120**, set by `SnippetBlock`. The binding *patterns* among
+  them (`{#each}`'s context, the `{:then}` / `{:catch}` bindings, `{@const}`'s id) are
+  built by the TypeScript side as owned values — converted from an expression, with an
+  annotation attached in place — so the Svelte parser allocates each one into the arena
+  itself, once; so does every identifier it synthesizes (the `bind:value` / `class:name`
+  shorthand, the `{name}` attribute). That is an allocation the rule otherwise never
+  adds, and it still pays where `CatchClause` would not: these fields set the width of
+  `FragmentNode` and `AttributeNode`, which are slice elements and are built by value at
+  every level of the recursive parse (the block and tag parsers return
+  `Result<FragmentNode>`, and `parse_children` wraps each parsed element in one), where
+  `CatchClause`'s width reaches nothing past its `Option<&>`. `{#snippet}`'s parameters
+  and `{@debug}`'s identifiers stay by-value slices.
 
 **The one exception to "rarity is the whole of the argument".** Once those heads
 narrowed, the only variants left setting `Statement`'s width were `ImportDeclaration`
