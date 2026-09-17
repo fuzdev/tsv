@@ -904,12 +904,37 @@ single committed-tree verdict. `../prettier` is not gated (its suites' oracle ou
 is computed live per file and the checkout rides `-dev` versions); `doctor` reports
 it.
 
-Bumping any of the five re-baselines the entire fixture corpus. Do it deliberately:
-edit `package.json` and `sidecar.ts` in lockstep (the `//canonical-sync` note in
-package.json restates this), regenerate the frozen sidecar lock with `deno task
-pins:lock` (updating `LOCKED_TRANSITIVE` if the lock's transitives moved —
-`pins:audit` fails until both agree), run `deno task fixtures:update`, and review the
-resulting churn.
+Bumping any of the five re-baselines the entire fixture corpus, so it is one
+deliberate sequence — shown for `svelte`; a bump of the other four skips the
+compile-fixture step, and an `@sveltejs/acorn-typescript` bump moves
+`../acorn-typescript` instead:
+
+```bash
+# 1. edit the pin sites in lockstep: benches/js/package.json + sidecar.ts (VERSIONS and
+#    its `npm:` import; the `//canonical-sync` note in package.json restates this)
+deno task bench:install            # benches/js node_modules at the new pin
+deno task pins:lock                # the frozen sidecar lock (--allow-fresh only for a <24h-old release)
+deno task pins:audit               # fails until LOCKED_TRANSITIVE matches the regenerated lock
+# 2. the suite checkout to the release tag (pins:audit:checkouts fails until it matches)
+git -C ../svelte fetch --tags && git -C ../svelte checkout svelte@<version>
+# 3. both fixture trees
+deno task fixtures:update          # review the churn
+deno task compile:fixtures:validate  # an oracle-freshness failure is a stale expected_server.js:
+#   re-init it with `deno task compile:fixtures:init <dir>` (bare re-reads its input.svelte);
+#   a parity failure that survives the re-init is tsv's compiler behind the oracle
+# 4. the sidecar-cadence gates, which name every count that moved
+deno task conformance              # checkouts, suite pins, both fixture trees, the fixtures
+#   gates, corpus parse/format, render:audit
+deno task compile:validation       # not in `conformance`; `:update` re-pins only an explained move
+# 5. prose that restated the old pin (below)
+rg '<old>' --glob '!benches/js/results/**'
+```
+
+A count that moves is re-pinned in `benches/js/lib/gate_counts.ts` per
+[gate_counts.md §Update ritual](gate_counts.md#update-ritual) — the constant, its
+`X → Y` attribution, a harvest pin's `oracle svelte@…` provenance, and the
+checkout's id in `GATE_CHECKOUT_IDS`, in one change. `bench:pins:suites` needs no
+`--force`: the reject harvests stamp the oracle version, so a new pin re-grades them.
 
 **Fixture churn is only one of three ways an oracle bump lands, and the third is
 ungated.** Read each upstream commit's source diff *and* the regression fixture it
@@ -931,9 +956,8 @@ A bump can equally make a construct newly *reachable* in tsv, which is how one t
 double-print it reports, not as a prompt to re-pin: the fixture didn't find a
 pre-existing bug, the parser change put a printer seam in reach for the first time.
 
-**Then grep the repo for the OLD version string** — `rg '<old>' --glob
-'!benches/js/results/**'`. Nothing gates this, and it is the step that gets skipped.
-Prose that restates the pin ("pinned at svelte X", "valid at the X pin", "the pinned
+**Step 5 greps the repo for the OLD version string.** Nothing gates this, and it is
+the step that gets skipped. Prose that restates the pin ("pinned at svelte X", "valid at the X pin", "the pinned
 oracle (svelte X) throws") is a duplicate of a value that just moved, and it goes
 silently wrong; a single past bump left five such claims behind across `docs/`
 and two crates. A **past**-version mention is different and stays true — "Prettier
@@ -941,13 +965,13 @@ and two crates. A **past**-version mention is different and stays true — "Pret
 so this cannot be a lint, only a read. Prefer pointing at `sidecar.ts`'s `VERSIONS`
 over restating the number.
 
-Two things a bump can invalidate that `deno task check` does **not** cover, because
-both are sidecar-dependent: `deno task compile:validation` (the ratchet's
-`ORACLE-ERROR` line is a claim about oracle behavior, explicitly held "until the pin
-moves") and `deno task bench:pins:suites` (`SVELTE_REJECTS_PIN` and
-`CSS_REJECTS_PIN` count what the oracle rejects — both stamp the oracle version, so
-the bump re-grades them; the group is a `deno task conformance` preflight, so a
-release run does catch a trip, but at the worst moment for the diagnosis). Run both.
-Svelte-source line anchors in
-[checklist_svelte_compiler.md](checklist_svelte_compiler.md) are the third — nothing
-gates a line number, so spot-check a few.
+Steps 3 and 4 are there because `deno task check` covers none of what they grade —
+each is sidecar-dependent. `check` runs only the compile fixtures' sidecar-free
+slice, which grades tsv against the committed `expected_server.js` and so stays
+green while the oracle moves away from both; the validation ratchet's
+`ORACLE-ERROR` line is a claim about oracle behavior, held "until the pin moves";
+and `SVELTE_REJECTS_PIN` / `CSS_REJECTS_PIN` count what the oracle rejects. A
+release's `conformance` run would catch most of it, at the worst moment for the
+diagnosis. Svelte-source line anchors in
+[checklist_svelte_compiler.md](checklist_svelte_compiler.md) are the one thing no
+step reaches — nothing gates a line number, so spot-check a few.

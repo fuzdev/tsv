@@ -13,7 +13,7 @@
  * moves one, never widen a band to absorb drift. The one exception is a NEW
  * row's first run: it ships a wide PLACEHOLDER so the dispatch dry run passes
  * and prints the size, and the band is cut to ±8% around that figure before
- * the tag (darwin-x64 today — both of its bands are marked).
+ * the tag.
  *
  * Usage: deno run --allow-read scripts/validate_napi_artifact.ts [--triple <t>]
  * (default: the single staged platform dir under crates/tsv_napi/pkg/)
@@ -34,34 +34,30 @@ const { values: args } = parseArgs({
  * unwind). Every band is ±8% around a real artifact BUILT BY THE MATRIX — the
  * anchors below are the measured sizes, not running figures.
  *
- * Anchored on the first full matrix run, where each row is built in the
- * environment that ships it (the gnu rows in almalinux:8, musl in rust:alpine,
- * mac/win natively) — the only measurement the gate ever sees. A host build of
- * the same commit came within 1,840 B of the almalinux linux-x64-gnu figure, so
- * the container is not the size variable it might have looked like; the size
- * variable is the TARGET (win32/darwin sit ~10% under the linux rows). */
+ * Anchored on a full matrix run, where each row is built in the environment
+ * that ships it (the gnu rows in almalinux:8, musl in rust:alpine, win and
+ * darwin-arm64 natively, darwin-x64 cross-compiled on the arm64 runner) — the
+ * only measurement the gate ever sees. A host build of the same commit came
+ * within 1,840 B of the almalinux linux-x64-gnu figure, so the container is not
+ * the size variable it might have looked like; the size variable is the TARGET
+ * (win32/darwin-arm64 sit ~10% under the linux rows, darwin-x64 ~4%). */
 const BOUNDS: Record<string, [number, number]> = {
 	'linux-x64-gnu': [3_458_000, 4_060_000], // 3,758,816
 	'linux-arm64-gnu': [3_202_000, 3_760_000], // 3,480,696
 	'linux-x64-musl': [3_460_000, 4_063_000], // 3,761,776
 	'darwin-arm64': [3_061_000, 3_595_000], // 3,327,968
-	// PLACEHOLDER — no matrix-built darwin-x64 artifact measured yet (the row
-	// cross-compiles on the arm64 runner). Wide on purpose so the first dispatch
-	// dry run passes and PRINTS the size; re-anchor at ±8% around it before the
-	// release tag. Expect near the linux-x64 figure minus Mach-O's share.
-	'darwin-x64': [2_800_000, 4_400_000],
+	'darwin-x64': [3_336_000, 3_917_000], // 3,626,360
 	'win32-x64': [3_437_000, 4_035_000] // 3,736,064
 };
 
 /** [min, max] bytes per triple for the native `tsv` CLI binary (`release`
- * profile: abort + LTO). Same anchoring discipline as `BOUNDS`, same run. */
+ * profile: abort + LTO). Same anchoring discipline as `BOUNDS`, same runs. */
 const CLI_BOUNDS: Record<string, [number, number]> = {
 	'linux-x64-gnu': [3_359_000, 3_944_000], // 3,651,832
 	'linux-arm64-gnu': [3_082_000, 3_619_000], // 3,350,072
 	'linux-x64-musl': [3_362_000, 3_947_000], // 3,654,360
 	'darwin-arm64': [2_819_000, 3_311_000], // 3,065,088
-	// PLACEHOLDER — see BOUNDS; re-anchor from the first dispatch dry run.
-	'darwin-x64': [2_500_000, 4_000_000],
+	'darwin-x64': [3_145_000, 3_693_000], // 3,418,904
 	'win32-x64': [2_990_000, 3_511_000] // 3,250,688
 };
 
