@@ -231,7 +231,7 @@ fn the_dedent_reads_the_source_acorn_was_handed() {
 }
 
 /// The run is BUILT rather than measured, so it has to be built in the units the blanked
-/// source is spelled in — and both of them are JavaScript's, not Rust's.
+/// source is spelled in — and both of them are JS's, not Rust's.
 ///
 /// - `{#snippet}`'s prelude is `replace(/\S/g, ' ')`, and `\S` is the complement of JS `\s`:
 ///   it does **not** match U+FEFF (which therefore survives and ends the run) and it **does**

@@ -210,7 +210,7 @@ pub struct SvelteCompileWarning {
 /// oracle's output.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SvelteCompileOutput {
-    /// Generated JavaScript.
+    /// Generated JS.
     pub js: String,
     /// Generated CSS, or `None` when the component has no styles.
     pub css: Option<String>,

@@ -1,6 +1,6 @@
 # private_fields_optional_chain_prettier_divergence
 
-Optional chaining to a private field (`x?.#a`) is **valid modern JavaScript** —
+Optional chaining to a private field (`x?.#a`) is **valid modern JS** —
 the spec's `OptionalChain : ?. PrivateIdentifier` production (added with the
 private-fields-in-`in` proposal). Our parser accepts it (matching Svelte /
 acorn-typescript) and our formatter keeps it stable.

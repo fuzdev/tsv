@@ -72,7 +72,7 @@ pub(crate) struct Erased<'arena> {
     pub(crate) changed: bool,
     /// Whether TypeScript-only *syntax* was erased. Distinct from
     /// [`Self::changed`]: unwrapping a `JsdocCast` (`/** @type {T} */ (x)`) is a
-    /// compile-path normalization of **valid JavaScript**, so it must not make a
+    /// compile-path normalization of **valid JS**, so it must not make a
     /// `lang`-less script look like TypeScript.
     pub(crate) typescript: bool,
 }
@@ -108,7 +108,7 @@ pub(crate) struct ErasedExpr<'arena> {
     /// Whether TypeScript-only *syntax* was erased — the `lang="ts"` gate, which
     /// applies to the template exactly as it does to the script (the oracle's
     /// flag is document-wide). Distinct from `expr.is_some()`: unwrapping a
-    /// `JsdocCast` rebuilds valid JavaScript and must not read as TypeScript.
+    /// `JsdocCast` rebuilds valid JS and must not read as TypeScript.
     pub(crate) typescript: bool,
 }
 
@@ -1881,7 +1881,7 @@ impl<'arena> Eraser<'arena, '_> {
             // (it parses without `preserveParens`), so its AST is the inner
             // expression carrying the JSDoc as a detached leading comment: it
             // prints `= /** @type {T} */ 1` and folds the `1`. Unwrap to match on
-            // both counts. Valid JavaScript, so this is NOT a TypeScript erasure —
+            // both counts. Valid JS, so this is NOT a TypeScript erasure —
             // it records no region and never trips the `lang="ts"` gate.
             //
             // The wrapper OWNS its JSDoc comment (`Comment::owned_by_node`), and

@@ -48,7 +48,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// conditional's own: `a ? (b) : c => d` is `a ? b : (c => d)`, not an arrow
     /// `(b): c => d` with nothing left to end the conditional. tsc parses the arrow
     /// anyway and keeps it only when **another `:` follows** it (`a ? (b): c => d : e`
-    /// — a syntax error read any other way, since JavaScript has no second colon
+    /// — a syntax error read any other way, since JS has no second colon
     /// there); otherwise it rewinds and reads the head as a parenthesized expression.
     /// The same here: while the return type is barred
     /// ([`Parser::arrow_return_type_barred`]) the parse runs from a

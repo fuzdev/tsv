@@ -185,7 +185,7 @@ fn compile_rejects_load_error_event_capture() {
 fn compile_attr_whitespace_collapse_trims_the_js_class_not_the_narrow_one() {
     // The oracle is `chunk.data.replace(/[ \t\n\r\f]+/g, ' ').trim()`
     // (`server/visitors/shared/utils.js:208` + `phases/patterns.js:11`): a NARROW
-    // ASCII collapse, then JavaScript's WIDE `String.prototype.trim`. Fusing them
+    // ASCII collapse, then JS's WIDE `String.prototype.trim`. Fusing them
     // into one narrow-class pass left every boundary character that is JS
     // whitespace but not `[ \t\n\r\f]` in place — 7 oracle-verified MISMATCHes.
     // All four affected sites, with two distinct exotic characters each.

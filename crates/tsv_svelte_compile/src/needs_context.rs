@@ -717,7 +717,7 @@ fn js_binding<'b>(nc: &'b Nc<'_>, name: &str) -> Option<&'b JsBinding> {
 /// a `let`/`var`, a function or class name) passes false. A `using` /
 /// `await using` declarator is deliberately NOT const here, on the SOURCE reading
 /// alone: the oracle's test is `declaration_kind === 'const'` exactly
-/// (`shared/utils.js`), and forbidding a write to one is JavaScript's own early
+/// (`shared/utils.js`), and forbidding a write to one is JS's own early
 /// error rather than a Svelte rule. ⚠️ The behavioral half is **undemonstrable**
 /// against the pinned oracle, which cannot parse `using` at all (its acorn rejects
 /// the declaration outright with `js_parse_error`), so this choice is unreachable
@@ -824,7 +824,7 @@ fn declare_ident(id: &tsv_ts::ast::internal::Identifier<'_>, nc: &mut Nc<'_>) {
 /// local, a `$state` binding, a block local, a global) read as a non-identifier
 /// and spuriously fire `needs_context` — wrapping the whole body in
 /// `$$renderer.component(…)` the oracle never emits. A silent MISMATCH, not a
-/// refusal. `JsdocCast` is the sixth transparent wrapper (valid JavaScript, and
+/// refusal. `JsdocCast` is the sixth transparent wrapper (valid JS, and
 /// the oracle has no such node at all).
 fn root_of<'e>(expr: &'e Expression<'e>) -> &'e Expression<'e> {
     let mut node = expr;

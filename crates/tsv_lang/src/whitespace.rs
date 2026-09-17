@@ -5,7 +5,7 @@
 //!
 //! | the site mirrors | class | asked by |
 //! | --- | --- | --- |
-//! | anything spelled in JavaScript — Svelte's parser, `parseCss`, prettier's `.trim()` | [`is_js_whitespace`] | `tsv_svelte`'s `is_svelte_ws`; `tsv_css`'s wire trims and escape terminators; this crate's directive + comment readers; `tsv_ts`'s comment renderer |
+//! | anything spelled in JS — Svelte's parser, `parseCss`, prettier's `.trim()` | [`is_js_whitespace`] | `tsv_svelte`'s `is_svelte_ws`; `tsv_css`'s wire trims and escape terminators; this crate's directive + comment readers; `tsv_ts`'s comment renderer |
 //! | css-syntax-3 tokenization (§4.2 **plus** §3.3, see there) | `tsv_css`'s `is_css_whitespace` (ASCII-only, five) | CSS value separation, value-text collapsing |
 //! | "may a formatter respell this without changing what RENDERS" | `tsv_svelte`'s `is_collapsible_ws` (`[ \t\n\r]`) | the Svelte printer's text/fill |
 //!
@@ -66,7 +66,7 @@
 //!   terminator mirrors `read_identifier`'s `(\r\n|\s)?` — a JS regex, which the comment
 //!   there had equated with `char::is_whitespace`.
 
-/// Whether `c` is whitespace to a **JavaScript regular expression's `\s`**.
+/// Whether `c` is whitespace to a **JS regular expression's `\s`**.
 ///
 /// Per ECMA-262 the `\s` CharSet is the union of the `WhiteSpace` and `LineTerminator`
 /// productions: `<TAB>`, `<VT>`, `<FF>`, `<ZWNBSP>` and every code point in general category
@@ -74,7 +74,7 @@
 ///
 /// It lives here rather than in one language crate because **five** crates need it and no
 /// language crate can serve them all: `tsv_svelte`'s tokenizer class *is* this set (Svelte
-/// spells every whitespace question in JavaScript — see that crate's `is_svelte_ws`), and so
+/// spells every whitespace question in JS — see that crate's `is_svelte_ws`), and so
 /// is the class `parseCss` skips at its `allow_whitespace()` junctures, which `tsv_css` must
 /// match — and `tsv_css` is a *dependency* of `tsv_svelte`, so it cannot borrow the predicate
 /// from it. Since then this crate's own directive and comment readers, `tsv_ts`'s comment

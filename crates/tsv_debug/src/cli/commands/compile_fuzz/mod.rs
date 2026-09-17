@@ -478,7 +478,7 @@ async fn grade_source(source: &str) -> Verdict {
             // reported as an over-acceptance (that would fail the run on a harness
             // hiccup).
             return match oracle_reject_code(&message) {
-                // `js_parse_error` says the mutant is not valid JavaScript, so it is a
+                // `js_parse_error` says the mutant is not valid JS, so it is a
                 // GENERATOR defect rather than a component tsv over-accepted.
                 Some(code) if code == "js_parse_error" => {
                     Verdict::HarnessInvalidJs(first_line(&message))

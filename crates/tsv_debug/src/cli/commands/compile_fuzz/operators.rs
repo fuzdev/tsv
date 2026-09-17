@@ -311,7 +311,7 @@ const JS_WHITESPACE_CHARS: &[&str] = &[
 ///
 /// This is the wider set on purpose. It carries the two ECMAScript-illegal
 /// separators [`JS_WHITESPACE_CHARS`] must exclude — `U+0085`, which Rust's `trim`
-/// strips and JavaScript's `.trim()` keeps, and `U+180E`, which neither counts but
+/// strips and JS's `.trim()` keeps, and `U+180E`, which neither counts but
 /// many hand-rolled scans do — plus the two `LineTerminator`s, inert here, plus the
 /// zero-width and wide characters the formatter fuzzer's `INTERESTING_SEQUENCES`
 /// stresses span math with.

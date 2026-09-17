@@ -1013,7 +1013,7 @@ fn pure_global_strip(global_span: Span) -> Vec<Removal> {
 /// The strip removal for a bare `:global`: drop `:global`, plus the preceding
 /// whitespace when the combinator is descendant (`div :global.x` → `div.x`,
 /// index.js `remove_global_pseudo_class`). The oracle's back-scan is
-/// `while (/\s/.test(state.code.original[start - 1])) start--` — a JavaScript
+/// `while (/\s/.test(state.code.original[start - 1])) start--` — a JS
 /// regex over CSS text, so the class is [`is_js_whitespace`], not a CSS one.
 fn bare_global_strip(
     global_span: Span,

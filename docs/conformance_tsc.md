@@ -3,7 +3,7 @@
 tsv's TypeScript parser graded against the TypeScript compiler's own test corpus,
 with **tsc as the validity oracle**. This is the parser's correctness gate for
 TypeScript the way [conformance_test262.md](./conformance_test262.md) is its gate
-for ECMAScript: test262 says what JavaScript is, tsc says what TypeScript is.
+for ECMAScript: test262 says what JS is, tsc says what TypeScript is.
 
 The corpus is a sibling checkout, `../typescript` (microsoft/TypeScript), pinned by
 commit in `benches/js/lib/gate_counts.ts` (`GATE_CHECKOUT_IDS`). Three tools read
@@ -72,7 +72,7 @@ through `benches/js/lib/tsc.ts`) and reads its verdict directly.
   mirrors `makeUnitsFromTest`: the directive name is case-insensitive, the `//` is
   anchored at line start and is exactly two slashes) and grades each **TypeScript**
   unit (`.ts`, `.mts`, `.cts`, and their `.d.*` forms). `.tsx` units, `.js` units (tsc
-  parses JavaScript under its own rules), and non-code units (`package.json`,
+  parses JS under its own rules), and non-code units (`package.json`,
   `.css`) are counted, never graded. A multi-file test whose baselines carry a grammar
   error anywhere is skipped whole as `multi_file_tainted`: the baseline cannot say
   which unit, so only a clean test makes a positive claim about every unit.

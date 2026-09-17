@@ -104,7 +104,7 @@ _relation_ between parses (the two spellings agree for tsv and disagree for
   on which side's comment carries it.
 
 **Boundary whitespace is JS `\s`.** `parseCss` skips whitespace through the template
-parser's `allow_whitespace()`, which is spelled in JavaScript, so `<NBSP>`, every `Zs`,
+parser's `allow_whitespace()`, which is spelled in JS, so `<NBSP>`, every `Zs`,
 `<LS>`, `<PS>` and `<ZWNBSP>` separate tokens wherever that skip runs — while its
 `read_identifier` takes every code point ≥ U+00A0 as identifier content. Which rule applies
 is decided by ORDER, and tsv mirrors the order rather than the class: the **lexer** keeps
@@ -1161,7 +1161,7 @@ directives. Svelte rejects each of them, and prettier
 failures at once — [script/no_lang_typescript](../tests/fixtures/svelte/script/no_lang_typescript_svelte_prettier_divergence/).
 
 **Tracked, not sanctioned.** Svelte's verdict is the drop-in target and a document with
-no `ts` flag is JavaScript; the fixture is the ledger entry that keeps the over-acceptance
+no `ts` flag is JS; the fixture is the ledger entry that keeps the over-acceptance
 visible until the parser threads the document flag, at which point it fails and converts
 to an `input_invalid_*` case. It is the parser-level twin of the over-acceptance
 `tsv_svelte_compile` refuses at the compile level ("TypeScript in a document with no `ts`
@@ -1390,7 +1390,7 @@ The **character class** that decides all of this is `internal::is_collapsible_ws
 #### Source `trimEnd` — one parse-time whitespace decision, and it agrees
 
 One whitespace decision *is* made at parse time. Svelte's parser opens with
-`this.template = template.trimEnd()` (`phases/1-parse/index.js`) — JavaScript's `trimEnd`,
+`this.template = template.trimEnd()` (`phases/1-parse/index.js`) — JS's `trimEnd`,
 i.e. ECMAScript `WhiteSpace` ∪ `LineTerminator`. tsv's counterpart (`parser/mod.rs`, the
 trailing-text capture) asks the same class, through `whitespace::is_svelte_ws`. It is **not**
 a divergence, and is recorded here because reaching for Rust's `str::trim_end` there is the
