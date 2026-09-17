@@ -38,7 +38,7 @@ Each `## Unreleased` section must be non-empty and carry a
 - **breaking** feat: native binaries, both CLI and JS lib — install `@fuzdev/tsv` (N-API addon plus
   the real native `tsv` CLI; `npx tsv` execs the binary) over `@fuzdev/tsv-<triple>` platform
   packages for Linux (x64 gnu and musl, arm64 gnu), macOS arm64, and Windows x64; API-compatible
-  with `@fuzdev/tsv_wasm` (minus the WASM-only `init`/`init_sync`/`wasm_module`/`reinstantiate` and
+  with `@fuzdev/tsv-wasm` (minus the WASM-only `init`/`init_sync`/`wasm_module`/`reinstantiate` and
   `IgnoreStack`'s `free()`), which stays the universal fallback. The same CLI binaries are attached
   to each GitHub Release with a `SHA256SUMS`, every asset carrying a Sigstore build provenance
   attestation, for use without npm
@@ -210,9 +210,9 @@ tsv has no config that changes its formatting style behavior, and none will be a
 ## 0.1.0
 
 - init
-- add `@fuzdev/tsv_wasm` — the full tool (format + parse) in one package, with a
+- add `@fuzdev/tsv-wasm` — the full tool (format + parse) in one package, with a
   `tsv` bin (`format` + `parse` subcommands mirroring the native CLI's flags and
   exit codes; single-threaded WASM — `--jobs` is accepted and ignored)
-- slim `@fuzdev/tsv_parse_wasm` to parse-only (the `format_*` exports and their
-  printers move to `@fuzdev/tsv_wasm`; wasm drops from ~2.9 MB to ~1.7 MB raw,
+- slim `@fuzdev/tsv-parse-wasm` to parse-only (the `format_*` exports and their
+  printers move to `@fuzdev/tsv-wasm`; wasm drops from ~2.9 MB to ~1.7 MB raw,
   ~895 KB to ~515 KB gzipped)
