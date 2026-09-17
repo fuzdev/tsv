@@ -406,7 +406,7 @@ fn guard_boundary_attributes<'arena>(
                 name: valid,
             }));
         }
-        guard_dropped(env, &tag.expression)?;
+        guard_dropped(env, tag.expression)?;
     }
     Ok(())
 }
@@ -505,8 +505,8 @@ pub(crate) fn emit_const_tag<'arena>(
     // the initializer. The erased init feeds BOTH the emitted declaration and the
     // evaluator overlay below, so a later `{a}` read folds through the same node
     // the oracle folds.
-    let id = env.erase(&tag.id)?;
-    let init = env.erase(&tag.init)?;
+    let id = env.erase(tag.id)?;
+    let init = env.erase(tag.init)?;
     // Only a plain-identifier binding is modeled: a destructured `{@const}`
     // whose init folds would have the oracle fold each read, which this port
     // can't reproduce per-binding — refuse rather than risk a silent mismatch.
@@ -573,7 +573,7 @@ pub(crate) fn emit_if_block<'arena>(
     let mut current = if_block;
     let final_else: Option<&'arena Fragment<'arena>>;
     loop {
-        branches.push((&current.test, &current.consequent));
+        branches.push((current.test, &current.consequent));
         match &current.alternate {
             Some(alt) => {
                 if let [FragmentNode::IfBlock(inner)] = alt.nodes
@@ -705,11 +705,11 @@ pub(crate) fn emit_each_block<'arena>(
     // (`{#each xs as x (k as string)}`) never reaches output and needs no erasure.
     // The guard walk carries its own TypeScript-unwrap arms for exactly this.
     if let Some(key) = &each.key {
-        guard_dropped(env, &key.expression)?;
+        guard_dropped(env, key.expression)?;
     }
     // The context pattern IS borrowed into the emitted `let CTX = each_array[IDX]`
     // — a template borrow point (`{#each xs as x: T}`).
-    let context = match &each.context {
+    let context = match each.context {
         Some(context) => {
             let context = env.erase(context)?;
             guard_pattern(env, context)?;
@@ -719,7 +719,7 @@ pub(crate) fn emit_each_block<'arena>(
     };
 
     // Collection (guard + bare-derived rewrite).
-    let collection_expr = env.erase(&each.expression)?;
+    let collection_expr = env.erase(each.expression)?;
     let collection = wrap_single(env, collection_expr)?;
 
     // Unique names. `each_array` is minted HERE, in emission (= transform) order,
@@ -917,13 +917,13 @@ pub(crate) fn emit_await_block<'arena>(
     let arena = env.b.arena;
     let preserve = ctx.preserve_whitespace;
 
-    let promise = env.erase(&await_block.expression)?;
+    let promise = env.erase(await_block.expression)?;
     let expr = wrap_single(env, promise)?;
     // The `{:then value}` binding is borrowed into the then-arrow's parameter list
     // — a template borrow point (`{#await p then v: T}`). The `{:catch error}`
     // binding is NOT: the oracle drops the catch branch from SSR entirely, so
     // `await_block.error` never reaches output and needs no erasure.
-    let value = match &await_block.value {
+    let value = match await_block.value {
         Some(value) => Some(env.erase(value)?),
         None => None,
     };
@@ -1020,7 +1020,7 @@ pub(crate) fn emit_key_block<'arena>(
 ) -> Result<(), CompileError> {
     let arena = env.b.arena;
     let preserve = ctx.preserve_whitespace;
-    guard_dropped(env, &key.expression)?;
+    guard_dropped(env, key.expression)?;
     out.push_text("<!---->");
     let body = emit_child_body(
         env,

@@ -357,7 +357,7 @@ fn build_component_props<'arena>(
                 }
             }
             AttributeNode::SpreadAttribute(spread) => {
-                groups.push(PropGroup::Spread(&spread.expression));
+                groups.push(PropGroup::Spread(spread.expression));
             }
             AttributeNode::BindDirective(_) => {
                 return Err(unsupported(Refusal::ComponentBindDirective {
@@ -611,7 +611,7 @@ fn build_prop_value<'arena>(
         [AttributeValue::ExpressionTag(tag)] => {
             // The template borrow point. The erased node also decides the caller's
             // `{ n }` shorthand test — `<Foo n={n as T} />` is `{ n }` to the oracle.
-            let expr = env.erase(&tag.expression)?;
+            let expr = env.erase(tag.expression)?;
             let wrapped = wrap_value_expr(env, expr)?;
             Ok(wrapped[0].clone())
         }

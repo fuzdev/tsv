@@ -1608,7 +1608,7 @@ fn get_possible_values(
         AttributeValue::Text(text) => Ok(Some(vec![text.data(source).into_owned()])),
         AttributeValue::ExpressionTag(tag) => {
             let mut set = GatherSet::default();
-            gather_possible_values(&tag.expression, is_class, &mut set, false, source)?;
+            gather_possible_values(tag.expression, is_class, &mut set, false, source)?;
             if set.unknown {
                 return Ok(None);
             }

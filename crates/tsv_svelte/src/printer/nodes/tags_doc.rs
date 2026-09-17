@@ -36,7 +36,7 @@ impl<'a> Printer<'a> {
         // Build expression doc with surrounding comments
         // Span range: after "{@html " to before "}"
         let head = self.build_expression_with_comments_doc(
-            &tag.expression,
+            tag.expression,
             tag.span.start + HTML_TAG_OPEN.len() as u32,
             tag.span.end - 1,
         );
@@ -46,7 +46,7 @@ impl<'a> Printer<'a> {
 
     /// Build a doc for {@const declaration}
     pub(super) fn build_const_tag_doc(&self, tag: &internal::ConstTag<'_>) -> DocId {
-        self.build_assignment_tag_doc(AT_CONST_TAG_OPEN, &tag.id, &tag.init, tag.span)
+        self.build_assignment_tag_doc(AT_CONST_TAG_OPEN, tag.id, tag.init, tag.span)
     }
 
     /// Build a doc for `{const …}` / `{let …}` — the body is a TS variable
@@ -476,7 +476,7 @@ impl<'a> Printer<'a> {
         // Build expression doc with surrounding comments
         // Span range: after "{@render " to before "}"
         let head = self.build_expression_with_comments_doc(
-            &tag.expression,
+            tag.expression,
             tag.span.start + RENDER_TAG_OPEN.len() as u32,
             tag.span.end - 1,
         );

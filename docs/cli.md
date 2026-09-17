@@ -207,8 +207,9 @@ host and the platform:
   generalize. Wherever a **member chain** is involved the printer binds, and by a wide
   margin: a nested memberish call (`a.f(a.f(…))`) parses to 27,506 levels and formats to
   9,208, and a nested computed subscript (`a[a[…]]`) parses to 34,270 and formats to
-  11,613 — the chain printer's own frames set the ceiling at ~⅓ of the parser's. The
-  wire-JSON writer adds nothing on top of the parser on any shape measured.
+  11,613 — the chain printer's own frames set the ceiling at ~⅓ of the parser's. **Svelte
+  elements** split too, by less: nested elements parse to 34,270 levels and format to
+  24,849. The wire-JSON writer adds nothing on top of the parser on any shape measured.
 
 Measured on `const x = ((((…1…))));`, one nesting level costs ~0.88 KiB of stack in a
 release build (~16 KiB in a debug build, where frames are much larger), so the shipped
@@ -223,8 +224,9 @@ release build: **nested arrow bodies (`() => {…}`) and nested memberish calls
 (`a.f(a.f(…))`) ~3.56 KiB** (the two worst measured, level with each other at
 ~9,200 levels — the depth every shape clears), nested computed subscripts
 (`a[a[…]]`) ~2.8, TS object literals ~2.4, TS *types* ~2.35, statement nesting ~2.0,
-Svelte elements ~1.7, nested binary chains ~1.5, unary chains ~1.25, calls ~1.2, array
-literals ~1.14, parens ~0.88, ternary / assignment chains ~0.50, CSS rules ~0.4.
+nested binary chains ~1.5, Svelte elements ~1.3 (formatting; ~0.96 to parse), unary
+chains ~1.25, calls ~1.2, array literals ~1.14, parens ~0.88, ternary / assignment
+chains ~0.50, CSS rules ~0.4.
 
 The two chain shapes used to head that list, because a member chain is printed from a
 *grouped* view of a linearized chain and those frames sit on the expression cycle: they

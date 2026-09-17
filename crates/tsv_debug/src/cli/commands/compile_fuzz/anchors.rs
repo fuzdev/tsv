@@ -236,7 +236,7 @@ impl Anchors {
             FragmentNode::EachBlock(block) => {
                 self.wrappable.push((block.span.start, block.span.end));
                 self.push_reads(block.expression.span().extract(source));
-                if let Some(context) = &block.context
+                if let Some(context) = block.context
                     && let Some(gap) = first_gap(&block.body)
                     && let Some(name) = plain_identifier(context.span().extract(source))
                 {

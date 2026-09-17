@@ -1259,7 +1259,7 @@ mod tests {
 
     /// Parse a bare array expression to its internal AST node (spans index into `src`),
     /// allocated in the caller-supplied `arena`.
-    fn parse_array<'a>(arena: &'a Bump, src: &str) -> internal::ArrayExpression<'a> {
+    fn parse_array<'a>(arena: &'a Bump, src: &str) -> &'a internal::ArrayExpression<'a> {
         match crate::parse_expression_with_comments(src, 0, arena)
             .expect("expression should parse")
             .0
@@ -1275,31 +1275,31 @@ mod tests {
     #[test]
     fn concise_array_shape_detection() {
         let arena = Bump::new();
-        assert!(array_elements_are_signed_numbers(&parse_array(
+        assert!(array_elements_are_signed_numbers(parse_array(
             &arena,
             "[1, 2, 3]"
         )));
         // A single +/- prefix over a numeric literal is a signed number.
-        assert!(array_elements_are_signed_numbers(&parse_array(
+        assert!(array_elements_are_signed_numbers(parse_array(
             &arena, "[-1, +2]"
         )));
         // …but the rule is NOT recursive (prettier's `isSignedNumericLiteral`), so a
         // doubled sign is not one.
-        assert!(!array_elements_are_signed_numbers(&parse_array(
+        assert!(!array_elements_are_signed_numbers(parse_array(
             &arena,
             "[- -1, -2]"
         )));
         // An empty array is not concisely printed.
-        assert!(!array_elements_are_signed_numbers(&parse_array(
+        assert!(!array_elements_are_signed_numbers(parse_array(
             &arena, "[]"
         )));
         // A non-numeric element disqualifies it.
-        assert!(!array_elements_are_signed_numbers(&parse_array(
+        assert!(!array_elements_are_signed_numbers(parse_array(
             &arena, "[1, 'x']"
         )));
         // A hole is not a numeric element (unlike is_simple_call_argument) — the fill
         // printer has nothing to push for one.
-        assert!(!array_elements_are_signed_numbers(&parse_array(
+        assert!(!array_elements_are_signed_numbers(parse_array(
             &arena, "[1, , 2]"
         )));
     }

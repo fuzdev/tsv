@@ -196,14 +196,14 @@ pub(crate) fn emit_attribute<'arena>(
                 }
                 // Dropped, but still guarded: a misplaced rune inside a handler is
                 // an oracle analysis-phase error, not an emission one.
-                return guard_dropped(env, &tag.expression);
+                return guard_dropped(env, tag.expression);
             }
             // Quoted (`class="{a}"`) vs bare (`class={a}`): the oracle's AST
             // represents the quoted form as a one-chunk ARRAY and the bare form
             // as a plain ExpressionTag (the wire writer's `preceded_by_quote`
             // discriminant) — the split the class `$.clsx` rule keys on.
             let quoted = preceded_by_quote(env.source, tag.span.start);
-            emit_dynamic_attribute(env, emit_name, &tag.expression, quoted, out)
+            emit_dynamic_attribute(env, emit_name, tag.expression, quoted, out)
         }
         _ => {
             // A mixed-value attribute whose RAW name starts with `on` is an
@@ -386,7 +386,7 @@ fn build_mixed_attr_value<'arena>(
             AttributeValue::ExpressionTag(tag) => {
                 // The template borrow point: erase once, then guard AND fold the
                 // erased node (the fold gate is the silent-divergence trap).
-                let expr = env.erase(&tag.expression)?;
+                let expr = env.erase(tag.expression)?;
                 // Guard first — never fold an oracle-invalid expression.
                 let wrapped = wrap_value_expr(env, expr)?;
                 let evaluated = evaluate(expr, &env.value_scope(), env.source, 0)
@@ -541,7 +541,7 @@ fn build_attribute_value_expr<'arena>(
             // The template borrow point. Both the `class` `$.clsx` gate and the
             // wrap read the ERASED node (an `x as T` value is the assignable `x`).
             let quoted = preceded_by_quote(env.source, tag.span.start);
-            let expr = env.erase(&tag.expression)?;
+            let expr = env.erase(tag.expression)?;
             let wrapped = wrap_value_expr(env, expr)?[0].clone();
             // A `class` single-expression wraps in `$.clsx` per the oracle's
             // `needs_clsx` rule (its `has_spread` branch pre-wraps the expression);
@@ -595,7 +595,7 @@ pub(crate) fn build_spread_object_property<'arena>(
     // oracle analysis error) → refuse.
     if raw_name.starts_with("on") {
         if let Some([AttributeValue::ExpressionTag(tag)]) = attr.value {
-            guard_dropped(env, &tag.expression)?;
+            guard_dropped(env, tag.expression)?;
             return Ok(None);
         }
         if raw_name.len() > 2 {

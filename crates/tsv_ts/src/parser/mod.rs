@@ -2459,8 +2459,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// The expression must fill the whole slice (see `expect_end_of_input`).
     pub fn parse_expression_with_comments(
         &mut self,
-    ) -> Result<(Expression<'arena>, &'arena [Comment]), ParseError> {
-        let expr = self.parse_expression()?;
+    ) -> Result<(&'arena Expression<'arena>, &'arena [Comment]), ParseError> {
+        let expr = self.parse_expression_ref()?;
         self.expect_end_of_input()?;
         let comments = self.take_comments();
         Ok((expr, comments))
@@ -2487,12 +2487,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub fn parse_assignment_expression_partial(
         &mut self,
         top_level_as: TopLevelAs,
-    ) -> Result<(Expression<'arena>, usize), ParseError> {
+    ) -> Result<(&'arena Expression<'arena>, usize), ParseError> {
         let saved = std::mem::replace(
             &mut self.top_level_as_is_assertion,
             top_level_as == TopLevelAs::Assertion,
         );
-        let result = self.parse_assignment_expression();
+        let result = self.parse_assignment_expression_ref();
         self.top_level_as_is_assertion = saved;
 
         let expr = result?;

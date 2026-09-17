@@ -613,7 +613,7 @@ impl<'a> Printer<'a> {
                 let head_expr = self.build_else_if_expr_doc(else_if, true);
                 let head = self.build_block_head(
                     ELSE_IF_BLOCK_OPEN,
-                    &else_if.test,
+                    else_if.test,
                     head_expr,
                     HeadCloser::BlockTag(None),
                     self.block_dangle_allowed(),
@@ -687,7 +687,7 @@ impl<'a> Printer<'a> {
         let head = self.build_block_head_expr(
             IF_BLOCK_OPEN,
             block.opening_tag_span,
-            &block.test,
+            block.test,
             block.opening_tag_span.end - 1,
             allow_wrapping || in_multiline_context,
         );
@@ -695,7 +695,7 @@ impl<'a> Printer<'a> {
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
         let head_doc = self.build_block_head(
             IF_BLOCK_OPEN,
-            &block.test,
+            block.test,
             head,
             HeadCloser::BlockTag(None),
             can_wrap,
@@ -793,7 +793,7 @@ impl<'a> Printer<'a> {
         self.build_block_head_expr(
             ELSE_IF_BLOCK_OPEN,
             else_if.opening_tag_span,
-            &else_if.test,
+            else_if.test,
             else_if.opening_tag_span.end - 1,
             in_multiline_context,
         )
@@ -818,7 +818,7 @@ impl<'a> Printer<'a> {
             // as its wrapping flag, so the dangle keys on the same condition.
             let head_doc = self.build_block_head(
                 ELSE_IF_BLOCK_OPEN,
-                &else_if.test,
+                else_if.test,
                 head_expr,
                 HeadCloser::BlockTag(None),
                 in_multiline_context && self.block_dangle_allowed(),
@@ -922,13 +922,7 @@ impl<'a> Printer<'a> {
             return Some(self.build_prefixed_head_doc("(", key_head, self.d().text(")")));
         }
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
-        Some(self.build_block_head(
-            "(",
-            &key.expression,
-            key_head,
-            HeadCloser::EachKey,
-            can_wrap,
-        ))
+        Some(self.build_block_head("(", key.expression, key_head, HeadCloser::EachKey, can_wrap))
     }
 
     /// Build each block doc with full context (multiline + preceding content).
@@ -948,7 +942,7 @@ impl<'a> Printer<'a> {
         let head = self.build_block_head_expr(
             EACH_BLOCK_OPEN,
             block.opening_tag_span,
-            &block.expression,
+            block.expression,
             expr_comment_end,
             allow_wrapping || in_multiline_context,
         );
@@ -972,7 +966,7 @@ impl<'a> Printer<'a> {
         // `as pattern[, index][ (key)]` tail WITHOUT its leading space (added by
         // `build_block_head`); the degenerate index/key-without-`as` cases (not
         // valid Svelte) keep hugging the expression unchanged.
-        let (head_expr, clause) = if let Some(context) = &block.context {
+        let (head_expr, clause) = if let Some(context) = block.context {
             let mut clause_parts: DocBuf = smallvec![d.text("as ")];
             clause_parts.push(self.build_pattern_doc(context));
             if let Some(index) = block.index {
@@ -1007,7 +1001,7 @@ impl<'a> Printer<'a> {
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
         let head_doc = self.build_block_head(
             EACH_BLOCK_OPEN,
-            &block.expression,
+            block.expression,
             head_expr,
             HeadCloser::BlockTag(clause),
             can_wrap,
@@ -1100,7 +1094,7 @@ impl<'a> Printer<'a> {
             return None;
         }
         let d = self.d();
-        if let Some(value) = &block.value {
+        if let Some(value) = block.value {
             Some(d.concat(&[
                 d.text("{:then "),
                 self.build_pattern_doc(value),
@@ -1116,7 +1110,7 @@ impl<'a> Printer<'a> {
     /// head instead.
     fn await_catch_keyword(&self, block: &internal::AwaitBlock<'_>) -> Option<DocId> {
         let d = self.d();
-        if let Some(error) = &block.error {
+        if let Some(error) = block.error {
             Some(d.concat(&[
                 d.text("{:catch "),
                 self.build_pattern_doc(error),
@@ -1269,7 +1263,7 @@ impl<'a> Printer<'a> {
         let head = self.build_block_head_expr(
             AWAIT_BLOCK_OPEN,
             block.opening_tag_span,
-            &block.expression,
+            block.expression,
             await_expr_comment_end(block),
             allow_wrapping || in_multiline_context,
         );
@@ -1303,11 +1297,11 @@ impl<'a> Printer<'a> {
         // newline-authored tail. Classified by `await_shorthand`, the same source
         // `await_shorthand_flags` uses to skip the head-carried keyword.
         let clause = match await_shorthand(block) {
-            AwaitShorthand::Then => Some(match &block.value {
+            AwaitShorthand::Then => Some(match block.value {
                 Some(value) => d.concat(&[d.text("then "), self.build_pattern_doc(value)]),
                 None => d.text("then"),
             }),
-            AwaitShorthand::Catch => Some(match &block.error {
+            AwaitShorthand::Catch => Some(match block.error {
                 Some(error) => d.concat(&[d.text("catch "), self.build_pattern_doc(error)]),
                 None => d.text("catch"),
             }),
@@ -1319,7 +1313,7 @@ impl<'a> Printer<'a> {
         // clause.
         let head_doc = self.build_block_head(
             AWAIT_BLOCK_OPEN,
-            &block.expression,
+            block.expression,
             head,
             HeadCloser::BlockTag(clause),
             can_wrap,
@@ -1376,7 +1370,7 @@ impl<'a> Printer<'a> {
         let head = self.build_block_head_expr(
             KEY_BLOCK_OPEN,
             block.opening_tag_span,
-            &block.expression,
+            block.expression,
             block.opening_tag_span.end - 1,
             allow_wrapping || in_multiline_context,
         );
@@ -1384,7 +1378,7 @@ impl<'a> Printer<'a> {
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
         let head_doc = self.build_block_head(
             KEY_BLOCK_OPEN,
-            &block.expression,
+            block.expression,
             head,
             HeadCloser::BlockTag(None),
             can_wrap,

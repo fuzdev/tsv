@@ -1346,7 +1346,7 @@ fn walk_fragment(fragment: &Fragment<'_>, nc: &mut Nc<'_>) {
     let mut names = Vec::new();
     for node in fragment.nodes {
         if let FragmentNode::ConstTag(tag) = node {
-            let _ = pattern_binding_names(&tag.id, nc.source, &mut names);
+            let _ = pattern_binding_names(tag.id, nc.source, &mut names);
         }
     }
     let added = enter_block_scope(&mut nc.template_consts, names);
@@ -1360,7 +1360,7 @@ fn walk_fragment_node(node: &FragmentNode<'_>, nc: &mut Nc<'_>) {
     match node {
         FragmentNode::Text(_) | FragmentNode::Comment(_) => {}
         FragmentNode::Element(element) => walk_element(element, nc),
-        FragmentNode::ExpressionTag(tag) => walk_expr(&tag.expression, nc),
+        FragmentNode::ExpressionTag(tag) => walk_expr(tag.expression, nc),
         FragmentNode::HtmlTag(tag) => walk_html_tag(tag, nc),
         FragmentNode::IfBlock(block) => walk_if_block(block, nc),
         FragmentNode::EachBlock(block) => walk_each_block(block, nc),
@@ -1434,10 +1434,10 @@ fn walk_special_element(se: &SpecialElement<'_>, nc: &mut Nc<'_>) {
     // its initial value where the oracle keeps it dynamic — mirrors `walk_element`.
     for attr_node in se.attributes {
         if let AttributeNode::BindDirective(d) = attr_node {
-            crate::rune_guard::assign_target_roots(&d.expression, nc.source, &mut nc.reassigned);
+            crate::rune_guard::assign_target_roots(d.expression, nc.source, &mut nc.reassigned);
             // A `bind:` reaches the SAME oracle validator as an assignment
             // (`BindDirective.js:181`), so its target obeys the same three rules.
-            refuse_invalid_assign_target(&d.expression, nc, true);
+            refuse_invalid_assign_target(d.expression, nc, true);
         }
     }
     each_reference_bearing_attribute_expression(se.attributes, &mut |expr| walk_expr(expr, nc));
@@ -1475,12 +1475,12 @@ fn walk_render_tag(tag: &RenderTag<'_>, nc: &mut Nc<'_>) {
     // expression is trigger-checked (a member-rooted callee over a prop must fire
     // the wrapper, matching the oracle).
     if nc.in_dropped_catch {
-        walk_expr(&tag.expression, nc);
+        walk_expr(tag.expression, nc);
         return;
     }
     // The same (possibly-parenthesized) call unwrap the emitter uses. A non-call
     // render refuses at emission, so here it simply yields no arguments to check.
-    if let Some(call) = render_call_expression(&tag.expression) {
+    if let Some(call) = render_call_expression(tag.expression) {
         walk_exprs(call.arguments, nc);
     }
 }
@@ -1497,10 +1497,10 @@ fn walk_element(element: &Element<'_>, nc: &mut Nc<'_>) {
     // assignment-target wrappers.
     for attr_node in element.attributes {
         if let AttributeNode::BindDirective(d) = attr_node {
-            crate::rune_guard::assign_target_roots(&d.expression, nc.source, &mut nc.reassigned);
+            crate::rune_guard::assign_target_roots(d.expression, nc.source, &mut nc.reassigned);
             // A `bind:` reaches the SAME oracle validator as an assignment
             // (`BindDirective.js:181`), so its target obeys the same three rules.
-            refuse_invalid_assign_target(&d.expression, nc, true);
+            refuse_invalid_assign_target(d.expression, nc, true);
         }
     }
     // The shared traversal (`attr_refs`) defines which attribute expressions are
@@ -1531,11 +1531,11 @@ fn walk_element(element: &Element<'_>, nc: &mut Nc<'_>) {
 }
 
 fn walk_html_tag(tag: &HtmlTag<'_>, nc: &mut Nc<'_>) {
-    walk_expr(&tag.expression, nc);
+    walk_expr(tag.expression, nc);
 }
 
 fn walk_if_block(block: &IfBlock<'_>, nc: &mut Nc<'_>) {
-    walk_expr(&block.test, nc);
+    walk_expr(block.test, nc);
     walk_fragment(&block.consequent, nc);
     if let Some(alt) = &block.alternate {
         walk_fragment(alt, nc);
@@ -1543,9 +1543,9 @@ fn walk_if_block(block: &IfBlock<'_>, nc: &mut Nc<'_>) {
 }
 
 fn walk_each_block(block: &EachBlock<'_>, nc: &mut Nc<'_>) {
-    walk_expr(&block.expression, nc);
+    walk_expr(block.expression, nc);
     if let Some(key) = &block.key {
-        walk_expr(&key.expression, nc);
+        walk_expr(key.expression, nc);
     }
     // The context binding is `kind: 'each'` in the oracle (`phases/scope.js:1244`),
     // so writing to it inside the block is `each_item_invalid_assignment`. Scoped
@@ -1555,7 +1555,7 @@ fn walk_each_block(block: &EachBlock<'_>, nc: &mut Nc<'_>) {
     // a write to it as `constant_assignment` — a template-scoped const, part of
     // the residual this slice leaves open (see the checklist).
     let mut each_added = Vec::new();
-    if let Some(context) = &block.context {
+    if let Some(context) = block.context {
         declare_pattern(context, nc);
         walk_expr(context, nc);
         let mut names = Vec::new();
@@ -1581,12 +1581,12 @@ fn walk_each_block(block: &EachBlock<'_>, nc: &mut Nc<'_>) {
 }
 
 fn walk_await_block(block: &AwaitBlock<'_>, nc: &mut Nc<'_>) {
-    walk_expr(&block.expression, nc);
-    if let Some(value) = &block.value {
+    walk_expr(block.expression, nc);
+    if let Some(value) = block.value {
         declare_pattern(value, nc);
         walk_expr(value, nc);
     }
-    if let Some(error) = &block.error {
+    if let Some(error) = block.error {
         declare_pattern(error, nc);
         walk_expr(error, nc);
     }
@@ -1600,13 +1600,13 @@ fn walk_await_block(block: &AwaitBlock<'_>, nc: &mut Nc<'_>) {
     // into their OWN branch fragment's scope (`phases/scope.js:1310`/`:1324`), so
     // a write to one is `constant_assignment`, scoped to that branch alone.
     if let Some(then) = &block.then {
-        let names = template_const_names(block.value.as_ref(), nc.source);
+        let names = template_const_names(block.value, nc.source);
         let added = enter_block_scope(&mut nc.template_consts, names);
         walk_fragment(then, nc);
         exit_block_scope(&mut nc.template_consts, added);
     }
     if let Some(catch) = &block.catch {
-        let names = template_const_names(block.error.as_ref(), nc.source);
+        let names = template_const_names(block.error, nc.source);
         let added = enter_block_scope(&mut nc.template_consts, names);
         let prev = nc.in_dropped_catch;
         nc.in_dropped_catch = true;
@@ -1617,12 +1617,12 @@ fn walk_await_block(block: &AwaitBlock<'_>, nc: &mut Nc<'_>) {
 }
 
 fn walk_key_block(block: &KeyBlock<'_>, nc: &mut Nc<'_>) {
-    walk_expr(&block.expression, nc);
+    walk_expr(block.expression, nc);
     walk_fragment(&block.fragment, nc);
 }
 
 fn walk_const_tag(tag: &ConstTag<'_>, nc: &mut Nc<'_>) {
-    declare_pattern(&tag.id, nc);
-    walk_expr(&tag.id, nc);
-    walk_expr(&tag.init, nc);
+    declare_pattern(tag.id, nc);
+    walk_expr(tag.id, nc);
+    walk_expr(tag.init, nc);
 }

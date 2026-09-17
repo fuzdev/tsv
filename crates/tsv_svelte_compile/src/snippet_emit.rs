@@ -199,14 +199,14 @@ pub(crate) fn emit_render_tag<'arena>(
     // observable: `{@render (s as T)(x)}` is a call and compiles, while
     // `{@render (s(x) as T)}` and `{@render s(x)!}` are rejected even though
     // erasure would turn both into calls.
-    if render_call_expression(&tag.expression).is_none() {
+    if render_call_expression(tag.expression).is_none() {
         return Err(unsupported(Refusal::RenderTagUnsupportedCallee));
     }
     // The template borrow point: the whole `callee(args)` call is erased once, so
     // the callee classification and the arguments below both read the type-free
     // node (`{@render s<T>(x as U)}` → `s(x)`). Erasing a call yields a call, so
     // the shape settled above survives.
-    let expression = env.erase(&tag.expression)?;
+    let expression = env.erase(tag.expression)?;
     let Some(call) = render_call_expression(expression) else {
         return Err(unsupported(Refusal::RenderTagUnsupportedCallee));
     };

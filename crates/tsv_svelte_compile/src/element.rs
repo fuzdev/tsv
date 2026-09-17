@@ -403,21 +403,21 @@ fn emit_plain_attributes<'arena>(
                 if is_load_error_element(name) {
                     return Err(unsupported(Refusal::UseDirectiveOnLoadErrorElement));
                 }
-                if let Some(expr) = &directive.expression {
+                if let Some(expr) = directive.expression {
                     guard_dropped(env, expr)?;
                 }
             }
             AttributeNode::TransitionDirective(directive) => {
-                if let Some(expr) = &directive.expression {
+                if let Some(expr) = directive.expression {
                     guard_dropped(env, expr)?;
                 }
             }
             AttributeNode::AnimateDirective(directive) => {
-                if let Some(expr) = &directive.expression {
+                if let Some(expr) = directive.expression {
                     guard_dropped(env, expr)?;
                 }
             }
-            AttributeNode::AttachTag(attach) => guard_dropped(env, &attach.expression)?,
+            AttributeNode::AttachTag(attach) => guard_dropped(env, attach.expression)?,
             // `bind:` is handled inline at its source slot. On a regular element a
             // handled core kind (`this` omits; `value`/`checked`/`group` on `<input>`
             // synthesize a `$.attr(...)`) emits, everything else refuses
@@ -554,7 +554,7 @@ fn build_element_spread_object<'arena>(
             }
             AttributeNode::SpreadAttribute(spread) => {
                 // The template borrow point: erase + guard + derived-rewrite.
-                let expr = env.erase(&spread.expression)?;
+                let expr = env.erase(spread.expression)?;
                 let argument = wrap_value_expr(env, expr)?[0].clone();
                 let argument_alloc = arena.alloc(argument);
                 // The span is the borrowed argument's — the printer emits `...`
@@ -675,21 +675,21 @@ fn emit_spread_attributes<'arena>(
             // The drop family: `use:` on a load-error element already refused above
             // (the whole element), so only the guard remains here.
             AttributeNode::UseDirective(directive) => {
-                if let Some(expr) = &directive.expression {
+                if let Some(expr) = directive.expression {
                     guard_dropped(env, expr)?;
                 }
             }
             AttributeNode::TransitionDirective(directive) => {
-                if let Some(expr) = &directive.expression {
+                if let Some(expr) = directive.expression {
                     guard_dropped(env, expr)?;
                 }
             }
             AttributeNode::AnimateDirective(directive) => {
-                if let Some(expr) = &directive.expression {
+                if let Some(expr) = directive.expression {
                     guard_dropped(env, expr)?;
                 }
             }
-            AttributeNode::AttachTag(attach) => guard_dropped(env, &attach.expression)?,
+            AttributeNode::AttachTag(attach) => guard_dropped(env, attach.expression)?,
             // A legacy `on:` directive and `let:` deliberately refuse — a runes-only
             // fence matching the non-spread path (the oracle drops them in SSR, but
             // tsv declines: deprecated syntax, migrate to `onclick` / the runes event
@@ -802,7 +802,7 @@ pub(crate) fn emit_svelte_element<'arena>(
         SpecialThis::Braced(et) => {
             // The template borrow point: erase a TS wrapper, rewrite a bare derived
             // read to `d()`, guard a stray rune / top-level `await`.
-            let erased = env.erase(&et.expression)?;
+            let erased = env.erase(et.expression)?;
             wrap_value_expr(env, erased)?[0].clone()
         }
     };

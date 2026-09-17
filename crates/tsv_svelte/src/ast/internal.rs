@@ -267,7 +267,7 @@ impl HtmlComment {
 #[derive(Debug, Clone)]
 pub struct IfBlock<'arena> {
     pub elseif: bool,
-    pub test: Expression<'arena>,
+    pub test: &'arena Expression<'arena>,
     pub consequent: Fragment<'arena>,
     pub alternate: Option<Fragment<'arena>>,
     pub span: Span,
@@ -281,8 +281,8 @@ pub struct IfBlock<'arena> {
 /// Also supports {#each expression} and {#each expression, index} without `as`.
 #[derive(Debug, Clone)]
 pub struct EachBlock<'arena> {
-    pub expression: Expression<'arena>,
-    pub context: Option<Expression<'arena>>, // Pattern (identifier or destructuring), None if no `as`
+    pub expression: &'arena Expression<'arena>,
+    pub context: Option<&'arena Expression<'arena>>, // Pattern (identifier or destructuring), None if no `as`
     pub index: Option<&'arena str>,
     pub key: Option<EachKey<'arena>>,
     pub body: Fragment<'arena>,
@@ -303,7 +303,7 @@ pub struct EachBlock<'arena> {
 /// pattern.
 #[derive(Debug, Clone)]
 pub struct EachKey<'arena> {
-    pub expression: Expression<'arena>,
+    pub expression: &'arena Expression<'arena>,
     /// Span of the key INCLUDING its parentheses — `(` through past `)`.
     pub span: Span,
 }
@@ -314,9 +314,9 @@ pub struct EachKey<'arena> {
 /// Also supports shorthand: {#await expression then value}...{/await}
 #[derive(Debug, Clone)]
 pub struct AwaitBlock<'arena> {
-    pub expression: Expression<'arena>,
-    pub value: Option<Expression<'arena>>, // Pattern for :then binding
-    pub error: Option<Expression<'arena>>, // Pattern for :catch binding
+    pub expression: &'arena Expression<'arena>,
+    pub value: Option<&'arena Expression<'arena>>, // Pattern for :then binding
+    pub error: Option<&'arena Expression<'arena>>, // Pattern for :catch binding
     /// The pending-phase **content** (`{#await x}<here>{:then}…`), or `None` when
     /// empty. Distinct from `pending_block`: an empty block-form pending is `None`
     /// here but `pending_block == true`. The printer reads this (an empty pending
@@ -343,7 +343,7 @@ pub struct AwaitBlock<'arena> {
 /// Forces re-creation of contents when expression changes.
 #[derive(Debug, Clone)]
 pub struct KeyBlock<'arena> {
-    pub expression: Expression<'arena>,
+    pub expression: &'arena Expression<'arena>,
     pub fragment: Fragment<'arena>,
     pub span: Span,
     /// Span of the opening tag `{#key ... }` for comment lookup
@@ -356,7 +356,7 @@ pub struct KeyBlock<'arena> {
 /// Defines a reusable chunk of markup that can be rendered with {@render}.
 #[derive(Debug, Clone)]
 pub struct SnippetBlock<'arena> {
-    pub expression: Expression<'arena>, // Snippet name (Identifier)
+    pub expression: &'arena Expression<'arena>, // Snippet name (Identifier)
     /// Parsed generic type parameters (`<T extends X = Y>`), routed through
     /// `tsv_ts`'s type-parameter printer for constraint/default/modifier
     /// handling and width-based wrapping. `Some` whenever `type_params_raw` is
@@ -383,7 +383,7 @@ pub struct SnippetBlock<'arena> {
 /// Injects raw HTML content without escaping.
 #[derive(Debug, Clone)]
 pub struct HtmlTag<'arena> {
-    pub expression: Expression<'arena>,
+    pub expression: &'arena Expression<'arena>,
     pub span: Span,
 }
 
@@ -394,8 +394,8 @@ pub struct HtmlTag<'arena> {
 /// The `id` is the pattern (identifier or destructuring) and `init` is the value.
 #[derive(Debug, Clone)]
 pub struct ConstTag<'arena> {
-    pub id: Expression<'arena>,   // Pattern (identifier or destructuring)
-    pub init: Expression<'arena>, // Initializer expression
+    pub id: &'arena Expression<'arena>, // Pattern (identifier or destructuring)
+    pub init: &'arena Expression<'arena>, // Initializer expression
     pub span: Span,
 }
 
@@ -432,7 +432,7 @@ pub struct DebugTag<'arena> {
 /// Renders a snippet, optionally with arguments.
 #[derive(Debug, Clone)]
 pub struct RenderTag<'arena> {
-    pub expression: Expression<'arena>, // CallExpression or ChainExpression
+    pub expression: &'arena Expression<'arena>, // CallExpression or ChainExpression
     pub span: Span,
 }
 
@@ -442,7 +442,7 @@ pub struct RenderTag<'arena> {
 /// Attaches reactive functions to elements (Svelte 5.29+).
 #[derive(Debug, Clone)]
 pub struct AttachTag<'arena> {
-    pub expression: Expression<'arena>,
+    pub expression: &'arena Expression<'arena>,
     pub span: Span,
 }
 
@@ -461,8 +461,8 @@ pub struct OnDirective<'arena> {
     /// `name_span.extract(source)`. Distinct from `head_span` below, which is the whole
     /// directive head token ("on:click|preventDefault", prefix + name + modifiers).
     pub name_span: Span,
-    pub expression: Option<Expression<'arena>>, // Handler function
-    pub modifiers: &'arena [&'arena str],       // "preventDefault", "stopPropagation", etc.
+    pub expression: Option<&'arena Expression<'arena>>, // Handler function
+    pub modifiers: &'arena [&'arena str],               // "preventDefault", "stopPropagation", etc.
     pub span: Span,
     /// Span of the whole directive head (`on:click|preventDefault`); used as `name_loc`.
     pub head_span: Span,
@@ -478,7 +478,7 @@ pub struct OnDirective<'arena> {
 pub struct BindDirective<'arena> {
     /// Span of the property name only (e.g. "value") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
-    pub expression: Expression<'arena>, // Binding target (always present - auto-generated for shorthand)
+    pub expression: &'arena Expression<'arena>, // Binding target (always present - auto-generated for shorthand)
     pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
@@ -494,7 +494,7 @@ pub struct BindDirective<'arena> {
 pub struct ClassDirective<'arena> {
     /// Span of the class name only (e.g. "class1") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
-    pub expression: Expression<'arena>, // Condition (always present - auto-generated for shorthand)
+    pub expression: &'arena Expression<'arena>, // Condition (always present - auto-generated for shorthand)
     pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
@@ -535,7 +535,7 @@ pub enum StyleDirectiveValue<'arena> {
 pub struct UseDirective<'arena> {
     /// Span of the action name only (e.g. "action") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
-    pub expression: Option<Expression<'arena>>, // Parameters passed to the action
+    pub expression: Option<&'arena Expression<'arena>>, // Parameters passed to the action
     pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
@@ -596,9 +596,9 @@ impl TransitionDirection {
 pub struct TransitionDirective<'arena> {
     /// Span of the transition name only (e.g. "fade") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
-    pub expression: Option<Expression<'arena>>, // Transition parameters
-    pub modifiers: &'arena [&'arena str],       // "local", "global"
-    pub direction: TransitionDirection,         // Which animations to run
+    pub expression: Option<&'arena Expression<'arena>>, // Transition parameters
+    pub modifiers: &'arena [&'arena str],               // "local", "global"
+    pub direction: TransitionDirection,                 // Which animations to run
     pub span: Span,
     pub head_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
@@ -612,7 +612,7 @@ pub struct TransitionDirective<'arena> {
 pub struct AnimateDirective<'arena> {
     /// Span of the animation name only (e.g. "flip") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
-    pub expression: Option<Expression<'arena>>, // Animation parameters
+    pub expression: Option<&'arena Expression<'arena>>, // Animation parameters
     pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
@@ -627,7 +627,7 @@ pub struct AnimateDirective<'arena> {
 pub struct LetDirective<'arena> {
     /// Span of the slot-prop name only (e.g. "item") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
-    pub expression: Option<Expression<'arena>>, // Local binding pattern (Identifier, ArrayPattern, ObjectPattern)
+    pub expression: Option<&'arena Expression<'arena>>, // Local binding pattern (Identifier, ArrayPattern, ObjectPattern)
     pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
@@ -1555,7 +1555,7 @@ impl Attribute<'_> {
 /// The expression can be any valid expression: identifier, call, member access, etc.
 #[derive(Debug, Clone)]
 pub struct SpreadAttribute<'arena> {
-    pub expression: Expression<'arena>,
+    pub expression: &'arena Expression<'arena>,
     pub span: Span,
 }
 
@@ -1871,7 +1871,7 @@ impl Text {
 /// The expression is evaluated and its result is rendered.
 #[derive(Debug, Clone)]
 pub struct ExpressionTag<'arena> {
-    pub expression: Expression<'arena>,
+    pub expression: &'arena Expression<'arena>,
     pub span: Span,
 }
 
@@ -1920,12 +1920,21 @@ pub struct Style<'arena> {
     pub css_stylesheet: CssStyleSheet<'arena>,
 }
 
-// No `size_of` guards on the slice-multiplied Svelte AST enums: the arena layout
-// deliberately favors traversal locality over node size, keeping every
-// `FragmentNode` / `AttributeNode` variant inline by value rather than
-// arena-boxing the fat ones for a smaller enum. Boxing them shrank the slice
-// element but added a pointer-chase on hot format-read paths that cost more than
-// the density win, so the inline form stands.
+// Widths of the slice-multiplied Svelte AST enums and the tag every attribute value and
+// template `{expr}` holds. Every variant stays inline by value: arena-boxing the fat
+// ones for a smaller enum shrank the slice element but added a pointer-chase on hot
+// format-read paths that cost more than the density win. The embedded TypeScript
+// expressions are the other story — the TS parser has already arena-allocated each one,
+// so the nodes hold them as `&'arena Expression` rather than copying 72 B out of that
+// allocation (`docs/architecture.md` §Nested AST, the second density rule). `SnippetBlock`
+// sets `FragmentNode`'s width. 64-bit only — pointers and slices are half-width on
+// wasm32, a different layout.
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<FragmentNode<'static>>() == 120);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<AttributeNode<'static>>() == 72);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<ExpressionTag<'static>>() == 16);
 
 #[cfg(test)]
 mod tests {

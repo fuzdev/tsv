@@ -85,7 +85,7 @@ fn build_class_base<'arena>(
             // don't reproduce — refuse, matching the standalone dynamic-attribute
             // path (`emit_dynamic_attribute`).
             let quoted = preceded_by_quote(env.source, tag.span.start);
-            let expr = env.erase(&tag.expression)?;
+            let expr = env.erase(tag.expression)?;
             if matches!(expr, Expression::Literal(lit)
                 if matches!(lit.value, LiteralValue::String(_)))
             {
@@ -122,7 +122,7 @@ fn build_class_directives_object<'arena>(
         let key_span = key.span();
         // The template borrow point: erase once, then guard + rewrite a bare
         // derived read to `d()`.
-        let expr = env.erase(&directive.expression)?;
+        let expr = env.erase(directive.expression)?;
         let value = wrap_value_expr(env, expr)?[0].clone();
         properties.push(ObjectProperty::Property(init_property(
             env.b.arena,
@@ -165,14 +165,14 @@ pub(crate) fn build_spread_class_object<'arena>(
         // The oracle's same-named-identifier shorthand fork, read on the RAW node:
         // the value is the bare `b.id(directive.name)` (no transform / derived
         // rewrite), exactly like a `style:` shorthand.
-        let same_named = matches!(&directive.expression, Expression::Identifier(id)
+        let same_named = matches!(directive.expression, Expression::Identifier(id)
             if plain_identifier_name(id, env.source).as_deref() == Some(name.as_str()));
         let (value, is_shorthand_id) = if same_named {
             (Expression::Identifier(env.b.ident(&name)), true)
         } else {
             // The template borrow point: erase once, then guard + rewrite a bare
             // derived read to `d()`.
-            let expr = env.erase(&directive.expression)?;
+            let expr = env.erase(directive.expression)?;
             (wrap_value_expr(env, expr)?[0].clone(), false)
         };
         let key_is_ident = is_js_identifier(&name);
@@ -340,7 +340,7 @@ fn build_style_base<'arena>(
             // `$.clsx`, unlike `class`). A string-literal expression takes the
             // oracle's inline-literal path we don't reproduce — refuse, matching the
             // standalone dynamic-attribute path (`emit_dynamic_attribute`).
-            let expr = env.erase(&tag.expression)?;
+            let expr = env.erase(tag.expression)?;
             if matches!(expr, Expression::Literal(lit)
                 if matches!(lit.value, LiteralValue::String(_)))
             {
@@ -379,7 +379,7 @@ fn build_style_property<'arena>(
         StyleDirectiveValue::ExpressionTag(tag) => {
             // The template borrow point: erase once, then guard + rewrite a bare
             // derived read to `d()`. `|important` does NOT wrap the value.
-            let expr = env.erase(&tag.expression)?;
+            let expr = env.erase(tag.expression)?;
             (wrap_value_expr(env, expr)?[0].clone(), false)
         }
         StyleDirectiveValue::Parts(parts) => match parts {

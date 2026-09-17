@@ -388,7 +388,7 @@ pub(crate) fn emit_fragment<'arena>(
             // an anchor the oracle elides. `emit_render_tag` erases again for its own
             // borrow; a second erase of a type-free node allocates nothing.
             [CleanNode::Render(tag)] => {
-                let expression = env.erase(&tag.expression)?;
+                let expression = env.erase(tag.expression)?;
                 render_callee_name(expression, source)
                     .is_some_and(|name| !render_callee_dynamic(env, name))
             }
@@ -412,10 +412,10 @@ pub(crate) fn emit_fragment<'arena>(
             }
             CleanNode::Boundary(se) => emit_boundary(env, se, out, &ctx)?,
             CleanNode::Expr(tag) => {
-                emit_expression_tag(env, &tag.expression, out, true)?;
+                emit_expression_tag(env, tag.expression, out, true)?;
             }
             CleanNode::Html(tag) => {
-                emit_expression_tag(env, &tag.expression, out, false)?;
+                emit_expression_tag(env, tag.expression, out, false)?;
             }
             CleanNode::If(block) => emit_if_block(env, block, out, &ctx)?,
             CleanNode::Each(block) => emit_each_block(env, block, out, &ctx)?,
@@ -593,7 +593,7 @@ fn emit_title_element<'arena>(
                 body.push_text(&escape_template_text(&escape_html_text(&decoded)));
             }
             FragmentNode::ExpressionTag(tag) => {
-                emit_expression_tag(env, &tag.expression, &mut body, true)?;
+                emit_expression_tag(env, tag.expression, &mut body, true)?;
             }
             // A non-text/expression child is `title_invalid_content` in the oracle.
             _ => return Err(unsupported(Refusal::TitleInvalidContent)),

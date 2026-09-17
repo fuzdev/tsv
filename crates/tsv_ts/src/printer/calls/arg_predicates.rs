@@ -667,7 +667,7 @@ mod tests {
 
     /// Parse a bare expression to its internal AST node (spans index into `src`),
     /// allocated in the caller-supplied `arena`.
-    fn parse_expr<'a>(arena: &'a Bump, src: &str) -> Expression<'a> {
+    fn parse_expr<'a>(arena: &'a Bump, src: &str) -> &'a Expression<'a> {
         crate::parse_expression_with_comments(src, 0, arena)
             .expect("expression should parse")
             .0
@@ -686,7 +686,7 @@ mod tests {
     #[test]
     fn lone_arg_params_render_flat_only_for_plain_identifiers() {
         let arena = Bump::new();
-        let flat = |src| lone_arg_params_render_flat(&parse_expr(&arena, src));
+        let flat = |src| lone_arg_params_render_flat(parse_expr(&arena, src));
 
         // Plain identifiers — including none at all.
         assert!(flat("(function () {})"));
@@ -712,24 +712,24 @@ mod tests {
     fn simple_call_argument_depth_and_shape() {
         let arena = Bump::new();
         // Depth 0 is always "not simple".
-        assert!(!is_simple_call_argument(&parse_expr(&arena, "x"), 0));
+        assert!(!is_simple_call_argument(parse_expr(&arena, "x"), 0));
         // Literals / identifiers are simple at any positive depth.
-        assert!(is_simple_call_argument(&parse_expr(&arena, "42"), 1));
-        assert!(is_simple_call_argument(&parse_expr(&arena, "foo"), 1));
+        assert!(is_simple_call_argument(parse_expr(&arena, "42"), 1));
+        assert!(is_simple_call_argument(parse_expr(&arena, "foo"), 1));
         // Regex is simple only if the pattern width is <= 5.
-        assert!(is_simple_call_argument(&parse_expr(&arena, "/abcde/"), 2));
-        assert!(!is_simple_call_argument(&parse_expr(&arena, "/abcdef/"), 2));
+        assert!(is_simple_call_argument(parse_expr(&arena, "/abcde/"), 2));
+        assert!(!is_simple_call_argument(parse_expr(&arena, "/abcdef/"), 2));
         // A call's args must fit within the remaining depth: `f(a)` needs depth >= 2.
-        assert!(!is_simple_call_argument(&parse_expr(&arena, "f(a)"), 1));
-        assert!(is_simple_call_argument(&parse_expr(&arena, "f(a)"), 2));
+        assert!(!is_simple_call_argument(parse_expr(&arena, "f(a)"), 1));
+        assert!(is_simple_call_argument(parse_expr(&arena, "f(a)"), 2));
         // Spread elements are never simple.
-        assert!(!is_simple_call_argument(&parse_expr(&arena, "[...x]"), 2));
+        assert!(!is_simple_call_argument(parse_expr(&arena, "[...x]"), 2));
     }
 
     #[test]
     fn simple_call_argument_looks_through_only_the_chain_wrappers() {
         let arena = Bump::new();
-        let simple = |src: &str| is_simple_call_argument(&parse_expr(&arena, src), 2);
+        let simple = |src: &str| is_simple_call_argument(parse_expr(&arena, src), 2);
         // `!` is prettier's `stripChainElementWrappers`, so `x!` is as simple as `x`.
         assert!(simple("x!"));
         // A TS cast is not looked through — prettier has no case for one.
@@ -748,7 +748,7 @@ mod tests {
         assert!(simple("import(a, b)"));
         // …and the argument count is still held to the depth.
         assert!(!is_simple_call_argument(
-            &parse_expr(&arena, "import(a, b)"),
+            parse_expr(&arena, "import(a, b)"),
             1
         ));
     }
@@ -756,7 +756,7 @@ mod tests {
     #[test]
     fn hopefully_short_reads_a_cast_through_its_type() {
         let arena = Bump::new();
-        let short = |src: &str| is_hopefully_short_arg(&parse_expr(&arena, src));
+        let short = |src: &str| is_hopefully_short_arg(parse_expr(&arena, src));
         // A bare type reference is simple, so the cast-wrapped seed stays short.
         assert!(short("{} as T"));
         assert!(short("{} satisfies T"));

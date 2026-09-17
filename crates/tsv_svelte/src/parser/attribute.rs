@@ -497,7 +497,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ///
     /// Accepts both `{expr}` and `"{expr}"` (quoted mustache) forms.
     /// Svelte's parser accepts quoted expressions in directives; prettier strips the quotes.
-    fn parse_directive_expression(&mut self) -> Result<(Expression<'arena>, Span), ParseError> {
+    fn parse_directive_expression(
+        &mut self,
+    ) -> Result<(&'arena Expression<'arena>, Span), ParseError> {
         self.check_directive_value_placement()?;
         if self.check(TokenKind::LeftBrace) {
             // Standard form: {expr}
@@ -527,15 +529,15 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         name: &str,
         start: usize,
         end: usize,
-    ) -> Expression<'arena> {
+    ) -> &'arena Expression<'arena> {
         let span = Span {
             start: start as u32,
             end: end as u32,
         };
-        Expression::Identifier(Identifier::simple(
+        self.arena.alloc(Expression::Identifier(Identifier::simple(
             self.synthesized_ident_name(name, span),
             span,
-        ))
+        )))
     }
 
     /// Name channel for a synthesized TS `Identifier` covering `span`:
@@ -863,7 +865,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             Identifier::simple(self.synthesized_ident_name(name, ident_span), ident_span);
 
         let expression_tag = ExpressionTag {
-            expression: Expression::Identifier(identifier),
+            expression: self.arena.alloc(Expression::Identifier(identifier)),
             span: ident_span,
         };
 

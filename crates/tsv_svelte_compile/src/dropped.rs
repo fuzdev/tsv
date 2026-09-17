@@ -83,7 +83,7 @@ pub(crate) fn guard_inert_special_element<'arena>(
                     // expression is still guarded (a misplaced rune / top-level
                     // `await` is an oracle analysis-phase error).
                     if let Some([AttributeValue::ExpressionTag(t)]) = a.value {
-                        guard_dropped(env, &t.expression)?;
+                        guard_dropped(env, t.expression)?;
                     }
                 } else {
                     return Err(unsupported(Refusal::SpecialElementIllegalAttribute {
@@ -113,7 +113,7 @@ pub(crate) fn guard_inert_special_element<'arena>(
                 // / top-level `await`); its reassignment is collected in
                 // `needs_context` so a later read of a `$state` target stays dynamic
                 // (an unreassigned `$state` read otherwise folds to its init value).
-                guard_dropped(env, &d.expression)?;
+                guard_dropped(env, d.expression)?;
             }
             // Legacy `on:` event directive and `let:` — runes-only fence: refuse,
             // matching the regular-element path (`element.rs`).
@@ -125,29 +125,29 @@ pub(crate) fn guard_inert_special_element<'arena>(
             }
             // The no-op drop family: guard-and-drop each expression, like a regular
             // element (the oracle accepts them on these elements and drops them).
-            AttributeNode::ClassDirective(d) => guard_dropped(env, &d.expression)?,
+            AttributeNode::ClassDirective(d) => guard_dropped(env, d.expression)?,
             AttributeNode::UseDirective(d) => {
-                if let Some(e) = &d.expression {
+                if let Some(e) = d.expression {
                     guard_dropped(env, e)?;
                 }
             }
             AttributeNode::TransitionDirective(d) => {
-                if let Some(e) = &d.expression {
+                if let Some(e) = d.expression {
                     guard_dropped(env, e)?;
                 }
             }
             AttributeNode::AnimateDirective(d) => {
-                if let Some(e) = &d.expression {
+                if let Some(e) = d.expression {
                     guard_dropped(env, e)?;
                 }
             }
-            AttributeNode::AttachTag(t) => guard_dropped(env, &t.expression)?,
+            AttributeNode::AttachTag(t) => guard_dropped(env, t.expression)?,
             AttributeNode::StyleDirective(d) => match &d.value {
-                StyleDirectiveValue::ExpressionTag(t) => guard_dropped(env, &t.expression)?,
+                StyleDirectiveValue::ExpressionTag(t) => guard_dropped(env, t.expression)?,
                 StyleDirectiveValue::Parts(parts) => {
                     for v in *parts {
                         if let AttributeValue::ExpressionTag(t) = v {
-                            guard_dropped(env, &t.expression)?;
+                            guard_dropped(env, t.expression)?;
                         }
                     }
                 }
