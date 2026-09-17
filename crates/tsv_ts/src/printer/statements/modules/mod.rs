@@ -585,9 +585,10 @@ impl<'a> Printer<'a> {
             ]));
         }
 
-        let internal::ExportDefaultValue::Expression(internal::Expression::ClassExpression(
-            class_expr,
-        )) = &decl.declaration
+        let internal::ExportDefaultValue::Expression(internal::Expression {
+            span: class_span,
+            kind: internal::ExpressionKind::ClassExpression(class_expr),
+        }) = &decl.declaration
         else {
             return None;
         };
@@ -607,7 +608,7 @@ impl<'a> Printer<'a> {
         // directive's line, which the inline emitter below would take away: a
         // keyword-trailing placement is inert under the floor, so the relocated form
         // would lose the freeze on the second pass.
-        if let Some(frozen) = self.value_head_frozen_span(keyword_end, class_expr.span) {
+        if let Some(frozen) = self.value_head_frozen_span(keyword_end, *class_span) {
             self.append_keyword_value_line_comments(
                 &mut parts,
                 keyword_end,
@@ -631,8 +632,8 @@ impl<'a> Printer<'a> {
         // through `build_expression_doc`, so the owned-comment seam there never
         // runs for it — the comment must be claimed here or nothing prints it.
         parts.push(self.prepend_owned_leading_comment_at(
-            class_expr.span.start,
-            self.build_class_expression_doc(class_expr),
+            class_span.start,
+            self.build_class_expression_doc(class_expr, *class_span),
         ));
         Some(d.concat(&parts))
     }

@@ -5,10 +5,11 @@
 // - Fill mode for number-only arrays
 // - Comment preservation
 
-use crate::ast::internal::{self, Expression, LiteralValue};
+use crate::ast::internal::{self, Expression, ExpressionKind, LiteralValue};
 use crate::printer::comments::{block_is_before_comma, next_real_element_start, run_defers_line};
 use crate::printer::{CommentVec, Printer};
 use smallvec::{SmallVec, smallvec};
+use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -17,8 +18,8 @@ use tsv_lang::doc::arena::DocId;
 /// element slides to. The array PATTERN's twin is `array_pattern_gap_end`, whose fallback
 /// stops before a `: T` the pattern's span swallowed; each container names its own end
 /// once and the walk past the holes is shared.
-fn array_gap_end(arr: &internal::ArrayExpression<'_>, i: usize) -> u32 {
-    next_real_element_start(arr.elements, i).unwrap_or(arr.span.end - 1)
+fn array_gap_end(arr: &internal::ArrayExpression<'_>, span: Span, i: usize) -> u32 {
+    next_real_element_start(arr.elements, i).unwrap_or(span.end - 1)
 }
 
 /// The SHAPE half of prettier's `isConciselyPrintedArray` (`print/array.js`): a non-empty
@@ -34,19 +35,22 @@ fn array_gap_end(arr: &internal::ArrayExpression<'_>, i: usize) -> u32 {
 /// [`Printer::is_concisely_printed_array`], the one entry every caller asks.
 fn array_elements_are_signed_numbers(arr: &internal::ArrayExpression<'_>) -> bool {
     !arr.elements.is_empty()
-        && arr.elements.iter().all(|elem| match elem {
-            Some(Expression::Literal(lit)) => matches!(lit.value, LiteralValue::Number(_)),
-            Some(Expression::UnaryExpression(unary)) => {
-                matches!(
-                    unary.operator,
-                    internal::UnaryOperator::Minus | internal::UnaryOperator::Plus
-                ) && matches!(
-                    unary.argument,
-                    Expression::Literal(lit) if matches!(lit.value, LiteralValue::Number(_))
-                )
-            }
-            _ => false,
-        })
+        && arr
+            .elements
+            .iter()
+            .all(|elem| match elem.as_ref().map(|e| &e.kind) {
+                Some(ExpressionKind::Literal(lit)) => matches!(lit.value, LiteralValue::Number(_)),
+                Some(ExpressionKind::UnaryExpression(unary)) => {
+                    matches!(
+                        unary.operator,
+                        internal::UnaryOperator::Minus | internal::UnaryOperator::Plus
+                    ) && matches!(
+                        &unary.argument.kind,
+                        ExpressionKind::Literal(lit) if matches!(lit.value, LiteralValue::Number(_))
+                    )
+                }
+                _ => false,
+            })
 }
 
 impl<'a> Printer<'a> {
@@ -68,9 +72,9 @@ impl<'a> Printer<'a> {
         for elem in arr.elements {
             let Some(expr) = elem else { return false };
 
-            let (is_array, inner_len) = match expr {
-                Expression::ArrayExpression(inner) => (true, inner.elements.len()),
-                Expression::ObjectExpression(inner) => (false, inner.properties.len()),
+            let (is_array, inner_len) = match &expr.kind {
+                ExpressionKind::ArrayExpression(inner) => (true, inner.elements.len()),
+                ExpressionKind::ObjectExpression(inner) => (false, inner.properties.len()),
                 _ => return false,
             };
 
@@ -138,6 +142,7 @@ impl<'a> Printer<'a> {
     fn has_blank_line_after_slot(
         &self,
         arr: &internal::ArrayExpression<'_>,
+        arr_span: Span,
         i: usize,
         emitted_leading_start: Option<u32>,
     ) -> bool {
@@ -149,7 +154,7 @@ impl<'a> Printer<'a> {
         // search, which runs past `upper`: the comma may sit below slot `i + 1`'s leading
         // comment, and `upper` stops at that comment's start
         // ([`Printer::has_blank_line_after_comma`]).
-        let next_real = array_gap_end(arr, i);
+        let next_real = array_gap_end(arr, arr_span, i);
 
         // A HOLE's printed content is its comma alone, so none of the three spellings above
         // applies — whatever a caller emits in this gap prints *past* that comma, and
@@ -393,12 +398,13 @@ impl<'a> Printer<'a> {
     fn leading_comment_search_start_for(
         &self,
         arr: &internal::ArrayExpression<'_>,
+        span: Span,
         i: usize,
         elem_start: u32,
     ) -> u32 {
         match self.prev_real_slot(arr, i) {
             Some((idx, prev)) => self.element_gap_split(arr, idx, prev.span().end, elem_start),
-            None => arr.span.start + 1,
+            None => span.start + 1,
         }
     }
 
@@ -411,6 +417,7 @@ impl<'a> Printer<'a> {
     fn add_trailing_array_comments(
         &self,
         arr: &internal::ArrayExpression<'_>,
+        span: Span,
         elem_end: u32,
         current_index: usize,
         parts: &mut DocBuf,
@@ -418,7 +425,7 @@ impl<'a> Printer<'a> {
         // Bounded at `next_boundary`: this element's separator, if it has one, lies before the
         // next element. A SOURCE trailing comma past the last element is still found — the
         // `is_last` arm is what keeps the comments past it on this element.
-        let next_boundary = array_gap_end(arr, current_index);
+        let next_boundary = array_gap_end(arr, span, current_index);
         let split = self.element_gap_split(arr, current_index, elem_end, next_boundary);
 
         // Everything below the split is this element's, by construction — the next
@@ -506,11 +513,12 @@ impl<'a> Printer<'a> {
     fn last_element_trailing_split(
         &self,
         arr: &internal::ArrayExpression<'_>,
+        span: Span,
     ) -> Option<(u32, u32)> {
         let (idx, elem) = self.prev_real_slot(arr, arr.elements.len())?;
         let elem_end = elem.span().end;
         // No real element follows, so the gap runs to the closing `]`.
-        let gap_end = arr.span.end - 1;
+        let gap_end = span.end - 1;
         Some((
             elem_end,
             self.element_gap_split(arr, idx, elem_end, gap_end),
@@ -521,9 +529,13 @@ impl<'a> Printer<'a> {
     ///
     /// The single entry point for every array position — top-level and nested alike — so
     /// one layout decision serves every one of them.
-    pub(in crate::printer) fn build_array_doc(&self, arr: &internal::ArrayExpression<'_>) -> DocId {
+    pub(in crate::printer) fn build_array_doc(
+        &self,
+        arr: &internal::ArrayExpression<'_>,
+        arr_span: Span,
+    ) -> DocId {
         if arr.elements.is_empty() {
-            return self.build_empty_brackets_inline_with_comments_doc(arr.span);
+            return self.build_empty_brackets_inline_with_comments_doc(arr_span);
         }
 
         // Whole-array comment-presence flag (one binary search over the `[…]` span).
@@ -532,7 +544,7 @@ impl<'a> Printer<'a> {
         // the fill/group builders — lies within [span.start, span.end], so when the
         // array holds no comment, none can lie in any of them (canonical reference:
         // build_params_doc_with_comments).
-        let has_comments = self.has_comments_on_page_between(arr.span.start, arr.span.end);
+        let has_comments = self.has_comments_on_page_between(arr_span.start, arr_span.end);
 
         // Check for comments that force expansion: line comments (can't be inline),
         // multi-line block comments (contain hardlines that must propagate),
@@ -540,12 +552,12 @@ impl<'a> Printer<'a> {
         // The gate skips all three sub-queries — and sub-query 3's eager element
         // collect — on the comment-free common case.
         let has_expanding_comments = has_comments
-            && (self.has_line_comments_between(arr.span.start, arr.span.end)
-                || self.has_multiline_block_comments_on_page_between(arr.span.start, arr.span.end)
-                || self.has_own_line_block_comments_in_array(arr));
+            && (self.has_line_comments_between(arr_span.start, arr_span.end)
+                || self.has_multiline_block_comments_on_page_between(arr_span.start, arr_span.end)
+                || self.has_own_line_block_comments_in_array(arr, arr_span));
 
         if has_expanding_comments {
-            return self.build_array_doc_with_expanding_comments(arr);
+            return self.build_array_doc_with_expanding_comments(arr, arr_span);
         }
 
         // A concisely printed array (numbers only) packs as a fill; everything else goes
@@ -557,10 +569,10 @@ impl<'a> Printer<'a> {
         // prettier's `literalline`-borne `breakParent` does.
         if self.is_concisely_printed_array(arr) {
             // Use fill for greedy packing of numbers
-            self.build_array_fill_doc(arr, has_comments)
+            self.build_array_fill_doc(arr, arr_span, has_comments)
         } else {
             // Use group with one-per-line for other content
-            self.build_array_group_doc(arr, has_comments)
+            self.build_array_group_doc(arr, arr_span, has_comments)
         }
     }
 
@@ -576,9 +588,13 @@ impl<'a> Printer<'a> {
     /// those two spellings expanded — a third fixed point neither the bare authoring nor
     /// prettier produces, and, since the reprint puts the comment back on the element's
     /// line, one the next pass immediately collapsed (`[a⏎, /* c */⏎b]` was a 2-pass).
-    fn has_own_line_block_comments_in_array(&self, arr: &internal::ArrayExpression<'_>) -> bool {
+    fn has_own_line_block_comments_in_array(
+        &self,
+        arr: &internal::ArrayExpression<'_>,
+        span: Span,
+    ) -> bool {
         let non_null: SmallVec<[_; 8]> = arr.elements.iter().flatten().collect();
-        self.has_own_line_block_comments_in_bracket_list(arr.span, &non_null, |e| e.span())
+        self.has_own_line_block_comments_in_bracket_list(span, &non_null, |e| e.span())
     }
 
     /// Prettier's `isConciselyPrintedArray` (`print/array.js`) — the ONE reading of "this
@@ -606,7 +622,7 @@ impl<'a> Printer<'a> {
     fn is_concisely_printed_array(&self, arr: &internal::ArrayExpression<'_>) -> bool {
         array_elements_are_signed_numbers(arr)
             && !arr.elements.iter().flatten().any(|elem| {
-                matches!(elem, Expression::UnaryExpression(_))
+                matches!(elem.kind, ExpressionKind::UnaryExpression(_))
                     && self.has_comments_on_page_between(elem.span().start, elem.span().end)
             })
     }
@@ -614,7 +630,7 @@ impl<'a> Printer<'a> {
     /// [`Self::is_concisely_printed_array`] read off a call ARGUMENT, which the caller holds
     /// as a bare expression: a non-array is never concisely printed.
     pub(in crate::printer) fn arg_is_concisely_printed_array(&self, expr: &Expression<'_>) -> bool {
-        matches!(expr, Expression::ArrayExpression(arr) if self.is_concisely_printed_array(arr))
+        matches!(&expr.kind, ExpressionKind::ArrayExpression(arr) if self.is_concisely_printed_array(arr))
     }
 
     /// Build fill doc for numbers-only arrays (greedy packing)
@@ -641,6 +657,7 @@ impl<'a> Printer<'a> {
     fn build_array_fill_doc(
         &self,
         arr: &internal::ArrayExpression<'_>,
+        span: Span,
         has_comments: bool,
     ) -> DocId {
         let d = self.d();
@@ -654,14 +671,14 @@ impl<'a> Printer<'a> {
             slot.clear();
             // Elements and their glued comments (a hole pushes nothing — though
             // `is_concisely_printed_array` already excludes elisions from this path).
-            self.push_array_element_with_inline_comments(arr, i, has_comments, &mut slot);
+            self.push_array_element_with_inline_comments(arr, span, i, has_comments, &mut slot);
 
             if i < last {
                 slot.push(d.text(","));
             }
             parts.push(d.concat(&slot));
             if i < last {
-                parts.push(if self.has_blank_line_after_slot(arr, i, None) {
+                parts.push(if self.has_blank_line_after_slot(arr, span, i, None) {
                     d.concat(&[d.literalline(), d.hardline()])
                 } else {
                     d.line()
@@ -701,6 +718,7 @@ impl<'a> Printer<'a> {
     fn push_array_element_with_inline_comments(
         &self,
         arr: &internal::ArrayExpression<'_>,
+        span: Span,
         i: usize,
         has_comments: bool,
         parts: &mut DocBuf,
@@ -711,7 +729,7 @@ impl<'a> Printer<'a> {
 
         if has_comments {
             let elem_start = expr.span().start;
-            let search_start = self.leading_comment_search_start_for(arr, i, elem_start);
+            let search_start = self.leading_comment_search_start_for(arr, span, i, elem_start);
             self.add_inline_leading_block_comments(search_start, elem_start, parts);
         }
 
@@ -721,7 +739,7 @@ impl<'a> Printer<'a> {
             // Trailing block comments — the ones `block_comment_trails_prev_element`
             // binds to this element (before its comma; on the last slot the whole
             // same-line run, its comma never being emitted).
-            self.add_trailing_array_comments(arr, expr.span().end, i, parts);
+            self.add_trailing_array_comments(arr, span, expr.span().end, i, parts);
         }
     }
 
@@ -734,6 +752,7 @@ impl<'a> Printer<'a> {
     fn build_array_group_doc(
         &self,
         arr: &internal::ArrayExpression<'_>,
+        arr_span: Span,
         has_comments: bool,
     ) -> DocId {
         let d = self.d();
@@ -756,11 +775,17 @@ impl<'a> Printer<'a> {
 
         for (i, elem) in arr.elements.iter().enumerate() {
             // Elements and their glued comments (a hole pushes nothing).
-            self.push_array_element_with_inline_comments(arr, i, has_comments, &mut parts);
+            self.push_array_element_with_inline_comments(
+                arr,
+                arr_span,
+                i,
+                has_comments,
+                &mut parts,
+            );
 
             let is_last = i == arr.elements.len() - 1;
             if !is_last {
-                let has_blank_after = self.has_blank_line_after_slot(arr, i, None);
+                let has_blank_after = self.has_blank_line_after_slot(arr, arr_span, i, None);
 
                 // Separator comma between elements
                 parts.push(d.text(","));
@@ -813,9 +838,9 @@ impl<'a> Printer<'a> {
                 // past the element's end either way, so a LAST spread's stripped-paren
                 // interior stays the spread doc's share and is never re-emitted here.
                 let scan_start = self
-                    .last_element_trailing_split(arr)
-                    .map_or(arr.span.start + 1, |(_, split)| split);
-                for comment in self.comments_to_emit_between(scan_start, arr.span.end - 1) {
+                    .last_element_trailing_split(arr, arr_span)
+                    .map_or(arr_span.start + 1, |(_, split)| split);
+                for comment in self.comments_to_emit_between(scan_start, arr_span.end - 1) {
                     if comment.is_block {
                         parts.push(self.build_comment_doc(comment));
                     }
@@ -844,8 +869,8 @@ impl<'a> Printer<'a> {
             .then(|| self.end_scan_start(arr))
             .flatten()
         {
-            let last_real_split = self.last_element_trailing_split(arr);
-            for comment in self.comments_to_emit_between(search_start, arr.span.end - 1) {
+            let last_real_split = self.last_element_trailing_split(arr, arr_span);
+            for comment in self.comments_to_emit_between(search_start, arr_span.end - 1) {
                 // Only what no one closer prints — see `end_scan_emits_comment`
                 // for the two-region rule; a comment the element's claim covers would
                 // double-print.
@@ -900,6 +925,7 @@ impl<'a> Printer<'a> {
     fn build_array_doc_with_expanding_comments(
         &self,
         arr: &internal::ArrayExpression<'_>,
+        span: Span,
     ) -> DocId {
         let d = self.d();
         let mut parts = d.pooled_docbuf();
@@ -913,16 +939,16 @@ impl<'a> Printer<'a> {
             .iter()
             .flatten()
             .next()
-            .map_or(arr.span.end - 1, |e| e.span().start);
+            .map_or(span.end - 1, |e| e.span().start);
         let (bracket_line_prefix, bracket_pull_pos) =
-            self.delimiter_line_comment_prefix(arr.span.start, first_elem_start);
+            self.delimiter_line_comment_prefix(span.start, first_elem_start);
 
         // End of the most recently emitted REAL element, and its slot. Holes don't advance
         // either; this lets the next real element's leading-comment range walk back across
         // any intervening hole commas to claim the comments between them and the
         // previous real element. The slot is what `element_gap_split` derives `is_last`
         // from, so the leading side asks the same question the trailing side answered.
-        let mut last_real_emit_end = arr.span.start + 1;
+        let mut last_real_emit_end = span.start + 1;
         let mut last_real_slot: Option<usize> = None;
 
         // End position of the last trailing-on-array comment emitted by the
@@ -936,7 +962,7 @@ impl<'a> Printer<'a> {
 
         for (i, elem) in arr.elements.iter().enumerate() {
             // O(remaining elements) — compute once and reuse below.
-            let next_boundary = array_gap_end(arr, i);
+            let next_boundary = array_gap_end(arr, span, i);
             let (elem_start, elem_end) = match elem {
                 Some(e) => (e.span().start, e.span().end),
                 None => (next_boundary, next_boundary),
@@ -958,7 +984,7 @@ impl<'a> Printer<'a> {
             let leading_upper = if elem.is_some() {
                 Some(elem_start)
             } else if is_trailing_hole {
-                Some(arr.span.end - 1)
+                Some(span.end - 1)
             } else {
                 None
             };
@@ -1002,7 +1028,7 @@ impl<'a> Printer<'a> {
                     .as_ref()
                     .and_then(|_| leading_comments.first())
                     .map(|c| c.span.start);
-                if self.has_blank_line_after_slot(arr, i - 1, emitted_leading_start) {
+                if self.has_blank_line_after_slot(arr, span, i - 1, emitted_leading_start) {
                     parts.push(d.literalline());
                 }
                 parts.push(d.hardline());
@@ -1014,11 +1040,10 @@ impl<'a> Printer<'a> {
             // this is the only element printer a directive reaches, since either spelling
             // of an own-line comment routes the whole array here.
             if let Some(e) = elem {
-                let element_doc =
-                    match self.element_frozen_span(arr.span.start + 1, arr.elements, i) {
-                        Some(frozen) => self.build_frozen_arg_doc(e, frozen),
-                        None => self.build_arg_expression_doc(e),
-                    };
+                let element_doc = match self.element_frozen_span(span.start + 1, arr.elements, i) {
+                    Some(frozen) => self.build_frozen_arg_doc(e, frozen),
+                    None => self.build_arg_expression_doc(e),
+                };
                 parts.push(self.build_list_element_group_from_comments(
                     leading_comments.iter().copied(),
                     elem_start,
@@ -1112,7 +1137,7 @@ impl<'a> Printer<'a> {
                 // Source position of the LAST comma before `]` (the comma we just
                 // emitted for this hole). Used as the same-line anchor for the
                 // first comment.
-                let last_comma = self.find_last_comma_before(last_real_emit_end, arr.span.end - 1);
+                let last_comma = self.find_last_comma_before(last_real_emit_end, span.end - 1);
 
                 for (ci, comment) in leading_comments.iter().enumerate() {
                     let same_line_inline = if ci == 0 {
@@ -1167,13 +1192,13 @@ impl<'a> Printer<'a> {
         // names, and it DOUBLE-PRINTS every `//` written in the gap after the `)`.
         let final_scan_start = trailing_hole_comments_end
             .or_else(|| self.end_scan_start(arr))
-            .unwrap_or(arr.span.start + 1);
-        let last_real_split = self.last_element_trailing_split(arr);
+            .unwrap_or(span.start + 1);
+        let last_real_split = self.last_element_trailing_split(arr, span);
         let mut prev_end = final_scan_start;
         // The comment this scan emitted last — `None` after one it skipped, which another
         // emitter put on a line of its own, so nothing here has it to glue to.
         let mut prev_comment: Option<&internal::Comment> = None;
-        for comment in self.comments_to_emit_between(final_scan_start, arr.span.end - 1) {
+        for comment in self.comments_to_emit_between(final_scan_start, span.end - 1) {
             if self.end_scan_emits_comment(comment, final_scan_start, last_real_split) {
                 // A pair the author GLUED onto one line keeps that line
                 // ([`Printer::trailing_run_hugs_previous`], the rule every end-of-container
@@ -1212,14 +1237,15 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_array_doc_expanded(
         &self,
         arr: &internal::ArrayExpression<'_>,
+        span: Span,
     ) -> DocId {
         let d = self.d();
         // A commented array hands off to `build_array_doc` wholesale — the element-doc-only
         // loop below would DROP every structural comment, the empty-`[]` dangling one
         // included. The object twin (`build_object_doc_expanded`) carries the same gate for
         // the same reason; the rationale lives there in full.
-        if self.has_comments_on_page_between(arr.span.start, arr.span.end) {
-            return self.build_array_doc(arr);
+        if self.has_comments_on_page_between(span.start, span.end) {
+            return self.build_array_doc(arr, span);
         }
         if arr.elements.is_empty() {
             return d.text("[]");
@@ -1264,7 +1290,10 @@ mod tests {
             .expect("expression should parse")
             .0
         {
-            Expression::ArrayExpression(arr) => arr,
+            Expression {
+                kind: ExpressionKind::ArrayExpression(arr),
+                ..
+            } => arr,
             other => panic!("expected an array expression, got: {other:?}"),
         }
     }

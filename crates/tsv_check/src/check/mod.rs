@@ -30,10 +30,10 @@ use duplicate_members::MemberCtx;
 use tsv_ts::ast::Program;
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ClassBody, ClassMember, Decorator, ExportDefaultValue, Expression,
-    ForInOfLeft, ForInit, ObjectPatternProperty, ObjectProperty, Statement, TSInterfaceDeclaration,
-    TSInterfaceHeritage, TSLiteralType, TSModuleDeclaration, TSModuleDeclarationBody, TSType,
-    TSTypeAnnotation, TSTypeElement, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
-    VariableDeclaration,
+    ExpressionKind, ForInOfLeft, ForInit, ObjectPatternProperty, ObjectProperty, Statement,
+    TSInterfaceDeclaration, TSInterfaceHeritage, TSLiteralType, TSModuleDeclaration,
+    TSModuleDeclarationBody, TSType, TSTypeAnnotation, TSTypeElement, TSTypeParameterDeclaration,
+    TSTypeParameterInstantiation, VariableDeclaration,
 };
 
 /// Run the syntactic check pass over one parsed file, returning its check-time
@@ -317,8 +317,8 @@ impl<'a> CheckWalk<'a> {
     // --- expressions ---------------------------------------------------------
 
     fn visit_expression(&mut self, expr: &Expression<'_>) {
-        use Expression as E;
-        match expr {
+        use ExpressionKind as E;
+        match &expr.kind {
             E::FunctionExpression(f) => self.check_function_common(
                 f.type_parameters.as_ref(),
                 f.params,
@@ -566,14 +566,14 @@ impl<'a> CheckWalk<'a> {
     }
 
     fn visit_param(&mut self, param: &Expression<'_>) {
-        match param {
-            Expression::Identifier(id) => {
+        match &param.kind {
+            ExpressionKind::Identifier(id) => {
                 self.visit_decorators(id.decorators());
                 if let Some(ann) = id.type_annotation() {
                     self.visit_type_annotation(ann);
                 }
             }
-            Expression::ObjectPattern(op) => {
+            ExpressionKind::ObjectPattern(op) => {
                 self.visit_decorators(op.decorators);
                 if let Some(ann) = &op.type_annotation {
                     self.visit_type_annotation(ann);
@@ -585,7 +585,7 @@ impl<'a> CheckWalk<'a> {
                     }
                 }
             }
-            Expression::ArrayPattern(ap) => {
+            ExpressionKind::ArrayPattern(ap) => {
                 self.visit_decorators(ap.decorators);
                 if let Some(ann) = &ap.type_annotation {
                     self.visit_type_annotation(ann);
@@ -594,18 +594,18 @@ impl<'a> CheckWalk<'a> {
                     self.visit_param(el);
                 }
             }
-            Expression::AssignmentPattern(a) => {
+            ExpressionKind::AssignmentPattern(a) => {
                 self.visit_decorators(a.decorators);
                 self.visit_param(a.left);
                 self.visit_expression(a.right);
             }
-            Expression::RestElement(r) => {
+            ExpressionKind::RestElement(r) => {
                 if let Some(ann) = &r.type_annotation {
                     self.visit_type_annotation(ann);
                 }
                 self.visit_param(r.argument);
             }
-            Expression::TSParameterProperty(pp) => self.visit_param(pp.parameter),
+            ExpressionKind::TSParameterProperty(pp) => self.visit_param(pp.parameter),
             _ => {}
         }
     }

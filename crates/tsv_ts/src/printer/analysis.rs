@@ -104,14 +104,14 @@ pub(crate) fn statement_gap_floor(body: &[internal::Statement<'_>], index: usize
 /// - `await import(stringLiteral)`
 pub(crate) fn is_module_path_fluid_call(expr: &internal::Expression<'_>, source: &str) -> bool {
     // Check for `await import(string)` — single-arg only (no options)
-    if let internal::Expression::AwaitExpression(await_expr) = expr
-        && let internal::Expression::ImportExpression(import_expr) = await_expr.argument
+    if let internal::ExpressionKind::AwaitExpression(await_expr) = &expr.kind
+        && let internal::ExpressionKind::ImportExpression(import_expr) = &await_expr.argument.kind
         && import_expr.options.is_none()
     {
         return is_string_literal(import_expr.source);
     }
 
-    let internal::Expression::CallExpression(call) = expr else {
+    let internal::ExpressionKind::CallExpression(call) = &expr.kind else {
         return false;
     };
 
@@ -121,12 +121,12 @@ pub(crate) fn is_module_path_fluid_call(expr: &internal::Expression<'_>, source:
     }
 
     // Check for `require.resolve()`
-    if let internal::Expression::MemberExpression(member) = call.callee
+    if let internal::ExpressionKind::MemberExpression(member) = &call.callee.kind
         && !member.computed
         && !member.optional
-        && let internal::Expression::Identifier(resolve_id) = member.property
+        && let internal::ExpressionKind::Identifier(resolve_id) = &member.property.kind
         && resolve_id.name(source) == "resolve"
-        && let internal::Expression::Identifier(require_id) = member.object
+        && let internal::ExpressionKind::Identifier(require_id) = &member.object.kind
         && require_id.name(source) == "require"
     {
         return true;
@@ -138,8 +138,8 @@ pub(crate) fn is_module_path_fluid_call(expr: &internal::Expression<'_>, source:
 /// Check if an expression is a string literal
 pub(crate) fn is_string_literal(expr: &internal::Expression<'_>) -> bool {
     matches!(
-        expr,
-        internal::Expression::Literal(lit) if matches!(lit.value, internal::LiteralValue::String { .. })
+        &expr.kind,
+        internal::ExpressionKind::Literal(lit) if matches!(lit.value, internal::LiteralValue::String { .. })
     )
 }
 
@@ -156,12 +156,12 @@ pub(crate) fn is_string_literal(expr: &internal::Expression<'_>) -> bool {
 ///
 /// Prettier ref: `shouldBreakAfterOperator` (`print/assignment.js`)
 pub fn conditional_should_break_after_op(expr: &internal::Expression<'_>) -> bool {
-    if let internal::Expression::ConditionalExpression(cond) = expr {
+    if let internal::ExpressionKind::ConditionalExpression(cond) = &expr.kind {
         // Check if test is binaryish (BinaryExpression includes logical operators like &&, ||),
         // but exclude logical expressions with inline-able RHS (non-empty object/array).
         // Prettier ref: `shouldBreakAfterOperator` (`print/assignment.js`)
         // `isBinaryish(test) && !shouldInlineLogicalExpression(test)`
-        if let internal::Expression::BinaryExpression(binary) = cond.test {
+        if let internal::ExpressionKind::BinaryExpression(binary) = &cond.test.kind {
             !super::expressions::assignment::should_inline_logical_expression(binary)
         } else {
             false
@@ -177,7 +177,7 @@ pub fn conditional_should_break_after_op(expr: &internal::Expression<'_>) -> boo
 /// 1. They span multiple lines in source
 /// 2. Prettier always wraps the declaration for these
 pub(crate) fn is_multiline_string_literal(expr: &internal::Expression<'_>, source: &str) -> bool {
-    if let internal::Expression::Literal(lit) = expr
+    if let internal::ExpressionKind::Literal(lit) = &expr.kind
         && let internal::LiteralValue::String { .. } = &lit.value
     {
         let raw = lit.span.extract(source);
@@ -248,11 +248,11 @@ fn pattern_nesting_depth(obj: &internal::ObjectPattern<'_>) -> usize {
     for prop in obj.properties {
         match prop {
             internal::ObjectPatternProperty::Property(p) => {
-                let nested_depth = match &p.value {
-                    internal::Expression::ObjectPattern(nested_obj) => {
+                let nested_depth = match &p.value.kind {
+                    internal::ExpressionKind::ObjectPattern(nested_obj) => {
                         1 + pattern_nesting_depth(nested_obj)
                     }
-                    internal::Expression::ArrayPattern(nested_arr) => {
+                    internal::ExpressionKind::ArrayPattern(nested_arr) => {
                         1 + array_pattern_nesting_depth(nested_arr)
                     }
                     // A property with a DEFAULT (`x: { y } = …`) does NOT count its
@@ -279,11 +279,11 @@ fn array_pattern_nesting_depth(arr: &internal::ArrayPattern<'_>) -> usize {
     let mut max_depth = 1;
 
     for elem in arr.elements.iter().flatten() {
-        let nested_depth = match elem {
-            internal::Expression::ObjectPattern(nested_obj) => {
+        let nested_depth = match &elem.kind {
+            internal::ExpressionKind::ObjectPattern(nested_obj) => {
                 1 + pattern_nesting_depth(nested_obj)
             }
-            internal::Expression::ArrayPattern(nested_arr) => {
+            internal::ExpressionKind::ArrayPattern(nested_arr) => {
                 1 + array_pattern_nesting_depth(nested_arr)
             }
             // A defaulted element (`[{ y } = …]`) doesn't count its nested pattern
@@ -309,9 +309,9 @@ pub(crate) fn template_literal_has_newlines(template: &internal::TemplateLiteral
 /// Combines the TemplateLiteral/TaggedTemplateExpression dispatch with the newline check.
 /// Used by call_formatting, new_expression, and arrow body formatting.
 pub(crate) fn is_multiline_template_expression(expr: &internal::Expression<'_>) -> bool {
-    match expr {
-        internal::Expression::TemplateLiteral(t) => template_literal_has_newlines(t),
-        internal::Expression::TaggedTemplateExpression(t) => {
+    match &expr.kind {
+        internal::ExpressionKind::TemplateLiteral(t) => template_literal_has_newlines(t),
+        internal::ExpressionKind::TaggedTemplateExpression(t) => {
             template_literal_has_newlines(&t.quasi)
         }
         _ => false,

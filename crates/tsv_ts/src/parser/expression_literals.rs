@@ -20,9 +20,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - String/number literal keys: `{ "key": value, 123: value }`
     /// - Trailing commas: `{ a: 1, }`
     /// - Empty objects: `{}`
+    ///
+    /// Returns the node beside its span rather than a bare `Expression`, so the caller
+    /// wrapping it keeps no 72 B value in its frame (§The expression ladder's return
+    /// currency).
     pub(super) fn parse_object_expression(
         &mut self,
-    ) -> Result<ObjectExpression<'arena>, ParseError> {
+    ) -> Result<(ObjectExpression<'arena>, Span), ParseError> {
         let arena = self.arena;
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BraceOpen)?; // consume '{'
@@ -38,11 +42,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let (_, end) = self.current_pos();
             self.advance()?; // consume '}'
             self.exit_grouping();
-            return Ok(ObjectExpression {
-                properties: properties.into_bump_slice(),
-                spread_trailing_comma: false,
-                span: Span::new(start as u32, end as u32),
-            });
+            return Ok((
+                ObjectExpression {
+                    properties: properties.into_bump_slice(),
+                    spread_trailing_comma: false,
+                },
+                Span::new(start as u32, end as u32),
+            ));
         }
 
         // Parse properties
@@ -139,7 +145,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let name = self.current_ident_name();
                     self.advance()?;
                     (
-                        Expression::Identifier(Identifier::simple(
+                        Expression::from_identifier(Identifier::simple(
                             name,
                             Span::new(key_start as u32, key_end as u32),
                         )),
@@ -167,7 +173,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     };
                     self.advance()?;
                     (
-                        Expression::Identifier(Identifier::simple(
+                        Expression::from_identifier(Identifier::simple(
                             name,
                             Span::new(key_start as u32, key_end as u32),
                         )),
@@ -180,7 +186,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 TokenKind::String => {
                     // String literal key: {"prop-name": value}
                     (
-                        Expression::Literal(self.parse_string_literal()?),
+                        Expression::from_literal(self.parse_string_literal()?),
                         false,
                         true,
                     )
@@ -190,7 +196,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // shares the full numeric decode (radix, separators, bigint)
                     let literal = self.parse_number_or_bigint_literal()?;
                     self.advance()?;
-                    (Expression::Literal(literal), false, true)
+                    (Expression::from_literal(literal), false, true)
                 }
                 _ => {
                     return Err(self.error_expected_found_at("property key", prop_start));
@@ -219,7 +225,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 )?;
                 (
                     accessor,
-                    &*arena.alloc(Expression::FunctionExpression(arena.alloc(func_expr))),
+                    &*arena.alloc(Expression::from_function_expression(arena.alloc(func_expr))),
                     false,
                     false,
                 )
@@ -232,7 +238,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let func_expr = self.parse_method_body(is_async_method, is_generator)?;
                 (
                     PropertyKind::Init,
-                    &*arena.alloc(Expression::FunctionExpression(arena.alloc(func_expr))),
+                    &*arena.alloc(Expression::from_function_expression(arena.alloc(func_expr))),
                     false,
                     true,
                 )
@@ -267,12 +273,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let assign_end = self.prev_token_end() as u32;
                     (
                         PropertyKind::Init,
-                        &*arena.alloc(Expression::AssignmentExpression(AssignmentExpression {
-                            left: arena.alloc(key.clone()),
-                            operator: AssignmentOperator::Assign,
-                            right: default_value,
+                        &*arena.alloc(Expression {
                             span: Span::new(key.span().start, assign_end),
-                        })),
+                            kind: ExpressionKind::AssignmentExpression(AssignmentExpression {
+                                left: arena.alloc(key.clone()),
+                                operator: AssignmentOperator::Assign,
+                                right: default_value,
+                            }),
+                        }),
                         true,
                         false,
                     )
@@ -307,11 +315,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::BraceClose)?; // consume '}'
         self.exit_grouping();
 
-        Ok(ObjectExpression {
-            properties: properties.into_bump_slice(),
-            spread_trailing_comma,
-            span: Span::new(start as u32, end as u32),
-        })
+        Ok((
+            ObjectExpression {
+                properties: properties.into_bump_slice(),
+                spread_trailing_comma,
+            },
+            Span::new(start as u32, end as u32),
+        ))
     }
 
     /// Parse array literal: `[elem, ...]`
@@ -322,7 +332,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - Elision (holes/sparse arrays): `[, a]`, `[1,,3]`, `[, , a]`
     /// - Trailing commas: `[1, 2, 3,]`
     /// - Empty arrays: `[]`
-    pub(super) fn parse_array_expression(&mut self) -> Result<ArrayExpression<'arena>, ParseError> {
+    ///
+    /// Returns the node beside its span, as `parse_object_expression` does.
+    pub(super) fn parse_array_expression(
+        &mut self,
+    ) -> Result<(ArrayExpression<'arena>, Span), ParseError> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BracketOpen)?; // consume '['
         self.enter_grouping();
@@ -337,11 +351,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let (_, end) = self.current_pos();
             self.advance()?; // consume ']'
             self.exit_grouping();
-            return Ok(ArrayExpression {
-                elements: elements.into_bump_slice(),
-                spread_trailing_comma: false,
-                span: Span::new(start as u32, end as u32),
-            });
+            return Ok((
+                ArrayExpression {
+                    elements: elements.into_bump_slice(),
+                    spread_trailing_comma: false,
+                },
+                Span::new(start as u32, end as u32),
+            ));
         }
 
         // Parse elements (including elision/holes)
@@ -373,7 +389,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // A trailing comma after a final spread (`[...a,]`) is the
                     // rest-trailing-comma case; record it for `to_assignable`
                     // (the discarded comma leaves no other trace).
-                    if matches!(elements.last(), Some(Some(Expression::SpreadElement(_)))) {
+                    if matches!(
+                        elements.last(),
+                        Some(Some(Expression {
+                            kind: ExpressionKind::SpreadElement(_),
+                            ..
+                        }))
+                    ) {
                         spread_trailing_comma = true;
                     }
                     break;
@@ -392,11 +414,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::BracketClose)?; // consume ']'
         self.exit_grouping();
 
-        Ok(ArrayExpression {
-            elements: elements.into_bump_slice(),
-            spread_trailing_comma,
-            span: Span::new(start as u32, end as u32),
-        })
+        Ok((
+            ArrayExpression {
+                elements: elements.into_bump_slice(),
+                spread_trailing_comma,
+            },
+            Span::new(start as u32, end as u32),
+        ))
     }
 
     /// Parse method body for method shorthand: `foo() { return 1; }`

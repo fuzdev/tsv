@@ -41,7 +41,7 @@ use tsv_lang::{
     has_comments_on_page_from, has_comments_to_emit_from, is_format_ignore_directive,
     is_format_ignore_range_end, is_format_ignore_range_start, is_honored_format_ignore,
 };
-use tsv_ts::Expression;
+use tsv_ts::{Expression, ExpressionKind};
 
 /// A buffered run of comments from one gap — collected rather than iterated because the
 /// callers ask two questions of it (how does each one lay out? and how did the run end?).
@@ -754,7 +754,7 @@ impl<'a> Printer<'a> {
         expr: &Expression<'_>,
         value_doc: DocId,
     ) -> DocId {
-        if matches!(expr, Expression::AssignmentExpression(_)) {
+        if matches!(expr.kind, ExpressionKind::AssignmentExpression(_)) {
             self.d().parens(value_doc)
         } else {
             value_doc

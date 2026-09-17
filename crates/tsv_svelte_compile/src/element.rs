@@ -28,7 +28,7 @@ use tsv_svelte::ast::internal::{
     SpecialThis, StyleDirective,
 };
 use tsv_ts::ast::internal::{
-    Expression, ObjectExpression, ObjectProperty, SpreadElement, Statement,
+    Expression, ExpressionKind, ObjectExpression, ObjectProperty, SpreadElement, Statement,
 };
 
 use crate::attribute::{build_spread_object_property, emit_attribute, is_load_error_element};
@@ -574,11 +574,13 @@ fn build_element_spread_object<'arena>(
         }
     }
     let cbrace = env.b.mint("}").end;
-    Ok(Expression::ObjectExpression(ObjectExpression {
-        properties: properties.into_bump_slice(),
-        spread_trailing_comma: false,
+    Ok(Expression {
         span: Span::new(obrace, cbrace),
-    }))
+        kind: ExpressionKind::ObjectExpression(ObjectExpression {
+            properties: properties.into_bump_slice(),
+            spread_trailing_comma: false,
+        }),
+    })
 }
 
 /// Assemble a `$.attributes(…)` argument list applying the oracle's `b.call`
@@ -849,7 +851,7 @@ pub(crate) fn emit_svelte_element<'arena>(
     // elision: a present childrenFn forces an absent attrsFn to `void 0`; a trailing
     // absent argument drops.
     let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
-    args.push(Expression::Identifier(env.b.ident("$$renderer")));
+    args.push(Expression::from_identifier(env.b.ident("$$renderer")));
     args.push(tag_expr);
     match (attrs_fn, children_fn) {
         (attrs, Some(children)) => {

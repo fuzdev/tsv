@@ -10,8 +10,9 @@ use super::super::symbols::{SymbolFlags, SymbolId};
 use super::{ContainerKind, DeclInput, DeclMods, Scope, SymbolBinder};
 use crate::ids::NodeId;
 use tsv_ts::ast::internal::{
-    ClassBody, ClassMember, Expression, MethodKind, Statement, TSEnumMemberId, TSInterfaceBody,
-    TSType, TSTypeAnnotation, TSTypeElement, TSTypeLiteral, TSTypeParameterDeclaration,
+    ClassBody, ClassMember, Expression, ExpressionKind, MethodKind, Statement, TSEnumMemberId,
+    TSInterfaceBody, TSType, TSTypeAnnotation, TSTypeElement, TSTypeLiteral,
+    TSTypeParameterDeclaration,
 };
 
 impl<'a> SymbolBinder<'a> {
@@ -166,18 +167,18 @@ impl<'a> SymbolBinder<'a> {
 
     fn bind_constructor_params(&mut self, params: &[Expression<'a>], class_symbol: SymbolId) {
         for param in params {
-            match param {
-                Expression::TSParameterProperty(pp) => {
+            match &param.kind {
+                ExpressionKind::TSParameterProperty(pp) => {
                     // Bind as a parameter (in the constructor scope)...
                     self.bind_param(pp.parameter);
                     // ...and as a class instance member (tsgo bindParameter).
-                    if let Expression::Identifier(id) = ident_of_param(pp.parameter) {
+                    if let ExpressionKind::Identifier(id) = &ident_of_param(pp.parameter).kind {
                         let opt = if id.optional {
                             SymbolFlags::OPTIONAL
                         } else {
                             SymbolFlags::NONE
                         };
-                        let d = self.decl_from_ident(id, pp.span, DeclMods::default());
+                        let d = self.decl_from_ident(id, param.span, DeclMods::default());
                         let table = self.members_of(class_symbol);
                         self.declare_symbol(
                             table,
@@ -457,7 +458,10 @@ impl<'a> SymbolBinder<'a> {
 /// The binding identifier of a parameter, unwrapping a default (`AssignmentPattern`).
 fn ident_of_param<'b, 'a>(param: &'b Expression<'a>) -> &'b Expression<'a> {
     match param {
-        Expression::AssignmentPattern(a) => a.left,
+        Expression {
+            kind: ExpressionKind::AssignmentPattern(a),
+            ..
+        } => a.left,
         other => other,
     }
 }

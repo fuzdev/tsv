@@ -2,7 +2,9 @@
 // the builders for parenthesized, single-param, generic, and async arrows. The
 // Pratt kernel in `expression.rs` calls into these; they never call back into it.
 
-use crate::ast::internal::{ArrowFunctionBody, ArrowFunctionExpression, Expression, Identifier};
+use crate::ast::internal::{
+    ArrowFunctionBody, ArrowFunctionExpression, Expression, ExpressionKind, Identifier,
+};
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
 
@@ -202,16 +204,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(alloc_expr(
             self.arena,
-            Expression::ArrowFunctionExpression(self.arena.alloc(ArrowFunctionExpression {
-                type_parameters: Some(type_parameters),
-                params,
-                body,
-                return_type,
-                r#async: false,
-                params_start: Some(params_start as u32),
-                arrow_token,
+            Expression {
                 span: Span::new(start as u32, end),
-            })),
+                kind: ExpressionKind::ArrowFunctionExpression(self.arena.alloc(
+                    ArrowFunctionExpression {
+                        type_parameters: Some(type_parameters),
+                        params,
+                        body,
+                        return_type,
+                        r#async: false,
+                        params_start: Some(params_start as u32),
+                        arrow_token,
+                    },
+                )),
+            },
         ))
     }
 
@@ -272,16 +278,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(alloc_expr(
             self.arena,
-            Expression::ArrowFunctionExpression(self.arena.alloc(ArrowFunctionExpression {
-                type_parameters: None, // Generic arrows like <T>() => {} are handled by parse_generic_arrow_function()
-                params,
-                body,
-                return_type,
-                r#async: false, // Non-async arrow function; async ones are parsed via parse_async_arrow_function
-                params_start: Some(params_start as u32),
-                arrow_token,
+            Expression {
                 span: Span::new(start as u32, end),
-            })),
+                kind: ExpressionKind::ArrowFunctionExpression(self.arena.alloc(
+                    ArrowFunctionExpression {
+                        type_parameters: None, // Generic arrows like <T>() => {} are handled by parse_generic_arrow_function()
+                        params,
+                        body,
+                        return_type,
+                        r#async: false, // Non-async arrow function; async ones are parsed via parse_async_arrow_function
+                        params_start: Some(params_start as u32),
+                        arrow_token,
+                    },
+                )),
+            },
         ))
     }
 
@@ -301,7 +311,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?;
 
         let mut params = self.bvec();
-        params.push(Expression::Identifier(Identifier::simple(
+        params.push(Expression::from_identifier(Identifier::simple(
             name,
             Span::new(id_start as u32, id_end as u32),
         )));
@@ -319,16 +329,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(alloc_expr(
             self.arena,
-            Expression::ArrowFunctionExpression(self.arena.alloc(ArrowFunctionExpression {
-                type_parameters: None,
-                params,
-                body,
-                return_type: None, // Single-param without parens can't have return type
-                r#async: false,
-                params_start: None, // No parens for single-param arrows
-                arrow_token,
+            Expression {
                 span: Span::new(start as u32, end),
-            })),
+                kind: ExpressionKind::ArrowFunctionExpression(self.arena.alloc(
+                    ArrowFunctionExpression {
+                        type_parameters: None,
+                        params,
+                        body,
+                        return_type: None, // Single-param without parens can't have return type
+                        r#async: false,
+                        params_start: None, // No parens for single-param arrows
+                        arrow_token,
+                    },
+                )),
+            },
         ))
     }
 
@@ -360,7 +374,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let name = self.current_ident_name();
             self.advance()?;
             let mut params = self.bvec();
-            params.push(Expression::Identifier(Identifier::simple(
+            params.push(Expression::from_identifier(Identifier::simple(
                 name,
                 Span::new(id_start as u32, id_end as u32),
             )));
@@ -384,16 +398,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(alloc_expr(
             self.arena,
-            Expression::ArrowFunctionExpression(self.arena.alloc(ArrowFunctionExpression {
-                type_parameters,
-                params,
-                body,
-                return_type,
-                r#async: true,
-                params_start,
-                arrow_token,
+            Expression {
                 span: Span::new(start as u32, end),
-            })),
+                kind: ExpressionKind::ArrowFunctionExpression(self.arena.alloc(
+                    ArrowFunctionExpression {
+                        type_parameters,
+                        params,
+                        body,
+                        return_type,
+                        r#async: true,
+                        params_start,
+                        arrow_token,
+                    },
+                )),
+            },
         ))
     }
 }

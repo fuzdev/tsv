@@ -9,7 +9,7 @@
 use crate::ast::internal::{FragmentNode, trim_end_collapsible_ws, trim_start_collapsible_ws};
 use crate::printer::Printer;
 use tsv_lang::doc::arena::DocId;
-use tsv_ts::ast::internal::Expression;
+use tsv_ts::ast::internal::{Expression, ExpressionKind};
 
 use super::element_doc::{
     BoundaryMode, ElementContext, ElementKind, ElementLayout, ElementParts, MultilineCause,
@@ -91,61 +91,65 @@ impl<'a> Printer<'a> {
     /// `>`-dangle hug, while break-capable content uses normal flow so the
     /// expression breaks internally first.
     pub(super) fn expression_has_break_points(expr: &Expression<'_>) -> bool {
-        match expr {
+        match &expr.kind {
             // Ternary always has break points
-            Expression::ConditionalExpression(_) => true,
+            ExpressionKind::ConditionalExpression(_) => true,
             // Binary expressions (includes &&, ||, +, -, etc.) have break points
-            Expression::BinaryExpression(_) => true,
+            ExpressionKind::BinaryExpression(_) => true,
             // Sequence expressions (comma-separated) have break points
-            Expression::SequenceExpression(_) => true,
+            ExpressionKind::SequenceExpression(_) => true,
             // Call expressions with multiple arguments can break
-            Expression::CallExpression(call) => call.arguments.len() > 1,
+            ExpressionKind::CallExpression(call) => call.arguments.len() > 1,
             // New expressions with multiple arguments can break
-            Expression::NewExpression(new) => new.arguments.len() > 1,
+            ExpressionKind::NewExpression(new) => new.arguments.len() > 1,
             // Template literals with expressions can break
-            Expression::TemplateLiteral(tpl) => !tpl.expressions.is_empty(),
+            ExpressionKind::TemplateLiteral(tpl) => !tpl.expressions.is_empty(),
             // Array/object literals with multiple elements can break
-            Expression::ArrayExpression(arr) => arr.elements.len() > 1,
-            Expression::ObjectExpression(obj) => obj.properties.len() > 1,
+            ExpressionKind::ArrayExpression(arr) => arr.elements.len() > 1,
+            ExpressionKind::ObjectExpression(obj) => obj.properties.len() > 1,
             // Assignment expressions have break points
-            Expression::AssignmentExpression(_) => true,
+            ExpressionKind::AssignmentExpression(_) => true,
             // Wrapping expressions: check inner
-            Expression::JsdocCast(cast) => Self::expression_has_break_points(cast.inner),
-            Expression::ParenthesizedExpression(paren) => {
+            ExpressionKind::JsdocCast(cast) => Self::expression_has_break_points(cast.inner),
+            ExpressionKind::ParenthesizedExpression(paren) => {
                 Self::expression_has_break_points(paren.expression)
             }
-            Expression::TSAsExpression(e) => Self::expression_has_break_points(e.expression),
-            Expression::TSSatisfiesExpression(e) => Self::expression_has_break_points(e.expression),
-            Expression::TSNonNullExpression(e) => Self::expression_has_break_points(e.expression),
-            Expression::TSTypeAssertion(e) => Self::expression_has_break_points(e.expression),
-            Expression::AwaitExpression(e) => Self::expression_has_break_points(e.argument),
-            Expression::YieldExpression(e) => e
+            ExpressionKind::TSAsExpression(e) => Self::expression_has_break_points(e.expression),
+            ExpressionKind::TSSatisfiesExpression(e) => {
+                Self::expression_has_break_points(e.expression)
+            }
+            ExpressionKind::TSNonNullExpression(e) => {
+                Self::expression_has_break_points(e.expression)
+            }
+            ExpressionKind::TSTypeAssertion(e) => Self::expression_has_break_points(e.expression),
+            ExpressionKind::AwaitExpression(e) => Self::expression_has_break_points(e.argument),
+            ExpressionKind::YieldExpression(e) => e
                 .argument
                 .as_ref()
                 .is_some_and(|a| Self::expression_has_break_points(a)),
             // Simple expressions without break points
-            Expression::Literal(_)
-            | Expression::Identifier(_)
-            | Expression::MemberExpression(_)
-            | Expression::PrivateIdentifier(_)
-            | Expression::UnaryExpression(_)
-            | Expression::UpdateExpression(_)
-            | Expression::ArrowFunctionExpression(_)
-            | Expression::FunctionExpression(_)
-            | Expression::ClassExpression(_)
-            | Expression::SpreadElement(_)
-            | Expression::TaggedTemplateExpression(_)
-            | Expression::RegexLiteral(_)
-            | Expression::ThisExpression(_)
-            | Expression::Super(_)
-            | Expression::ObjectPattern(_)
-            | Expression::ArrayPattern(_)
-            | Expression::AssignmentPattern(_)
-            | Expression::RestElement(_)
-            | Expression::TSInstantiationExpression(_)
-            | Expression::TSParameterProperty(_)
-            | Expression::ImportExpression(_)
-            | Expression::MetaProperty(_) => false,
+            ExpressionKind::Literal(_)
+            | ExpressionKind::Identifier(_)
+            | ExpressionKind::MemberExpression(_)
+            | ExpressionKind::PrivateIdentifier(_)
+            | ExpressionKind::UnaryExpression(_)
+            | ExpressionKind::UpdateExpression(_)
+            | ExpressionKind::ArrowFunctionExpression(_)
+            | ExpressionKind::FunctionExpression(_)
+            | ExpressionKind::ClassExpression(_)
+            | ExpressionKind::SpreadElement(_)
+            | ExpressionKind::TaggedTemplateExpression(_)
+            | ExpressionKind::RegexLiteral(_)
+            | ExpressionKind::ThisExpression(_)
+            | ExpressionKind::Super(_)
+            | ExpressionKind::ObjectPattern(_)
+            | ExpressionKind::ArrayPattern(_)
+            | ExpressionKind::AssignmentPattern(_)
+            | ExpressionKind::RestElement(_)
+            | ExpressionKind::TSInstantiationExpression(_)
+            | ExpressionKind::TSParameterProperty(_)
+            | ExpressionKind::ImportExpression(_)
+            | ExpressionKind::MetaProperty(_) => false,
         }
     }
 

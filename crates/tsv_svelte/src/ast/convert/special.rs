@@ -111,7 +111,8 @@ pub(super) fn bool_option(
                 None => Some(true),
                 Some(values) => values.iter().find_map(|v| {
                     if let internal::AttributeValue::ExpressionTag(expr) = v
-                        && let tsv_ts::ast::internal::Expression::Literal(lit) = expr.expression
+                        && let tsv_ts::ast::internal::ExpressionKind::Literal(lit) =
+                            &expr.expression.kind
                         && let tsv_ts::ast::internal::LiteralValue::Boolean(b) = lit.value
                     {
                         Some(b)

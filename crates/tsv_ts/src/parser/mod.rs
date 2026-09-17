@@ -827,10 +827,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Whether a private identifier's name (the part after `#`) equals `expected`.
     /// The name begins one byte past the node span's start — the `#` — so it passes
     /// `span.start + 1`. Used to reject the reserved `#constructor` class-element name.
-    pub(super) fn private_name_is(&self, pid: &PrivateIdentifier<'_>, expected: &str) -> bool {
+    pub(super) fn private_name_is(
+        &self,
+        pid: &PrivateIdentifier<'_>,
+        span: Span,
+        expected: &str,
+    ) -> bool {
         self.name_bytes_are(
             pid.name.escaped,
-            pid.span.start as usize + 1,
+            span.start as usize + 1,
             pid.name.raw_len as usize,
             expected,
         )
@@ -2044,10 +2049,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///   not a private name (acorn rejects them in the lexer). Without the check
     ///   tsv accepted them and reprinted `#a` — rewriting invalid code as valid.
     ///
-    /// Returns the PrivateIdentifier with span including the `#`.
+    /// Returns the PrivateIdentifier beside its span, which includes the `#`.
     pub(super) fn parse_private_identifier(
         &mut self,
-    ) -> Result<PrivateIdentifier<'arena>, ParseError> {
+    ) -> Result<(PrivateIdentifier<'arena>, Span), ParseError> {
         debug_assert!(matches!(self.current_kind(), TokenKind::Hash));
         let (start, hash_end) = self.current_pos();
         self.advance()?; // consume '#'
@@ -2063,10 +2068,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
         self.advance()?;
 
-        Ok(PrivateIdentifier {
-            name,
-            span: Span::new(start as u32, end as u32),
-        })
+        Ok((
+            PrivateIdentifier { name },
+            Span::new(start as u32, end as u32),
+        ))
     }
 
     pub(super) fn expect(&mut self, kind: &TokenKind) -> Result<(), ParseError> {

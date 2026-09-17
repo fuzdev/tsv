@@ -141,7 +141,7 @@ fn write_identifier_expression_with_character_in(
     expr: &internal::Expression<'_>,
     ctx: &Ctx<'_>,
 ) {
-    if let internal::Expression::Identifier(id) = expr {
+    if let internal::ExpressionKind::Identifier(id) = &expr.kind {
         write_identifier_parts_with_character(
             w,
             id.span,
@@ -187,8 +187,8 @@ pub fn write_pattern_embedded(
     if let Some(ann) = crate::pattern_type_annotation(expr) {
         ctx.pattern_ann_span = ann.span;
     }
-    match expr {
-        internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_) => {
+    match &expr.kind {
+        internal::ExpressionKind::ObjectPattern(_) | internal::ExpressionKind::ArrayPattern(_) => {
             // Destructure: `+1`-column adjustment on the start line (when `> 1`).
             // Only affects column output, so skip the line lookup entirely on the
             // no-locations path (where it would only hit the stub `[0]` table).
@@ -205,7 +205,7 @@ pub fn write_pattern_embedded(
             }
             expressions::write_expression(w, expr, &ctx);
         }
-        internal::Expression::Identifier(id) => {
+        internal::ExpressionKind::Identifier(id) => {
             // Simple identifier: inject `character` on its own `loc`.
             write_identifier_parts_with_character(
                 w,

@@ -247,6 +247,7 @@ pub(crate) fn board() -> Vec<TypeRow> {
             ts::CallExpression<'static>,
             ts::ConditionalExpression<'static>,
             ts::Expression<'static>,
+            ts::ExpressionKind<'static>,
             ts::FunctionExpression<'static>,
             ts::ImportExpression<'static>,
             ts::JsdocCast<'static>,

@@ -20,8 +20,8 @@
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
 use tsv_ts::ast::internal::{
-    ClassBody, ClassDeclaration, ClassMember, Expression, PropertyDefinition, Statement,
-    VariableDeclaration, VariableDeclarator,
+    ClassBody, ClassDeclaration, ClassMember, Expression, ExpressionKind, PropertyDefinition,
+    Statement, VariableDeclaration, VariableDeclarator,
 };
 
 use crate::analyze::{NameSet, RuneInit, classify_rune_init, is_effect_call, is_inspect_call};
@@ -75,13 +75,13 @@ fn script_walk_ctx<'a>(
 pub(crate) fn unthunk_callee<'arena>(
     expr: &Expression<'arena>,
 ) -> Option<&'arena Expression<'arena>> {
-    let Expression::CallExpression(call) = expr else {
+    let ExpressionKind::CallExpression(call) = &expr.kind else {
         return None;
     };
     if !call.arguments.is_empty() || call.optional {
         return None;
     }
-    matches!(call.callee, Expression::Identifier(_)).then_some(call.callee)
+    matches!(call.callee.kind, ExpressionKind::Identifier(_)).then_some(call.callee)
 }
 
 /// Refuse a `$derived(…)` whose WHOLE argument is a bare `$derived` read
@@ -97,7 +97,7 @@ fn refuse_bare_derived_arg(
     source: &str,
     derived_names: &NameSet,
 ) -> Result<(), CompileError> {
-    if let Expression::Identifier(id) = expr
+    if let ExpressionKind::Identifier(id) = &expr.kind
         && is_bare_derived_read(source, derived_names, expr)
         && let Some(name) = plain_identifier_name(id, source)
     {
@@ -426,7 +426,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
                 // `$props()` call's host span, so the declarator's `=`-gap
                 // comment windows stay exactly the authored ones.
                 let props_ident = b.ident_at("$$props", init_span);
-                Some(&*b.arena.alloc(Expression::Identifier(props_ident)))
+                Some(&*b.arena.alloc(Expression::from_identifier(props_ident)))
             }
             // Handled above by `continue` — the declarator is skipped, never
             // rebuilt, so this arm is unreachable. Kept for match exhaustiveness.
@@ -692,7 +692,7 @@ fn is_lone_reactive_binding(
     derived_names: &NameSet,
     store_names: &NameSet,
 ) -> bool {
-    let Expression::Identifier(id) = arg else {
+    let ExpressionKind::Identifier(id) = &arg.kind else {
         return false;
     };
     if id.escaped_name.is_some() {

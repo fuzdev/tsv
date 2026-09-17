@@ -8,6 +8,7 @@ use super::arg_comments::has_inter_argument_comments_slice;
 use super::call_paren_open;
 use crate::ast::internal::{self, IdentName};
 use smallvec::SmallVec;
+use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
 
 /// Test function patterns that Prettier keeps on a single line
@@ -46,7 +47,7 @@ pub(super) const TEST_CALL_PATTERNS: &[&str] = &[
 
 /// Get the name channel (+ span start) of an identifier if it's a simple identifier
 fn get_identifier_name<'a>(expr: &internal::Expression<'a>) -> Option<(IdentName<'a>, u32, u32)> {
-    if let internal::Expression::Identifier(id) = expr {
+    if let internal::ExpressionKind::Identifier(id) = &expr.kind {
         Some((id.ident_name(), id.span.start, id.span.end))
     } else {
         None
@@ -110,12 +111,12 @@ fn get_member_chain_parts<'a>(
 ) -> Option<SmallVec<[(IdentName<'a>, u32, u32); 8]>> {
     let mut parts: SmallVec<[(IdentName<'a>, u32, u32); 8]> = SmallVec::new();
 
-    match expr {
-        internal::Expression::Identifier(id) => {
+    match &expr.kind {
+        internal::ExpressionKind::Identifier(id) => {
             parts.push((id.ident_name(), id.span.start, id.span.end));
             Some(parts)
         }
-        internal::Expression::MemberExpression(member) => {
+        internal::ExpressionKind::MemberExpression(member) => {
             // Don't match computed or optional chains (a[b] or a?.b)
             if member.computed || member.optional {
                 return None;
@@ -158,12 +159,13 @@ fn get_member_chain_parts<'a>(
 /// relocation.
 pub(super) fn test_call_flat_layout_applies(
     call: &internal::CallExpression<'_>,
+    span: Span,
     printer: &Printer<'_>,
 ) -> bool {
     if !is_test_call(call, printer) {
         return false;
     }
-    let paren_open = call_paren_open(printer, call);
+    let paren_open = call_paren_open(printer, call, span);
     // Zero-comment fast gate: ONE binary search over `[paren_open, last argument's start)`,
     // which strictly contains every gap the check below looks at — the `(`→first-argument
     // gap and each inter-argument gap all end at or before the last argument. So with no
@@ -211,11 +213,11 @@ pub(super) fn is_test_call(call: &internal::CallExpression<'_>, printer: &Printe
     }
 
     // First argument must be a string or template literal
-    let first_is_string = match &call.arguments[0] {
-        internal::Expression::Literal(lit) => {
+    let first_is_string = match &call.arguments[0].kind {
+        internal::ExpressionKind::Literal(lit) => {
             matches!(lit.value, internal::LiteralValue::String { .. })
         }
-        internal::Expression::TemplateLiteral(_) => true,
+        internal::ExpressionKind::TemplateLiteral(_) => true,
         _ => false,
     };
     if !first_is_string {
@@ -224,8 +226,8 @@ pub(super) fn is_test_call(call: &internal::CallExpression<'_>, printer: &Printe
 
     // Third argument (if present) must be a number (timeout)
     if arg_count == 3 {
-        let third_is_number = match &call.arguments[2] {
-            internal::Expression::Literal(lit) => {
+        let third_is_number = match &call.arguments[2].kind {
+            internal::ExpressionKind::Literal(lit) => {
                 matches!(lit.value, internal::LiteralValue::Number(_))
             }
             _ => false,
@@ -247,9 +249,11 @@ pub(super) fn is_test_call(call: &internal::CallExpression<'_>, printer: &Printe
     // runs past print width in a position where prettier breaks every argument out and holds
     // 100 — tsv over-width exactly where prettier is not. Pinned by
     // `tests/fixtures/typescript/expressions/calls/test_functions_timeout`.
-    let callback_ok = match &call.arguments[1] {
-        internal::Expression::FunctionExpression(func) => arg_count == 2 || func.params.len() <= 1,
-        internal::Expression::ArrowFunctionExpression(arrow) => {
+    let callback_ok = match &call.arguments[1].kind {
+        internal::ExpressionKind::FunctionExpression(func) => {
+            arg_count == 2 || func.params.len() <= 1
+        }
+        internal::ExpressionKind::ArrowFunctionExpression(arrow) => {
             arg_count == 2 || (!arrow.body.is_expression() && arrow.params.len() <= 1)
         }
         _ => false,

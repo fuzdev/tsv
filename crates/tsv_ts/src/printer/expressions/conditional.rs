@@ -16,8 +16,8 @@ use tsv_lang::{INDENT, Span};
 /// Prettier wraps `??` in parens when inside a ternary for clarity.
 fn is_nullish_coalescing(expr: &internal::Expression<'_>) -> bool {
     matches!(
-        expr,
-        internal::Expression::BinaryExpression(bin)
+        &expr.kind,
+        internal::ExpressionKind::BinaryExpression(bin)
             if bin.operator == internal::BinaryOperator::QuestionQuestion
     )
 }
@@ -29,10 +29,10 @@ fn is_nullish_coalescing(expr: &internal::Expression<'_>) -> bool {
 /// line-comment layouts so both branch paths agree.
 fn ternary_branch_needs_parens(expr: &internal::Expression<'_>) -> bool {
     matches!(
-        expr,
-        internal::Expression::TSAsExpression(_)
-            | internal::Expression::TSSatisfiesExpression(_)
-            | internal::Expression::AssignmentExpression(_)
+        expr.kind,
+        internal::ExpressionKind::TSAsExpression(_)
+            | internal::ExpressionKind::TSSatisfiesExpression(_)
+            | internal::ExpressionKind::AssignmentExpression(_)
     ) || is_nullish_coalescing(expr)
 }
 
@@ -49,14 +49,14 @@ fn ternary_branch_needs_parens(expr: &internal::Expression<'_>) -> bool {
 pub(in crate::printer) fn ternary_test_needs_parens(expr: &internal::Expression<'_>) -> bool {
     is_nullish_coalescing(expr)
         || matches!(
-            expr,
-            internal::Expression::AssignmentExpression(_)
-                | internal::Expression::AwaitExpression(_)
-                | internal::Expression::ArrowFunctionExpression(_)
-                | internal::Expression::ConditionalExpression(_)
-                | internal::Expression::YieldExpression(_)
-                | internal::Expression::TSAsExpression(_)
-                | internal::Expression::TSSatisfiesExpression(_)
+            expr.kind,
+            internal::ExpressionKind::AssignmentExpression(_)
+                | internal::ExpressionKind::AwaitExpression(_)
+                | internal::ExpressionKind::ArrowFunctionExpression(_)
+                | internal::ExpressionKind::ConditionalExpression(_)
+                | internal::ExpressionKind::YieldExpression(_)
+                | internal::ExpressionKind::TSAsExpression(_)
+                | internal::ExpressionKind::TSSatisfiesExpression(_)
         )
 }
 
@@ -66,7 +66,7 @@ pub(in crate::printer) fn ternary_test_needs_parens(expr: &internal::Expression<
 /// it should be treated as "multiline" for formatting purposes. This is used
 /// to force ternaries to break when their consequent or alternate is multiline.
 fn is_multiline_template_literal(expr: &internal::Expression<'_>) -> bool {
-    matches!(expr, internal::Expression::TemplateLiteral(t) if template_literal_has_newlines(t))
+    matches!(&expr.kind, internal::ExpressionKind::TemplateLiteral(t) if template_literal_has_newlines(t))
 }
 
 /// Prettier's `shouldExtraIndentForConditionalExpression` (`print/ternary.js`), asked
@@ -101,17 +101,17 @@ fn spine_ternary(expr: &internal::Expression<'_>) -> Option<(Span, bool)> {
     let mut child = expr;
     let mut stepped = false;
     loop {
-        let next = match child {
-            internal::Expression::ConditionalExpression(cond) => {
-                return Some((cond.span, stepped));
+        let next = match &child.kind {
+            internal::ExpressionKind::ConditionalExpression(_) => {
+                return Some((child.span, stepped));
             }
-            internal::Expression::MemberExpression(m) => m.object,
-            internal::Expression::CallExpression(c) => c.callee,
-            internal::Expression::NewExpression(n) => n.callee,
-            internal::Expression::TSNonNullExpression(n) => n.expression,
-            internal::Expression::TSAsExpression(a) => a.expression,
-            internal::Expression::TSSatisfiesExpression(s) => s.expression,
-            internal::Expression::TSInstantiationExpression(i) => i.expression,
+            internal::ExpressionKind::MemberExpression(m) => m.object,
+            internal::ExpressionKind::CallExpression(c) => c.callee,
+            internal::ExpressionKind::NewExpression(n) => n.callee,
+            internal::ExpressionKind::TSNonNullExpression(n) => n.expression,
+            internal::ExpressionKind::TSAsExpression(a) => a.expression,
+            internal::ExpressionKind::TSSatisfiesExpression(s) => s.expression,
+            internal::ExpressionKind::TSInstantiationExpression(i) => i.expression,
             _ => return None,
         };
         stepped = true;
@@ -183,8 +183,10 @@ impl<'a> Printer<'a> {
         &self,
         expr: &internal::Expression<'_>,
     ) -> bool {
-        matches!(expr, internal::Expression::ConditionalExpression(cond)
-            if self.ternary_hang_target.get() == Some(cond.span))
+        matches!(
+            expr.kind,
+            internal::ExpressionKind::ConditionalExpression(_)
+        ) && self.ternary_hang_target.get() == Some(expr.span)
     }
 
     /// The chain-base form of [`Self::ternary_takes_extra_indent`]: does this base's
@@ -290,9 +292,9 @@ impl<'a> Printer<'a> {
     /// `left_spine_paren_prettier_ignore_interior`). The whole-branch freeze above does NOT
     /// fire for it — the directive's scope is the test — which is why this is a separate term.
     fn chained_test_shell_holds_directive(&self, branch: &internal::Expression<'_>) -> bool {
-        match branch {
-            internal::Expression::ConditionalExpression(nested) => self
-                .left_spine_operand_frozen_span(nested.span.start, nested.test)
+        match &branch.kind {
+            internal::ExpressionKind::ConditionalExpression(nested) => self
+                .left_spine_operand_frozen_span(branch.span.start, nested.test)
                 .is_some(),
             _ => false,
         }
@@ -363,7 +365,10 @@ impl<'a> Printer<'a> {
         if !ternary_test_needs_parens(expr) {
             return doc;
         }
-        if matches!(expr, internal::Expression::ConditionalExpression(_)) {
+        if matches!(
+            expr.kind,
+            internal::ExpressionKind::ConditionalExpression(_)
+        ) {
             return self.build_expanding_parens_doc(doc);
         }
         self.d().parens(doc)
@@ -383,10 +388,11 @@ impl<'a> Printer<'a> {
     fn build_ternary_test_doc(
         &self,
         cond: &internal::ConditionalExpression<'_>,
+        span: Span,
         ordinary: impl FnOnce() -> DocId,
     ) -> DocId {
         let test = self.build_left_spine_operand_doc(
-            cond.span.start,
+            span.start,
             cond.test,
             FrozenOperandPair::Emitted,
             ordinary,
@@ -464,8 +470,8 @@ impl<'a> Printer<'a> {
     /// gate, the run itself — reads this one bound, so none of them can see the shell's
     /// comments differently from the emitter that prints them.
     fn branch_gap_end(&self, branch: &internal::Expression<'_>) -> u32 {
-        match branch {
-            internal::Expression::ConditionalExpression(nested) => nested.test.span().start,
+        match &branch.kind {
+            internal::ExpressionKind::ConditionalExpression(nested) => nested.test.span().start,
             _ => branch.span().start,
         }
     }
@@ -500,8 +506,9 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_conditional_doc(
         &self,
         cond: &internal::ConditionalExpression<'_>,
+        span: Span,
     ) -> DocId {
-        self.build_conditional_doc_impl(cond, TernaryNesting::Root, false)
+        self.build_conditional_doc_impl(cond, span, TernaryNesting::Root, false)
     }
 
     /// Build a Doc for a conditional expression in return/throw/call/new context.
@@ -513,8 +520,9 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_conditional_doc_with_binary_test_indent(
         &self,
         cond: &internal::ConditionalExpression<'_>,
+        span: Span,
     ) -> DocId {
-        self.build_conditional_doc_impl(cond, TernaryNesting::Root, true)
+        self.build_conditional_doc_impl(cond, span, TernaryNesting::Root, true)
     }
 
     /// Implementation of conditional doc building
@@ -532,6 +540,7 @@ impl<'a> Printer<'a> {
     fn build_conditional_doc_impl(
         &self,
         cond: &internal::ConditionalExpression<'_>,
+        cond_span: Span,
         nesting: TernaryNesting,
         indent_binary_test: bool,
     ) -> DocId {
@@ -587,7 +596,7 @@ impl<'a> Printer<'a> {
         // drifting.) A CHAINED conditional's shell is its parent's branch gap
         // ([`Self::branch_gap_end`]): the parent's run prints it, and the nested emits none.
         let root_run = (!is_chained)
-            .then(|| self.removed_paren_comments_opt(cond.span.start, cond.test.span().start))
+            .then(|| self.removed_paren_comments_opt(cond_span.start, cond.test.span().start))
             .flatten();
 
         // If there are line comments, a blank-separated branch comment, or multiline
@@ -598,7 +607,7 @@ impl<'a> Printer<'a> {
             || has_blank_separated_comment
             || has_multiline_template
         {
-            let doc = self.build_conditional_doc_with_line_comments(cond, nesting);
+            let doc = self.build_conditional_doc_with_line_comments(cond, cond_span, nesting);
             return self.prepend_opt(root_run, doc);
         }
 
@@ -614,7 +623,7 @@ impl<'a> Printer<'a> {
         // The test's pairs and freeze are [`Self::build_ternary_test_doc`]'s; the test's
         // stripped shell run is `root_run` above.
         let test = self.place_nested_ternary_test(nesting, cond.test, || {
-            self.build_ternary_test_doc(cond, || {
+            self.build_ternary_test_doc(cond, cond_span, || {
                 if indent_binary_test {
                     // The term does not fire, so the ordinary dispatch's
                     // continuation-indent default is already the answer.
@@ -695,8 +704,8 @@ impl<'a> Printer<'a> {
         // Prettier wraps each branch in indent() so that multiline content
         // (like arrow block bodies) gets proper nesting. Exception: nested
         // conditionals handle their own indentation, so no extra wrapper.
-        let consequent_doc = if let internal::Expression::ConditionalExpression(nested) =
-            cond.consequent
+        let consequent_doc = if let internal::ExpressionKind::ConditionalExpression(nested) =
+            &cond.consequent.kind
         {
             let run = question_pos
                 .and_then(|q| self.build_branch_comment_run(q + 1, consequent_start, d.line()))
@@ -704,8 +713,12 @@ impl<'a> Printer<'a> {
             // Broken version: continue chain without parens. The nested ternary's own
             // binaries have THIS ternary for a grandparent, so `indent_binary_test` stops
             // here.
-            let broken_consequent =
-                self.build_conditional_doc_impl(nested, TernaryNesting::Consequent, false);
+            let broken_consequent = self.build_conditional_doc_impl(
+                nested,
+                cond.consequent.span,
+                TernaryNesting::Consequent,
+                false,
+            );
             let broken_consequent = self.prepend_opt(run, broken_consequent);
             // The RUN's break counts too: a multi-line block comment in the gap is a hard
             // break prettier's `propagateBreaks` carries to the enclosing group, but tsv's
@@ -738,8 +751,8 @@ impl<'a> Printer<'a> {
         //   (right-associative, so naturally parsed as `a ? b : (c ? d : e)`)
         // - `as`/`satisfies` need parens to avoid `:` ambiguity: `a ? b : (c as T)`
         // - `??` needs parens for clarity: `a ? b : (c ?? d)`
-        let alternate_doc = if let internal::Expression::ConditionalExpression(nested) =
-            cond.alternate
+        let alternate_doc = if let internal::ExpressionKind::ConditionalExpression(nested) =
+            &cond.alternate.kind
         {
             let run = colon_pos
                 .and_then(|c| self.build_branch_comment_run(c + 1, alternate_start, d.line()))
@@ -759,9 +772,16 @@ impl<'a> Printer<'a> {
             // ends coincide.
             let nested_doc = self.build_stripped_shell_tail_doc(
                 cond.alternate,
-                nested.span.end,
-                cond.span.end,
-                || self.build_conditional_doc_impl(nested, TernaryNesting::Alternate, false),
+                cond.alternate.span.end,
+                cond_span.end,
+                || {
+                    self.build_conditional_doc_impl(
+                        nested,
+                        cond.alternate.span,
+                        TernaryNesting::Alternate,
+                        false,
+                    )
+                },
             );
             self.prepend_opt(run, nested_doc)
         } else {
@@ -770,10 +790,10 @@ impl<'a> Printer<'a> {
             let alternate = self.build_ternary_branch_expr_doc(
                 cond.alternate,
                 indent_binary_test,
-                cond.span.end,
+                cond_span.end,
             );
             let branch =
-                self.parenthesize_ternary_branch(cond.alternate, alternate, Some(cond.span.end));
+                self.parenthesize_ternary_branch(cond.alternate, alternate, Some(cond_span.end));
             d.indent(self.prepend_opt(run, branch))
         };
 
@@ -826,6 +846,7 @@ impl<'a> Printer<'a> {
     fn build_conditional_doc_with_line_comments(
         &self,
         cond: &internal::ConditionalExpression<'_>,
+        cond_span: Span,
         nesting: TernaryNesting,
     ) -> DocId {
         let d = self.d();
@@ -840,7 +861,7 @@ impl<'a> Printer<'a> {
             // The same seam as the non-breaking path, so the load-bearing arrow/yield parens
             // (and the `as`/`satisfies` clarity parens) are never dropped just because a
             // branch carries a line comment.
-            self.build_ternary_test_doc(cond, || self.build_expression_doc(cond.test))
+            self.build_ternary_test_doc(cond, cond_span, || self.build_expression_doc(cond.test))
         });
 
         // Find the ? and : positions for proper comment categorization
@@ -892,9 +913,15 @@ impl<'a> Printer<'a> {
         // the break from the parent to the entire ternary chain.
         let (consequent, is_nested_cond) = if let Some(frozen) = consequent_frozen {
             (frozen, false)
-        } else if let internal::Expression::ConditionalExpression(nested) = cond.consequent {
-            let chained =
-                self.build_conditional_doc_impl(nested, TernaryNesting::Consequent, false);
+        } else if let internal::ExpressionKind::ConditionalExpression(nested) =
+            &cond.consequent.kind
+        {
+            let chained = self.build_conditional_doc_impl(
+                nested,
+                cond.consequent.span,
+                TernaryNesting::Consequent,
+                false,
+            );
             (d.group_break(chained), true)
         } else {
             // Clarity parens (`(a ?? b)`, `(x as T)`) exactly as the inline layout
@@ -943,9 +970,14 @@ impl<'a> Printer<'a> {
         // The `:`→alternate value head, the consequent's mirror.
         let alternate_doc = if let Some(frozen) = alternate_frozen {
             d.indent(frozen)
-        } else if let internal::Expression::ConditionalExpression(nested) = cond.alternate {
+        } else if let internal::ExpressionKind::ConditionalExpression(nested) = &cond.alternate.kind
+        {
             // Recursively use breaking layout - no indent wrapper (has its own structure)
-            self.build_conditional_doc_with_line_comments(nested, TernaryNesting::Alternate)
+            self.build_conditional_doc_with_line_comments(
+                nested,
+                cond.alternate.span,
+                TernaryNesting::Alternate,
+            )
         } else {
             // Regular expressions get indent wrapper, plus the same clarity parens
             // the inline layout applies (`(a ?? b)`, `(x as T)`).
@@ -974,7 +1006,7 @@ impl<'a> Printer<'a> {
         self.push_trailing_comments_in_range(
             &mut q_parts,
             cond.alternate.span().end,
-            cond.span.end,
+            cond_span.end,
         );
 
         parts.push(d.indent(d.concat(&q_parts)));

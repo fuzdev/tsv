@@ -7,7 +7,7 @@
 // - String key normalization (unquote valid identifiers)
 // - Blank line preservation between properties
 
-use crate::ast::internal::{self, Expression, Literal, LiteralValue};
+use crate::ast::internal::{self, Expression, ExpressionKind, Literal, LiteralValue};
 use crate::printer::comments::ValueGap;
 use crate::printer::expressions::assignment::{AssignmentLeft, RhsCommentInfo};
 use crate::printer::expressions::literals::is_valid_js_identifier;
@@ -28,6 +28,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_object_doc(
         &self,
         obj: &internal::ObjectExpression<'_>,
+        obj_span: Span,
     ) -> DocId {
         let d = self.d();
         // Check for comments inside the object.
@@ -37,10 +38,10 @@ impl<'a> Printer<'a> {
         // `key: value` form. An owned annotation on a value is on the page and hangs the
         // value onto a continuation line exactly as any other own-line comment does, so
         // the gate has to see it. (`build_object_doc_expanded` carries the twin gate.)
-        let has_comments = self.has_comments_on_page_between(obj.span.start, obj.span.end);
+        let has_comments = self.has_comments_on_page_between(obj_span.start, obj_span.end);
 
         // Check if object contains line comments or block comments on their own line (force multiline)
-        let has_line_comments = self.has_line_comments_between(obj.span.start, obj.span.end);
+        let has_line_comments = self.has_line_comments_between(obj_span.start, obj_span.end);
 
         // Check for block comments on their own line (not same line as any property).
         // Only relevant when the object has comments at all — otherwise there are no
@@ -56,8 +57,8 @@ impl<'a> Printer<'a> {
                 .map(internal::ObjectProperty::span)
                 .collect();
             self.has_standalone_block_comment(
-                obj.span.start,
-                obj.span.end,
+                obj_span.start,
+                obj_span.end,
                 &property_spans,
                 StandaloneGlue::Source,
             )
@@ -65,7 +66,7 @@ impl<'a> Printer<'a> {
 
         if obj.properties.is_empty() {
             // Handle empty object with comments
-            return self.build_empty_braces_inline_with_comments_doc(obj.span);
+            return self.build_empty_braces_inline_with_comments_doc(obj_span);
         }
 
         // Check if source has newline after opening brace.
@@ -77,7 +78,7 @@ impl<'a> Printer<'a> {
         // form reprints one newline and never the author's blank
         // (`patterns.rs::collection_formatting_hints`). Don't mirror this line over there.
         let first_prop_start = obj.properties[0].span().start;
-        let has_source_newline = self.has_newline_between(obj.span.start + 1, first_prop_start);
+        let has_source_newline = self.has_newline_between(obj_span.start + 1, first_prop_start);
 
         // Decide the formatting strategy
         // must_break: conditions that require hardlines (comments)
@@ -94,7 +95,7 @@ impl<'a> Printer<'a> {
             // Use hardlines when must_break, use line() when only has_comments
             // This allows inline objects with block comments to stay inline if they fit
             let mut parts = d.pooled_docbuf();
-            let mut prev_end = obj.span.start + 1; // After opening brace
+            let mut prev_end = obj_span.start + 1; // After opening brace
 
             // A comment trailing the opening `{` is kept on the `{` line when the
             // object expands — both a line comment and a block comment before a
@@ -103,7 +104,7 @@ impl<'a> Printer<'a> {
             // comment). See conformance_prettier_ts_comments.md §Comment relocation (Object
             // literal `{`).
             let (brace_line_prefix, brace_pull_pos) =
-                self.delimiter_line_comment_prefix_object(obj.span.start, first_prop_start);
+                self.delimiter_line_comment_prefix_object(obj_span.start, first_prop_start);
             // The prefix is only emitted on the break path, so a fired pull forces
             // must-break (an expanding object with a block on the `{` line breaks
             // via has_source_newline, not the must_break conditions above).
@@ -192,7 +193,7 @@ impl<'a> Printer<'a> {
                 let upper_bound = obj
                     .properties
                     .get(i + 1)
-                    .map_or(obj.span.end, |next| next.span().start);
+                    .map_or(obj_span.end, |next| next.span().start);
 
                 let is_last = i == obj.properties.len() - 1;
                 let spread = prop.as_spread();
@@ -223,7 +224,7 @@ impl<'a> Printer<'a> {
             // this replaces had drifted from it on all three. An object that may still
             // COLLAPSE takes a soft `line` separator its group decides; a broken one takes
             // the hardline, like every other body.
-            let closing_brace_pos = obj.span.end - 1;
+            let closing_brace_pos = obj_span.end - 1;
             let separator = if must_break { d.hardline() } else { d.line() };
             self.push_trailing_closer_comments(
                 &mut parts,
@@ -335,6 +336,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_object_doc_expanded(
         &self,
         obj: &internal::ObjectExpression<'_>,
+        span: Span,
     ) -> DocId {
         let d = self.d();
         // A commented object hands off to `build_object_doc` wholesale: the loop below
@@ -345,8 +347,8 @@ impl<'a> Printer<'a> {
         // forced-hardline form the caller wants for its `fits()` measurement is only ever
         // needed on the comment-free path, and that is exactly where the two agree.
         // **on page**, in lockstep with the twin gate in `build_object_doc`.
-        if self.has_comments_on_page_between(obj.span.start, obj.span.end) {
-            return self.build_object_doc(obj);
+        if self.has_comments_on_page_between(span.start, span.end) {
+            return self.build_object_doc(obj, span);
         }
         if obj.properties.is_empty() {
             return d.text("{}");
@@ -468,7 +470,7 @@ impl<'a> Printer<'a> {
             internal::PropertyKind::Get | internal::PropertyKind::Set
         ) {
             // Getter/setter: `get x() {}` or `set x(v) {}`
-            if let Expression::FunctionExpression(func) = &prop.value {
+            if let ExpressionKind::FunctionExpression(func) = &prop.value.kind {
                 let func_doc = self.build_function_doc_body(func);
                 // Comments between key and type params/parens: `get [x] /* c */() {}`
                 // or `get x/* c */ <T>() {}`
@@ -485,7 +487,7 @@ impl<'a> Printer<'a> {
             }
         } else if prop.method {
             // Method shorthand: `foo() {}`, `async foo() {}`, `*gen() {}`, or `async *gen() {}`
-            if let Expression::FunctionExpression(func) = &prop.value {
+            if let ExpressionKind::FunctionExpression(func) = &prop.value.kind {
                 let func_doc = self.build_function_doc_body(func);
                 // Build prefix: async? + *?, preserving comments after `async`
                 // (e.g., `async /* c */ m()`)
@@ -533,8 +535,8 @@ impl<'a> Printer<'a> {
             // the initializer — a relocation across the binding, and a DROP the moment the
             // anchor was corrected. The value's doc prints the key and that gap alike, and
             // is not parenthesized here: the shorthand form is the syntax.
-            match &prop.value {
-                Expression::AssignmentExpression(_) | Expression::AssignmentPattern(_) => {
+            match &prop.value.kind {
+                ExpressionKind::AssignmentExpression(_) | ExpressionKind::AssignmentPattern(_) => {
                     self.build_expression_doc(prop.value)
                 }
                 _ => key_doc,
@@ -865,7 +867,7 @@ impl<'a> Printer<'a> {
         // Prettier: MIN_OVERLAP_FOR_BREAK = 3 (`isObjectPropertyWithShortKey`, `print/assignment.js`)
         let threshold = TAB_WIDTH + super::assignment::MIN_OVERLAP_FOR_BREAK;
 
-        let base_width = match key {
+        let base_width = match &key.kind {
             // Prettier: cleanDoc reduces identifier keys to their name string.
             //
             // ⭐ **A plain-ASCII name is not measured at all.** An identifier holds no
@@ -876,7 +878,7 @@ impl<'a> Printer<'a> {
             // run makes are this arm (51,042 of 67,654 on a 1,666-file corpus, mean 7.3
             // bytes — too short for either of `visual_width`'s vector loops to engage),
             // and it asks only whether the width is under `threshold`.
-            Expression::Identifier(id) => {
+            ExpressionKind::Identifier(id) => {
                 let name = id.ident_name();
                 if name.escaped.is_none() && name.plain_ascii {
                     // Graded on every key in every debug build: over-claiming is a silent
@@ -894,7 +896,7 @@ impl<'a> Printer<'a> {
                     self.with_ident_name_at(name, id.span.start, |s| visual_width(s, TAB_WIDTH))
                 }
             }
-            Expression::Literal(lit) => match &lit.value {
+            ExpressionKind::Literal(lit) => match &lit.value {
                 LiteralValue::String(cooked) => {
                     let content = cooked.resolve(lit.span, self.source);
                     // For computed keys, quotes are always preserved: ["x"] prints as ['x']
@@ -973,8 +975,8 @@ impl<'a> Printer<'a> {
     /// String literal keys that are valid identifiers are output without quotes.
     /// Example: `{"key": 1}` → `{key: 1}`, but `{"kebab-case": 1}` keeps quotes.
     pub(in crate::printer) fn build_property_key_doc(&self, key: &Expression<'_>) -> DocId {
-        match key {
-            Expression::Literal(
+        match &key.kind {
+            ExpressionKind::Literal(
                 lit @ Literal {
                     value: LiteralValue::String(cooked),
                     ..

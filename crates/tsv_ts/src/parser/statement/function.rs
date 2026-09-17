@@ -342,7 +342,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(alloc_expr(
             self.arena,
-            Expression::FunctionExpression(self.arena.alloc(FunctionExpression {
+            Expression::from_function_expression(self.arena.alloc(FunctionExpression {
                 id,
                 type_parameters,
                 params,

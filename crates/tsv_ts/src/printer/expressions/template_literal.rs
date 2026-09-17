@@ -3,7 +3,7 @@
 // Builds docs for template literals (quasi/interpolation layout, alignment,
 // interpolation comments) and tagged template expressions.
 
-use crate::ast::internal::Expression;
+use crate::ast::internal::{Expression, ExpressionKind};
 use crate::printer::chain::tag_paren_leading_start;
 use crate::printer::comments::CommentSpacing;
 use crate::printer::ignore::FrozenOperandPair;
@@ -344,16 +344,16 @@ impl<'a> Printer<'a> {
         // mid-chain. Member-only: `foo()!` / `x!` stay non-qualifying, and
         // `(obj.a as T)` already qualifies via TSAsExpression below.
         matches!(
-            strip_non_null_wrappers(expr),
-            Expression::MemberExpression(_)
+            strip_non_null_wrappers(expr).kind,
+            ExpressionKind::MemberExpression(_)
         ) || matches!(
-            expr,
-            Expression::Identifier(_)
-                | Expression::ConditionalExpression(_)
-                | Expression::BinaryExpression(_)
-                | Expression::SequenceExpression(_)
-                | Expression::TSAsExpression(_)
-                | Expression::TSSatisfiesExpression(_)
+            expr.kind,
+            ExpressionKind::Identifier(_)
+                | ExpressionKind::ConditionalExpression(_)
+                | ExpressionKind::BinaryExpression(_)
+                | ExpressionKind::SequenceExpression(_)
+                | ExpressionKind::TSAsExpression(_)
+                | ExpressionKind::TSSatisfiesExpression(_)
         )
     }
 
@@ -420,6 +420,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_tagged_template_doc(
         &self,
         tagged: &crate::ast::internal::TaggedTemplateExpression<'_>,
+        span: Span,
     ) -> DocId {
         let d = self.d();
 
@@ -431,7 +432,7 @@ impl<'a> Printer<'a> {
         // is exactly what a tag-kind test paired with a position-keyed gap produced. The
         // pair must be the author's own for a trailing gap to exist at all
         // (`paren_shell_close_after`).
-        let pair_open = tag_paren_leading_start(tagged);
+        let pair_open = tag_paren_leading_start(tagged, span);
         let trailing_gap = self.owned_pair_trailing_gap(tagged.tag.span().end, pair_open.is_some());
         // Every window downstream — the type-argument gap, the tag→`` ` `` gap — opens
         // PAST the pair's `)`, so a comment this doc emitted inside the parens is not
@@ -459,7 +460,7 @@ impl<'a> Printer<'a> {
             // `prepend_removed_paren_comments` below already emits
             // ([`Printer::build_left_spine_operand_doc`]).
             let tag_doc = self.build_left_spine_operand_doc(
-                tagged.span.start,
+                span.start,
                 tagged.tag,
                 FrozenOperandPair::position(ParenContext::TaggedTemplateTag),
                 || {
@@ -473,8 +474,8 @@ impl<'a> Printer<'a> {
                 },
             );
             // Check for comments between removed parentheses and tag
-            // e.g., (/* comment */ tag)`template` has tagged.span.start at '(' and tag.span.start at 'tag'
-            self.prepend_removed_paren_comments(tagged.span.start, tagged.tag.span().start, tag_doc)
+            // e.g., (/* comment */ tag)`template` has span.start at '(' and tag.span.start at 'tag'
+            self.prepend_removed_paren_comments(span.start, tagged.tag.span().start, tag_doc)
         };
 
         let mut parts: DocBuf = smallvec![tag_doc];

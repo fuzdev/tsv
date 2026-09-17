@@ -15,7 +15,7 @@ use smallvec::smallvec;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Comment, Span};
-use tsv_ts::ast::internal::Expression;
+use tsv_ts::ast::internal::{Expression, ExpressionKind};
 
 /// How a directive prints its expression value — the only axis the expression-valued
 /// directive builders differ on, so [`Printer::build_directive_doc`] serves them all.
@@ -984,15 +984,15 @@ impl<'a> Printer<'a> {
         //   Flat: ={expr}
         //   Broken: ={\n\t\texpr\n\t}
         let is_hugged = matches!(
-            expr,
-            Expression::ArrowFunctionExpression(_)
-                | Expression::FunctionExpression(_)
-                | Expression::ObjectExpression(_)
-                | Expression::ConditionalExpression(_)
-                | Expression::CallExpression(_)
-                | Expression::NewExpression(_)
-                | Expression::ArrayExpression(_)
-                | Expression::BinaryExpression(_)
+            expr.kind,
+            ExpressionKind::ArrowFunctionExpression(_)
+                | ExpressionKind::FunctionExpression(_)
+                | ExpressionKind::ObjectExpression(_)
+                | ExpressionKind::ConditionalExpression(_)
+                | ExpressionKind::CallExpression(_)
+                | ExpressionKind::NewExpression(_)
+                | ExpressionKind::ArrayExpression(_)
+                | ExpressionKind::BinaryExpression(_)
         );
 
         // A run ENDING in a line comment already forces `}` onto its own line (its doc ends
@@ -1178,7 +1178,7 @@ impl<'a> Printer<'a> {
     ) -> DocBuf {
         let d = self.d();
         // For SequenceExpression, use the bare (no parens) version for getter/setter syntax
-        if let Expression::SequenceExpression(seq) = expr {
+        if let ExpressionKind::SequenceExpression(seq) = &expr.kind {
             // The per-operand path below is comment-blind, so any comment in the value —
             // leading (`{// c\n get, set}`), interior (`{get, /* c */ set}`), or trailing
             // (`{get, set /* c */}`) — is silently dropped there. Route the whole
@@ -1196,7 +1196,7 @@ impl<'a> Printer<'a> {
             {
                 return smallvec![
                     d.text("="),
-                    self.build_bind_sequence_with_comments_doc(seq, span),
+                    self.build_bind_sequence_with_comments_doc(seq, expr.span, span),
                 ];
             }
 
@@ -1229,7 +1229,7 @@ impl<'a> Printer<'a> {
 
         // For bind: directives, BinaryExpression should use block structure (not hugging).
         // This matches Prettier's behavior where bind: uses `={\n\texpr\n}` format.
-        if let Expression::BinaryExpression(_) = expr {
+        if let ExpressionKind::BinaryExpression(_) = &expr.kind {
             return self.build_expression_doc_parts_with_span_block_structure(expr, tag_span);
         }
 
@@ -1260,6 +1260,7 @@ impl<'a> Printer<'a> {
     fn build_bind_sequence_with_comments_doc(
         &self,
         seq: &tsv_ts::ast::internal::SequenceExpression<'_>,
+        span: Span,
         tag_span: Span,
     ) -> DocId {
         let d = self.d();
@@ -1284,14 +1285,14 @@ impl<'a> Printer<'a> {
         content.extend(self.leading_comment_docs(tag_span.start + 1, first_start));
 
         // The sequence itself, and where the run past it starts. A freeze replaces the
-        // sequence's own doc with a verbatim slice of `seq.span`, so its tail opens at the
+        // sequence's own doc with a verbatim slice of `span`, so its tail opens at the
         // slice's end — strictly outside the verbatim text, so a comment written INSIDE the
         // slice rides in it rather than being printed twice. The built form's tail opens at
         // the last operand's NODE end instead: a comment inside that operand's stripped paren
-        // shell (`(set /* c */)`) sits past the node and before `seq.span.end`, and the tail
+        // shell (`(set /* c */)`) sits past the node and before `span.end`, and the tail
         // is its only emitter.
         let (sequence, tail_from) = if head_frozen {
-            (self.build_frozen_node_doc(seq.span), seq.span.end)
+            (self.build_frozen_node_doc(span), span.end)
         } else {
             let last_end = seq.expressions[seq.expressions.len() - 1].span().end;
             (self.build_bind_sequence_operands_doc(seq), last_end)
@@ -1465,7 +1466,7 @@ impl<'a> Printer<'a> {
         name: &str,
         tag_span: Option<Span>,
     ) -> bool {
-        matches!(expr, Expression::Identifier(id) if id.name(self.source) == name)
+        matches!(&expr.kind, ExpressionKind::Identifier(id) if id.name(self.source) == name)
             && tag_span.is_none_or(|s| !self.has_comments_on_page_between(s.start, s.end))
     }
 }

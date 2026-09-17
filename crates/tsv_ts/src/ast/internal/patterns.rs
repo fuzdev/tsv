@@ -22,14 +22,13 @@ use super::{Decorator, Expression, Property, TSTypeAnnotation};
 pub struct ObjectPattern<'arena> {
     pub properties: &'arena [ObjectPatternProperty<'arena>],
     /// Optional destructuring-pattern parameter (`{a}?`). Only ever set in a
-    /// parameter position; the `?` extends `span` and precedes `type_annotation`.
+    /// parameter position; the `?` extends the expression's span and precedes `type_annotation`.
     pub optional: bool,
     pub type_annotation: Option<TSTypeAnnotation<'arena>>,
     /// Parameter decorators (`@dec { a }: T`). Only set in a parameter position;
     /// emitted last in the wire, matching acorn (which attaches a parameter's
     /// decorators to its top-level binding node).
     pub decorators: Option<&'arena [Decorator<'arena>]>,
-    pub span: Span,
 }
 
 /// Object pattern property - either a regular property or a rest element
@@ -85,13 +84,12 @@ pub struct ArrayPattern<'arena> {
     /// Elements are Option to support holes like `[a, , b]`
     pub elements: &'arena [Option<Expression<'arena>>],
     /// Optional destructuring-pattern parameter (`[a]?`). Only ever set in a
-    /// parameter position; the `?` extends `span` and precedes `type_annotation`.
+    /// parameter position; the `?` extends the expression's span and precedes `type_annotation`.
     pub optional: bool,
     pub type_annotation: Option<TSTypeAnnotation<'arena>>,
     /// Parameter decorators (`@dec [a]: T`). Only set in a parameter position;
     /// emitted last in the wire, matching acorn.
     pub decorators: Option<&'arena [Decorator<'arena>]>,
-    pub span: Span,
 }
 
 /// Assignment pattern for default values in destructuring: `a = 1`
@@ -112,7 +110,6 @@ pub struct AssignmentPattern<'arena> {
     /// parameter position; emitted last in the wire — acorn attaches a decorated
     /// default parameter's decorators to the `AssignmentPattern`, not its `left`.
     pub decorators: Option<&'arena [Decorator<'arena>]>,
-    pub span: Span,
 }
 
 /// Rest element in destructuring: `...rest`

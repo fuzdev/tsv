@@ -12,8 +12,9 @@
 // stripped `(`. Either way the comment ends up leading a paren it was never written
 // against — inert for an annotation the next token was carrying (`/* @__PURE__ */`).
 
-use crate::ast::internal::{self, Expression};
+use crate::ast::internal::{self, Expression, ExpressionKind};
 use crate::printer::Printer;
+use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan;
 
@@ -31,25 +32,25 @@ use tsv_lang::source_scan;
 /// asks only whether the child *starts where the parent does*. Merging them would be a
 /// behavior change, not a cleanup.
 fn left_spine_child<'x>(expr: &'x Expression<'x>) -> Option<&'x Expression<'x>> {
-    Some(match expr {
-        Expression::MemberExpression(m) => m.object,
-        Expression::CallExpression(c) => c.callee,
-        Expression::BinaryExpression(b) => b.left,
-        Expression::ConditionalExpression(c) => c.test,
-        Expression::AssignmentExpression(a) => a.left,
+    Some(match &expr.kind {
+        ExpressionKind::MemberExpression(m) => m.object,
+        ExpressionKind::CallExpression(c) => c.callee,
+        ExpressionKind::BinaryExpression(b) => b.left,
+        ExpressionKind::ConditionalExpression(c) => c.test,
+        ExpressionKind::AssignmentExpression(a) => a.left,
         // A destructuring default's binding (`[/* c */ a = 1]`). Its `left` starts where
         // the pattern does, so without this arm the seam claims the comment here AND again
         // when the left's own `build_expression_doc` runs — printing it TWICE. The object
         // pattern's twin never showed it: its property builder prints a shorthand key
         // directly instead of routing the `AssignmentPattern` through the seam.
-        Expression::AssignmentPattern(a) => a.left,
-        Expression::TaggedTemplateExpression(t) => t.tag,
-        Expression::SequenceExpression(s) => s.expressions.first()?,
-        Expression::TSNonNullExpression(n) => n.expression,
-        Expression::TSAsExpression(a) => a.expression,
-        Expression::TSSatisfiesExpression(s) => s.expression,
-        Expression::TSInstantiationExpression(i) => i.expression,
-        Expression::UpdateExpression(u) if !u.prefix => u.argument,
+        ExpressionKind::AssignmentPattern(a) => a.left,
+        ExpressionKind::TaggedTemplateExpression(t) => t.tag,
+        ExpressionKind::SequenceExpression(s) => s.expressions.first()?,
+        ExpressionKind::TSNonNullExpression(n) => n.expression,
+        ExpressionKind::TSAsExpression(a) => a.expression,
+        ExpressionKind::TSSatisfiesExpression(s) => s.expression,
+        ExpressionKind::TSInstantiationExpression(i) => i.expression,
+        ExpressionKind::UpdateExpression(u) if !u.prefix => u.argument,
         _ => return None,
     })
 }
@@ -63,8 +64,8 @@ fn left_spine_child<'x>(expr: &'x Expression<'x>) -> Option<&'x Expression<'x>> 
 /// hoist declines at the same pair ([`Printer::hoisted_owned_value_gap_run_opt`]), so the
 /// two readings of one seam agree.
 fn outermost_claim_child<'x>(value: &'x Expression<'x>) -> Option<&'x Expression<'x>> {
-    match value {
-        Expression::SequenceExpression(_) => None,
+    match &value.kind {
+        ExpressionKind::SequenceExpression(_) => None,
         _ => left_spine_child(value),
     }
 }
@@ -72,7 +73,7 @@ fn outermost_claim_child<'x>(value: &'x Expression<'x>) -> Option<&'x Expression
 /// The [`internal::JsdocCast`] whose comment is the FIRST thing `expr` prints — `expr`
 /// itself, or the leftmost leaf reached through [`left_spine_child`].
 ///
-/// A cast is the one owned comment that has to be reached as a **node**: `JsdocCast::span`
+/// A cast is the one owned comment that has to be reached as a **node**: the cast's span
 /// covers the `(`…`)` only, so the comment sits *outside* it and may be a newline above,
 /// where the glued lookup every other owned comment answers through finds nothing.
 ///
@@ -90,12 +91,14 @@ fn outermost_claim_child<'x>(value: &'x Expression<'x>) -> Option<&'x Expression
 /// ⚠️ The **unguarded** walk. Every caller goes through [`Printer::leading_jsdoc_cast`],
 /// which carries the document-level short-circuit; this half exists only so that
 /// short-circuit has exactly one spelling.
-fn leading_jsdoc_cast_walk<'x>(expr: &'x Expression<'x>) -> Option<&'x internal::JsdocCast<'x>> {
+fn leading_jsdoc_cast_walk<'x>(
+    expr: &'x Expression<'x>,
+) -> Option<(&'x internal::JsdocCast<'x>, Span)> {
     let start = expr.span().start;
     let mut node = expr;
     loop {
-        if let Expression::JsdocCast(cast) = node {
-            return Some(cast);
+        if let ExpressionKind::JsdocCast(cast) = &node.kind {
+            return Some((cast, node.span));
         }
         let child = left_spine_child(node)?;
         if child.span().start != start {
@@ -139,7 +142,7 @@ impl<'a> Printer<'a> {
     fn leading_jsdoc_cast<'x>(
         &self,
         value: &'x Expression<'x>,
-    ) -> Option<&'x internal::JsdocCast<'x>> {
+    ) -> Option<(&'x internal::JsdocCast<'x>, Span)> {
         if !self.has_owned_comments {
             return None;
         }
@@ -166,7 +169,7 @@ impl<'a> Printer<'a> {
     /// their build in [`Printer::with_jsdoc_cast_cannot_hang_gap`] instead.
     pub(in crate::printer) fn mark_jsdoc_cast_cannot_hang_gap(&self, value: &Expression<'_>) {
         self.jsdoc_cast_cannot_hang_target
-            .set(self.leading_jsdoc_cast(value).map(|cast| cast.span));
+            .set(self.leading_jsdoc_cast(value).map(|(_, span)| span));
     }
 
     /// Build `value`'s doc under a cannot-hang mark, restoring the previous mark after —
@@ -184,7 +187,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let saved = self.jsdoc_cast_cannot_hang_target.get();
         self.jsdoc_cast_cannot_hang_target
-            .set(self.leading_jsdoc_cast(value).map(|cast| cast.span));
+            .set(self.leading_jsdoc_cast(value).map(|(_, span)| span));
         let doc = build();
         self.jsdoc_cast_cannot_hang_target.set(saved);
         doc
@@ -195,11 +198,8 @@ impl<'a> Printer<'a> {
     /// arm. The complement of [`Printer::jsdoc_cast_in_value_gap`], which reflows only
     /// the soft-`line` arm (its gaps CAN hang, so their own-line authoring keeps the
     /// hardline and the enclosing gap supplies the hang).
-    pub(in crate::printer) fn jsdoc_cast_in_cannot_hang_gap(
-        &self,
-        cast: &internal::JsdocCast<'_>,
-    ) -> bool {
-        self.jsdoc_cast_cannot_hang_target.get() == Some(cast.span)
+    pub(in crate::printer) fn jsdoc_cast_in_cannot_hang_gap(&self, span: Span) -> bool {
+        self.jsdoc_cast_cannot_hang_target.get() == Some(span)
     }
 }
 
@@ -434,7 +434,7 @@ impl<'a> Printer<'a> {
         }
         // A pair between the run and the value — the seam's, or the sequence's own — holds
         // the comment where the author wrote it (the ⚠️ above).
-        if seam_prints_pair || matches!(value, Expression::SequenceExpression(_)) {
+        if seam_prints_pair || matches!(value.kind, ExpressionKind::SequenceExpression(_)) {
             return None;
         }
         self.build_hoisted_value_gap_comments_opt(gap_start, value.span().start)
@@ -665,7 +665,7 @@ impl<'a> Printer<'a> {
         }
         // A JSDoc cast holds its own copy of its comment and prints it against its own
         // `(` — see `build_jsdoc_cast_lead_doc`. Claiming it here would print it twice.
-        if matches!(expr, Expression::JsdocCast(_)) {
+        if matches!(expr.kind, ExpressionKind::JsdocCast(_)) {
             return doc;
         }
         // A node whose left-spine child starts here is not the innermost — that child is
@@ -786,7 +786,7 @@ impl<'a> Printer<'a> {
     /// short-circuit.
     pub(crate) fn is_own_line_jsdoc_cast(&self, value: &Expression<'_>) -> bool {
         self.leading_jsdoc_cast(value)
-            .is_some_and(|cast| self.jsdoc_cast_comment_own_line(cast))
+            .is_some_and(|(cast, span)| self.jsdoc_cast_comment_own_line(cast, span))
     }
 
     /// **on page**: where `expr`'s printed content begins in source — the start of the owned
@@ -811,14 +811,14 @@ impl<'a> Printer<'a> {
         }
         // A JSDoc cast carries its own copy and always prints it (`build_jsdoc_cast_lead_doc`), so
         // it is the one node that answers from the node rather than the position lookup.
-        // It must: `JsdocCast::span` covers the `(`…`)` only — the comment sits *outside* it —
+        // It must: the cast's span covers the `(`…`)` only — the comment sits *outside* it —
         // so the lookup below can only ever find the cast's comment when the cast is `expr`'s
         // own left edge, and it is asked at a POSITION, which cannot walk.
         // Resolved down the left spine ([`Self::leading_jsdoc_cast`]): the comment leads the value
         // from its leftmost leaf too, and a bound taken past it drops an authored blank line
         // (`[a,⏎⏎/** @type {A} */⏎(x).b]`) — the loss this function exists to prevent.
-        if let Some(cast) = self.leading_jsdoc_cast(expr) {
-            return Some(self.jsdoc_cast_comment(cast).span.start);
+        if let Some((cast, span)) = self.leading_jsdoc_cast(expr) {
+            return Some(self.jsdoc_cast_comment(cast, span).span.start);
         }
         self.owned_leading_comment_at(expr.span().start)
             .map(|c| c.span.start)
@@ -851,8 +851,12 @@ impl<'a> Printer<'a> {
     /// [`Self::owned_leading_comment_at`] finds it from the same position that bound it.
     /// Unconditional rather than gated on a document flag: a cast is rare, and a gate that
     /// can be forgotten at a fourth read site is worth less than the two compares it saves.
-    pub(crate) fn jsdoc_cast_comment(&self, cast: &internal::JsdocCast<'_>) -> internal::Comment {
-        self.owned_leading_comment_at(cast.span.start)
+    pub(crate) fn jsdoc_cast_comment(
+        &self,
+        cast: &internal::JsdocCast<'_>,
+        span: Span,
+    ) -> internal::Comment {
+        self.owned_leading_comment_at(span.start)
             .copied()
             .unwrap_or(cast.comment)
     }
@@ -900,8 +904,12 @@ impl<'a> Printer<'a> {
     /// a nestled predecessor merges into the cast's comment, and the line the run opens is
     /// then the predecessor's. The resolution lives inside this predicate rather than at its
     /// caller so the two cannot part.
-    pub(crate) fn jsdoc_cast_comment_own_line(&self, cast: &internal::JsdocCast<'_>) -> bool {
-        let comment = self.jsdoc_cast_comment(cast);
+    pub(crate) fn jsdoc_cast_comment_own_line(
+        &self,
+        cast: &internal::JsdocCast<'_>,
+        span: Span,
+    ) -> bool {
+        let comment = self.jsdoc_cast_comment(cast, span);
         let bytes = self.source.as_bytes();
         // Only whitespace between the start of the line and the comment.
         let mut i = comment.span.start as usize;
@@ -917,6 +925,6 @@ impl<'a> Printer<'a> {
             }
         };
         newline_before
-            && !tsv_lang::printing::is_same_line(self.source, comment.span.end, cast.span.start)
+            && !tsv_lang::printing::is_same_line(self.source, comment.span.end, span.start)
     }
 }

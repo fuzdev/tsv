@@ -30,17 +30,19 @@ impl<'a> Printer<'a> {
     pub(crate) fn print_call_args(
         &self,
         call: &internal::CallExpression<'_>,
+        span: Span,
         facts: ChainCall,
     ) -> DocId {
-        self.build_call_args_doc_for_chain(call, facts)
+        self.build_call_args_doc_for_chain(call, span, facts)
     }
 
     pub(crate) fn print_call_args_expanded(
         &self,
         call: &internal::CallExpression<'_>,
+        span: Span,
         facts: ChainCall,
     ) -> DocId {
-        self.build_call_args_doc_for_chain_expanded(call, facts)
+        self.build_call_args_doc_for_chain_expanded(call, span, facts)
     }
 
     pub(crate) fn build_chain_block_comments_doc(

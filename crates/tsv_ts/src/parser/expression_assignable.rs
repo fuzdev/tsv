@@ -3,7 +3,7 @@
 // rewriting — no token consumption.
 
 use crate::ast::internal::{
-    ArrayPattern, AssignmentOperator, AssignmentPattern, Expression, ObjectPattern,
+    ArrayPattern, AssignmentOperator, AssignmentPattern, Expression, ExpressionKind, ObjectPattern,
     ObjectPatternProperty, ObjectProperty, Property, RestElement, SpreadElement,
 };
 use tsv_lang::ParseError;
@@ -69,7 +69,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         expr: Expression<'arena>,
         context: AssignableContext,
     ) -> Result<Expression<'arena>, ParseError> {
-        match expr {
+        match &expr.kind {
             // A target on an optional chain (`a?.b`, `a?.b!`, `a?.[i].c`) is no target
             // at all in a for-head: ecma262 gives an `OptionalExpression` the invalid
             // `AssignmentTargetType`, and there is no wire shape for it — acorn wraps
@@ -93,16 +93,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
 
             // Identifier is already a valid assignment target
-            Expression::Identifier(_) => Ok(expr),
+            ExpressionKind::Identifier(_) => Ok(expr),
 
             // Member expression is a valid assignment target
-            Expression::MemberExpression(_) => Ok(expr),
+            ExpressionKind::MemberExpression(_) => Ok(expr),
 
             // Convert ObjectExpression to ObjectPattern
-            Expression::ObjectExpression(obj) => {
+            ExpressionKind::ObjectExpression(obj) => {
                 // `{...a,}` — trailing comma after the rest property.
                 if obj.spread_trailing_comma {
-                    let span = obj.properties.last().map_or(obj.span, ObjectProperty::span);
+                    let span = obj
+                        .properties
+                        .last()
+                        .map_or(expr.span, ObjectProperty::span);
                     return Err(self.rest_trailing_comma_error(span.start_usize()));
                 }
 
@@ -124,17 +127,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     properties.push(self.object_property_to_pattern(prop.clone(), context)?);
                 }
 
-                Ok(Expression::ObjectPattern(ObjectPattern {
-                    properties: properties.into_bump_slice(),
-                    optional: false,
-                    type_annotation: None,
-                    decorators: None,
-                    span: obj.span,
-                }))
+                Ok(Expression {
+                    span: expr.span,
+                    kind: ExpressionKind::ObjectPattern(ObjectPattern {
+                        properties: properties.into_bump_slice(),
+                        optional: false,
+                        type_annotation: None,
+                        decorators: None,
+                    }),
+                })
             }
 
             // Convert ArrayExpression to ArrayPattern
-            Expression::ArrayExpression(arr) => {
+            ExpressionKind::ArrayExpression(arr) => {
                 // `[...a,]` — trailing comma after the rest element.
                 // Element-after-rest (`[...a, b]`) and rest-with-default
                 // (`[...a = 1]`) are caught in the loop below.
@@ -143,7 +148,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         .elements
                         .last()
                         .and_then(|e| e.as_ref())
-                        .map_or(arr.span, Expression::span);
+                        .map_or(expr.span, Expression::span);
                     return Err(self.rest_trailing_comma_error(span.start_usize()));
                 }
 
@@ -156,7 +161,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             // destructuring pattern (`ArrayBindingPattern` /
                             // `ArrayAssignmentPattern` place the rest last). acorn:
                             // "Comma is not permitted after the rest element".
-                            if matches!(e, Expression::SpreadElement(_)) && i != last_index {
+                            if matches!(e.kind, ExpressionKind::SpreadElement(_)) && i != last_index
+                            {
                                 return Err(self.error_msg_at(
                                     "A rest element must be last in a destructuring pattern",
                                     e.span().start_usize(),
@@ -169,18 +175,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     elements.push(converted);
                 }
 
-                Ok(Expression::ArrayPattern(ArrayPattern {
-                    elements: elements.into_bump_slice(),
-                    optional: false,
-                    type_annotation: None,
-                    decorators: None,
-                    span: arr.span,
-                }))
+                Ok(Expression {
+                    span: expr.span,
+                    kind: ExpressionKind::ArrayPattern(ArrayPattern {
+                        elements: elements.into_bump_slice(),
+                        optional: false,
+                        type_annotation: None,
+                        decorators: None,
+                    }),
+                })
             }
 
             // Convert SpreadElement to RestElement
-            Expression::SpreadElement(spread) => Ok(Expression::RestElement(
-                self.spread_to_rest_element(&spread, context)?,
+            ExpressionKind::SpreadElement(spread) => Ok(Expression::from_rest_element(
+                self.spread_to_rest_element(spread, context)?,
             )),
 
             // AssignmentExpression in pattern context becomes AssignmentPattern
@@ -204,11 +212,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // `[a = b] = xs` is a different program, so this is the faithful-reprint
             // floor, not a deferrable early error. Rejected in every context; acorn
             // spells it the same way.
-            Expression::AssignmentExpression(assign) => {
+            ExpressionKind::AssignmentExpression(assign) => {
                 if assign.operator != AssignmentOperator::Assign {
                     return Err(self.error_msg_at(
                         "Only '=' operator can be used for specifying default value",
-                        assign.span.start_usize(),
+                        expr.span.start_usize(),
                     ));
                 }
                 let left_context = match context {
@@ -216,19 +224,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     c => c,
                 };
                 let left = self.to_assignable(assign.left.clone(), left_context)?;
-                Ok(Expression::AssignmentPattern(AssignmentPattern {
-                    left: self.alloc(left),
-                    right: assign.right,
-                    decorators: None,
-                    span: assign.span,
-                }))
+                Ok(Expression {
+                    span: expr.span,
+                    kind: ExpressionKind::AssignmentPattern(AssignmentPattern {
+                        left: self.alloc(left),
+                        right: assign.right,
+                        decorators: None,
+                    }),
+                })
             }
 
             // Already a pattern (can happen with nested patterns)
-            Expression::ObjectPattern(_)
-            | Expression::ArrayPattern(_)
-            | Expression::AssignmentPattern(_)
-            | Expression::RestElement(_) => Ok(expr),
+            ExpressionKind::ObjectPattern(_)
+            | ExpressionKind::ArrayPattern(_)
+            | ExpressionKind::AssignmentPattern(_)
+            | ExpressionKind::RestElement(_) => Ok(expr),
 
             // A type-assertion-family expression (`as` / `satisfies` / non-null `!` /
             // `<T>`) or a JSDoc `/** @type {T} */ (expr)` cast is a valid target — as an
@@ -255,17 +265,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // `({ a: b as T } = x)` and `({ a: (b as T) } = x)` are the same target,
             // both accepted — pinned by `cast_target_destructure` and
             // `cast_target_destructure_paren`.
-            Expression::TSAsExpression(_)
-            | Expression::TSSatisfiesExpression(_)
-            | Expression::TSNonNullExpression(_)
-            | Expression::TSTypeAssertion(_)
-            | Expression::JsdocCast(_)
+            ExpressionKind::TSAsExpression(_)
+            | ExpressionKind::TSSatisfiesExpression(_)
+            | ExpressionKind::TSNonNullExpression(_)
+            | ExpressionKind::TSTypeAssertion(_)
+            | ExpressionKind::JsdocCast(_)
                 if matches!(
                     context,
                     AssignableContext::Assignment | AssignableContext::ForHead
                 ) && matches!(
-                    expr.skip_type_assertions(),
-                    Expression::Identifier(_) | Expression::MemberExpression(_)
+                    expr.skip_type_assertions().kind,
+                    ExpressionKind::Identifier(_) | ExpressionKind::MemberExpression(_)
                 ) =>
             {
                 Ok(expr)
@@ -311,7 +321,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<Expression<'arena>, ParseError> {
         let start = expr.span().start_usize();
         let target = self.to_assignable(expr, context)?;
-        if matches!(target, Expression::AssignmentPattern(_)) {
+        if matches!(target.kind, ExpressionKind::AssignmentPattern(_)) {
             return Err(self.error_msg_at("Invalid assignment target", start));
         }
         Ok(target)
@@ -340,7 +350,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         context: AssignableContext,
     ) -> Result<RestElement<'arena>, ParseError> {
         let argument = self.to_assignable(spread.argument.clone(), context)?;
-        if matches!(argument, Expression::AssignmentPattern(_)) {
+        if matches!(argument.kind, ExpressionKind::AssignmentPattern(_)) {
             return Err(self.error_msg_at(
                 "A rest element cannot have a default value",
                 spread.span.start_usize(),

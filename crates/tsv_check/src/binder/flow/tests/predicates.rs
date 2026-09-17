@@ -6,7 +6,7 @@ use super::super::*;
 use crate::binder::{NodeKind, addr_of, bind_file};
 use crate::ids::FileId;
 use bumpalo::Bump;
-use tsv_ts::ast::internal::{Expression, Statement};
+use tsv_ts::ast::internal::{Expression, ExpressionKind, Statement};
 
 #[test]
 fn create_flow_condition_ports_verbatim() {
@@ -20,9 +20,9 @@ fn create_flow_condition_ports_verbatim() {
         let Statement::ExpressionStatement(s) = &program.body[i] else {
             panic!("expression statement");
         };
-        let id = match &s.expression {
-            Expression::Literal(l) => bound.require_node_id(addr_of(l), NodeKind::Literal),
-            Expression::Identifier(idn) => {
+        let id = match &s.expression.kind {
+            ExpressionKind::Literal(l) => bound.require_node_id(addr_of(l), NodeKind::Literal),
+            ExpressionKind::Identifier(idn) => {
                 bound.require_node_id(addr_of(idn), NodeKind::Identifier)
             }
             _ => panic!("unexpected expression"),

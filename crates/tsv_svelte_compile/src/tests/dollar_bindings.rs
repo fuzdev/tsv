@@ -450,7 +450,7 @@ fn compile_refuses_props_illegal_name_member_site() {
 fn compile_allows_member_access_that_is_not_rest_prop_illegal() {
     // Controls that MUST keep compiling — the member-site rule must not over-refuse.
     // A computed STRING key: the property is a Literal, not an Identifier, so the
-    // `Expression::Identifier(prop)` arm fails and it never matches — the oracle
+    // `ExpressionKind::Identifier(prop)` arm fails and it never matches — the oracle
     // also compiles it. (Contrast the computed IDENTIFIER key `rest[$$slots]`,
     // which DOES match and refuses — in the refuse test above.)
     let _ = compile_js(

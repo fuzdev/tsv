@@ -11,7 +11,7 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Comment, Span};
-use tsv_ts::Expression;
+use tsv_ts::{Expression, ExpressionKind};
 
 /// Trailing-comment range end for an `{#each}` head expression: the start of whatever
 /// the head puts after the iterable — the `as`-pattern when there is one, else the
@@ -561,7 +561,7 @@ impl<'a> Printer<'a> {
     }
 
     pub(super) fn build_pattern_doc(&self, expr: &Expression<'_>) -> DocId {
-        match expr {
+        match &expr.kind {
             // Comments thread through every gap so a comment in any pattern position is
             // preserved in place — a `_svelte_prettier_divergence` from prettier-plugin-svelte,
             // which drops it. The `*Expression` variants are reached as assignment-pattern
@@ -575,7 +575,7 @@ impl<'a> Printer<'a> {
             // `{ a: /* c */ { … } }`, `[/* c */ { … }]`) is the brace/bracket builders' —
             // made where the opening delimiter is printed, so it lands inside any type
             // annotation rather than between the pattern and its `: T`.
-            Expression::ObjectPattern(obj) => {
+            ExpressionKind::ObjectPattern(obj) => {
                 let entries: SmallVec<[(u32, u32, DocId); 8]> = obj
                     .properties
                     .iter()
@@ -584,10 +584,10 @@ impl<'a> Printer<'a> {
                         (s.start, s.end, self.build_object_pattern_property_doc(p))
                     })
                     .collect();
-                let braces = self.build_object_braces(obj.span.start, obj.span.end, &entries);
+                let braces = self.build_object_braces(expr.span.start, expr.span.end, &entries);
                 self.append_pattern_type_annotation(braces, obj.type_annotation.as_ref())
             }
-            Expression::ObjectExpression(obj) => {
+            ExpressionKind::ObjectExpression(obj) => {
                 let entries: SmallVec<[(u32, u32, DocId); 8]> = obj
                     .properties
                     .iter()
@@ -596,26 +596,26 @@ impl<'a> Printer<'a> {
                         (s.start, s.end, self.build_object_expr_property_doc(p))
                     })
                     .collect();
-                self.build_object_braces(obj.span.start, obj.span.end, &entries)
+                self.build_object_braces(expr.span.start, expr.span.end, &entries)
             }
-            Expression::ArrayPattern(arr) => {
+            ExpressionKind::ArrayPattern(arr) => {
                 let brackets =
-                    self.build_array_brackets(arr.elements, arr.span.start, arr.span.end);
+                    self.build_array_brackets(arr.elements, expr.span.start, expr.span.end);
                 self.append_pattern_type_annotation(brackets, arr.type_annotation.as_ref())
             }
-            Expression::ArrayExpression(arr) => {
-                self.build_array_brackets(arr.elements, arr.span.start, arr.span.end)
+            ExpressionKind::ArrayExpression(arr) => {
+                self.build_array_brackets(arr.elements, expr.span.start, expr.span.end)
             }
-            Expression::RestElement(rest) => {
+            ExpressionKind::RestElement(rest) => {
                 self.build_rest_pattern_doc(rest.span.start, rest.argument)
             }
             // Comments around the `=` stay on the side the author wrote them
             // (`a /* c */ = 1` vs `a = /* c */ 1`). The `Expression` variant is the
             // default-value form of the same `=`.
-            Expression::AssignmentPattern(assign) => {
+            ExpressionKind::AssignmentPattern(assign) => {
                 self.build_pattern_assignment(assign.left, assign.right)
             }
-            Expression::AssignmentExpression(assign) => {
+            ExpressionKind::AssignmentExpression(assign) => {
                 self.build_pattern_assignment(assign.left, assign.right)
             }
             // Default: build doc through the comment-aware TS builder. Literals route

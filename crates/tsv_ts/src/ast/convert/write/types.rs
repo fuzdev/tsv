@@ -300,7 +300,7 @@ fn write_literal_type(w: &mut JsonWriter, lit: &internal::TSLiteralType<'_>, ctx
             // Negative number types like `-1`; the parser guarantees the
             // argument is a Literal.
             #[expect(clippy::unreachable)]
-            let internal::Expression::Literal(arg_lit) = unary.argument else {
+            let internal::ExpressionKind::Literal(arg_lit) = &unary.argument.kind else {
                 unreachable!(
                     "parser only creates TSLiteralType::UnaryExpression with Literal argument"
                 )
@@ -389,7 +389,7 @@ fn write_type_element(w: &mut JsonWriter, elem: &internal::TSTypeElement<'_>, ct
             }
             // acorn quirk: omits `computed` when the key is the `new` keyword
             // and the signature is neither computed nor readonly.
-            let is_new_key = matches!(&p.key, internal::Expression::Identifier(id)
+            let is_new_key = matches!(&p.key.kind, internal::ExpressionKind::Identifier(id)
                 if id.name(ctx.source) == "new");
             if !(!p.computed && !p.readonly && is_new_key) {
                 w.raw(",\"computed\":");

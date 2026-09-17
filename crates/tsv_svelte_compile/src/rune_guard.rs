@@ -37,8 +37,9 @@
 use std::collections::HashSet;
 
 use tsv_ts::ast::internal::{
-    ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ForInOfLeft,
-    ForInit, FunctionExpression, ImportSpecifier, ObjectPatternProperty, ObjectProperty, Statement,
+    ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ExpressionKind,
+    ForInOfLeft, ForInit, FunctionExpression, ImportSpecifier, ObjectPatternProperty,
+    ObjectProperty, Statement,
 };
 
 use crate::analyze::{NameSet, expression_kind, pattern_binding_names};
@@ -180,14 +181,18 @@ fn identifier_name<'s>(
 /// accesses (`$state.raw`), non-null assertions, instantiations, and preserved
 /// parens — `None` when the root is not a plain `$`-identifier.
 fn dollar_callee_root<'s>(callee: &Expression<'_>, source: &'s str) -> Option<&'s str> {
-    match callee {
-        Expression::Identifier(id) => dollar_identifier_name(id, source),
-        Expression::MemberExpression(member) => dollar_callee_root(member.object, source),
-        Expression::TSNonNullExpression(non_null) => {
+    match &callee.kind {
+        ExpressionKind::Identifier(id) => dollar_identifier_name(id, source),
+        ExpressionKind::MemberExpression(member) => dollar_callee_root(member.object, source),
+        ExpressionKind::TSNonNullExpression(non_null) => {
             dollar_callee_root(non_null.expression, source)
         }
-        Expression::TSInstantiationExpression(inst) => dollar_callee_root(inst.expression, source),
-        Expression::ParenthesizedExpression(paren) => dollar_callee_root(paren.expression, source),
+        ExpressionKind::TSInstantiationExpression(inst) => {
+            dollar_callee_root(inst.expression, source)
+        }
+        ExpressionKind::ParenthesizedExpression(paren) => {
+            dollar_callee_root(paren.expression, source)
+        }
         _ => None,
     }
 }
@@ -235,13 +240,13 @@ fn store_read_exemption(ctx: &WalkCtx<'_>, name: &str) -> Option<Result<(), Comp
 /// `needs_context` (which must see mutations inside dropped event handlers so a
 /// reassigned binding is never statically folded).
 pub(crate) fn assign_target_roots(target: &Expression<'_>, source: &str, out: &mut NameSet) {
-    match target {
-        Expression::Identifier(id) => {
+    match &target.kind {
+        ExpressionKind::Identifier(id) => {
             if let Some(name) = identifier_name(id, source) {
                 out.insert(name.to_string());
             }
         }
-        Expression::MemberExpression(m) => assign_target_roots(m.object, source, out),
+        ExpressionKind::MemberExpression(m) => assign_target_roots(m.object, source, out),
         // All four TypeScript assignment-target wrappers the parser accepts
         // (`expression_assignable.rs`). LOAD-BEARING, not defense in depth: the
         // script's statements are erased before this walk, but the TEMPLATE's are
@@ -250,12 +255,14 @@ pub(crate) fn assign_target_roots(target: &Expression<'_>, source: &str, out: &m
         // reassignment collection walks the raw fragment. A missing arm silently
         // loses a reassignment root (`(x as any).y = 1` in a handler) and then
         // statically folds a mutated binding.
-        Expression::TSNonNullExpression(t) => assign_target_roots(t.expression, source, out),
-        Expression::TSAsExpression(t) => assign_target_roots(t.expression, source, out),
-        Expression::TSSatisfiesExpression(t) => assign_target_roots(t.expression, source, out),
-        Expression::TSTypeAssertion(t) => assign_target_roots(t.expression, source, out),
-        Expression::ParenthesizedExpression(p) => assign_target_roots(p.expression, source, out),
-        Expression::ObjectPattern(obj) => {
+        ExpressionKind::TSNonNullExpression(t) => assign_target_roots(t.expression, source, out),
+        ExpressionKind::TSAsExpression(t) => assign_target_roots(t.expression, source, out),
+        ExpressionKind::TSSatisfiesExpression(t) => assign_target_roots(t.expression, source, out),
+        ExpressionKind::TSTypeAssertion(t) => assign_target_roots(t.expression, source, out),
+        ExpressionKind::ParenthesizedExpression(p) => {
+            assign_target_roots(p.expression, source, out);
+        }
+        ExpressionKind::ObjectPattern(obj) => {
             for prop in obj.properties {
                 match prop {
                     ObjectPatternProperty::Property(p) => {
@@ -267,13 +274,13 @@ pub(crate) fn assign_target_roots(target: &Expression<'_>, source: &str, out: &m
                 }
             }
         }
-        Expression::ArrayPattern(arr) => {
+        ExpressionKind::ArrayPattern(arr) => {
             for element in arr.elements.iter().flatten() {
                 assign_target_roots(element, source, out);
             }
         }
-        Expression::AssignmentPattern(a) => assign_target_roots(a.left, source, out),
-        Expression::RestElement(r) => assign_target_roots(r.argument, source, out),
+        ExpressionKind::AssignmentPattern(a) => assign_target_roots(a.left, source, out),
+        ExpressionKind::RestElement(r) => assign_target_roots(r.argument, source, out),
         _ => {}
     }
 }
@@ -289,7 +296,7 @@ pub(crate) fn assign_target_roots(target: &Expression<'_>, source: &str, out: &m
 /// computed index) and is left for the read rewrite to lower (`d().x = v` /
 /// `x[d()] = v`). Only a bare-name binding leaf is a write; a default's value
 /// (`[d = 1] = …` → the `1`) is a read, so only the `left` of an
-/// [`AssignmentPattern`](Expression::AssignmentPattern) is a binding.
+/// [`AssignmentPattern`](ExpressionKind::AssignmentPattern) is a binding.
 ///
 /// Keyed on `derived_names`, so in a dropped region (an empty set) it never fires
 /// — a dropped-handler derived write compiles, unchanged.
@@ -297,9 +304,9 @@ fn refuse_derived_write_target(
     target: &Expression<'_>,
     ctx: &WalkCtx<'_>,
 ) -> Result<(), CompileError> {
-    match target {
+    match &target.kind {
         // A bare-identifier binding target — a write to the derived itself.
-        Expression::Identifier(id) => {
+        ExpressionKind::Identifier(id) => {
             if let Some(name) = identifier_name(id, ctx.source)
                 && ctx.derived_names.contains(name)
             {
@@ -310,15 +317,15 @@ fn refuse_derived_write_target(
         }
         // A member/index target READS the derived, never binds it — STOP here so
         // `d.x = v` / `x[d] = v` compile via the read rewrite.
-        Expression::MemberExpression(_) => {}
+        ExpressionKind::MemberExpression(_) => {}
         // Destructuring-pattern targets: every slot is itself an assignment target,
         // so recurse into each binding-leaf position.
-        Expression::ArrayPattern(pattern) => {
+        ExpressionKind::ArrayPattern(pattern) => {
             for element in pattern.elements.iter().flatten() {
                 refuse_derived_write_target(element, ctx)?;
             }
         }
-        Expression::ObjectPattern(pattern) => {
+        ExpressionKind::ObjectPattern(pattern) => {
             for prop in pattern.properties {
                 match prop {
                     ObjectPatternProperty::Property(p) => {
@@ -332,13 +339,13 @@ fn refuse_derived_write_target(
         }
         // A default (`[d = 1] = …`): `left` is the binding, `right` the default
         // (a read the read rewrite / guard handles). Only the binding refuses.
-        Expression::AssignmentPattern(pattern) => {
+        ExpressionKind::AssignmentPattern(pattern) => {
             refuse_derived_write_target(pattern.left, ctx)?;
         }
-        Expression::RestElement(rest) => {
+        ExpressionKind::RestElement(rest) => {
             refuse_derived_write_target(rest.argument, ctx)?;
         }
-        Expression::ParenthesizedExpression(paren) => {
+        ExpressionKind::ParenthesizedExpression(paren) => {
             refuse_derived_write_target(paren.expression, ctx)?;
         }
         _ => {}
@@ -363,7 +370,7 @@ fn collect_nested_declared(pattern: &Expression<'_>, ctx: &mut WalkCtx<'_>) {
 ///
 /// This is the rule that separates the two `$$slots` positions, and it is the
 /// only thing that makes the reference carve-out in `walk_expression`'s
-/// `Expression::Identifier` arm sound: a `$$slots` *reference* is the real
+/// `ExpressionKind::Identifier` arm sound: a `$$slots` *reference* is the real
 /// runtime value the transform injects, while a `$$slots` *declaration* is a
 /// compile error. The rule is Svelte-domain, not a JS early error — `let $$slots
 /// = 1` is valid JavaScript.
@@ -473,11 +480,11 @@ fn collect_decoded_binding_names(
     source: &str,
     out: &mut Vec<String>,
 ) -> Result<(), CompileError> {
-    match pattern {
-        Expression::Identifier(id) => {
+    match &pattern.kind {
+        ExpressionKind::Identifier(id) => {
             out.push(id.name(source).to_string());
         }
-        Expression::ObjectPattern(obj) => {
+        ExpressionKind::ObjectPattern(obj) => {
             for prop in obj.properties {
                 match prop {
                     ObjectPatternProperty::Property(p) => {
@@ -489,7 +496,7 @@ fn collect_decoded_binding_names(
                 }
             }
         }
-        Expression::ObjectExpression(obj) => {
+        ExpressionKind::ObjectExpression(obj) => {
             for prop in obj.properties {
                 match prop {
                     ObjectProperty::Property(p) => {
@@ -501,20 +508,20 @@ fn collect_decoded_binding_names(
                 }
             }
         }
-        Expression::ArrayPattern(arr) => {
+        ExpressionKind::ArrayPattern(arr) => {
             for element in arr.elements.iter().flatten() {
                 collect_decoded_binding_names(element, source, out)?;
             }
         }
-        Expression::AssignmentPattern(assign) => {
+        ExpressionKind::AssignmentPattern(assign) => {
             collect_decoded_binding_names(assign.left, source, out)?;
         }
-        Expression::RestElement(rest) => {
+        ExpressionKind::RestElement(rest) => {
             collect_decoded_binding_names(rest.argument, source, out)?;
         }
-        other => {
+        _ => {
             return Err(CompileError::Unsupported(Refusal::BindingPatternShape {
-                kind: expression_kind(other),
+                kind: expression_kind(pattern),
             }));
         }
     }
@@ -866,7 +873,7 @@ fn walk_class_member(member: &ClassMember<'_>, ctx: &mut WalkCtx<'_>) -> Result<
 }
 
 fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), CompileError> {
-    match expr {
+    match &expr.kind {
         // The rune guard: any call/new whose callee roots in a `$`-identifier. A
         // store-base callee root (`$fn()`, `$obj.m()`, `new $C()`) is a store read
         // in callee position — EXEMPT it (the store rewrite descends into the
@@ -875,7 +882,7 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
         // refused (`store_read_base` excludes `RUNE_BASES`, so `$state()` etc. are
         // never store bases), as does a shadowed base
         // (`store_invalid_scoped_subscription`).
-        Expression::CallExpression(call) => {
+        ExpressionKind::CallExpression(call) => {
             if let Some(name) = dollar_callee_root(call.callee, ctx.source) {
                 match store_read_exemption(ctx, name) {
                     Some(Ok(())) => {}
@@ -886,7 +893,7 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
             walk_expression(call.callee, ctx)?;
             walk_expressions(call.arguments, ctx)
         }
-        Expression::NewExpression(new_expr) => {
+        ExpressionKind::NewExpression(new_expr) => {
             if let Some(name) = dollar_callee_root(new_expr.callee, ctx.source) {
                 match store_read_exemption(ctx, name) {
                     Some(Ok(())) => {}
@@ -904,7 +911,7 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
         // pattern default, a script position, an unsupported wrapper, or an
         // escaped-identifier read) refuses here. Name-only positions
         // (non-computed member properties / object keys) are never walked.
-        Expression::Identifier(id) => {
+        ExpressionKind::Identifier(id) => {
             if let Some(name) = dollar_identifier_name(id, ctx.source) {
                 // `$$slots` READ in a value position is a real runtime reference
                 // (the transform injects `const $$slots = $.sanitize_slots(
@@ -986,14 +993,14 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
         }
 
         // Leaves.
-        Expression::Literal(_)
-        | Expression::PrivateIdentifier(_)
-        | Expression::RegexLiteral(_)
-        | Expression::ThisExpression(_)
-        | Expression::Super(_)
-        | Expression::MetaProperty(_) => Ok(()),
+        ExpressionKind::Literal(_)
+        | ExpressionKind::PrivateIdentifier(_)
+        | ExpressionKind::RegexLiteral(_)
+        | ExpressionKind::ThisExpression(_)
+        | ExpressionKind::Super(_)
+        | ExpressionKind::MetaProperty(_) => Ok(()),
 
-        Expression::ObjectExpression(obj) => {
+        ExpressionKind::ObjectExpression(obj) => {
             for prop in obj.properties {
                 match prop {
                     ObjectProperty::Property(p) => {
@@ -1007,35 +1014,35 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
             }
             Ok(())
         }
-        Expression::ArrayExpression(arr) => {
+        ExpressionKind::ArrayExpression(arr) => {
             for element in arr.elements {
                 walk_opt(element.as_ref(), ctx)?;
             }
             Ok(())
         }
-        Expression::UnaryExpression(u) => walk_expression(u.argument, ctx),
-        Expression::UpdateExpression(u) => {
+        ExpressionKind::UnaryExpression(u) => walk_expression(u.argument, ctx),
+        ExpressionKind::UpdateExpression(u) => {
             assign_target_roots(u.argument, ctx.source, ctx.updated);
             refuse_derived_write_target(u.argument, ctx)?;
             walk_expression(u.argument, ctx)
         }
-        Expression::BinaryExpression(b) => {
+        ExpressionKind::BinaryExpression(b) => {
             walk_expression(b.left, ctx)?;
             walk_expression(b.right, ctx)
         }
-        Expression::MemberExpression(m) => {
+        ExpressionKind::MemberExpression(m) => {
             walk_expression(m.object, ctx)?;
             if m.computed {
                 walk_expression(m.property, ctx)?;
             }
             Ok(())
         }
-        Expression::ConditionalExpression(c) => {
+        ExpressionKind::ConditionalExpression(c) => {
             walk_expression(c.test, ctx)?;
             walk_expression(c.consequent, ctx)?;
             walk_expression(c.alternate, ctx)
         }
-        Expression::ArrowFunctionExpression(a) => {
+        ExpressionKind::ArrowFunctionExpression(a) => {
             enter_function(a.params, ctx)?;
             let result = match &a.body {
                 ArrowFunctionBody::Expression(e) => walk_expression(e, ctx),
@@ -1044,7 +1051,7 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
             ctx.fn_depth -= 1;
             result
         }
-        Expression::FunctionExpression(f) => walk_function_expression(f, ctx),
+        ExpressionKind::FunctionExpression(f) => walk_function_expression(f, ctx),
         // A class EXPRESSION id is the one `$`-prefixed binding name the oracle
         // ACCEPTS (it declares no binding for it, so `dollar_prefix_invalid`
         // never fires) — this refusal is a deliberate over-refusal, not the
@@ -1061,7 +1068,7 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
         // compiling — it lands on the oracle's own mis-compile rather than a tsv
         // over-refusal, and is not one of the escaped over-acceptances the
         // `Identifier::name` decode closes. See `docs/conformance_svelte_compiler.md`.
-        Expression::ClassExpression(c) => {
+        ExpressionKind::ClassExpression(c) => {
             if let Some(id) = &c.id
                 && let Some(name) = dollar_identifier_name(id, ctx.source)
             {
@@ -1071,33 +1078,33 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
             }
             walk_class_body(&c.body, ctx)
         }
-        Expression::SpreadElement(s) => walk_expression(s.argument, ctx),
-        Expression::TemplateLiteral(t) => walk_expressions(t.expressions, ctx),
-        Expression::TaggedTemplateExpression(t) => {
+        ExpressionKind::SpreadElement(s) => walk_expression(s.argument, ctx),
+        ExpressionKind::TemplateLiteral(t) => walk_expressions(t.expressions, ctx),
+        ExpressionKind::TaggedTemplateExpression(t) => {
             walk_expression(t.tag, ctx)?;
             walk_expressions(t.quasi.expressions, ctx)
         }
         // Top-level/template `await` forces the oracle's async-component
         // shapes (blockers, thunked pushes) — not implemented, refuse. Inside
         // a nested function it is ordinary code and passes through.
-        Expression::AwaitExpression(a) => {
+        ExpressionKind::AwaitExpression(a) => {
             if ctx.fn_depth == 0 {
                 return Err(CompileError::Unsupported(Refusal::TopLevelAwait));
             }
             walk_expression(a.argument, ctx)
         }
-        Expression::YieldExpression(y) => match y.argument {
+        ExpressionKind::YieldExpression(y) => match y.argument {
             Some(argument) => walk_expression(argument, ctx),
             None => Ok(()),
         },
-        Expression::SequenceExpression(s) => walk_expressions(s.expressions, ctx),
-        Expression::AssignmentExpression(a) => {
+        ExpressionKind::SequenceExpression(s) => walk_expressions(s.expressions, ctx),
+        ExpressionKind::AssignmentExpression(a) => {
             assign_target_roots(a.left, ctx.source, ctx.updated);
             refuse_derived_write_target(a.left, ctx)?;
             walk_expression(a.left, ctx)?;
             walk_expression(a.right, ctx)
         }
-        Expression::ObjectPattern(p) => {
+        ExpressionKind::ObjectPattern(p) => {
             for prop in p.properties {
                 match prop {
                     ObjectPatternProperty::Property(prop) => {
@@ -1113,31 +1120,31 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
             }
             Ok(())
         }
-        Expression::ArrayPattern(p) => {
+        ExpressionKind::ArrayPattern(p) => {
             for element in p.elements {
                 walk_opt(element.as_ref(), ctx)?;
             }
             Ok(())
         }
-        Expression::AssignmentPattern(p) => {
+        ExpressionKind::AssignmentPattern(p) => {
             walk_expression(p.left, ctx)?;
             walk_expression(p.right, ctx)
         }
-        Expression::RestElement(r) => walk_expression(r.argument, ctx),
-        Expression::TSTypeAssertion(t) => walk_expression(t.expression, ctx),
-        Expression::TSAsExpression(t) => walk_expression(t.expression, ctx),
-        Expression::TSSatisfiesExpression(t) => walk_expression(t.expression, ctx),
-        Expression::TSInstantiationExpression(t) => walk_expression(t.expression, ctx),
-        Expression::TSNonNullExpression(t) => walk_expression(t.expression, ctx),
-        Expression::TSParameterProperty(t) => walk_expression(t.parameter, ctx),
-        Expression::ImportExpression(i) => {
+        ExpressionKind::RestElement(r) => walk_expression(r.argument, ctx),
+        ExpressionKind::TSTypeAssertion(t) => walk_expression(t.expression, ctx),
+        ExpressionKind::TSAsExpression(t) => walk_expression(t.expression, ctx),
+        ExpressionKind::TSSatisfiesExpression(t) => walk_expression(t.expression, ctx),
+        ExpressionKind::TSInstantiationExpression(t) => walk_expression(t.expression, ctx),
+        ExpressionKind::TSNonNullExpression(t) => walk_expression(t.expression, ctx),
+        ExpressionKind::TSParameterProperty(t) => walk_expression(t.parameter, ctx),
+        ExpressionKind::ImportExpression(i) => {
             walk_expression(i.source, ctx)?;
             match i.options {
                 Some(options) => walk_expression(options, ctx),
                 None => Ok(()),
             }
         }
-        Expression::JsdocCast(j) => walk_expression(j.inner, ctx),
-        Expression::ParenthesizedExpression(p) => walk_expression(p.expression, ctx),
+        ExpressionKind::JsdocCast(j) => walk_expression(j.inner, ctx),
+        ExpressionKind::ParenthesizedExpression(p) => walk_expression(p.expression, ctx),
     }
 }

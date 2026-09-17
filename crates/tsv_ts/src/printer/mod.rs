@@ -758,7 +758,8 @@ impl<'a> Printer<'a> {
         already_parenthesized: bool,
         doc: DocId,
     ) -> DocId {
-        let self_parenthesizing = matches!(expr, internal::Expression::SequenceExpression(_));
+        let self_parenthesizing =
+            matches!(expr.kind, internal::ExpressionKind::SequenceExpression(_));
         if self.in_for_init.get()
             && !already_parenthesized
             && !self_parenthesizing
@@ -815,7 +816,7 @@ impl<'a> Printer<'a> {
         expr: &internal::Expression<'_>,
         slice_end: u32,
     ) -> bool {
-        use internal::Expression as E;
+        use internal::ExpressionKind as E;
         if is_in_binary(expr) {
             return true;
         }
@@ -823,7 +824,7 @@ impl<'a> Printer<'a> {
             !self.frozen_slice_child_is_parenthesized(child, slice_end)
                 && self.frozen_slice_hands_header_a_bare_in(child, slice_end)
         };
-        match expr {
+        match &expr.kind {
             E::SequenceExpression(seq) => seq.expressions.iter().any(&mut reaches),
             E::AssignmentExpression(assign) => reaches(assign.right),
             E::BinaryExpression(binary) => reaches(binary.left) || reaches(binary.right),
@@ -1208,7 +1209,7 @@ impl<'a> Printer<'a> {
     /// break-lhs arm — so keep them in step: a rule added to one is a rule missing from
     /// the other.
     pub(crate) fn is_complex_destructuring_target(&self, expr: &internal::Expression<'_>) -> bool {
-        let internal::Expression::ObjectPattern(obj) = expr else {
+        let internal::ExpressionKind::ObjectPattern(obj) = &expr.kind else {
             return false;
         };
 
@@ -1221,7 +1222,8 @@ impl<'a> Printer<'a> {
             match prop {
                 internal::ObjectPatternProperty::Property(p) => {
                     // Has default if value is AssignmentPattern
-                    let has_default = matches!(p.value, internal::Expression::AssignmentPattern(_));
+                    let has_default =
+                        matches!(p.value.kind, internal::ExpressionKind::AssignmentPattern(_));
                     // Not shorthand if key != value
                     let not_shorthand = !p.shorthand;
                     has_default || not_shorthand

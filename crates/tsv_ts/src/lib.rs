@@ -704,8 +704,8 @@ pub fn attach_pattern_type_annotation<'arena>(
     // on the spellings that separate them. `pattern` is still the bare binding here: both
     // callers parse the annotation separately and attach it after.
     ta.span.start = pattern.span().end;
-    match pattern {
-        Expression::Identifier(id) => {
+    match &mut pattern.kind {
+        ExpressionKind::Identifier(id) => {
             // Re-bind the identifier's binding extra with the parsed type
             // annotation (preserving any decorators already present).
             let decorators = id.decorators();
@@ -714,15 +714,15 @@ pub fn attach_pattern_type_annotation<'arena>(
                 decorators,
             }));
         }
-        Expression::ObjectPattern(pattern) => pattern.type_annotation = Some(ta),
-        Expression::ArrayPattern(pattern) => pattern.type_annotation = Some(ta),
+        ExpressionKind::ObjectPattern(pattern) => pattern.type_annotation = Some(ta),
+        ExpressionKind::ArrayPattern(pattern) => pattern.type_annotation = Some(ta),
         // The Svelte block grammar admits an identifier or a destructuring
         // pattern, so nothing else is reachable — and no other `Expression`
         // variant has an annotation slot to hold it. Reject rather than drop.
-        other => {
+        _ => {
             return Err(tsv_lang::lex_err(
                 "type annotation is not valid on this binding pattern",
-                other.span().start as usize,
+                pattern.span.start as usize,
             ));
         }
     }
@@ -747,10 +747,10 @@ pub fn attach_pattern_type_annotation<'arena>(
 pub fn pattern_type_annotation<'a, 'arena>(
     pattern: &'a Expression<'arena>,
 ) -> Option<&'a TSTypeAnnotation<'arena>> {
-    match pattern {
-        Expression::Identifier(id) => id.type_annotation(),
-        Expression::ObjectPattern(obj) => obj.type_annotation.as_ref(),
-        Expression::ArrayPattern(arr) => arr.type_annotation.as_ref(),
+    match &pattern.kind {
+        ExpressionKind::Identifier(id) => id.type_annotation(),
+        ExpressionKind::ObjectPattern(obj) => obj.type_annotation.as_ref(),
+        ExpressionKind::ArrayPattern(arr) => arr.type_annotation.as_ref(),
         _ => None,
     }
 }
@@ -1118,13 +1118,13 @@ pub use printer::buffer_stats::{
 };
 
 // Re-exports of types that appear in this crate's public function signatures
-// (`Program`, `Expression`, `TSTypeAnnotation`) or are named via the short
-// `tsv_ts::Foo` path by external consumers (`Statement`, `ObjectProperty`,
-// `ObjectPatternProperty` — currently only by tsv_svelte). All other AST
-// types remain accessible through the full `tsv_ts::ast::internal::Foo` path.
+// (`Program`, `Expression` and its variant half `ExpressionKind`, `TSTypeAnnotation`)
+// or are named via the short `tsv_ts::Foo` path by external consumers (`Statement`,
+// `ObjectProperty`, `ObjectPatternProperty` — currently only by tsv_svelte). All other
+// AST types remain accessible through the full `tsv_ts::ast::internal::Foo` path.
 pub use ast::internal::{
-    Expression, ObjectPatternProperty, ObjectProperty, Program, Statement, TSTypeAnnotation,
-    TSTypeParameterDeclaration, VariableDeclaration,
+    Expression, ExpressionKind, ObjectPatternProperty, ObjectProperty, Program, Statement,
+    TSTypeAnnotation, TSTypeParameterDeclaration, VariableDeclaration,
 };
 
 /// Drive the raw lexer over `source` and return a deterministic, line-per-token

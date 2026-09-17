@@ -376,7 +376,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let unary = UnaryExpression {
                     operator: UnaryOperator::Minus,
                     prefix: true,
-                    argument: self.alloc(Expression::Literal(argument)),
+                    argument: self.alloc(Expression::from_literal(argument)),
                     span: Span::new(start as u32, num_end as u32),
                 };
                 Ok(self.alloc(TSType::Literal(TSLiteralType::UnaryExpression(unary))))
@@ -991,7 +991,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // (`parse_function_type_param`), so it lands here too.
         if !self.check(&TokenKind::Arrow)
             && !saw_comma
-            && let [Expression::Identifier(id)] = params
+            && let [
+                Expression {
+                    kind: ExpressionKind::Identifier(id),
+                    ..
+                },
+            ] = params
             && id.type_annotation().is_none()
             && !id.optional
         {
@@ -1182,7 +1187,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         if !self.check(&TokenKind::ParenClose) {
             let first = self.parse_function_type_param()?;
-            let mut rest_seen = matches!(&first, Expression::RestElement(_));
+            let mut rest_seen = matches!(first.kind, ExpressionKind::RestElement(_));
             params.push(first);
             while self.eat(TokenKind::Comma) {
                 saw_comma = true;
@@ -1201,7 +1206,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     break;
                 }
                 let param = self.parse_function_type_param()?;
-                rest_seen = matches!(&param, Expression::RestElement(_));
+                rest_seen = matches!(param.kind, ExpressionKind::RestElement(_));
                 params.push(param);
             }
         }
@@ -1235,14 +1240,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     .try_param_name()
                     .ok_or_else(|| self.error_expected("parameter name"))?;
                 self.advance()?;
-                Expression::Identifier(Identifier::simple(
+                Expression::from_identifier(Identifier::simple(
                     name,
                     Span::new(id_start as u32, id_end as u32),
                 ))
             };
             let (optional, type_annotation, arg_end) =
                 self.parse_rest_param_tail(argument.span().end)?;
-            return Ok(Expression::RestElement(RestElement {
+            return Ok(Expression::from_rest_element(RestElement {
                 argument: self.alloc(argument),
                 optional,
                 type_annotation,
@@ -1281,7 +1286,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let extra = type_annotation.map(|ta| self.typed_extra(ta));
 
-        Ok(Expression::Identifier(Identifier {
+        Ok(Expression::from_identifier(Identifier {
             escaped_name: name.escaped,
             name_len: name.raw_len,
             name_plain_ascii: name.plain_ascii,

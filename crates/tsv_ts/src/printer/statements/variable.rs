@@ -1,7 +1,7 @@
 // Variable declaration printing for TypeScript
 
 use super::Printer;
-use crate::ast::internal::{self, Expression};
+use crate::ast::internal::{self, Expression, ExpressionKind};
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::statements::TerminatorGap;
 use crate::printer::{
@@ -286,16 +286,17 @@ impl<'a> Printer<'a> {
         let has_complex_type_annotation = self.id_has_complex_type_annotation(declarator.id);
         let has_complex_destructuring = self.is_complex_destructuring_target(declarator.id);
         let is_arrow_with_breakable_left =
-            matches!(init, Expression::ArrowFunctionExpression(_)) && *can_break_left;
+            matches!(init.kind, ExpressionKind::ArrowFunctionExpression(_)) && *can_break_left;
 
         // Calls and imports with trailing comments expand internally and should not use fluid layout
-        let is_call_with_trailing_comments = if let Expression::CallExpression(call) = init {
-            call.arguments.last().is_some_and(|last_arg| {
-                self.has_line_comments_between(last_arg.span().end, call.span.end)
-            })
-        } else {
-            false
-        };
+        let is_call_with_trailing_comments =
+            if let ExpressionKind::CallExpression(call) = &init.kind {
+                call.arguments.last().is_some_and(|last_arg| {
+                    self.has_line_comments_between(last_arg.span().end, init.span.end)
+                })
+            } else {
+                false
+            };
 
         // Import expressions with trailing comments also expand internally
         // (handles `await import('./x' // comment)`)
@@ -353,13 +354,12 @@ impl<'a> Printer<'a> {
             // the same fact `choose_layout` states for the assignment-RHS twin.
             // Without it the sequence's internal break satisfies the fluid layout's
             // fits() and the operands hang off the `=` column instead.
-            || matches!(init, Expression::SequenceExpression(_))
-            || matches!(init, Expression::RegexLiteral(_));
+            || matches!(init.kind, ExpressionKind::SequenceExpression(_))
+            || matches!(init.kind, ExpressionKind::RegexLiteral(_));
 
         // Decorated class expression → break after operator, each decorator
         // on its own line (`const C =\n\t@dec\n\tclass {}`).
-        let is_decorated_class_expr =
-            matches!(init, Expression::ClassExpression(c) if class_expr_has_decorators(c));
+        let is_decorated_class_expr = matches!(&init.kind, ExpressionKind::ClassExpression(c) if class_expr_has_decorators(c));
 
         // Expressions that need break-after-operator layout:
         // group([left, " =", indent([line, right])])
@@ -371,7 +371,7 @@ impl<'a> Printer<'a> {
         //   `const x = foo || { a: 1 }` not `const x =\n  foo || {a: 1}`
         // Prettier ref: `shouldBreakAfterOperator` (`print/assignment.js`) +
         // `shouldInlineLogicalExpression` (`print/binaryish.js`)
-        let is_non_inline_binary = if let Expression::BinaryExpression(binary) = init {
+        let is_non_inline_binary = if let ExpressionKind::BinaryExpression(binary) = &init.kind {
             !should_inline_logical_expression(binary)
         } else {
             false
@@ -434,7 +434,7 @@ impl<'a> Printer<'a> {
         // Type assertion calls with LHS type annotation need special fluid handling
         // (handled separately below because they need non-wrapping LHS type)
         let is_type_assertion_with_lhs_type = is_type_assertion_call(init, self.source)
-            && matches!(&declarator.id, Expression::Identifier(id) if id.type_annotation().is_some());
+            && matches!(&declarator.id.kind, ExpressionKind::Identifier(id) if id.type_annotation().is_some());
 
         // Answered per declarator, exactly as prettier's `printAssignment` is: a
         // multi-declarator list does NOT withhold the width-decided break at `=` from its
@@ -530,7 +530,9 @@ impl<'a> Printer<'a> {
             //
             // For complex type annotations, rebuild with wrapping type.
             // Complex destructuring and arrow with breakable left already have correct id_doc.
-            if has_complex_type_annotation && let Expression::Identifier(ident) = &declarator.id {
+            if has_complex_type_annotation
+                && let ExpressionKind::Identifier(ident) = &declarator.id.kind
+            {
                 parts.push(lhs_doc_with_comments(self.build_typed_identifier_doc(
                     ident,
                     declarator.definite,
@@ -557,7 +559,7 @@ impl<'a> Printer<'a> {
             // call under a typed binding, which rebuilds the LHS with a non-wrapping type
             // annotation. Every value-keyed fluid case is the default arm below.
             let fluid_id_doc = if is_type_assertion_with_lhs_type
-                && let Expression::Identifier(ident) = &declarator.id
+                && let ExpressionKind::Identifier(ident) = &declarator.id.kind
             {
                 self.build_typed_identifier_doc(
                     ident,
@@ -684,13 +686,13 @@ impl<'a> Printer<'a> {
     /// Uses wrapping type annotations so TypeReference type arguments break internally when needed.
     fn build_variable_binding_doc(&self, id: &Expression<'_>, definite: bool) -> DocId {
         if definite {
-            if let Expression::Identifier(ident) = id {
+            if let ExpressionKind::Identifier(ident) = &id.kind {
                 self.build_typed_identifier_doc(ident, true, true)
             } else {
                 // Destructuring patterns don't support definite assignment
                 self.build_expression_doc(id)
             }
-        } else if let Expression::Identifier(ident) = id {
+        } else if let ExpressionKind::Identifier(ident) = &id.kind {
             self.build_identifier_doc_with_wrapping_type(ident)
         } else {
             self.build_expression_doc(id)
@@ -947,7 +949,7 @@ impl<'a> Printer<'a> {
                 // span excludes the `!`; advance past it so comments between the name and
                 // `!` (already emitted inside the id doc) aren't re-emitted before `=`.
                 if declarator.definite
-                    && let Expression::Identifier(ident) = &declarator.id
+                    && let ExpressionKind::Identifier(ident) = &declarator.id.kind
                     && ident.type_annotation().is_none()
                     && let Some(bang_pos) =
                         self.find_char_outside_comments(id_end, init_start, b'!')

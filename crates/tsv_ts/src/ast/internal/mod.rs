@@ -86,8 +86,8 @@ pub use statements::{
 pub use expressions::{
     ArrayExpression, ArrowFunctionBody, ArrowFunctionExpression, AssignmentExpression,
     AssignmentOperator, AwaitExpression, BinaryExpression, BinaryOperator, CallExpression,
-    ConditionalExpression, Expression, FunctionExpression, ImportExpression, JsdocCast,
-    MemberExpression, MetaProperty, NewExpression, ObjectExpression, ObjectProperty,
+    ConditionalExpression, Expression, ExpressionKind, FunctionExpression, ImportExpression,
+    JsdocCast, MemberExpression, MetaProperty, NewExpression, ObjectExpression, ObjectProperty,
     ParenthesizedExpression, Property, PropertyKind, RegexLiteral, SequenceExpression,
     SpreadElement, Super, TSAsExpression, TSInstantiationExpression, TSNonNullExpression,
     TSSatisfiesExpression, TSTypeAssertion, TaggedTemplateExpression, TemplateCooked,
@@ -136,11 +136,22 @@ pub use expressions::{
 // reference there would ADD an allocation, and `CatchClause` is reached only through
 // `Option<&CatchClause>` so its width sets nothing.
 //
+// `Expression` itself is a header over its variant (`span` + `ExpressionKind`), so a
+// span read is a field load rather than a dispatch; the variant payloads shed their
+// own spans to pay for the header, which is why the width holds at 72.
+//
 // Pinned so a variant that widens any of them shows up as a failed build rather
-// than as a silently lower nesting ceiling and a fatter element slot. 64-bit only:
-// the counts are pointer-width-relative and the doc's measurements are x86-64.
+// than as a silently lower nesting ceiling and a fatter element slot. The counts are
+// pointer-width-relative and the doc's measurements are x86-64; `Expression` is also
+// pinned on wasm32 (a 4 B pointer, but an 8 B-aligned payload), and its `Option` must
+// stay niche-packed on both.
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(size_of::<Expression<'static>>() == 72);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<ExpressionKind<'static>>() == 64);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(size_of::<Expression<'static>>() == 48);
+const _: () = assert!(size_of::<Option<Expression<'static>>>() == size_of::<Expression<'static>>());
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(size_of::<Statement<'static>>() == 72);
 #[cfg(target_pointer_width = "64")]
@@ -438,34 +449,34 @@ impl<'arena> Identifier<'arena> {
 /// Private identifier: `#foo` in class fields and methods
 ///
 /// Used for truly private class members (ES2022 private class fields).
-/// The name does NOT include the `#` prefix, while the span DOES include the
-/// `#` character — so the verbatim name is the span minus its leading byte.
+/// The name does NOT include the `#` prefix, while the holding `Expression`'s span
+/// DOES include the `#` character — so the verbatim name is the span minus its
+/// leading byte.
 #[derive(Debug, Clone)]
 pub struct PrivateIdentifier<'arena> {
     /// The name channel (name excludes the `#`; `raw_len` covers the name
     /// bytes after the `#`).
     pub name: IdentName<'arena>,
-    pub span: Span,
 }
 
 impl<'arena> PrivateIdentifier<'arena> {
-    /// The name's sub-span: the trailing `raw_len` bytes of the span (the name
-    /// token ends the span; anchoring at the end stays correct even if the
-    /// parser ever tolerated separation after the `#`).
+    /// The name's sub-span: the trailing `raw_len` bytes of `span`, the span of the
+    /// `Expression` holding this node (the name token ends the span; anchoring at the
+    /// end stays correct even if the parser ever tolerated separation after the `#`).
     #[inline]
-    pub fn name_span(&self) -> Span {
-        Span::new(self.span.end - self.name.raw_len as u32, self.span.end)
+    pub fn name_span(&self, span: Span) -> Span {
+        Span::new(span.end - self.name.raw_len as u32, span.end)
     }
 
     /// Resolve the name (without `#`): the raw source slice, or the decoded
-    /// `&'arena str` for escaped names.
+    /// `&'arena str` for escaped names. `span` is the holding `Expression`'s.
     #[inline]
-    pub fn name<'s>(&self, source: &'s str) -> &'s str
+    pub fn name<'s>(&self, span: Span, source: &'s str) -> &'s str
     where
         'arena: 's,
     {
         self.name
-            .resolve(self.span.end - self.name.raw_len as u32, source)
+            .resolve(span.end - self.name.raw_len as u32, source)
     }
 }
 

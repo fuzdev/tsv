@@ -44,7 +44,9 @@ use tsv_css::ast::internal::{
 };
 use tsv_lang::Span;
 use tsv_svelte::ast::internal::{AttributeNode, AttributeValue, Element, SpecialElement, Style};
-use tsv_ts::ast::internal::{BinaryOperator, Expression, Literal, LiteralValue, ObjectProperty};
+use tsv_ts::ast::internal::{
+    BinaryOperator, Expression, ExpressionKind, Literal, LiteralValue, ObjectProperty,
+};
 
 use crate::analyze::stringify_js_number;
 use crate::element_census::{
@@ -1679,13 +1681,13 @@ struct GatherSet {
 /// no allocation.
 fn strip_ts_wrappers<'a, 'arena>(mut node: &'a Expression<'arena>) -> &'a Expression<'arena> {
     loop {
-        node = match node {
-            Expression::TSAsExpression(n) => n.expression,
-            Expression::TSSatisfiesExpression(n) => n.expression,
-            Expression::TSNonNullExpression(n) => n.expression,
-            Expression::TSInstantiationExpression(n) => n.expression,
-            Expression::TSTypeAssertion(n) => n.expression,
-            Expression::JsdocCast(cast) => cast.inner,
+        node = match &node.kind {
+            ExpressionKind::TSAsExpression(n) => n.expression,
+            ExpressionKind::TSSatisfiesExpression(n) => n.expression,
+            ExpressionKind::TSNonNullExpression(n) => n.expression,
+            ExpressionKind::TSInstantiationExpression(n) => n.expression,
+            ExpressionKind::TSTypeAssertion(n) => n.expression,
+            ExpressionKind::JsdocCast(cast) => cast.inner,
             _ => return node,
         };
     }
@@ -1712,24 +1714,24 @@ fn gather_possible_values(
     // over-matches). Stripping at entry also covers wrappers nested in the
     // conditional/logical/array/object sub-expressions this fn recurses into.
     let node = strip_ts_wrappers(node);
-    match node {
-        Expression::Literal(lit) => {
+    match &node.kind {
+        ExpressionKind::Literal(lit) => {
             set.values.insert(literal_possible_value(lit, source)?);
         }
         // The oracle treats a regex as an enumerable `Literal` (`String(/x/)` =
         // `"/x/"`); tsv models it as a distinct node and cannot reproduce its
         // source-format stringification, so refuse rather than fall to UNKNOWN and
         // over-match a selector the oracle would prune.
-        Expression::RegexLiteral(_) => {
+        ExpressionKind::RegexLiteral(_) => {
             return Err(unsupported(Refusal::CssDynamicAttributeMatch));
         }
-        Expression::ConditionalExpression(cond) => {
+        ExpressionKind::ConditionalExpression(cond) => {
             gather_possible_values(cond.consequent, is_class, set, is_nested, source)?;
             gather_possible_values(cond.alternate, is_class, set, is_nested, source)?;
         }
         // Svelte's parser routes `&&` / `||` / `??` through `BinaryExpression`; the
         // oracle's `LogicalExpression` arm is exactly `operator.is_logical()`.
-        Expression::BinaryExpression(bin) if bin.operator.is_logical() => {
+        ExpressionKind::BinaryExpression(bin) if bin.operator.is_logical() => {
             if bin.operator == BinaryOperator::AmpersandAmpersand {
                 // `&&` is special: the left value is only included when it is falsy.
                 let mut left = GatherSet::default();
@@ -1756,21 +1758,21 @@ fn gather_possible_values(
                 gather_possible_values(bin.right, is_class, set, is_nested, source)?;
             }
         }
-        Expression::ArrayExpression(arr) if is_class => {
+        ExpressionKind::ArrayExpression(arr) if is_class => {
             // `.flatten()` skips a hole (the oracle's `if (entry)`); a spread element
             // is a non-Literal node → the recursion marks it UNKNOWN via the else arm.
             for entry in arr.elements.iter().flatten() {
                 gather_possible_values(entry, is_class, set, true, source)?;
             }
         }
-        Expression::ObjectExpression(obj) if is_class => {
+        ExpressionKind::ObjectExpression(obj) if is_class => {
             for property in obj.properties {
                 if set.unknown {
                     break;
                 }
                 match property {
-                    ObjectProperty::Property(p) if !p.computed => match &p.key {
-                        Expression::Identifier(id) => match plain_identifier_str(id, source) {
+                    ObjectProperty::Property(p) if !p.computed => match &p.key.kind {
+                        ExpressionKind::Identifier(id) => match plain_identifier_str(id, source) {
                             Some(name) => {
                                 set.values.insert(PossibleValue::Str(name.to_string()));
                             }
@@ -1778,7 +1780,7 @@ fn gather_possible_values(
                             // refuse (safe over-refusal) rather than UNKNOWN-assume.
                             None => return Err(unsupported(Refusal::CssDynamicAttributeMatch)),
                         },
-                        Expression::Literal(lit) => {
+                        ExpressionKind::Literal(lit) => {
                             set.values.insert(literal_possible_value(lit, source)?);
                         }
                         _ => set.unknown = true,

@@ -35,7 +35,7 @@ use crate::ids::FileId;
 use crate::span_scan::{bracket_end, bracket_start};
 use tsv_lang::{FxHashMap, Span};
 use tsv_ts::ast::internal::{
-    ClassMember, Expression, Literal, LiteralValue, MethodKind, TSTypeElement,
+    ClassMember, Expression, ExpressionKind, Literal, LiteralValue, MethodKind, TSTypeElement,
     TSTypeParameterDeclaration,
 };
 
@@ -109,7 +109,7 @@ fn class_entries(ctx: &MemberCtx<'_>, members: &[ClassMember<'_>]) -> Vec<Entry>
             ClassMember::MethodDefinition(m) => match m.kind {
                 MethodKind::Constructor => {
                     for param in m.value.params {
-                        if let Expression::TSParameterProperty(pp) = param
+                        if let ExpressionKind::TSParameterProperty(pp) = &param.kind
                             && let Some((key, span)) = param_property_key(ctx, pp.parameter)
                         {
                             entries.push(Entry {
@@ -334,8 +334,8 @@ fn member_key(
         // A computed name is a stable key only for a string/number literal; the
         // diagnostic points at the whole `[ … ]` name node, so the span runs from
         // the `[` to just past the `]` and the display is that raw source.
-        return match key {
-            Expression::Literal(lit)
+        return match &key.kind {
+            ExpressionKind::Literal(lit)
                 if matches!(lit.value, LiteralValue::String(_) | LiteralValue::Number(_)) =>
             {
                 let k = literal_key(ctx, lit)?;
@@ -348,18 +348,18 @@ fn member_key(
             _ => None,
         };
     }
-    match key {
-        Expression::Identifier(id) => {
+    match &key.kind {
+        ExpressionKind::Identifier(id) => {
             let name = id.name(ctx.source).to_string();
             Some((name.clone(), name, id.name_span()))
         }
-        Expression::Literal(lit) => literal_key(ctx, lit).map(|k| (k.clone(), k, lit.span)),
-        Expression::PrivateIdentifier(pid) => {
+        ExpressionKind::Literal(lit) => literal_key(ctx, lit).map(|k| (k.clone(), k, lit.span)),
+        ExpressionKind::PrivateIdentifier(pid) => {
             // A `#name` — key it with the `#` so it never collides with the public
             // `name`; the diagnostic covers the whole `#name` node.
-            let name = pid.name(ctx.source);
+            let name = pid.name(key.span, ctx.source);
             let keyed = format!("#{name}");
-            Some((keyed.clone(), keyed, pid.span))
+            Some((keyed.clone(), keyed, key.span))
         }
         _ => None,
     }
@@ -370,11 +370,14 @@ fn member_key(
 /// `!ast.IsBindingPattern(param.Name())` guard) — those contribute no member.
 fn param_property_key(ctx: &MemberCtx<'_>, parameter: &Expression<'_>) -> Option<(String, Span)> {
     let inner = match parameter {
-        Expression::AssignmentPattern(a) => a.left,
+        Expression {
+            kind: ExpressionKind::AssignmentPattern(a),
+            ..
+        } => a.left,
         other => other,
     };
-    match inner {
-        Expression::Identifier(id) => Some((id.name(ctx.source).to_string(), id.name_span())),
+    match &inner.kind {
+        ExpressionKind::Identifier(id) => Some((id.name(ctx.source).to_string(), id.name_span())),
         _ => None,
     }
 }

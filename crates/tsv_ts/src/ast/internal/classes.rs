@@ -60,7 +60,6 @@ pub struct ClassExpression<'arena> {
     pub r#abstract: bool,
     /// Type parameters (e.g., `<T>` in `class Foo<T>`)
     pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
-    pub span: Span,
 }
 
 /// Class body: `{ constructor() {} method() {} prop = value; }`
@@ -160,7 +159,6 @@ pub struct TSParameterProperty<'arena> {
     pub r#override: bool,
     /// The actual parameter - can be Identifier or AssignmentPattern (with default value)
     pub parameter: &'arena Expression<'arena>,
-    pub span: Span,
 }
 
 /// Method definition in a class body: `method() { ... }` or `get x() { ... }`

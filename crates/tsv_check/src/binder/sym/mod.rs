@@ -73,8 +73,8 @@ use crate::merge::{FileMerge, MergeDecl, MergeSymbol, ModuleAug};
 use tsv_lang::{FxHashMap, Span};
 use tsv_ts::ast::Program;
 use tsv_ts::ast::internal::{
-    ExportDefaultValue, Expression, Identifier, Literal, LiteralValue, ModuleExportName, Statement,
-    TSTypeParameterDeclaration,
+    ExportDefaultValue, Expression, ExpressionKind, Identifier, Literal, LiteralValue,
+    ModuleExportName, Statement, TSTypeParameterDeclaration,
 };
 
 /// The container kinds that route member declarations (a subset of tsgo's node
@@ -436,8 +436,8 @@ impl<'a> SymbolBinder<'a> {
     ) -> Option<KeyInfo> {
         if computed {
             // A computed key names a member only for a string/numeric literal.
-            return match key {
-                Expression::Literal(lit)
+            return match &key.kind {
+                ExpressionKind::Literal(lit)
                     if matches!(lit.value, LiteralValue::String(_) | LiteralValue::Number(_)) =>
                 {
                     // The grouping key stays the decoded/canonical value (so `[0]` and
@@ -460,8 +460,8 @@ impl<'a> SymbolBinder<'a> {
                 _ => None,
             };
         }
-        match key {
-            Expression::Identifier(id) => {
+        match &key.kind {
+            ExpressionKind::Identifier(id) => {
                 let a = self.ident_atom(id);
                 Some(KeyInfo {
                     key: a,
@@ -469,7 +469,7 @@ impl<'a> SymbolBinder<'a> {
                     span: id.name_span(),
                 })
             }
-            Expression::Literal(lit) => {
+            ExpressionKind::Literal(lit) => {
                 let a = self.string_atom(lit);
                 Some(KeyInfo {
                     key: a,
@@ -477,8 +477,8 @@ impl<'a> SymbolBinder<'a> {
                     span: lit.span,
                 })
             }
-            Expression::PrivateIdentifier(pid) => {
-                let raw = pid.name(self.source);
+            ExpressionKind::PrivateIdentifier(pid) => {
+                let raw = pid.name(key.span, self.source);
                 // The display carries the leading `#`, matching the `#name` span and
                 // the check-side form (`duplicate_members.rs`'s `member_key`) — a
                 // duplicate reported by BOTH the bind cascade and the check pass shares
@@ -501,14 +501,14 @@ impl<'a> SymbolBinder<'a> {
                 // class collide (tsgo GetSymbolNameForPrivateIdentifier). The mangled
                 // key keeps the bare `raw` — only `display` gains the `#`.
                 let mangled = format!("\u{FE}#{}@{}", class_symbol.map_or(0, |s| s.0), raw);
-                let key = self.atoms.intern(&mangled);
+                let mangled_key = self.atoms.intern(&mangled);
                 // The diagnostic points at the whole `#name` node (tsgo's
                 // `getNameOfDeclaration` -> the PrivateIdentifier), so the squiggle
                 // covers the `#` — and `display` now matches that span.
                 Some(KeyInfo {
-                    key,
+                    key: mangled_key,
                     display,
-                    span: pid.span,
+                    span: key.span,
                 })
             }
             _ => None,

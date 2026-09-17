@@ -10,9 +10,9 @@ use super::{ContainerKind, DeclInput, DeclMods, NodeKind, Scope, SymbolBinder};
 use crate::ids::NodeId;
 use tsv_lang::Span;
 use tsv_ts::ast::internal::{
-    ExportDefaultValue, ExportSpecifier, Expression, ForInOfLeft, ForInit, Identifier,
-    ImportSpecifier, ModuleExportName, ObjectPatternProperty, Statement, TSModuleDeclarationBody,
-    TSModuleName,
+    ExportDefaultValue, ExportSpecifier, Expression, ExpressionKind, ForInOfLeft, ForInit,
+    Identifier, ImportSpecifier, ModuleExportName, ObjectPatternProperty, Statement,
+    TSModuleDeclarationBody, TSModuleName,
 };
 
 impl<'a> SymbolBinder<'a> {
@@ -356,8 +356,8 @@ impl<'a> SymbolBinder<'a> {
             let name = self.atoms.export_equals();
             // The name node is the expression when it is a bare identifier
             // (tsgo `getNonAssignedNameOfDeclaration`), else the whole node.
-            let error_span = match &ea.expression {
-                Expression::Identifier(id) => id.name_span(),
+            let error_span = match &ea.expression.kind {
+                ExpressionKind::Identifier(id) => id.name_span(),
                 _ => ea.span,
             };
             let d = DeclInput {
@@ -420,8 +420,8 @@ impl<'a> SymbolBinder<'a> {
                 if let Some(sym) = self.container.symbol {
                     let name = self.atoms.default_export();
                     let is_alias = matches!(
-                        expr,
-                        Expression::Identifier(_) | Expression::MemberExpression(_)
+                        expr.kind,
+                        ExpressionKind::Identifier(_) | ExpressionKind::MemberExpression(_)
                     );
                     let flags = if is_alias {
                         SymbolFlags::ALIAS
@@ -431,8 +431,8 @@ impl<'a> SymbolBinder<'a> {
                     // The name node is the expression only when it is a bare
                     // identifier (tsgo `getNonAssignedNameOfDeclaration`); otherwise
                     // the whole `export default` node.
-                    let error_span = match expr {
-                        Expression::Identifier(id) => id.name_span(),
+                    let error_span = match &expr.kind {
+                        ExpressionKind::Identifier(id) => id.name_span(),
                         _ => e.span,
                     };
                     let d = DeclInput {
@@ -549,8 +549,8 @@ impl<'a> SymbolBinder<'a> {
     }
 
     pub(super) fn bind_param(&mut self, param: &Expression<'a>) {
-        match param {
-            Expression::TSParameterProperty(pp) => {
+        match &param.kind {
+            ExpressionKind::TSParameterProperty(pp) => {
                 // The inner parameter binds as a parameter; a property-parameter
                 // also declares a class member (handled where the constructor's
                 // owning class scope is live — the constructor scope's parent).
@@ -578,8 +578,8 @@ impl<'a> SymbolBinder<'a> {
         mods: DeclMods,
         node_span: Span,
     ) {
-        match target {
-            Expression::Identifier(id) => {
+        match &target.kind {
+            ExpressionKind::Identifier(id) => {
                 let d = self.decl_from_ident(id, node_span, mods);
                 if block_scoped {
                     self.declare_block_scoped(d, includes, excludes);
@@ -595,7 +595,7 @@ impl<'a> SymbolBinder<'a> {
                     self.bind_type_annotation(ann);
                 }
             }
-            Expression::ObjectPattern(p) => {
+            ExpressionKind::ObjectPattern(p) => {
                 for prop in p.properties {
                     match prop {
                         ObjectPatternProperty::Property(pr) => {
@@ -621,16 +621,16 @@ impl<'a> SymbolBinder<'a> {
                     }
                 }
             }
-            Expression::ArrayPattern(p) => {
+            ExpressionKind::ArrayPattern(p) => {
                 for el in p.elements.iter().flatten() {
                     self.bind_binding(el, includes, excludes, block_scoped, mods, el_span(el));
                 }
             }
-            Expression::AssignmentPattern(a) => {
+            ExpressionKind::AssignmentPattern(a) => {
                 self.bind_binding(a.left, includes, excludes, block_scoped, mods, node_span);
                 self.visit_expression(a.right);
             }
-            Expression::RestElement(r) => {
+            ExpressionKind::RestElement(r) => {
                 self.bind_binding(r.argument, includes, excludes, block_scoped, mods, r.span);
             }
             _ => {}
@@ -808,16 +808,16 @@ fn var_flags(
 
 /// The span a bare parameter expression points a diagnostic at.
 fn param_span(param: &Expression<'_>) -> Span {
-    match param {
-        Expression::Identifier(id) => id.name_span(),
+    match &param.kind {
+        ExpressionKind::Identifier(id) => id.name_span(),
         _ => param.span(),
     }
 }
 
 /// The span an array-pattern element points a diagnostic at.
 fn el_span(el: &Expression<'_>) -> Span {
-    match el {
-        Expression::Identifier(id) => id.name_span(),
+    match &el.kind {
+        ExpressionKind::Identifier(id) => id.name_span(),
         _ => el.span(),
     }
 }

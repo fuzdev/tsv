@@ -67,7 +67,9 @@
 use std::collections::HashMap;
 
 use bumpalo::collections::Vec as BumpVec;
-use tsv_ts::ast::internal::{Expression, ObjectPatternProperty, Property, VariableDeclarator};
+use tsv_ts::ast::internal::{
+    Expression, ExpressionKind, ObjectPatternProperty, Property, VariableDeclarator,
+};
 
 use crate::CompileError;
 use crate::analyze::{NameSet, RuneInit};
@@ -186,13 +188,13 @@ pub(crate) fn expand_destructured_derived<'arena>(
 
     // rhs: a bare-identifier `$derived(o)` projects directly from the borrowed
     // `o`; every other shape mints `$$d` and projects from `$$d()`.
-    let mint_d = !(is_derived && matches!(value, Expression::Identifier(_)));
+    let mint_d = !(is_derived && matches!(value.kind, ExpressionKind::Identifier(_)));
     let rhs: &'arena Expression<'arena> = if mint_d {
         let d_name = names.generate("$$d");
         // Mint the id BEFORE the init so the declarator span runs forward
         // (`id.start < init.end`) — the invariant `build_sanitize_slots_decl`
         // relies on, else the printer's `callee.end - decl.start` underflows.
-        let d_id = Expression::Identifier(b.ident(&d_name));
+        let d_id = Expression::from_identifier(b.ident(&d_name));
         let span = d_id.span();
         // `$.derived(<init>)`: `$derived` thunks the value (reusing the identifier
         // path's unthunk collapse); `$derived.by` passes the compute fn directly.
@@ -287,7 +289,7 @@ pub(crate) fn expand_destructured_state<'arena>(
     // `callee.end - decl.span.start` (`variable.rs`) reads the reused host
     // STATEMENT span (`rewrite_script_statement`'s `span: decl.span`), never this
     // appendix id span.
-    let tmp_id = Expression::Identifier(b.ident(&tmp_name));
+    let tmp_id = Expression::from_identifier(b.ident(&tmp_name));
     let tmp_span = tmp_id.span();
     declarations.push(VariableDeclarator {
         id: b.arena.alloc(tmp_id),
@@ -370,14 +372,14 @@ impl<'arena> Extractor<'_, 'arena> {
         expr: &'arena Expression<'arena>,
         names: &mut GeneratedNames<'_>,
     ) -> Result<(), CompileError> {
-        match param {
+        match &param.kind {
             // Leaf: `const <param> = $.derived(() => expr)`. A declaration pattern
             // never binds a member expression, so an Identifier is the only leaf.
-            Expression::Identifier(_) => {
+            ExpressionKind::Identifier(_) => {
                 self.push_path(param, expr);
                 Ok(())
             }
-            Expression::ObjectPattern(obj) => {
+            ExpressionKind::ObjectPattern(obj) => {
                 for prop in obj.properties {
                     match prop {
                         ObjectPatternProperty::RestElement(rest) => {
@@ -394,19 +396,24 @@ impl<'arena> Extractor<'_, 'arena> {
                 }
                 Ok(())
             }
-            Expression::ArrayPattern(arr) => {
+            ExpressionKind::ArrayPattern(arr) => {
                 // Derived: `const $$derived_array = $.derived(() => $.to_array(expr[,
                 // len]))`. State: `const $$array = $.to_array(expr[, len])` (a plain
                 // `const`, no `$.derived` wrap). The length is omitted when the last
                 // element is a rest.
-                let has_rest =
-                    matches!(arr.elements.last(), Some(Some(Expression::RestElement(_))));
+                let has_rest = matches!(
+                    arr.elements.last(),
+                    Some(Some(Expression {
+                        kind: ExpressionKind::RestElement(_),
+                        ..
+                    }))
+                );
                 let len = (!has_rest).then_some(arr.elements.len());
                 let name = names.generate(self.mode.array_base());
                 // Mint the id BEFORE the `$.to_array` / `$.derived` init so the
                 // declarator span runs forward (see the `$$d` mint's forward-span
                 // note in `expand_destructured_derived`).
-                let id = Expression::Identifier(self.b.ident(&name));
+                let id = Expression::from_identifier(self.b.ident(&name));
                 let id_span = id.span();
                 let to_array = self.build_to_array(expr, len);
                 let init = match self.mode {
@@ -427,7 +434,7 @@ impl<'arena> Extractor<'_, 'arena> {
                     let Some(element) = element else {
                         continue; // a hole (`[a, , b]`) projects nothing
                     };
-                    if let Expression::RestElement(rest) = element {
+                    if let ExpressionKind::RestElement(rest) = &element.kind {
                         let slice = self.array_rest(&name, i);
                         self.extract(rest.argument, slice, names)?;
                     } else {
@@ -437,7 +444,7 @@ impl<'arena> Extractor<'_, 'arena> {
                 }
                 Ok(())
             }
-            Expression::AssignmentPattern(assign) => {
+            ExpressionKind::AssignmentPattern(assign) => {
                 // A default: project `$.fallback(expr, <default>)`, then recurse on
                 // the left (Identifier → leaf, nested → recurse).
                 let fallback = self.build_fallback(expr, assign.right);
@@ -483,7 +490,7 @@ impl<'arena> Extractor<'_, 'arena> {
         if prop.computed {
             return Err(unsupported(self.refusal.clone()));
         }
-        let Expression::Identifier(key) = &prop.key else {
+        let ExpressionKind::Identifier(key) = &prop.key.kind else {
             return Err(unsupported(self.refusal.clone()));
         };
         let Some(name) = plain_identifier_name(key, self.source) else {
@@ -506,7 +513,7 @@ impl<'arena> Extractor<'_, 'arena> {
                 if p.computed {
                     return Err(unsupported(self.refusal.clone()));
                 }
-                let Expression::Identifier(key) = &p.key else {
+                let ExpressionKind::Identifier(key) = &p.key.kind else {
                     return Err(unsupported(self.refusal.clone()));
                 };
                 let Some(name) = plain_identifier_name(key, self.source) else {
@@ -619,19 +626,19 @@ impl<'arena> Extractor<'_, 'arena> {
 
 /// The oracle's `is_simple_expression` (`utils/ast.js:442`): an identifier /
 /// literal / function / arrow, or a conditional/binary/logical whose operands are
-/// all simple. tsv folds logical into [`Expression::BinaryExpression`].
+/// all simple. tsv folds logical into [`ExpressionKind::BinaryExpression`].
 fn is_simple_expression(node: &Expression<'_>) -> bool {
-    match node {
-        Expression::Literal(_)
-        | Expression::Identifier(_)
-        | Expression::ArrowFunctionExpression(_)
-        | Expression::FunctionExpression(_) => true,
-        Expression::ConditionalExpression(c) => {
+    match &node.kind {
+        ExpressionKind::Literal(_)
+        | ExpressionKind::Identifier(_)
+        | ExpressionKind::ArrowFunctionExpression(_)
+        | ExpressionKind::FunctionExpression(_) => true,
+        ExpressionKind::ConditionalExpression(c) => {
             is_simple_expression(c.test)
                 && is_simple_expression(c.consequent)
                 && is_simple_expression(c.alternate)
         }
-        Expression::BinaryExpression(b) => {
+        ExpressionKind::BinaryExpression(b) => {
             // TODO: the oracle (`utils/ast.js:461`) also guards `left.type !==
             // 'PrivateIdentifier'` on this arm; omitted as unreachable — a
             // `#x in obj` default is parse-rejected at module scope.

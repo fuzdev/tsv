@@ -47,6 +47,7 @@ use crate::ast::internal;
 use arg_comments::{any_arg_empty_line, any_comment_forces_expansion, last_arg_has_comments};
 use arg_predicates::is_block_function;
 use arg_wrapping::{build_args_split_last, multiline_template_hug_applies};
+use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
 
 /// A call's callee gap: whether the callee prints a REQUIRED pair that keeps both its gaps
@@ -169,12 +170,16 @@ impl CalleeGap {
 }
 
 /// Resolve a call's [`CalleeGap`].
-pub(super) fn callee_gap(printer: &Printer<'_>, call: &internal::CallExpression<'_>) -> CalleeGap {
+pub(super) fn callee_gap(
+    printer: &Printer<'_>,
+    call: &internal::CallExpression<'_>,
+    span: Span,
+) -> CalleeGap {
     let callee_end = call.callee.span().end;
-    let owned_pair = call_callee_paren_leading_start(call).is_some();
+    let owned_pair = call_callee_paren_leading_start(call, span).is_some();
     let trailing_gap = printer.owned_pair_trailing_gap(callee_end, owned_pair);
     let start = Printer::gap_start_after_owned_pair(callee_end, trailing_gap);
-    let optional = call_optional(printer, call, start);
+    let optional = call_optional(printer, call, span, start);
     let paren_open = args_side_start(call, optional.arg_side_start().unwrap_or(start));
     CalleeGap {
         paren_split: call_paren_split(printer, call, paren_open),
@@ -305,6 +310,7 @@ fn split_strands_directive(
 fn call_optional(
     printer: &Printer<'_>,
     call: &internal::CallExpression<'_>,
+    span: Span,
     start: u32,
 ) -> CallOptional {
     if !call.optional {
@@ -320,7 +326,7 @@ fn call_optional(
         || {
             call.arguments
                 .first()
-                .map_or(call.span.end, |arg| arg.span().start)
+                .map_or(span.end, |arg| arg.span().start)
         },
         |ta| ta.span.start,
     );
@@ -367,19 +373,27 @@ pub(super) fn optional_callee_gap_doc(printer: &Printer<'_>, gap: CalleeGap) -> 
 
 /// [`CalleeGap::paren_open`] for a caller that wants only the position — the dispatcher's
 /// bypass tests and the test-call predicate, neither of which builds a callee doc.
-pub(super) fn call_paren_open(printer: &Printer<'_>, call: &internal::CallExpression<'_>) -> u32 {
-    callee_gap(printer, call).paren_open(call)
+pub(super) fn call_paren_open(
+    printer: &Printer<'_>,
+    call: &internal::CallExpression<'_>,
+    span: Span,
+) -> u32 {
+    callee_gap(printer, call, span).paren_open(call)
 }
 
 /// Check if a chain expression contains any call expressions
 pub(in crate::printer) fn chain_has_calls(expr: &internal::Expression<'_>) -> bool {
-    match expr {
-        internal::Expression::CallExpression(_) => true,
-        internal::Expression::MemberExpression(member) => chain_has_calls(member.object),
-        internal::Expression::TSNonNullExpression(non_null) => chain_has_calls(non_null.expression),
+    match &expr.kind {
+        internal::ExpressionKind::CallExpression(_) => true,
+        internal::ExpressionKind::MemberExpression(member) => chain_has_calls(member.object),
+        internal::ExpressionKind::TSNonNullExpression(non_null) => {
+            chain_has_calls(non_null.expression)
+        }
         // Look through await/yield to find nested calls: (await fn()).method()
-        internal::Expression::AwaitExpression(await_expr) => chain_has_calls(await_expr.argument),
-        internal::Expression::YieldExpression(yield_expr) => yield_expr
+        internal::ExpressionKind::AwaitExpression(await_expr) => {
+            chain_has_calls(await_expr.argument)
+        }
+        internal::ExpressionKind::YieldExpression(yield_expr) => yield_expr
             .argument
             .as_ref()
             .is_some_and(|arg| chain_has_calls(arg)),
@@ -422,7 +436,7 @@ pub(super) enum CalleeParens<'a> {
     /// softline])` over FLAT parts. The operand is therefore the ungrouped chain — the
     /// paren group alone decides whether to break after `(` — and not the
     /// continuation-indented default a binaryish value takes everywhere else.
-    Binary(&'a internal::BinaryExpression<'a>),
+    Binary(&'a internal::BinaryExpression<'a>, Span),
 }
 
 impl<'a> CalleeParens<'a> {
@@ -440,10 +454,10 @@ impl<'a> CalleeParens<'a> {
         if !printer.needs_parens(callee, context) {
             return None;
         }
-        Some(match callee {
-            internal::Expression::TSAsExpression(_)
-            | internal::Expression::TSSatisfiesExpression(_) => Self::Cast(callee),
-            internal::Expression::BinaryExpression(binary) => Self::Binary(binary),
+        Some(match &callee.kind {
+            internal::ExpressionKind::TSAsExpression(_)
+            | internal::ExpressionKind::TSSatisfiesExpression(_) => Self::Cast(callee),
+            internal::ExpressionKind::BinaryExpression(binary) => Self::Binary(binary, callee.span),
             _ => Self::Welded(callee),
         })
     }
@@ -452,7 +466,7 @@ impl<'a> CalleeParens<'a> {
     /// shape but [`Self::Binary`].
     pub(super) fn build_body_doc(&self, printer: &Printer<'_>) -> DocId {
         match self {
-            Self::Binary(binary) => printer.build_binary_chain_doc_ungrouped(binary),
+            Self::Binary(binary, span) => printer.build_binary_chain_doc_ungrouped(binary, *span),
             Self::Welded(callee) | Self::Cast(callee) => printer.build_expression_doc(callee),
         }
     }
@@ -461,7 +475,7 @@ impl<'a> CalleeParens<'a> {
     pub(super) fn build_doc(&self, printer: &Printer<'_>, body: DocId) -> DocId {
         match self {
             Self::Welded(_) => printer.arena().parens(body),
-            Self::Cast(_) | Self::Binary(_) => printer.build_expanding_parens_doc(body),
+            Self::Cast(_) | Self::Binary(..) => printer.build_expanding_parens_doc(body),
         }
     }
 }
@@ -473,8 +487,9 @@ impl<'a> CalleeParens<'a> {
 /// `mark_own_call_layout` — which of the chain's own calls that redirect swallowed.
 pub(in crate::printer) fn is_memberish(expr: &internal::Expression<'_>) -> bool {
     matches!(
-        expr,
-        internal::Expression::MemberExpression(_) | internal::Expression::TSNonNullExpression(_)
+        expr.kind,
+        internal::ExpressionKind::MemberExpression(_)
+            | internal::ExpressionKind::TSNonNullExpression(_)
     )
 }
 
@@ -483,8 +498,9 @@ impl<'a> Printer<'a> {
     pub(super) fn build_call_doc_with_wrapping(
         &self,
         call: &internal::CallExpression<'_>,
+        span: Span,
     ) -> DocId {
-        call_formatting::build_call_doc_with_wrapping(self, call)
+        call_formatting::build_call_doc_with_wrapping(self, call, span)
     }
 
     /// Build a Doc for a call expression (for nested contexts)
@@ -495,19 +511,19 @@ impl<'a> Printer<'a> {
     ///
     /// Simple calls like `obj.method()` use the simple call path unless they have
     /// comments between member segments.
-    pub(super) fn build_call_doc(&self, call: &internal::CallExpression<'_>) -> DocId {
+    pub(super) fn build_call_doc(&self, call: &internal::CallExpression<'_>, span: Span) -> DocId {
         // Curried call with callback pattern: fn()('arg', () => { ... })
         // When the callee is a simple call expression and the last argument is a
         // block function, use conditional_group to try inline first, then expand-all.
         //
         // Skip when the inner call has array/object args — those may force multiline,
         // and the chain formatter handles that correctly via group(oneLine).
-        if let internal::Expression::CallExpression(inner) = call.callee {
+        if let internal::ExpressionKind::CallExpression(inner) = &call.callee.kind {
             let inner_has_multiline_arg = inner.arguments.iter().any(|arg| {
                 matches!(
-                    arg,
-                    internal::Expression::ArrayExpression(_)
-                        | internal::Expression::ObjectExpression(_)
+                    arg.kind,
+                    internal::ExpressionKind::ArrayExpression(_)
+                        | internal::ExpressionKind::ObjectExpression(_)
                 )
             });
             let any_arg_empty_line = any_arg_empty_line(call.arguments, self);
@@ -520,13 +536,14 @@ impl<'a> Printer<'a> {
             // text on the page (a *layout* question), not who emits it. A bundler annotation
             // on the last argument must still disable the expand-last hug, exactly as an
             // ordinary leading comment does — prettier's `shouldExpandLastArg` sees it.
-            let call_has_comments = self.has_comments_on_page_between(paren_open, call.span.end);
+            let call_has_comments = self.has_comments_on_page_between(paren_open, span.end);
             if call.arguments.len() >= 2
                 && call.arguments.last().is_some_and(is_block_function)
                 && !any_arg_empty_line
-                && !(call_has_comments && any_comment_forces_expansion(call, self, paren_open))
                 && !(call_has_comments
-                    && last_arg_has_comments(call.arguments, self, call.span.end, paren_open))
+                    && any_comment_forces_expansion(call, span, self, paren_open))
+                && !(call_has_comments
+                    && last_arg_has_comments(call.arguments, self, span.end, paren_open))
                 && !inner_has_multiline_arg
             {
                 let d = self.d();
@@ -593,23 +610,23 @@ impl<'a> Printer<'a> {
             // print-once ledger is blind to. Line comments only: ownership binds a block
             // (`owned ⇒ is_block`) and a block never defers, so this is the axis-free half of
             // the question.
-            if test_patterns::test_call_flat_layout_applies(call, self) {
-                return self.build_call_doc_with_wrapping(call);
+            if test_patterns::test_call_flat_layout_applies(call, span, self) {
+                return self.build_call_doc_with_wrapping(call, span);
             }
-            let paren_open = call_paren_open(self, call);
+            let paren_open = call_paren_open(self, call, span);
             if multiline_template_hug_applies(self, call.arguments, paren_open)
-                && !self.has_line_comments_between(call.span.start, paren_open)
+                && !self.has_line_comments_between(span.start, paren_open)
             {
-                return self.build_call_doc_with_wrapping(call);
+                return self.build_call_doc_with_wrapping(call, span);
             }
 
             // Use chain wrapping for chains (nested calls) or memberish callees
             let mut nodes = chain::ChainNodeVec::new();
-            chain::linearize_chain_from_call_into(call, self.linearize_input(), &mut nodes);
-            chain::build_linearized_chain_doc(&nodes, call.callee, call.span.start, call.span, self)
+            chain::linearize_chain_from_call_into(call, span, self.linearize_input(), &mut nodes);
+            chain::build_linearized_chain_doc(&nodes, call.callee, span.start, span, self)
         } else {
             // Simple call (non-memberish callee) - wrap args directly
-            self.build_call_doc_with_wrapping(call)
+            self.build_call_doc_with_wrapping(call, span)
         }
     }
 
@@ -619,34 +636,33 @@ impl<'a> Printer<'a> {
     /// 1. Linearize AST into flat list of chain nodes
     /// 2. Group nodes by natural break points
     /// 3. Build doc with conditionalGroup for oneLine/expanded alternatives
-    pub(super) fn build_member_doc(&self, member: &internal::MemberExpression<'_>) -> DocId {
+    pub(super) fn build_member_doc(
+        &self,
+        member: &internal::MemberExpression<'_>,
+        span: Span,
+    ) -> DocId {
         // A format-ignore directive attached to this member access (in the gap between
         // the object and the property) makes prettier print the entire member
         // expression verbatim from source — preserving inner call args (numbers,
         // etc.) that the chain formatter would otherwise reformat. Mirrors
         // prettier's `hasPrettierIgnore` → verbatim-print behavior.
         if self.member_gap_frozen(member.object.span().end, member.property.span().start) {
-            return self.build_frozen_opaque_node_doc(member.span);
+            return self.build_frozen_opaque_node_doc(span);
         }
 
         // Use chain-based implementation
         let mut nodes = chain::ChainNodeVec::new();
-        chain::linearize_chain_from_member_into(member, self.linearize_input(), &mut nodes);
-        chain::build_linearized_chain_doc(
-            &nodes,
-            member.object,
-            member.span.start,
-            member.span,
-            self,
-        )
+        chain::linearize_chain_from_member_into(member, span, self.linearize_input(), &mut nodes);
+        chain::build_linearized_chain_doc(&nodes, member.object, span.start, span, self)
     }
 
     /// Build a Doc for a dynamic import expression: `import('module')` or `import('module', options)`
     pub(super) fn build_import_expression_doc(
         &self,
         import_expr: &internal::ImportExpression<'_>,
+        span: Span,
     ) -> DocId {
-        import_expr::build_import_expression_doc(self, import_expr)
+        import_expr::build_import_expression_doc(self, import_expr, span)
     }
 
     /// Build a Doc for a meta property: `import.meta`, `new.target`
@@ -660,9 +676,10 @@ impl<'a> Printer<'a> {
     pub(super) fn build_call_args_doc_for_chain(
         &self,
         call: &internal::CallExpression<'_>,
+        span: Span,
         facts: ChainCall,
     ) -> DocId {
-        chain_args::build_call_args_doc_for_chain(self, call, facts)
+        chain_args::build_call_args_doc_for_chain(self, call, span, facts)
     }
 
     /// Build a Doc for call arguments with forced expansion (hardlines instead of softlines)
@@ -671,8 +688,9 @@ impl<'a> Printer<'a> {
     pub(super) fn build_call_args_doc_for_chain_expanded(
         &self,
         call: &internal::CallExpression<'_>,
+        span: Span,
         facts: ChainCall,
     ) -> DocId {
-        chain_args::build_call_args_doc_for_chain_expanded(self, call, facts)
+        chain_args::build_call_args_doc_for_chain_expanded(self, call, span, facts)
     }
 }

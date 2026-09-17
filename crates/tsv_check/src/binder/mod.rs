@@ -65,7 +65,7 @@ use crate::ids::{FileId, NodeId};
 use crate::merge::FileMerge;
 use tsv_lang::{FxHashMap, Span};
 use tsv_ts::ast::Program;
-use tsv_ts::ast::internal::{Expression, Statement, TSModuleReference};
+use tsv_ts::ast::internal::{Expression, ExpressionKind, Statement, TSModuleReference};
 
 /// The pre-order node kinds the SoA walk assigns — one variant per tsv_ts AST enum
 /// variant the walk ids (the program root, then statements, expressions, types, and
@@ -445,8 +445,8 @@ fn stmt_contains_import_meta(stmt: &Statement<'_>) -> bool {
 /// the common expression positions; deliberately not exhaustive over every type
 /// node (types never carry `import.meta`).
 fn expr_contains_import_meta(expr: &Expression<'_>) -> bool {
-    use Expression as E;
-    match expr {
+    use ExpressionKind as E;
+    match &expr.kind {
         // `import.meta` vs `new.target`: the only two meta-properties, told apart
         // by the meta keyword's name length (`import` = 6, `new` = 3).
         E::MetaProperty(m) => m.meta.name_len == 6,
@@ -642,7 +642,7 @@ pub(crate) fn statement_kind(stmt: &Statement<'_>) -> NodeKind {
 /// reparsed cast is not a flow subject), and the SoA walk lowers both the
 /// wrapper and the inner, so the inner's key is always present.
 pub(crate) fn expression_addr_kind(e: &Expression<'_>) -> (usize, NodeKind) {
-    use Expression as E;
+    use ExpressionKind as E;
     // ⚠️ The five arena-boxed variants deref (`addr_of(*x)`), the rest do not. Their
     // binder is a `&&Node`, so a bare `addr_of(x)` infers `T = &Node` and keys on the
     // address of the ENUM's pointer slot instead of the node's — a different key from
@@ -650,7 +650,7 @@ pub(crate) fn expression_addr_kind(e: &Expression<'_>) -> (usize, NodeKind) {
     // coercion and so sees the node. The boxed spelling is also the more stable key:
     // it survives a copy of the enum, where an inline payload's address does not.
     // The lockstep `debug_assert` in `lower::expression` is what catches drift here.
-    match e {
+    match &e.kind {
         E::JsdocCast(c) => expression_addr_kind(c.inner),
         E::Literal(x) => (addr_of(x), NodeKind::Literal),
         E::Identifier(x) => (addr_of(x), NodeKind::Identifier),

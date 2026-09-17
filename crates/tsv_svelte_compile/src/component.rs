@@ -25,8 +25,8 @@ use tsv_svelte::ast::internal::{
     SpecialElement, SpecialElementKind,
 };
 use tsv_ts::ast::internal::{
-    ArrayExpression, BlockStatement, Expression, ObjectExpression, ObjectProperty, Property,
-    Statement,
+    ArrayExpression, BlockStatement, Expression, ExpressionKind, ObjectExpression, ObjectProperty,
+    Property, Statement,
 };
 
 use crate::analyze::BindingKind;
@@ -284,7 +284,7 @@ pub(crate) fn emit_component<'arena>(
     // identifier — member components refuse above).
     let callee = env.b.ident_expr(name);
     let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
-    args.push(Expression::Identifier(env.b.ident("$$renderer")));
+    args.push(Expression::from_identifier(env.b.ident("$$renderer")));
     args.push(props_expr);
     let call = env.b.call_of(callee, args.into_bump_slice(), false);
     let call_stmt = env.b.expression_statement(call);
@@ -416,11 +416,13 @@ fn build_component_props<'arena>(
         elements.push(Some(build_props_object(env, &[], Some(plan))?));
     }
     let rbracket = env.b.mint("]").end;
-    let array = Expression::ArrayExpression(ArrayExpression {
-        elements: elements.into_bump_slice(),
-        spread_trailing_comma: false,
+    let array = Expression {
         span: Span::new(lbracket, rbracket),
-    });
+        kind: ExpressionKind::ArrayExpression(ArrayExpression {
+            elements: elements.into_bump_slice(),
+            spread_trailing_comma: false,
+        }),
+    };
     let array_alloc = arena.alloc(array);
     Ok(env
         .b
@@ -464,11 +466,13 @@ fn build_props_object<'arena>(
         )));
     }
     let cbrace = env.b.mint("}").end;
-    Ok(Expression::ObjectExpression(ObjectExpression {
-        properties: properties.into_bump_slice(),
-        spread_trailing_comma: false,
+    Ok(Expression {
         span: Span::new(obrace, cbrace),
-    }))
+        kind: ExpressionKind::ObjectExpression(ObjectExpression {
+            properties: properties.into_bump_slice(),
+            spread_trailing_comma: false,
+        }),
+    })
 }
 
 /// A `{ name }` shorthand prop for a named-snippet child — the value references
@@ -479,8 +483,8 @@ fn build_snippet_prop<'arena>(env: &mut EmitEnv<'arena, '_>, name: &str) -> Prop
     let value = env.b.ident(name);
     init_property(
         env.b.arena,
-        Expression::Identifier(key),
-        Expression::Identifier(value),
+        Expression::from_identifier(key),
+        Expression::from_identifier(value),
         true,
         key_span,
     )
@@ -514,13 +518,13 @@ fn build_children_prop<'arena>(
         },
         HashMap::new(),
     )?;
-    let renderer_param = Expression::Identifier(env.b.ident("$$renderer"));
+    let renderer_param = Expression::from_identifier(env.b.ident("$$renderer"));
     let params = std::slice::from_ref(arena.alloc(renderer_param));
     let block_span = env.b.here();
     let arrow = env.b.arrow_block(params, body, block_span);
     Ok(init_property(
         arena,
-        Expression::Identifier(key),
+        Expression::from_identifier(key),
         arrow,
         false,
         key_span,
@@ -546,19 +550,27 @@ fn build_slots_prop<'arena>(
         let entry_val = env.b.true_literal();
         inner_props.push(ObjectProperty::Property(init_property(
             arena,
-            Expression::Identifier(entry_key),
+            Expression::from_identifier(entry_key),
             entry_val,
             false,
             entry_key_span,
         )));
     }
     let cbrace = env.b.mint("}").end;
-    let inner = Expression::ObjectExpression(ObjectExpression {
-        properties: inner_props.into_bump_slice(),
-        spread_trailing_comma: false,
+    let inner = Expression {
         span: Span::new(obrace, cbrace),
-    });
-    init_property(arena, Expression::Identifier(key), inner, false, key_span)
+        kind: ExpressionKind::ObjectExpression(ObjectExpression {
+            properties: inner_props.into_bump_slice(),
+            spread_trailing_comma: false,
+        }),
+    };
+    init_property(
+        arena,
+        Expression::from_identifier(key),
+        inner,
+        false,
+        key_span,
+    )
 }
 
 /// Build one `key: value` object property from a component attribute. The key is
@@ -574,14 +586,14 @@ fn build_component_property<'arena>(
     let name = attr.name(env.source).to_string();
     let key_is_ident = is_js_identifier(&name);
     let key = if key_is_ident {
-        Expression::Identifier(env.b.ident(&name))
+        Expression::from_identifier(env.b.ident(&name))
     } else {
         env.b.string_literal_expr(&name)
     };
     let key_span = key.span();
     let value = build_prop_value(env, attr)?;
     let shorthand = key_is_ident
-        && matches!(&value, Expression::Identifier(id)
+        && matches!(&value.kind, ExpressionKind::Identifier(id)
             if plain_identifier_name(id, env.source).as_deref() == Some(name.as_str()));
     Ok(init_property(env.b.arena, key, value, shorthand, key_span))
 }

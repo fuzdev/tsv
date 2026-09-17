@@ -26,12 +26,12 @@ pub(super) fn is_module_path_no_break(
     }
 
     // Check for `require.resolve()`
-    if let internal::Expression::MemberExpression(member) = call.callee
+    if let internal::ExpressionKind::MemberExpression(member) = &call.callee.kind
         && !member.computed
         && !member.optional
-        && let internal::Expression::Identifier(resolve_id) = member.property
+        && let internal::ExpressionKind::Identifier(resolve_id) = &member.property.kind
         && printer.with_ident_name(resolve_id, |s| s == "resolve")
-        && let internal::Expression::Identifier(require_id) = member.object
+        && let internal::ExpressionKind::Identifier(require_id) = &member.object.kind
         && printer.with_ident_name(require_id, |s| s == "require")
     {
         return true;
@@ -56,7 +56,7 @@ pub(super) fn get_module_path_chain_break<'a>(
     }
 
     // Callee must be a member expression (not computed, not optional)
-    let internal::Expression::MemberExpression(member) = call.callee else {
+    let internal::ExpressionKind::MemberExpression(member) = &call.callee.kind else {
         return None;
     };
     if member.computed || member.optional {
@@ -64,7 +64,7 @@ pub(super) fn get_module_path_chain_break<'a>(
     }
 
     // Property must be an identifier
-    let internal::Expression::Identifier(method_name) = member.property else {
+    let internal::ExpressionKind::Identifier(method_name) = &member.property.kind else {
         return None;
     };
 
@@ -74,12 +74,12 @@ pub(super) fn get_module_path_chain_break<'a>(
     // Check for `require.resolve.paths()`
     if is_paths {
         // Object should be `require.resolve`
-        if let internal::Expression::MemberExpression(obj_member) = member.object
+        if let internal::ExpressionKind::MemberExpression(obj_member) = &member.object.kind
             && !obj_member.computed
             && !obj_member.optional
-            && let internal::Expression::Identifier(resolve_id) = obj_member.property
+            && let internal::ExpressionKind::Identifier(resolve_id) = &obj_member.property.kind
             && printer.with_ident_name(resolve_id, |s| s == "resolve")
-            && let internal::Expression::Identifier(require_id) = obj_member.object
+            && let internal::ExpressionKind::Identifier(require_id) = &obj_member.object.kind
             && printer.with_ident_name(require_id, |s| s == "require")
         {
             return Some((member.object, method_name));
@@ -87,7 +87,7 @@ pub(super) fn get_module_path_chain_break<'a>(
     }
 
     // Check for `import.meta.resolve()`
-    if is_resolve && let internal::Expression::MetaProperty(meta) = member.object {
+    if is_resolve && let internal::ExpressionKind::MetaProperty(meta) = &member.object.kind {
         let is_import_meta = printer.with_ident_name(&meta.meta, |m| m == "import")
             && printer.with_ident_name(&meta.property, |p| p == "meta");
         if is_import_meta {

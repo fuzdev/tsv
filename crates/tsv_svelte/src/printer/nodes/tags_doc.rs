@@ -9,7 +9,7 @@ use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::doc::{DocBuf, GroupId};
 use tsv_lang::source_scan::TriviaProfile;
-use tsv_ts::Expression;
+use tsv_ts::{Expression, ExpressionKind};
 
 // Opening-tag literals whose `.len()` locates the embedded expression past the
 // tag; sharing the literal keeps the emitted text and the scan offset in sync.
@@ -226,13 +226,13 @@ impl<'a> Printer<'a> {
     /// rules can't drift from our own assignment printer.
     /// Prettier ref: assignment.js:196-226
     fn const_should_break_after_op(expr: &Expression<'_>) -> bool {
-        match expr {
+        match &expr.kind {
             // Binary expressions break after `=`, UNLESS it's a logical expression
             // with an inlinable RHS (non-empty object/array). In that case, the
             // RHS handles its own expansion: `= item || { ... }` not `=\n  item || {}`
             // Prettier ref: assignment.js:199 `isBinaryish && !shouldInlineLogicalExpression`
-            Expression::BinaryExpression(bin) => !tsv_ts::should_inline_logical_expression(bin),
-            Expression::SequenceExpression(_) => true,
+            ExpressionKind::BinaryExpression(bin) => !tsv_ts::should_inline_logical_expression(bin),
+            ExpressionKind::SequenceExpression(_) => true,
             // Conditionals break only when the test is binary (and not inline
             // logical); simple identifier tests (e.g., `cond ? a : b`) use fluid
             // layout. False for every other expression type.

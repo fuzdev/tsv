@@ -485,7 +485,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let Statement::ExpressionStatement(expr_stmt) = stmt else {
             return Ok(false);
         };
-        let Expression::Literal(lit) = &expr_stmt.expression else {
+        let ExpressionKind::Literal(lit) = &expr_stmt.expression.kind else {
             return Ok(false);
         };
         if !matches!(lit.value, LiteralValue::String(_)) {
@@ -521,7 +521,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let Statement::ExpressionStatement(expr_stmt) = stmt else {
             return None;
         };
-        let Expression::Literal(lit) = &expr_stmt.expression else {
+        let ExpressionKind::Literal(lit) = &expr_stmt.expression.kind else {
             return None;
         };
         // The literal's own span, not the statement's: the two differ by the trailing

@@ -95,16 +95,16 @@ pub(crate) struct ParenLeadingValue {
 /// still keeps the shell that holds it"), unconditionally, so they have no hoisted left
 /// side at all and are excluded here rather than at the pair gate.
 fn left_side_child<'e>(expr: &'e internal::Expression<'e>) -> Option<&'e internal::Expression<'e>> {
-    use internal::Expression;
-    Some(match expr {
-        Expression::CallExpression(call) => call.callee,
-        Expression::MemberExpression(member) => member.object,
-        Expression::TSNonNullExpression(non_null) => non_null.expression,
-        Expression::TaggedTemplateExpression(tagged) => tagged.tag,
-        Expression::ConditionalExpression(cond) => cond.test,
-        Expression::BinaryExpression(binary) => binary.left,
-        Expression::AssignmentExpression(assign) => assign.left,
-        Expression::SequenceExpression(seq) => seq.expressions.first()?,
+    use internal::ExpressionKind;
+    Some(match &expr.kind {
+        ExpressionKind::CallExpression(call) => call.callee,
+        ExpressionKind::MemberExpression(member) => member.object,
+        ExpressionKind::TSNonNullExpression(non_null) => non_null.expression,
+        ExpressionKind::TaggedTemplateExpression(tagged) => tagged.tag,
+        ExpressionKind::ConditionalExpression(cond) => cond.test,
+        ExpressionKind::BinaryExpression(binary) => binary.left,
+        ExpressionKind::AssignmentExpression(assign) => assign.left,
+        ExpressionKind::SequenceExpression(seq) => seq.expressions.first()?,
         _ => return None,
     })
 }
@@ -131,8 +131,8 @@ fn left_side_child<'e>(expr: &'e internal::Expression<'e>) -> Option<&'e interna
 /// erased from its LAST operand, so the comment written there floats out of the pair
 /// (`[(x, (y /* t */))]` → `[(x, y) /* t */]`).
 fn shell_content_end(expr: &internal::Expression<'_>) -> u32 {
-    match expr {
-        internal::Expression::SequenceExpression(seq) => seq
+    match &expr.kind {
+        internal::ExpressionKind::SequenceExpression(seq) => seq
             .expressions
             .last()
             .map_or_else(|| expr.span().end, |last| last.span().end),
@@ -142,9 +142,9 @@ fn shell_content_end(expr: &internal::Expression<'_>) -> u32 {
 
 pub(crate) fn paren_pair_keeps_leading_run(expr: &internal::Expression<'_>) -> bool {
     matches!(
-        expr,
-        internal::Expression::ArrowFunctionExpression(_)
-            | internal::Expression::FunctionExpression(_)
+        expr.kind,
+        internal::ExpressionKind::ArrowFunctionExpression(_)
+            | internal::ExpressionKind::FunctionExpression(_)
     )
 }
 
@@ -241,10 +241,10 @@ impl<'a> Printer<'a> {
         &self,
         expr: &'e internal::Expression<'e>,
     ) -> Option<&'e internal::Expression<'e>> {
-        use internal::Expression;
+        use internal::ExpressionKind;
         let child = left_side_child(expr)?;
-        let retains = match expr {
-            Expression::MemberExpression(_) | Expression::CallExpression(_) => {
+        let retains = match &expr.kind {
+            ExpressionKind::MemberExpression(_) | ExpressionKind::CallExpression(_) => {
                 chain_paren_leading_gap(expr, self.comments).is_some()
             }
             // The chain's base-pair answer covers the sealed optional chain and the
@@ -252,15 +252,15 @@ impl<'a> Printer<'a> {
             // pair — as the family's expanded shell, run inside — whenever the operand
             // needs its parens (`( // c⏎x + y⏎)!`), and that pair the linearizer never
             // sees.
-            Expression::TSNonNullExpression(non_null) => {
+            ExpressionKind::TSNonNullExpression(non_null) => {
                 chain_paren_leading_gap(expr, self.comments).is_some()
                     || self.needs_parens(non_null.expression, ParenContext::NonNull)
             }
-            Expression::TaggedTemplateExpression(tagged) => {
-                tagged.span.start < tagged.tag.span().start
+            ExpressionKind::TaggedTemplateExpression(tagged) => {
+                expr.span.start < tagged.tag.span().start
                     && paren_pair_keeps_leading_run(tagged.tag)
             }
-            Expression::AssignmentExpression(assign) => {
+            ExpressionKind::AssignmentExpression(assign) => {
                 self.needs_parens(assign.left, ParenContext::AssignmentTarget)
             }
             _ => false,
@@ -290,24 +290,24 @@ impl<'a> Printer<'a> {
         expr: &internal::Expression<'_>,
         child: &internal::Expression<'_>,
     ) -> bool {
-        use internal::Expression;
+        use internal::ExpressionKind;
         // No shell between them at all, so there is no pair to re-emit.
         if expr.span().start == child.span().start {
             return false;
         }
-        let ctx = match expr {
-            Expression::MemberExpression(_) => ParenContext::ChainBase,
-            Expression::CallExpression(_) => ParenContext::Callee,
-            Expression::TaggedTemplateExpression(_) => ParenContext::TaggedTemplateTag,
-            Expression::TSNonNullExpression(_) => ParenContext::NonNull,
-            Expression::AssignmentExpression(_) => ParenContext::AssignmentTarget,
-            Expression::BinaryExpression(binary) => ParenContext::BinaryLeft {
+        let ctx = match &expr.kind {
+            ExpressionKind::MemberExpression(_) => ParenContext::ChainBase,
+            ExpressionKind::CallExpression(_) => ParenContext::Callee,
+            ExpressionKind::TaggedTemplateExpression(_) => ParenContext::TaggedTemplateTag,
+            ExpressionKind::TSNonNullExpression(_) => ParenContext::NonNull,
+            ExpressionKind::AssignmentExpression(_) => ParenContext::AssignmentTarget,
+            ExpressionKind::BinaryExpression(binary) => ParenContext::BinaryLeft {
                 parent_op: binary.operator,
             },
             // The ternary test's pair is its printer's own question, not `needs_parens`'
             // ([`ternary_test_needs_parens`], which the inline, line-comment and frozen
             // layouts all share).
-            Expression::ConditionalExpression(_) => return ternary_test_needs_parens(child),
+            ExpressionKind::ConditionalExpression(_) => return ternary_test_needs_parens(child),
             // A sequence's operands ride the sequence's OWN envelope, so an operand's
             // source shell is never re-emitted as a pair of its own.
             _ => return false,
@@ -1042,6 +1042,7 @@ impl<'a> Printer<'a> {
     fn build_shell_sequence_doc(
         &self,
         seq: &internal::SequenceExpression<'_>,
+        span: Span,
         expr_end: u32,
         boundary_end: u32,
         layout: SeqLayout,
@@ -1049,7 +1050,7 @@ impl<'a> Printer<'a> {
         let grouping_close = self
             .collapsed_grouping_close(expr_end, boundary_end)
             .unwrap_or(boundary_end);
-        self.build_sequence_doc_value(seq, grouping_close, layout)
+        self.build_sequence_doc_value(seq, span, grouping_close, layout)
     }
 
     /// The index of the next byte that is neither whitespace nor trivia, at or after
@@ -1166,7 +1167,7 @@ impl<'a> Printer<'a> {
         // sequence's printer emits them itself, not because the pair is redundant — so the
         // comment is already inside a pair that prints flat around it and nothing is at risk
         // (`const s1 = (/* c⏎d */ b, c) as T;`).
-        !matches!(expr, internal::Expression::SequenceExpression(_))
+        !matches!(expr.kind, internal::ExpressionKind::SequenceExpression(_))
             && !self.needs_parens(expr, operand_ctx)
             && self
                 .comments_in_source_between(leading_start, expr.span().start)
@@ -1213,7 +1214,7 @@ impl<'a> Printer<'a> {
         let close = self.collapsed_grouping_close(expr_end, boundary_end);
         let inner_end = close.map_or(boundary_end, |c| c + 1);
 
-        if matches!(expr, internal::Expression::SequenceExpression(_)) && !has_leading {
+        if matches!(expr.kind, internal::ExpressionKind::SequenceExpression(_)) && !has_leading {
             let seq =
                 self.build_expression_doc_keep_paren_comments(expr, inner_end, SeqLayout::Aligned);
             return Some(self.append_shell_outside_run(seq, close, boundary_end));
@@ -1241,12 +1242,12 @@ impl<'a> Printer<'a> {
         if let Some(run) = leading_run {
             body.push(run);
         }
-        body.push(match expr {
+        body.push(match &expr.kind {
             // Bare: the shell composed below IS the sequence's required pair. Its own
             // printer takes the owned-comment claim ([`Self::build_sequence_doc_bare`] →
             // the run form), so this arm needs none.
-            internal::Expression::SequenceExpression(seq) => {
-                self.build_sequence_doc_bare(seq, expr_end)
+            internal::ExpressionKind::SequenceExpression(seq) => {
+                self.build_sequence_doc_bare(seq, expr.span, expr_end)
             }
             // A MULTI-LINE block the operand OWNS prints just inside this shell's `(`,
             // outside the operand's own group
@@ -1783,7 +1784,7 @@ impl<'a> Printer<'a> {
     ) -> bool {
         // A sequence self-parenthesizes on every path, so it never takes the caller's
         // pair and is excluded rather than reported here.
-        if matches!(expr, internal::Expression::SequenceExpression(_)) {
+        if matches!(expr.kind, internal::ExpressionKind::SequenceExpression(_)) {
             return false;
         }
         let expr_end = expr.span().end;
@@ -1980,7 +1981,7 @@ impl<'a> Printer<'a> {
         printer_owns_grouping: bool,
     ) -> u32 {
         let span_end = expr.span().end;
-        let unfrozen = if matches!(expr, internal::Expression::SequenceExpression(_))
+        let unfrozen = if matches!(expr.kind, internal::ExpressionKind::SequenceExpression(_))
             && (printer_owns_grouping
                 || self
                     .collapsed_grouping_close(span_end, boundary_end)
@@ -2031,7 +2032,7 @@ impl<'a> Printer<'a> {
         // `for` clause and its last operand — is prettier's default layout arm; the two
         // that hang (a `return`/`throw` argument, an arrow body) claim their sequence
         // before reaching here.
-        if let internal::Expression::SequenceExpression(seq) = expr {
+        if let internal::ExpressionKind::SequenceExpression(seq) = &expr.kind {
             // A FROZEN sequence prints verbatim, so the operand-per-line layout the
             // sequence builder chooses is not available to it — its required pair takes
             // the retained-shell rendering below instead, which is where this gap's
@@ -2051,13 +2052,17 @@ impl<'a> Printer<'a> {
                 None if tail == ShellTail::ForClauseSeparator
                     && self.shell_gap_holds_unplaceable_comment(expr_end, boundary_end) =>
                 {
-                    let inner = self.build_sequence_doc_bare(seq, expr_end);
+                    let inner = self.build_sequence_doc_bare(seq, expr.span, expr_end);
                     self.build_kept_paren_shell_doc(inner, expr_end, boundary_end)
                         .unwrap_or_else(|| self.d().parens(inner))
                 }
-                None => {
-                    self.build_shell_sequence_doc(seq, expr_end, boundary_end, SeqLayout::Aligned)
-                }
+                None => self.build_shell_sequence_doc(
+                    seq,
+                    expr.span,
+                    expr_end,
+                    boundary_end,
+                    SeqLayout::Aligned,
+                ),
             };
         }
 
@@ -2268,8 +2273,8 @@ impl<'a> Printer<'a> {
         // paren-restoring path below — `build_expression_doc` would emit its parens and
         // this method would re-wrap them (`() => ((1, 2, 3) /* c */)`). `layout` is the
         // caller's: an arrow body hangs its operands, the ASI-shell operands align.
-        if let internal::Expression::SequenceExpression(seq) = expr {
-            return self.build_shell_sequence_doc(seq, expr_end, boundary_end, layout);
+        if let internal::ExpressionKind::SequenceExpression(seq) = &expr.kind {
+            return self.build_shell_sequence_doc(seq, expr.span, expr_end, boundary_end, layout);
         }
 
         let inner = self.build_expression_doc(expr);

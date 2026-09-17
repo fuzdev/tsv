@@ -21,7 +21,7 @@
 
 use bumpalo::collections::Vec as BumpVec;
 use tsv_svelte::ast::internal::{Attribute, AttributeValue};
-use tsv_ts::ast::internal::{Expression, LiteralValue, Property};
+use tsv_ts::ast::internal::{Expression, ExpressionKind, LiteralValue, Property};
 
 use crate::analyze::{evaluate, stringify_value};
 use crate::body_builder::BodyBuilder;
@@ -241,9 +241,9 @@ pub(crate) fn class_needs_clsx(expr: &Expression<'_>, quoted: bool) -> bool {
     if quoted {
         return false;
     }
-    match expr {
-        Expression::Literal(_) | Expression::TemplateLiteral(_) => false,
-        Expression::BinaryExpression(b) => b.operator.is_logical(),
+    match &expr.kind {
+        ExpressionKind::Literal(_) | ExpressionKind::TemplateLiteral(_) => false,
+        ExpressionKind::BinaryExpression(b) => b.operator.is_logical(),
         _ => true,
     }
 }
@@ -292,7 +292,7 @@ fn emit_dynamic_attribute<'arena>(
     let expr = env.erase(expr)?;
     // A string-literal expression value takes the oracle's inline-literal path
     // (pre-escaped static emission) — refuse rather than guess its edge rules.
-    if matches!(expr, Expression::Literal(lit)
+    if matches!(&expr.kind, ExpressionKind::Literal(lit)
         if matches!(lit.value, LiteralValue::String(_)))
     {
         return Err(unsupported(Refusal::StringLiteralExprAttribute));
@@ -616,7 +616,7 @@ pub(crate) fn build_spread_object_property<'arena>(
     };
     let key_is_ident = is_js_identifier(emit_name);
     let key = if key_is_ident {
-        Expression::Identifier(env.b.ident(emit_name))
+        Expression::from_identifier(env.b.ident(emit_name))
     } else {
         env.b.string_literal_expr(emit_name)
     };
@@ -624,7 +624,7 @@ pub(crate) fn build_spread_object_property<'arena>(
     // Object shorthand `{ hidden }`: an identifier key whose value is the plain
     // identifier of the same (emitted) name (`hidden={hidden}`, `viewBox={viewBox}`).
     let shorthand = key_is_ident
-        && matches!(&value, Expression::Identifier(id)
+        && matches!(&value.kind, ExpressionKind::Identifier(id)
             if plain_identifier_name(id, env.source).as_deref() == Some(emit_name));
     Ok(Some(init_property(
         env.b.arena,

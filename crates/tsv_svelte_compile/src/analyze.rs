@@ -27,7 +27,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use tsv_ts::ast::internal::{ArrowFunctionBody, BinaryOperator, Expression, UnaryOperator};
+use tsv_ts::ast::internal::{
+    ArrowFunctionBody, BinaryOperator, Expression, ExpressionKind, UnaryOperator,
+};
 
 use crate::{CompileError, Refusal};
 
@@ -334,7 +336,7 @@ pub(crate) fn rune_call_spread(
     }
     call.arguments
         .iter()
-        .any(|arg| matches!(arg, Expression::SpreadElement(_)))
+        .any(|arg| matches!(arg.kind, ExpressionKind::SpreadElement(_)))
         .then_some(keypath)
 }
 
@@ -348,10 +350,10 @@ pub(crate) fn evaluate(
     if depth > 16 {
         return gray("evaluation recursion limit (cyclic bindings?)");
     }
-    match expr {
-        Expression::Literal(lit) => literal_value(lit, source),
+    match &expr.kind {
+        ExpressionKind::Literal(lit) => literal_value(lit, source),
 
-        Expression::Identifier(id) => {
+        ExpressionKind::Identifier(id) => {
             if id.escaped_name.is_some() {
                 // Synthetic identifiers never appear on an evaluated spine.
                 return Ok(Evaluation::single(Entry::Unknown));
@@ -382,7 +384,7 @@ pub(crate) fn evaluate(
             }
         }
 
-        Expression::BinaryExpression(bin) => {
+        ExpressionKind::BinaryExpression(bin) => {
             use BinaryOperator::{
                 Ampersand, AmpersandAmpersand, BangEquals, BangEqualsEquals, Caret, EqualsEquals,
                 EqualsEqualsEquals, GreaterThan, GreaterThanEquals, In, Instanceof, LeftShift,
@@ -461,7 +463,7 @@ pub(crate) fn evaluate(
             }
         }
 
-        Expression::ConditionalExpression(cond) => {
+        ExpressionKind::ConditionalExpression(cond) => {
             let test = evaluate(cond.test, scope, source, depth + 1)?;
             let consequent = evaluate(cond.consequent, scope, source, depth + 1)?;
             let alternate = evaluate(cond.alternate, scope, source, depth + 1)?;
@@ -473,7 +475,7 @@ pub(crate) fn evaluate(
             Ok(union)
         }
 
-        Expression::UnaryExpression(unary) => {
+        ExpressionKind::UnaryExpression(unary) => {
             let argument = evaluate(unary.argument, scope, source, depth + 1)?;
             if let Some(v) = argument.known_value() {
                 return Ok(Evaluation::known(unary_op(unary.operator, v)?));
@@ -497,7 +499,7 @@ pub(crate) fn evaluate(
             Ok(eval)
         }
 
-        Expression::CallExpression(call) => {
+        ExpressionKind::CallExpression(call) => {
             match global_keypath(call.callee, scope, source) {
                 Some(keypath) if keypath.starts_with('$') => {
                     // The rune table.
@@ -515,7 +517,10 @@ pub(crate) fn evaluate(
                             Ok(eval)
                         }
                         "$derived.by" => match arg {
-                            Some(Expression::ArrowFunctionExpression(arrow)) => match &arrow.body {
+                            Some(Expression {
+                                kind: ExpressionKind::ArrowFunctionExpression(arrow),
+                                ..
+                            }) => match &arrow.body {
                                 ArrowFunctionBody::Expression(body) => {
                                     evaluate(body, scope, source, depth + 1)
                                 }
@@ -537,7 +542,7 @@ pub(crate) fn evaluate(
             }
         }
 
-        Expression::TemplateLiteral(template) => {
+        ExpressionKind::TemplateLiteral(template) => {
             let mut result = String::new();
             match quasi_cooked(template, 0, source) {
                 Some(text) => result.push_str(&text),
@@ -563,7 +568,7 @@ pub(crate) fn evaluate(
             Ok(Evaluation::known(Value::Str(result)))
         }
 
-        Expression::MemberExpression(_) => match global_keypath(expr, scope, source) {
+        ExpressionKind::MemberExpression(_) => match global_keypath(expr, scope, source) {
             // The oracle folds `global_constants` keypaths (Math.PI, …) — not
             // ported, so any global-rooted member read refuses.
             Some(keypath) => gray(format!(
@@ -572,12 +577,12 @@ pub(crate) fn evaluate(
             None => Ok(Evaluation::single(Entry::Unknown)),
         },
 
-        Expression::ArrowFunctionExpression(_) | Expression::FunctionExpression(_) => {
+        ExpressionKind::ArrowFunctionExpression(_) | ExpressionKind::FunctionExpression(_) => {
             Ok(Evaluation::single(Entry::FunctionSentinel))
         }
 
         // Values the oracle carries but this port cannot stringify/compare.
-        Expression::RegexLiteral(_) => gray("regex literal value"),
+        ExpressionKind::RegexLiteral(_) => gray("regex literal value"),
 
         // The SIX transparent wrappers evaluate through to their inner
         // expression. The oracle's AST carries none of them: it erases the five
@@ -587,14 +592,16 @@ pub(crate) fn evaluate(
         // erasure unwraps all six before this runs, so these arms are defense in
         // depth: falling into the `default: UNKNOWN` arm below would *under-fold*
         // (a parity divergence, not a refusal).
-        Expression::TSAsExpression(e) => evaluate(e.expression, scope, source, depth + 1),
-        Expression::TSSatisfiesExpression(e) => evaluate(e.expression, scope, source, depth + 1),
-        Expression::TSNonNullExpression(e) => evaluate(e.expression, scope, source, depth + 1),
-        Expression::TSTypeAssertion(e) => evaluate(e.expression, scope, source, depth + 1),
-        Expression::TSInstantiationExpression(e) => {
+        ExpressionKind::TSAsExpression(e) => evaluate(e.expression, scope, source, depth + 1),
+        ExpressionKind::TSSatisfiesExpression(e) => {
             evaluate(e.expression, scope, source, depth + 1)
         }
-        Expression::JsdocCast(e) => evaluate(e.inner, scope, source, depth + 1),
+        ExpressionKind::TSNonNullExpression(e) => evaluate(e.expression, scope, source, depth + 1),
+        ExpressionKind::TSTypeAssertion(e) => evaluate(e.expression, scope, source, depth + 1),
+        ExpressionKind::TSInstantiationExpression(e) => {
+            evaluate(e.expression, scope, source, depth + 1)
+        }
+        ExpressionKind::JsdocCast(e) => evaluate(e.inner, scope, source, depth + 1),
 
         // Everything else is the oracle's `default: UNKNOWN` — portable.
         _ => Ok(Evaluation::single(Entry::Unknown)),
@@ -657,8 +664,8 @@ fn literal_value(lit: &tsv_ts::ast::internal::Literal<'_>, source: &str) -> Eval
 /// binding. `None` when the root is a local binding, computed, or not an
 /// identifier.
 fn global_keypath(expr: &Expression<'_>, scope: &Scope<'_, '_>, source: &str) -> Option<String> {
-    match expr {
-        Expression::Identifier(id) => {
+    match &expr.kind {
+        ExpressionKind::Identifier(id) => {
             if id.escaped_name.is_some() {
                 return None;
             }
@@ -677,9 +684,9 @@ fn global_keypath(expr: &Expression<'_>, scope: &Scope<'_, '_>, source: &str) ->
             }
             Some(name.to_string())
         }
-        Expression::MemberExpression(member) if !member.computed => {
+        ExpressionKind::MemberExpression(member) if !member.computed => {
             let object = global_keypath(member.object, scope, source)?;
-            let Expression::Identifier(prop) = member.property else {
+            let ExpressionKind::Identifier(prop) = &member.property.kind else {
                 return None;
             };
             if prop.escaped_name.is_some() {
@@ -822,15 +829,15 @@ pub(crate) fn pattern_binding_names(
     out: &mut Vec<String>,
 ) -> Result<(), CompileError> {
     use tsv_ts::ast::internal::{ObjectPatternProperty, ObjectProperty};
-    match pattern {
-        Expression::Identifier(id) => {
+    match &pattern.kind {
+        ExpressionKind::Identifier(id) => {
             if id.escaped_name.is_none() {
                 let start = id.span.start as usize;
                 out.push(source[start..start + id.name_len as usize].to_string());
             }
             Ok(())
         }
-        Expression::ObjectPattern(obj) => {
+        ExpressionKind::ObjectPattern(obj) => {
             for prop in obj.properties {
                 match prop {
                     ObjectPatternProperty::Property(p) => {
@@ -843,7 +850,7 @@ pub(crate) fn pattern_binding_names(
             }
             Ok(())
         }
-        Expression::ObjectExpression(obj) => {
+        ExpressionKind::ObjectExpression(obj) => {
             // Patterns reuse expression shapes in some positions.
             for prop in obj.properties {
                 match prop {
@@ -857,16 +864,18 @@ pub(crate) fn pattern_binding_names(
             }
             Ok(())
         }
-        Expression::ArrayPattern(arr) => {
+        ExpressionKind::ArrayPattern(arr) => {
             for element in arr.elements.iter().flatten() {
                 pattern_binding_names(element, source, out)?;
             }
             Ok(())
         }
-        Expression::AssignmentPattern(assign) => pattern_binding_names(assign.left, source, out),
-        Expression::RestElement(rest) => pattern_binding_names(rest.argument, source, out),
-        other => Err(CompileError::Unsupported(Refusal::BindingPatternShape {
-            kind: expression_kind(other),
+        ExpressionKind::AssignmentPattern(assign) => {
+            pattern_binding_names(assign.left, source, out)
+        }
+        ExpressionKind::RestElement(rest) => pattern_binding_names(rest.argument, source, out),
+        _ => Err(CompileError::Unsupported(Refusal::BindingPatternShape {
+            kind: expression_kind(pattern),
         })),
     }
 }
@@ -887,34 +896,36 @@ pub(crate) fn pattern_binding_names(
 /// can only disagree in the safe direction.
 pub(crate) fn pattern_binds_unnameable_identifier(pattern: &Expression<'_>) -> bool {
     use tsv_ts::ast::internal::{ObjectPatternProperty, ObjectProperty};
-    match pattern {
-        Expression::Identifier(id) => id.escaped_name.is_some(),
-        Expression::ObjectPattern(obj) => obj.properties.iter().any(|prop| match prop {
+    match &pattern.kind {
+        ExpressionKind::Identifier(id) => id.escaped_name.is_some(),
+        ExpressionKind::ObjectPattern(obj) => obj.properties.iter().any(|prop| match prop {
             ObjectPatternProperty::Property(p) => pattern_binds_unnameable_identifier(p.value),
             ObjectPatternProperty::RestElement(rest) => {
                 pattern_binds_unnameable_identifier(rest.argument)
             }
         }),
-        Expression::ObjectExpression(obj) => obj.properties.iter().any(|prop| match prop {
+        ExpressionKind::ObjectExpression(obj) => obj.properties.iter().any(|prop| match prop {
             ObjectProperty::Property(p) => pattern_binds_unnameable_identifier(p.value),
             ObjectProperty::SpreadElement(s) => pattern_binds_unnameable_identifier(s.argument),
         }),
-        Expression::ArrayPattern(arr) => arr
+        ExpressionKind::ArrayPattern(arr) => arr
             .elements
             .iter()
             .flatten()
             .any(pattern_binds_unnameable_identifier),
-        Expression::AssignmentPattern(assign) => pattern_binds_unnameable_identifier(assign.left),
-        Expression::RestElement(rest) => pattern_binds_unnameable_identifier(rest.argument),
+        ExpressionKind::AssignmentPattern(assign) => {
+            pattern_binds_unnameable_identifier(assign.left)
+        }
+        ExpressionKind::RestElement(rest) => pattern_binds_unnameable_identifier(rest.argument),
         _ => true,
     }
 }
 
 pub(crate) fn expression_kind(expr: &Expression<'_>) -> &'static str {
     // Only used for error messages on unusual pattern shapes.
-    match expr {
-        Expression::MemberExpression(_) => "member expression",
-        Expression::CallExpression(_) => "call expression",
+    match &expr.kind {
+        ExpressionKind::MemberExpression(_) => "member expression",
+        ExpressionKind::CallExpression(_) => "call expression",
         _ => "unrecognized expression",
     }
 }
@@ -945,7 +956,7 @@ pub(crate) fn classify_rune_init<'arena>(
     init: &'arena Expression<'arena>,
     source: &str,
 ) -> Option<RuneInit<'arena>> {
-    let Expression::CallExpression(call) = init else {
+    let ExpressionKind::CallExpression(call) = &init.kind else {
         return None;
     };
     // An optional-chained rune init — `$state?.(x)`, `$state.snapshot?.(obj)`,
@@ -963,7 +974,9 @@ pub(crate) fn classify_rune_init<'arena>(
     // (a safe over-refusal). The template snapshot path (`snapshot_call_arg`)
     // recognizes the optional form separately and correctly emits `$.snapshot(x)`,
     // matching the oracle there.
-    if call.optional || matches!(call.callee, Expression::MemberExpression(m) if m.optional) {
+    if call.optional
+        || matches!(&call.callee.kind, ExpressionKind::MemberExpression(m) if m.optional)
+    {
         return None;
     }
     let keypath = callee_keypath(call.callee, source)?;
@@ -989,7 +1002,7 @@ pub(crate) fn is_effect_call<'arena>(
     expr: &'arena Expression<'arena>,
     source: &str,
 ) -> Option<&'arena Expression<'arena>> {
-    let Expression::CallExpression(call) = expr else {
+    let ExpressionKind::CallExpression(call) = &expr.kind else {
         return None;
     };
     let keypath = callee_keypath(call.callee, source)?;
@@ -1022,13 +1035,13 @@ pub(crate) fn is_inspect_call<'arena>(
     expr: &'arena Expression<'arena>,
     source: &str,
 ) -> Option<Vec<&'arena Expression<'arena>>> {
-    let Expression::CallExpression(call) = expr else {
+    let ExpressionKind::CallExpression(call) = &expr.kind else {
         return None;
     };
-    match call.callee {
+    match &call.callee.kind {
         // Bare `$inspect(args)` — one or more arguments (the oracle rejects
         // `$inspect()` with `rune_invalid_arguments_length`).
-        Expression::Identifier(_) => (callee_keypath(call.callee, source).as_deref()
+        ExpressionKind::Identifier(_) => (callee_keypath(call.callee, source).as_deref()
             == Some("$inspect")
             && !call.arguments.is_empty())
         .then(|| call.arguments.iter().collect()),
@@ -1037,8 +1050,8 @@ pub(crate) fn is_inspect_call<'arena>(
         // method leaves the outer call un-rewritten in the oracle → invalid JS;
         // a wrong outer arity (`.with()` / `.with(f, x)`) is a hard oracle error
         // (`rune_invalid_arguments_length`). Both stay refused via the guard.
-        Expression::MemberExpression(member) if !member.computed => {
-            let Expression::CallExpression(inner) = member.object else {
+        ExpressionKind::MemberExpression(member) if !member.computed => {
+            let ExpressionKind::CallExpression(inner) = &member.object.kind else {
                 return None;
             };
             if callee_keypath(member.property, source).as_deref() != Some("with")
@@ -1069,13 +1082,13 @@ pub(crate) fn callee_keypath(callee: &Expression<'_>, source: &str) -> Option<St
         let start = id.span.start as usize;
         Some(&source[start..start + id.name_len as usize])
     }
-    match callee {
-        Expression::Identifier(id) => plain_name(id, source).map(str::to_string),
-        Expression::MemberExpression(member) if !member.computed => {
-            let Expression::Identifier(obj) = member.object else {
+    match &callee.kind {
+        ExpressionKind::Identifier(id) => plain_name(id, source).map(str::to_string),
+        ExpressionKind::MemberExpression(member) if !member.computed => {
+            let ExpressionKind::Identifier(obj) = &member.object.kind else {
                 return None;
             };
-            let Expression::Identifier(prop) = member.property else {
+            let ExpressionKind::Identifier(prop) = &member.property.kind else {
                 return None;
             };
             Some(format!(

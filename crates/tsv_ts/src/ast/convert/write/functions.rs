@@ -9,6 +9,7 @@ use super::{
     Ctx, JsonWriter, close_node, node_header, write_identifier_with_optional, write_or_null,
     write_return_type_field, write_type_arguments_field, write_type_parameters_field,
 };
+use tsv_lang::Span;
 
 /// Emits an `ArrowFunctionExpression` node.
 ///
@@ -27,14 +28,15 @@ use super::{
 pub(super) fn write_arrow_function_expression(
     w: &mut JsonWriter,
     arrow: &internal::ArrowFunctionExpression<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "ArrowFunctionExpression", arrow.span, ctx);
+    node_header(w, "ArrowFunctionExpression", span, ctx);
     let generic_async = arrow.r#async
         && arrow
             .type_parameters
             .as_ref()
-            .is_some_and(|tp| tp.span.start > arrow.span.start);
+            .is_some_and(|tp| tp.span.start > span.start);
     if generic_async {
         write_type_parameters_field(w, arrow.type_parameters.as_ref(), ctx);
         w.raw(",\"params\":");
@@ -56,7 +58,7 @@ pub(super) fn write_arrow_function_expression(
         write_arrow_body(w, &arrow.body, ctx);
         write_type_parameters_field(w, arrow.type_parameters.as_ref(), ctx);
     }
-    close_node(w, "ArrowFunctionExpression", arrow.span, ctx);
+    close_node(w, "ArrowFunctionExpression", span, ctx);
 }
 
 fn write_arrow_body(w: &mut JsonWriter, body: &internal::ArrowFunctionBody<'_>, ctx: &Ctx<'_>) {
@@ -106,15 +108,16 @@ pub(super) fn write_function_expression(
 pub(super) fn write_new_expression(
     w: &mut JsonWriter,
     new_expr: &internal::NewExpression<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "NewExpression", new_expr.span, ctx);
+    node_header(w, "NewExpression", span, ctx);
     w.raw(",\"callee\":");
     write_expression(w, new_expr.callee, ctx);
     write_type_arguments_field(w, new_expr.type_arguments.as_ref(), ctx);
     w.raw(",\"arguments\":");
     write_expressions(w, new_expr.arguments, ctx);
-    close_node(w, "NewExpression", new_expr.span, ctx);
+    close_node(w, "NewExpression", span, ctx);
 }
 
 /// Emits a `CallExpression` node (chain-aware). Field order: `callee`,
@@ -126,12 +129,13 @@ pub(super) fn write_new_expression(
 pub(super) fn write_call_expression(
     w: &mut JsonWriter,
     call: &internal::CallExpression<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
     callee_chain: ChainState,
     force_optional: bool,
     strip_optional: bool,
 ) {
-    node_header(w, "CallExpression", call.span, ctx);
+    node_header(w, "CallExpression", span, ctx);
     w.raw(",\"callee\":");
     write_expression_inner(
         w,
@@ -166,14 +170,14 @@ pub(super) fn write_call_expression(
         if call.type_arguments.is_none()
             || call.optional
             || (callee_chain != ChainState::KnownFree
-                && call.span.start >= call.callee.span().start
+                && span.start >= call.callee.span().start
                 && call.callee.has_optional_in_chain())
         {
             w.raw(",\"optional\":");
             w.bool(call.optional);
         }
     }
-    close_node(w, "CallExpression", call.span, ctx);
+    close_node(w, "CallExpression", span, ctx);
 }
 
 /// Emits a `MemberExpression` node (chain-aware). Field order: `object`,
@@ -182,12 +186,13 @@ pub(super) fn write_call_expression(
 pub(super) fn write_member_expression(
     w: &mut JsonWriter,
     member: &internal::MemberExpression<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
     object_chain: ChainState,
     force_optional: bool,
     strip_optional: bool,
 ) {
-    node_header(w, "MemberExpression", member.span, ctx);
+    node_header(w, "MemberExpression", span, ctx);
     w.raw(",\"object\":");
     write_expression_inner(
         w,
@@ -209,35 +214,37 @@ pub(super) fn write_member_expression(
         w.raw(",\"optional\":");
         w.bool(force_optional || member.optional);
     }
-    close_node(w, "MemberExpression", member.span, ctx);
+    close_node(w, "MemberExpression", span, ctx);
 }
 
 /// Emits a `ConditionalExpression` node.
 pub(super) fn write_conditional_expression(
     w: &mut JsonWriter,
     cond: &internal::ConditionalExpression<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "ConditionalExpression", cond.span, ctx);
+    node_header(w, "ConditionalExpression", span, ctx);
     w.raw(",\"test\":");
     write_expression(w, cond.test, ctx);
     w.raw(",\"consequent\":");
     write_expression(w, cond.consequent, ctx);
     w.raw(",\"alternate\":");
     write_expression(w, cond.alternate, ctx);
-    close_node(w, "ConditionalExpression", cond.span, ctx);
+    close_node(w, "ConditionalExpression", span, ctx);
 }
 
 /// Emits an `AwaitExpression` node.
 pub(super) fn write_await_expression(
     w: &mut JsonWriter,
     await_expr: &internal::AwaitExpression<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "AwaitExpression", await_expr.span, ctx);
+    node_header(w, "AwaitExpression", span, ctx);
     w.raw(",\"argument\":");
     write_expression(w, await_expr.argument, ctx);
-    close_node(w, "AwaitExpression", await_expr.span, ctx);
+    close_node(w, "AwaitExpression", span, ctx);
 }
 
 /// Emits a `YieldExpression` node. Field order: `delegate`, `argument`
@@ -245,14 +252,15 @@ pub(super) fn write_await_expression(
 pub(super) fn write_yield_expression(
     w: &mut JsonWriter,
     yield_expr: &internal::YieldExpression<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "YieldExpression", yield_expr.span, ctx);
+    node_header(w, "YieldExpression", span, ctx);
     w.raw(",\"delegate\":");
     w.bool(yield_expr.delegate);
     w.raw(",\"argument\":");
     write_or_null(w, yield_expr.argument.as_ref(), |w, e| {
         write_expression(w, e, ctx);
     });
-    close_node(w, "YieldExpression", yield_expr.span, ctx);
+    close_node(w, "YieldExpression", span, ctx);
 }

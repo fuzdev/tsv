@@ -7,7 +7,7 @@ use crate::lexer::TokenKind;
 use crate::whitespace::is_svelte_ws;
 use tsv_lang::source_scan::{TriviaProfile, skip_comment, skip_trivia};
 use tsv_lang::{ParseError, Span};
-use tsv_ts::Expression;
+use tsv_ts::{Expression, ExpressionKind};
 
 use super::parser_impl::SvelteParser;
 use super::subslice_offset;
@@ -254,7 +254,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         init_str: &str,
         init_offset: usize,
     ) -> Result<(), ParseError> {
-        if !matches!(init, Expression::SequenceExpression(_)) {
+        if !matches!(init.kind, ExpressionKind::SequenceExpression(_)) {
             return Ok(());
         }
         match super::find_top_level_delim(
@@ -438,8 +438,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // `{@debug (a, b)}` both yield `[a, b]` (a comma inside `()` is not a
             // top-level separator, so the parenthesized form is one
             // `SequenceExpression`); a single expression is a one-element list.
-            match expr {
-                Expression::SequenceExpression(seq) => {
+            match &expr.kind {
+                ExpressionKind::SequenceExpression(seq) => {
                     for element in seq.expressions {
                         self.require_debug_identifier(element)?;
                         identifiers.push(element.clone());
@@ -454,7 +454,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     // the printer emits identifiers by source span, so flattening
                     // through the cast would drop its parens from the output
                     // (breaking idempotency and the cast's binding).
-                    if let Expression::SequenceExpression(seq) = expr.unwrap_jsdoc_casts() {
+                    if let ExpressionKind::SequenceExpression(seq) = &expr.unwrap_jsdoc_casts().kind
+                    {
                         for element in seq.expressions {
                             self.require_debug_identifier(element)?;
                         }
@@ -485,7 +486,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// cast is nothing but parens + a comment, so `{@debug /** @type {A} */ (a)}`
     /// is an identifier to both parsers.
     fn require_debug_identifier(&self, expr: &Expression<'arena>) -> Result<(), ParseError> {
-        if matches!(expr.unwrap_jsdoc_casts(), Expression::Identifier(_)) {
+        if matches!(
+            expr.unwrap_jsdoc_casts().kind,
+            ExpressionKind::Identifier(_)
+        ) {
             Ok(())
         } else {
             Err(self.error_msg_at(
@@ -516,8 +520,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let (expression, span) = self.parse_keyword_expression_tag(start, "render")?;
 
         if !matches!(
-            expression.unwrap_jsdoc_casts(),
-            Expression::CallExpression(_)
+            expression.unwrap_jsdoc_casts().kind,
+            ExpressionKind::CallExpression(_)
         ) {
             return Err(self.error_msg_at(
                 "{@render ...} tags can only contain call expressions",

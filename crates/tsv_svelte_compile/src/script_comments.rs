@@ -12,8 +12,8 @@
 
 use tsv_svelte::ast::internal::{ElementKind, FragmentNode, Root};
 use tsv_ts::ast::internal::{
-    ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ForInOfLeft,
-    ForInit, ObjectPatternProperty, ObjectProperty, Statement, VariableDeclaration,
+    ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ExpressionKind,
+    ForInOfLeft, ForInit, ObjectPatternProperty, ObjectProperty, Statement, VariableDeclaration,
 };
 
 use tsv_lang::Span;
@@ -599,8 +599,8 @@ fn census_exprs(exprs: &[Expression<'_>], census: &mut BlockCensus) {
 }
 
 fn census_expr(expr: &Expression<'_>, census: &mut BlockCensus) {
-    match expr {
-        Expression::ArrowFunctionExpression(a) => {
+    match &expr.kind {
+        ExpressionKind::ArrowFunctionExpression(a) => {
             for param in a.params {
                 census_expr(param, census);
             }
@@ -612,29 +612,29 @@ fn census_expr(expr: &Expression<'_>, census: &mut BlockCensus) {
                 }
             }
         }
-        Expression::FunctionExpression(f) => {
+        ExpressionKind::FunctionExpression(f) => {
             for param in f.params {
                 census_expr(param, census);
             }
             census.blocks.push(f.body.span);
             census_stmts(f.body.body, census);
         }
-        Expression::ClassExpression(c) => census_class_body(&c.body, census),
-        Expression::NewExpression(e) => {
+        ExpressionKind::ClassExpression(c) => census_class_body(&c.body, census),
+        ExpressionKind::NewExpression(e) => {
             census_expr(e.callee, census);
             census_exprs(e.arguments, census);
         }
-        Expression::CallExpression(e) => {
+        ExpressionKind::CallExpression(e) => {
             census_expr(e.callee, census);
             census_exprs(e.arguments, census);
         }
-        Expression::MemberExpression(e) => {
+        ExpressionKind::MemberExpression(e) => {
             census_expr(e.object, census);
             if e.computed {
                 census_expr(e.property, census);
             }
         }
-        Expression::ObjectExpression(obj) => {
+        ExpressionKind::ObjectExpression(obj) => {
             for prop in obj.properties {
                 match prop {
                     ObjectProperty::Property(p) => {
@@ -647,42 +647,42 @@ fn census_expr(expr: &Expression<'_>, census: &mut BlockCensus) {
                 }
             }
         }
-        Expression::ArrayExpression(arr) => {
+        ExpressionKind::ArrayExpression(arr) => {
             for element in arr.elements {
                 if let Some(e) = element.as_ref() {
                     census_expr(e, census);
                 }
             }
         }
-        Expression::UnaryExpression(u) => census_expr(u.argument, census),
-        Expression::UpdateExpression(u) => census_expr(u.argument, census),
-        Expression::BinaryExpression(b) => {
+        ExpressionKind::UnaryExpression(u) => census_expr(u.argument, census),
+        ExpressionKind::UpdateExpression(u) => census_expr(u.argument, census),
+        ExpressionKind::BinaryExpression(b) => {
             census_expr(b.left, census);
             census_expr(b.right, census);
         }
-        Expression::ConditionalExpression(c) => {
+        ExpressionKind::ConditionalExpression(c) => {
             census_expr(c.test, census);
             census_expr(c.consequent, census);
             census_expr(c.alternate, census);
         }
-        Expression::SpreadElement(s) => census_expr(s.argument, census),
-        Expression::TemplateLiteral(t) => census_exprs(t.expressions, census),
-        Expression::TaggedTemplateExpression(t) => {
+        ExpressionKind::SpreadElement(s) => census_expr(s.argument, census),
+        ExpressionKind::TemplateLiteral(t) => census_exprs(t.expressions, census),
+        ExpressionKind::TaggedTemplateExpression(t) => {
             census_expr(t.tag, census);
             census_exprs(t.quasi.expressions, census);
         }
-        Expression::AwaitExpression(a) => census_expr(a.argument, census),
-        Expression::YieldExpression(y) => {
+        ExpressionKind::AwaitExpression(a) => census_expr(a.argument, census),
+        ExpressionKind::YieldExpression(y) => {
             if let Some(arg) = y.argument {
                 census_expr(arg, census);
             }
         }
-        Expression::SequenceExpression(s) => census_exprs(s.expressions, census),
-        Expression::AssignmentExpression(a) => {
+        ExpressionKind::SequenceExpression(s) => census_exprs(s.expressions, census),
+        ExpressionKind::AssignmentExpression(a) => {
             census_expr(a.left, census);
             census_expr(a.right, census);
         }
-        Expression::ObjectPattern(p) => {
+        ExpressionKind::ObjectPattern(p) => {
             for prop in p.properties {
                 match prop {
                     ObjectPatternProperty::Property(prop) => {
@@ -695,40 +695,40 @@ fn census_expr(expr: &Expression<'_>, census: &mut BlockCensus) {
                 }
             }
         }
-        Expression::ArrayPattern(p) => {
+        ExpressionKind::ArrayPattern(p) => {
             for element in p.elements {
                 if let Some(e) = element.as_ref() {
                     census_expr(e, census);
                 }
             }
         }
-        Expression::AssignmentPattern(p) => {
+        ExpressionKind::AssignmentPattern(p) => {
             census_expr(p.left, census);
             census_expr(p.right, census);
         }
-        Expression::RestElement(r) => census_expr(r.argument, census),
-        Expression::TSTypeAssertion(t) => census_expr(t.expression, census),
-        Expression::TSAsExpression(t) => census_expr(t.expression, census),
-        Expression::TSSatisfiesExpression(t) => census_expr(t.expression, census),
-        Expression::TSInstantiationExpression(t) => census_expr(t.expression, census),
-        Expression::TSNonNullExpression(t) => census_expr(t.expression, census),
-        Expression::TSParameterProperty(t) => census_expr(t.parameter, census),
-        Expression::ImportExpression(i) => {
+        ExpressionKind::RestElement(r) => census_expr(r.argument, census),
+        ExpressionKind::TSTypeAssertion(t) => census_expr(t.expression, census),
+        ExpressionKind::TSAsExpression(t) => census_expr(t.expression, census),
+        ExpressionKind::TSSatisfiesExpression(t) => census_expr(t.expression, census),
+        ExpressionKind::TSInstantiationExpression(t) => census_expr(t.expression, census),
+        ExpressionKind::TSNonNullExpression(t) => census_expr(t.expression, census),
+        ExpressionKind::TSParameterProperty(t) => census_expr(t.parameter, census),
+        ExpressionKind::ImportExpression(i) => {
             census_expr(i.source, census);
             if let Some(options) = i.options {
                 census_expr(options, census);
             }
         }
-        Expression::JsdocCast(j) => census_expr(j.inner, census),
-        Expression::ParenthesizedExpression(p) => census_expr(p.expression, census),
+        ExpressionKind::JsdocCast(j) => census_expr(j.inner, census),
+        ExpressionKind::ParenthesizedExpression(p) => census_expr(p.expression, census),
         // Leaves — no children, no blocks.
-        Expression::Literal(_)
-        | Expression::Identifier(_)
-        | Expression::PrivateIdentifier(_)
-        | Expression::RegexLiteral(_)
-        | Expression::ThisExpression(_)
-        | Expression::Super(_)
-        | Expression::MetaProperty(_) => {}
+        ExpressionKind::Literal(_)
+        | ExpressionKind::Identifier(_)
+        | ExpressionKind::PrivateIdentifier(_)
+        | ExpressionKind::RegexLiteral(_)
+        | ExpressionKind::ThisExpression(_)
+        | ExpressionKind::Super(_)
+        | ExpressionKind::MetaProperty(_) => {}
     }
 }
 

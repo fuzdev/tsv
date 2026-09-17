@@ -21,7 +21,7 @@
 
 use bumpalo::collections::Vec as BumpVec;
 use tsv_svelte::ast::internal::{Attribute, AttributeNode, AttributeValue, BindDirective, Element};
-use tsv_ts::ast::internal::{BinaryOperator, Expression, Property};
+use tsv_ts::ast::internal::{BinaryOperator, Expression, ExpressionKind, Property};
 
 use crate::attribute::escape_html_attr;
 use crate::body_builder::BodyBuilder;
@@ -131,9 +131,9 @@ fn classify_input_type(env: &EmitEnv<'_, '_>, element: &Element<'_>) -> InputTyp
 /// is expressed by refusing any optional link; the recursion propagates it from a
 /// deeper link up.
 fn bind_target_root(expr: &Expression<'_>, source: &str) -> Option<String> {
-    match expr {
-        Expression::Identifier(id) => plain_identifier_name(id, source),
-        Expression::MemberExpression(member) if !member.optional => {
+    match &expr.kind {
+        ExpressionKind::Identifier(id) => plain_identifier_name(id, source),
+        ExpressionKind::MemberExpression(member) if !member.optional => {
             bind_target_root(member.object, source)
         }
         _ => None,
@@ -146,7 +146,7 @@ fn bind_target_root(expr: &Expression<'_>, source: &str) -> Option<String> {
 /// in its `BindDirective` analysis). Recognized only so `bind:this` can OMIT it at
 /// parity — the value/checked/group arms still refuse it (no attr value to emit).
 fn is_get_set_pair(expr: &Expression<'_>) -> bool {
-    matches!(expr, Expression::SequenceExpression(seq) if seq.expressions.len() == 2)
+    matches!(&expr.kind, ExpressionKind::SequenceExpression(seq) if seq.expressions.len() == 2)
 }
 
 /// The bind target's root name, but only when that root is something the oracle
@@ -190,7 +190,8 @@ fn reassignable_bind_target_root(env: &EmitEnv<'_, '_>, expr: &Expression<'_>) -
     // MUTATES the object and never rebinds the name, so only rebinding the name
     // itself is refused. Walking to the member-chain root here instead would
     // over-refuse a common shape.
-    if matches!(expr, Expression::Identifier(_)) && env.unassignable_names.contains(&name) {
+    if matches!(expr.kind, ExpressionKind::Identifier(_)) && env.unassignable_names.contains(&name)
+    {
         return None;
     }
     Some(name)
@@ -547,11 +548,11 @@ pub(crate) fn build_bind_object_property<'arena>(
             // identifier key; `shorthand` collapses `{ value: value }` → `{ value }`.
             let key = env.b.ident(name);
             let key_span = key.span;
-            let shorthand = matches!(&value, Expression::Identifier(id)
+            let shorthand = matches!(&value.kind, ExpressionKind::Identifier(id)
                 if plain_identifier_name(id, env.source).as_deref() == Some(name));
             Ok(Some(init_property(
                 env.b.arena,
-                Expression::Identifier(key),
+                Expression::from_identifier(key),
                 value,
                 shorthand,
                 key_span,

@@ -37,6 +37,7 @@ use crate::printer::expressions::functions::{
 };
 use crate::printer::ignore::FrozenOperandPair;
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -70,13 +71,14 @@ use tsv_lang::doc::arena::DocId;
 pub(super) fn build_call_doc_with_wrapping(
     printer: &Printer<'_>,
     call: &internal::CallExpression<'_>,
+    span: Span,
 ) -> DocId {
     let d = printer.d();
-    let head = build_call_head(printer, call);
+    let head = build_call_head(printer, call, span);
     let Some((split_start, paren)) = head.gap.paren_split else {
-        return build_call_args_doc(printer, call, head.doc, &head);
+        return build_call_args_doc(printer, call, span, head.doc, &head);
     };
-    let args = build_call_args_doc(printer, call, d.empty(), &head);
+    let args = build_call_args_doc(printer, call, span, d.empty(), &head);
     super::hang_args_under_split(printer, head.doc, (split_start, paren), args)
 }
 
@@ -94,7 +96,11 @@ struct CallHead {
     fuse_optional: bool,
 }
 
-fn build_call_head(printer: &Printer<'_>, call: &internal::CallExpression<'_>) -> CallHead {
+fn build_call_head(
+    printer: &Printer<'_>,
+    call: &internal::CallExpression<'_>,
+    span: Span,
+) -> CallHead {
     let d = printer.d();
 
     // Test function calls (`it`, `test.only`, `describe`, …) stay on one line even past
@@ -103,7 +109,7 @@ fn build_call_head(printer: &Printer<'_>, call: &internal::CallExpression<'_>) -
     // re-read by the layout branch below: the flat CALLEE and the flat LAYOUT are two
     // halves of one decision, and a second `test_call_flat_layout_applies` call is a
     // second question that can answer differently.
-    let test_call_flat = test_call_flat_layout_applies(call, printer);
+    let test_call_flat = test_call_flat_layout_applies(call, span, printer);
 
     // Two callee positions print a required pair that keeps BOTH its gaps inside it: an
     // IIFE (`paren_pair_keeps_leading_run` — prettier's `printCommentsForFunction` prints
@@ -123,7 +129,7 @@ fn build_call_head(printer: &Printer<'_>, call: &internal::CallExpression<'_>) -
     let callee_parens = super::CalleeParens::of(printer, call.callee, ParenContext::Callee);
     // The pair's facts and every window that opens past its `)`, off ONE derivation
     // ([`super::CalleeGap`]).
-    let gap = super::callee_gap(printer, call);
+    let gap = super::callee_gap(printer, call, span);
     let CalleeGap {
         owned_pair,
         trailing_gap,
@@ -151,7 +157,7 @@ fn build_call_head(printer: &Printer<'_>, call: &internal::CallExpression<'_>) -
     let callee_freezes = callee_parens.is_none() && !owned_pair;
     let callee_doc = printer.build_left_spine_operand_doc_if(
         callee_freezes,
-        call.span.start,
+        span.start,
         call.callee,
         FrozenOperandPair::position(ParenContext::Callee),
         || {
@@ -169,7 +175,7 @@ fn build_call_head(printer: &Printer<'_>, call: &internal::CallExpression<'_>) -
 
     let callee = if owned_pair {
         printer.build_owned_required_pair_doc(
-            (call.span.start, call.callee.span().start),
+            (span.start, call.callee.span().start),
             trailing_gap,
             callee_doc,
             callee_doc,
@@ -182,14 +188,10 @@ fn build_call_head(printer: &Printer<'_>, call: &internal::CallExpression<'_>) -
             .as_ref()
             .map_or(callee_doc, |parens| parens.build_doc(printer, callee_doc));
         // Check for comments between removed parentheses and callee
-        // e.g., (/* comment */ foo)() has call.span.start at '(' and callee.span.start at 'foo'
-        // The comment is in the range [call.span.start, callee.span.start) and needs to be preserved
+        // e.g., (/* comment */ foo)() has span.start at '(' and callee.span.start at 'foo'
+        // The comment is in the range [span.start, callee.span.start) and needs to be preserved
         // Note: This happens AFTER parens wrapping so `(/* c */ (a ? b : c))()` -> `/* c */ (a ? b : c)()`
-        printer.prepend_removed_paren_comments(
-            call.span.start,
-            call.callee.span().start,
-            callee_doc,
-        )
+        printer.prepend_removed_paren_comments(span.start, call.callee.span().start, callee_doc)
     };
 
     // Handle optional chaining. With an empty argument list and no explicit type arguments
@@ -235,6 +237,7 @@ fn build_call_head(printer: &Printer<'_>, call: &internal::CallExpression<'_>) -
 fn build_call_args_doc(
     printer: &Printer<'_>,
     call: &internal::CallExpression<'_>,
+    span: Span,
     callee: DocId,
     head: &CallHead,
 ) -> DocId {
@@ -253,13 +256,7 @@ fn build_call_args_doc(
             .type_arguments
             .as_ref()
             .map_or(callee_gap_start, |ta| ta.span.end);
-        return build_empty_args_doc(
-            printer,
-            callee,
-            after_type_args,
-            call.span.end,
-            fuse_optional,
-        );
+        return build_empty_args_doc(printer, callee, after_type_args, span.end, fuse_optional);
     }
 
     let paren_open = gap.paren_open(call);
@@ -288,7 +285,7 @@ fn build_call_args_doc(
     // again. The `new` twin and the member chain already hugged past a leading comment, so
     // this is the plain call joining them rather than a third answer.
     if let Some(doc) =
-        try_hug_multiline_template_arg(printer, callee, call.arguments, paren_open, call.span.end)
+        try_hug_multiline_template_arg(printer, callee, call.arguments, paren_open, span.end)
     {
         return doc;
     }
@@ -297,7 +294,7 @@ fn build_call_args_doc(
     // and inline block comments. Own-line trailing comments defer to the general
     // comment path, so this returns `None` and the caller falls through.
     if call.arguments.len() == 1
-        && let Some(doc) = try_single_arg_comment_paths(printer, call, callee, paren_open)
+        && let Some(doc) = try_single_arg_comment_paths(printer, call, span, callee, paren_open)
     {
         return doc;
     }
@@ -311,7 +308,7 @@ fn build_call_args_doc(
         let Some(last_arg) = call.arguments.last() else {
             unreachable!("a test call requires arguments");
         };
-        let paren_close = call.span.end;
+        let paren_close = span.end;
 
         // The callback's own parameter list stays flat. Prettier reaches the same place from
         // the other side — its parameter printers ask `isTestCall` of the function's PARENT
@@ -360,12 +357,12 @@ fn build_call_args_doc(
     // Whole-call comment-presence gate: one binary search over the entire argument
     // window. Every per-argument comment sub-query below (the leading / inter-arg /
     // trailing predicates, each O(n) over args, plus the general comment path) lies
-    // within [paren_open, call.span.end], so when the call has no comment they are
+    // within [paren_open, call_span.end], so when the call has no comment they are
     // provably all false/empty — skip them. Canonical reference:
     // build_params_doc_with_comments.
     // Counts owned comments: this asks whether the argument window puts any comment text on
     // the page (a *layout* question), not who emits it — see `has_comments_on_page_between`.
-    let call_has_comments = printer.has_comments_on_page_between(paren_open, call.span.end);
+    let call_has_comments = printer.has_comments_on_page_between(paren_open, span.end);
 
     // Prettier's React-hook deps-array layout — the FIRST thing `printCallArguments` asks,
     // above `anyArgEmptyLine` and every specialized layout, so an author blank between the
@@ -374,7 +371,7 @@ fn build_call_args_doc(
         printer,
         call.arguments,
         paren_open,
-        call.span.end,
+        span.end,
         call_has_comments,
         d.concat(&[callee, d.text("(")]),
     ) {
@@ -390,7 +387,7 @@ fn build_call_args_doc(
     // same reason.) The `call_has_comments` conjunct keeps a comment-free call at the one
     // window-wide binary search above.
     let arg_trailing_line_comment =
-        call_has_comments && has_trailing_comments_on_args(call, printer);
+        call_has_comments && has_trailing_comments_on_args(call, span, printer);
 
     // Prettier's `anyArgEmptyLine` (`print/call-arguments.js`): an author blank line in ANY
     // inter-argument gap forces `allArgsBrokenOut()` — and that test sits ABOVE
@@ -426,7 +423,7 @@ fn build_call_args_doc(
     let has_trailing_block_comment = call_has_comments
         && call.arguments.last().is_some_and(|last_arg| {
             printer
-                .comments_on_page_between(last_arg.span().end, call.span.end)
+                .comments_on_page_between(last_arg.span().end, span.end)
                 .any(|c| c.is_block)
         });
 
@@ -444,19 +441,14 @@ fn build_call_args_doc(
         return build_call_with_arg_comments(
             printer,
             call,
+            span,
             callee,
             paren_open,
             has_trailing_block_comment,
             call_has_comments,
         )
         .unwrap_or_else(|| {
-            build_call_args_with_blank_lines(
-                printer,
-                callee,
-                call.arguments,
-                paren_open,
-                call.span.end,
-            )
+            build_call_args_with_blank_lines(printer, callee, call.arguments, paren_open, span.end)
         });
     }
 
@@ -530,7 +522,7 @@ fn build_call_args_doc(
             ArgOpener::Callee(callee),
             call.arguments,
             paren_open,
-            call.span.end,
+            span.end,
         );
     }
 
@@ -549,7 +541,7 @@ fn build_call_args_doc(
             ArgOpener::Callee(callee),
             call.arguments,
             paren_open,
-            call.span.end,
+            span.end,
         );
     }
 
@@ -569,7 +561,7 @@ fn build_call_args_doc(
         call.arguments,
         callee,
         paren_open,
-        call.span.end,
+        span.end,
         call_has_comments,
         ArgOwner::Call,
     ) {
@@ -582,6 +574,7 @@ fn build_call_args_doc(
     if let Some(doc) = build_call_with_arg_comments(
         printer,
         call,
+        span,
         callee,
         paren_open,
         has_trailing_block_comment,
@@ -654,6 +647,7 @@ fn push_lone_arg_trailing_comments(
 fn try_single_arg_comment_paths(
     printer: &Printer<'_>,
     call: &internal::CallExpression<'_>,
+    span: Span,
     callee: DocId,
     paren_open: u32,
 ) -> Option<DocId> {
@@ -661,7 +655,7 @@ fn try_single_arg_comment_paths(
     let first_arg = &call.arguments[0];
     let arg_start = first_arg.span().start;
     let arg_end = first_arg.span().end;
-    let paren_close = call.span.end;
+    let paren_close = span.end;
 
     // Own-line trailing comments after the arg (any line comment, or a block
     // comment on a line below the arg) aren't handled by the single-arg
@@ -798,8 +792,8 @@ fn try_single_arg_hug(
     // A break forced inside the SIGNATURE still wins, as it did when this lived one level
     // down: that layout renders the signature's head on the callee's line, which the break
     // makes impossible, so the block-arrow arm's own refusal keeps it.
-    if let internal::Expression::ArrowFunctionExpression(arrow) = arg
-        && !arrow_signature_has_breaking_comments(printer, arrow)
+    if let internal::ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind
+        && !arrow_signature_has_breaking_comments(printer, arrow, arg.span)
         && let Some(gap_break) = last_arg_arrow_gap_break(printer, arg)
     {
         return Some(build_arrow_gap_break_single_arg_doc(
@@ -812,16 +806,18 @@ fn try_single_arg_hug(
         ));
     }
 
-    match arg {
+    match &arg.kind {
         // Block arrow (or expandable arrow chain): use conditional_group to let Doc decide hug vs wrap
         //
         // Expandable arrow chains: `() => () => { block }`, `() => () => ({obj})`
         // are treated identically to block-body arrows. Matches prettier's
         // couldExpandArg recursive check with arrowChainRecursion=true.
-        internal::Expression::ArrowFunctionExpression(arrow)
+        internal::ExpressionKind::ArrowFunctionExpression(arrow)
             if !arrow.body.is_expression() || could_expand_arrow_chain(arrow) =>
         {
-            return Some(build_block_arrow_hug_states(printer, callee, arrow, arg));
+            return Some(build_block_arrow_hug_states(
+                printer, callee, arrow, arg.span, arg,
+            ));
         }
 
         // Regular function expression: the shared lone-argument ladder
@@ -832,7 +828,7 @@ fn try_single_arg_hug(
         // A comment forcing the parameter list multiline refuses the hug outright: every hug
         // state renders the callee and the signature's head on one line, which the break makes
         // impossible.
-        internal::Expression::FunctionExpression(func) => {
+        internal::ExpressionKind::FunctionExpression(func) => {
             let arg_doc = printer.build_expression_doc(arg);
             let opener = ArgOpener::Callee(callee);
             if function_signature_has_breaking_comments(printer, func) {
@@ -867,7 +863,7 @@ fn try_single_arg_hug(
         // body cannot reach here, since [`could_expand_arrow_chain`] claims it for the first
         // arm above. (Probed: 0 hits over 15.5k real files and the whole fixture suite, which
         // is what the guard's complement already says.)
-        internal::Expression::ArrowFunctionExpression(arrow) => {
+        internal::ExpressionKind::ArrowFunctionExpression(arrow) => {
             if let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body {
                 // Expandable body (ternary): use conditional parens
                 // Prettier's "expand last arg" pattern:
@@ -882,10 +878,10 @@ fn try_single_arg_hug(
                 // from a signature and a body doc, synthesizing its own parens around the
                 // ternary, so such a comment reaches no emitter.
                 if is_ternary_arrow_body(body_expr)
-                    && !arrow_hug_refused_by_comments(printer, arrow, body_expr)
+                    && !arrow_hug_refused_by_comments(printer, arrow, arg.span, body_expr)
                 {
                     return Some(build_ternary_arrow_hug_states(
-                        printer, callee, arrow, body_expr,
+                        printer, callee, arrow, arg.span, body_expr,
                     ));
                 }
             }
@@ -897,7 +893,7 @@ fn try_single_arg_hug(
     }
 
     // Wrap callback with width-aware breaking
-    if let internal::Expression::ArrowFunctionExpression(arrow) = &call.arguments[0] {
+    if let internal::ExpressionKind::ArrowFunctionExpression(arrow) = &call.arguments[0].kind {
         if let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body {
             // Prettier keeps `fn((x) =>` together (sig on opening line) when the
             // body is a call expression (looking through a trailing non-null `!`,
@@ -909,7 +905,7 @@ fn try_single_arg_hug(
                 // invalidates this hug exactly as it does the object/array one above, and so
                 // does a comment on the body's own tail, which the states this builds
                 // reassemble past (`arrow_hug_refused_by_comments`).
-                && !arrow_hug_refused_by_comments(printer, arrow, body_expr)
+                && !arrow_hug_refused_by_comments(printer, arrow, arg.span, body_expr)
             {
                 // Build the body ONCE and compose both hug/wrap states from it; building
                 // the whole arrow separately for the flat state re-built this same body
@@ -917,7 +913,7 @@ fn try_single_arg_hug(
                 let body_doc = printer.build_expression_doc(body_expr);
                 let body_doc =
                     prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
-                let sig_doc = build_arrow_sig_doc(printer, arrow);
+                let sig_doc = build_arrow_sig_doc(printer, arrow, arg.span);
 
                 return Some(build_arrow_call_body_states(d, callee, sig_doc, body_doc));
             }
@@ -942,6 +938,7 @@ fn build_block_arrow_hug_states(
     printer: &Printer<'_>,
     callee: DocId,
     arrow: &internal::ArrowFunctionExpression<'_>,
+    span: Span,
     arg: &internal::Expression<'_>,
 ) -> DocId {
     let d = printer.d();
@@ -953,7 +950,7 @@ fn build_block_arrow_hug_states(
 
     // If the arrow has trailing param comments, the params will be multiline,
     // so we should force the wrapped state (prettier behavior)
-    if arrow_signature_has_breaking_comments(printer, arrow) {
+    if arrow_signature_has_breaking_comments(printer, arrow, span) {
         // Force wrapped state when arrow has trailing param comments
         let printed = build_arrow_hug_printed_doc(printer, arg, arrow, build);
         return d.concat(&[
@@ -986,10 +983,11 @@ fn build_ternary_arrow_hug_states(
     printer: &Printer<'_>,
     callee: DocId,
     arrow: &internal::ArrowFunctionExpression<'_>,
+    span: Span,
     body_expr: &internal::Expression<'_>,
 ) -> DocId {
     let d = printer.d();
-    let sig_doc = build_arrow_sig_doc(printer, arrow);
+    let sig_doc = build_arrow_sig_doc(printer, arrow, span);
 
     // Build body expression with comments between `=>` and body
     let body_doc = printer.build_arrow_arg_body_doc(body_expr);
@@ -1006,6 +1004,7 @@ fn build_ternary_arrow_hug_states(
 fn build_call_with_arg_comments(
     printer: &Printer<'_>,
     call: &internal::CallExpression<'_>,
+    span: Span,
     callee: DocId,
     paren_open: u32,
     has_trailing_block_comment: bool,
@@ -1024,7 +1023,7 @@ fn build_call_with_arg_comments(
     let has_leading_comments = !call.arguments.is_empty()
         && printer.has_comments_to_emit_between(paren_open, call.arguments[0].span().start);
     let has_inter_arg_comments = has_inter_argument_comments(call, printer);
-    let has_trailing_arg_comments = has_trailing_comments_on_args(call, printer);
+    let has_trailing_arg_comments = has_trailing_comments_on_args(call, span, printer);
     // Also check for trailing block comments (has_trailing_comments_on_args only checks line comments)
     let has_any_trailing_comments = has_trailing_arg_comments || has_trailing_block_comment;
 
@@ -1037,7 +1036,7 @@ fn build_call_with_arg_comments(
     let has_own_line_trailing_block = call.arguments.last().is_some_and(|last_arg| {
         let search_start = last_arg.span().end;
         printer
-            .comments_on_page_between(search_start, call.span.end)
+            .comments_on_page_between(search_start, span.end)
             .any(|c| c.is_block && !printer.is_same_line(search_start, c.span.start))
     });
 
@@ -1186,7 +1185,7 @@ fn build_call_with_arg_comments(
             // reach the interior claims the spread's share a second time — the same-line
             // blocks and interior `//`s print twice.
             let arg_end = arg.span().end;
-            let paren_close = call.span.end;
+            let paren_close = span.end;
 
             // The last-argument gap holds the list's own comma (`for_closer_gap`, never the
             // delimiter reading) — see `emit_last_arg_trailing_comments`, the shared path
