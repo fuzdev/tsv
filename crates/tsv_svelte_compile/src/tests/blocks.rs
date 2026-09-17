@@ -4,19 +4,17 @@ use super::support::*;
 
 #[test]
 fn compile_if_else_block() {
-    // Branch anchors are single-quoted string pushes; the closer `<!--]-->`
-    // is its own template push. A missing branch synthesizes nothing here.
+    // A branch anchor folds into the branch's first push when that push is a
+    // template; the closer `<!--]-->` is its own template push.
     let js = compile_js("{#if a}<p>1</p>{:else}<p>2</p>{/if}");
     assert_eq!(
         js,
         "import * as $ from 'svelte/internal/server';\n\
              export default function Input($$renderer) {\n\
              \tif (a) {\n\
-             \t\t$$renderer.push('<!--[0-->');\n\
-             \t\t$$renderer.push(`<p>1</p>`);\n\
+             \t\t$$renderer.push(`<!--[0--><p>1</p>`);\n\
              \t} else {\n\
-             \t\t$$renderer.push('<!--[-1-->');\n\
-             \t\t$$renderer.push(`<p>2</p>`);\n\
+             \t\t$$renderer.push(`<!--[-1--><p>2</p>`);\n\
              \t}\n\
              \t$$renderer.push(`<!--]-->`);\n\
              }\n"
@@ -39,9 +37,24 @@ fn compile_else_if_chain_numbers_branches() {
     let js = compile_js("{#if a}<p>1</p>{:else if b}<p>2</p>{:else}<p>3</p>{/if}");
     assert!(js.contains("if (a) {"), "{js}");
     assert!(js.contains("} else if (b) {"), "{js}");
-    assert!(js.contains("$$renderer.push('<!--[0-->');"), "{js}");
-    assert!(js.contains("$$renderer.push('<!--[1-->');"), "{js}");
-    assert!(js.contains("$$renderer.push('<!--[-1-->');"), "{js}");
+    assert!(js.contains("$$renderer.push(`<!--[0--><p>1</p>`);"), "{js}");
+    assert!(js.contains("$$renderer.push(`<!--[1--><p>2</p>`);"), "{js}");
+    assert!(
+        js.contains("$$renderer.push(`<!--[-1--><p>3</p>`);"),
+        "{js}"
+    );
+}
+
+#[test]
+fn compile_block_marker_stays_separate_before_a_statement() {
+    // The fold needs a template push FIRST: a branch that opens with a `{@const}`
+    // declaration keeps its anchor as a separate single-quoted push.
+    let js =
+        compile_js("<script>let { a } = $props();</script>\n{#if a}{@const b = a}<p>{b}</p>{/if}");
+    assert!(
+        js.contains("if (a) {\n\t\t$$renderer.push('<!--[0-->');\n\t\tconst b = a;"),
+        "{js}"
+    );
 }
 
 #[test]
@@ -106,7 +119,10 @@ fn compile_each_with_else_hoists_and_uses_authored_index() {
         "each_array must hoist before the if: {js}"
     );
     assert!(js.contains("$$renderer.push('<!--[-->');"), "{js}");
-    assert!(js.contains("$$renderer.push('<!--[!-->');"), "{js}");
+    assert!(
+        js.contains("$$renderer.push(`<!--[!--><p>none</p>`);"),
+        "{js}"
+    );
     assert!(
         js.contains("for (let i = 0, $$length = each_array.length; i < $$length; i++) {"),
         "authored index must replace $$index: {js}"
@@ -210,7 +226,7 @@ fn compile_marks_text_first_each_body_not_if_branch() {
     assert!(each.contains("`<!---->hi ${$.escape(item)}`"), "{each}");
     let iff = compile_js("<script>let { a } = $props();</script>\n{#if a}hi {a}{/if}");
     assert!(
-        iff.contains("$$renderer.push(`hi ${$.escape(a)}`);"),
+        iff.contains("$$renderer.push(`<!--[0-->hi ${$.escape(a)}`);"),
         "if branch must NOT get a text-first marker: {iff}"
     );
 }

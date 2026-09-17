@@ -21,14 +21,13 @@
 //! Svelte's `validate_code` deliberately chose over the spec's:
 //! - **NUL, not U+FFFD, for a code that cannot be represented** — a surrogate half or a
 //!   code past the last code point Unicode defines.
-//! - **A line feed becomes a space** (`&#10;` → U+0020).
+//! - **A line feed becomes a space in text** (`&#10;` → U+0020). In an attribute value
+//!   it stays a line feed — the spec's answer in both places, which Svelte keeps where
+//!   the character is significant and trades for a space where whitespace collapses.
 //!
-//! Five others are *slips* in Svelte's implementation rather than choices, so the decoder
+//! Four others are *slips* in Svelte's implementation rather than choices, so the decoder
 //! follows the spec instead — cataloged in `docs/conformance_svelte.md` §Entity Decoding
 //! Corrections, and each one an upstream candidate:
-//! - **Uppercase hex** — `&#X41;` decodes. The spec's numeric-character-reference state
-//!   lists `U+0078 x` and `U+0058 X` side by side; Svelte's pattern spells only the
-//!   lowercase one.
 //! - **A zero code** — `&#0;` decodes (to NUL, per the sentinel above). Svelte's
 //!   `if (!code) return match` guards against an unknown/unparseable reference, and a code
 //!   of 0 is merely the falsy value caught in passing.
@@ -103,7 +102,7 @@ pub fn decode_character_references(html: &str, is_attribute_value: bool) -> Stri
         let rest = &html[i + 1..];
 
         // Numeric character reference: &#... or &#x...
-        if let Some((consumed, decoded)) = decode_numeric_entity(rest) {
+        if let Some((consumed, decoded)) = decode_numeric_entity(rest, is_attribute_value) {
             result.push(decoded);
             i += 1 + consumed; // +1 for '&'
             continue;
@@ -129,15 +128,13 @@ pub fn decode_character_references(html: &str, is_attribute_value: bool) -> Stri
 /// Returns (bytes_consumed, the character it stands for) if successful — the same
 /// (span, value) order as [`decode_named_entity`], so the caller's two arms read alike.
 /// Examples: &#65; &#x41; &#X41; &#0041;
-fn decode_numeric_entity(rest: &str) -> Option<(usize, char)> {
+fn decode_numeric_entity(rest: &str, is_attribute_value: bool) -> Option<(usize, char)> {
     if !rest.starts_with('#') {
         return None;
     }
 
     let after_hash = &rest[1..];
     // Either case opens a hex reference, per the spec's numeric-character-reference state.
-    // Svelte's pattern (`#(?:x[a-fA-F\d]+|\d+)`) spells only the lowercase one — a slip the
-    // module docs catalog.
     let is_hex = after_hash.starts_with('x') || after_hash.starts_with('X');
 
     let digits_start_offset = if is_hex { 1 } else { 0 };
@@ -180,7 +177,7 @@ fn decode_numeric_entity(rest: &str) -> Option<(usize, char)> {
     let total_consumed = 1 + digits_start_offset + digit_count + if has_semicolon { 1 } else { 0 };
 
     // Validate and convert
-    let validated = validate_code(code);
+    let validated = validate_code(code, is_attribute_value);
     let decoded = char::from_u32(validated)?;
 
     Some((total_consumed, decoded))
@@ -242,7 +239,7 @@ fn decode_named_entity(rest: &str, is_attribute_value: bool) -> Option<(usize, &
 /// Validate and normalize a Unicode code point per HTML5 spec
 ///
 /// Some code points are verboten and must be replaced or normalized:
-/// - Line feed (10) becomes space (32)
+/// - Line feed (10) becomes space (32) outside an attribute value
 /// - Code points 128-159 use Windows-1252 replacements
 /// - UTF-16 surrogate halves (D800-DFFF) become NUL
 /// - Code points past U+10FFFF become NUL
@@ -260,13 +257,14 @@ fn decode_named_entity(rest: &str, is_attribute_value: bool) -> Option<(usize, &
 /// - <http://en.wikipedia.org/wiki/Character_encodings_in_HTML#Illegal_characters>
 /// - <https://html.spec.whatwg.org/multipage/parsing.html#numeric-character-reference-end-state>
 /// - <https://html.spec.whatwg.org/multipage/parsing.html#preprocessing-the-input-stream>
-fn validate_code(code: u32) -> u32 {
+fn validate_code(code: u32, is_attribute_value: bool) -> u32 {
     const NUL: u32 = 0;
     const MAX_CODE_POINT: u32 = 0x10FFFF;
     const SURROGATES: std::ops::RangeInclusive<u32> = 0xD800..=0xDFFF;
 
-    // Line feed becomes generic whitespace
-    if code == 10 {
+    // Line feed becomes generic whitespace in text, where it collapses with the
+    // whitespace around it anyway; in an attribute value it is significant, so it stays
+    if code == 10 && !is_attribute_value {
         return 32;
     }
 
@@ -361,24 +359,25 @@ mod tests {
 
     #[test]
     fn test_validate_code() {
-        // Line feed -> space
-        assert_eq!(validate_code(10), 32);
+        // Line feed -> space in text, kept in an attribute value
+        assert_eq!(validate_code(10, false), 32);
+        assert_eq!(validate_code(10, true), 10);
 
         // ASCII
-        assert_eq!(validate_code(65), 65); // 'A'
+        assert_eq!(validate_code(65, false), 65); // 'A'
 
         // Windows-1252 replacement
-        assert_eq!(validate_code(128), 8364); // Euro sign
+        assert_eq!(validate_code(128, false), 8364); // Euro sign
 
         // Valid BMP
-        assert_eq!(validate_code(0x00C6), 0x00C6); // Æ
+        assert_eq!(validate_code(0x00C6, false), 0x00C6); // Æ
 
         // Surrogate halves -> NUL
-        assert_eq!(validate_code(0xD800), 0);
-        assert_eq!(validate_code(0xDFFF), 0);
+        assert_eq!(validate_code(0xD800, false), 0);
+        assert_eq!(validate_code(0xDFFF, false), 0);
 
         // Valid supplementary plane
-        assert_eq!(validate_code(0x1F4A9), 0x1F4A9); // 💩
+        assert_eq!(validate_code(0x1F4A9, false), 0x1F4A9); // 💩
     }
 
     #[test]

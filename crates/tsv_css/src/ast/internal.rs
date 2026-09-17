@@ -154,8 +154,8 @@ pub enum SimpleSelector<'arena> {
         span: Span,
     },
     Universal {
-        /// The `<ns-prefix>` span, as [`Self::Type`]'s (only the empty-prefix `|*` form
-        /// is reachable — `svg|*` and `*|*` are not parsed). `None` for a bare `*`.
+        /// The `<ns-prefix>` span, as [`Self::Type`]'s — the `svg` of `svg|*`, the `*` of
+        /// `*|*`, an EMPTY span at the `|` of `|*`. `None` for a bare `*`.
         namespace_span: Option<Span>,
         span: Span,
     },
@@ -920,11 +920,11 @@ impl PreludeValue<'_> {
 #[derive(Debug, Clone)]
 pub struct CssAtrule<'arena> {
     /// At-rule name without `@` (e.g., "media", "keyframes"), **escape-decoded**
-    /// (spec-canonical `<at-keyword-token>`, CSS Syntax §4.3.3; Svelte's parser also decodes
-    /// it — `@\6d edia` → `"media"`). Both the printer (`@` + this) and convert emit the
-    /// decoded form, matching Svelte + spec. Kept as an arena string, NOT recovered from
-    /// `span`: the span covers `@name …` and holds the raw escaped bytes, so a span-drop would
-    /// silently un-decode the name and diverge from Svelte/spec for escaped names. Same
+    /// (spec-canonical `<at-keyword-token>`, CSS Syntax §4.3.3 — `@\6d edia` → `"media"`),
+    /// the form every at-rule dispatch compares against. The printer emits `name_span`
+    /// instead, and the wire writer half-decodes `name_span` the way parseCss does. Kept
+    /// as an arena string, NOT recovered from `span`: the span holds the raw escaped
+    /// bytes, so a span read would silently un-decode the name for every dispatch. Same
     /// category as `CssDeclaration.property` / `Container.name`.
     pub name: &'arena str,
 
@@ -933,8 +933,9 @@ pub struct CssAtrule<'arena> {
     /// escaped name (`@m\A x`) decodes to a raw control char, and emitting that
     /// verbatim injects it into the output (content loss on reparse). Emitting the
     /// source slice preserves the escape, matching every other decoded-name site in
-    /// this crate (`CssDeclaration.property`, preludes). Unused by the wire writer,
-    /// which emits the decoded `name` to match parseCss.
+    /// this crate (`CssDeclaration.property`, preludes). The wire writer reads it too,
+    /// half-decoding it like a selector name, since parseCss reads an at-rule name with
+    /// the same `read_identifier` (an identity escape keeps its backslash there).
     pub name_span: Span,
 
     /// Prelude value (structured for @import, raw string for others)

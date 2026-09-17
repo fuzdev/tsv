@@ -3,8 +3,7 @@ import { count } from './stores.js';
 export default function Input($$renderer) {
 	var $$store_subs;
 	if ($.store_get(($$store_subs ??= {}), '$count', count)) {
-		$$renderer.push('<!--[0-->');
-		$$renderer.push(`<p>yes</p>`);
+		$$renderer.push(`<!--[0--><p>yes</p>`);
 	} else {
 		$$renderer.push('<!--[-1-->');
 	}

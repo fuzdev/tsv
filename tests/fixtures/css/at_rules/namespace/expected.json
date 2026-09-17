@@ -64,6 +64,7 @@
 										{
 											"type": "TypeSelector",
 											"name": "rect",
+											"namespace": "svg",
 											"start": 439,
 											"end": 447
 										}
@@ -111,6 +112,7 @@
 										{
 											"type": "TypeSelector",
 											"name": "div",
+											"namespace": "*",
 											"start": 469,
 											"end": 474
 										}

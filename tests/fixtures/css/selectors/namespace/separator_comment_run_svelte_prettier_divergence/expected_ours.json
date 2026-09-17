@@ -24,6 +24,7 @@
 										{
 											"type": "TypeSelector",
 											"name": "rect",
+											"namespace": "svg",
 											"start": 154,
 											"end": 178
 										}

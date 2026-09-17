@@ -352,8 +352,9 @@ pub(super) fn selector_contains_invalid(complex: &internal::ComplexSelector<'_>)
 
 /// Extract a selector name from source, skipping `prefix_len` bytes of sigil (`.`/`#`),
 /// half-decoded the way Svelte's `read_identifier` does it: hex escapes (`\3A `,
-/// `\1F4A9`, optional single whitespace terminator) decode to their codepoint, while
-/// identity escapes (`\?`) keep the backslash. The internal AST stores the fully
+/// `\1F4A9`, optional single whitespace terminator) decode to their codepoint — except a
+/// decoded backslash (`\5c`), which is spelled `\\` — while identity escapes (`\?`)
+/// keep the backslash. The internal AST stores the fully
 /// decoded spec form; this reconstructs Svelte's public form at the boundary.
 pub(super) fn raw_selector_name(source: &str, span: Span, prefix_len: usize) -> Cow<'_, str> {
     let raw = &source[span.start as usize + prefix_len..span.end as usize];
@@ -400,7 +401,15 @@ pub(super) fn raw_selector_name(source: &str, span: Span, prefix_len: usize) -> 
             if let Ok(cp) = u32::from_str_radix(&hex, 16)
                 && let Some(c) = char::from_u32(cp)
             {
-                out.push(c);
+                // A decoded backslash is spelled `\\`, the same two characters an identity
+                // escape keeps (`\\` stays `\\` below), so a backslash in the wire name
+                // always reads as the head of an escape. The internal AST keeps the one
+                // decoded character; this is the public form only.
+                if c == '\\' {
+                    out.push_str("\\\\");
+                } else {
+                    out.push(c);
+                }
             }
         } else if let Some(next) = chars.next() {
             out.push('\\');

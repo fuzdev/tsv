@@ -747,7 +747,7 @@ pub(crate) fn parse_simple_selector<'arena>(
     match &parser.current_kind {
         TokenKind::Identifier => {
             // Type selector: div, span, etc. Could also be a namespace prefix:
-            // svg|rect, *|div. Both forms recover their text verbatim from `span` at
+            // svg|rect, svg|*. Both forms recover their text verbatim from `span` at
             // print time, so nothing is copied into the arena either way.
             if matches!(parser.peek_past_comments()?, TokenKind::Pipe) {
                 // Namespace prefix: identifier|element. A comment may split either of the
@@ -766,19 +766,30 @@ pub(crate) fn parse_simple_selector<'arena>(
                 parser.advance()?; // consume the pipe
                 parser.register_and_skip_comments()?;
 
-                // Must be followed by an identifier (element name)
-                if !parser.check(TokenKind::Identifier) {
-                    return Err(parser.error_expected_after("element name", "namespace prefix"));
+                // Followed by an element name, or `*` for the namespaced universal
+                // selector (`svg|*` — selectors-4 `<ns-prefix>? '*'`)
+                let universal = parser.check(TokenKind::Asterisk);
+                if !universal && !parser.check(TokenKind::Identifier) {
+                    return Err(
+                        parser.error_expected_after("element name or '*'", "namespace prefix")
+                    );
                 }
-                let end = parser.span_pos(parser.current_end);
+                let span = Span {
+                    start: start as u32,
+                    end: parser.span_pos(parser.current_end),
+                };
                 parser.advance()?;
 
-                Ok(SimpleSelector::Type {
-                    namespace_span,
-                    span: Span {
-                        start: start as u32,
-                        end,
-                    },
+                Ok(if universal {
+                    SimpleSelector::Universal {
+                        namespace_span,
+                        span,
+                    }
+                } else {
+                    SimpleSelector::Type {
+                        namespace_span,
+                        span,
+                    }
                 })
             } else {
                 // No namespace, just a regular type selector; its text is recovered
@@ -835,7 +846,7 @@ pub(crate) fn parse_simple_selector<'arena>(
         }
         TokenKind::Asterisk => {
             // Universal selector: *
-            // Could also be universal namespace prefix: *|div
+            // Could also be universal namespace prefix: *|div, *|*
             // The comment lookahead runs BEFORE the `*` is consumed, so a comment that is
             // NOT a wq-name separator (`*/* c */ .b`) is left for the gap emitter.
             let namespaced = matches!(parser.peek_past_comments()?, TokenKind::Pipe);
@@ -853,24 +864,35 @@ pub(crate) fn parse_simple_selector<'arena>(
                 parser.advance()?; // consume pipe
                 parser.register_and_skip_comments()?;
 
-                // Must be followed by an identifier (element name)
-                if !parser.check(TokenKind::Identifier) {
-                    return Err(
-                        parser.error_expected_after("element name", "universal namespace prefix")
-                    );
+                // Followed by an element name, or `*` for the any-namespace universal
+                // selector (`*|*`)
+                let universal = parser.check(TokenKind::Asterisk);
+                if !universal && !parser.check(TokenKind::Identifier) {
+                    return Err(parser.error_expected_after(
+                        "element name or '*'",
+                        "universal namespace prefix",
+                    ));
                 }
 
                 // The element name's text is recovered from `span` at print time, so
                 // nothing is copied into the arena.
-                let end = parser.span_pos(parser.current_end);
+                let span = Span {
+                    start: start as u32,
+                    end: parser.span_pos(parser.current_end),
+                };
                 parser.advance()?;
 
-                Ok(SimpleSelector::Type {
-                    namespace_span: Some(namespace_span), // Universal namespace
-                    span: Span {
-                        start: start as u32,
-                        end,
-                    },
+                let namespace_span = Some(namespace_span); // universal namespace
+                Ok(if universal {
+                    SimpleSelector::Universal {
+                        namespace_span,
+                        span,
+                    }
+                } else {
+                    SimpleSelector::Type {
+                        namespace_span,
+                        span,
+                    }
                 })
             } else {
                 // Just a universal selector (no namespace)

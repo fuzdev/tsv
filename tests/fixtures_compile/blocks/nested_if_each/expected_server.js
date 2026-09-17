@@ -6,8 +6,7 @@ export default function Input($$renderer, $$props) {
 	for (let $$index = 0, $$length = each_array.length; $$index < $$length; $$index++) {
 		let item = each_array[$$index];
 		if (item) {
-			$$renderer.push('<!--[0-->');
-			$$renderer.push(`<li>${$.escape(item)}</li>`);
+			$$renderer.push(`<!--[0--><li>${$.escape(item)}</li>`);
 		} else {
 			$$renderer.push('<!--[-1-->');
 		}
