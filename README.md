@@ -205,33 +205,31 @@ and package READMEs for the full API and CLI flags:
     bindings) still parse for now, with enforcement deferred to a future
     diagnostics layer
 
-Each language is a self-contained Rust crate exposing the same
-`parse`/`format`/`convert_ast_json_bytes` functions over its own concrete types - no
-central `Language` trait, registry, or dynamic dispatch ("closed scope, open convention").
-Each artifact carries only what it uses: the parse build excludes the printers,
-the format build excludes the JSON-AST conversion layer, and a TypeScript-only
-build would exclude Svelte and CSS entirely (lang-specific builds aren't published yet) -
-see [docs/architecture.md](docs/architecture.md)
+Some non-goals:
 
-tsv currently has no support for JS plugins or JS/WASM runtime integration.
-JS bridging and WASM plugins will be evaluated to see if the tradeoffs work for tsv's goals,
-but the current lean is against, mainly for performance and simplicity.
-Forks could maintain custom extensible APIs on some of tsv's crates today
-(please share any friction you experience with these cases).
-
-tsv's goal is to be an optimal toolchain for TypeScript and Svelte.
-Consumers can use tsv's crates ([not yet published](https://github.com/fuzdev/tsv/issues/140) to crates.io)
-to build custom tools independently.
-Hard non-goals:
-
-- no style config settings, so on-disk state and caller params
-  never change the output for a given input
+- no formatter style config settings
 - no markup for frameworks besides Svelte - no JSX/TSX, Vue, Astro, etc (unlike Biome+Oxc+SWC+friends) -
   but note that you can use tsv's crates and patterns to vibe your own thing
 - no SCSS, CSS Modules, LESS, etc - standard CSS with Svelte extensions only
 - no strict Prettier conformance -
   see the [conformance doc](https://github.com/fuzdev/tsv/blob/main/docs/conformance_prettier.md)
   and [discussion #1](https://github.com/fuzdev/tsv/discussions/1)
+
+Each language is a self-contained Rust crate exposing the same
+`parse`/`format`/`convert_ast_json_bytes` functions over its own concrete types - no
+central `Language` trait, registry, or dynamic dispatch ("closed scope, open convention").
+Each artifact includes only what it uses: the parse build excludes the printers,
+the format build excludes the JSON-AST conversion layer, and a future TypeScript/JS-only
+build would exclude Svelte and CSS (lang-specific builds aren't published yet) -
+see [docs/architecture.md](docs/architecture.md).
+
+tsv currently has no support for JS plugins or JS/WASM runtime integration.
+JS bridging and WASM plugins will be evaluated to see if the tradeoffs work for tsv's goals,
+but the current lean is against, mainly for performance and simplicity.
+
+tsv's goal is to be an optimal, focused toolchain for TypeScript/JS, CSS, and Svelte.
+Its crates [will be published](https://github.com/fuzdev/tsv/issues/140)
+to crates.io for reusability.
 
 ## Docs
 
