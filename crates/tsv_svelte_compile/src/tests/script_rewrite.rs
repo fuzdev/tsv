@@ -183,17 +183,23 @@ fn compile_plain_props_destructure_gets_no_injection() {
 }
 
 #[test]
-fn compile_refuses_props_injection_with_comments() {
-    // The injected properties' appendix spans between host-span siblings
-    // would sweep host comments — refuse.
-    assert_unsupported(
-        "<script>\n\t// note\n\tlet { a, ...rest } = $props();\n</script>\n<p>{a}</p>",
-        "rest-element $props()",
-    );
-    assert_unsupported(
-        "<script>\n\t// note\n\tlet props = $props();\n</script>\n<p>x</p>",
-        "non-destructured $props()",
-    );
+fn compile_carries_comments_with_props_injection() {
+    // Every injected node sits zero-width at a host position — `$$slots`/`$$events`
+    // at the rest element, a `$props.id()` hoist at the body start, an argument-less
+    // `$bindable()` / `$state()`'s `void 0` at the call's end — so a comment after the
+    // pattern, inside it, or inside a later function body prints exactly once. With
+    // appendix spans each swept it into the synthetic node's window as well.
+    for src in [
+        "<script>\n\tlet {\n\t\ta,\n\t\t...rest // c\n\t} = $props();\n</script>\n<p {...rest}>{a}</p>",
+        "<script>\n\tlet props = $props();\n\tfunction f() {\n\t\t// c\n\t\treturn props.a;\n\t}\n</script>\n<p>{f()}</p>",
+        "<script>\n\tconst id = $props.id();\n\tfunction f() {\n\t\t// c\n\t\treturn id;\n\t}\n</script>\n<p>{f()}</p>",
+        "<script>\n\tlet { value = $bindable() } = $props();\n\tfunction f() {\n\t\t// c\n\t\treturn value;\n\t}\n</script>\n<p>{f()}</p>",
+        "<script>\n\tlet a = $state();\n\tfunction f() {\n\t\t// c\n\t\treturn a;\n\t}\n\ta = 1;\n</script>\n<p>{f()}</p>",
+        "<script>\n\tlet a = $state(\n\t\t// c\n\t);\n\tlet b = 1;\n\ta = 2;\n</script>\n<p>{a}{b}</p>",
+    ] {
+        let js = compile_js(src);
+        assert_eq!(js.matches("// c").count(), 1, "{src}\n{js}");
+    }
 }
 
 #[test]

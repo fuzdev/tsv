@@ -805,7 +805,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                         return unsupported(Refusal::StoreScopedSubscription);
                     }
                     let is_derived = self.derived_names.contains(&base);
-                    Some(self.b.store_get(&base, is_derived))
+                    Some(self.b.store_get(&base, is_derived, id.span))
                 }
                 // A plain read of a `$derived` binding → `d()` (the script analog
                 // of the template value walk). Name-only positions (a non-computed
@@ -1214,7 +1214,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                     let bin_ref: &'arena Expression<'arena> = self.b.arena.alloc(bin);
                     self.rewrite_value(bin_ref)?
                 };
-                Ok(Some(self.b.store_set(&base, value)))
+                Ok(Some(self.b.store_set(&base, value, assign.span)))
             }
             StoreTarget::NotStore => {
                 let left = self.expr_ref(assign.left)?;
@@ -1246,7 +1246,12 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                 return unsupported(Refusal::StoreScopedSubscription);
             }
             let decrement = update.operator == UpdateOperator::Decrement;
-            return Ok(Some(self.b.update_store(&base, update.prefix, decrement)));
+            return Ok(Some(self.b.update_store(
+                &base,
+                update.prefix,
+                decrement,
+                update.span,
+            )));
         }
         // A member update rooted at a store (`$obj.x++`) → `$.store_mutate` (not
         // implemented). A member over a plain lvalue recurses (its store is a read).

@@ -38,6 +38,16 @@ pub struct CompileCompareCommand {
     file: Option<String>,
 }
 
+/// Why tsv refused, in the two spellings a caller filters on.
+#[derive(serde::Serialize)]
+struct RefusalReport {
+    /// The stable corpus bucket key (`Refusal::bucket_key`) — the key
+    /// `compile_corpus_compare --json`'s `refusal_reasons` groups by.
+    bucket: String,
+    /// The full human-readable message, parameters included.
+    message: String,
+}
+
 /// Machine-readable `--json` report.
 #[derive(serde::Serialize)]
 struct CompareReport {
@@ -50,6 +60,8 @@ struct CompareReport {
     comment_position_tolerated: bool,
     /// The tsv side's outcome ("ok" | "unsupported").
     ours_status: &'static str,
+    /// The refusal behind an "unsupported" outcome; `None` otherwise.
+    refusal: Option<RefusalReport>,
     /// The unified diff of the two canonical forms, when both sides exist and differ
     /// (present for a tolerated position difference too, to show what moved).
     hunks: Option<String>,
@@ -147,6 +159,7 @@ fn report_both(
             parity,
             comment_position_tolerated: tolerated,
             ours_status: "ok",
+            refusal: None,
             hunks,
         };
         print_json_tabs(&report, CliError::Errored)?;
@@ -194,6 +207,13 @@ fn report_unsupported(
             parity: false,
             comment_position_tolerated: false,
             ours_status: "unsupported",
+            refusal: match err {
+                CompileError::Unsupported(refusal) => Some(RefusalReport {
+                    bucket: refusal.bucket_key().into_owned(),
+                    message: refusal.to_string(),
+                }),
+                _ => None,
+            },
             hunks: None,
         };
         print_json_tabs(&report, CliError::Errored)?;

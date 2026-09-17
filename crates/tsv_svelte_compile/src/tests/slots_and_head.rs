@@ -16,13 +16,15 @@ fn compile_slots_reference_injects_sanitize() {
 }
 
 #[test]
-fn compile_rejects_slots_with_comments() {
-    // Script comments plus the injected first statement would sweep the
-    // comment windows — refused for now.
-    assert_unsupported(
-        "<script>\n\t// note\n\tlet x = 1;\n</script>\n<p>{x}{$$slots}</p>",
-        "$$slots reference",
+fn compile_carries_comments_with_slots() {
+    // The injected `const $$slots = $.sanitize_slots($$props)` is zero-width at the
+    // body start, so it opens no window over the script: a comment inside a function
+    // body prints once, not also swept ahead of the injected statement.
+    let js = compile_js(
+        "<script>\n\t// note\n\tlet x = 1;\n\tfunction f() {\n\t\t// inner\n\t\treturn $$slots.default;\n\t}\n</script>\n<p>{x}{f()}</p>",
     );
+    assert_eq!(js.matches("// note").count(), 1, "{js}");
+    assert_eq!(js.matches("// inner").count(), 1, "{js}");
 }
 
 #[test]

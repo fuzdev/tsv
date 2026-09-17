@@ -289,48 +289,50 @@ impl<'arena> Builder<'arena> {
         })
     }
 
-    /// `() => <body>` for the `$derived` thunk, with every synthetic span
-    /// collapsed onto `anchor` (the replaced `$derived(...)` init's host span)
-    /// instead of the appendix. Only the borrowed `body` keeps its host span;
-    /// `() => ` is static punctuation, so the fictional spans never reach output.
-    /// This keeps the enclosing `$.derived(...)` call's argument comment windows
-    /// empty for a carried script comment (see [`Self::derived_call`]).
-    pub fn arrow_expr_at(
-        &self,
-        anchor: Span,
-        body: &'arena Expression<'arena>,
-    ) -> Expression<'arena> {
+    /// `() => <body>` — the `$derived` thunk (and the destructured-`$derived`
+    /// intermediates'), every synthetic position collapsed onto the `body`'s own span.
+    /// The arrow's parameter and body windows are then empty: with no `params_start` the
+    /// empty list prints `()` without the printer's source-wide `)` scan (which, from a
+    /// body opening with `(`, claims that paren group), and the `=>`-to-body gap is
+    /// inverted. So a comment inside the `$derived(…)` parens but outside `body` falls
+    /// to the enclosing `$.derived(…)` call's argument windows ([`Self::member_call_at`])
+    /// exactly once, and a comment inside `body` prints with `body`. A thunk anchored on
+    /// the replaced init instead let that scan reach the host `$derived(`…`)` parens and
+    /// print the argument's comments a second time inside `()`.
+    pub fn thunk_on_body(&self, body: &'arena Expression<'arena>) -> Expression<'arena> {
+        let span = body.span();
         Expression::ArrowFunctionExpression(self.arena.alloc(ArrowFunctionExpression {
             type_parameters: None,
             params: &[],
             body: ArrowFunctionBody::Expression(body),
             return_type: None,
             r#async: false,
-            params_start: Some(anchor.start),
-            arrow_token: anchor.start,
-            span: anchor,
+            params_start: None,
+            arrow_token: span.start,
+            span,
         }))
     }
 
-    /// `$.derived(<argument>)` for a `$derived` / `$derived.by` rewrite. Every
-    /// synthetic leaf (`$`, `derived`) collapses onto `anchor.start` and the
-    /// outer call span *steals* `anchor` — the replaced `$derived(...)` init's
-    /// host span — so the enclosing declarator's `=`-gap window and the call's
-    /// own internal windows stay empty for a carried script comment (the same
-    /// fictional-span discipline the `$$props` span-steal uses). The interned
-    /// `$`/`derived` names and the static `.`/`(`/`)` supply the text, so the
-    /// fictional spans never reach output: a comment after the declarator flows
-    /// to the next statement instead of being swept into the `$.derived(...)`
-    /// slot. Byte-identical to the appendix-spanned [`Self::member_call`] form
-    /// when the script carries no comments.
-    pub fn derived_call(
+    /// `<object>.<property>(<arguments>)` — the fictional-span form of
+    /// [`Self::member_call`]. Every synthetic leaf (`<object>`, `<property>`) collapses
+    /// onto `anchor.start` and the call *steals* `anchor`, the host span of what it
+    /// replaces (a `$derived(...)` init, a store read), so the enclosing node's windows
+    /// read the authored span and the call's own internal windows hold no host comment
+    /// its arguments don't claim. The interned names and the static `.`/`(`/`)` supply
+    /// the text, so the fictional spans never reach output — byte-identical to the
+    /// appendix-spanned form when the script carries no comments. With a zero-width
+    /// `anchor` and zero-width synthetic arguments the whole call sits at one host
+    /// position (the prepended `$props.id()` / `$$slots` declarations).
+    pub fn member_call_at(
         &self,
+        object: &str,
+        property: &str,
+        arguments: &'arena [Expression<'arena>],
         anchor: Span,
-        argument: &'arena Expression<'arena>,
     ) -> Expression<'arena> {
         let low = Span::new(anchor.start, anchor.start);
-        let object = self.ident_expr_at("$", low);
-        let property = self.ident_expr_at("derived", low);
+        let object = self.ident_expr_at(object, low);
+        let property = self.ident_expr_at(property, low);
         let callee = self
             .arena
             .alloc(Expression::MemberExpression(MemberExpression {
@@ -343,10 +345,22 @@ impl<'arena> Builder<'arena> {
         Expression::CallExpression(CallExpression {
             callee,
             type_arguments: None,
-            arguments: std::slice::from_ref(argument),
+            arguments,
             optional: false,
             span: anchor,
         })
+    }
+
+    /// `void 0` as a zero-width fictional node at host position `at`, for a
+    /// replaced argument-less rune call (`$state()`, `$bindable()`). [`Self::void_zero`]
+    /// mints the literal into the appendix, and a numeric literal prints its own source
+    /// slice, so its span cannot move; the window from the host `=` to that appendix
+    /// start would then sweep every later carried comment. This spells the two tokens
+    /// through the synthetic-identifier name channel instead, which prints the name
+    /// and reads no source, so the node can sit at `at` — the end of the replaced
+    /// call, leaving a comment inside the empty call to the window before it.
+    pub fn void_zero_at(&self, at: u32) -> Expression<'arena> {
+        Expression::Identifier(self.ident_at("void 0", Span::new(at, at)))
     }
 
     /// `(<params>) => { <stmts> }` — a block-bodied arrow (the
@@ -556,57 +570,64 @@ impl<'arena> Builder<'arena> {
         Expression::Literal(self.string_literal(content))
     }
 
-    /// `$$store_subs ??= {}` — the store-subscription accumulator argument shared
-    /// by [`store_get`](Self::store_get) and [`update_store`](Self::update_store).
-    /// The printer parenthesizes this `??=` assignment to match the canonical
-    /// form (`($$store_subs ??= {})`).
-    fn store_subs_assign(&mut self) -> Expression<'arena> {
-        let subs_left = self.ident_expr("$$store_subs");
-        self.mint(" ??= ");
-        let obj_span = self.mint("{}");
+    /// `$.store_get(($$store_subs ??= {}), '$<base>', <base>)` — the oracle's SSR
+    /// store auto-subscription read (`Identifier.js` → `serialize_get_binding` for a
+    /// `store_sub` binding). `base` is the `$`-stripped store name; the string key
+    /// keeps the leading `$` (`'$count'`); a `$derived` base reads `<base>()` (the
+    /// store the derived currently holds). The printer parenthesizes the `??=`
+    /// assignment argument to match the canonical form.
+    ///
+    /// A fictional-span node: the call takes `read`, the replaced `$<base>`
+    /// identifier's host span, and every synthetic leaf sits zero-width at its start,
+    /// so no window in or around the call holds a host comment the enclosing node's
+    /// windows don't already claim. With appendix spans a window from a host
+    /// neighbour into the call swept every later carried script comment. The
+    /// `'$<base>'` key is spelled through the identifier name channel, as
+    /// [`Self::void_zero_at`] spells `void 0`: a string literal prints its own source
+    /// slice, so it cannot move off the appendix.
+    pub fn store_get(&self, base: &str, base_is_derived: bool, read: Span) -> Expression<'arena> {
+        let at = Span::new(read.start, read.start);
+        let mut args: bumpalo::collections::Vec<'arena, Expression<'arena>> =
+            bumpalo::collections::Vec::new_in(self.arena);
+        args.push(self.store_subs_assign(at));
+        args.push(Expression::Identifier(
+            self.ident_at(&format!("'${base}'"), at),
+        ));
+        args.push(self.store_base_value(base, base_is_derived, at));
+        self.member_call_at("$", "store_get", args.into_bump_slice(), read)
+    }
+
+    /// `($$store_subs ??= {})` zero-width at `at` ([`Self::store_get`]).
+    fn store_subs_assign(&self, at: Span) -> Expression<'arena> {
         let obj = self
             .arena
             .alloc(Expression::ObjectExpression(ObjectExpression {
                 properties: &[],
                 spread_trailing_comma: false,
-                span: obj_span,
+                span: at,
             }));
         Expression::AssignmentExpression(AssignmentExpression {
-            left: subs_left,
+            left: self.ident_expr_at("$$store_subs", at),
             operator: AssignmentOperator::NullishAssign,
             right: obj,
-            span: Span::new(subs_left.span().start, obj_span.end),
+            span: at,
         })
     }
 
-    /// The store's value expression — `<base>()` when `base` is a `$derived`
-    /// binding (the store the derived currently holds), else the bare `<base>`
-    /// identifier.
-    fn store_base_value(&mut self, base: &str, base_is_derived: bool) -> Expression<'arena> {
+    /// The store's value expression — `<base>()` when `base` is a `$derived` binding,
+    /// else the bare `<base>` identifier — zero-width at `at` ([`Self::store_get`]).
+    fn store_base_value(&self, base: &str, base_is_derived: bool, at: Span) -> Expression<'arena> {
         if base_is_derived {
-            let callee = self.ident_expr(base);
-            self.call_expr(callee, &[])
+            Expression::CallExpression(CallExpression {
+                callee: self.ident_expr_at(base, at),
+                type_arguments: None,
+                arguments: &[],
+                optional: false,
+                span: at,
+            })
         } else {
-            Expression::Identifier(self.ident(base))
+            Expression::Identifier(self.ident_at(base, at))
         }
-    }
-
-    /// `$.store_get(($$store_subs ??= {}), '$<base>', <base>)` — the oracle's SSR
-    /// store auto-subscription read (`Identifier.js` → `serialize_get_binding` for a
-    /// `store_sub` binding). `base` is the `$`-stripped store name; the string key
-    /// keeps the leading `$` (`'$count'`). The printer parenthesizes the `??=`
-    /// assignment argument to match the canonical form.
-    pub fn store_get(&mut self, base: &str, base_is_derived: bool) -> Expression<'arena> {
-        let assign = self.store_subs_assign();
-        let name_lit = self.string_literal_expr(&format!("${base}"));
-        // The store base is read like any binding: a `$derived` base reads `d()`.
-        let base_value = self.store_base_value(base, base_is_derived);
-        let mut args: bumpalo::collections::Vec<'arena, Expression<'arena>> =
-            bumpalo::collections::Vec::new_in(self.arena);
-        args.push(assign);
-        args.push(name_lit);
-        args.push(base_value);
-        self.member_call("$", "store_get", args.into_bump_slice())
     }
 
     /// `$.store_set(<base>, <value>)` — the oracle's SSR store write
@@ -615,13 +636,27 @@ impl<'arena> Builder<'arena> {
     /// referenced bare, never `$$store_subs`); `value` is the already-rewritten
     /// right-hand side (a compound `+=` is reconstructed as `store_get(...) <op>
     /// rhs` by the caller).
-    pub fn store_set(&mut self, base: &str, value: Expression<'arena>) -> Expression<'arena> {
-        let base_ident = Expression::Identifier(self.ident(base));
+    ///
+    /// A script rewrite, so fictional-span throughout ([`Self::store_get`]): the
+    /// call takes `assign`, the replaced assignment's host span, its callee sits at the
+    /// assignment's start, and `<base>` zero-width at `value`'s start — so the call's
+    /// leading-argument window is the authored target-and-`=` run and the one after
+    /// `value` the authored tail, each claimed once. (Between two arguments the call
+    /// printer looks for their comma in the source; with none there, a `<base>` at the
+    /// target's end left the `=` gap to no window, dropping its comment.)
+    pub fn store_set(
+        &self,
+        base: &str,
+        value: Expression<'arena>,
+        assign: Span,
+    ) -> Expression<'arena> {
+        let at = value.span().start;
+        let base_ident = Expression::Identifier(self.ident_at(base, Span::new(at, at)));
         let mut args: bumpalo::collections::Vec<'arena, Expression<'arena>> =
             bumpalo::collections::Vec::new_in(self.arena);
         args.push(base_ident);
         args.push(value);
-        self.member_call("$", "store_set", args.into_bump_slice())
+        self.member_call_at("$", "store_set", args.into_bump_slice(), assign)
     }
 
     /// `$.update_store[_pre](($$store_subs ??= {}), '$<base>', <base>[, -1])` — the
@@ -630,36 +665,43 @@ impl<'arena> Builder<'arena> {
     /// (`$x++` / `$x--`); `decrement` appends the trailing `-1` argument
     /// (increment elides it). The printer parenthesizes the `??=` assignment
     /// argument, like [`store_get`](Self::store_get).
+    ///
+    /// Fictional-span like [`Self::store_get`]: the call takes `update`, the replaced
+    /// update expression's host span, with every leaf zero-width at its start (`-1`
+    /// spelled through the identifier name channel for the same reason as the key).
     pub fn update_store(
-        &mut self,
+        &self,
         base: &str,
         prefix: bool,
         decrement: bool,
+        update: Span,
     ) -> Expression<'arena> {
-        let assign = self.store_subs_assign();
-        let name_lit = self.string_literal_expr(&format!("${base}"));
-        let base_ident = Expression::Identifier(self.ident(base));
+        let at = Span::new(update.start, update.start);
         let mut args: bumpalo::collections::Vec<'arena, Expression<'arena>> =
             bumpalo::collections::Vec::new_in(self.arena);
-        args.push(assign);
-        args.push(name_lit);
-        args.push(base_ident);
+        args.push(self.store_subs_assign(at));
+        args.push(Expression::Identifier(
+            self.ident_at(&format!("'${base}'"), at),
+        ));
+        args.push(Expression::Identifier(self.ident_at(base, at)));
         if decrement {
-            args.push(self.number(-1.0));
+            args.push(Expression::Identifier(self.ident_at("-1", at)));
         }
         let property = if prefix {
             "update_store_pre"
         } else {
             "update_store"
         };
-        self.member_call("$", property, args.into_bump_slice())
+        self.member_call_at("$", property, args.into_bump_slice(), update)
     }
 
     /// `var $$store_subs;` — the store-subscription accumulator, injected as a
-    /// component-body statement when any store read compiled.
-    pub fn store_subs_var(&mut self) -> Statement<'arena> {
-        let id = Expression::Identifier(self.ident("$$store_subs"));
-        let span = id.span();
+    /// component-body statement when any store read compiled. Zero-width at `at`, the
+    /// body block's start, for the reason `transform_server.rs::build_props_id_decl`
+    /// gives.
+    pub fn store_subs_var_at(&self, at: u32) -> Statement<'arena> {
+        let span = Span::new(at, at);
+        let id = Expression::Identifier(self.ident_at("$$store_subs", span));
         let declarator = VariableDeclarator {
             id: self.arena.alloc(id),
             init: None,

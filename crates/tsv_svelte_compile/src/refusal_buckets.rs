@@ -194,12 +194,12 @@ impl Refusal {
             Self::CommentsAlongsideMultiDeclarator => Cow::Borrowed(
                 "comments in a script alongside a multi-declarator declaration (the oracle re-anchors comments inside the split)",
             ),
-            Self::CommentsWithStore => Cow::Borrowed(
-                "comments in a script that references a store ($$store_subs injection)",
+            Self::CommentInRewrittenRuneRegion => Cow::Borrowed(
+                "comment inside a rewritten rune call (a trailing-comma gap or an empty $props() call)",
             ),
-            Self::CommentInRewrittenRuneRegion => {
-                Cow::Borrowed("comment inside a rewritten rune region (dropped by the transform)")
-            }
+            Self::CommentReflushedIntoBlock => Cow::Borrowed(
+                "comment inside a block opened on the line a statement ends (the oracle prints it twice)",
+            ),
             Self::CommentAfterLastStatementWithBlock => Cow::Borrowed(
                 "comment after the last script statement in a template that emits a nested block (the oracle drops it)",
             ),
@@ -212,30 +212,12 @@ impl Refusal {
             Self::CommentsWithTemplateBeforeScript => {
                 Cow::Borrowed("comments with template markup before the script (window ordering)")
             }
-            Self::CommentsWithArglessState => {
-                Cow::Borrowed("comments in a script with an argument-less $state()")
-            }
             Self::CommentsWithDestructuredDerived => {
                 Cow::Borrowed("comments in a script with a destructured $derived declarator")
             }
             Self::CommentsWithDestructuredState => {
                 Cow::Borrowed("comments in a script with a destructured $state declarator")
             }
-            Self::CommentsWithRestProps => Cow::Borrowed(
-                "comments in a script with a rest-element $props() (injected $$slots/$$events)",
-            ),
-            Self::CommentsWithNonDestructuredProps => Cow::Borrowed(
-                "comments in a script with a non-destructured $props() (injected $$slots/$$events)",
-            ),
-            Self::CommentsWithPropsId => {
-                Cow::Borrowed("comments in a script with a $props.id() declarator")
-            }
-            Self::CommentsWithBindable => {
-                Cow::Borrowed("comments in a script with a $bindable() prop default")
-            }
-            Self::CommentsWithSlots => Cow::Borrowed(
-                "comments in a script with a $$slots reference (injected sanitize_slots)",
-            ),
             Self::MultilineBlockComment => Cow::Borrowed(
                 "multi-line block comment in script (interior-line re-indentation not carried through)",
             ),
@@ -497,20 +479,14 @@ impl Refusal {
             },
             Self::MemberCallEscapedRoot,
             Self::CommentsAlongsideMultiDeclarator,
-            Self::CommentsWithStore,
             Self::CommentInRewrittenRuneRegion,
+            Self::CommentReflushedIntoBlock,
             Self::CommentAfterLastStatementWithBlock,
             Self::ModuleCommentAfterInstanceScript,
             Self::LeadingCommentGluedToScript,
             Self::CommentsWithTemplateBeforeScript,
-            Self::CommentsWithArglessState,
             Self::CommentsWithDestructuredDerived,
             Self::CommentsWithDestructuredState,
-            Self::CommentsWithRestProps,
-            Self::CommentsWithNonDestructuredProps,
-            Self::CommentsWithPropsId,
-            Self::CommentsWithBindable,
-            Self::CommentsWithSlots,
             Self::MultilineBlockComment,
             Self::FormatIgnoreComment,
             Self::TemplateComments,

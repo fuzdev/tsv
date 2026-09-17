@@ -105,14 +105,14 @@ fn bindable_property<'arena>(
 /// the key, the `AssignmentPattern.left`, and every flag stay borrowed; only the
 /// default's `right` changes.
 fn rewrite_bindable_default<'arena>(
-    b: &mut Builder<'arena>,
+    b: &Builder<'arena>,
     p: &'arena Property<'arena>,
     assign: &'arena AssignmentPattern<'arena>,
     default: BindableDefault<'arena>,
 ) -> ObjectPatternProperty<'arena> {
     let new_right: &'arena Expression<'arena> = match default {
         BindableDefault::Arg(arg) => arg,
-        BindableDefault::ArgLess => b.arena.alloc(b.void_zero()),
+        BindableDefault::ArgLess => b.arena.alloc(b.void_zero_at(assign.right.span().end)),
     };
     let new_value = Expression::AssignmentPattern(AssignmentPattern {
         left: assign.left,
@@ -149,9 +149,10 @@ fn rewrite_bindable_default<'arena>(
 /// Returns `(replacement pattern, bindable entries)`. The replacement is `None`
 /// when nothing changed, so the original borrowed pattern is kept. Refuses a
 /// non-identifier/non-object `$props()` pattern (the oracle rejects those —
-/// props_invalid_identifier) and both rewrites alongside carried comments (the
-/// minted appendix spans between host-span siblings would sweep host comments — a
-/// safe over-refusal). An ObjectPattern is first validated per-property in the
+/// props_invalid_identifier). Every node either rewrite injects is zero-width at a
+/// host position (the start of the property it precedes, the end of a replaced
+/// `$bindable()` call), so a carried comment's windows stay the authored gaps. An
+/// ObjectPattern is first validated per-property in the
 /// oracle's source order (computed key or nested value → [`Refusal::PropsInvalidPattern`],
 /// a `$$` key → [`Refusal::PropsIllegalName`]) before any rewrite.
 ///
@@ -162,10 +163,9 @@ fn rewrite_bindable_default<'arena>(
 /// user `$$slots_`/`$$events` reference or declaration is oracle-rejected input,
 /// so no second-order collision exists).
 pub(crate) fn rewrite_props_pattern<'arena>(
-    b: &mut Builder<'arena>,
+    b: &Builder<'arena>,
     id: &'arena Expression<'arena>,
     source: &str,
-    has_comments: bool,
     uses_slots: bool,
 ) -> Result<(Option<Expression<'arena>>, Vec<BindableEntry>), CompileError> {
     let arena = b.arena;
@@ -223,20 +223,14 @@ pub(crate) fn rewrite_props_pattern<'arena>(
             if !has_rest && !has_bindable {
                 return Ok((None, Vec::new()));
             }
-            if has_comments {
-                return Err(unsupported(if has_bindable {
-                    Refusal::CommentsWithBindable
-                } else {
-                    Refusal::CommentsWithRestProps
-                }));
-            }
             let mut entries = Vec::new();
             let mut properties: BumpVec<'arena, ObjectPatternProperty<'arena>> =
                 BumpVec::new_in(arena);
             for prop in obj.properties {
                 if matches!(prop, ObjectPatternProperty::RestElement(_)) {
-                    properties.push(slots_pattern_prop(b, uses_slots));
-                    properties.push(shorthand_pattern_prop(b, "$$events"));
+                    let at = prop.span().start;
+                    properties.push(slots_pattern_prop(b, uses_slots, at));
+                    properties.push(shorthand_pattern_prop(b, "$$events", at));
                     properties.push(prop.clone());
                 } else if let Some((entry, p, assign, default)) = bindable_property(prop, source) {
                     entries.push(entry);
@@ -257,13 +251,11 @@ pub(crate) fn rewrite_props_pattern<'arena>(
             ))
         }
         Expression::Identifier(_) => {
-            if has_comments {
-                return Err(unsupported(Refusal::CommentsWithNonDestructuredProps));
-            }
             let mut properties: BumpVec<'arena, ObjectPatternProperty<'arena>> =
                 BumpVec::new_in(arena);
-            properties.push(slots_pattern_prop(b, uses_slots));
-            properties.push(shorthand_pattern_prop(b, "$$events"));
+            let at = id.span().start;
+            properties.push(slots_pattern_prop(b, uses_slots, at));
+            properties.push(shorthand_pattern_prop(b, "$$events", at));
             properties.push(ObjectPatternProperty::RestElement(RestElement {
                 argument: arena.alloc(id.clone()),
                 optional: false,
@@ -287,35 +279,38 @@ pub(crate) fn rewrite_props_pattern<'arena>(
 
 /// The injected `$$slots` pattern property: shorthand `{ $$slots }` normally,
 /// renamed `{ $$slots: $$slots_ }` when the sanitize_slots const owns the name
-/// (see [`rewrite_props_pattern`]).
+/// (see [`rewrite_props_pattern`]). Zero-width at `at`, like
+/// [`shorthand_pattern_prop`].
 fn slots_pattern_prop<'arena>(
-    b: &mut Builder<'arena>,
+    b: &Builder<'arena>,
     uses_slots: bool,
+    at: u32,
 ) -> ObjectPatternProperty<'arena> {
     if !uses_slots {
-        return shorthand_pattern_prop(b, "$$slots");
+        return shorthand_pattern_prop(b, "$$slots", at);
     }
-    let key = b.ident("$$slots");
-    b.mint(": ");
-    let value = b.ident("$$slots_");
-    let span = Span::new(key.span.start, value.span.end);
+    let span = Span::new(at, at);
     ObjectPatternProperty::Property(init_property(
         b.arena,
-        Expression::Identifier(key),
-        Expression::Identifier(value),
+        Expression::Identifier(b.ident_at("$$slots", span)),
+        Expression::Identifier(b.ident_at("$$slots_", span)),
         false,
         span,
     ))
 }
 
-/// A shorthand `{ name }` pattern property over a synthetic identifier
-/// (interned name; the span is the minted appendix text).
+/// A shorthand `{ name }` pattern property over a synthetic identifier, zero-width
+/// at host position `at` — the start of the property it is injected before. An
+/// appendix span there would open the previous property's trailing window from its
+/// host end into the appendix, sweeping every later carried comment into the
+/// pattern; at `at`, the windows around it are the authored gaps.
 fn shorthand_pattern_prop<'arena>(
-    b: &mut Builder<'arena>,
+    b: &Builder<'arena>,
     name: &str,
+    at: u32,
 ) -> ObjectPatternProperty<'arena> {
-    let ident = b.ident(name);
-    let span = ident.span;
+    let span = Span::new(at, at);
+    let ident = b.ident_at(name, span);
     ObjectPatternProperty::Property(init_property(
         b.arena,
         Expression::Identifier(ident.clone()),

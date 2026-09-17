@@ -61,12 +61,13 @@
 //!   generated-name collisions, transition/animate conflicts, snippet/head hoist
 //!   order), and the component invocation refusals; and
 //! - the pipeline-inline comment-family refusals gated on `has_comments` **and** a
-//!   script-side condition (comments alongside a `$derived` / argument-less
-//!   `$state()` / a rest-element or non-destructured `$props()` / a `$bindable()`
-//!   default / a `$props.id()` / a `$$slots` reference / a multi-declarator, and
-//!   comments inside a rewritten rune region). The template shapes that once gated
-//!   comment carry — blocks, component invocations, expression attributes,
-//!   `{#snippet}`/`{@render}`, hoisted imports — now carry through.
+//!   script-side condition (comments alongside a destructured `$derived` / `$state`
+//!   or a multi-declarator, a comment inside a rewritten rune call, and one esrap
+//!   reflushes into a block). The shapes that once gated comment carry — template
+//!   blocks, component invocations, expression attributes, `{#snippet}`/`{@render}`,
+//!   hoisted imports, and the rune rewrites that now mint fictional-span nodes
+//!   (`$props()` injections, `$props.id()`, `$$slots`, argument-less `$state()`,
+//!   stores) — carry through.
 //!
 //! [`refusal_census_buckets`] is the single source of truth for which
 //! [`bucket_key`](crate::Refusal::bucket_key)s the census attempts; the caller
@@ -191,9 +192,6 @@ pub fn refusal_census_buckets() -> Vec<Cow<'static, str>> {
         Refusal::DestructuringDerivedBy,
         Refusal::PropsBindingPattern,
         Refusal::BindingPatternShape { kind: "" },
-        Refusal::CommentsWithArglessState,
-        Refusal::CommentsWithRestProps,
-        Refusal::CommentsWithNonDestructuredProps,
         // needs_context member/call classification.
         Refusal::MemberCallAmbiguousRoot { name: s() },
         Refusal::MemberCallEscapedRoot,
