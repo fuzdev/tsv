@@ -30,9 +30,9 @@ pub struct TSTypeAnnotation<'arena> {
 /// `Infer` — for the density reason `Statement` and `Expression` take: each is wide
 /// enough to set the enum's size on its own (`TSImportType` 112 B, `TSConstructorType`
 /// and `TSInferType` 80) and rare enough that the allocation is free, while the width
-/// is paid on every element of every `&[TSType]` and on every `?`-propagation copy up
-/// the type parser's precedence ladder — which is a deep one, so the propagation
-/// dominates the slot count. Boxed, `TSType` is 80 B rather than 112; the next-widest
+/// is paid on every element of every `&[TSType]` and every by-value holder. (The type
+/// parser's precedence ladder does not pay it: each level returns an `&'arena TSType`
+/// — see `Parser::parse_type`.) Boxed, `TSType` is 80 B rather than 112; the next-widest
 /// inline variants are `TSTypeReference` / `TSTypeQuery` / `TSMappedType` /
 /// `TSFunctionType` at 72, and `TSTypeReference` is the common case, so the ladder
 /// stops there.

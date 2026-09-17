@@ -15,6 +15,13 @@ use super::scan::{
     identifier_starts_at, is_word_at, skip_identifier, skip_whitespace_and_comments,
 };
 
+// The type ladder's return (see `Parser::parse_type`): a reference plus the pointer-sized
+// `ParseError` needs a discriminant word, so the `Result` is two words — 16 B on 64-bit,
+// which x86-64 hands back in two registers where an 80 B `TSType` needs a stack slot.
+// wasm32 returns every `Result` through a slot either way; there the assert holds at 8 B
+// and the slot is 8 B rather than a whole `TSType`.
+const _: () = assert!(size_of::<Result<&TSType<'static>, ParseError>>() == 2 * size_of::<usize>());
+
 impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse a `: Type` annotation when the next token is a `:`, else `None` —
     /// the optional-annotation guard shared by variable declarations, class
@@ -36,11 +43,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let start = self.current_pos().0;
         self.expect(&TokenKind::Colon)?;
 
-        let type_node = self.parse_type()?;
-        let end = type_node.span().end;
+        let type_annotation = self.parse_type()?;
+        let end = type_annotation.span().end;
 
         Ok(TSTypeAnnotation {
-            type_annotation: self.alloc(type_node),
+            type_annotation,
             span: Span::new(start as u32, end),
         })
     }
@@ -72,7 +79,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// parse. The postfix-`[` ASI rule (a newline before `[` ends the type — see
     /// `parse_array_type`) applies uniformly, so the `as`/`satisfies` expression
     /// context needs no separate entry.
-    pub(in crate::parser) fn parse_type(&mut self) -> Result<TSType<'arena>, ParseError> {
+    ///
+    /// Returns the type **arena-allocated**, as does every builder on the ladder below
+    /// it (`parse_union_type` → `parse_intersection_type` → `parse_array_type` →
+    /// `parse_primary_type` and each leaf it dispatches to), each boxing at its own
+    /// tail — the `ParsedExpr` rule applied to types: no `parse_*` reached from a
+    /// dispatcher returns the bare `TSType` enum. A by-value `TSType` (80 B) comes back
+    /// through a caller stack slot at every level of this deep ladder, and a dispatcher
+    /// reserves one such slot per arm in every frame; an `&'arena TSType` return is a
+    /// two-scalar `Result` (see the size assert at the top of this file). The consumers
+    /// that hold a type by reference — most of them — keep the allocation; the few
+    /// by-value holders (a union / intersection / tuple / type-argument /
+    /// template-literal slice element, the type alias's right-hand side) take a shallow
+    /// clone, the same 80 B copy the by-value return moved.
+    pub(in crate::parser) fn parse_type(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
         debug_assert!(self.pending_conditional_extends.is_none());
         self.with_full_type_context(|p| {
             let start = p.current_pos().0;
@@ -113,13 +133,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let false_type = p.parse_type()?;
                 let end = false_type.span().end;
 
-                Ok(TSType::Conditional(TSConditionalType {
-                    check_type: p.alloc(check_type),
-                    extends_type: p.alloc(extends_type),
-                    true_type: p.alloc(true_type),
-                    false_type: p.alloc(false_type),
+                Ok(p.alloc(TSType::Conditional(TSConditionalType {
+                    check_type,
+                    extends_type,
+                    true_type,
+                    false_type,
                     span: Span::new(start as u32, end),
-                }))
+                })))
             } else {
                 Ok(check_type)
             }
@@ -127,7 +147,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse union type: `A | B | C` or `| A | B | C`
-    fn parse_union_type(&mut self) -> Result<TSType<'arena>, ParseError> {
+    fn parse_union_type(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
 
         // Handle leading pipe: `| A | B`
@@ -152,20 +172,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         let mut types = self.bvec();
-        types.push(first);
+        types.push(first.clone());
         while self.eat(TokenKind::Pipe) {
-            types.push(self.with_fn_type_disallowed(true, Self::parse_intersection_type)?);
+            types.push(
+                self.with_fn_type_disallowed(true, Self::parse_intersection_type)?
+                    .clone(),
+            );
         }
 
         let end = types.last().map_or_else(|| start as u32, |t| t.span().end);
-        Ok(TSType::Union(TSUnionType {
+        Ok(self.alloc(TSType::Union(TSUnionType {
             types: types.into_bump_slice(),
             span: Span::new(start as u32, end),
-        }))
+        })))
     }
 
     /// Parse intersection type: `A & B & C` or `& A & B & C`
-    fn parse_intersection_type(&mut self) -> Result<TSType<'arena>, ParseError> {
+    fn parse_intersection_type(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
 
         // Handle leading ampersand: `& A & B`
@@ -188,16 +211,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         let mut types = self.bvec();
-        types.push(first);
+        types.push(first.clone());
         while self.eat(TokenKind::Ampersand) {
-            types.push(self.with_fn_type_disallowed(true, Self::parse_array_type)?);
+            types.push(
+                self.with_fn_type_disallowed(true, Self::parse_array_type)?
+                    .clone(),
+            );
         }
 
         let end = types.last().map_or_else(|| start as u32, |t| t.span().end);
-        Ok(TSType::Intersection(TSIntersectionType {
+        Ok(self.alloc(TSType::Intersection(TSIntersectionType {
             types: types.into_bump_slice(),
             span: Span::new(start as u32, end),
-        }))
+        })))
     }
 
     /// Parse array type suffix `T[]` or indexed access type `T[K]`.
@@ -212,7 +238,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// tsc guards the postfix `?` of a tuple element on the same rule, in the same loop
     /// — see [`Self::error_optional_marker_after_line_break`], where acorn's port drops
     /// the guard and tsv keeps it.
-    fn parse_array_type(&mut self) -> Result<TSType<'arena>, ParseError> {
+    fn parse_array_type(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
         let mut result = self.parse_primary_type()?;
 
@@ -224,10 +250,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let (_, arr_end) = self.current_pos();
                 self.expect(&TokenKind::BracketClose)?;
 
-                result = TSType::Array(TSArrayType {
-                    element_type: self.alloc(result),
+                result = self.alloc(TSType::Array(TSArrayType {
+                    element_type: result,
                     span: Span::new(start as u32, arr_end as u32),
-                });
+                }));
             } else {
                 // Indexed access type: T[K]
                 self.advance()?; // consume '['
@@ -235,11 +261,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let (_, end) = self.current_pos();
                 self.expect(&TokenKind::BracketClose)?;
 
-                result = TSType::IndexedAccess(TSIndexedAccessType {
-                    object_type: self.alloc(result),
-                    index_type: self.alloc(index_type),
+                result = self.alloc(TSType::IndexedAccess(TSIndexedAccessType {
+                    object_type: result,
+                    index_type,
                     span: Span::new(start as u32, end as u32),
-                });
+                }));
             }
         }
 
@@ -247,7 +273,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse primary type (highest precedence)
-    fn parse_primary_type(&mut self) -> Result<TSType<'arena>, ParseError> {
+    fn parse_primary_type(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
         let (start, end) = self.current_pos();
         let span = Span::new(start as u32, end as u32);
 
@@ -267,7 +293,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 return self.parse_type_reference();
             }
             self.advance()?;
-            return Ok(TSType::Keyword(TSKeywordType::new(ts_kind, span)));
+            return Ok(self.alloc(TSType::Keyword(TSKeywordType::new(ts_kind, span))));
         }
 
         match self.current_kind() {
@@ -290,16 +316,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             this_name,
                             Span::new(start as u32, end as u32),
                         ),
-                        type_annotation: Some(self.alloc(type_node)),
+                        type_annotation: Some(type_node),
                         asserts: false,
                         span: Span::new(start as u32, type_end),
                     };
-                    return Ok(TSType::TypePredicate(predicate));
+                    return Ok(self.alloc(TSType::TypePredicate(predicate)));
                 }
                 self.advance()?;
-                Ok(TSType::ThisType(TSThisType {
+                Ok(self.alloc(TSType::ThisType(TSThisType {
                     span: Span::new(start as u32, end as u32),
-                }))
+                })))
             }
             // `const` keyword in type context (for `as const`)
             // Treated as a type reference with name "const"
@@ -308,14 +334,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let name = self.current_raw_ident_name();
                 self.advance()?;
 
-                Ok(TSType::TypeReference(TSTypeReference {
+                Ok(self.alloc(TSType::TypeReference(TSTypeReference {
                     type_name: TSEntityName::Identifier(Identifier::simple(
                         name,
                         Span::new(start as u32, end as u32),
                     )),
                     type_arguments: None,
                     span: Span::new(start as u32, end as u32),
-                }))
+                })))
             }
             // Numeric literal types: `1`, `42.5`, `1n`
             TokenKind::Number => {
@@ -324,15 +350,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.advance()?;
 
                 if is_bigint {
-                    Ok(TSType::Literal(TSLiteralType::BigInt(literal)))
+                    Ok(self.alloc(TSType::Literal(TSLiteralType::BigInt(literal))))
                 } else {
-                    Ok(TSType::Literal(TSLiteralType::Number(literal)))
+                    Ok(self.alloc(TSType::Literal(TSLiteralType::Number(literal))))
                 }
             }
             // String literal types: `"hello"`, `'world'`
-            TokenKind::String => Ok(TSType::Literal(TSLiteralType::String(
-                self.parse_string_literal()?,
-            ))),
+            TokenKind::String => {
+                let literal = self.parse_string_literal()?;
+                Ok(self.alloc(TSType::Literal(TSLiteralType::String(literal))))
+            }
             // Negative number literal types: `-1`, `-42n`
             TokenKind::Minus => {
                 let start = self.current_pos().0;
@@ -352,12 +379,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     argument: self.alloc(Expression::Literal(argument)),
                     span: Span::new(start as u32, num_end as u32),
                 };
-                Ok(TSType::Literal(TSLiteralType::UnaryExpression(unary)))
+                Ok(self.alloc(TSType::Literal(TSLiteralType::UnaryExpression(unary))))
             }
             // Template literal types
             TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead => {
                 let template = self.parse_template_literal_type()?;
-                Ok(TSType::Literal(TSLiteralType::TemplateLiteral(template)))
+                Ok(self.alloc(TSType::Literal(TSLiteralType::TemplateLiteral(template))))
             }
             // Parenthesized type or function type: (T) or (x: T) => U
             TokenKind::ParenOpen => self.parse_parenthesized_or_function_type(),
@@ -427,7 +454,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_type_operator(
         &mut self,
         operator: TSTypeOperatorKind,
-    ) -> Result<TSType<'arena>, ParseError> {
+    ) -> Result<&'arena TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.advance()?; // consume the operator keyword (keyof, unique, readonly)
 
@@ -438,15 +465,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let type_annotation = self.with_fn_type_disallowed(true, Self::parse_array_type)?;
         let end = type_annotation.span().end;
 
-        Ok(TSType::TypeOperator(TSTypeOperator {
+        Ok(self.alloc(TSType::TypeOperator(TSTypeOperator {
             operator,
-            type_annotation: self.alloc(type_annotation),
+            type_annotation,
             span: Span::new(start as u32, end),
-        }))
+        })))
     }
 
     /// Parse infer type: `infer U` (in conditional type extends clause)
-    fn parse_infer_type(&mut self) -> Result<TSType<'arena>, ParseError> {
+    fn parse_infer_type(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.advance()?; // consume 'infer'
 
@@ -497,11 +524,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.pending_conditional_extends = Some(constraint_type);
             } else {
                 end = constraint_type.span().end;
-                constraint = Some(self.alloc(constraint_type));
+                constraint = Some(constraint_type);
             }
         }
 
-        Ok(TSType::Infer(self.arena.alloc(TSInferType {
+        Ok(self.alloc(TSType::Infer(self.arena.alloc(TSInferType {
             type_parameter: TSTypeParameter {
                 name,
                 constraint,
@@ -511,7 +538,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 span: Span::new(name_start, end),
             },
             span: Span::new(start as u32, end),
-        })))
+        }))))
     }
 
     /// Check if the peek token could start a type
@@ -598,7 +625,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse type reference: `Foo` or `Foo.Bar` or `Foo<T>`
-    fn parse_type_reference(&mut self) -> Result<TSType<'arena>, ParseError> {
+    fn parse_type_reference(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
         let type_name = self.parse_type_entity_name()?;
 
@@ -611,19 +638,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             .as_ref()
             .map_or_else(|| type_name.span().end, |ta| ta.span.end);
 
-        Ok(TSType::TypeReference(TSTypeReference {
+        Ok(self.alloc(TSType::TypeReference(TSTypeReference {
             type_name,
             type_arguments,
             span: Span::new(start as u32, end),
-        }))
+        })))
     }
 
     /// Parse import type: `import('module')` or `import('module', {with: {...}}).Foo<T>`
-    fn parse_import_type(&mut self) -> Result<TSType<'arena>, ParseError> {
+    fn parse_import_type(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.advance()?; // consume 'import'
         let import = self.parse_import_type_body(start)?;
-        Ok(TSType::Import(self.arena.alloc(import)))
+        Ok(self.alloc(TSType::Import(self.arena.alloc(import))))
     }
 
     /// Parse import type body after `import` keyword has been consumed.
@@ -684,7 +711,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse type query: `typeof x`, `typeof Foo.bar`, `typeof import("module")`
-    fn parse_type_query(&mut self) -> Result<TSType<'arena>, ParseError> {
+    fn parse_type_query(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.advance()?; // consume 'typeof'
 
@@ -710,11 +737,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             .as_ref()
             .map_or_else(|| expr_name.span().end, |ta| ta.span.end);
 
-        Ok(TSType::TypeQuery(TSTypeQuery {
+        Ok(self.alloc(TSType::TypeQuery(TSTypeQuery {
             expr_name,
             type_arguments,
             span: Span::new(start as u32, end),
-        }))
+        })))
     }
 
     /// Parse an entity name (`Foo` / `Foo.Bar.Baz`) in a **type** position, where every
@@ -843,13 +870,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let mut params = self.bvec();
         if !self.check_greater_than_in_type() {
-            params.push(self.parse_type()?);
+            params.push(self.parse_type()?.clone());
             while self.eat(TokenKind::Comma) {
                 // Allow trailing comma - check for closing > before parsing another type
                 if self.check_greater_than_in_type() {
                     break;
                 }
-                params.push(self.parse_type()?);
+                params.push(self.parse_type()?.clone());
             }
         }
 
@@ -917,7 +944,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse parenthesized type `(T)` or function type `(x: T) => U`
-    fn parse_parenthesized_or_function_type(&mut self) -> Result<TSType<'arena>, ParseError> {
+    fn parse_parenthesized_or_function_type(
+        &mut self,
+    ) -> Result<&'arena TSType<'arena>, ParseError> {
         // Raw `(` offset into `self.source` for the byte scan below (NOT
         // `current_pos()`, which adds `base_offset` for span coordinates and would
         // mis-index the embedded `<script>` slice).
@@ -945,10 +974,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             self.expect(&TokenKind::ParenClose)?;
             let end = self.prev_token_end();
 
-            return Ok(TSType::Parenthesized(TSParenthesizedType {
-                type_annotation: self.alloc(inner_type),
+            return Ok(self.alloc(TSType::Parenthesized(TSParenthesizedType {
+                type_annotation: inner_type,
                 span: Span::new(start as u32, end as u32),
-            }));
+            })));
         }
 
         // Try to parse as function parameters
@@ -977,10 +1006,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             };
             // Use end of closing paren, not end of inner type
             let end = self.prev_token_end() as u32;
-            return Ok(TSType::Parenthesized(TSParenthesizedType {
+            return Ok(self.alloc(TSType::Parenthesized(TSParenthesizedType {
                 type_annotation: self.alloc(inner),
                 span: Span::new(start as u32, end),
-            }));
+            })));
         }
 
         // Anything else committed to a function-type parameter list (annotated
@@ -994,12 +1023,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let return_type = self.parse_return_type_inner(arrow_start)?;
         let end = return_type.span.end;
 
-        Ok(TSType::Function(TSFunctionType {
+        Ok(self.alloc(TSType::Function(TSFunctionType {
             type_parameters: None,
             params,
             return_type,
             span: Span::new(start as u32, end),
-        }))
+        })))
     }
 
     /// Check if current token definitely starts a type (not a valid parameter name)
@@ -1058,7 +1087,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse generic function type: `<T>() => U`, `<T, U extends V>(x: T) => U`
-    fn parse_generic_function_type(&mut self) -> Result<TSType<'arena>, ParseError> {
+    fn parse_generic_function_type(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
         // Function types are not allowed at operand positions (`A & <T>() => U`
         // must be `A & (<T>() => U)`) — see `fn_type_disallowed`.
         if self.fn_type_disallowed {
@@ -1084,16 +1113,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let return_type = self.parse_return_type_inner(arrow_start)?;
         let end = return_type.span.end;
 
-        Ok(TSType::Function(TSFunctionType {
+        Ok(self.alloc(TSType::Function(TSFunctionType {
             type_parameters: Some(type_parameters),
             params,
             return_type,
             span: Span::new(start as u32, end),
-        }))
+        })))
     }
 
     /// Parse constructor type: `new () => T`, `new <T>() => T`, `abstract new () => T`
-    fn parse_constructor_type(&mut self, is_abstract: bool) -> Result<TSType<'arena>, ParseError> {
+    fn parse_constructor_type(
+        &mut self,
+        is_abstract: bool,
+    ) -> Result<&'arena TSType<'arena>, ParseError> {
         // Constructor types are not allowed at operand positions (`A & new () => T`
         // must be `A & (new () => T)`) — see `fn_type_disallowed`.
         if self.fn_type_disallowed {
@@ -1127,13 +1159,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let return_type = self.parse_return_type_inner(arrow_start)?;
         let end = return_type.span.end;
 
-        Ok(TSType::Constructor(self.arena.alloc(TSConstructorType {
-            abstract_: is_abstract,
-            type_parameters,
-            params,
-            return_type,
-            span: Span::new(start as u32, end),
-        })))
+        Ok(
+            self.alloc(TSType::Constructor(self.arena.alloc(TSConstructorType {
+                abstract_: is_abstract,
+                type_parameters,
+                params,
+                return_type,
+                span: Span::new(start as u32, end),
+            }))),
+        )
     }
 
     /// Parse function type parameters. The returned flag is whether any comma
@@ -1258,7 +1292,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse object type: `{ prop: T; method(): U }` or mapped type: `{ [K in T]: V }`
-    fn parse_object_type(&mut self) -> Result<TSType<'arena>, ParseError> {
+    fn parse_object_type(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.expect(&TokenKind::BraceOpen)?;
 
@@ -1282,14 +1316,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?;
 
-        Ok(TSType::TypeLiteral(TSTypeLiteral {
+        Ok(self.alloc(TSType::TypeLiteral(TSTypeLiteral {
             members: members.into_bump_slice(),
             span: Span::new(start as u32, end as u32),
-        }))
+        })))
     }
 
     /// Parse the body of a mapped type (after '{' has been consumed)
-    fn parse_mapped_type_body(&mut self, start: usize) -> Result<TSType<'arena>, ParseError> {
+    fn parse_mapped_type_body(
+        &mut self,
+        start: usize,
+    ) -> Result<&'arena TSType<'arena>, ParseError> {
         // Parse optional readonly modifier: `readonly`, `+readonly`, `-readonly`
         let readonly = self.parse_mapped_type_readonly_modifier()?;
 
@@ -1322,16 +1359,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         param_start: usize,
         param_name: IdentName<'arena>,
         readonly: Option<TSMappedTypeModifier>,
-    ) -> Result<TSType<'arena>, ParseError> {
-        let arena = self.arena;
-
+    ) -> Result<&'arena TSType<'arena>, ParseError> {
         // Parse constraint type (e.g., `keyof T`)
         let constraint = self.parse_type()?;
         let param_end = constraint.span().end;
 
         // Check for optional `as` clause: `as NewKey`
         let name_type = if self.eat(TokenKind::Keyword(KeywordKind::As)) {
-            Some(&*arena.alloc(self.parse_type()?))
+            Some(self.parse_type()?)
         } else {
             None
         };
@@ -1345,7 +1380,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse optional `:` and value type — the annotation may be absent
         // entirely (`{ [K in T] }`, `{ [K in T]+? }`), matching acorn.
         let type_annotation = if self.eat(TokenKind::Colon) {
-            Some(&*arena.alloc(self.parse_type()?))
+            Some(self.parse_type()?)
         } else {
             None
         };
@@ -1357,10 +1392,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?;
 
-        Ok(TSType::Mapped(TSMappedType {
+        Ok(self.alloc(TSType::Mapped(TSMappedType {
             type_parameter: TSMappedTypeParameter {
                 name: param_name,
-                constraint: self.alloc(constraint),
+                constraint,
                 span: Span::new(param_start as u32, param_end),
             },
             name_type,
@@ -1368,7 +1403,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             readonly,
             optional,
             span: Span::new(start as u32, end as u32),
-        }))
+        })))
     }
 
     /// Parse readonly modifier for mapped type: `readonly`, `+readonly`, `-readonly`.
@@ -1432,42 +1467,42 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse tuple type: `[T, U, V]`, `[...T]`, `[label: T]`, `[T?]`, `[first: string, ...rest: T]`
-    fn parse_tuple_type(&mut self) -> Result<TSType<'arena>, ParseError> {
+    fn parse_tuple_type(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.expect(&TokenKind::BracketOpen)?;
 
         let mut element_types = self.bvec();
         if !self.check(&TokenKind::BracketClose) {
-            element_types.push(self.parse_tuple_element()?);
+            element_types.push(self.parse_tuple_element()?.clone());
             while self.eat(TokenKind::Comma) {
                 if self.check(&TokenKind::BracketClose) {
                     break; // trailing comma
                 }
-                element_types.push(self.parse_tuple_element()?);
+                element_types.push(self.parse_tuple_element()?.clone());
             }
         }
 
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BracketClose)?;
 
-        Ok(TSType::Tuple(TSTupleType {
+        Ok(self.alloc(TSType::Tuple(TSTupleType {
             element_types: element_types.into_bump_slice(),
             span: Span::new(start as u32, end as u32),
-        }))
+        })))
     }
 
     /// Parse a single tuple element: `T`, `T?`, `...T`, `label: T`, `label?: T`, `...label: T`
-    fn parse_tuple_element(&mut self) -> Result<TSType<'arena>, ParseError> {
+    fn parse_tuple_element(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
         let elem_start = self.current_pos().0;
 
         // Check for rest element: `...T` or `...label: T`
         if self.eat(TokenKind::DotDotDot) {
             let inner = self.parse_tuple_element_inner()?;
             let end = inner.span().end;
-            return Ok(TSType::Rest(TSRestType {
-                type_annotation: self.alloc(inner),
+            return Ok(self.alloc(TSType::Rest(TSRestType {
+                type_annotation: inner,
                 span: Span::new(elem_start as u32, end),
-            }));
+            })));
         }
 
         self.parse_tuple_element_inner()
@@ -1539,28 +1574,28 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         keyword: Option<KeywordKind>,
         name: IdentName<'arena>,
         span: Span,
-    ) -> Result<TSType<'arena>, ParseError> {
+    ) -> Result<&'arena TSType<'arena>, ParseError> {
         if let Some(kw) = keyword {
             if let Some(ts_kind) = TSKeywordKind::from_lexer_keyword(kw) {
-                return Ok(TSType::Keyword(TSKeywordType::new(ts_kind, span)));
+                return Ok(self.alloc(TSType::Keyword(TSKeywordType::new(ts_kind, span))));
             }
             match kw {
-                KeywordKind::This => return Ok(TSType::ThisType(TSThisType { span })),
+                KeywordKind::This => return Ok(self.alloc(TSType::ThisType(TSThisType { span }))),
                 KeywordKind::Typeof | KeywordKind::New | KeywordKind::Import => {
                     return Err(self.error_msg_at("Expected a type name", span.start as usize));
                 }
                 _ => {}
             }
         }
-        Ok(TSType::TypeReference(TSTypeReference {
+        Ok(self.alloc(TSType::TypeReference(TSTypeReference {
             type_name: TSEntityName::Identifier(Identifier::simple(name, span)),
             type_arguments: None,
             span,
-        }))
+        })))
     }
 
     /// Parse a tuple element (without leading `...`): `T`, `T?`, `label: T`, `label?: T`
-    fn parse_tuple_element_inner(&mut self) -> Result<TSType<'arena>, ParseError> {
+    fn parse_tuple_element_inner(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
         let elem_start = self.current_pos().0;
 
         // Check for named tuple member: `label: T` or `label?: T`
@@ -1596,10 +1631,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         label_name,
                         Span::new(label_start as u32, label_end as u32),
                     )?;
-                    return Ok(TSType::Optional(TSOptionalType {
-                        type_annotation: self.alloc(head),
+                    return Ok(self.alloc(TSType::Optional(TSOptionalType {
+                        type_annotation: head,
                         span: Span::new(elem_start as u32, self.prev_token_end() as u32),
-                    }));
+                    })));
                 }
             } else {
                 false
@@ -1610,15 +1645,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let element_type = self.parse_type()?;
             let end = element_type.span().end;
 
-            return Ok(TSType::NamedTupleMember(TSNamedTupleMember {
+            return Ok(self.alloc(TSType::NamedTupleMember(TSNamedTupleMember {
                 label: Identifier::simple(
                     label_name,
                     Span::new(label_start as u32, label_end as u32),
                 ),
-                element_type: self.alloc(element_type),
+                element_type,
                 optional,
                 span: Span::new(elem_start as u32, end),
-            }));
+            })));
         }
 
         // Parse as regular type, then check for trailing `?` (optional type)
@@ -1632,10 +1667,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             self.advance()?; // consume `?`
             let end = self.prev_token_end();
-            Ok(TSType::Optional(TSOptionalType {
-                type_annotation: self.alloc(inner_type),
+            Ok(self.alloc(TSType::Optional(TSOptionalType {
+                type_annotation: inner_type,
                 span: Span::new(elem_start as u32, end as u32),
-            }))
+            })))
         } else {
             Ok(inner_type)
         }
@@ -1682,7 +1717,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 loop {
                     // Parse the interpolated type (not expression!)
                     let ts_type = self.parse_type()?;
-                    types.push(ts_type);
+                    types.push(ts_type.clone());
 
                     // Expect closing } of the interpolation
                     if !self.check(&TokenKind::BraceClose) {
@@ -1878,7 +1913,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             self.advance()?;
             let constraint_type = self.parse_type()?;
             end = constraint_type.span().end;
-            Some(self.alloc(constraint_type))
+            Some(constraint_type)
         } else {
             None
         };
@@ -1887,7 +1922,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let default = if self.eat(TokenKind::Equals) {
             let default_type = self.parse_type()?;
             end = default_type.span().end;
-            Some(self.alloc(default_type))
+            Some(default_type)
         } else {
             None
         };
@@ -1914,7 +1949,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let mut params = self.bvec();
         loop {
             let ts_type = self.parse_type()?;
-            params.push(ts_type);
+            params.push(ts_type.clone());
 
             if !self.eat(TokenKind::Comma) {
                 break;

@@ -350,7 +350,7 @@ pub struct Parser<'a, 'arena> {
     /// the current token is `?`; consumed by the innermost enclosing
     /// `parse_type`, which nothing can precede (every intermediate
     /// union/intersection/array/operand loop breaks on `?`).
-    pending_conditional_extends: Option<TSType<'arena>>,
+    pending_conditional_extends: Option<&'arena TSType<'arena>>,
 }
 
 impl<'a, 'arena> Parser<'a, 'arena> {

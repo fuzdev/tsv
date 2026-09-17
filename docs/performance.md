@@ -771,11 +771,12 @@ ladder asks about is a named wire node and is counted exactly.
 
 ⚠️ **A census counts values; a `?`-ladder charges per level.** The `count ×
 size` column ranks a type by where its values come to *rest*, which under-counts
-one the parser threads up a deep precedence ladder — a `TSType` is returned
-through every level of the type parser's `?`-chain, so its width is paid once
-per level and not once per node. Narrowing `TSType` 112 → 80 B outmeasured a
-`Statement` rung carrying ~3× its slot megabytes, by ~1.6× on every corpus. The
-instrument that reads that channel directly is the recursion-depth probe
+one the parser returns BY VALUE up a deep precedence ladder — its width is then
+paid once per level and not once per node. Narrowing a by-value-returned
+`TSType` 112 → 80 B outmeasured a `Statement` rung carrying ~3× its slot
+megabytes, by ~1.6× on every corpus; returning `&'arena TSType` from the type
+parser's `?`-chain closes that channel for types. The instrument that reads the
+per-level channel directly is the recursion-depth probe
 ([cli.md §Recursion Depth](./cli.md#recursion-depth)), worth a look before
 ranking two rungs a slot census puts close together.
 

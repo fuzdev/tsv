@@ -111,15 +111,13 @@ pub use expressions::{
 // widest (`ClassExpression` / `FunctionExpression` / `ArrowFunctionExpression` /
 // `MetaProperty` / `TaggedTemplateExpression`, together ~3% of expressions, of which
 // the widest two are ~0.02%), `TSType`'s three widest (`TSImportType`,
-// `TSConstructorType`, `TSInferType`, taking it 112 → 80 — where the cost is mostly the
-// `?`-propagation up the type parser's deep precedence ladder rather than the slot
-// count), `Statement`'s DECLARATION heads and its four loop /
-// `try` heads one level down (`internal::statements`). Two of those declaration
-// heads — `ImportDeclaration` and `ExportNamedDeclaration` — are boxed despite NOT
-// being rare (6.8–11.7% and 2.4–4.0% of statements): they are simply the last two
-// rungs of the ladder, and a boxed head's construction copies the same bytes into
-// the arena that it would have moved into the enum, so the cost is one bump pointer
-// against 24 bytes off every other statement slot.
+// `TSConstructorType`, `TSInferType`, taking it 112 → 80), `Statement`'s DECLARATION
+// heads and its four loop / `try` heads one level down (`internal::statements`). Two
+// of those declaration heads — `ImportDeclaration` and `ExportNamedDeclaration` — are
+// boxed despite NOT being rare (6.8–11.7% and 2.4–4.0% of statements): they are
+// simply the last two rungs of the ladder, and a boxed head's construction copies the
+// same bytes into the arena that it would have moved into the enum, so the cost is
+// one bump pointer against 24 bytes off every other statement slot.
 //
 // The LIST-ELEMENT containers whose own width was inline `Expression`s —
 // `Property` (an object literal's `key: value`, and a destructuring pattern's),
