@@ -146,7 +146,9 @@ fn rewrite_template_value<'arena>(
             .iter()
             .any(|overlay| overlay.contains_key(&base))
     {
-        let call = env.b.store_get(&base, env.derived_names.contains(&base));
+        let call = env
+            .b
+            .store_get(&base, env.derived_names.contains(&base), expr.span());
         return Ok(env.b.arena.alloc(call));
     }
     // A `$state.snapshot(x)` call → `$.snapshot(<processed x>)`.

@@ -112,7 +112,8 @@ project-wide conventions.
     also refuse. Carried script comments alongside a template block, a component
     invocation, an expression-valued attribute, `{#snippet}`/`{@render}`, or
     hoisted imports **compile** — those emitters write template-region spans only,
-    which no script-comment window reaches.
+    which no script-comment window reaches — and so do comments alongside the script
+    rune rewrites, whose mints are zero-width fictional nodes at host positions.
     The output is **self-validated by reparse** before it returns: generated JS
     that `tsv_ts` rejects surfaces as `CompileError::CorruptOutput` (a compiler
     bug — a divergent shape slipped every guard), never a silently invalid
@@ -236,7 +237,11 @@ project-wide conventions.
   the `None` contract is the whole safety argument: re-running the eraser over the
   *finished* program and getting no change PROVES no TypeScript survived — the one
   check that catches a missed erase, which the output reparse cannot (a surviving
-  annotation still parses). Refuse-don't-erase for the runtime-bearing constructs
+  annotation still parses). Besides TypeScript it applies two JavaScript
+  normalizations the oracle's printer makes: a `JsdocCast` unwraps, and a same-name
+  longhand property (`{ a: a }`) collapses to the shorthand esrap prints
+  (`Eraser::same_name_shorthand`, recording the dropped `a:` gap as a comment
+  window). Refuse-don't-erase for the runtime-bearing constructs
   and the ones the oracle mis-compiles (see `refusal.rs`); every erased source
   region is recorded, and a comment intersecting one refuses — because the
   oracle's surviving-comment placement is an emergent artifact of its printer's
@@ -439,8 +444,10 @@ project-wide conventions.
   `store_shadowed` = `nested_declared` ∪ `component.fn_declared`). Respects
   **name-only positions** (a non-computed member property / object-or-class key is
   a name, never a read) — the one place it diverges from `erase.rs`. Builders live
-  in `build.rs` (`store_set`, `update_store`, sharing `store_subs_assign`/
-  `store_base_value` with `store_get`; `call_expr` for the `d()` read).
+  in `build.rs` (`store_get`, `store_set`, `update_store`, sharing `store_subs_assign`/
+  `store_base_value`) — fictional-span nodes that take the replaced expression's host
+  span with every synthetic leaf zero-width inside it, so a carried comment's windows
+  stay the authored ones; the template's store reads use the same `store_get`.
 - `snippet.rs` — the `{#snippet}` hoist analysis (name-based port of Svelte's
   `can_hoist_snippet`): which top-level snippets go to true module scope. Collects
   each snippet's free references (a flat scope-tracking walk) minus its bound
@@ -827,10 +834,27 @@ pipeline order.
   not a refusal: a module-FIRST comment the oracle keeps is CARRIED at its authored
   span; the rest drop. Divergent placement classes
   also still refuse —
-  template-expression comments, comments inside dropped rune regions, and comments
-  alongside a rune rewrite that mints a **script-region** span a comment window
-  would sweep (`$derived` — the `$.derived(() => e)` thunk — and argument-less
-  `$state()`). A template block, a component invocation, an expression-valued
+  template-expression comments, a comment in a rune call region the carry can't
+  place (`CommentInRewrittenRuneRegion`: past a trailing comma, or inside an empty
+  `$props()` call). The rune rewrites that used to mint **script-region** spans a
+  comment window would sweep now place every synthetic node zero-width at a host
+  position — `$props.id()`'s and `$$slots`'s prepended declarations at the body
+  block's start, the injected `$$slots`/`$$events` pattern properties at the rest
+  element, an argument-less `$state()` / `$bindable()`'s `void 0` at the call's end
+  (`Builder::void_zero_at`, spelled through the identifier name channel because a
+  numeric literal prints its own source slice). `$derived(e)`'s `$.derived(() => e)` thunk no longer is one: it anchors on the
+  borrowed body (`Builder::thunk_on_body`, no `params_start`), so the argument's
+  comments fall to the `$.derived(…)` call windows and the body, once each. The rest of a rune call's dropped syntax is
+  NOT a refusal region — the oracle writes those comments beside the kept argument,
+  and so does the carry. A comment esrap prints TWICE refuses too
+  (`CommentReflushedIntoBlock`): its `body()` flushes a comment starting on a
+  statement's end line as that statement's trailing comment even when the comment
+  sits inside a block of the NEXT statement (the bound is the next statement's END),
+  and the block's `reset_comment_index` then seeks back and writes it again — a
+  one-line layout (`let n = 1; if (n) { /* c */ }`) prettier-formatted code never
+  has. The test (`refuse_comment_reflushed_into_block`, over a `BlockCensus` of
+  blocks and statement/member ends) is a superset, so it only over-refuses; it
+  gates kept module comments the same way. A template block, a component invocation, an expression-valued
   attribute, `{#snippet}`/`{@render}`, and hoisted imports emit **template-region**
   spans only, so a carried comment window can't reach them and they compile.
 
@@ -838,15 +862,17 @@ pipeline order.
   `<script module>` program (threaded to `module_program`), computed only for the
   module-FIRST ordering (`collect_script_comments` refuses module-second first). A
   module comment is KEPT iff BOTH a `BlockStatement`/`ClassBody`/static block STARTS
-  before it (`module_min_block_start` — the anchor is the BLOCK's start, exactly the
+  before it (`BlockCensus::min_block_start` — the anchor is the BLOCK's start, exactly the
   nodes esrap re-seeks its index on; a `switch`/object/array `{}`/`[]` is not one)
   AND a flush target exists — a non-empty module statement extends PAST it, or an
   instance script is present (the exported component function is NOT one). Otherwise
   it drops. The rule is BIDIRECTIONALLY exact against the pinned oracle (no safe
   direction: over-keep and under-keep are both mismatches), so
-  `module_min_block_start` only ever notes a genuine block — a missed descent can
+  the census only ever notes a genuine block — a missed descent can
   under-report (leave a mismatch unclosed) but never keep a comment the oracle drops.
-  A kept comment whose reprint would diverge refuses (multi-line block comment,
+  A kept comment whose reprint would diverge refuses (a non-gutter multi-line block
+  comment — `multiline_comment_carries`, which carries a `*`-gutter one because the
+  canonical reprint rebuilds it from trimmed lines on both sides —
   erased-region comment, format-ignore), mirroring the instance-side rules. Full
   condition + fixtures: `../../docs/checklist_svelte_compiler.md` §The other half.
 - `script_rewrite.rs` — the per-statement rune rewrites
@@ -862,7 +888,7 @@ pipeline order.
   `$inspect(args)` / `$inspect(args).with(cb)` (recognized by
   `analyze.rs::is_inspect_call`) also dropped, but WITHOUT forcing the wrapper
   (no `has_effects`): its arguments and `.with` callback are still guard-walked
-  and its span pushed to `dropped_regions` (a comment inside refuses) — a
+  (a comment inside carries — the oracle keeps it, as for `$effect`) — a
   `$props.id()` declarator SKIPPED (the transform hoists `const <name> =
   $.props_id($$renderer)` to the component body's first statement, forcing no
   wrapper; duplicate / non-identifier target / carried comment refuse) — a

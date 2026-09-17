@@ -199,10 +199,7 @@ pub(crate) fn expand_destructured_derived<'arena>(
         let argument: &'arena Expression<'arena> = if is_derived {
             match unthunk_callee(value) {
                 Some(callee) => callee,
-                None => {
-                    let anchor = b.here();
-                    &*b.arena.alloc(b.arrow_expr_at(anchor, value))
-                }
+                None => &*b.arena.alloc(b.thunk_on_body(value)),
             }
         } else {
             value
@@ -470,8 +467,7 @@ impl<'arena> Extractor<'_, 'arena> {
 
     /// `$.derived(() => access)`.
     fn derived_of(&mut self, access: &'arena Expression<'arena>) -> Expression<'arena> {
-        let anchor = self.b.here();
-        let arrow = &*self.b.arena.alloc(self.b.arrow_expr_at(anchor, access));
+        let arrow = &*self.b.arena.alloc(self.b.thunk_on_body(access));
         self.b
             .member_call("$", "derived", std::slice::from_ref(arrow))
     }
@@ -611,10 +607,7 @@ impl<'arena> Extractor<'_, 'arena> {
         } else {
             let thunk = match unthunk_callee(default) {
                 Some(callee) => callee,
-                None => {
-                    let anchor = self.b.here();
-                    &*self.b.arena.alloc(self.b.arrow_expr_at(anchor, default))
-                }
+                None => &*self.b.arena.alloc(self.b.thunk_on_body(default)),
             };
             args.push(thunk.clone());
             args.push(self.b.true_literal());

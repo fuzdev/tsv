@@ -460,17 +460,21 @@ pub enum Refusal {
          (the oracle re-anchors comments inside the split)"
     )]
     CommentsAlongsideMultiDeclarator,
-    /// Comments in a script that makes a store reference. The `var $$store_subs;`
-    /// injection (and the `$.store_get`/`$.store_set` mints) are synthetic
-    /// (appendix-span) nodes whose leading comment window would sweep the carried
-    /// script comments — a safe over-refusal, like [`Self::CommentsWithSlots`].
-    /// Fires for a template-only `$name` read too (the var is injected all the
-    /// same).
-    #[error("comments in a script that references a store ($$store_subs injection)")]
-    CommentsWithStore,
-    /// A comment inside a rewritten (dropped) rune region.
-    #[error("comment inside a rewritten rune region (dropped by the transform)")]
+    /// A comment in a rune call region the carry can't place: past a trailing comma in
+    /// a `$state` / `$state.snapshot` / `$derived` / `$derived.by` call, or inside an
+    /// empty `$props()` call, whose `$$props` replacement has no comment window. The
+    /// oracle keeps both; the carry drops them.
+    #[error(
+        "comment inside a rewritten rune call (a trailing-comma gap or an empty $props() call)"
+    )]
     CommentInRewrittenRuneRegion,
+    /// A comment inside a block that opens on the line a statement ends, which the
+    /// oracle's printer writes twice (a same-line trailing flush, then a backward
+    /// comment-index seek when the block opens).
+    #[error(
+        "comment inside a block opened on the line a statement ends (the oracle prints it twice)"
+    )]
+    CommentReflushedIntoBlock,
     /// A comment after the last surviving script statement in a component whose
     /// template emits a nested block (the oracle drops it).
     #[error(
@@ -496,9 +500,6 @@ pub enum Refusal {
     /// Comments with template markup preceding the script (window ordering).
     #[error("comments with template markup before the script (window ordering)")]
     CommentsWithTemplateBeforeScript,
-    /// Comments in a script with an argument-less `$state()`.
-    #[error("comments in a script with an argument-less $state()")]
-    CommentsWithArglessState,
     /// Comments in a script with a destructured `$derived`/`$derived.by`
     /// declarator. Unlike an identifier target (which span-steals the replaced
     /// call so authored gaps survive), the destructure lowers ONE source
@@ -506,8 +507,7 @@ pub enum Refusal {
     /// the pattern leaves and minting `$$d`/`$$derived_array` intermediates whose
     /// leading-comment windows would sweep a carried script comment. A safe
     /// over-refusal (absent from the gating Svelte corpus but reachable in
-    /// ecosystem code), like [`Self::CommentsWithArglessState`] /
-    /// [`Self::CommentsWithBindable`].
+    /// ecosystem code).
     #[error("comments in a script with a destructured $derived declarator")]
     CommentsWithDestructuredDerived,
     /// Comments in a script with a destructured `$state`/`$state.raw`/
@@ -517,33 +517,14 @@ pub enum Refusal {
     /// intermediate), scattering the pattern leaves across synthetic spans whose
     /// leading-comment windows would sweep a carried script comment. A safe
     /// over-refusal (absent from the gating Svelte corpus but reachable in ecosystem
-    /// code), like [`Self::CommentsWithArglessState`].
+    /// code).
     #[error("comments in a script with a destructured $state declarator")]
     CommentsWithDestructuredState,
-    /// Comments in a script with a rest-element `$props()`.
-    #[error("comments in a script with a rest-element $props() (injected $$slots/$$events)")]
-    CommentsWithRestProps,
-    /// Comments in a script with a non-destructured `$props()`.
-    #[error("comments in a script with a non-destructured $props() (injected $$slots/$$events)")]
-    CommentsWithNonDestructuredProps,
-    /// Comments in a script with a `$props.id()` declarator. The hoisted
-    /// `const <name> = $.props_id($$renderer)` is a synthetic first statement whose
-    /// leading comment window would sweep the carried script comments — a safe
-    /// over-refusal, like [`Self::CommentsWithSlots`].
-    #[error("comments in a script with a $props.id() declarator")]
-    CommentsWithPropsId,
-    /// Comments in a script with a `$bindable()` prop default. The bindable
-    /// rewrite mints an appendix `void 0` and rewrites the `$bindable(...)` call
-    /// syntax inside the destructure pattern, so a carried comment's window would
-    /// sweep those synthetic spans — a safe over-refusal.
-    #[error("comments in a script with a $bindable() prop default")]
-    CommentsWithBindable,
-    /// Comments alongside a `$$slots` reference (the injected
-    /// `sanitize_slots` first statement would sweep the comment windows).
-    #[error("comments in a script with a $$slots reference (injected sanitize_slots)")]
-    CommentsWithSlots,
-    /// A multi-line block comment in the script (the oracle re-indents its
-    /// interior lines to the emit position; tsv carries them verbatim).
+    /// A multi-line block comment in the script that the canonical reprint does not
+    /// rebuild from trimmed lines (a preserved, non-`*`-gutter comment, or a gutter one
+    /// whose first line Svelte's indentation strip reaches): the oracle strips the
+    /// start-line indentation and re-indents the interior lines to the emit position,
+    /// tsv carries them verbatim.
     #[error(
         "multi-line block comment in script (interior-line re-indentation not carried through)"
     )]

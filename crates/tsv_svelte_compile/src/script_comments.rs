@@ -16,6 +16,8 @@ use tsv_ts::ast::internal::{
     ForInit, ObjectPatternProperty, ObjectProperty, Statement, VariableDeclaration,
 };
 
+use tsv_lang::Span;
+
 use crate::analyze::{is_effect_call, is_inspect_call};
 use crate::transform_server::unsupported;
 use crate::{CompileError, Refusal};
@@ -101,6 +103,9 @@ pub(crate) fn collect_script_comments(
         .max()
         .unwrap_or(content.start);
     let nested_block = template_emits_nested_block(root.fragment.nodes);
+    // Walk only what the emitted body keeps: a hoisted import or a dropped effect
+    // opens no block and flushes nothing in the oracle's output.
+    let census = BlockCensus::of(instance_body.iter().filter(|stmt| survives(stmt)));
     // A leading comment glued to the `<script>` line (no newline before it) shares
     // its source line with the function's synthetic opening brace, so the printer
     // trails it after the `{` instead of onto its own line — refuse the class
@@ -130,13 +135,11 @@ pub(crate) fn collect_script_comments(
         if comment.span.start < content.start || comment.span.end > content.end {
             return Err(unsupported(Refusal::TemplateComments));
         }
-        // A multi-line block comment carries verbatim, but the oracle (esrap)
-        // re-indents its interior lines to the emit position, so the two diverge on
-        // any interior line whose source indentation differs from the target — refuse
-        // until the printer re-indents block-comment interiors to match. Checked
-        // before the after-last rule below so this independent gate keeps its own
-        // refusal bucket whatever the template emits.
-        if comment.multiline {
+        // A multi-line block comment's interior lines diverge unless it is a `*`-gutter
+        // comment (`multiline_comment_carries`). Checked before the after-last rule
+        // below so this independent gate keeps its own refusal bucket whatever the
+        // template emits.
+        if comment.multiline && !multiline_comment_carries(comment, source) {
             return Err(unsupported(Refusal::MultilineBlockComment));
         }
         if nested_block && comment.span.start >= last_stmt_end {
@@ -152,6 +155,7 @@ pub(crate) fn collect_script_comments(
         if text.contains("prettier-ignore") || text.contains("format-ignore") {
             return Err(unsupported(Refusal::FormatIgnoreComment));
         }
+        refuse_comment_reflushed_into_block(comment, &census, source)?;
         let mut comment = *comment;
         // Release a JSDoc cast's comment back to the positional machinery. `tsv_ts`
         // binds it to its `JsdocCast` node (`Comment::owned_by_node`) so a synthesized
@@ -198,7 +202,7 @@ pub(crate) fn collect_script_comments(
 ///
 /// 1. **A block precedes it** — some `BlockStatement` / `ClassBody` / class static
 ///    block in the module body starts at a source position `< C.span.start`
-///    ([`module_min_block_start`]). Those are exactly the nodes esrap opens with a
+///    ([`BlockCensus::min_block_start`]). Those are exactly the nodes esrap opens with a
 ///    `loc`-bearing `reset_comment_index`; a block whose `{` sits AFTER the comment
 ///    (a comment in a param list, before the body) does NOT count, so the anchor is
 ///    the BLOCK's start, not its statement's. A `switch` has no `BlockStatement`
@@ -219,7 +223,7 @@ pub(crate) fn collect_script_comments(
 ///
 /// A kept comment whose reprint would DIVERGE refuses instead (safe — a gap, not a
 /// mismatch), mirroring [`collect_script_comments`]'s instance-side rules: a
-/// multi-line block comment (esrap re-indents its interior lines), a comment
+/// multi-line block comment the reprint doesn't rebuild ([`multiline_comment_carries`]), a comment
 /// intersecting an erased TypeScript region (the oracle's surviving placement there
 /// is an emergent stale-span artifact), and a format-ignore directive (would switch
 /// the printer to raw-source emission).
@@ -231,7 +235,7 @@ pub(crate) fn collect_module_script_comments(
     root: &Root<'_>,
     source: &str,
     module_body: &[Statement<'_>],
-    module_erased_windows: &[tsv_lang::Span],
+    module_erased_windows: &[Span],
 ) -> Result<Vec<tsv_lang::Comment>, CompileError> {
     let Some(module) = root.module else {
         return Ok(Vec::new());
@@ -250,7 +254,8 @@ pub(crate) fn collect_module_script_comments(
     }
     let has_instance = root.instance.is_some();
     // Condition 1's substrate: the earliest block esrap can re-seek the index on.
-    let min_block = module_min_block_start(module_body);
+    let census = BlockCensus::of(module_body);
+    let min_block = census.min_block_start();
     let mut kept = Vec::new();
     for comment in &root.comments {
         // Only comments physically inside the module `<script>` content.
@@ -269,7 +274,7 @@ pub(crate) fn collect_module_script_comments(
             continue;
         }
         // The oracle KEEPS `comment`. Refuse the reprint-divergent classes.
-        if comment.multiline {
+        if comment.multiline && !multiline_comment_carries(comment, source) {
             return Err(unsupported(Refusal::MultilineBlockComment));
         }
         for window in module_erased_windows {
@@ -281,6 +286,7 @@ pub(crate) fn collect_module_script_comments(
         if text.contains("prettier-ignore") || text.contains("format-ignore") {
             return Err(unsupported(Refusal::FormatIgnoreComment));
         }
+        refuse_comment_reflushed_into_block(comment, &census, source)?;
         let mut comment = *comment;
         // Release JSDoc-cast ownership so the positional machinery prints it — its
         // owning `JsdocCast` node is erased in the emitted program (see the same
@@ -291,145 +297,232 @@ pub(crate) fn collect_module_script_comments(
     Ok(kept)
 }
 
-/// The earliest source position of a `BlockStatement`, `ClassBody`, or class
-/// static block anywhere in the module body — the nodes esrap opens with a
-/// `loc`-bearing `reset_comment_index` (the module comment's condition-1 anchor
-/// above). `None` when the module holds no such block.
+/// Whether a multi-line block comment reprints identically on both sides of the parity
+/// comparison.
 ///
-/// The walk only ever notes a genuine block node, so it can never OVER-report (keep
-/// a comment the oracle drops); a missed descent can only UNDER-report (leave a
-/// mismatch unclosed), never regress. Exhaustively matched so a new AST variant
-/// fails compilation here rather than silently changing that balance.
-fn module_min_block_start(statements: &[Statement<'_>]) -> Option<u32> {
-    let mut min = None;
-    block_min_stmts(statements, &mut min);
-    min
+/// The oracle rewrites its interior lines twice: Svelte's parse strips the comment's
+/// start-line indentation from the start of every line of the value
+/// ([`tsv_lang::Comment::wire_value`] models it), and esrap prints each later line after a
+/// newline plus the emit indent. tsv carries the host text. Both outputs then pass through
+/// `canonicalize_js`, whose printer rebuilds an indentable (`*`-gutter) comment from its
+/// trimmed lines — erasing every leading-whitespace difference on the lines after the
+/// first — and prints a preserved one verbatim. So an indentable comment converges iff its
+/// first line (only end-trimmed) survived the strip, and a preserved one diverges whenever
+/// the two indents differ, so it refuses.
+///
+/// A `\r` / U+2028 / U+2029 inside refuses: the strip's `m`-flag `^` starts a line there,
+/// while esrap and the printer split on `\n` alone. Reproducing a preserved comment's
+/// interior (strip + emit indent) in the compile path would reclaim the rest.
+fn multiline_comment_carries(comment: &tsv_lang::Comment, source: &str) -> bool {
+    let content = comment.content(source);
+    if content.contains(['\r', '\u{2028}', '\u{2029}'])
+        || !tsv_lang::is_indentable_block(source, comment)
+    {
+        return false;
+    }
+    let value = comment.wire_value(source, tsv_lang::AcornPrefix::DOCUMENT);
+    content.split('\n').next() == value.split('\n').next()
 }
 
-fn note_block(min: &mut Option<u32>, start: u32) {
-    match min {
-        Some(current) => *current = (*current).min(start),
-        None => *min = Some(start),
+/// Refuse a comment the oracle prints TWICE: one inside a block that opens on the
+/// line a statement (or class member) ends, ahead of that block.
+///
+/// esrap's `body()` flushes, after each statement, every comment that starts on the
+/// statement's end line and ends before the NEXT statement's END — not its start — as
+/// a trailing comment. On `let n = 1; if (n) { /* c */ n = 2; }` that writes `c` after
+/// `let n = 1;`, reaching into the next statement. Opening the `if` block then runs
+/// `reset_comment_index`, which finds the index already past a comment inside the
+/// block, seeks back to it, and writes `c` again. tsv prints it once — a count
+/// difference the parity bar grades. Prettier-formatted code never puts two statements
+/// on one line, so real code rarely reaches this.
+///
+/// The test is a superset of esrap's condition, so it can only over-refuse: the
+/// innermost block holding the comment, and any statement or member end at or before
+/// that block's start with no `\n` between it and the comment (a `\n`-only line test
+/// joins lines the ECMAScript line class splits, never the reverse).
+fn refuse_comment_reflushed_into_block(
+    comment: &tsv_lang::Comment,
+    census: &BlockCensus,
+    source: &str,
+) -> Result<(), CompileError> {
+    let Some(block) = census
+        .blocks
+        .iter()
+        .filter(|block| block.start <= comment.span.start && comment.span.end <= block.end)
+        .max_by_key(|block| block.start)
+    else {
+        return Ok(());
+    };
+    // The latest end at or before the block decides: any earlier end's gap to the
+    // comment contains this one's, so it holds a `\n` whenever this one does.
+    let flushed_ahead = census
+        .item_ends
+        .iter()
+        .copied()
+        .filter(|&end| end <= block.start)
+        .max()
+        .is_some_and(|end| {
+            !Span::new(end, comment.span.start)
+                .extract(source)
+                .contains('\n')
+        });
+    if flushed_ahead {
+        return Err(unsupported(Refusal::CommentReflushedIntoBlock));
+    }
+    Ok(())
+}
+
+/// The positions esrap's single comment index keys on, gathered in one exhaustive
+/// walk: every `BlockStatement`, `ClassBody` and class static block — the nodes its
+/// `body()` opens with a `loc`-bearing `reset_comment_index`, which can seek the index
+/// BACKWARD — and every statement / class-member end, the points after which a
+/// `body()` flushes a same-line comment as a trailing comment.
+///
+/// The walk only ever notes a genuine block node, so a reader of `blocks` alone never
+/// OVER-reports; `item_ends` deliberately notes MORE than esrap flushes after (every
+/// statement, not only a body-list child), which a reader may only use in the
+/// refusing direction. Exhaustively matched so a new AST variant fails compilation
+/// here rather than silently changing that balance.
+#[derive(Default)]
+struct BlockCensus {
+    blocks: Vec<Span>,
+    item_ends: Vec<u32>,
+}
+
+impl BlockCensus {
+    fn of<'s, 'arena: 's>(statements: impl IntoIterator<Item = &'s Statement<'arena>>) -> Self {
+        let mut census = Self::default();
+        for stmt in statements {
+            census_stmt(stmt, &mut census);
+        }
+        census
+    }
+
+    /// The earliest block start — the module comment's condition-1 anchor
+    /// ([`collect_module_script_comments`]). `None` when the body holds no block.
+    fn min_block_start(&self) -> Option<u32> {
+        self.blocks.iter().map(|block| block.start).min()
     }
 }
 
-fn block_min_stmts(statements: &[Statement<'_>], min: &mut Option<u32>) {
+fn census_stmts(statements: &[Statement<'_>], census: &mut BlockCensus) {
     for stmt in statements {
-        block_min_stmt(stmt, min);
+        census_stmt(stmt, census);
     }
 }
 
-fn block_min_stmt(stmt: &Statement<'_>, min: &mut Option<u32>) {
+fn census_stmt(stmt: &Statement<'_>, census: &mut BlockCensus) {
+    census.item_ends.push(stmt.span().end);
     match stmt {
         Statement::BlockStatement(block) => {
-            note_block(min, block.span.start);
-            block_min_stmts(block.body, min);
+            census.blocks.push(block.span);
+            census_stmts(block.body, census);
         }
         Statement::FunctionDeclaration(f) => {
             for param in f.params {
-                block_min_expr(param, min);
+                census_expr(param, census);
             }
-            note_block(min, f.body.span.start);
-            block_min_stmts(f.body.body, min);
+            census.blocks.push(f.body.span);
+            census_stmts(f.body.body, census);
         }
-        Statement::ClassDeclaration(c) => block_min_class_body(&c.body, min),
-        Statement::ExpressionStatement(s) => block_min_expr(s.expression, min),
-        Statement::VariableDeclaration(d) => block_min_var_decl(d, min),
+        Statement::ClassDeclaration(c) => census_class_body(&c.body, census),
+        Statement::ExpressionStatement(s) => census_expr(s.expression, census),
+        Statement::VariableDeclaration(d) => census_var_decl(d, census),
         Statement::ReturnStatement(s) => {
             if let Some(arg) = s.argument.as_ref() {
-                block_min_expr(arg, min);
+                census_expr(arg, census);
             }
         }
-        Statement::ThrowStatement(s) => block_min_expr(s.argument, min),
+        Statement::ThrowStatement(s) => census_expr(s.argument, census),
         Statement::IfStatement(s) => {
-            block_min_expr(s.test, min);
-            block_min_stmt(s.consequent, min);
+            census_expr(s.test, census);
+            census_stmt(s.consequent, census);
             if let Some(alt) = s.alternate {
-                block_min_stmt(alt, min);
+                census_stmt(alt, census);
             }
         }
         Statement::ForStatement(s) => {
             match &s.init {
-                Some(ForInit::VariableDeclaration(d)) => block_min_var_decl(d, min),
-                Some(ForInit::Expression(e)) => block_min_expr(e, min),
+                Some(ForInit::VariableDeclaration(d)) => census_var_decl(d, census),
+                Some(ForInit::Expression(e)) => census_expr(e, census),
                 None => {}
             }
             if let Some(test) = s.test.as_ref() {
-                block_min_expr(test, min);
+                census_expr(test, census);
             }
             if let Some(update) = s.update.as_ref() {
-                block_min_expr(update, min);
+                census_expr(update, census);
             }
-            block_min_stmt(s.body, min);
+            census_stmt(s.body, census);
         }
         Statement::ForInStatement(s) => {
-            block_min_for_left(s.left, min);
-            block_min_expr(s.right, min);
-            block_min_stmt(s.body, min);
+            census_for_left(s.left, census);
+            census_expr(s.right, census);
+            census_stmt(s.body, census);
         }
         Statement::ForOfStatement(s) => {
-            block_min_for_left(s.left, min);
-            block_min_expr(s.right, min);
-            block_min_stmt(s.body, min);
+            census_for_left(s.left, census);
+            census_expr(s.right, census);
+            census_stmt(s.body, census);
         }
         Statement::WhileStatement(s) => {
-            block_min_expr(s.test, min);
-            block_min_stmt(s.body, min);
+            census_expr(s.test, census);
+            census_stmt(s.body, census);
         }
         Statement::DoWhileStatement(s) => {
-            block_min_stmt(s.body, min);
-            block_min_expr(s.test, min);
+            census_stmt(s.body, census);
+            census_expr(s.test, census);
         }
         // Unreachable in practice: a Svelte `<script>` is Module code, so it is strict
         // and the parser refuses `with` there.
         Statement::WithStatement(s) => {
-            block_min_expr(s.object, min);
-            block_min_stmt(s.body, min);
+            census_expr(s.object, census);
+            census_stmt(s.body, census);
         }
         Statement::SwitchStatement(s) => {
-            block_min_expr(s.discriminant, min);
+            census_expr(s.discriminant, census);
             for case in s.cases {
                 if let Some(test) = case.test.as_ref() {
-                    block_min_expr(test, min);
+                    census_expr(test, census);
                 }
-                block_min_stmts(case.consequent, min);
+                census_stmts(case.consequent, census);
             }
         }
         Statement::TryStatement(s) => {
-            note_block(min, s.block.span.start);
-            block_min_stmts(s.block.body, min);
+            census.blocks.push(s.block.span);
+            census_stmts(s.block.body, census);
             if let Some(handler) = &s.handler {
                 if let Some(param) = &handler.param {
-                    block_min_expr(param, min);
+                    census_expr(param, census);
                 }
-                note_block(min, handler.body.span.start);
-                block_min_stmts(handler.body.body, min);
+                census.blocks.push(handler.body.span);
+                census_stmts(handler.body.body, census);
             }
             if let Some(finalizer) = &s.finalizer {
-                note_block(min, finalizer.span.start);
-                block_min_stmts(finalizer.body, min);
+                census.blocks.push(finalizer.span);
+                census_stmts(finalizer.body, census);
             }
         }
-        Statement::LabeledStatement(s) => block_min_stmt(s.body, min),
+        Statement::LabeledStatement(s) => census_stmt(s.body, census),
         Statement::ExportNamedDeclaration(s) => {
             if let Some(decl) = &s.declaration {
-                block_min_stmt(decl, min);
+                census_stmt(decl, census);
             }
         }
         Statement::ExportDefaultDeclaration(s) => match &s.declaration {
-            ExportDefaultValue::Expression(e) => block_min_expr(e, min),
+            ExportDefaultValue::Expression(e) => census_expr(e, census),
             ExportDefaultValue::FunctionDeclaration(f) => {
                 for param in f.params {
-                    block_min_expr(param, min);
+                    census_expr(param, census);
                 }
-                note_block(min, f.body.span.start);
-                block_min_stmts(f.body.body, min);
+                census.blocks.push(f.body.span);
+                census_stmts(f.body.body, census);
             }
-            ExportDefaultValue::ClassDeclaration(c) => block_min_class_body(&c.body, min),
+            ExportDefaultValue::ClassDeclaration(c) => census_class_body(&c.body, census),
             ExportDefaultValue::TSDeclareFunction(_)
             | ExportDefaultValue::TSInterfaceDeclaration(_) => {}
         },
-        Statement::TSExportAssignment(s) => block_min_expr(&s.expression, min),
+        Statement::TSExportAssignment(s) => census_expr(&s.expression, census),
         // No block-bearing children (or a TypeScript-only statement dropped before
         // this runs).
         Statement::BreakStatement(_)
@@ -448,93 +541,97 @@ fn block_min_stmt(stmt: &Statement<'_>, min: &mut Option<u32>) {
     }
 }
 
-fn block_min_var_decl(decl: &VariableDeclaration<'_>, min: &mut Option<u32>) {
+fn census_var_decl(decl: &VariableDeclaration<'_>, census: &mut BlockCensus) {
     for declarator in decl.declarations {
-        block_min_expr(declarator.id, min);
+        census_expr(declarator.id, census);
         if let Some(init) = declarator.init.as_ref() {
-            block_min_expr(init, min);
+            census_expr(init, census);
         }
     }
 }
 
-fn block_min_for_left(left: &ForInOfLeft<'_>, min: &mut Option<u32>) {
+fn census_for_left(left: &ForInOfLeft<'_>, census: &mut BlockCensus) {
     match left {
-        ForInOfLeft::VariableDeclaration(d) => block_min_var_decl(d, min),
-        ForInOfLeft::Pattern(p) => block_min_expr(p, min),
+        ForInOfLeft::VariableDeclaration(d) => census_var_decl(d, census),
+        ForInOfLeft::Pattern(p) => census_expr(p, census),
     }
 }
 
-fn block_min_class_body(body: &ClassBody<'_>, min: &mut Option<u32>) {
-    note_block(min, body.span.start);
+fn census_class_body(body: &ClassBody<'_>, census: &mut BlockCensus) {
+    census.blocks.push(body.span);
     for member in body.body {
+        census.item_ends.push(member.span().end);
         match member {
             ClassMember::MethodDefinition(m) => {
                 if m.computed {
-                    block_min_expr(&m.key, min);
+                    census_expr(&m.key, census);
                 }
                 for param in m.value.params {
-                    block_min_expr(param, min);
+                    census_expr(param, census);
                 }
-                note_block(min, m.value.body.span.start);
-                block_min_stmts(m.value.body.body, min);
+                census.blocks.push(m.value.body.span);
+                census_stmts(m.value.body.body, census);
             }
             ClassMember::PropertyDefinition(p) => {
                 if p.computed {
-                    block_min_expr(&p.key, min);
+                    census_expr(&p.key, census);
                 }
                 if let Some(value) = p.value.as_ref() {
-                    block_min_expr(value, min);
+                    // esrap's `PropertyDefinition` flushes after the VALUE with no
+                    // upper bound, and the value can end a line above the member.
+                    census.item_ends.push(value.span().end);
+                    census_expr(value, census);
                 }
             }
             ClassMember::StaticBlock(b) => {
-                note_block(min, b.span.start);
-                block_min_stmts(b.body, min);
+                census.blocks.push(b.span);
+                census_stmts(b.body, census);
             }
             ClassMember::IndexSignature(_) => {}
         }
     }
 }
 
-fn block_min_exprs(exprs: &[Expression<'_>], min: &mut Option<u32>) {
+fn census_exprs(exprs: &[Expression<'_>], census: &mut BlockCensus) {
     for expr in exprs {
-        block_min_expr(expr, min);
+        census_expr(expr, census);
     }
 }
 
-fn block_min_expr(expr: &Expression<'_>, min: &mut Option<u32>) {
+fn census_expr(expr: &Expression<'_>, census: &mut BlockCensus) {
     match expr {
         Expression::ArrowFunctionExpression(a) => {
             for param in a.params {
-                block_min_expr(param, min);
+                census_expr(param, census);
             }
             match &a.body {
-                ArrowFunctionBody::Expression(e) => block_min_expr(e, min),
+                ArrowFunctionBody::Expression(e) => census_expr(e, census),
                 ArrowFunctionBody::BlockStatement(b) => {
-                    note_block(min, b.span.start);
-                    block_min_stmts(b.body, min);
+                    census.blocks.push(b.span);
+                    census_stmts(b.body, census);
                 }
             }
         }
         Expression::FunctionExpression(f) => {
             for param in f.params {
-                block_min_expr(param, min);
+                census_expr(param, census);
             }
-            note_block(min, f.body.span.start);
-            block_min_stmts(f.body.body, min);
+            census.blocks.push(f.body.span);
+            census_stmts(f.body.body, census);
         }
-        Expression::ClassExpression(c) => block_min_class_body(&c.body, min),
+        Expression::ClassExpression(c) => census_class_body(&c.body, census),
         Expression::NewExpression(e) => {
-            block_min_expr(e.callee, min);
-            block_min_exprs(e.arguments, min);
+            census_expr(e.callee, census);
+            census_exprs(e.arguments, census);
         }
         Expression::CallExpression(e) => {
-            block_min_expr(e.callee, min);
-            block_min_exprs(e.arguments, min);
+            census_expr(e.callee, census);
+            census_exprs(e.arguments, census);
         }
         Expression::MemberExpression(e) => {
-            block_min_expr(e.object, min);
+            census_expr(e.object, census);
             if e.computed {
-                block_min_expr(e.property, min);
+                census_expr(e.property, census);
             }
         }
         Expression::ObjectExpression(obj) => {
@@ -542,88 +639,88 @@ fn block_min_expr(expr: &Expression<'_>, min: &mut Option<u32>) {
                 match prop {
                     ObjectProperty::Property(p) => {
                         if p.computed {
-                            block_min_expr(p.key, min);
+                            census_expr(p.key, census);
                         }
-                        block_min_expr(p.value, min);
+                        census_expr(p.value, census);
                     }
-                    ObjectProperty::SpreadElement(s) => block_min_expr(s.argument, min),
+                    ObjectProperty::SpreadElement(s) => census_expr(s.argument, census),
                 }
             }
         }
         Expression::ArrayExpression(arr) => {
             for element in arr.elements {
                 if let Some(e) = element.as_ref() {
-                    block_min_expr(e, min);
+                    census_expr(e, census);
                 }
             }
         }
-        Expression::UnaryExpression(u) => block_min_expr(u.argument, min),
-        Expression::UpdateExpression(u) => block_min_expr(u.argument, min),
+        Expression::UnaryExpression(u) => census_expr(u.argument, census),
+        Expression::UpdateExpression(u) => census_expr(u.argument, census),
         Expression::BinaryExpression(b) => {
-            block_min_expr(b.left, min);
-            block_min_expr(b.right, min);
+            census_expr(b.left, census);
+            census_expr(b.right, census);
         }
         Expression::ConditionalExpression(c) => {
-            block_min_expr(c.test, min);
-            block_min_expr(c.consequent, min);
-            block_min_expr(c.alternate, min);
+            census_expr(c.test, census);
+            census_expr(c.consequent, census);
+            census_expr(c.alternate, census);
         }
-        Expression::SpreadElement(s) => block_min_expr(s.argument, min),
-        Expression::TemplateLiteral(t) => block_min_exprs(t.expressions, min),
+        Expression::SpreadElement(s) => census_expr(s.argument, census),
+        Expression::TemplateLiteral(t) => census_exprs(t.expressions, census),
         Expression::TaggedTemplateExpression(t) => {
-            block_min_expr(t.tag, min);
-            block_min_exprs(t.quasi.expressions, min);
+            census_expr(t.tag, census);
+            census_exprs(t.quasi.expressions, census);
         }
-        Expression::AwaitExpression(a) => block_min_expr(a.argument, min),
+        Expression::AwaitExpression(a) => census_expr(a.argument, census),
         Expression::YieldExpression(y) => {
             if let Some(arg) = y.argument {
-                block_min_expr(arg, min);
+                census_expr(arg, census);
             }
         }
-        Expression::SequenceExpression(s) => block_min_exprs(s.expressions, min),
+        Expression::SequenceExpression(s) => census_exprs(s.expressions, census),
         Expression::AssignmentExpression(a) => {
-            block_min_expr(a.left, min);
-            block_min_expr(a.right, min);
+            census_expr(a.left, census);
+            census_expr(a.right, census);
         }
         Expression::ObjectPattern(p) => {
             for prop in p.properties {
                 match prop {
                     ObjectPatternProperty::Property(prop) => {
                         if prop.computed {
-                            block_min_expr(prop.key, min);
+                            census_expr(prop.key, census);
                         }
-                        block_min_expr(prop.value, min);
+                        census_expr(prop.value, census);
                     }
-                    ObjectPatternProperty::RestElement(rest) => block_min_expr(rest.argument, min),
+                    ObjectPatternProperty::RestElement(rest) => census_expr(rest.argument, census),
                 }
             }
         }
         Expression::ArrayPattern(p) => {
             for element in p.elements {
                 if let Some(e) = element.as_ref() {
-                    block_min_expr(e, min);
+                    census_expr(e, census);
                 }
             }
         }
         Expression::AssignmentPattern(p) => {
-            block_min_expr(p.left, min);
-            block_min_expr(p.right, min);
+            census_expr(p.left, census);
+            census_expr(p.right, census);
         }
-        Expression::RestElement(r) => block_min_expr(r.argument, min),
-        Expression::TSTypeAssertion(t) => block_min_expr(t.expression, min),
-        Expression::TSAsExpression(t) => block_min_expr(t.expression, min),
-        Expression::TSSatisfiesExpression(t) => block_min_expr(t.expression, min),
-        Expression::TSInstantiationExpression(t) => block_min_expr(t.expression, min),
-        Expression::TSNonNullExpression(t) => block_min_expr(t.expression, min),
-        Expression::TSParameterProperty(t) => block_min_expr(t.parameter, min),
+        Expression::RestElement(r) => census_expr(r.argument, census),
+        Expression::TSTypeAssertion(t) => census_expr(t.expression, census),
+        Expression::TSAsExpression(t) => census_expr(t.expression, census),
+        Expression::TSSatisfiesExpression(t) => census_expr(t.expression, census),
+        Expression::TSInstantiationExpression(t) => census_expr(t.expression, census),
+        Expression::TSNonNullExpression(t) => census_expr(t.expression, census),
+        Expression::TSParameterProperty(t) => census_expr(t.parameter, census),
         Expression::ImportExpression(i) => {
-            block_min_expr(i.source, min);
+            census_expr(i.source, census);
             if let Some(options) = i.options {
-                block_min_expr(options, min);
+                census_expr(options, census);
             }
         }
-        Expression::JsdocCast(j) => block_min_expr(j.inner, min),
-        Expression::ParenthesizedExpression(p) => block_min_expr(p.expression, min),
+        Expression::JsdocCast(j) => census_expr(j.inner, census),
+        Expression::ParenthesizedExpression(p) => census_expr(p.expression, census),
         // Leaves — no children, no blocks.
         Expression::Literal(_)
         | Expression::Identifier(_)

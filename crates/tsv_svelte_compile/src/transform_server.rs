@@ -799,13 +799,6 @@ pub(crate) fn compile_server<'arena>(
             other => body.push(other),
         }
     }
-    // The hoisted `const <name> = $.props_id($$renderer)` is a synthetic
-    // (appendix-span) first statement, so its leading comment window would sweep
-    // every carried script comment — the same hazard the `$$slots` sanitize decl
-    // has. Refuse the combination (a safe over-refusal).
-    if props_id.is_some() && has_comments {
-        return Err(unsupported(Refusal::CommentsWithPropsId));
-    }
     // The oracle wraps the whole body in `$$renderer.component(($$renderer) => …)`
     // whenever its `needs_context` analysis fires (a `new` expression or a
     // member/call rooted in a prop/import — see `needs_context`). A dropped
@@ -845,24 +838,12 @@ pub(crate) fn compile_server<'arena>(
     }
     // A `$$slots` reference makes the component inject
     // `const $$slots = $.sanitize_slots($$props)` (below) and take `$$props`
-    // (the oracle's `should_inject_props` includes `uses_slots`). Carried script
-    // comments plus the injected first statement would sweep the function-body
-    // comment windows, so refuse that combination for now.
-    // A store reference makes the component inject `var $$store_subs;` as a
-    // component-body statement (below). Being a synthetic (appendix-span)
-    // statement, it sweeps the function-body / wrapper-block leading comment
-    // window exactly as the `$$slots` injection does, so refuse a carried script
-    // comment alongside it — including a template-only `$name` read, which still
-    // injects the var. (The script-position store rewrite mints — `$.store_get`
-    // / `$.store_set` — sweep the same way; both are covered here since either
-    // implies `uses_stores`.)
-    if component.uses_stores && has_comments {
-        return Err(unsupported(Refusal::CommentsWithStore));
-    }
+    // (the oracle's `should_inject_props` includes `uses_slots`). That declaration,
+    // `var $$store_subs;` for a store reference, and the script's `$.store_get` /
+    // `$.store_set` / `$.update_store` mints are all fictional-span nodes (zero-width
+    // host positions — `build_props_id_decl`, `Builder::store_get`), so carried
+    // script comments ride alongside them.
     if component.uses_slots {
-        if has_comments {
-            return Err(unsupported(Refusal::CommentsWithSlots));
-        }
         uses_props = true;
     }
     for comment in &script_comments {
@@ -1028,7 +1009,7 @@ pub(crate) fn compile_server<'arena>(
     // Prepended here (before the `needs_context` wrapper) so it lands INSIDE the
     // wrapper when there is one, at the component-body top.
     let body = if env.uses_stores {
-        let decl = env.b.store_subs_var();
+        let decl = env.b.store_subs_var_at(block_start);
         let mut with_subs: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
         with_subs.push(decl);
         with_subs.extend_from_slice(body);
@@ -1045,7 +1026,7 @@ pub(crate) fn compile_server<'arena>(
     // prepended OUTSIDE the wrapper below). It references `$$renderer` (always in
     // scope), never `$$props`, so it forces no parameter.
     let body = if let Some(name) = &props_id {
-        let decl = build_props_id_decl(&mut env.b, arena, name);
+        let decl = build_props_id_decl(&env.b, name, block_start);
         let mut with_id: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
         with_id.push(decl);
         with_id.extend_from_slice(body);
@@ -1129,7 +1110,7 @@ pub(crate) fn compile_server<'arena>(
     // `:300`). Prepend it here so it sits outside any `$$renderer.component`
     // wrapper, matching the oracle's placement.
     let body = if component.uses_slots {
-        let slots_decl = build_sanitize_slots_decl(&mut env.b, arena);
+        let slots_decl = build_sanitize_slots_decl(&env.b, block_start);
         let mut with_slots: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
         with_slots.push(slots_decl);
         with_slots.extend_from_slice(body);
@@ -1353,31 +1334,28 @@ fn build_bindable_object<'arena>(
 
 /// `const <name> = $.props_id($$renderer);` — the oracle's hoisted `$props.id()`
 /// binding, prepended as the component body's first statement.
-fn build_props_id_decl<'arena>(
-    b: &mut Builder<'arena>,
-    arena: &'arena bumpalo::Bump,
-    name: &str,
-) -> Statement<'arena> {
-    // Mint the id before the init so the declaration span runs forward, the same
-    // invariant `build_sanitize_slots_decl` relies on.
-    let id = Expression::Identifier(b.ident(name));
-    let renderer_ident = b.ident("$$renderer");
-    let renderer_arg = arena.alloc(Expression::Identifier(renderer_ident));
-    let init = b.member_call("$", "props_id", std::slice::from_ref(renderer_arg));
+///
+/// Every node is zero-width at `at`, the body block's start. A prepended statement
+/// with appendix spans opens the block's first leading window from the host block
+/// start into the appendix, sweeping every carried script comment — including one
+/// inside a later function body, which then prints twice. At the block start both
+/// that window and its own internal ones are empty, and the next statement's leading
+/// window is the authored one.
+fn build_props_id_decl<'arena>(b: &Builder<'arena>, name: &str, at: u32) -> Statement<'arena> {
+    let span = Span::new(at, at);
+    let id = Expression::Identifier(b.ident_at(name, span));
+    let renderer_arg = b.ident_expr_at("$$renderer", span);
+    let init = b.member_call_at("$", "props_id", std::slice::from_ref(renderer_arg), span);
     declaration_stmt(b, VariableDeclarationKind::Const, id, init)
 }
 
 /// `const $$slots = $.sanitize_slots($$props);` — the oracle's `uses_slots`
-/// binding, prepended to the component function body.
-fn build_sanitize_slots_decl<'arena>(
-    b: &mut Builder<'arena>,
-    arena: &'arena bumpalo::Bump,
-) -> Statement<'arena> {
-    // Mint the id before the init so the declaration span runs forward
-    // (`id.start < init.end`), the same invariant the each-array decl relies on.
-    let slots_id = Expression::Identifier(b.ident("$$slots"));
-    let props_ident = b.ident("$$props");
-    let props_arg = arena.alloc(Expression::Identifier(props_ident));
-    let init = b.member_call("$", "sanitize_slots", std::slice::from_ref(props_arg));
+/// binding, prepended to the component function body, zero-width at `at` like
+/// [`build_props_id_decl`].
+fn build_sanitize_slots_decl<'arena>(b: &Builder<'arena>, at: u32) -> Statement<'arena> {
+    let span = Span::new(at, at);
+    let slots_id = Expression::Identifier(b.ident_at("$$slots", span));
+    let props_arg = b.ident_expr_at("$$props", span);
+    let init = b.member_call_at("$", "sanitize_slots", std::slice::from_ref(props_arg), span);
     declaration_stmt(b, VariableDeclarationKind::Const, slots_id, init)
 }

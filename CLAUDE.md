@@ -670,8 +670,8 @@ cargo run -p tsv_debug render_compare a.svelte b.svelte
 # tolerates a comment-POSITION difference (compare_canonical), so a remaining diff is a real code
 # difference. Exit codes: 0 parity, 1 real diff, 2 error (incl. a component shape tsv doesn't cover
 # yet — prints the oracle canonical form as the target). --json emits { target, parity,
-# comment_position_tolerated, ours_status, hunks }. The ad-hoc one-file view; durable expectations
-# live in the compile fixtures (tests/fixtures_compile).
+# comment_position_tolerated, ours_status, refusal: { bucket, message } | null, hunks }. The ad-hoc
+# one-file view; durable expectations live in the compile fixtures (tests/fixtures_compile).
 cargo run -p tsv_debug compile_compare file.svelte [--target server|client] [--content|--stdin] [--json]
 
 # compile_fixture_init - create/reinit a compile fixture (tests/fixtures_compile/<feature>/<case>/):

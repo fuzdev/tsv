@@ -51,8 +51,8 @@ use tsv_ts::ast::internal::{
     ExportDefaultValue, ExportKind, Expression, ForInOfLeft, ForInit, FunctionDeclaration,
     FunctionExpression, Identifier, ImportKind, ImportSpecifier, MethodDefinition, MethodKind,
     ObjectPattern, ObjectPatternProperty, ObjectProperty, Property, PropertyDefinition,
-    PropertyModifier, RestElement, Statement, StaticBlock, SwitchCase, TSModuleDeclarationBody,
-    TemplateLiteral, VariableDeclaration, VariableDeclarator,
+    PropertyKind, PropertyModifier, RestElement, Statement, StaticBlock, SwitchCase,
+    TSModuleDeclarationBody, TemplateLiteral, VariableDeclaration, VariableDeclarator,
 };
 
 use crate::CompileError;
@@ -1998,16 +1998,60 @@ impl<'arena> Eraser<'arena, '_> {
         &mut self,
         prop: &Property<'arena>,
     ) -> Result<Option<Property<'arena>>, CompileError> {
-        let key = self.expr(prop.key)?;
-        let value = self.expr(prop.value)?;
-        if key.is_none() && value.is_none() {
-            return Ok(None);
+        let erased_key = self.expr(prop.key)?;
+        let erased_value = self.expr(prop.value)?;
+        let changed = erased_key.is_some() || erased_value.is_some();
+        let key = erased_key.map_or(prop.key, |key| &*self.arena.alloc(key));
+        let value = erased_value.map_or(prop.value, |value| &*self.arena.alloc(value));
+        if let Some(shorthand) = self.same_name_shorthand(prop, key, value) {
+            return Ok(Some(shorthand));
         }
-        Ok(Some(Property {
-            key: key.map_or(prop.key, |key| &*self.arena.alloc(key)),
-            value: value.map_or(prop.value, |value| &*self.arena.alloc(value)),
+        Ok(changed.then(|| Property {
+            key,
+            value,
             ..prop.clone()
         }))
+    }
+
+    /// A longhand `init` property whose key and value name the same identifier
+    /// (`{ a: a }`, `{ a: a = 1 }` in a pattern), rebuilt as the shorthand the oracle
+    /// prints. esrap's `Property` visitor collapses exactly that shape to its value
+    /// (`!computed && kind === 'init' && key.type === 'Identifier' && value.type ===
+    /// 'Identifier' && key.name === value.name`, reading an `AssignmentPattern`'s
+    /// `left`), and it runs after Svelte's transforms, so a value those rewrite (a
+    /// `$derived` read, a store) no longer matches — which the transform reproduces
+    /// by expanding the shorthand again. Names compare decoded, as acorn's `name`
+    /// does. The dropped `key:` gap is recorded as a comment window like an erased
+    /// region, since the shorthand leaves no window for a comment there.
+    fn same_name_shorthand(
+        &mut self,
+        prop: &Property<'arena>,
+        key: &'arena Expression<'arena>,
+        value: &'arena Expression<'arena>,
+    ) -> Option<Property<'arena>> {
+        if prop.shorthand || prop.computed || prop.method || prop.kind != PropertyKind::Init {
+            return None;
+        }
+        let Expression::Identifier(key_id) = key else {
+            return None;
+        };
+        let base = match value {
+            Expression::AssignmentPattern(assign) => assign.left,
+            other => other,
+        };
+        let Expression::Identifier(base_id) = base else {
+            return None;
+        };
+        if key_id.name(self.source) != base_id.name(self.source) {
+            return None;
+        }
+        self.push_window(key_id.span.end, base_id.span.start);
+        Some(Property {
+            key: base,
+            value,
+            shorthand: true,
+            ..prop.clone()
+        })
     }
 
     fn template_literal(

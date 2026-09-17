@@ -164,12 +164,13 @@ pub(crate) fn rewrite_script_statement<'arena>(
     }
 
     // Statement-position effects are dropped (and force the wrapper); their
-    // callback is still guard-walked so stray runes inside refuse.
+    // callback is still guard-walked so stray runes inside refuse. A comment inside
+    // is NOT a dropped region: the oracle keeps it (its printer writes it in the gap
+    // the statement leaves), and so does the positional carry.
     if let Statement::ExpressionStatement(expr_stmt) = stmt
         && let Some(callback) = is_effect_call(expr_stmt.expression, source)
     {
         *has_effects = true;
-        dropped_regions.push(stmt.span());
         let mut ctx = script_walk_ctx(source, updated, nested_declared, derived_names, store_names);
         walk_expression_guarded(callback, &mut ctx)?;
         return Ok(None);
@@ -182,11 +183,11 @@ pub(crate) fn rewrite_script_statement<'arena>(
     // statements included — before this drop). The arguments and `.with`
     // callback are still guard-walked so a stray rune (`$inspect($state(x))`,
     // which the oracle rejects) or a derived read refuses; the `$inspect` callee
-    // itself is exempt at this recognized position.
+    // itself is exempt at this recognized position. A comment inside is kept, as
+    // for `$effect`.
     if let Statement::ExpressionStatement(expr_stmt) = stmt
         && let Some(guarded) = is_inspect_call(expr_stmt.expression, source)
     {
-        dropped_regions.push(stmt.span());
         let mut ctx = script_walk_ctx(source, updated, nested_declared, derived_names, store_names);
         for expr in guarded {
             walk_expression_guarded(expr, &mut ctx)?;
@@ -289,8 +290,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
             // The split scatters the pattern leaves and mints `$$d`/
             // `$$derived_array` intermediates whose leading-comment windows would
             // sweep a carried script comment. Refuse rather than reproduce the
-            // oracle's emergent placement — a safe over-refusal, like the argless
-            // `$state` / `$bindable` cases.
+            // oracle's emergent placement — a safe over-refusal.
             if has_comments {
                 return Err(unsupported(Refusal::CommentsWithDestructuredDerived));
             }
@@ -335,8 +335,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
             // The split scatters the pattern leaves and mints `tmp`/`$$array`
             // intermediates whose leading-comment windows would sweep a carried
             // script comment. Refuse rather than reproduce the oracle's emergent
-            // placement — a safe over-refusal, like the derived arm and the argless
-            // `$state` case.
+            // placement — a safe over-refusal, like the derived arm.
             if has_comments {
                 return Err(unsupported(Refusal::CommentsWithDestructuredState));
             }
@@ -369,25 +368,37 @@ pub(crate) fn rewrite_script_statement<'arena>(
         if rune.is_none() {
             walk_expression_guarded(declarator.id, &mut ctx)?;
         }
-        // A rune init rewrite drops the call's own syntax around the kept
-        // argument — record the dropped region(s) so comments inside refuse.
-        if let (Some(init), Some(_)) = (&declarator.init, &rune) {
-            let init_span = init.span();
+        // The regions of a rewritten rune call a carried comment cannot survive —
+        // recorded so a comment inside refuses. Not the call syntax the rewrite drops:
+        // the oracle keeps every comment there (esrap writes it by position, beside
+        // the kept argument), and so does the positional carry.
+        // A rune is recognized from the init, so with one `init_span` is the call's span.
+        let init_span = declarator.init.map_or(declarator.span, Expression::span);
+        if let Some(rune) = &rune {
             match rune {
-                // `$state(v)` / `$state.snapshot(x)` unwrap to the bare argument (no
-                // synthesized syntax around it), so the borrowed argument carries its
-                // own interior comments and only the call syntax around it is dropped.
-                Some(RuneInit::State(Some(arg))) | Some(RuneInit::StateSnapshot(arg)) => {
-                    let arg_span = arg.span();
-                    dropped_regions.push(Span::new(init_span.start, arg_span.start));
-                    dropped_regions.push(Span::new(arg_span.end, init_span.end));
+                // `$state(v)` / `$state.snapshot(x)` unwrap to the bare argument, and
+                // `$derived.by(f)` / `$derived(e)` become a `$.derived(…)` call that steals
+                // the init's span around `f` or a body-anchored thunk of `e`
+                // (`Builder::thunk_on_body`) — the borrowed argument keeps its host span,
+                // so a comment before, inside or after it carries once. Except past a
+                // trailing comma, which the carry drops.
+                RuneInit::State(Some(arg))
+                | RuneInit::StateSnapshot(arg)
+                | RuneInit::Derived(arg)
+                | RuneInit::DerivedBy(arg) => {
+                    if let Some(region) = trailing_comma_region(source, arg.span(), init_span) {
+                        dropped_regions.push(region);
+                    }
                 }
-                // `$derived(e)` / `$derived.by(f)` wrap the argument in a synthesized
-                // `() => …` arrow whose param-list span sweeps a comment INTERIOR to the
-                // argument into a double-print (and the oracle relocates it). Drop the
-                // WHOLE init span so a comment anywhere inside refuses — the argument's
-                // borrowed expression must not carry a comment through the arrow synthesis.
-                _ => dropped_regions.push(init_span),
+                // An argument-less `$state()` becomes a zero-width `void 0` at the
+                // call's end, so a comment inside the empty call carries.
+                RuneInit::State(None) => {}
+                // An empty `$props()` becomes `$$props`, stealing the call's span, so
+                // a comment inside it has no window.
+                RuneInit::Props => dropped_regions.push(init_span),
+                // Skipped by the `continue` above; its declarator is dropped whole and
+                // hoisted as a zero-width declaration, so there is no region to record.
+                RuneInit::PropsId => {}
             }
         }
 
@@ -399,7 +410,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
             Some(RuneInit::Props) => {
                 *uses_props = true;
                 let (rewritten, entries) =
-                    rewrite_props_pattern(b, declarator.id, source, has_comments, uses_slots)?;
+                    rewrite_props_pattern(b, declarator.id, source, uses_slots)?;
                 if let Some(rewritten) = rewritten {
                     new_id = rewritten;
                 }
@@ -414,7 +425,6 @@ pub(crate) fn rewrite_script_statement<'arena>(
                 // Span-steal: the synthetic `$$props` takes the replaced
                 // `$props()` call's host span, so the declarator's `=`-gap
                 // comment windows stay exactly the authored ones.
-                let init_span = declarator.init.map_or(declarator.span, Expression::span);
                 let props_ident = b.ident_at("$$props", init_span);
                 Some(&*b.arena.alloc(Expression::Identifier(props_ident)))
             }
@@ -426,14 +436,10 @@ pub(crate) fn rewrite_script_statement<'arena>(
                     walk_expression_guarded(arg, &mut ctx)?;
                     Some(&*b.arena.alloc(arg.clone()))
                 }
-                None => {
-                    if has_comments {
-                        // `void 0` mints an appendix literal; the declarator's
-                        // init windows would then sweep host comments.
-                        return Err(unsupported(Refusal::CommentsWithArglessState));
-                    }
-                    Some(&*b.arena.alloc(b.void_zero()))
-                }
+                // A zero-width `void 0` at the call's end: the declarator's `=`
+                // window then holds the authored gap and the empty call, and no
+                // later comment (`Builder::void_zero_at`).
+                None => Some(&*b.arena.alloc(b.void_zero_at(init_span.end))),
             },
             // `$state.snapshot(x)` unwraps to `x` (like `$state`), guarding `x`.
             Some(RuneInit::StateSnapshot(arg)) => {
@@ -463,14 +469,18 @@ pub(crate) fn rewrite_script_statement<'arena>(
                 //
                 // The synthetic `$.derived(...)` and its arrow steal the replaced
                 // `$derived(...)` init's host span so a carried script comment's
-                // declarator/call windows stay empty (`derived_call`), the
+                // declarator/call windows stay empty (`Builder::member_call_at`), the
                 // call-structure analog of the `$$props` span-steal above.
-                let anchor = declarator.init.map_or(declarator.span, Expression::span);
                 let argument = match unthunk_callee(expr) {
                     Some(callee) => callee,
-                    None => &*b.arena.alloc(b.arrow_expr_at(anchor, expr)),
+                    None => &*b.arena.alloc(b.thunk_on_body(expr)),
                 };
-                Some(&*b.arena.alloc(b.derived_call(anchor, argument)))
+                Some(&*b.arena.alloc(b.member_call_at(
+                    "$",
+                    "derived",
+                    std::slice::from_ref(argument),
+                    init_span,
+                )))
             }
             Some(RuneInit::DerivedBy(f)) => {
                 // `$derived.by(d)` passes `d` straight through as the compute
@@ -480,8 +490,12 @@ pub(crate) fn rewrite_script_statement<'arena>(
                 // needed (unlike the `$derived(d)` arm, whose `() => d()` the oracle
                 // collapses to `$.derived(d)`, a form the rewrite can't reproduce).
                 walk_expression_guarded(f, &mut ctx)?;
-                let anchor = declarator.init.map_or(declarator.span, Expression::span);
-                Some(&*b.arena.alloc(b.derived_call(anchor, f)))
+                Some(&*b.arena.alloc(b.member_call_at(
+                    "$",
+                    "derived",
+                    std::slice::from_ref(f),
+                    init_span,
+                )))
             }
             None => {
                 if let Some(init) = declarator.init {
@@ -510,6 +524,16 @@ pub(crate) fn rewrite_script_statement<'arena>(
     })))
 }
 
+/// The gap after a rune call's kept argument when the call carries a trailing comma
+/// (`$state(v, /* c */)`), `None` otherwise. The oracle keeps a comment there, but the
+/// carry drops it: the rewrite leaves no node whose comment window reaches past the
+/// comma. Any `,` in the gap counts, even one inside a comment — over-refusing that is
+/// safe.
+fn trailing_comma_region(source: &str, arg_span: Span, init_span: Span) -> Option<Span> {
+    let gap = Span::new(arg_span.end, init_span.end);
+    gap.extract(source).contains(',').then_some(gap)
+}
+
 /// Rewrite a top-level class declaration for the server module: unwrap each
 /// **direct** `$state(v)` / `$state.raw(v)` class field to its argument (exactly
 /// like a top-level `$state` declarator init), and guard-walk every other member
@@ -530,9 +554,9 @@ pub(crate) fn rewrite_script_statement<'arena>(
 /// a BARE field `field;` (the value dropped, NOT `void 0` — the divergence from the
 /// top-level no-arg declarator, which mints `void 0`); a `static`/computed field is
 /// oracle-rejected placement and refuses here. Non-rune members clone through in
-/// source order (the class member order is preserved). Only the call syntax around
-/// the kept argument is dropped, recorded in `dropped_regions` so a comment inside
-/// refuses.
+/// source order (the class member order is preserved). A comment in the dropped call
+/// syntax carries like the top-level declarator's; only a trailing-comma gap is
+/// recorded in `dropped_regions`, so a comment there refuses.
 ///
 /// The member list is rebuilt **lazily** (the `erase.rs::class_body`
 /// structural-sharing idiom): `out` stays `None` — allocating nothing — until the
@@ -594,17 +618,15 @@ fn rewrite_class_state_fields<'arena>(
                         return Err(unsupported(Refusal::ClassFieldStateReactiveArg));
                     }
                     walk_expression_guarded(arg, &mut ctx)?;
-                    let arg_span = arg.span();
-                    dropped_regions.push(Span::new(init_span.start, arg_span.start));
-                    dropped_regions.push(Span::new(arg_span.end, init_span.end));
+                    if let Some(region) = trailing_comma_region(source, arg.span(), init_span) {
+                        dropped_regions.push(region);
+                    }
                     Some(arg.clone())
                 }
                 // `field = $state()` → a bare field `field;` (value dropped, no
-                // `void 0`). The whole call is a dropped region.
-                None => {
-                    dropped_regions.push(init_span);
-                    None
-                }
+                // `void 0`). Nothing is minted, so a comment inside the empty call
+                // carries (the oracle trails it after the field).
+                None => None,
             };
             Some(ClassMember::PropertyDefinition(PropertyDefinition {
                 value: new_value,
