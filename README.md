@@ -205,7 +205,7 @@ and package READMEs for the full API and CLI flags:
     bindings) still parse for now, with enforcement deferred to a future
     diagnostics layer
 
-Some non-goals:
+Intentional non-features:
 
 - no formatter style config settings
 - no markup for frameworks besides Svelte - no JSX/TSX, Vue, Astro, etc (unlike Biome+Oxc+SWC+friends) -
