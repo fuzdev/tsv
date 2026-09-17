@@ -1,0 +1,449 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 493,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 65,
+					"end": 70,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 65,
+							"end": 70,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "*",
+											"namespace": "svg",
+											"start": 65,
+											"end": 70
+										}
+									],
+									"start": 65,
+									"end": 70
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 71,
+					"end": 88,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 75,
+							"end": 84,
+							"property": "fill",
+							"value": "red"
+						}
+					]
+				},
+				"start": 65,
+				"end": 88
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 134,
+					"end": 137,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 134,
+							"end": 137,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "*",
+											"namespace": "*",
+											"start": 134,
+											"end": 137
+										}
+									],
+									"start": 134,
+									"end": 137
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 138,
+					"end": 157,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 142,
+							"end": 153,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 134,
+				"end": 157
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 228,
+					"end": 240,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 228,
+							"end": 240,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "*",
+											"namespace": "svg",
+											"start": 228,
+											"end": 233
+										},
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 233,
+											"end": 240
+										}
+									],
+									"start": 228,
+									"end": 240
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 241,
+					"end": 262,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 245,
+							"end": 258,
+							"property": "stroke",
+							"value": "green"
+						}
+					]
+				},
+				"start": 228,
+				"end": 262
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 265,
+					"end": 274,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 265,
+							"end": 274,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "*",
+											"namespace": "*",
+											"start": 265,
+											"end": 268
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "hover",
+											"args": null,
+											"start": 268,
+											"end": 274
+										}
+									],
+									"start": 265,
+									"end": 274
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 275,
+					"end": 295,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 279,
+							"end": 291,
+							"property": "opacity",
+							"value": "0.5"
+						}
+					]
+				},
+				"start": 265,
+				"end": 295
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 355,
+					"end": 377,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 355,
+							"end": 377,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "*",
+											"namespace": "svg",
+											"start": 355,
+											"end": 360
+										}
+									],
+									"start": 355,
+									"end": 360
+								},
+								{
+									"type": "RelativeSelector",
+									"combinator": {
+										"type": "Combinator",
+										"name": ">",
+										"start": 361,
+										"end": 362
+									},
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "*",
+											"namespace": "*",
+											"start": 363,
+											"end": 366
+										}
+									],
+									"start": 361,
+									"end": 366
+								},
+								{
+									"type": "RelativeSelector",
+									"combinator": {
+										"type": "Combinator",
+										"name": "+",
+										"start": 367,
+										"end": 368
+									},
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "rect",
+											"namespace": "svg",
+											"start": 369,
+											"end": 377
+										}
+									],
+									"start": 367,
+									"end": 377
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 378,
+					"end": 395,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 382,
+							"end": 391,
+							"property": "margin",
+							"value": "0"
+						}
+					]
+				},
+				"start": 355,
+				"end": 395
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 450,
+					"end": 465,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 450,
+							"end": 465,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "is",
+											"args": {
+												"type": "SelectorList",
+												"start": 454,
+												"end": 464,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 454,
+														"end": 459,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "*",
+																		"namespace": "svg",
+																		"start": 454,
+																		"end": 459
+																	}
+																],
+																"start": 454,
+																"end": 459
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 461,
+														"end": 464,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "*",
+																		"namespace": "*",
+																		"start": 461,
+																		"end": 464
+																	}
+																],
+																"start": 461,
+																"end": 464
+															}
+														]
+													}
+												]
+											},
+											"start": 450,
+											"end": 465
+										}
+									],
+									"start": 450,
+									"end": 465
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 466,
+					"end": 484,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 470,
+							"end": 480,
+							"property": "padding",
+							"value": "0"
+						}
+					]
+				},
+				"start": 450,
+				"end": 484
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " Universal selector with a named namespace prefix ",
+				"start": 9,
+				"end": 63
+			},
+			{
+				"type": "CSSComment",
+				"value": " Universal selector in any namespace ",
+				"start": 91,
+				"end": 132
+			},
+			{
+				"type": "CSSComment",
+				"value": " Namespaced universal selector followed by subclass selectors ",
+				"start": 160,
+				"end": 226
+			},
+			{
+				"type": "CSSComment",
+				"value": " Namespaced universal selectors across combinators ",
+				"start": 298,
+				"end": 353
+			},
+			{
+				"type": "CSSComment",
+				"value": " Inside a selector-list pseudo-class argument ",
+				"start": 398,
+				"end": 448
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 485,
+			"styles": "\n\t/* Universal selector with a named namespace prefix */\n\tsvg|* {\n\t\tfill: red;\n\t}\n\n\t/* Universal selector in any namespace */\n\t*|* {\n\t\tcolor: blue;\n\t}\n\n\t/* Namespaced universal selector followed by subclass selectors */\n\tsvg|*.class1 {\n\t\tstroke: green;\n\t}\n\n\t*|*:hover {\n\t\topacity: 0.5;\n\t}\n\n\t/* Namespaced universal selectors across combinators */\n\tsvg|* > *|* + svg|rect {\n\t\tmargin: 0;\n\t}\n\n\t/* Inside a selector-list pseudo-class argument */\n\t:is(svg|*, *|*) {\n\t\tpadding: 0;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 494,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

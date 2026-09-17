@@ -4,8 +4,7 @@ export default function Input($$renderer, $$props) {
 	Foo($$renderer, {
 		children: ($$renderer) => {
 			if (x) {
-				$$renderer.push('<!--[0-->');
-				$$renderer.push(`<p>a</p>`);
+				$$renderer.push(`<!--[0--><p>a</p>`);
 			} else {
 				$$renderer.push('<!--[-1-->');
 			}

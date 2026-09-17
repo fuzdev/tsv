@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 101,
+	"end": 134,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -148,6 +148,44 @@
 							"end": 96,
 							"raw": "&#x0041;",
 							"data": "A"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 100,
+				"end": 101,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 101,
+				"end": 133,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 102
+					},
+					"end": {
+						"line": 5,
+						"column": 2,
+						"character": 103
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 104,
+							"end": 129,
+							"raw": "&#X41; &#X1f4a9; &#X0041;",
+							"data": "A 💩 A"
 						}
 					]
 				}

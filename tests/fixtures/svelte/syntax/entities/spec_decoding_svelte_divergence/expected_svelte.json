@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 654,
+	"end": 552,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 265,
-				"data": "\n\tFour character references the HTML5 spec decodes and Svelte's decoder does not: an\n\tuppercase hex marker, a zero code, a code point in a plane its decoder omits, and — in\n\tan attribute value only — a semicolon-less reference standing before an underscore.\n"
+				"end": 241,
+				"data": "\n\tThree character references the HTML5 spec decodes and Svelte's decoder does not: a zero\n\tcode, a code point in a plane its decoder omits, and — in an attribute value only — a\n\tsemicolon-less reference standing before an underscore.\n"
 			},
 			{
 				"type": "Text",
-				"start": 265,
-				"end": 266,
+				"start": 241,
+				"end": 242,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 266,
-				"end": 304,
+				"start": 242,
+				"end": 276,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 6,
 						"column": 1,
-						"character": 267
+						"character": 243
 					},
 					"end": {
 						"line": 6,
 						"column": 2,
-						"character": 268
+						"character": 244
 					}
 				},
 				"attributes": [],
@@ -43,46 +43,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 269,
-							"end": 300,
-							"raw": "uppercase hex: &#X41; &#X1F4A9;",
-							"data": "uppercase hex: &#X41; &#X1F4A9;"
-						}
-					]
-				}
-			},
-			{
-				"type": "Text",
-				"start": 304,
-				"end": 305,
-				"raw": "\n",
-				"data": "\n"
-			},
-			{
-				"type": "RegularElement",
-				"start": 305,
-				"end": 339,
-				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 7,
-						"column": 1,
-						"character": 306
-					},
-					"end": {
-						"line": 7,
-						"column": 2,
-						"character": 307
-					}
-				},
-				"attributes": [],
-				"fragment": {
-					"type": "Fragment",
-					"nodes": [
-						{
-							"type": "Text",
-							"start": 308,
-							"end": 335,
+							"start": 245,
+							"end": 272,
 							"raw": "zero code: &#0; &#00; &#x0;",
 							"data": "zero code: &#0; &#00; &#x0;"
 						}
@@ -91,26 +53,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 339,
-				"end": 340,
+				"start": 276,
+				"end": 277,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 340,
-				"end": 393,
+				"start": 277,
+				"end": 330,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 8,
+						"line": 7,
 						"column": 1,
-						"character": 341
+						"character": 278
 					},
 					"end": {
-						"line": 8,
+						"line": 7,
 						"column": 2,
-						"character": 342
+						"character": 279
 					}
 				},
 				"attributes": [],
@@ -119,8 +81,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 343,
-							"end": 389,
+							"start": 280,
+							"end": 326,
 							"raw": "omitted planes: &#x30000; &#xF0000; &#x10FFFF;",
 							"data": "omitted planes: \u0000 \u0000 \u0000"
 						}
@@ -129,50 +91,50 @@
 			},
 			{
 				"type": "Text",
-				"start": 393,
-				"end": 394,
+				"start": 330,
+				"end": 331,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 394,
-				"end": 431,
+				"start": 331,
+				"end": 368,
 				"name": "div",
 				"name_loc": {
 					"start": {
-						"line": 9,
+						"line": 8,
 						"column": 1,
-						"character": 395
+						"character": 332
 					},
 					"end": {
-						"line": 9,
+						"line": 8,
 						"column": 4,
-						"character": 398
+						"character": 335
 					}
 				},
 				"attributes": [
 					{
 						"type": "Attribute",
-						"start": 399,
-						"end": 424,
+						"start": 336,
+						"end": 361,
 						"name": "data-attr",
 						"name_loc": {
 							"start": {
-								"line": 9,
+								"line": 8,
 								"column": 5,
-								"character": 399
+								"character": 336
 							},
 							"end": {
-								"line": 9,
+								"line": 8,
 								"column": 14,
-								"character": 408
+								"character": 345
 							}
 						},
 						"value": [
 							{
-								"start": 410,
-								"end": 423,
+								"start": 347,
+								"end": 360,
 								"type": "Text",
 								"raw": "&AMP_ &COPY_1",
 								"data": "&AMP_ &COPY_1"
@@ -187,39 +149,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 431,
-				"end": 433,
+				"start": 368,
+				"end": 370,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 433,
-				"end": 501,
+				"start": 370,
+				"end": 438,
 				"data": " The forms each contrasts with, where the two decoders agree "
 			},
 			{
 				"type": "Text",
-				"start": 501,
-				"end": 502,
+				"start": 438,
+				"end": 439,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 502,
-				"end": 540,
+				"start": 439,
+				"end": 470,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 12,
+						"line": 11,
 						"column": 1,
-						"character": 503
+						"character": 440
 					},
 					"end": {
-						"line": 12,
+						"line": 11,
 						"column": 2,
-						"character": 504
+						"character": 441
 					}
 				},
 				"attributes": [],
@@ -228,46 +190,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 505,
-							"end": 536,
-							"raw": "lowercase hex: &#x41; &#x1F4A9;",
-							"data": "lowercase hex: A 💩"
-						}
-					]
-				}
-			},
-			{
-				"type": "Text",
-				"start": 540,
-				"end": 541,
-				"raw": "\n",
-				"data": "\n"
-			},
-			{
-				"type": "RegularElement",
-				"start": 541,
-				"end": 572,
-				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 13,
-						"column": 1,
-						"character": 542
-					},
-					"end": {
-						"line": 13,
-						"column": 2,
-						"character": 543
-					}
-				},
-				"attributes": [],
-				"fragment": {
-					"type": "Fragment",
-					"nodes": [
-						{
-							"type": "Text",
-							"start": 544,
-							"end": 568,
+							"start": 442,
+							"end": 466,
 							"raw": "nonzero code: &#1; &#x1;",
 							"data": "nonzero code: \u0001 \u0001"
 						}
@@ -276,26 +200,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 572,
-				"end": 573,
+				"start": 470,
+				"end": 471,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 573,
-				"end": 616,
+				"start": 471,
+				"end": 514,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 14,
+						"line": 12,
 						"column": 1,
-						"character": 574
+						"character": 472
 					},
 					"end": {
-						"line": 14,
+						"line": 12,
 						"column": 2,
-						"character": 575
+						"character": 473
 					}
 				},
 				"attributes": [],
@@ -304,8 +228,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 576,
-							"end": 612,
+							"start": 474,
+							"end": 510,
 							"raw": "admitted planes: &#x2FFFF; &#xE0001;",
 							"data": "admitted planes: 𯿿 󠀁"
 						}
@@ -314,50 +238,50 @@
 			},
 			{
 				"type": "Text",
-				"start": 616,
-				"end": 617,
+				"start": 514,
+				"end": 515,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 617,
-				"end": 653,
+				"start": 515,
+				"end": 551,
 				"name": "div",
 				"name_loc": {
 					"start": {
-						"line": 15,
+						"line": 13,
 						"column": 1,
-						"character": 618
+						"character": 516
 					},
 					"end": {
-						"line": 15,
+						"line": 13,
 						"column": 4,
-						"character": 621
+						"character": 519
 					}
 				},
 				"attributes": [
 					{
 						"type": "Attribute",
-						"start": 622,
-						"end": 646,
+						"start": 520,
+						"end": 544,
 						"name": "data-attr",
 						"name_loc": {
 							"start": {
-								"line": 15,
+								"line": 13,
 								"column": 5,
-								"character": 622
+								"character": 520
 							},
 							"end": {
-								"line": 15,
+								"line": 13,
 								"column": 14,
-								"character": 631
+								"character": 529
 							}
 						},
 						"value": [
 							{
-								"start": 633,
-								"end": 645,
+								"start": 531,
+								"end": 543,
 								"type": "Text",
 								"raw": "&AMP- &AMP=1",
 								"data": "&- &AMP=1"

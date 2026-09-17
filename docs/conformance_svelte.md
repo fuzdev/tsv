@@ -46,7 +46,7 @@ catalog entry.
 - Comments splitting a `<wq-name>` namespace separator (`svg/* c */|rect`, `svg|/* c */rect`, and the `*|` / `|` prefix forms) — Rejected (`css_expected_identifier`); tsv accepts, per the spec. The comment stays **glued**: selectors-4 forbids white space "between any of the components of a `<wq-name>`" (tsv rejects `svg |rect` too), and a comment is not a `<whitespace-token>` — the same rule that keeps `.a/* c */.b` a compound. Prettier's freeze lands on the same output, so the single-comment forms have no prettier divergence; a glued **run** does (it relocates the `{`) — [separator_comment](../tests/fixtures/css/selectors/namespace/separator_comment_svelte_divergence/), [separator_comment_run](../tests/fixtures/css/selectors/namespace/separator_comment_run_svelte_prettier_divergence/)
 - Attribute namespaces `[ns|attr]` — Not supported — [namespace](../tests/fixtures/css/selectors/attribute/namespace_svelte_divergence/)
 - An escaped `|` in an attribute selector's namespace prefix (`[a\|b|attr]`) — Rejected with the rest of the attribute-namespace family; tsv accepts, reading the escape's payload as prefix *content* (css-syntax-3 §4.3.7) and taking the **next** `|` as the `<wq-name>` separator. The prefix is emitted verbatim and half-decoded on the wire, like every other selector name. Prettier loses content here (a `_prettier_divergence`, see [conformance_prettier_css.md §CSS: Selectors](conformance_prettier_css.md#css-selectors)) — [namespace_escaped_prefix](../tests/fixtures/css/selectors/attribute/namespace_escaped_prefix_svelte_prettier_divergence/)
-- No-namespace `|element` — Not supported — [no_namespace](../tests/fixtures/css/selectors/namespace/no_namespace_svelte_divergence/)
+- No-namespace `|element` / `|*` — Not supported; tsv accepts, per selectors-4's `<ns-prefix>`. Svelte's `TypeSelector` carries `namespace` only when a prefix is written (`svg|a` → `"svg"`, `*|a` → `"*"`), so tsv extends the same field to the empty prefix: `namespace: ""`. An absent key stays a bare `a` — any namespace, or the default one — which the spec reads differently from `|a`, no namespace — [no_namespace](../tests/fixtures/css/selectors/namespace/no_namespace_svelte_divergence/)
 - Forgiving :is()/:where() — Strict parsing (should be forgiving); tsv drops both syntactically invalid items (`.`, `[`) and contextually invalid ones (known syntax in the wrong place — e.g. an `An+B`/`of S` term, valid only in `:nth-*()`, so `:is(2n of)` → empty), while Svelte fails the whole parse — [forgiving_is_where](../tests/fixtures/css/selectors/forgiving_is_where_svelte_divergence/)
 - Forgiving :is()/:where() dropped-item newline — the formatter side of the row above: a dropped invalid item spanning a newline (`:is(.a > .⏎> .b)`) has its preserved verbatim text's whitespace runs (including the newline) collapsed to single spaces, matching prettier (which collapses whitespace inside a selector) — the same rule tsv applies to every other selector-argument position. Parser behavior is unchanged from the row above (the item is still dropped from the AST) — [forgiving_is_where_newline](../tests/fixtures/css/selectors/forgiving_is_where_newline_svelte_divergence/)
 - Empty-after-comment declarations — Rejected (`css_empty_declaration`) — [comment_empty_value](../tests/fixtures/css/tokens/comments/comment_empty_value_svelte_divergence/)
@@ -394,15 +394,14 @@ Svelte decodes character references with a generated regex over its entity table
 differently from [HTML5](https://html.spec.whatwg.org/multipage/parsing.html#character-reference-state).
 Those deliberate answers are **matched**, quirks and all — NUL rather than U+FFFD for a
 code with no character to emit (a surrogate half, or one past U+10FFFF), and `&#10;`
-becoming a space. Five others are slips in the implementation rather than choices, so tsv
-follows the spec — the first four pinned by
+becoming a space in text (an attribute value keeps the line feed, as the spec does —
+[numeric_line_feed](../tests/fixtures/svelte/syntax/entities/numeric_line_feed/)). Four
+others are slips in the implementation rather than choices, so tsv follows the spec — the
+first three pinned by
 [spec_decoding](../tests/fixtures/svelte/syntax/entities/spec_decoding_svelte_divergence/),
-whose README carries the per-case argument, the fifth by its own fixture, and every one of
+whose README carries the per-case argument, the fourth by its own fixture, and every one of
 them an upstream candidate:
 
-- **Uppercase hex marker** — the numeric-character-reference state opens a hex reference
-  on `U+0078 x` or `U+0058 X`; Svelte's pattern (`#(?:x[a-fA-F\d]+|\d+)(?:;)?`) spells only
-  the lowercase one, so `&#X41;` stays literal text where tsv decodes it to `A`.
 - **A zero code** — `if (!code) return match` guards the decode against an unknown or
   unparseable reference and catches a code of `0` as the other falsy value, so `&#0;` (any
   spelling) stays literal text. tsv decodes it, to NUL — the sentinel above, rather than the

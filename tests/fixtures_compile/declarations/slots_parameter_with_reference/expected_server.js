@@ -5,8 +5,7 @@ export default function Input($$renderer, $$props) {
 		return $$slots;
 	}
 	if ($$slots.a) {
-		$$renderer.push('<!--[0-->');
-		$$renderer.push(`<p>${$.escape(f(1))}</p>`);
+		$$renderer.push(`<!--[0--><p>${$.escape(f(1))}</p>`);
 	} else {
 		$$renderer.push('<!--[-1-->');
 	}
