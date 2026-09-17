@@ -21,13 +21,9 @@
 //
 // Bumping prettier / svelte / acorn / @sveltejs/acorn-typescript / prettier-plugin-svelte
 // is NOT a routine refresh — it re-baselines the entire fixture corpus (these tools define
-// every fixture's expected.json + output_prettier.*). After any bump: REGENERATE the
-// lockfile (`deno task pins:lock`) and update `LOCKED_TRANSITIVE` in
-// scripts/check_canonical_pins.ts if a transitive pin moved with it, run
-// `deno task fixtures:update` and review the churn, run the two sidecar-dependent gates
-// `deno task check` cannot (`compile:validation`, `bench:pins:suites`), and grep the repo for
-// the OLD version string — prose that restates a pin goes silently stale, and nothing gates
-// it. See docs/benchmarks.md §"Canonical baseline is coupled" for the full procedure.
+// every fixture's expected.json + output_prettier.* and every compile fixture's
+// expected_server.js). The command sequence lives in one place, docs/benchmarks.md
+// §"Canonical baseline is coupled"; follow it rather than a copy here.
 //
 // NOTE: Requires deno.json with "acorn": "npm:acorn@8.16.0" import map
 // to ensure @sveltejs/acorn-typescript uses the same acorn instance.
