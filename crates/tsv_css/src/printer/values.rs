@@ -353,7 +353,7 @@ impl<'a> Printer<'a> {
             // the enclosing list's question, never this node's (`value_gap_is_glued`).
             CssValue::Operator { span } => self.d().source_span(*span, self.source),
             CssValue::String { content, span } => self.build_string_doc(content, *span),
-            CssValue::Dimension { span, .. } => self.build_dimension_doc(*span),
+            CssValue::Dimension { span } => self.build_dimension_doc(*span),
             CssValue::Color { color, span } => self.build_color_doc(color, *span),
             CssValue::Function {
                 name_span,

@@ -1,5 +1,5 @@
 // CSS number grammar — the single source of truth for how a numeric token is
-// scanned, shared by the lexer (token spans), the parser (dimension splitting),
+// scanned, shared by the lexer (token spans), the parser (dimension classification),
 // and the printer (value/prelude normalization). Pure functions over `&str`;
 // no allocation, no AST. Formatting (leading-zero/trailing-zero normalization)
 // lives in `printer::value_normalization`, not here — this module is grammar only.
