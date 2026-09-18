@@ -6,7 +6,7 @@ use super::super::*;
 use crate::binder::{NodeKind, addr_of, bind_file};
 use crate::ids::FileId;
 use bumpalo::Bump;
-use tsv_ts::ast::internal::{Expression, ExpressionKind, Statement};
+use tsv_ts::ast::internal::{Expression, ExpressionKind, StatementKind};
 
 #[test]
 fn create_flow_condition_ports_verbatim() {
@@ -17,7 +17,7 @@ fn create_flow_condition_ports_verbatim() {
 
     // Extract the top-level expressions + their node ids.
     let expr_at = |i: usize| -> (&Expression<'_>, NodeId) {
-        let Statement::ExpressionStatement(s) = &program.body[i] else {
+        let StatementKind::ExpressionStatement(s) = &program.body[i].kind else {
             panic!("expression statement");
         };
         let id = match &s.expression.kind {
@@ -99,7 +99,7 @@ fn is_narrowable_reference_matches_tsgo_shape() {
     let src = "a.b; a[0]; a?.b;";
     let program = tsv_ts::parse(src, &arena).expect("parse");
     for stmt in program.body {
-        if let Statement::ExpressionStatement(s) = stmt {
+        if let StatementKind::ExpressionStatement(s) = &stmt.kind {
             assert!(
                 is_narrowable_reference(s.expression),
                 "member/element access should be narrowable"

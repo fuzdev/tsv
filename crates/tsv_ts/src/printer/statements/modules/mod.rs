@@ -41,6 +41,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_export_assignment_doc(
         &self,
         decl: &internal::TSExportAssignment<'_>,
+        span: Span,
     ) -> DocId {
         let d = self.d();
         let value_span = decl.expression.span();
@@ -55,9 +56,9 @@ impl<'a> Printer<'a> {
         // `export default`'s twin arm gives: deferring it past the `)` and the `;` merges
         // it with whatever already trails that line. Decided ahead of the header, because
         // the shell wraps the VALUE and the value is built inside the closure below.
-        let shell_close = self.value_paren_line_comment_close(argument_end, decl.span.end);
+        let shell_close = self.value_paren_line_comment_close(argument_end, span.end);
         let (keyword_doc, keyword_end) =
-            self.build_keyword_words_doc(&["export", "="], decl.span.start, value_span.start);
+            self.build_keyword_words_doc(&["export", "="], span.start, value_span.start);
         let value = self.build_value_head_doc(keyword_end, &decl.expression, || {
             self.build_expression_doc_claiming_outermost(&decl.expression)
         });
@@ -98,15 +99,15 @@ impl<'a> Printer<'a> {
             ])
         };
         let gap_start = shell_close.map_or(argument_end, |close| {
-            Self::past_grouping_close(close, decl.span.end)
+            Self::past_grouping_close(close, span.end)
         });
-        let has_trailing_comments = self.has_comments_to_emit_between(gap_start, decl.span.end);
+        let has_trailing_comments = self.has_comments_to_emit_between(gap_start, span.end);
         if has_trailing_comments {
             // `export =` keeps a same-line trailing block comment *before* the `;`
             // (operand-attached — prettier 3.9 does not move it, unlike `export default`
             // / named exports). A line comment still floats after the `;` via `line_suffix`.
             let mut parts = smallvec![head];
-            self.append_trailing_paren_comments(&mut parts, gap_start, decl.span.end);
+            self.append_trailing_paren_comments(&mut parts, gap_start, span.end);
             parts.push(d.text(";"));
             d.concat(&parts)
         } else {
@@ -121,13 +122,14 @@ impl<'a> Printer<'a> {
     pub(super) fn build_export_named_declaration_doc(
         &self,
         decl: &internal::ExportNamedDeclaration<'_>,
+        span: Span,
     ) -> DocId {
         let d = self.d();
         if let Some(declaration) = &decl.declaration {
             // When exporting a declaration, always use plain "export " because
             // the type/interface/declare keyword is part of the declaration itself
             let export_keyword = "export";
-            let export_keyword_end = decl.span.start + export_keyword.len() as u32;
+            let export_keyword_end = span.start + export_keyword.len() as u32;
             let decl_span = declaration.span();
             let decl_start = decl_span.start;
 
@@ -147,9 +149,9 @@ impl<'a> Printer<'a> {
             // they print in the source order rather than through the plain
             // keyword→declaration continuation.
             if frozen.is_none()
-                && let internal::Statement::ClassDeclaration(class) = declaration
+                && let internal::StatementKind::ClassDeclaration(class) = &declaration.kind
                 && let Some(doc) =
-                    self.build_export_named_decorated_class_doc(decl, class, export_keyword_end)
+                    self.build_export_named_decorated_class_doc(span, class, export_keyword_end)
             {
                 return doc;
             }
@@ -181,8 +183,8 @@ impl<'a> Printer<'a> {
                 // one level; the leading space comes from the `export ` token. The
                 // `type`→`{` gap is handled beside each brace path below. Mirrors the
                 // import side.
-                let kw_end = decl.span.start + MODULE_KW_LEN;
-                let search_end = decl.source.as_ref().map_or(decl.span.end, |s| s.span.start);
+                let kw_end = span.start + MODULE_KW_LEN;
+                let search_end = decl.source.as_ref().map_or(span.end, |s| s.span.start);
                 let type_start = self
                     .find_keyword_in_range(kw_end, search_end, "type")
                     .unwrap_or(kw_end);
@@ -205,8 +207,8 @@ impl<'a> Printer<'a> {
                 // Prettier relocates comments from inside empty braces:
                 //   `export { /* c */ }` → `export /* c */ {}`
                 //   `export { /* c */ } from 'a'` → `export {} from /* c */ 'a'`
-                let semi_or_source = decl.source.as_ref().map_or(decl.span.end, |s| s.span.start);
-                let keyword_end = self.export_header_end(decl, semi_or_source);
+                let semi_or_source = decl.source.as_ref().map_or(span.end, |s| s.span.start);
+                let keyword_end = self.export_header_end(decl, span, semi_or_source);
                 // Find closing brace outside of comments — naive find('}') matches
                 // inside comments like `export // {}\n{}`, breaking comment extraction.
                 let brace_close = self
@@ -244,8 +246,8 @@ impl<'a> Printer<'a> {
             } else {
                 // Named specifiers: comment-aware braced list. `close_brace_end`
                 // is the offset past `}`, for the trailing pre-`;` comment scan.
-                let kw_end = self.export_header_end(decl, decl.specifiers[0].span.start);
-                let bound = decl.source.as_ref().map_or(decl.span.end, |s| s.span.start);
+                let kw_end = self.export_header_end(decl, span, decl.specifiers[0].span.start);
+                let bound = decl.source.as_ref().map_or(span.end, |s| s.span.start);
                 // Export named specifiers always have the `{` directly after the
                 // header (no default/namespace binding), so the keyword→`{` comment
                 // (`export /* c */ {a}`, `export type /* c */ {a}`) is always
@@ -255,7 +257,7 @@ impl<'a> Printer<'a> {
                     &mut parts,
                     decl.specifiers,
                     SpecifierListSpans {
-                        header_start: decl.span.start,
+                        header_start: span.start,
                         kw_end,
                         gap_start: kw_end,
                         bound,
@@ -273,7 +275,7 @@ impl<'a> Printer<'a> {
             // doesn't expand the braces.
             let content_end = if let Some(source) = &decl.source {
                 let empty_brace_start = if decl.specifiers.is_empty() {
-                    Some(self.export_header_end(decl, source.span.start))
+                    Some(self.export_header_end(decl, span, source.span.start))
                 } else {
                     None
                 };
@@ -286,7 +288,7 @@ impl<'a> Printer<'a> {
                     Some(close_brace_end)
                 };
                 parts.push(self.build_from_source_doc(
-                    decl.span.start,
+                    span.start,
                     source,
                     empty_brace_start,
                     from_content_end,
@@ -296,12 +298,12 @@ impl<'a> Printer<'a> {
                     &mut parts,
                     decl.attributes,
                     source.span.end,
-                    decl.span.end,
+                    span.end,
                 )
             } else {
                 close_brace_end
             };
-            self.finish_with_pre_semi(parts, content_end, decl.span.end, true)
+            self.finish_with_pre_semi(parts, content_end, span.end, true)
         }
     }
 
@@ -321,14 +323,14 @@ impl<'a> Printer<'a> {
     /// wants the plain continuation instead.
     fn build_export_named_decorated_class_doc(
         &self,
-        decl: &internal::ExportNamedDeclaration<'_>,
+        span: Span,
         class: &internal::ClassDeclaration<'_>,
         export_keyword_end: u32,
     ) -> Option<DocId> {
         let d = self.d();
         let decorators = class.decorators.filter(|dec| !dec.is_empty())?;
         let continuation = self.build_class_declaration_without_decorators_doc(class);
-        let export_first = decorators[0].span.start > decl.span.start;
+        let export_first = decorators[0].span.start > span.start;
 
         // The token right after the decorators is the trailing-comment boundary for
         // `build_decorators_doc`: the class's own first keyword for the export-first
@@ -342,7 +344,7 @@ impl<'a> Printer<'a> {
         let next_after_decorators = if export_first {
             self.class_declaration_keyword_start(class)
         } else {
-            self.find_keyword_after_decorators(class.decorators, "export", decl.span.start)
+            self.find_keyword_after_decorators(class.decorators, "export", span.start)
         };
 
         // `decorators` is non-empty, so this is always `Some`; the `?` keeps the code off
@@ -367,7 +369,7 @@ impl<'a> Printer<'a> {
 
         // Decorator-first (`@dec export class`): decorators, then `export`, then the class.
         // The gap runs from the REAL `export` keyword — `next_after_decorators` here — to
-        // the class's own first keyword. `decl.span.start` is the DECORATOR in this form, so
+        // the class's own first keyword. `span.start` is the DECORATOR in this form, so
         // anchoring the scan on it inverted the window and dropped every comment in the gap.
         // The gap sits inside the declaration's span rather than before it, so nothing
         // freezes here: there is no following node for Rule A to bind to (the
@@ -384,11 +386,12 @@ impl<'a> Printer<'a> {
     pub(super) fn build_export_default_declaration_doc(
         &self,
         decl: &internal::ExportDefaultDeclaration<'_>,
+        span: Span,
     ) -> DocId {
         let d = self.d();
         // The two decorated forms print declaration-style layouts of their own, neither of
         // which is the keyword→value shape below.
-        if let Some(doc) = self.build_export_default_decorated_doc(decl) {
+        if let Some(doc) = self.build_export_default_decorated_doc(decl, span) {
             return doc;
         }
 
@@ -399,8 +402,8 @@ impl<'a> Printer<'a> {
         // position an author can comment in, and measuring never scans it. Located
         // before the value is built, so the value can ask whether this gap freezes it.
         let (keyword_doc, keyword_end) =
-            self.build_keyword_words_doc(&["export", "default"], decl.span.start, decl_start);
-        let value_doc = self.build_export_default_value_doc(decl, keyword_end, value_span);
+            self.build_keyword_words_doc(&["export", "default"], span.start, decl_start);
+        let value_doc = self.build_export_default_value_doc(decl, span, keyword_end, value_span);
 
         // A comment that can't stay inline forces the value onto its own indented
         // line, keeping the comment where the author wrote it. This gap uses the
@@ -457,6 +460,7 @@ impl<'a> Printer<'a> {
     fn build_export_default_value_doc(
         &self,
         decl: &internal::ExportDefaultDeclaration<'_>,
+        span: Span,
         keyword_end: u32,
         value_span: Span,
     ) -> DocId {
@@ -480,7 +484,7 @@ impl<'a> Printer<'a> {
                     expr_doc = d.concat(&[d.text("("), expr_doc, d.text(")")]);
                 }
                 let argument_end = value_span.end;
-                if !self.has_comments_to_emit_between(argument_end, decl.span.end) {
+                if !self.has_comments_to_emit_between(argument_end, span.end) {
                     return d.concat(&[expr_doc, d.text(";")]);
                 }
                 // A `//` the author wrote inside the value's own grouping parens keeps
@@ -489,13 +493,13 @@ impl<'a> Printer<'a> {
                 // MERGE into one comment. The retained shell is the same answer the
                 // `return`/`throw` operand and the `await`/`yield` operand shell give.
                 if let Some((shell, after_close)) =
-                    self.build_value_paren_line_comment_shell(expr_doc, argument_end, decl.span.end)
+                    self.build_value_paren_line_comment_shell(expr_doc, argument_end, span.end)
                 {
                     let mut parts = smallvec![shell];
                     let after = self.split_terminator_gap_comments(
                         &mut parts,
                         after_close,
-                        decl.span.end,
+                        span.end,
                         false,
                         false,
                         TerminatorGap::ListClaims,
@@ -517,7 +521,7 @@ impl<'a> Printer<'a> {
                 let after = self.split_terminator_gap_comments(
                     &mut parts,
                     argument_end,
-                    decl.span.end,
+                    span.end,
                     false,
                     false,
                     TerminatorGap::ListClaims,
@@ -558,11 +562,12 @@ impl<'a> Printer<'a> {
     fn build_export_default_decorated_doc(
         &self,
         decl: &internal::ExportDefaultDeclaration<'_>,
+        span: Span,
     ) -> Option<DocId> {
         let d = self.d();
         if let internal::ExportDefaultValue::ClassDeclaration(class) = &decl.declaration {
             let export_start =
-                self.find_keyword_after_decorators(class.decorators, "export", decl.span.start);
+                self.find_keyword_after_decorators(class.decorators, "export", span.start);
             let dec_doc = self.build_decorators_doc(class.decorators, export_start)?;
             // `export default` word by word, bounded by the class's own first keyword:
             // both the gap *inside* the keyword and the one after it are positions an
@@ -598,7 +603,7 @@ impl<'a> Printer<'a> {
         // never scans that gap — the comment would be dropped).
         let (keyword_doc, keyword_end) = self.build_keyword_words_doc(
             &["export", "default"],
-            decl.span.start,
+            span.start,
             decorators[0].span.start,
         );
         let mut parts: DocBuf = smallvec![keyword_doc];
@@ -642,10 +647,11 @@ impl<'a> Printer<'a> {
     pub(super) fn build_export_all_declaration_doc(
         &self,
         decl: &internal::ExportAllDeclaration<'_>,
+        span: Span,
     ) -> DocId {
         let d = self.d();
         let is_type = decl.export_kind == internal::ExportKind::Type;
-        let export_end = decl.span.start + MODULE_KW_LEN;
+        let export_end = span.start + MODULE_KW_LEN;
         // The `*` token, after the keyword(s) and before any `as`/`from`.
         let star_limit = decl
             .exported
@@ -687,7 +693,7 @@ impl<'a> Printer<'a> {
         // `from …` continuation; prettier relocates it after `from`. Handled by
         // `build_from_source_doc`'s binding→`from` gap (the end of `*`/`as ns`).
         let prev_end = decl.exported.as_ref().map_or(star_end, |e| e.span().end);
-        parts.push(self.build_from_source_doc(decl.span.start, &decl.source, None, Some(prev_end)));
+        parts.push(self.build_from_source_doc(span.start, &decl.source, None, Some(prev_end)));
         // Import attributes: `export * from "y" with { type: "json" }`.
         // Returns the offset past the attribute `}` (or source) for the trailing
         // pre-`;` comment scan, preserved in place.
@@ -695,9 +701,9 @@ impl<'a> Printer<'a> {
             &mut parts,
             decl.attributes,
             decl.source.span.end,
-            decl.span.end,
+            span.end,
         );
-        self.finish_with_pre_semi(parts, content_end, decl.span.end, false)
+        self.finish_with_pre_semi(parts, content_end, span.end, false)
     }
 
     /// Emit an import declaration's leading header keyword — an import-phase keyword
@@ -719,10 +725,11 @@ impl<'a> Printer<'a> {
         &self,
         parts: &mut DocBuf,
         decl: &internal::ImportDeclaration<'_>,
+        span: Span,
         keyword: &'static str,
     ) {
         let d = self.d();
-        let kw_end = decl.span.start + MODULE_KW_LEN;
+        let kw_end = span.start + MODULE_KW_LEN;
         let keyword_start = self
             .find_keyword_in_range(kw_end, decl.source.span.start, keyword)
             .unwrap_or(kw_end);
@@ -737,10 +744,11 @@ impl<'a> Printer<'a> {
     pub(super) fn build_import_declaration_doc(
         &self,
         decl: &internal::ImportDeclaration<'_>,
+        span: Span,
     ) -> DocId {
         let d = self.d();
         // Check if source has empty braces (for `import {} from 'x'`)
-        let has_empty_braces = self.has_empty_named_braces(decl);
+        let has_empty_braces = self.has_empty_named_braces(decl, span);
 
         // Check if this is a type-only import
         let is_type_import = decl.import_kind == internal::ImportKind::Type;
@@ -786,15 +794,15 @@ impl<'a> Printer<'a> {
         // `push_import_header_keyword` for why the gap before it must be scanned. The
         // `type`/phase→binding/`{` gap is handled beside each form below.
         if let Some(keyword) = decl.phase.as_str() {
-            self.push_import_header_keyword(&mut parts, decl, keyword);
+            self.push_import_header_keyword(&mut parts, decl, span, keyword);
         }
         if is_type_import {
-            self.push_import_header_keyword(&mut parts, decl, "type");
+            self.push_import_header_keyword(&mut parts, decl, span, "type");
         }
 
         // Position just past the leading keyword(s), used to bound the scan for
         // comments preserved before a default binding or namespace `*`.
-        let header_end = self.import_header_end(decl, decl.source.span.start);
+        let header_end = self.import_header_end(decl, span, decl.source.span.start);
 
         // End of the last binding/specifier, used to scan for a comment in the
         // gap before `from` (preserved in place). Set in each binding branch below;
@@ -897,7 +905,7 @@ impl<'a> Printer<'a> {
             } else {
                 // Named specifiers: comment-aware braced list. `from_content_end`
                 // is the offset past `}`, for the `}`→`from` gap comment scan.
-                let kw_end = self.import_header_end(decl, named_specs[0].span.start);
+                let kw_end = self.import_header_end(decl, span, named_specs[0].span.start);
                 // A default/namespace binding sits between the header and the `{`
                 // (prettier's `standaloneSpecifiers`), which lets a lone specifier
                 // break. (Empty braces after a binding were dropped above, so
@@ -927,7 +935,7 @@ impl<'a> Printer<'a> {
                     &mut parts,
                     &named_specs,
                     SpecifierListSpans {
-                        header_start: decl.span.start,
+                        header_start: span.start,
                         kw_end,
                         gap_start: brace_gap_start,
                         bound: decl.source.span.start,
@@ -946,12 +954,12 @@ impl<'a> Printer<'a> {
             // its gap comment stays in place via `from_content_end` (plain-default path).
             let empty_brace_start =
                 if has_empty_braces && named_specs.is_empty() && !drop_empty_after_binding {
-                    Some(decl.span.start)
+                    Some(span.start)
                 } else {
                     None
                 };
             parts.push(self.build_from_source_doc(
-                decl.span.start,
+                span.start,
                 &decl.source,
                 empty_brace_start,
                 from_content_end,
@@ -965,7 +973,7 @@ impl<'a> Printer<'a> {
             } else {
                 "import"
             };
-            let keyword_end = decl.span.start + keyword.len() as u32;
+            let keyword_end = span.start + keyword.len() as u32;
             parts.push(self.gap_comment_continuation_tail(
                 keyword_end,
                 decl.source.span.start,
@@ -981,15 +989,16 @@ impl<'a> Printer<'a> {
             &mut parts,
             decl.attributes,
             decl.source.span.end,
-            decl.span.end,
+            span.end,
         );
-        self.finish_with_pre_semi(parts, content_end, decl.span.end, true)
+        self.finish_with_pre_semi(parts, content_end, span.end, true)
     }
 
     /// Build doc for `import x = require("y")` or `import x = A.B`
     pub(super) fn build_import_equals_declaration_doc(
         &self,
         decl: &internal::TSImportEqualsDeclaration<'_>,
+        span: Span,
     ) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
@@ -1009,7 +1018,7 @@ impl<'a> Printer<'a> {
         }
         parts.push(self.build_keyword_header_doc(
             &words,
-            decl.span.start,
+            span.start,
             decl.id.span.start,
             self.identifier_name_doc(&decl.id),
         ));
@@ -1075,7 +1084,7 @@ impl<'a> Printer<'a> {
         // *before* the `;` (operand-attached — prettier 3.9 keeps it), while a same-line
         // **line** comment floats after the `;` via `line_suffix`. So this uses the
         // comma-style `block_after_separator: false`, not `finish_with_pre_semi`.
-        self.push_semicolon_with_gap_comments(&mut parts, ref_end, decl.span.end, false, None);
+        self.push_semicolon_with_gap_comments(&mut parts, ref_end, span.end, false, None);
         d.concat(&parts)
     }
 
@@ -1172,6 +1181,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_namespace_export_declaration_doc(
         &self,
         decl: &internal::TSNamespaceExportDeclaration<'_>,
+        span: Span,
     ) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
@@ -1180,19 +1190,13 @@ impl<'a> Printer<'a> {
         // too. Emitting the keyword as one text never scans any of them.
         parts.push(self.build_keyword_header_doc(
             &["export", "as", "namespace"],
-            decl.span.start,
+            span.start,
             decl.id.span.start,
             self.identifier_name_doc(&decl.id),
         ));
         // Trailing comment between the name and `;` (mirrors `export =` / import-equals):
         // a same-line block comment stays before `;`, a line comment floats after it.
-        self.push_semicolon_with_gap_comments(
-            &mut parts,
-            decl.id.span.end,
-            decl.span.end,
-            false,
-            None,
-        );
+        self.push_semicolon_with_gap_comments(&mut parts, decl.id.span.end, span.end, false, None);
         d.concat(&parts)
     }
 }

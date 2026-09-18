@@ -606,9 +606,10 @@ pub(super) fn write_declare_function(
 pub(super) fn write_enum_declaration(
     w: &mut JsonWriter,
     enum_decl: &internal::TSEnumDeclaration<'_>,
+    span: tsv_lang::Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "TSEnumDeclaration", enum_decl.span, ctx);
+    node_header(w, "TSEnumDeclaration", span, ctx);
     if enum_decl.r#const {
         w.raw(",\"const\":true");
     }
@@ -631,5 +632,5 @@ pub(super) fn write_enum_declaration(
         }
         close_node(w, "TSEnumMember", member.span, ctx);
     });
-    close_node(w, "TSEnumDeclaration", enum_decl.span, ctx);
+    close_node(w, "TSEnumDeclaration", span, ctx);
 }

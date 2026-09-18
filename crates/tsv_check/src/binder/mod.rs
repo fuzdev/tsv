@@ -65,7 +65,9 @@ use crate::ids::{FileId, NodeId};
 use crate::merge::FileMerge;
 use tsv_lang::{FxHashMap, Span};
 use tsv_ts::ast::Program;
-use tsv_ts::ast::internal::{Expression, ExpressionKind, Statement, TSModuleReference};
+use tsv_ts::ast::internal::{
+    Expression, ExpressionKind, Statement, StatementKind, TSModuleReference,
+};
 
 /// The pre-order node kinds the SoA walk assigns — one variant per tsv_ts AST enum
 /// variant the walk ids (the program root, then statements, expressions, types, and
@@ -362,18 +364,18 @@ pub fn module_ness(program: &Program<'_>) -> ModuleNess {
 
 /// tsgo's `isAnExternalModuleIndicatorNode` over one top-level statement.
 fn is_external_module_indicator(stmt: &Statement<'_>) -> bool {
-    match stmt {
+    match &stmt.kind {
         // `import ...` / `export ... from` / `export {}` / `export *`.
-        Statement::ImportDeclaration(_)
-        | Statement::ExportNamedDeclaration(_)
-        | Statement::ExportAllDeclaration(_)
+        StatementKind::ImportDeclaration(_)
+        | StatementKind::ExportNamedDeclaration(_)
+        | StatementKind::ExportAllDeclaration(_)
         // `export = x` and `export default ...` are both `ExportAssignment` in
         // tsgo, both indicators.
-        | Statement::TSExportAssignment(_)
-        | Statement::ExportDefaultDeclaration(_) => true,
+        | StatementKind::TSExportAssignment(_)
+        | StatementKind::ExportDefaultDeclaration(_) => true,
         // `import x = require('y')` counts only with an external-module reference;
         // `import x = A.B` (an entity name) does not.
-        Statement::TSImportEqualsDeclaration(decl) => matches!(
+        StatementKind::TSImportEqualsDeclaration(decl) => matches!(
             decl.module_reference,
             TSModuleReference::ExternalModuleReference(_)
         ),
@@ -386,8 +388,8 @@ fn is_external_module_indicator(stmt: &Statement<'_>) -> bool {
 /// its nested expressions/blocks — `import.meta` is inert for the bind cascade,
 /// so this only refines the recorded [`ModuleNess`] fact.
 fn stmt_contains_import_meta(stmt: &Statement<'_>) -> bool {
-    use Statement as S;
-    match stmt {
+    use StatementKind as S;
+    match &stmt.kind {
         S::ExpressionStatement(s) => expr_contains_import_meta(s.expression),
         S::VariableDeclaration(d) => d
             .declarations
@@ -594,40 +596,40 @@ impl SoaWalk {
 /// unreachable-code shim, which resolve statements through the compound-keyed
 /// address map (`require_node_id` / a lenient `address_map` lookup).
 pub(crate) fn statement_kind(stmt: &Statement<'_>) -> NodeKind {
-    match stmt {
-        Statement::ExpressionStatement(_) => NodeKind::ExpressionStatement,
-        Statement::VariableDeclaration(_) => NodeKind::VariableDeclaration,
-        Statement::TSTypeAliasDeclaration(_) => NodeKind::TSTypeAliasDeclaration,
-        Statement::TSInterfaceDeclaration(_) => NodeKind::TSInterfaceDeclaration,
-        Statement::TSDeclareFunction(_) => NodeKind::TSDeclareFunction,
-        Statement::TSEnumDeclaration(_) => NodeKind::TSEnumDeclaration,
-        Statement::TSModuleDeclaration(_) => NodeKind::TSModuleDeclaration,
-        Statement::ReturnStatement(_) => NodeKind::ReturnStatement,
-        Statement::BlockStatement(_) => NodeKind::BlockStatement,
-        Statement::FunctionDeclaration(_) => NodeKind::FunctionDeclaration,
-        Statement::ClassDeclaration(_) => NodeKind::ClassDeclaration,
-        Statement::ExportNamedDeclaration(_) => NodeKind::ExportNamedDeclaration,
-        Statement::ExportDefaultDeclaration(_) => NodeKind::ExportDefaultDeclaration,
-        Statement::ExportAllDeclaration(_) => NodeKind::ExportAllDeclaration,
-        Statement::TSExportAssignment(_) => NodeKind::TSExportAssignment,
-        Statement::TSNamespaceExportDeclaration(_) => NodeKind::TSNamespaceExportDeclaration,
-        Statement::ImportDeclaration(_) => NodeKind::ImportDeclaration,
-        Statement::TSImportEqualsDeclaration(_) => NodeKind::TSImportEqualsDeclaration,
-        Statement::IfStatement(_) => NodeKind::IfStatement,
-        Statement::ForStatement(_) => NodeKind::ForStatement,
-        Statement::ForInStatement(_) => NodeKind::ForInStatement,
-        Statement::ForOfStatement(_) => NodeKind::ForOfStatement,
-        Statement::WhileStatement(_) => NodeKind::WhileStatement,
-        Statement::DoWhileStatement(_) => NodeKind::DoWhileStatement,
-        Statement::WithStatement(_) => NodeKind::WithStatement,
-        Statement::SwitchStatement(_) => NodeKind::SwitchStatement,
-        Statement::TryStatement(_) => NodeKind::TryStatement,
-        Statement::ThrowStatement(_) => NodeKind::ThrowStatement,
-        Statement::BreakStatement(_) => NodeKind::BreakStatement,
-        Statement::ContinueStatement(_) => NodeKind::ContinueStatement,
-        Statement::LabeledStatement(_) => NodeKind::LabeledStatement,
-        Statement::EmptyStatement(_) => NodeKind::EmptyStatement,
-        Statement::DebuggerStatement(_) => NodeKind::DebuggerStatement,
+    match &stmt.kind {
+        StatementKind::ExpressionStatement(_) => NodeKind::ExpressionStatement,
+        StatementKind::VariableDeclaration(_) => NodeKind::VariableDeclaration,
+        StatementKind::TSTypeAliasDeclaration(_) => NodeKind::TSTypeAliasDeclaration,
+        StatementKind::TSInterfaceDeclaration(_) => NodeKind::TSInterfaceDeclaration,
+        StatementKind::TSDeclareFunction(_) => NodeKind::TSDeclareFunction,
+        StatementKind::TSEnumDeclaration(_) => NodeKind::TSEnumDeclaration,
+        StatementKind::TSModuleDeclaration(_) => NodeKind::TSModuleDeclaration,
+        StatementKind::ReturnStatement(_) => NodeKind::ReturnStatement,
+        StatementKind::BlockStatement(_) => NodeKind::BlockStatement,
+        StatementKind::FunctionDeclaration(_) => NodeKind::FunctionDeclaration,
+        StatementKind::ClassDeclaration(_) => NodeKind::ClassDeclaration,
+        StatementKind::ExportNamedDeclaration(_) => NodeKind::ExportNamedDeclaration,
+        StatementKind::ExportDefaultDeclaration(_) => NodeKind::ExportDefaultDeclaration,
+        StatementKind::ExportAllDeclaration(_) => NodeKind::ExportAllDeclaration,
+        StatementKind::TSExportAssignment(_) => NodeKind::TSExportAssignment,
+        StatementKind::TSNamespaceExportDeclaration(_) => NodeKind::TSNamespaceExportDeclaration,
+        StatementKind::ImportDeclaration(_) => NodeKind::ImportDeclaration,
+        StatementKind::TSImportEqualsDeclaration(_) => NodeKind::TSImportEqualsDeclaration,
+        StatementKind::IfStatement(_) => NodeKind::IfStatement,
+        StatementKind::ForStatement(_) => NodeKind::ForStatement,
+        StatementKind::ForInStatement(_) => NodeKind::ForInStatement,
+        StatementKind::ForOfStatement(_) => NodeKind::ForOfStatement,
+        StatementKind::WhileStatement(_) => NodeKind::WhileStatement,
+        StatementKind::DoWhileStatement(_) => NodeKind::DoWhileStatement,
+        StatementKind::WithStatement(_) => NodeKind::WithStatement,
+        StatementKind::SwitchStatement(_) => NodeKind::SwitchStatement,
+        StatementKind::TryStatement(_) => NodeKind::TryStatement,
+        StatementKind::ThrowStatement(_) => NodeKind::ThrowStatement,
+        StatementKind::BreakStatement(_) => NodeKind::BreakStatement,
+        StatementKind::ContinueStatement(_) => NodeKind::ContinueStatement,
+        StatementKind::LabeledStatement(_) => NodeKind::LabeledStatement,
+        StatementKind::EmptyStatement(_) => NodeKind::EmptyStatement,
+        StatementKind::DebuggerStatement(_) => NodeKind::DebuggerStatement,
     }
 }
 
@@ -806,7 +808,7 @@ mod tests {
         let src = "class C { m() {} }";
         let program = tsv_ts::parse(src, &arena).expect("parse");
         let bound = bind_file(&program, src, FileId::ROOT);
-        let Statement::ClassDeclaration(class) = &program.body[0] else {
+        let StatementKind::ClassDeclaration(class) = &program.body[0].kind else {
             panic!("expected a class declaration");
         };
         let ClassMember::MethodDefinition(method) = &class.body.body[0] else {

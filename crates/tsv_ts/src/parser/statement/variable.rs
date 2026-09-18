@@ -35,7 +35,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let end = self.semicolon_end()?;
 
-        Ok(Statement::VariableDeclaration(VariableDeclaration {
+        Ok(Statement::from_variable_declaration(VariableDeclaration {
             kind,
             declarations: declarations.into_bump_slice(),
             declare: false,

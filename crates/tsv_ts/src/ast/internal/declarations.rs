@@ -73,7 +73,6 @@ pub struct TSEnumDeclaration<'arena> {
     pub r#const: bool,
     /// Whether this is an ambient declaration (declare enum)
     pub declare: bool,
-    pub span: Span,
 }
 
 /// TypeScript enum member: `A`, `A = 1`, `A = "value"`

@@ -14,9 +14,21 @@ use super::{
     TSTypeParameterDeclaration,
 };
 
-/// Statement node type
+/// Statement node: the span every variant shares, beside the variant itself.
+///
+/// The span is hoisted out of the variants so reading it is a field load rather than a
+/// dispatch over [`StatementKind`]; a variant struct carries no span of its own unless
+/// some node also holds that type outside a `Statement` (see
+/// [`Statement::from_variable_declaration`]).
 #[derive(Debug, Clone)]
-pub enum Statement<'arena> {
+pub struct Statement<'arena> {
+    pub span: Span,
+    pub kind: StatementKind<'arena>,
+}
+
+/// The variant half of a [`Statement`].
+#[derive(Debug, Clone)]
+pub enum StatementKind<'arena> {
     ExpressionStatement(ExpressionStatement<'arena>),
     VariableDeclaration(VariableDeclaration<'arena>),
     // Arena-boxed, unlike every inline variant here: these are the widest
@@ -38,9 +50,10 @@ pub enum Statement<'arena> {
     // the only reason to box — the struct is copied into the arena instead of into
     // the enum, so the copy volume is unchanged and the cost is one bump pointer,
     // while all of the file's other statement slots get 24 bytes narrower. With
-    // both inline the enum is 96 bytes; boxed it is 72, which is what the
-    // `size_of` assert in this module's parent pins. The next-widest inline
-    // variant is `TryStatement` at 64, so the ladder stops here.
+    // both inline a `Statement` is 96 bytes; boxed it is 72 — the span header over a
+    // 64-byte `StatementKind` — which is what the `size_of` asserts in this module's
+    // parent pin. The next-widest inline variant is `TryStatement` at 56, so the
+    // ladder stops here.
     //
     // (The loop and `try` heads below hold their own heads by reference for the
     // same reason, one level down; the `Expression`-holding heads below hold
@@ -80,42 +93,100 @@ pub enum Statement<'arena> {
 }
 
 impl<'arena> Statement<'arena> {
+    #[inline]
     pub fn span(&self) -> Span {
-        match self {
-            Statement::ExpressionStatement(stmt) => stmt.span,
-            Statement::VariableDeclaration(decl) => decl.span,
-            Statement::TSTypeAliasDeclaration(decl) => decl.span,
-            Statement::TSInterfaceDeclaration(decl) => decl.span,
-            Statement::TSDeclareFunction(decl) => decl.span,
-            Statement::TSEnumDeclaration(decl) => decl.span,
-            Statement::TSModuleDeclaration(decl) => decl.span,
-            Statement::ReturnStatement(stmt) => stmt.span,
-            Statement::BlockStatement(block) => block.span,
-            Statement::FunctionDeclaration(decl) => decl.span,
-            Statement::ClassDeclaration(decl) => decl.span,
-            Statement::ExportNamedDeclaration(decl) => decl.span,
-            Statement::ExportDefaultDeclaration(decl) => decl.span,
-            Statement::ExportAllDeclaration(decl) => decl.span,
-            Statement::TSExportAssignment(decl) => decl.span,
-            Statement::TSNamespaceExportDeclaration(decl) => decl.span,
-            Statement::ImportDeclaration(decl) => decl.span,
-            Statement::TSImportEqualsDeclaration(decl) => decl.span,
-            // Control flow statements
-            Statement::IfStatement(stmt) => stmt.span,
-            Statement::ForStatement(stmt) => stmt.span,
-            Statement::ForInStatement(stmt) => stmt.span,
-            Statement::ForOfStatement(stmt) => stmt.span,
-            Statement::WhileStatement(stmt) => stmt.span,
-            Statement::DoWhileStatement(stmt) => stmt.span,
-            Statement::WithStatement(stmt) => stmt.span,
-            Statement::SwitchStatement(stmt) => stmt.span,
-            Statement::TryStatement(stmt) => stmt.span,
-            Statement::ThrowStatement(stmt) => stmt.span,
-            Statement::BreakStatement(stmt) => stmt.span,
-            Statement::ContinueStatement(stmt) => stmt.span,
-            Statement::LabeledStatement(stmt) => stmt.span,
-            Statement::EmptyStatement(stmt) => stmt.span,
-            Statement::DebuggerStatement(stmt) => stmt.span,
+        #[cfg(debug_assertions)]
+        self.debug_assert_payload_span();
+        self.span
+    }
+
+    /// Debug-build check that a payload carrying its own span agrees with the header
+    /// (see [`Statement::from_variable_declaration`]).
+    #[cfg(debug_assertions)]
+    fn debug_assert_payload_span(&self) {
+        let payload = match &self.kind {
+            StatementKind::VariableDeclaration(decl) => decl.span,
+            StatementKind::BlockStatement(block) => block.span,
+            StatementKind::FunctionDeclaration(func) => func.span,
+            StatementKind::TSDeclareFunction(func) => func.span,
+            StatementKind::ClassDeclaration(class) => class.span,
+            StatementKind::TSInterfaceDeclaration(decl) => decl.span,
+            StatementKind::TSModuleDeclaration(decl) => decl.span,
+            _ => return,
+        };
+        debug_assert_eq!(
+            payload, self.span,
+            "statement header span disagrees with its payload"
+        );
+    }
+
+    /// Wrap a [`VariableDeclaration`], taking the wrapper's span from the node's own.
+    ///
+    /// The seven variant types some node also holds OUTSIDE a `Statement` keep a span of
+    /// their own, so their wrapped form carries it twice. Both are `pub`; they start equal
+    /// because the wrapped form is built only through these constructors, and no span
+    /// write reaches one of these seven after it is wrapped — a parser that rewrites a
+    /// payload's span does so before wrapping it. A debug build asserts the agreement on
+    /// every [`Statement::span`] read.
+    #[inline]
+    pub fn from_variable_declaration(decl: VariableDeclaration<'arena>) -> Self {
+        Self {
+            span: decl.span,
+            kind: StatementKind::VariableDeclaration(decl),
+        }
+    }
+
+    /// Wrap a [`BlockStatement`] (see [`Statement::from_variable_declaration`]).
+    #[inline]
+    pub fn from_block_statement(block: BlockStatement<'arena>) -> Self {
+        Self {
+            span: block.span,
+            kind: StatementKind::BlockStatement(block),
+        }
+    }
+
+    /// Wrap a [`FunctionDeclaration`] (see [`Statement::from_variable_declaration`]).
+    #[inline]
+    pub fn from_function_declaration(func: &'arena FunctionDeclaration<'arena>) -> Self {
+        Self {
+            span: func.span,
+            kind: StatementKind::FunctionDeclaration(func),
+        }
+    }
+
+    /// Wrap a [`ClassDeclaration`] (see [`Statement::from_variable_declaration`]).
+    #[inline]
+    pub fn from_class_declaration(class: &'arena ClassDeclaration<'arena>) -> Self {
+        Self {
+            span: class.span,
+            kind: StatementKind::ClassDeclaration(class),
+        }
+    }
+
+    /// Wrap a [`TSInterfaceDeclaration`] (see [`Statement::from_variable_declaration`]).
+    #[inline]
+    pub fn from_ts_interface_declaration(decl: &'arena TSInterfaceDeclaration<'arena>) -> Self {
+        Self {
+            span: decl.span,
+            kind: StatementKind::TSInterfaceDeclaration(decl),
+        }
+    }
+
+    /// Wrap a [`TSDeclareFunction`] (see [`Statement::from_variable_declaration`]).
+    #[inline]
+    pub fn from_ts_declare_function(func: &'arena TSDeclareFunction<'arena>) -> Self {
+        Self {
+            span: func.span,
+            kind: StatementKind::TSDeclareFunction(func),
+        }
+    }
+
+    /// Wrap a [`TSModuleDeclaration`] (see [`Statement::from_variable_declaration`]).
+    #[inline]
+    pub fn from_ts_module_declaration(decl: &'arena TSModuleDeclaration<'arena>) -> Self {
+        Self {
+            span: decl.span,
+            kind: StatementKind::TSModuleDeclaration(decl),
         }
     }
 }
@@ -132,7 +203,6 @@ impl<'arena> Statement<'arena> {
 #[derive(Debug, Clone)]
 pub struct ExpressionStatement<'arena> {
     pub expression: &'arena Expression<'arena>,
-    pub span: Span,
     /// True when this is a directive prologue entry — an unparenthesized
     /// string-literal statement in the leading run of a `Program` or function
     /// body (e.g. `"use strict";`). Directives are printed verbatim from source
@@ -158,7 +228,6 @@ pub struct BlockStatement<'arena> {
 #[derive(Debug, Clone)]
 pub struct ReturnStatement<'arena> {
     pub argument: Option<&'arena Expression<'arena>>,
-    pub span: Span,
 }
 
 //
@@ -171,7 +240,6 @@ pub struct IfStatement<'arena> {
     pub test: &'arena Expression<'arena>,
     pub consequent: &'arena Statement<'arena>,
     pub alternate: Option<&'arena Statement<'arena>>,
-    pub span: Span,
 }
 
 /// For statement: `for (init; test; update) body`
@@ -194,7 +262,6 @@ pub struct ForStatement<'arena> {
     /// Update expression (or None)
     pub update: Option<&'arena Expression<'arena>>,
     pub body: &'arena Statement<'arena>,
-    pub span: Span,
 }
 
 /// For statement initialization - either a variable declaration or expression
@@ -221,7 +288,6 @@ pub struct ForInStatement<'arena> {
     pub left: &'arena ForInOfLeft<'arena>,
     pub right: &'arena Expression<'arena>,
     pub body: &'arena Statement<'arena>,
-    pub span: Span,
 }
 
 /// For-of statement: `for (left of right) body`
@@ -235,7 +301,6 @@ pub struct ForOfStatement<'arena> {
     /// Whether this is `for await (... of ...)`
     pub r#await: bool,
     pub body: &'arena Statement<'arena>,
-    pub span: Span,
 }
 
 /// Left side of for-in/for-of: either a variable declaration or expression pattern
@@ -253,7 +318,6 @@ pub enum ForInOfLeft<'arena> {
 pub struct WhileStatement<'arena> {
     pub test: &'arena Expression<'arena>,
     pub body: &'arena Statement<'arena>,
-    pub span: Span,
 }
 
 /// Do-while statement: `do body while (test)`
@@ -261,7 +325,6 @@ pub struct WhileStatement<'arena> {
 pub struct DoWhileStatement<'arena> {
     pub body: &'arena Statement<'arena>,
     pub test: &'arena Expression<'arena>,
-    pub span: Span,
 }
 
 /// With statement: `with (object) body` — sloppy-mode Script code only.
@@ -269,7 +332,6 @@ pub struct DoWhileStatement<'arena> {
 pub struct WithStatement<'arena> {
     pub object: &'arena Expression<'arena>,
     pub body: &'arena Statement<'arena>,
-    pub span: Span,
 }
 
 /// Switch statement: `switch (discriminant) { cases }`
@@ -277,7 +339,6 @@ pub struct WithStatement<'arena> {
 pub struct SwitchStatement<'arena> {
     pub discriminant: &'arena Expression<'arena>,
     pub cases: &'arena [SwitchCase<'arena>],
-    pub span: Span,
 }
 
 /// Switch case: `case test: consequent` or `default: consequent`
@@ -297,7 +358,6 @@ pub struct TryStatement<'arena> {
     /// density reason on `ForStatement`.
     pub handler: Option<&'arena CatchClause<'arena>>,
     pub finalizer: Option<BlockStatement<'arena>>,
-    pub span: Span,
 }
 
 /// Catch clause: `catch (param) { body }`
@@ -318,21 +378,18 @@ pub struct CatchClause<'arena> {
 #[derive(Debug, Clone)]
 pub struct ThrowStatement<'arena> {
     pub argument: &'arena Expression<'arena>,
-    pub span: Span,
 }
 
 /// Break statement: `break` or `break label`
 #[derive(Debug, Clone)]
 pub struct BreakStatement<'arena> {
     pub label: Option<Identifier<'arena>>,
-    pub span: Span,
 }
 
 /// Continue statement: `continue` or `continue label`
 #[derive(Debug, Clone)]
 pub struct ContinueStatement<'arena> {
     pub label: Option<Identifier<'arena>>,
-    pub span: Span,
 }
 
 /// Labeled statement: `label: statement`
@@ -340,20 +397,15 @@ pub struct ContinueStatement<'arena> {
 pub struct LabeledStatement<'arena> {
     pub label: Identifier<'arena>,
     pub body: &'arena Statement<'arena>,
-    pub span: Span,
 }
 
 /// Empty statement: `;`
 #[derive(Debug, Clone)]
-pub struct EmptyStatement {
-    pub span: Span,
-}
+pub struct EmptyStatement;
 
 /// Debugger statement: `debugger;`
 #[derive(Debug, Clone)]
-pub struct DebuggerStatement {
-    pub span: Span,
-}
+pub struct DebuggerStatement;
 
 //
 // Declarations

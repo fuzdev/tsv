@@ -58,6 +58,7 @@ use tsv_svelte::ast::internal::{
 };
 use tsv_ts::ast::internal::{
     ExportNamedDeclaration, Expression, ExpressionKind, LiteralValue, ModuleExportName, Statement,
+    StatementKind,
 };
 
 /// The oracle's `root_only_meta_tags` (`phases/1-parse/state/element.js:45`) —
@@ -745,7 +746,7 @@ pub(crate) fn validate_module_exports(
     // gates neither on the module scope being readable nor on a re-export's
     // `node.source`, unlike the snippet-export check that follows.
     for stmt in module_body {
-        if let Statement::ExportNamedDeclaration(export) = stmt
+        if let StatementKind::ExportNamedDeclaration(export) = &stmt.kind
             && export_named_has_default_specifier(export, source)
         {
             return Err(unsupported(Refusal::ModuleDefaultExport));
@@ -757,7 +758,7 @@ pub(crate) fn validate_module_exports(
     };
 
     for stmt in module_body {
-        let Statement::ExportNamedDeclaration(export) = stmt else {
+        let StatementKind::ExportNamedDeclaration(export) = &stmt.kind else {
             continue;
         };
         if export.source.is_some() {

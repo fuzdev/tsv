@@ -294,7 +294,6 @@ pub struct TSTypeAliasDeclaration<'arena> {
     pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
     pub type_annotation: TSType<'arena>,
     pub declare: bool,
-    pub span: Span,
 }
 
 /// TypeScript literal type: wraps a literal value as a type

@@ -419,14 +419,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Empty statement: `;`
                 let (start, end) = self.current_pos();
                 self.advance()?;
-                Ok(Statement::EmptyStatement(EmptyStatement {
+                Ok(Statement {
                     span: Span::new(start as u32, end as u32),
-                }))
+                    kind: StatementKind::EmptyStatement(EmptyStatement),
+                })
             }
             TokenKind::BraceOpen => {
                 // Block statement: `{ ... }`
                 let block = self.parse_block_statement()?;
-                Ok(Statement::BlockStatement(block))
+                Ok(Statement::from_block_statement(block))
             }
             TokenKind::At => {
                 // Decorator: `@expression class Foo { }`
@@ -444,11 +445,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let start = self.current_pos().0 as u32;
         let expr = self.parse_expression_ref()?;
         let end = self.semicolon_end()?;
-        Ok(Statement::ExpressionStatement(ExpressionStatement {
-            expression: expr,
+        Ok(Statement {
             span: Span::new(start, end),
-            is_directive: false,
-        }))
+            kind: StatementKind::ExpressionStatement(ExpressionStatement {
+                expression: expr,
+                is_directive: false,
+            }),
+        })
     }
 
     /// Mark a just-parsed statement as a directive while a `Program` or function
@@ -482,7 +485,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         stmt: &mut Statement<'arena>,
         prologue: &[Statement<'arena>],
     ) -> Result<bool, ParseError> {
-        let Statement::ExpressionStatement(expr_stmt) = stmt else {
+        let stmt_start = stmt.span.start;
+        let StatementKind::ExpressionStatement(expr_stmt) = &mut stmt.kind else {
             return Ok(false);
         };
         let ExpressionKind::Literal(lit) = &expr_stmt.expression.kind else {
@@ -492,7 +496,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return Ok(false);
         }
         // Reject parenthesized strings: the statement must open with a quote.
-        let local_start = (expr_stmt.span.start as usize).saturating_sub(self.base_offset);
+        let local_start = (stmt_start as usize).saturating_sub(self.base_offset);
         let Some(rest @ [b'"' | b'\'', ..]) = self.source.as_bytes().get(local_start..) else {
             return Ok(false);
         };
@@ -518,7 +522,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// is long gone, so the question is asked of its raw source — the same walk the
     /// string-literal seam runs (`Parser::legacy_escape_error`).
     fn directive_legacy_escape_error(&self, stmt: &Statement<'arena>) -> Option<ParseError> {
-        let Statement::ExpressionStatement(expr_stmt) = stmt else {
+        let StatementKind::ExpressionStatement(expr_stmt) = &stmt.kind else {
             return None;
         };
         let ExpressionKind::Literal(lit) = &expr_stmt.expression.kind else {

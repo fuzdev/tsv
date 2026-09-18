@@ -6,11 +6,11 @@ use super::super::*;
 use tsv_ts::ast::internal::{
     CatchClause, ClassBody, ClassDeclaration, ClassMember, Decorator, ExportDefaultValue,
     ExportSpecifier, Expression, ForInOfLeft, ForInit, FunctionDeclaration, Identifier,
-    ImportAttribute, ImportAttributeKey, ImportSpecifier, ModuleExportName, Statement, SwitchCase,
-    TSDeclareFunction, TSEnumMember, TSEnumMemberId, TSInterfaceDeclaration, TSInterfaceHeritage,
-    TSModuleDeclaration, TSModuleDeclarationBody, TSModuleName, TSModuleReference,
-    TSTypeAnnotation, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
-    VariableDeclaration, VariableDeclarator,
+    ImportAttribute, ImportAttributeKey, ImportSpecifier, ModuleExportName, Statement,
+    StatementKind, SwitchCase, TSDeclareFunction, TSEnumMember, TSEnumMemberId,
+    TSInterfaceDeclaration, TSInterfaceHeritage, TSModuleDeclaration, TSModuleDeclarationBody,
+    TSModuleName, TSModuleReference, TSTypeAnnotation, TSTypeParameterDeclaration,
+    TSTypeParameterInstantiation, VariableDeclaration, VariableDeclarator,
 };
 
 impl SoaWalk {
@@ -29,26 +29,26 @@ impl SoaWalk {
             Some(parent),
             addr_of(stmt),
         );
-        match stmt {
-            Statement::ExpressionStatement(s) => self.visit_expression(s.expression, id),
-            Statement::VariableDeclaration(decl) => self.visit_declarators(decl, id),
-            Statement::FunctionDeclaration(f) => self.descend_function(f, id),
-            Statement::ClassDeclaration(c) => self.descend_class(c, id),
-            Statement::TSDeclareFunction(f) => self.descend_declare_function(f, id),
-            Statement::TSTypeAliasDeclaration(t) => {
+        match &stmt.kind {
+            StatementKind::ExpressionStatement(s) => self.visit_expression(s.expression, id),
+            StatementKind::VariableDeclaration(decl) => self.visit_declarators(decl, id),
+            StatementKind::FunctionDeclaration(f) => self.descend_function(f, id),
+            StatementKind::ClassDeclaration(c) => self.descend_class(c, id),
+            StatementKind::TSDeclareFunction(f) => self.descend_declare_function(f, id),
+            StatementKind::TSTypeAliasDeclaration(t) => {
                 self.visit_identifier(&t.id, id);
                 self.visit_type_params(t.type_parameters.as_ref(), id);
                 self.visit_type(&t.type_annotation, id);
             }
-            Statement::TSInterfaceDeclaration(i) => self.descend_interface(i, id),
-            Statement::TSEnumDeclaration(e) => {
+            StatementKind::TSInterfaceDeclaration(i) => self.descend_interface(i, id),
+            StatementKind::TSEnumDeclaration(e) => {
                 self.visit_identifier(&e.id, id);
                 for member in e.members {
                     self.visit_enum_member(member, id);
                 }
             }
-            Statement::TSModuleDeclaration(m) => self.descend_module(m, id),
-            Statement::ImportDeclaration(imp) => {
+            StatementKind::TSModuleDeclaration(m) => self.descend_module(m, id),
+            StatementKind::ImportDeclaration(imp) => {
                 for spec in imp.specifiers {
                     self.visit_import_specifier(spec, id);
                 }
@@ -59,11 +59,11 @@ impl SoaWalk {
                     }
                 }
             }
-            Statement::TSImportEqualsDeclaration(ie) => {
+            StatementKind::TSImportEqualsDeclaration(ie) => {
                 self.visit_identifier(&ie.id, id);
                 self.visit_module_reference(&ie.module_reference, id);
             }
-            Statement::ExportNamedDeclaration(e) => {
+            StatementKind::ExportNamedDeclaration(e) => {
                 if let Some(inner) = e.declaration {
                     self.visit_statement(inner, id);
                 } else {
@@ -80,8 +80,10 @@ impl SoaWalk {
                     }
                 }
             }
-            Statement::ExportDefaultDeclaration(e) => self.visit_export_default(&e.declaration, id),
-            Statement::ExportAllDeclaration(e) => {
+            StatementKind::ExportDefaultDeclaration(e) => {
+                self.visit_export_default(&e.declaration, id);
+            }
+            StatementKind::ExportAllDeclaration(e) => {
                 if let Some(exp) = &e.exported {
                     self.visit_module_export_name(exp, id);
                 }
@@ -92,9 +94,9 @@ impl SoaWalk {
                     }
                 }
             }
-            Statement::TSExportAssignment(ea) => self.visit_expression(&ea.expression, id),
-            Statement::TSNamespaceExportDeclaration(n) => self.visit_identifier(&n.id, id),
-            Statement::ReturnStatement(s) => {
+            StatementKind::TSExportAssignment(ea) => self.visit_expression(&ea.expression, id),
+            StatementKind::TSNamespaceExportDeclaration(n) => self.visit_identifier(&n.id, id),
+            StatementKind::ReturnStatement(s) => {
                 if let Some(a) = &s.argument {
                     self.visit_expression(a, id);
                 }
@@ -102,15 +104,15 @@ impl SoaWalk {
             // A function/try/catch/finally body `BlockStatement` is flattened by
             // its owner (a list-wrapper, per today's shape); a *standalone* block
             // statement is its own node whose body follows here.
-            Statement::BlockStatement(block) => self.visit_statements(block.body, id),
-            Statement::IfStatement(s) => {
+            StatementKind::BlockStatement(block) => self.visit_statements(block.body, id),
+            StatementKind::IfStatement(s) => {
                 self.visit_expression(s.test, id);
                 self.visit_statement(s.consequent, id);
                 if let Some(alt) = s.alternate {
                     self.visit_statement(alt, id);
                 }
             }
-            Statement::ForStatement(s) => {
+            StatementKind::ForStatement(s) => {
                 match &s.init {
                     Some(ForInit::VariableDeclaration(decl)) => {
                         self.visit_variable_declaration(decl, id);
@@ -126,38 +128,38 @@ impl SoaWalk {
                 }
                 self.visit_statement(s.body, id);
             }
-            Statement::ForInStatement(s) => {
+            StatementKind::ForInStatement(s) => {
                 self.visit_for_left(s.left, id);
                 self.visit_expression(s.right, id);
                 self.visit_statement(s.body, id);
             }
-            Statement::ForOfStatement(s) => {
+            StatementKind::ForOfStatement(s) => {
                 self.visit_for_left(s.left, id);
                 self.visit_expression(s.right, id);
                 self.visit_statement(s.body, id);
             }
-            Statement::WhileStatement(s) => {
+            StatementKind::WhileStatement(s) => {
                 self.visit_expression(s.test, id);
                 self.visit_statement(s.body, id);
             }
-            Statement::DoWhileStatement(s) => {
+            StatementKind::DoWhileStatement(s) => {
                 self.visit_statement(s.body, id);
                 self.visit_expression(s.test, id);
             }
             // The `with` object environment is a checker gap — tsc refuses `with` in a
             // TypeScript file outright (TS2410), so there is no name resolution to model
             // and a plain walk of the two children is the honest shape.
-            Statement::WithStatement(s) => {
+            StatementKind::WithStatement(s) => {
                 self.visit_expression(s.object, id);
                 self.visit_statement(s.body, id);
             }
-            Statement::SwitchStatement(s) => {
+            StatementKind::SwitchStatement(s) => {
                 self.visit_expression(s.discriminant, id);
                 for case in s.cases {
                     self.visit_switch_case(case, id);
                 }
             }
-            Statement::TryStatement(s) => {
+            StatementKind::TryStatement(s) => {
                 self.visit_statements(s.block.body, id);
                 if let Some(handler) = &s.handler {
                     self.visit_catch_clause(handler, id);
@@ -166,22 +168,22 @@ impl SoaWalk {
                     self.visit_statements(finalizer.body, id);
                 }
             }
-            Statement::ThrowStatement(s) => self.visit_expression(s.argument, id),
-            Statement::BreakStatement(s) => {
+            StatementKind::ThrowStatement(s) => self.visit_expression(s.argument, id),
+            StatementKind::BreakStatement(s) => {
                 if let Some(label) = &s.label {
                     self.visit_identifier(label, id);
                 }
             }
-            Statement::ContinueStatement(s) => {
+            StatementKind::ContinueStatement(s) => {
                 if let Some(label) = &s.label {
                     self.visit_identifier(label, id);
                 }
             }
-            Statement::LabeledStatement(s) => {
+            StatementKind::LabeledStatement(s) => {
                 self.visit_identifier(&s.label, id);
                 self.visit_statement(s.body, id);
             }
-            Statement::EmptyStatement(_) | Statement::DebuggerStatement(_) => {}
+            StatementKind::EmptyStatement(_) | StatementKind::DebuggerStatement(_) => {}
         }
         self.close(id);
     }

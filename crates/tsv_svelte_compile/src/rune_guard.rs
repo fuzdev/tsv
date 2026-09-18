@@ -39,7 +39,7 @@ use std::collections::HashSet;
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ExpressionKind,
     ForInOfLeft, ForInit, FunctionExpression, ImportSpecifier, ObjectPatternProperty,
-    ObjectProperty, Statement,
+    ObjectProperty, Statement, StatementKind,
 };
 
 use crate::analyze::{NameSet, expression_kind, pattern_binding_names};
@@ -616,12 +616,12 @@ fn walk_statement(
     ctx: &mut WalkCtx<'_>,
     depth: usize,
 ) -> Result<(), CompileError> {
-    match stmt {
-        Statement::ExpressionStatement(s) => walk_expression(s.expression, ctx),
-        Statement::VariableDeclaration(s) => walk_variable_declaration(s, ctx, depth),
-        Statement::ReturnStatement(s) => walk_opt(s.argument, ctx),
-        Statement::BlockStatement(s) => walk_statements(s.body, ctx, depth + 1),
-        Statement::FunctionDeclaration(s) => {
+    match &stmt.kind {
+        StatementKind::ExpressionStatement(s) => walk_expression(s.expression, ctx),
+        StatementKind::VariableDeclaration(s) => walk_variable_declaration(s, ctx, depth),
+        StatementKind::ReturnStatement(s) => walk_opt(s.argument, ctx),
+        StatementKind::BlockStatement(s) => walk_statements(s.body, ctx, depth + 1),
+        StatementKind::FunctionDeclaration(s) => {
             if let Some(id) = &s.id {
                 refuse_dollar_binding_name(id, ctx.source)?;
             }
@@ -638,18 +638,20 @@ fn walk_statement(
         }
         // Nothing else here is walkable — the source is a literal and the
         // imported name is a name-only position.
-        Statement::ImportDeclaration(s) => refuse_dollar_import_locals(s.specifiers, ctx.source),
-        Statement::ClassDeclaration(s) => {
+        StatementKind::ImportDeclaration(s) => {
+            refuse_dollar_import_locals(s.specifiers, ctx.source)
+        }
+        StatementKind::ClassDeclaration(s) => {
             if let Some(id) = &s.id {
                 refuse_dollar_binding_name(id, ctx.source)?;
             }
             walk_class_body(&s.body, ctx)
         }
-        Statement::ExportNamedDeclaration(s) => match &s.declaration {
+        StatementKind::ExportNamedDeclaration(s) => match &s.declaration {
             Some(decl) => walk_statement(decl, ctx, depth),
             None => Ok(()),
         },
-        Statement::ExportDefaultDeclaration(s) => match &s.declaration {
+        StatementKind::ExportDefaultDeclaration(s) => match &s.declaration {
             ExportDefaultValue::Expression(e) => walk_expression(e, ctx),
             ExportDefaultValue::FunctionDeclaration(f) => {
                 if let Some(id) = &f.id {
@@ -669,7 +671,7 @@ fn walk_statement(
             ExportDefaultValue::TSDeclareFunction(_)
             | ExportDefaultValue::TSInterfaceDeclaration(_) => Ok(()),
         },
-        Statement::IfStatement(s) => {
+        StatementKind::IfStatement(s) => {
             walk_expression(s.test, ctx)?;
             walk_statement(s.consequent, ctx, depth + 1)?;
             match s.alternate {
@@ -677,7 +679,7 @@ fn walk_statement(
                 None => Ok(()),
             }
         }
-        Statement::ForStatement(s) => {
+        StatementKind::ForStatement(s) => {
             match &s.init {
                 Some(ForInit::VariableDeclaration(decl)) => {
                     // For-scope declarations are block-scoped — always shadow
@@ -694,31 +696,31 @@ fn walk_statement(
             walk_opt(s.update, ctx)?;
             walk_statement(s.body, ctx, depth + 1)
         }
-        Statement::ForInStatement(s) => {
+        StatementKind::ForInStatement(s) => {
             walk_for_left(s.left, ctx, depth)?;
             walk_expression(s.right, ctx)?;
             walk_statement(s.body, ctx, depth + 1)
         }
-        Statement::ForOfStatement(s) => {
+        StatementKind::ForOfStatement(s) => {
             walk_for_left(s.left, ctx, depth)?;
             walk_expression(s.right, ctx)?;
             walk_statement(s.body, ctx, depth + 1)
         }
-        Statement::WhileStatement(s) => {
+        StatementKind::WhileStatement(s) => {
             walk_expression(s.test, ctx)?;
             walk_statement(s.body, ctx, depth + 1)
         }
-        Statement::DoWhileStatement(s) => {
+        StatementKind::DoWhileStatement(s) => {
             walk_statement(s.body, ctx, depth + 1)?;
             walk_expression(s.test, ctx)
         }
         // Unreachable in practice: a Svelte `<script>` is Module code, so it is strict
         // and the parser refuses `with` there.
-        Statement::WithStatement(s) => {
+        StatementKind::WithStatement(s) => {
             walk_expression(s.object, ctx)?;
             walk_statement(s.body, ctx, depth + 1)
         }
-        Statement::SwitchStatement(s) => {
+        StatementKind::SwitchStatement(s) => {
             walk_expression(s.discriminant, ctx)?;
             for case in s.cases {
                 walk_opt(case.test, ctx)?;
@@ -726,7 +728,7 @@ fn walk_statement(
             }
             Ok(())
         }
-        Statement::TryStatement(s) => {
+        StatementKind::TryStatement(s) => {
             walk_statements(s.block.body, ctx, depth + 1)?;
             if let Some(handler) = &s.handler {
                 if let Some(param) = &handler.param {
@@ -744,28 +746,28 @@ fn walk_statement(
             }
             Ok(())
         }
-        Statement::ThrowStatement(s) => walk_expression(s.argument, ctx),
-        Statement::LabeledStatement(s) => walk_statement(s.body, ctx, depth + 1),
+        StatementKind::ThrowStatement(s) => walk_expression(s.argument, ctx),
+        StatementKind::LabeledStatement(s) => walk_statement(s.body, ctx, depth + 1),
         // No expression-bearing children.
-        Statement::BreakStatement(_)
-        | Statement::ContinueStatement(_)
-        | Statement::EmptyStatement(_)
-        | Statement::DebuggerStatement(_)
-        | Statement::ExportAllDeclaration(_)
-        | Statement::TSNamespaceExportDeclaration(_)
-        | Statement::TSImportEqualsDeclaration(_)
-        | Statement::TSTypeAliasDeclaration(_)
-        | Statement::TSInterfaceDeclaration(_)
-        | Statement::TSDeclareFunction(_) => Ok(()),
+        StatementKind::BreakStatement(_)
+        | StatementKind::ContinueStatement(_)
+        | StatementKind::EmptyStatement(_)
+        | StatementKind::DebuggerStatement(_)
+        | StatementKind::ExportAllDeclaration(_)
+        | StatementKind::TSNamespaceExportDeclaration(_)
+        | StatementKind::TSImportEqualsDeclaration(_)
+        | StatementKind::TSTypeAliasDeclaration(_)
+        | StatementKind::TSInterfaceDeclaration(_)
+        | StatementKind::TSDeclareFunction(_) => Ok(()),
         // Unreachable in practice — type erasure runs first and either drops
         // these (a type-only namespace) or refuses them. Kept as defense in
         // depth: their bodies can carry initializer expressions the guard walk
         // isn't wired for, so refuse rather than under-guard.
-        Statement::TSEnumDeclaration(_) => Err(CompileError::Unsupported(Refusal::TsEnum)),
-        Statement::TSModuleDeclaration(_) => {
+        StatementKind::TSEnumDeclaration(_) => Err(CompileError::Unsupported(Refusal::TsEnum)),
+        StatementKind::TSModuleDeclaration(_) => {
             Err(CompileError::Unsupported(Refusal::TsNamespaceWithValue))
         }
-        Statement::TSExportAssignment(s) => walk_expression(&s.expression, ctx),
+        StatementKind::TSExportAssignment(s) => walk_expression(&s.expression, ctx),
     }
 }
 

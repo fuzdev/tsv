@@ -346,7 +346,7 @@ project-wide conventions.
   field initializer, and a static block do NOT count as such an ancestor. It keys on
   a `nonarrow_fn_depth` field **distinct from `fn_depth`** (which ALSO counts arrows,
   static blocks, and snippet bodies): the depth is bumped only at the three non-arrow
-  function sites (`walk_function_expression`, the `Statement::FunctionDeclaration` and
+  function sites (`walk_function_expression`, the `StatementKind::FunctionDeclaration` and
   `ExportDefaultValue::FunctionDeclaration` arms), BEFORE the params walk (so a
   function parameter default is inside the function while an arrow's is not), and the
   reference test is `nonarrow_fn_depth == 0`. `is_reference` semantics are free from

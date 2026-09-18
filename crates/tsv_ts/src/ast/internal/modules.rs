@@ -27,7 +27,6 @@ pub struct ExportNamedDeclaration<'arena> {
     pub attributes: Option<&'arena [ImportAttribute<'arena>]>,
     /// Export kind: "value" for regular exports, "type" for type-only exports
     pub export_kind: ExportKind,
-    pub span: Span,
 }
 
 /// Export kind for TypeScript type-only exports
@@ -45,7 +44,6 @@ pub enum ExportKind {
 pub struct ExportDefaultDeclaration<'arena> {
     /// The expression or declaration being exported as default
     pub declaration: ExportDefaultValue<'arena>,
-    pub span: Span,
 }
 
 /// Function declaration that may be ambient (TSDeclareFunction) or regular (FunctionDeclaration)
@@ -104,7 +102,6 @@ pub struct ExportAllDeclaration<'arena> {
     pub attributes: Option<&'arena [ImportAttribute<'arena>]>,
     /// Export kind: "value" or "type" (for `export type * from`)
     pub export_kind: ExportKind,
-    pub span: Span,
 }
 
 /// TypeScript export assignment: `export = value;`
@@ -112,7 +109,6 @@ pub struct ExportAllDeclaration<'arena> {
 #[derive(Debug, Clone)]
 pub struct TSExportAssignment<'arena> {
     pub expression: Expression<'arena>,
-    pub span: Span,
 }
 
 /// TypeScript UMD namespace export: `export as namespace Foo;`
@@ -122,7 +118,6 @@ pub struct TSExportAssignment<'arena> {
 pub struct TSNamespaceExportDeclaration<'arena> {
     /// The global namespace name
     pub id: Identifier<'arena>,
-    pub span: Span,
 }
 
 /// Export specifier: `export { x }` or `export { x as y }` or `export { type x }`
@@ -186,7 +181,6 @@ pub struct ImportDeclaration<'arena> {
     pub import_kind: ImportKind,
     /// Import phase: `Source`/`Defer` for `import source …` / `import defer …`.
     pub phase: ImportPhase,
-    pub span: Span,
 }
 
 /// Import specifier variants
@@ -285,7 +279,6 @@ pub struct TSImportEqualsDeclaration<'arena> {
     pub import_kind: ImportKind,
     /// Whether this is an export: `export import x = require("y")`
     pub is_export: bool,
-    pub span: Span,
 }
 
 /// Module reference: either external module reference or entity name

@@ -1119,12 +1119,13 @@ pub use printer::buffer_stats::{
 
 // Re-exports of types that appear in this crate's public function signatures
 // (`Program`, `Expression` and its variant half `ExpressionKind`, `TSTypeAnnotation`)
-// or are named via the short `tsv_ts::Foo` path by external consumers (`Statement`,
-// `ObjectProperty`, `ObjectPatternProperty` — currently only by tsv_svelte). All other
-// AST types remain accessible through the full `tsv_ts::ast::internal::Foo` path.
+// or are named via the short `tsv_ts::Foo` path by external consumers (`Statement` and
+// its variant half `StatementKind`, `ObjectProperty`, `ObjectPatternProperty` — currently
+// only by tsv_svelte). All other AST types remain accessible through the full
+// `tsv_ts::ast::internal::Foo` path.
 pub use ast::internal::{
     Expression, ExpressionKind, ObjectPatternProperty, ObjectProperty, Program, Statement,
-    TSTypeAnnotation, TSTypeParameterDeclaration, VariableDeclaration,
+    StatementKind, TSTypeAnnotation, TSTypeParameterDeclaration, VariableDeclaration,
 };
 
 /// Drive the raw lexer over `source` and return a deterministic, line-per-token

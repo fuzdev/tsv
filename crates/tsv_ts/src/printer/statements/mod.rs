@@ -28,7 +28,7 @@ use super::RunLeadingBlank;
 use super::class_expr_has_decorators;
 use super::expressions::literals::format_directive;
 use super::expressions::operators::SeqLayout;
-use crate::ast::internal::{self, Expression, ExpressionKind, Statement};
+use crate::ast::internal::{self, Expression, ExpressionKind, Statement, StatementKind};
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
@@ -205,70 +205,102 @@ impl<'a> Printer<'a> {
         ctx: StatementContext,
     ) -> DocId {
         let d = self.d();
-        match statement {
-            Statement::ExpressionStatement(stmt) => self.build_expression_statement_doc(stmt, ctx),
-            Statement::VariableDeclaration(decl) => {
+        match &statement.kind {
+            StatementKind::ExpressionStatement(stmt) => {
+                self.build_expression_statement_doc(stmt, statement.span, ctx)
+            }
+            StatementKind::VariableDeclaration(decl) => {
                 self.build_variable_declaration_doc(decl, Some(ctx.terminator_gap()))
             }
-            Statement::TSTypeAliasDeclaration(decl) => {
-                self.build_type_alias_declaration_doc(decl, ctx.clause_tail())
+            StatementKind::TSTypeAliasDeclaration(decl) => {
+                self.build_type_alias_declaration_doc(decl, statement.span, ctx.clause_tail())
             }
-            Statement::ReturnStatement(ret) => {
-                self.build_return_statement_doc(ret, ctx.terminator_gap())
+            StatementKind::ReturnStatement(ret) => {
+                self.build_return_statement_doc(ret, statement.span, ctx.terminator_gap())
             }
             // A statement-position block (bare `{ }`, a labeled block's body, or a
             // block nested directly in another block) expands its empty form to `{\n}`,
             // matching prettier. Only control-flow *bodies* (while/for/do/catch) and
             // function/class bodies collapse to `{}`, and those are built by their own
             // parents — never through this dispatch.
-            Statement::BlockStatement(block) => self.build_block_statement_expand_empty_doc(block),
-            Statement::FunctionDeclaration(decl) => self.build_function_declaration_doc(decl),
-            Statement::ClassDeclaration(decl) => self.build_class_declaration_doc(decl),
-            Statement::ExportNamedDeclaration(decl) => {
-                self.build_export_named_declaration_doc(decl)
+            StatementKind::BlockStatement(block) => {
+                self.build_block_statement_expand_empty_doc(block)
             }
-            Statement::ExportDefaultDeclaration(decl) => {
-                self.build_export_default_declaration_doc(decl)
+            StatementKind::FunctionDeclaration(decl) => self.build_function_declaration_doc(decl),
+            StatementKind::ClassDeclaration(decl) => self.build_class_declaration_doc(decl),
+            StatementKind::ExportNamedDeclaration(decl) => {
+                self.build_export_named_declaration_doc(decl, statement.span)
             }
-            Statement::ExportAllDeclaration(decl) => self.build_export_all_declaration_doc(decl),
-            Statement::TSExportAssignment(decl) => self.build_export_assignment_doc(decl),
-            Statement::TSNamespaceExportDeclaration(decl) => {
-                self.build_namespace_export_declaration_doc(decl)
+            StatementKind::ExportDefaultDeclaration(decl) => {
+                self.build_export_default_declaration_doc(decl, statement.span)
             }
-            Statement::ImportDeclaration(decl) => self.build_import_declaration_doc(decl),
-            Statement::TSImportEqualsDeclaration(decl) => {
-                self.build_import_equals_declaration_doc(decl)
+            StatementKind::ExportAllDeclaration(decl) => {
+                self.build_export_all_declaration_doc(decl, statement.span)
+            }
+            StatementKind::TSExportAssignment(decl) => {
+                self.build_export_assignment_doc(decl, statement.span)
+            }
+            StatementKind::TSNamespaceExportDeclaration(decl) => {
+                self.build_namespace_export_declaration_doc(decl, statement.span)
+            }
+            StatementKind::ImportDeclaration(decl) => {
+                self.build_import_declaration_doc(decl, statement.span)
+            }
+            StatementKind::TSImportEqualsDeclaration(decl) => {
+                self.build_import_equals_declaration_doc(decl, statement.span)
             }
             // Control flow statements - use simple doc building
-            Statement::IfStatement(stmt) => self.build_if_statement_doc(stmt, ctx),
-            Statement::ForStatement(stmt) => self.build_for_statement_doc(stmt, ctx),
-            Statement::ForInStatement(stmt) => self.build_for_in_statement_doc(stmt, ctx),
-            Statement::ForOfStatement(stmt) => self.build_for_of_statement_doc(stmt, ctx),
-            Statement::WhileStatement(stmt) => self.build_while_statement_doc(stmt, ctx),
-            Statement::DoWhileStatement(stmt) => self.build_do_while_statement_doc(stmt, ctx),
-            Statement::WithStatement(stmt) => self.build_with_statement_doc(stmt, ctx),
-            Statement::SwitchStatement(stmt) => self.build_switch_statement_doc(stmt),
-            Statement::TryStatement(stmt) => self.build_try_statement_doc(stmt),
-            Statement::ThrowStatement(stmt) => {
-                self.build_throw_statement_doc(stmt, ctx.terminator_gap())
+            StatementKind::IfStatement(stmt) => {
+                self.build_if_statement_doc(stmt, statement.span, ctx)
             }
-            Statement::BreakStatement(stmt) => {
-                self.build_break_statement_doc(stmt, ctx.terminator_gap())
+            StatementKind::ForStatement(stmt) => {
+                self.build_for_statement_doc(stmt, statement.span, ctx)
             }
-            Statement::ContinueStatement(stmt) => {
-                self.build_continue_statement_doc(stmt, ctx.terminator_gap())
+            StatementKind::ForInStatement(stmt) => {
+                self.build_for_in_statement_doc(stmt, statement.span, ctx)
             }
-            Statement::LabeledStatement(stmt) => self.build_labeled_statement_doc(stmt, ctx),
-            Statement::EmptyStatement(_) => d.text(";"),
-            Statement::DebuggerStatement(stmt) => {
-                self.build_bare_keyword_terminator_doc("debugger", stmt.span, ctx.terminator_gap())
+            StatementKind::ForOfStatement(stmt) => {
+                self.build_for_of_statement_doc(stmt, statement.span, ctx)
             }
-            Statement::TSInterfaceDeclaration(decl) => self.build_interface_declaration_doc(decl),
-            Statement::TSDeclareFunction(decl) => {
+            StatementKind::WhileStatement(stmt) => {
+                self.build_while_statement_doc(stmt, statement.span, ctx)
+            }
+            StatementKind::DoWhileStatement(stmt) => {
+                self.build_do_while_statement_doc(stmt, statement.span, ctx)
+            }
+            StatementKind::WithStatement(stmt) => {
+                self.build_with_statement_doc(stmt, statement.span, ctx)
+            }
+            StatementKind::SwitchStatement(stmt) => {
+                self.build_switch_statement_doc(stmt, statement.span)
+            }
+            StatementKind::TryStatement(stmt) => self.build_try_statement_doc(stmt, statement.span),
+            StatementKind::ThrowStatement(stmt) => {
+                self.build_throw_statement_doc(stmt, statement.span, ctx.terminator_gap())
+            }
+            StatementKind::BreakStatement(stmt) => {
+                self.build_break_statement_doc(stmt, statement.span, ctx.terminator_gap())
+            }
+            StatementKind::ContinueStatement(stmt) => {
+                self.build_continue_statement_doc(stmt, statement.span, ctx.terminator_gap())
+            }
+            StatementKind::LabeledStatement(stmt) => self.build_labeled_statement_doc(stmt, ctx),
+            StatementKind::EmptyStatement(_) => d.text(";"),
+            StatementKind::DebuggerStatement(_) => self.build_bare_keyword_terminator_doc(
+                "debugger",
+                statement.span,
+                ctx.terminator_gap(),
+            ),
+            StatementKind::TSInterfaceDeclaration(decl) => {
+                self.build_interface_declaration_doc(decl)
+            }
+            StatementKind::TSDeclareFunction(decl) => {
                 self.build_declare_function_doc(decl, ctx.clause_tail())
             }
-            Statement::TSEnumDeclaration(decl) => self.build_enum_declaration_doc(decl),
-            Statement::TSModuleDeclaration(decl) => {
+            StatementKind::TSEnumDeclaration(decl) => {
+                self.build_enum_declaration_doc(decl, statement.span)
+            }
+            StatementKind::TSModuleDeclaration(decl) => {
                 self.build_module_declaration_doc(decl, ctx.clause_tail())
             }
         }
@@ -280,6 +312,7 @@ impl<'a> Printer<'a> {
     fn build_expression_statement_doc(
         &self,
         stmt: &internal::ExpressionStatement<'_>,
+        span: Span,
         ctx: StatementContext,
     ) -> DocId {
         let d = self.d();
@@ -304,7 +337,7 @@ impl<'a> Printer<'a> {
             let mut consumed = None;
             let doc = self.build_value_with_outermost_owned_comment(stmt.expression, || {
                 let (doc, close) =
-                    self.build_expression_statement_value_doc(stmt, ctx.in_program_or_block);
+                    self.build_expression_statement_value_doc(stmt, span, ctx.in_program_or_block);
                 consumed = Some(close);
                 doc
             });
@@ -317,14 +350,13 @@ impl<'a> Printer<'a> {
         // (`fn() // c` → `fn(); // c`), an own-line comment drops to its own line after it
         // (emitting a line comment before the `;` would swallow it). See
         // `push_semicolon_with_gap_comments`.
-        let gap_start = consumed_close.map_or(expr_end, |close| {
-            Self::past_grouping_close(close, stmt.span.end)
-        });
-        if self.semicolon_gap_is_bare(gap_start, stmt.span.end) {
+        let gap_start =
+            consumed_close.map_or(expr_end, |close| Self::past_grouping_close(close, span.end));
+        if self.semicolon_gap_is_bare(gap_start, span.end) {
             return d.concat(&[value_doc, d.text(";")]);
         }
         let mut parts: DocBuf = smallvec![value_doc];
-        self.push_statement_semicolon(&mut parts, gap_start, stmt.span.end, ctx.terminator_gap());
+        self.push_statement_semicolon(&mut parts, gap_start, span.end, ctx.terminator_gap());
         d.concat(&parts)
     }
 
@@ -365,6 +397,7 @@ impl<'a> Printer<'a> {
     fn build_expression_statement_value_doc(
         &self,
         stmt: &internal::ExpressionStatement<'_>,
+        span: Span,
         in_program_or_block: bool,
     ) -> (DocId, Option<u32>) {
         let d = self.d();
@@ -374,7 +407,7 @@ impl<'a> Printer<'a> {
         // statement's other value positions (declarator initializer, assignment RHS,
         // ternary branch) already answer this way through the shared shell builder.
         let expr_end = stmt.expression.span().end;
-        let shell_close = self.value_paren_line_comment_close(expr_end, stmt.span.end);
+        let shell_close = self.value_paren_line_comment_close(expr_end, span.end);
         // A comment between a source `(` and the expression (`(// c⏎ expr)` /
         // `(/* c */⏎ expr)` — e.g. a bare parenthesized decorated class
         // expression) is preserved inside the parens, breaking them open; the flat
@@ -383,12 +416,12 @@ impl<'a> Printer<'a> {
         // before `(` — a divergence (`expression_statement_paren_kept_comment`,
         // `decorated_expr_open_paren_comment`).
         let expr_start = stmt.expression.span().start;
-        let source_paren = self.statement_opens_with_paren(stmt.span, expr_start);
+        let source_paren = self.statement_opens_with_paren(span, expr_start);
         // An own-line directive in that `(`→expression gap freezes the expression
         // (Rule A). Only a SOURCE paren opens the gap: without one the directive
         // leads the statement, where the statement list's own rule already claims it.
         let frozen = source_paren
-            .then(|| self.value_head_frozen_span(stmt.span.start + 1, stmt.expression.span()))
+            .then(|| self.value_head_frozen_span(span.start + 1, stmt.expression.span()))
             .flatten();
 
         // Parens required for correctness (object expressions, object pattern
@@ -414,13 +447,13 @@ impl<'a> Printer<'a> {
 
         // The `(`→expression gap, resolved in one place so the gate below and the two
         // emitters that can claim it cannot read different ranges.
-        let paren_gap = || self.comments_to_emit_between(stmt.span.start + 1, expr_start);
+        let paren_gap = || self.comments_to_emit_between(span.start + 1, expr_start);
         // Deliberately **to emit**, not on-page: this branch also *prints* the comments it
         // finds. A block glued to the *expression* is owned by it, rides inside its doc and
         // is skipped here — which is what keeps `(/* c */ expr)` flat.
         let paren_open_comments = needs_parens
             && source_paren
-            && self.has_comments_to_emit_between(stmt.span.start + 1, expr_start);
+            && self.has_comments_to_emit_between(span.start + 1, expr_start);
 
         // Build the expression once — or not at all, when the freeze replaces its doc
         // with the verbatim slice. `is_expression_statement` is the context flag for chain
@@ -573,15 +606,16 @@ impl<'a> Printer<'a> {
     fn build_return_statement_doc(
         &self,
         ret: &internal::ReturnStatement<'_>,
+        span: Span,
         gap: TerminatorGap,
     ) -> DocId {
         let Some(arg) = &ret.argument else {
             // No argument: a bare keyword closed by `;` (interior comments handled
             // there) — `return; /* c */` etc.
-            return self.build_bare_keyword_terminator_doc("return", ret.span, gap);
+            return self.build_bare_keyword_terminator_doc("return", span, gap);
         };
 
-        self.build_keyword_argument_doc("return", ret.span.start, ret.span.end, arg, gap)
+        self.build_keyword_argument_doc("return", span.start, span.end, arg, gap)
     }
 
     /// Build a Doc for a "bare" keyword-terminator statement — a keyword that takes

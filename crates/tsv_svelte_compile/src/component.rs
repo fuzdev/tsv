@@ -301,7 +301,7 @@ pub(crate) fn emit_component<'arena>(
         }
         block_body.push(call_stmt);
         let block_span = env.b.here();
-        Statement::BlockStatement(BlockStatement {
+        Statement::from_block_statement(BlockStatement {
             body: block_body.into_bump_slice(),
             span: block_span,
         })

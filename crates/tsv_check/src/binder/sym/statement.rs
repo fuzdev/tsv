@@ -11,7 +11,7 @@ use crate::ids::NodeId;
 use tsv_lang::Span;
 use tsv_ts::ast::internal::{
     ExportDefaultValue, ExportSpecifier, Expression, ExpressionKind, ForInOfLeft, ForInit,
-    Identifier, ImportSpecifier, ModuleExportName, ObjectPatternProperty, Statement,
+    Identifier, ImportSpecifier, ModuleExportName, ObjectPatternProperty, Statement, StatementKind,
     TSModuleDeclarationBody, TSModuleName,
 };
 
@@ -19,16 +19,16 @@ impl<'a> SymbolBinder<'a> {
     /// Sub-step A: declare a hoisted function's symbol only (no body descent),
     /// unwrapping any `export`/`export default` wrapper for its modifiers.
     pub(super) fn declare_hoisted_function(&mut self, stmt: &Statement<'a>) {
-        match stmt {
-            Statement::FunctionDeclaration(f) => {
+        match &stmt.kind {
+            StatementKind::FunctionDeclaration(f) => {
                 if let Some(id) = &f.id {
                     self.bind_function_name(id, f.span, DeclMods::default());
                 }
             }
-            Statement::TSDeclareFunction(f) => {
+            StatementKind::TSDeclareFunction(f) => {
                 self.bind_function_name(&f.id, f.span, DeclMods::default());
             }
-            Statement::ExportNamedDeclaration(e) => {
+            StatementKind::ExportNamedDeclaration(e) => {
                 if let Some(inner) = e.declaration {
                     self.declare_hoisted_function_inner(
                         inner,
@@ -39,17 +39,17 @@ impl<'a> SymbolBinder<'a> {
                     );
                 }
             }
-            Statement::ExportDefaultDeclaration(e) => {
+            StatementKind::ExportDefaultDeclaration(e) => {
                 let mods = DeclMods {
                     exported: true,
                     default: true,
                 };
                 match &e.declaration {
                     ExportDefaultValue::FunctionDeclaration(f) => {
-                        self.bind_default_function(f.id.as_ref(), e.span, mods);
+                        self.bind_default_function(f.id.as_ref(), stmt.span, mods);
                     }
                     ExportDefaultValue::TSDeclareFunction(f) => {
-                        self.bind_default_function(Some(&f.id), e.span, mods);
+                        self.bind_default_function(Some(&f.id), stmt.span, mods);
                     }
                     _ => {}
                 }
@@ -59,13 +59,13 @@ impl<'a> SymbolBinder<'a> {
     }
 
     fn declare_hoisted_function_inner(&mut self, inner: &Statement<'a>, mods: DeclMods) {
-        match inner {
-            Statement::FunctionDeclaration(f) => {
+        match &inner.kind {
+            StatementKind::FunctionDeclaration(f) => {
                 if let Some(id) = &f.id {
                     self.bind_function_name(id, f.span, mods);
                 }
             }
-            Statement::TSDeclareFunction(f) => self.bind_function_name(&f.id, f.span, mods),
+            StatementKind::TSDeclareFunction(f) => self.bind_function_name(&f.id, f.span, mods),
             _ => {}
         }
     }
@@ -78,8 +78,8 @@ impl<'a> SymbolBinder<'a> {
         mods: DeclMods,
         skip_symbol: bool,
     ) {
-        match stmt {
-            Statement::VariableDeclaration(decl) => {
+        match &stmt.kind {
+            StatementKind::VariableDeclaration(decl) => {
                 let (includes, excludes, block_scoped) = var_flags(decl.kind);
                 for d in decl.declarations {
                     self.bind_binding(d.id, includes, excludes, block_scoped, mods, decl.span);
@@ -88,7 +88,7 @@ impl<'a> SymbolBinder<'a> {
                     }
                 }
             }
-            Statement::FunctionDeclaration(f) => {
+            StatementKind::FunctionDeclaration(f) => {
                 if !skip_symbol && let Some(id) = &f.id {
                     self.bind_function_name(id, f.span, mods);
                 }
@@ -97,7 +97,7 @@ impl<'a> SymbolBinder<'a> {
                     b.bind_statement_list(f.body.body, true);
                 });
             }
-            Statement::TSDeclareFunction(f) => {
+            StatementKind::TSDeclareFunction(f) => {
                 if !skip_symbol {
                     self.bind_function_name(&f.id, f.span, mods);
                 }
@@ -105,8 +105,8 @@ impl<'a> SymbolBinder<'a> {
                     b.bind_params(f.params);
                 });
             }
-            Statement::ClassDeclaration(c) => self.bind_class_statement(c, mods, skip_symbol),
-            Statement::TSInterfaceDeclaration(i) => {
+            StatementKind::ClassDeclaration(c) => self.bind_class_statement(c, mods, skip_symbol),
+            StatementKind::TSInterfaceDeclaration(i) => {
                 let d = self.decl_from_ident(&i.id, i.span, mods);
                 let sym = self.declare_block_scoped(
                     d,
@@ -115,75 +115,83 @@ impl<'a> SymbolBinder<'a> {
                 );
                 self.bind_interface_body(&i.body, sym, i.type_parameters.as_ref());
             }
-            Statement::TSEnumDeclaration(e) => self.bind_enum_statement(e, mods),
-            Statement::TSModuleDeclaration(m) => self.bind_module(m, mods),
-            Statement::TSTypeAliasDeclaration(t) => self.bind_type_alias_statement(t, mods),
-            Statement::ImportDeclaration(imp) => {
+            StatementKind::TSEnumDeclaration(e) => self.bind_enum_statement(e, stmt.span, mods),
+            StatementKind::TSModuleDeclaration(m) => self.bind_module(m, mods),
+            StatementKind::TSTypeAliasDeclaration(t) => {
+                self.bind_type_alias_statement(t, stmt.span, mods);
+            }
+            StatementKind::ImportDeclaration(imp) => {
                 for spec in imp.specifiers {
                     self.bind_import_specifier(spec);
                 }
             }
-            Statement::TSImportEqualsDeclaration(ie) => self.bind_import_equals_statement(ie),
-            Statement::ExportNamedDeclaration(e) => {
+            StatementKind::TSImportEqualsDeclaration(ie) => {
+                self.bind_import_equals_statement(ie, stmt.span);
+            }
+            StatementKind::ExportNamedDeclaration(e) => {
                 self.bind_export_named_statement(e, skip_symbol);
             }
-            Statement::ExportDefaultDeclaration(e) => self.bind_export_default(e, skip_symbol),
+            StatementKind::ExportDefaultDeclaration(e) => {
+                self.bind_export_default(e, stmt.span, skip_symbol);
+            }
             // Control flow: descend for nested bindings + block scopes.
-            Statement::BlockStatement(b) => {
+            StatementKind::BlockStatement(b) => {
                 self.with_block_scope(|bd| bd.bind_statement_list(b.body, true));
             }
-            Statement::IfStatement(s) => {
+            StatementKind::IfStatement(s) => {
                 self.visit_expression(s.test);
                 self.visit_statement(s.consequent, DeclMods::default(), false);
                 if let Some(alt) = s.alternate {
                     self.visit_statement(alt, DeclMods::default(), false);
                 }
             }
-            Statement::ForStatement(s) => self.bind_for_statement(s),
-            Statement::ForInStatement(s) => self.with_block_scope(|bd| {
+            StatementKind::ForStatement(s) => self.bind_for_statement(s),
+            StatementKind::ForInStatement(s) => self.with_block_scope(|bd| {
                 bd.bind_for_left(s.left);
                 bd.visit_expression(s.right);
                 bd.visit_statement(s.body, DeclMods::default(), false);
             }),
-            Statement::ForOfStatement(s) => self.with_block_scope(|bd| {
+            StatementKind::ForOfStatement(s) => self.with_block_scope(|bd| {
                 bd.bind_for_left(s.left);
                 bd.visit_expression(s.right);
                 bd.visit_statement(s.body, DeclMods::default(), false);
             }),
-            Statement::WhileStatement(s) => {
+            StatementKind::WhileStatement(s) => {
                 self.visit_expression(s.test);
                 self.visit_statement(s.body, DeclMods::default(), false);
             }
-            Statement::DoWhileStatement(s) => {
+            StatementKind::DoWhileStatement(s) => {
                 self.visit_statement(s.body, DeclMods::default(), false);
                 self.visit_expression(s.test);
             }
             // No `with` object scope: tsc refuses `with` in a TypeScript file outright
             // (TS2410), so there is no object environment to push and the two children
             // bind in the enclosing scope.
-            Statement::WithStatement(s) => {
+            StatementKind::WithStatement(s) => {
                 self.visit_expression(s.object);
                 self.visit_statement(s.body, DeclMods::default(), false);
             }
-            Statement::SwitchStatement(s) => self.bind_switch_statement(s),
-            Statement::TryStatement(s) => self.bind_try_statement(s),
-            Statement::LabeledStatement(s) => {
+            StatementKind::SwitchStatement(s) => self.bind_switch_statement(s),
+            StatementKind::TryStatement(s) => self.bind_try_statement(s),
+            StatementKind::LabeledStatement(s) => {
                 self.visit_statement(s.body, DeclMods::default(), false);
             }
-            Statement::ReturnStatement(s) => {
+            StatementKind::ReturnStatement(s) => {
                 if let Some(a) = &s.argument {
                     self.visit_expression(a);
                 }
             }
-            Statement::ThrowStatement(s) => self.visit_expression(s.argument),
-            Statement::ExpressionStatement(s) => self.visit_expression(s.expression),
-            Statement::TSExportAssignment(ea) => self.bind_export_assignment_statement(ea),
-            Statement::ExportAllDeclaration(_)
-            | Statement::TSNamespaceExportDeclaration(_)
-            | Statement::BreakStatement(_)
-            | Statement::ContinueStatement(_)
-            | Statement::EmptyStatement(_)
-            | Statement::DebuggerStatement(_) => {}
+            StatementKind::ThrowStatement(s) => self.visit_expression(s.argument),
+            StatementKind::ExpressionStatement(s) => self.visit_expression(s.expression),
+            StatementKind::TSExportAssignment(ea) => {
+                self.bind_export_assignment_statement(ea, stmt.span);
+            }
+            StatementKind::ExportAllDeclaration(_)
+            | StatementKind::TSNamespaceExportDeclaration(_)
+            | StatementKind::BreakStatement(_)
+            | StatementKind::ContinueStatement(_)
+            | StatementKind::EmptyStatement(_)
+            | StatementKind::DebuggerStatement(_) => {}
         }
     }
 
@@ -209,6 +217,7 @@ impl<'a> SymbolBinder<'a> {
     fn bind_enum_statement(
         &mut self,
         e: &tsv_ts::ast::internal::TSEnumDeclaration<'a>,
+        span: Span,
         mods: DeclMods,
     ) {
         let (inc, exc) = if e.r#const {
@@ -219,7 +228,7 @@ impl<'a> SymbolBinder<'a> {
                 SymbolFlags::REGULAR_ENUM_EXCLUDES,
             )
         };
-        let d = self.decl_from_ident(&e.id, e.span, mods);
+        let d = self.decl_from_ident(&e.id, span, mods);
         let sym = self.declare_block_scoped(d, inc, exc);
         self.bind_enum_members(e.members, sym);
     }
@@ -228,6 +237,7 @@ impl<'a> SymbolBinder<'a> {
     fn bind_type_alias_statement(
         &mut self,
         t: &tsv_ts::ast::internal::TSTypeAliasDeclaration<'a>,
+        span: Span,
         mods: DeclMods,
     ) {
         // tsgo's `declareSymbolEx` adds a TS1369 "Did you mean
@@ -238,7 +248,7 @@ impl<'a> SymbolBinder<'a> {
         // reaches this cascade. The sole corpus baseline exercising the hint
         // (`exportDeclaration_missingBraces.ts`) is therefore a tsv
         // parse-rejection, not a gradeable bind.
-        let d = self.decl_from_ident(&t.id, t.span, mods);
+        let d = self.decl_from_ident(&t.id, span, mods);
         self.declare_block_scoped(d, SymbolFlags::TYPE_ALIAS, SymbolFlags::TYPE_ALIAS_EXCLUDES);
         self.bind_type_params_in_new_locals(t.type_parameters.as_ref());
     }
@@ -247,10 +257,11 @@ impl<'a> SymbolBinder<'a> {
     fn bind_import_equals_statement(
         &mut self,
         ie: &tsv_ts::ast::internal::TSImportEqualsDeclaration<'a>,
+        span: Span,
     ) {
         let d = self.decl_from_ident(
             &ie.id,
-            ie.span,
+            span,
             DeclMods {
                 exported: ie.is_export,
                 default: false,
@@ -348,6 +359,7 @@ impl<'a> SymbolBinder<'a> {
     fn bind_export_assignment_statement(
         &mut self,
         ea: &tsv_ts::ast::internal::TSExportAssignment<'a>,
+        span: Span,
     ) {
         // `export = x` — tsgo `bindExportAssignment` with `IsExportEquals`:
         // declared into `exports` under the `"export="` name with ALL
@@ -358,7 +370,7 @@ impl<'a> SymbolBinder<'a> {
             // (tsgo `getNonAssignedNameOfDeclaration`), else the whole node.
             let error_span = match &ea.expression.kind {
                 ExpressionKind::Identifier(id) => id.name_span(),
-                _ => ea.span,
+                _ => span,
             };
             let d = DeclInput {
                 name,
@@ -404,6 +416,7 @@ impl<'a> SymbolBinder<'a> {
     fn bind_export_default(
         &mut self,
         e: &tsv_ts::ast::internal::ExportDefaultDeclaration<'a>,
+        span: Span,
         skip_symbol: bool,
     ) {
         let mods = DeclMods {
@@ -433,7 +446,7 @@ impl<'a> SymbolBinder<'a> {
                     // the whole `export default` node.
                     let error_span = match &expr.kind {
                         ExpressionKind::Identifier(id) => id.name_span(),
-                        _ => e.span,
+                        _ => span,
                     };
                     let d = DeclInput {
                         name,
@@ -451,7 +464,7 @@ impl<'a> SymbolBinder<'a> {
             }
             ExportDefaultValue::FunctionDeclaration(f) => {
                 if !skip_symbol {
-                    self.bind_default_function(f.id.as_ref(), e.span, mods);
+                    self.bind_default_function(f.id.as_ref(), span, mods);
                 }
                 self.with_function_scope(f.type_parameters.as_ref(), |b| {
                     b.bind_params(f.params);
@@ -460,12 +473,12 @@ impl<'a> SymbolBinder<'a> {
             }
             ExportDefaultValue::TSDeclareFunction(f) => {
                 if !skip_symbol {
-                    self.bind_default_function(Some(&f.id), e.span, mods);
+                    self.bind_default_function(Some(&f.id), span, mods);
                 }
                 self.with_function_scope(f.type_parameters.as_ref(), |b| b.bind_params(f.params));
             }
             ExportDefaultValue::ClassDeclaration(c) => {
-                let d = self.default_decl(c.id.as_ref(), e.span);
+                let d = self.default_decl(c.id.as_ref(), span);
                 let sym = self.container.symbol.map(|cs| {
                     let table = self.exports_of(cs);
                     self.declare_symbol(
@@ -479,7 +492,7 @@ impl<'a> SymbolBinder<'a> {
                 self.bind_class_body(&c.body, sym, c.type_parameters.as_ref());
             }
             ExportDefaultValue::TSInterfaceDeclaration(i) => {
-                let d = self.default_decl(Some(&i.id), e.span);
+                let d = self.default_decl(Some(&i.id), span);
                 if let Some(cs) = self.container.symbol {
                     let table = self.exports_of(cs);
                     self.declare_symbol(
@@ -842,14 +855,14 @@ fn module_instantiated(m: &tsv_ts::ast::internal::TSModuleDeclaration<'_>) -> bo
 /// Whether a module-body statement contributes no value (tsgo
 /// `getModuleInstanceStateWorker`).
 fn statement_is_non_instantiated(stmt: &Statement<'_>) -> bool {
-    match stmt {
-        Statement::TSInterfaceDeclaration(_) | Statement::TSTypeAliasDeclaration(_) => true,
-        Statement::ImportDeclaration(_) => true,
-        Statement::TSImportEqualsDeclaration(ie) => !ie.is_export,
-        Statement::TSModuleDeclaration(nested) => !module_instantiated(nested),
+    match &stmt.kind {
+        StatementKind::TSInterfaceDeclaration(_) | StatementKind::TSTypeAliasDeclaration(_) => true,
+        StatementKind::ImportDeclaration(_) => true,
+        StatementKind::TSImportEqualsDeclaration(ie) => !ie.is_export,
+        StatementKind::TSModuleDeclaration(nested) => !module_instantiated(nested),
         // `export interface`/`export type` wrap a non-instantiated declaration;
         // specifier-only named exports are approximated non-instantiated.
-        Statement::ExportNamedDeclaration(e) => match e.declaration {
+        StatementKind::ExportNamedDeclaration(e) => match e.declaration {
             Some(inner) => statement_is_non_instantiated(inner),
             None => true,
         },

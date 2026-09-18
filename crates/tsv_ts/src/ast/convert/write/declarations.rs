@@ -61,9 +61,10 @@ pub(super) fn write_decorators_field(
 pub(super) fn write_type_alias_declaration(
     w: &mut JsonWriter,
     type_alias: &internal::TSTypeAliasDeclaration<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "TSTypeAliasDeclaration", type_alias.span, ctx);
+    node_header(w, "TSTypeAliasDeclaration", span, ctx);
     w.raw(",\"id\":");
     write_identifier_plain(w, &type_alias.id, ctx);
     write_type_parameters_field(w, type_alias.type_parameters.as_ref(), ctx);
@@ -72,7 +73,7 @@ pub(super) fn write_type_alias_declaration(
     if type_alias.declare {
         w.raw(",\"declare\":true");
     }
-    close_node(w, "TSTypeAliasDeclaration", type_alias.span, ctx);
+    close_node(w, "TSTypeAliasDeclaration", span, ctx);
 }
 
 /// Emits a `FunctionDeclaration` node. Field order: `id` (nullable),

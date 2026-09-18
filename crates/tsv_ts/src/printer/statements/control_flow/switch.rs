@@ -3,7 +3,7 @@
 // Switch head, case labels, and case-body layout with comment handling.
 
 use super::{HeadChainGrouping, OpenParenLineBlockComment};
-use crate::ast::internal::{self, Statement};
+use crate::ast::internal::{self, StatementKind};
 use crate::printer::expressions::blocks::{OrphanSemiCursor, StatementBlankScan};
 use crate::printer::statements::StatementContext;
 use crate::printer::{
@@ -11,6 +11,7 @@ use crate::printer::{
     statement_gap_floor,
 };
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{TriviaProfile, find_char};
@@ -23,15 +24,16 @@ impl<'a> Printer<'a> {
     pub(in crate::printer::statements) fn build_switch_statement_doc(
         &self,
         stmt: &internal::SwitchStatement<'_>,
+        span: Span,
     ) -> DocId {
         let d = self.d();
         // Find paren positions for comment handling
-        let open_paren = self.find_open_paren_after(stmt.span.start);
+        let open_paren = self.find_open_paren_after(span.start);
         let close_paren = open_paren.and_then(|o| self.matching_close_paren(o));
 
         // Preserve comments between `switch` keyword and `(` in place:
         //   switch/* c */(a){} → switch /* c */ (a) {}
-        let switch_keyword_end = stmt.span.start + "switch".len() as u32;
+        let switch_keyword_end = span.start + "switch".len() as u32;
         let keyword_comments = self.build_keyword_paren_comments(switch_keyword_end, open_paren);
 
         // Preserve comments between ) and { in place:
@@ -40,7 +42,7 @@ impl<'a> Printer<'a> {
         // inside the gap comment (`switch (x) /* { */ {`), mis-anchoring the body
         // brace and dropping the comment.
         let body_open_brace = close_paren
-            .and_then(|close| self.find_char_outside_comments(close + 1, stmt.span.end, b'{'));
+            .and_then(|close| self.find_char_outside_comments(close + 1, span.end, b'{'));
         // Build condition group (handles breaking within discriminant and comments).
         // Deliberately the inner builder, not `build_statement_condition_doc`: prettier
         // excludes `switch` from `shouldInlineCondition`, so a negated parenthesized
@@ -72,7 +74,7 @@ impl<'a> Printer<'a> {
         // per-consequent comment scans below. Fail-open — on-page counts owned, so a
         // present comment always takes the full path. Blank-line preservation between
         // consequents is independent of comments and is NOT gated.
-        let switch_body_end = stmt.span.end - 1; // before '}'
+        let switch_body_end = span.end - 1; // before '}'
         let body_has_comments = self.has_comments_on_page_between(brace_start + 1, switch_body_end);
         for (i, case) in stmt.cases.iter().enumerate() {
             // Own-line comments between the previous case and this one. Same-line
@@ -131,7 +133,7 @@ impl<'a> Printer<'a> {
             // Determine the end boundary for inline comments on this case
             // For empty cases (fallthrough), we need to look ahead to the next case
             let next_case_start = stmt.cases.get(i + 1).map(|c| c.span.start);
-            let inline_comment_boundary = next_case_start.unwrap_or(stmt.span.end - 1);
+            let inline_comment_boundary = next_case_start.unwrap_or(span.end - 1);
 
             // The case-gap claim split: a comment hugging the next case's label leads it
             // (`b1(); /* c */ case 2:`), emitted by the between-case leading run on the
@@ -482,7 +484,7 @@ impl<'a> Printer<'a> {
             // nothing following them in this iteration to glue to. The next
             // iteration's own unconditional leading hardline supplies the
             // separator (mirroring `build_statement_list_docs_into`).
-            if matches!(stmt, Statement::EmptyStatement(_)) {
+            if matches!(&stmt.kind, StatementKind::EmptyStatement(_)) {
                 let stmt_end = stmt.span().end;
                 // A TRAILING dropped `;` — one with no printed statement after it in this
                 // consequent — claims nothing; [`Printer::orphan_semi_slot`] states why. The
@@ -685,7 +687,7 @@ impl<'a> Printer<'a> {
             // §Comment relocation), so comment kind stops deciding the layout. A frozen statement
             // keeps its own line too: the hug would take away the directive's.
             if i == 0
-                && matches!(stmt, Statement::BlockStatement(_))
+                && matches!(&stmt.kind, StatementKind::BlockStatement(_))
                 && frozen.is_none()
                 && leading_comments.is_empty()
             {

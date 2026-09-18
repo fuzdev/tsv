@@ -13,7 +13,8 @@
 use tsv_svelte::ast::internal::{ElementKind, FragmentNode, Root};
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ExpressionKind,
-    ForInOfLeft, ForInit, ObjectPatternProperty, ObjectProperty, Statement, VariableDeclaration,
+    ForInOfLeft, ForInit, ObjectPatternProperty, ObjectProperty, Statement, StatementKind,
+    VariableDeclaration,
 };
 
 use tsv_lang::Span;
@@ -88,9 +89,9 @@ pub(crate) fn collect_script_comments(
     //
     // The one shape that does NOT converge is a template emitting a nested block —
     // see [`template_emits_nested_block`].
-    let survives = |stmt: &Statement<'_>| match stmt {
-        Statement::ImportDeclaration(_) => false,
-        Statement::ExpressionStatement(expr_stmt) => {
+    let survives = |stmt: &Statement<'_>| match &stmt.kind {
+        StatementKind::ImportDeclaration(_) => false,
+        StatementKind::ExpressionStatement(expr_stmt) => {
             is_effect_call(expr_stmt.expression, source).is_none()
                 && is_inspect_call(expr_stmt.expression, source).is_none()
         }
@@ -268,7 +269,8 @@ pub(crate) fn collect_module_script_comments(
         // the comment, or an instance script.
         let has_flush = has_instance
             || module_body.iter().any(|stmt| {
-                !matches!(stmt, Statement::EmptyStatement(_)) && stmt.span().end > comment.span.end
+                !matches!(&stmt.kind, StatementKind::EmptyStatement(_))
+                    && stmt.span().end > comment.span.end
             });
         if !block_before || !has_flush {
             continue;
@@ -413,35 +415,35 @@ fn census_stmts(statements: &[Statement<'_>], census: &mut BlockCensus) {
 
 fn census_stmt(stmt: &Statement<'_>, census: &mut BlockCensus) {
     census.item_ends.push(stmt.span().end);
-    match stmt {
-        Statement::BlockStatement(block) => {
+    match &stmt.kind {
+        StatementKind::BlockStatement(block) => {
             census.blocks.push(block.span);
             census_stmts(block.body, census);
         }
-        Statement::FunctionDeclaration(f) => {
+        StatementKind::FunctionDeclaration(f) => {
             for param in f.params {
                 census_expr(param, census);
             }
             census.blocks.push(f.body.span);
             census_stmts(f.body.body, census);
         }
-        Statement::ClassDeclaration(c) => census_class_body(&c.body, census),
-        Statement::ExpressionStatement(s) => census_expr(s.expression, census),
-        Statement::VariableDeclaration(d) => census_var_decl(d, census),
-        Statement::ReturnStatement(s) => {
+        StatementKind::ClassDeclaration(c) => census_class_body(&c.body, census),
+        StatementKind::ExpressionStatement(s) => census_expr(s.expression, census),
+        StatementKind::VariableDeclaration(d) => census_var_decl(d, census),
+        StatementKind::ReturnStatement(s) => {
             if let Some(arg) = s.argument.as_ref() {
                 census_expr(arg, census);
             }
         }
-        Statement::ThrowStatement(s) => census_expr(s.argument, census),
-        Statement::IfStatement(s) => {
+        StatementKind::ThrowStatement(s) => census_expr(s.argument, census),
+        StatementKind::IfStatement(s) => {
             census_expr(s.test, census);
             census_stmt(s.consequent, census);
             if let Some(alt) = s.alternate {
                 census_stmt(alt, census);
             }
         }
-        Statement::ForStatement(s) => {
+        StatementKind::ForStatement(s) => {
             match &s.init {
                 Some(ForInit::VariableDeclaration(d)) => census_var_decl(d, census),
                 Some(ForInit::Expression(e)) => census_expr(e, census),
@@ -455,31 +457,31 @@ fn census_stmt(stmt: &Statement<'_>, census: &mut BlockCensus) {
             }
             census_stmt(s.body, census);
         }
-        Statement::ForInStatement(s) => {
+        StatementKind::ForInStatement(s) => {
             census_for_left(s.left, census);
             census_expr(s.right, census);
             census_stmt(s.body, census);
         }
-        Statement::ForOfStatement(s) => {
+        StatementKind::ForOfStatement(s) => {
             census_for_left(s.left, census);
             census_expr(s.right, census);
             census_stmt(s.body, census);
         }
-        Statement::WhileStatement(s) => {
+        StatementKind::WhileStatement(s) => {
             census_expr(s.test, census);
             census_stmt(s.body, census);
         }
-        Statement::DoWhileStatement(s) => {
+        StatementKind::DoWhileStatement(s) => {
             census_stmt(s.body, census);
             census_expr(s.test, census);
         }
         // Unreachable in practice: a Svelte `<script>` is Module code, so it is strict
         // and the parser refuses `with` there.
-        Statement::WithStatement(s) => {
+        StatementKind::WithStatement(s) => {
             census_expr(s.object, census);
             census_stmt(s.body, census);
         }
-        Statement::SwitchStatement(s) => {
+        StatementKind::SwitchStatement(s) => {
             census_expr(s.discriminant, census);
             for case in s.cases {
                 if let Some(test) = case.test.as_ref() {
@@ -488,7 +490,7 @@ fn census_stmt(stmt: &Statement<'_>, census: &mut BlockCensus) {
                 census_stmts(case.consequent, census);
             }
         }
-        Statement::TryStatement(s) => {
+        StatementKind::TryStatement(s) => {
             census.blocks.push(s.block.span);
             census_stmts(s.block.body, census);
             if let Some(handler) = &s.handler {
@@ -503,13 +505,13 @@ fn census_stmt(stmt: &Statement<'_>, census: &mut BlockCensus) {
                 census_stmts(finalizer.body, census);
             }
         }
-        Statement::LabeledStatement(s) => census_stmt(s.body, census),
-        Statement::ExportNamedDeclaration(s) => {
+        StatementKind::LabeledStatement(s) => census_stmt(s.body, census),
+        StatementKind::ExportNamedDeclaration(s) => {
             if let Some(decl) = &s.declaration {
                 census_stmt(decl, census);
             }
         }
-        Statement::ExportDefaultDeclaration(s) => match &s.declaration {
+        StatementKind::ExportDefaultDeclaration(s) => match &s.declaration {
             ExportDefaultValue::Expression(e) => census_expr(e, census),
             ExportDefaultValue::FunctionDeclaration(f) => {
                 for param in f.params {
@@ -522,22 +524,22 @@ fn census_stmt(stmt: &Statement<'_>, census: &mut BlockCensus) {
             ExportDefaultValue::TSDeclareFunction(_)
             | ExportDefaultValue::TSInterfaceDeclaration(_) => {}
         },
-        Statement::TSExportAssignment(s) => census_expr(&s.expression, census),
+        StatementKind::TSExportAssignment(s) => census_expr(&s.expression, census),
         // No block-bearing children (or a TypeScript-only statement dropped before
         // this runs).
-        Statement::BreakStatement(_)
-        | Statement::ContinueStatement(_)
-        | Statement::EmptyStatement(_)
-        | Statement::DebuggerStatement(_)
-        | Statement::ImportDeclaration(_)
-        | Statement::ExportAllDeclaration(_)
-        | Statement::TSNamespaceExportDeclaration(_)
-        | Statement::TSImportEqualsDeclaration(_)
-        | Statement::TSTypeAliasDeclaration(_)
-        | Statement::TSInterfaceDeclaration(_)
-        | Statement::TSDeclareFunction(_)
-        | Statement::TSEnumDeclaration(_)
-        | Statement::TSModuleDeclaration(_) => {}
+        StatementKind::BreakStatement(_)
+        | StatementKind::ContinueStatement(_)
+        | StatementKind::EmptyStatement(_)
+        | StatementKind::DebuggerStatement(_)
+        | StatementKind::ImportDeclaration(_)
+        | StatementKind::ExportAllDeclaration(_)
+        | StatementKind::TSNamespaceExportDeclaration(_)
+        | StatementKind::TSImportEqualsDeclaration(_)
+        | StatementKind::TSTypeAliasDeclaration(_)
+        | StatementKind::TSInterfaceDeclaration(_)
+        | StatementKind::TSDeclareFunction(_)
+        | StatementKind::TSEnumDeclaration(_)
+        | StatementKind::TSModuleDeclaration(_) => {}
     }
 }
 

@@ -1401,7 +1401,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // construction — stated as an error rather than an `if let` so a head whose
             // pieces went nowhere can never reach the printer as a silently empty
             // signature (the shape a raw-text fallback would produce).
-            let Some(tsv_ts::Statement::FunctionDeclaration(func)) = program.body.first() else {
+            let Some(tsv_ts::StatementKind::FunctionDeclaration(func)) =
+                program.body.first().map(|stmt| &stmt.kind)
+            else {
                 return Err(
                     self.error_expected_at("snippet signature", content_offset + head_start)
                 );

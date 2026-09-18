@@ -18,7 +18,7 @@ mod try_jump;
 
 use smallvec::SmallVec;
 
-use crate::ast::internal::{Expression, ExpressionKind, Statement, UnaryOperator};
+use crate::ast::internal::{Expression, ExpressionKind, Statement, StatementKind, UnaryOperator};
 use crate::printer::statements::StatementContext;
 use crate::printer::{CommentVec, LeadingGlue, Printer};
 use tsv_lang::Comment;
@@ -236,7 +236,7 @@ impl<'a> Printer<'a> {
     /// empty case). The `while` handler and `catch` inline their own block builds (extra
     /// close-paren handling / an always-block body), so they don't route through here.
     fn build_collapsing_body_doc(&self, body: &Statement<'_>, body_ctx: StatementContext) -> DocId {
-        if let Statement::BlockStatement(block) = body {
+        if let StatementKind::BlockStatement(block) = &body.kind {
             self.build_block_statement_doc(block)
         } else {
             // Non-block body: its container is the control-flow statement itself,

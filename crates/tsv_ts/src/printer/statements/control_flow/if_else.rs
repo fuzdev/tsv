@@ -4,9 +4,10 @@
 // comment-handling variants, and else-clause layout helpers.
 
 use super::HeadChainGrouping;
-use crate::ast::internal::{self, Statement};
+use crate::ast::internal::{self, Statement, StatementKind};
 use crate::printer::Printer;
 use crate::printer::statements::StatementContext;
+use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::skip_comment;
@@ -17,14 +18,14 @@ use tsv_lang::source_scan::skip_comment;
 /// Other statements (if, for, while, etc.) go on a new line with indent.
 fn is_inline_consequent(stmt: &Statement<'_>) -> bool {
     matches!(
-        stmt,
-        Statement::BlockStatement(_)
-            | Statement::ExpressionStatement(_)
-            | Statement::BreakStatement(_)
-            | Statement::ContinueStatement(_)
-            | Statement::ReturnStatement(_)
-            | Statement::ThrowStatement(_)
-            | Statement::EmptyStatement(_)
+        &stmt.kind,
+        StatementKind::BlockStatement(_)
+            | StatementKind::ExpressionStatement(_)
+            | StatementKind::BreakStatement(_)
+            | StatementKind::ContinueStatement(_)
+            | StatementKind::ReturnStatement(_)
+            | StatementKind::ThrowStatement(_)
+            | StatementKind::EmptyStatement(_)
     )
 }
 
@@ -32,7 +33,7 @@ fn is_inline_consequent(stmt: &Statement<'_>) -> bool {
 ///
 /// Same as `is_inline_consequent` but also allows IfStatement for else-if chains.
 fn is_inline_alternate(stmt: &Statement<'_>) -> bool {
-    is_inline_consequent(stmt) || matches!(stmt, Statement::IfStatement(_))
+    is_inline_consequent(stmt) || matches!(&stmt.kind, StatementKind::IfStatement(_))
 }
 
 impl<'a> Printer<'a> {
@@ -62,8 +63,10 @@ impl<'a> Printer<'a> {
         body: &Statement<'_>,
         body_ctx: StatementContext,
     ) -> DocId {
-        match body {
-            Statement::BlockStatement(block) => self.build_block_statement_expand_empty_doc(block),
+        match &body.kind {
+            StatementKind::BlockStatement(block) => {
+                self.build_block_statement_expand_empty_doc(block)
+            }
             _ => self.build_statement_doc(body, body_ctx),
         }
     }
@@ -121,9 +124,9 @@ impl<'a> Printer<'a> {
     ) {
         let d = self.d();
         let alt_start = alternate.span().start;
-        let flush_with_else = match alternate {
-            Statement::BlockStatement(_) => true,
-            Statement::IfStatement(_) => {
+        let flush_with_else = match &alternate.kind {
+            StatementKind::BlockStatement(_) => true,
+            StatementKind::IfStatement(_) => {
                 self.has_anchor_trailing_comment_between(else_end, alt_start)
             }
             _ => false,
@@ -197,7 +200,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let alt_start = alternate.span().start;
 
-        if matches!(alternate, Statement::EmptyStatement(_)) {
+        if matches!(&alternate.kind, StatementKind::EmptyStatement(_)) {
             // Empty alternate: `else;`, `else /* c */ ;`, or `else // c\n;` — the same gap
             // the `)`→`;` one is, so it shares that emitter.
             match else_end {
@@ -263,25 +266,26 @@ impl<'a> Printer<'a> {
     fn build_if_head_and_consequent(
         &self,
         stmt: &internal::IfStatement<'_>,
+        span: Span,
         ctx: StatementContext,
     ) -> DocBuf {
         let (mut parts, paren_end) = self.build_paren_condition_head(
             "if",
-            stmt.span.start,
+            span.start,
             stmt.test,
             HeadChainGrouping::ParenGroupDrives,
         );
         // The consequent is always one `adjustClause` indent in, and an `else`
         // CONTINUES on the line its tail flushes at (a block consequent ignores this).
         let body_ctx = ctx.clause_body(stmt.alternate.is_some(), true);
-        match stmt.consequent {
+        match &stmt.consequent.kind {
             // Block consequent: `if (` + condition + `) ` + block.
-            Statement::BlockStatement(block) => {
+            StatementKind::BlockStatement(block) => {
                 self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
                 parts.push(self.build_branch_body_doc(paren_end, stmt.consequent, body_ctx));
             }
             // `if (cond);` or `if (cond) /* c */ ;`
-            Statement::EmptyStatement(_) => {
+            StatementKind::EmptyStatement(_) => {
                 let empty_start = stmt.consequent.span().start;
                 self.append_close_paren_empty_stmt_with_comments(
                     &mut parts,
@@ -340,10 +344,11 @@ impl<'a> Printer<'a> {
     pub(in crate::printer::statements) fn build_if_statement_doc(
         &self,
         stmt: &internal::IfStatement<'_>,
+        span: Span,
         ctx: StatementContext,
     ) -> DocId {
         let d = self.d();
-        let mut parts = self.build_if_head_and_consequent(stmt, ctx);
+        let mut parts = self.build_if_head_and_consequent(stmt, span, ctx);
 
         if let Some(alternate) = &stmt.alternate {
             let consequent_end = stmt.consequent.span().end;
@@ -358,7 +363,7 @@ impl<'a> Printer<'a> {
                 &mut parts,
                 consequent_end,
                 before_else_end,
-                matches!(stmt.consequent, Statement::BlockStatement(_)),
+                matches!(&stmt.consequent.kind, StatementKind::BlockStatement(_)),
                 self.terminator_defers_comment(stmt.consequent.span().start, consequent_end),
             );
             self.append_else_clause(&mut parts, alternate, else_end, false, ctx);
@@ -366,8 +371,8 @@ impl<'a> Printer<'a> {
 
         let doc = d.concat(&parts);
         if matches!(
-            stmt.consequent,
-            Statement::BlockStatement(_) | Statement::EmptyStatement(_)
+            &stmt.consequent.kind,
+            StatementKind::BlockStatement(_) | StatementKind::EmptyStatement(_)
         ) {
             d.group(doc)
         } else {

@@ -4,7 +4,7 @@
 // for-in/for-of left/right printing.
 
 use super::HeadChainGrouping;
-use crate::ast::internal::{self, Expression, ExpressionKind, Statement};
+use crate::ast::internal::{self, Expression, ExpressionKind, Statement, StatementKind};
 use crate::printer::expressions::operators::SeqLayout;
 use crate::printer::statements::StatementContext;
 use crate::printer::statements::variable::{DeclaratorEqGap, DeclaratorInitInputs};
@@ -173,7 +173,7 @@ impl<'a> Printer<'a> {
 
         if !self.has_comments_to_emit_between(paren_end, body_start) {
             parts.push(d.text(")"));
-            if matches!(body, Statement::EmptyStatement(_)) {
+            if matches!(&body.kind, StatementKind::EmptyStatement(_)) {
                 // Prettier's `adjustClause` returns `";"` directly for an empty
                 // body (no leading `line`) → `for (x of y);`, not `for (x of y) ;`.
                 parts.push(body_doc);
@@ -222,26 +222,27 @@ impl<'a> Printer<'a> {
     fn build_for_statement_with_body_doc(
         &self,
         stmt: &internal::ForStatement<'_>,
+        span: Span,
         parens: ForParens,
         ctx: StatementContext,
     ) -> DocId {
         let d = self.d();
-        let header_doc = self.build_for_header_doc(stmt, parens, None);
-        if matches!(stmt.body, Statement::EmptyStatement(_)) {
+        let header_doc = self.build_for_header_doc(stmt, span, parens, None);
+        if matches!(&stmt.body.kind, StatementKind::EmptyStatement(_)) {
             // No space before empty statement: `for (...);` (the ctx is inert — an
             // EmptyStatement is bare `";"` with no terminator gap)
             d.concat(&[
                 header_doc,
                 self.build_statement_doc(stmt.body, ctx.clause_body(false, true)),
             ])
-        } else if let Statement::BlockStatement(block) = stmt.body {
+        } else if let StatementKind::BlockStatement(block) = &stmt.body.kind {
             // Block body: `for (...) { ... }`
             // Note: Unlike for-in/for-of, standard for loops keep empty blocks inline `{}`
             d.concat(&[
                 header_doc,
                 d.text(" "),
                 self.build_statement_head_doc(
-                    self.get_for_header_end(stmt, parens),
+                    self.get_for_header_end(stmt, span, parens),
                     stmt.body,
                     || self.build_block_statement_doc(block),
                 ),
@@ -255,7 +256,7 @@ impl<'a> Printer<'a> {
             // the inner header group still decides its own flat/break, so a
             // width-only overflow keeps the header flat (matching Prettier).
             let body_doc = self.build_statement_head_doc(
-                self.get_for_header_end(stmt, parens),
+                self.get_for_header_end(stmt, span, parens),
                 stmt.body,
                 // `adjustClause` wraps the body in one indent; nothing continues on
                 // the tail's line.
@@ -270,7 +271,12 @@ impl<'a> Printer<'a> {
     /// `parens.close` is depth-tracked, so redundant parens or parens inside a clause
     /// don't yield a premature match; the last clause's end is the fallback when the
     /// header has no locatable `)`.
-    fn get_for_header_end(&self, stmt: &internal::ForStatement<'_>, parens: ForParens) -> u32 {
+    fn get_for_header_end(
+        &self,
+        stmt: &internal::ForStatement<'_>,
+        span: Span,
+        parens: ForParens,
+    ) -> u32 {
         // `map_or_else` so the located-paren path — every well-formed header — costs one map
         // and never walks the clause spans for a fallback it discards.
         parens.close.map_or_else(
@@ -280,7 +286,7 @@ impl<'a> Printer<'a> {
                     .map(|u| u.span().end)
                     .or_else(|| stmt.test.as_ref().map(|t| t.span().end))
                     .or_else(|| stmt.init.as_ref().map(|i| self.get_for_init_span_end(i)))
-                    .unwrap_or(stmt.span.start + "for ".len() as u32)
+                    .unwrap_or(span.start + "for ".len() as u32)
             },
             |p| p + 1,
         )
@@ -425,6 +431,7 @@ impl<'a> Printer<'a> {
     fn build_for_header_doc(
         &self,
         stmt: &internal::ForStatement<'_>,
+        span: Span,
         parens: ForParens,
         keyword_comments: Option<DocId>,
     ) -> DocId {
@@ -472,15 +479,12 @@ impl<'a> Printer<'a> {
 
         // Find semicolon positions for proper comment boundary detection.
         // The semicolons in `for (init; test; update)` are at specific positions in
-        // source. Anchored at the clause ends, not `stmt.span.start` — see
+        // source. Anchored at the clause ends, not `span.start` — see
         // `find_for_semicolons`. `open_paren` is only the fallback for an absent init,
         // so a header with no open paren to find (already degenerate) keeps the
         // previous keyword-relative behavior.
-        let (first_semi, second_semi) = self.find_for_semicolons(
-            stmt,
-            open_paren.unwrap_or(stmt.span.start),
-            close_paren_approx,
-        );
+        let (first_semi, second_semi) =
+            self.find_for_semicolons(stmt, open_paren.unwrap_or(span.start), close_paren_approx);
 
         let spans = ForHeaderSpans {
             open_paren,
@@ -504,9 +508,9 @@ impl<'a> Printer<'a> {
         // below and the emitter further down cannot read different gaps — the directive
         // that freezes a clause has to be exactly the one printed above it.
         let test_search_start =
-            self.for_clause_search_start(stmt.span.start, open_paren, first_semi, init_end);
+            self.for_clause_search_start(span.start, open_paren, first_semi, init_end);
         let update_search_start = self.for_clause_search_start(
-            stmt.span.start,
+            span.start,
             open_paren,
             second_semi,
             test_end.or(init_end),
@@ -708,7 +712,7 @@ impl<'a> Printer<'a> {
             self.push_for_update_trailing_comments(
                 &mut inner_parts,
                 start,
-                spans.close_paren.unwrap_or(stmt.span.end),
+                spans.close_paren.unwrap_or(span.end),
                 update_end,
             );
         }
@@ -1185,16 +1189,11 @@ impl<'a> Printer<'a> {
     pub(in crate::printer::statements) fn build_for_in_statement_doc(
         &self,
         stmt: &internal::ForInStatement<'_>,
+        span: Span,
         ctx: StatementContext,
     ) -> DocId {
         self.build_for_in_of_statement_with_body_doc(
-            stmt.left,
-            stmt.right,
-            stmt.body,
-            stmt.span.start,
-            "in",
-            false,
-            ctx,
+            stmt.left, stmt.right, stmt.body, span.start, "in", false, ctx,
         )
     }
 
@@ -1202,13 +1201,14 @@ impl<'a> Printer<'a> {
     pub(in crate::printer::statements) fn build_for_of_statement_doc(
         &self,
         stmt: &internal::ForOfStatement<'_>,
+        span: Span,
         ctx: StatementContext,
     ) -> DocId {
         self.build_for_in_of_statement_with_body_doc(
             stmt.left,
             stmt.right,
             stmt.body,
-            stmt.span.start,
+            span.start,
             "of",
             stmt.r#await,
             ctx,
@@ -1637,12 +1637,12 @@ impl<'a> Printer<'a> {
         body_ctx: StatementContext,
     ) {
         let paren_end = close_paren.map_or(right_end + 1, |p| p + 1);
-        if let Statement::BlockStatement(block) = body {
+        if let StatementKind::BlockStatement(block) = &body.kind {
             self.append_close_paren_with_comments(parts, paren_end, block.span.start);
             parts.push(self.build_statement_head_doc(paren_end, body, || {
                 self.build_block_statement_expand_empty_doc(block)
             }));
-        } else if matches!(body, Statement::EmptyStatement(_)) {
+        } else if matches!(&body.kind, StatementKind::EmptyStatement(_)) {
             // An empty body is NOT an `adjustClause` body — prettier returns `";"`
             // directly, so the gap's run stays trailing `)` and the `;` sits flush
             // beneath it, never indented. `if` and `while` already routed here; for-x
@@ -1713,20 +1713,21 @@ impl<'a> Printer<'a> {
     pub(in crate::printer::statements) fn build_for_statement_doc(
         &self,
         stmt: &internal::ForStatement<'_>,
+        span: Span,
         ctx: StatementContext,
     ) -> DocId {
         let d = self.d();
 
         // Preserve comments between `for` keyword and `(` in place:
         //   for/* c */(;;){} → for /* c */ (;;) {}
-        let for_keyword_end = stmt.span.start + "for".len() as u32;
+        let for_keyword_end = span.start + "for".len() as u32;
         // Located once here and threaded through every consumer — see `ForParens`.
-        let parens = self.for_parens(stmt.span.start);
+        let parens = self.for_parens(span.start);
         let keyword_comments = self.build_keyword_paren_comments(for_keyword_end, parens.open);
         let has_pre_paren_comments = keyword_comments.is_some();
 
         // Check for comments between ) and body (Prettier 3.7 #18108)
-        let header_end = self.get_for_header_end(stmt, parens);
+        let header_end = self.get_for_header_end(stmt, span, parens);
         let body_start = stmt.body.span().start;
 
         if has_pre_paren_comments || self.has_comments_to_emit_between(header_end, body_start) {
@@ -1736,14 +1737,14 @@ impl<'a> Printer<'a> {
             // trails the comment after `)`). Only comments *inside* the parens (handled
             // in `build_for_header_doc`) or overflow expand the header.
             let mut parts: DocBuf =
-                smallvec![self.build_for_header_doc(stmt, parens, keyword_comments)];
+                smallvec![self.build_for_header_doc(stmt, span, parens, keyword_comments)];
 
             // Post-header comments. Non-block bodies use Prettier's `adjustClause`
             // (`indent([line, body])`) wrapped with the header in an outer group, so
             // the body drops to its own indented line when the header breaks (a
             // comment hardline propagates) or the whole thing overflows — while the
             // header group still decides its own flat/break.
-            let is_block_body = matches!(stmt.body, Statement::BlockStatement(_));
+            let is_block_body = matches!(&stmt.body.kind, StatementKind::BlockStatement(_));
             // A C-style `for` collapses its empty block body (`for (…) {}`) — unless an
             // own-line directive in the `)`→body gap freezes it.
             let body_doc = self.build_statement_head_doc(header_end, stmt.body, || {
@@ -1754,7 +1755,7 @@ impl<'a> Printer<'a> {
 
             let gap_breaks = self.header_to_body_gap_breaks(header_end, body_start);
             let (tail, group_it) = if self.has_comments_to_emit_between(header_end, body_start) {
-                if matches!(stmt.body, Statement::EmptyStatement(_)) {
+                if matches!(&stmt.body.kind, StatementKind::EmptyStatement(_)) {
                     // Asked FIRST: the empty-body arm below is guarded by this branch;
                     // asked later, a comment in the gap would route the `;` through
                     // `adjustClause` and indent it. An empty body has no clause — prettier returns `";"`
@@ -1804,7 +1805,7 @@ impl<'a> Printer<'a> {
                         )
                     }
                 }
-            } else if matches!(stmt.body, Statement::EmptyStatement(_)) {
+            } else if matches!(&stmt.body.kind, StatementKind::EmptyStatement(_)) {
                 // Empty body attaches directly: `);` (no space, no adjustClause).
                 // Matches the main path (`build_for_statement_with_body_doc`) and Prettier.
                 (body_doc, false)
@@ -1822,7 +1823,7 @@ impl<'a> Printer<'a> {
             }
         } else {
             // Delegate to the sophisticated version that handles all edge cases
-            self.build_for_statement_with_body_doc(stmt, parens, ctx)
+            self.build_for_statement_with_body_doc(stmt, span, parens, ctx)
         }
     }
 

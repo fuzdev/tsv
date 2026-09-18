@@ -31,7 +31,7 @@ use tsv_ts::ast::Program;
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ClassBody, ClassMember, Decorator, ExportDefaultValue, Expression,
     ExpressionKind, ForInOfLeft, ForInit, ObjectPatternProperty, ObjectProperty, Statement,
-    TSInterfaceDeclaration, TSInterfaceHeritage, TSLiteralType, TSModuleDeclaration,
+    StatementKind, TSInterfaceDeclaration, TSInterfaceHeritage, TSLiteralType, TSModuleDeclaration,
     TSModuleDeclarationBody, TSType, TSTypeAnnotation, TSTypeElement, TSTypeParameterDeclaration,
     TSTypeParameterInstantiation, VariableDeclaration,
 };
@@ -72,21 +72,21 @@ impl<'a> CheckWalk<'a> {
     // --- statements ----------------------------------------------------------
 
     fn visit_statement(&mut self, stmt: &Statement<'_>) {
-        match stmt {
-            Statement::ExpressionStatement(s) => self.visit_expression(s.expression),
-            Statement::VariableDeclaration(d) => self.visit_variable_declaration(d),
-            Statement::FunctionDeclaration(f) => self.check_function_common(
+        match &stmt.kind {
+            StatementKind::ExpressionStatement(s) => self.visit_expression(s.expression),
+            StatementKind::VariableDeclaration(d) => self.visit_variable_declaration(d),
+            StatementKind::FunctionDeclaration(f) => self.check_function_common(
                 f.type_parameters.as_ref(),
                 f.params,
                 f.return_type.as_ref(),
                 f.body.body,
             ),
-            Statement::TSDeclareFunction(f) => {
+            StatementKind::TSDeclareFunction(f) => {
                 self.visit_type_params(f.type_parameters.as_ref());
                 self.visit_params(f.params);
                 self.visit_type_annotation_opt(f.return_type.as_ref());
             }
-            Statement::ClassDeclaration(c) => self.check_class_common(
+            StatementKind::ClassDeclaration(c) => self.check_class_common(
                 c.type_parameters.as_ref(),
                 c.decorators,
                 c.super_class,
@@ -94,37 +94,37 @@ impl<'a> CheckWalk<'a> {
                 c.implements,
                 &c.body,
             ),
-            Statement::TSInterfaceDeclaration(i) => self.check_interface_common(i),
-            Statement::TSTypeAliasDeclaration(t) => {
+            StatementKind::TSInterfaceDeclaration(i) => self.check_interface_common(i),
+            StatementKind::TSTypeAliasDeclaration(t) => {
                 self.visit_type_params(t.type_parameters.as_ref());
                 self.visit_type(&t.type_annotation);
             }
-            Statement::TSEnumDeclaration(e) => {
+            StatementKind::TSEnumDeclaration(e) => {
                 for member in e.members {
                     if let Some(init) = &member.initializer {
                         self.visit_expression(init);
                     }
                 }
             }
-            Statement::TSModuleDeclaration(m) => self.visit_module_declaration(m),
-            Statement::ReturnStatement(s) => {
+            StatementKind::TSModuleDeclaration(m) => self.visit_module_declaration(m),
+            StatementKind::ReturnStatement(s) => {
                 if let Some(a) = &s.argument {
                     self.visit_expression(a);
                 }
             }
-            Statement::BlockStatement(b) => {
+            StatementKind::BlockStatement(b) => {
                 for s in b.body {
                     self.visit_statement(s);
                 }
             }
-            Statement::IfStatement(s) => {
+            StatementKind::IfStatement(s) => {
                 self.visit_expression(s.test);
                 self.visit_statement(s.consequent);
                 if let Some(alt) = s.alternate {
                     self.visit_statement(alt);
                 }
             }
-            Statement::ForStatement(s) => {
+            StatementKind::ForStatement(s) => {
                 if let Some(init) = &s.init {
                     match init {
                         ForInit::VariableDeclaration(d) => self.visit_variable_declaration(d),
@@ -139,29 +139,29 @@ impl<'a> CheckWalk<'a> {
                 }
                 self.visit_statement(s.body);
             }
-            Statement::ForInStatement(s) => {
+            StatementKind::ForInStatement(s) => {
                 self.visit_for_left(s.left);
                 self.visit_expression(s.right);
                 self.visit_statement(s.body);
             }
-            Statement::ForOfStatement(s) => {
+            StatementKind::ForOfStatement(s) => {
                 self.visit_for_left(s.left);
                 self.visit_expression(s.right);
                 self.visit_statement(s.body);
             }
-            Statement::WhileStatement(s) => {
+            StatementKind::WhileStatement(s) => {
                 self.visit_expression(s.test);
                 self.visit_statement(s.body);
             }
-            Statement::DoWhileStatement(s) => {
+            StatementKind::DoWhileStatement(s) => {
                 self.visit_statement(s.body);
                 self.visit_expression(s.test);
             }
-            Statement::WithStatement(s) => {
+            StatementKind::WithStatement(s) => {
                 self.visit_expression(s.object);
                 self.visit_statement(s.body);
             }
-            Statement::SwitchStatement(s) => {
+            StatementKind::SwitchStatement(s) => {
                 self.visit_expression(s.discriminant);
                 for case in s.cases {
                     if let Some(t) = &case.test {
@@ -172,7 +172,7 @@ impl<'a> CheckWalk<'a> {
                     }
                 }
             }
-            Statement::TryStatement(s) => {
+            StatementKind::TryStatement(s) => {
                 for stmt in s.block.body {
                     self.visit_statement(stmt);
                 }
@@ -190,23 +190,23 @@ impl<'a> CheckWalk<'a> {
                     }
                 }
             }
-            Statement::ThrowStatement(s) => self.visit_expression(s.argument),
-            Statement::LabeledStatement(s) => self.visit_statement(s.body),
-            Statement::ExportNamedDeclaration(e) => {
+            StatementKind::ThrowStatement(s) => self.visit_expression(s.argument),
+            StatementKind::LabeledStatement(s) => self.visit_statement(s.body),
+            StatementKind::ExportNamedDeclaration(e) => {
                 if let Some(inner) = e.declaration {
                     self.visit_statement(inner);
                 }
             }
-            Statement::ExportDefaultDeclaration(e) => self.visit_export_default(&e.declaration),
-            Statement::TSExportAssignment(ea) => self.visit_expression(&ea.expression),
-            Statement::ExportAllDeclaration(_)
-            | Statement::TSNamespaceExportDeclaration(_)
-            | Statement::ImportDeclaration(_)
-            | Statement::TSImportEqualsDeclaration(_)
-            | Statement::BreakStatement(_)
-            | Statement::ContinueStatement(_)
-            | Statement::EmptyStatement(_)
-            | Statement::DebuggerStatement(_) => {}
+            StatementKind::ExportDefaultDeclaration(e) => self.visit_export_default(&e.declaration),
+            StatementKind::TSExportAssignment(ea) => self.visit_expression(&ea.expression),
+            StatementKind::ExportAllDeclaration(_)
+            | StatementKind::TSNamespaceExportDeclaration(_)
+            | StatementKind::ImportDeclaration(_)
+            | StatementKind::TSImportEqualsDeclaration(_)
+            | StatementKind::BreakStatement(_)
+            | StatementKind::ContinueStatement(_)
+            | StatementKind::EmptyStatement(_)
+            | StatementKind::DebuggerStatement(_) => {}
         }
     }
 

@@ -4,15 +4,15 @@
 
 use tsv_ts::ast::internal::{
     AssignmentOperator, BinaryExpression, BinaryOperator, Expression, ExpressionKind, LiteralValue,
-    Statement, UnaryOperator,
+    Statement, StatementKind, UnaryOperator,
 };
 
 /// `is_potentially_executable` (utilities.go:4210) — the statement range (minus
 /// `Block`/`Empty`, which are below the range), with `VariableStatement` gated
 /// on block-scoping or an initializer, plus class/enum/module declarations.
 pub(super) fn is_potentially_executable(stmt: &Statement<'_>) -> bool {
-    use Statement as S;
-    match stmt {
+    use StatementKind as S;
+    match &stmt.kind {
         S::ExpressionStatement(_)
         | S::IfStatement(_)
         | S::DoWhileStatement(_)
@@ -42,9 +42,9 @@ pub(super) fn is_potentially_executable(stmt: &Statement<'_>) -> bool {
 /// (binder.go:1663) — the entry-flow write set. Excludes `Block`/`Empty` (below
 /// the range) and every declaration kind (above it).
 pub(super) fn is_statement_range(stmt: &Statement<'_>) -> bool {
-    use Statement as S;
+    use StatementKind as S;
     matches!(
-        stmt,
+        &stmt.kind,
         S::ExpressionStatement(_)
             | S::VariableDeclaration(_)
             | S::IfStatement(_)

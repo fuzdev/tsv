@@ -40,12 +40,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 (None, consequent.span().end)
             };
 
-        Ok(Statement::IfStatement(IfStatement {
-            test,
-            consequent,
-            alternate,
+        Ok(Statement {
             span: Span::new(start as u32, end),
-        }))
+            kind: StatementKind::IfStatement(IfStatement {
+                test,
+                consequent,
+                alternate,
+            }),
+        })
     }
 
     /// Parse for statement: `for (init; test; update) body` or `for (left in/of right) body`
@@ -338,13 +340,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let body = self.arena.alloc(self.parse_nested_statement()?);
         let end = body.span().end;
 
-        Ok(Statement::ForStatement(ForStatement {
-            init,
-            test,
-            update,
-            body,
+        Ok(Statement {
             span: Span::new(start as u32, end),
-        }))
+            kind: StatementKind::ForStatement(ForStatement {
+                init,
+                test,
+                update,
+                body,
+            }),
+        })
     }
 
     /// Parse for-in loop: `for (left in right) body`. `await_at` is the head's `await`
@@ -364,12 +368,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let body = self.arena.alloc(self.parse_nested_statement()?);
         let end = body.span().end;
 
-        Ok(Statement::ForInStatement(ForInStatement {
-            left,
-            right,
-            body,
+        Ok(Statement {
             span: Span::new(start as u32, end),
-        }))
+            kind: StatementKind::ForInStatement(ForInStatement { left, right, body }),
+        })
     }
 
     /// Parse for-of loop: `for (left of right) body`
@@ -400,23 +402,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let body = self.arena.alloc(self.parse_nested_statement()?);
         let end = body.span().end;
 
-        Ok(Statement::ForOfStatement(ForOfStatement {
-            left,
-            right,
-            r#await,
-            body,
+        Ok(Statement {
             span: Span::new(start as u32, end),
-        }))
+            kind: StatementKind::ForOfStatement(ForOfStatement {
+                left,
+                right,
+                r#await,
+                body,
+            }),
+        })
     }
 
     /// Parse while statement: `while (test) body`
     pub(super) fn parse_while_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (test, body, span) = self.parse_paren_head_statement(KeywordKind::While)?;
-        Ok(Statement::WhileStatement(WhileStatement {
-            test,
-            body,
+        Ok(Statement {
             span,
-        }))
+            kind: StatementKind::WhileStatement(WhileStatement { test, body }),
+        })
     }
 
     /// Parse with statement: `with (object) body`
@@ -426,11 +429,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// prints it (one printer keyed on the node type).
     pub(super) fn parse_with_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (object, body, span) = self.parse_paren_head_statement(KeywordKind::With)?;
-        Ok(Statement::WithStatement(WithStatement {
-            object,
-            body,
+        Ok(Statement {
             span,
-        }))
+            kind: StatementKind::WithStatement(WithStatement { object, body }),
+        })
     }
 
     /// Parse the `keyword (expression) body` shape shared by `while` and `with` — the
@@ -491,11 +493,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.eat(TokenKind::Semicolon);
         let end = self.prev_token_end() as u32;
 
-        Ok(Statement::DoWhileStatement(DoWhileStatement {
-            body,
-            test,
+        Ok(Statement {
             span: Span::new(start as u32, end),
-        }))
+            kind: StatementKind::DoWhileStatement(DoWhileStatement { body, test }),
+        })
     }
 
     /// Parse switch statement: `switch (discriminant) { cases }`
@@ -525,11 +526,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?;
 
-        Ok(Statement::SwitchStatement(SwitchStatement {
-            discriminant,
-            cases: cases.into_bump_slice(),
+        Ok(Statement {
             span: Span::new(start as u32, end as u32),
-        }))
+            kind: StatementKind::SwitchStatement(SwitchStatement {
+                discriminant,
+                cases: cases.into_bump_slice(),
+            }),
+        })
     }
 
     /// Parse switch case: `case test: consequent` or `default: consequent`
@@ -618,12 +621,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             |f| f.span.end,
         );
 
-        Ok(Statement::TryStatement(TryStatement {
-            block,
-            handler,
-            finalizer,
+        Ok(Statement {
             span: Span::new(start as u32, end),
-        }))
+            kind: StatementKind::TryStatement(TryStatement {
+                block,
+                handler,
+                finalizer,
+            }),
+        })
     }
 
     /// Parse catch clause: `catch (param) { body }` or `catch { body }`
@@ -715,10 +720,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let argument = self.parse_expression_ref()?;
         let end = self.semicolon_end()?;
 
-        Ok(Statement::ThrowStatement(ThrowStatement {
-            argument,
+        Ok(Statement {
             span: Span::new(start as u32, end),
-        }))
+            kind: StatementKind::ThrowStatement(ThrowStatement { argument }),
+        })
     }
 
     /// Take the optional `LabelIdentifier` of a `break` / `continue`, or `None`
@@ -763,10 +768,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let end = self.semicolon_end()?;
 
-        Ok(Statement::BreakStatement(BreakStatement {
-            label,
+        Ok(Statement {
             span: Span::new(start as u32, end),
-        }))
+            kind: StatementKind::BreakStatement(BreakStatement { label }),
+        })
     }
 
     /// Parse continue statement: `continue;` or `continue label;`
@@ -784,10 +789,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let end = self.semicolon_end()?;
 
-        Ok(Statement::ContinueStatement(ContinueStatement {
-            label,
+        Ok(Statement {
             span: Span::new(start as u32, end),
-        }))
+            kind: StatementKind::ContinueStatement(ContinueStatement { label }),
+        })
     }
 
     /// Parse debugger statement: `debugger;`
@@ -802,9 +807,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let end = self.semicolon_end()?;
 
-        Ok(Statement::DebuggerStatement(DebuggerStatement {
+        Ok(Statement {
             span: Span::new(start as u32, end),
-        }))
+            kind: StatementKind::DebuggerStatement(DebuggerStatement),
+        })
     }
 
     /// Parse labeled statement: `label: statement`
@@ -849,9 +855,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // reports an unexpected token). A `var` statement and ordinary statements are
         // fine; TS declarations (`enum`/`interface`/`type`/`namespace`)
         // acorn-typescript accepts, so they pass through.
-        let label_target_invalid = match &body_stmt {
-            Statement::ClassDeclaration(_) | Statement::FunctionDeclaration(_) => true,
-            Statement::VariableDeclaration(decl) => {
+        let label_target_invalid = match &body_stmt.kind {
+            StatementKind::ClassDeclaration(_) | StatementKind::FunctionDeclaration(_) => true,
+            StatementKind::VariableDeclaration(decl) => {
                 !matches!(decl.kind, VariableDeclarationKind::Var)
             }
             _ => false,
@@ -866,10 +872,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let body = self.arena.alloc(body_stmt);
         let end = body.span().end;
 
-        Ok(Statement::LabeledStatement(LabeledStatement {
-            label,
-            body,
+        Ok(Statement {
             span: Span::new(start as u32, end),
-        }))
+            kind: StatementKind::LabeledStatement(LabeledStatement { label, body }),
+        })
     }
 }

@@ -129,6 +129,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_type_alias_declaration_doc(
         &self,
         decl: &internal::TSTypeAliasDeclaration<'_>,
+        span: Span,
         clause_tail: Option<u8>,
     ) -> DocId {
         let d = self.d();
@@ -138,7 +139,7 @@ impl<'a> Printer<'a> {
         let (keyword_doc, keyword_end) = self.build_declaration_head_doc(
             decl.declare,
             &["type"],
-            decl.span.start,
+            span.start,
             decl.id.span.start,
         );
         parts.push(keyword_doc);
@@ -217,13 +218,7 @@ impl<'a> Printer<'a> {
         // disagreeing with every other `;` in the language (docs/comments.md §Trailing
         // and dangling runs).
         let value_end = decl.type_annotation.span().end;
-        self.push_semicolon_with_gap_comments(
-            &mut parts,
-            value_end,
-            decl.span.end,
-            false,
-            clause_tail,
-        );
+        self.push_semicolon_with_gap_comments(&mut parts, value_end, span.end, false, clause_tail);
 
         d.concat(&parts)
     }
@@ -1244,6 +1239,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_enum_declaration_doc(
         &self,
         decl: &internal::TSEnumDeclaration<'_>,
+        span: Span,
     ) -> DocId {
         let d = self.d();
         let mut prefix = DocBuf::new();
@@ -1256,12 +1252,8 @@ impl<'a> Printer<'a> {
         } else {
             &["enum"]
         };
-        let (keyword_doc, keyword_end) = self.build_declaration_head_doc(
-            decl.declare,
-            head,
-            decl.span.start,
-            decl.id.span.start,
-        );
+        let (keyword_doc, keyword_end) =
+            self.build_declaration_head_doc(decl.declare, head, span.start, decl.id.span.start);
         prefix.push(keyword_doc);
 
         // Everything after the `enum`→name gap is collected into `parts` (the
@@ -1271,13 +1263,12 @@ impl<'a> Printer<'a> {
 
         // Handle comments between name and body: enum C /* comment */ {
         // Use comment-aware search to skip `{` inside comments.
-        let enum_body_brace =
-            self.find_char_outside_comments(decl.id.span.end, decl.span.end, b'{');
+        let enum_body_brace = self.find_char_outside_comments(decl.id.span.end, span.end, b'{');
 
         // Find body start (after '{')
-        let body_start = enum_body_brace.map_or(decl.span.start, |b| b + 1);
-        let body_end = decl.span.end.saturating_sub(1); // Before '}'
-        let body_span = Span::new(body_start - 1, decl.span.end); // Include '{' and '}'
+        let body_start = enum_body_brace.map_or(span.start, |b| b + 1);
+        let body_end = span.end.saturating_sub(1); // Before '}'
+        let body_span = Span::new(body_start - 1, span.end); // Include '{' and '}'
 
         // The header→`{` gap: its comments plus the pre-`{` spacing, and the body's
         // format-ignore verdict. A line comment drops the brace to the next line —

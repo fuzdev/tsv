@@ -49,8 +49,8 @@ use tsv_lang::{Comment, Span};
 use tsv_ts::ast::Program;
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ClassMember, Decorator, ExportDefaultValue, Expression, ExpressionKind,
-    ForInOfLeft, ForInit, ObjectPatternProperty, ObjectProperty, Statement, TSModuleDeclaration,
-    TSModuleDeclarationBody,
+    ForInOfLeft, ForInit, ObjectPatternProperty, ObjectProperty, Statement, StatementKind,
+    TSModuleDeclaration, TSModuleDeclarationBody,
 };
 
 /// A namespace body's instantiation classification — tsgo's
@@ -435,8 +435,8 @@ impl CandidateWalk<'_> {
     /// Descend a **non-candidate** statement's nested statement positions and value
     /// expressions (an embedded arrow/function/class body can hide dead code).
     fn descend(&mut self, stmt: &Statement<'_>) {
-        use Statement as S;
-        match stmt {
+        use StatementKind as S;
+        match &stmt.kind {
             S::ExpressionStatement(s) => self.visit_expr(s.expression),
             S::VariableDeclaration(d) => {
                 for decl in d.declarations {
@@ -796,11 +796,11 @@ impl CandidateWalk<'_> {
 
 /// Classify a candidate statement for the option filter.
 fn classify(stmt: &Statement<'_>) -> CandidateKind {
-    match stmt {
-        Statement::TSEnumDeclaration(e) => CandidateKind::Enum {
+    match &stmt.kind {
+        StatementKind::TSEnumDeclaration(e) => CandidateKind::Enum {
             is_const: e.r#const,
         },
-        Statement::TSModuleDeclaration(m) => CandidateKind::Module {
+        StatementKind::TSModuleDeclaration(m) => CandidateKind::Module {
             state: module_instance_state(m),
         },
         _ => CandidateKind::Plain,
@@ -834,8 +834,8 @@ fn block_instance_state(stmts: &[Statement<'_>]) -> ModuleInstanceState {
 
 /// The per-statement classification of `getModuleInstanceStateWorker`'s switch.
 fn statement_instance_state(stmt: &Statement<'_>) -> ModuleInstanceState {
-    use Statement as S;
-    match stmt {
+    use StatementKind as S;
+    match &stmt.kind {
         S::TSInterfaceDeclaration(_) | S::TSTypeAliasDeclaration(_) => {
             ModuleInstanceState::NonInstantiated
         }
@@ -1060,8 +1060,8 @@ mod tests {
         let parse = |s: &str| tsv_ts::parse(s, &arena).expect("parse");
         let state_of = |src: &str| -> ModuleInstanceState {
             let program = parse(src);
-            match &program.body[0] {
-                Statement::TSModuleDeclaration(m) => module_instance_state(m),
+            match &program.body[0].kind {
+                StatementKind::TSModuleDeclaration(m) => module_instance_state(m),
                 _ => panic!("expected a module"),
             }
         };
