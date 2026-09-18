@@ -105,7 +105,9 @@ Things the published numbers measure that aren't quite what they look like.
   the weakest sample: only a few dozen real standalone files exist in this
   ecosystem (most CSS is authored inside `.svelte` `<style>` blocks), so the
   corpus adds the `svelte_styles` harvest — those blocks extracted and
-  concatenated per repo (~3× the standalone bytes, naturally-sized files). Those
+  concatenated per repo (more bytes than the standalone files hold — about
+  three fifths of the CSS corpus at the current snapshot — in naturally-sized
+  files). Those
   harvest bytes are also timed inside the svelte rows (rows are never summed, so
   this is disclosure, not distortion), and CSS per-file ratios stay the noisiest.
   One shape note on that harvest: the blocks keep their authored bytes verbatim,
@@ -298,9 +300,11 @@ Things the published numbers measure that aren't quite what they look like.
   overturning a reading). The within-noise half also needs ten cleaned timings a side
   before it will call a cell quiet, and prints `n` for each: sample count varies by
   two orders of magnitude across one table (a microsecond row gets four figures; a
-  multi-second row gets the iteration floor of 8), and a cv from a handful of timings
-  that happen to agree is not evidence of quiet — which is what leaves the
-  multi-second rows (prettier and oxfmt on svelte and typescript, at n=8) unclassified.
+  multi-second row gets the iteration floor — 8, or 16 on the canonical rows, the
+  denominator of every ratio), and a cv from a handful of timings that happen to
+  agree is not evidence of quiet — which is what leaves the multi-second
+  alternative rows (oxfmt on svelte and typescript, at n=8) unclassified while the
+  canonical rows' floor clears the ten-timing bar.
 - **Per-iteration forced GC** — off by default (`BENCH_GC=1` makes the bench call
   `globalThis.gc()` between every iteration), and not a uniform bias. Measured on a BENCH_LIMIT=20 / 500ms / WARMUP=2 sample: low-
   allocation paths are penalized heavily (`tsv-internal` 1.4–1.7× slower with the

@@ -116,6 +116,67 @@ const BIOME_CONFIGURATION: Configuration = {
 };
 
 /**
+ * A biome diagnostic as `formatContent` returns it. Only the fields the harness
+ * reads are typed — the js-api's own `Diagnostic` is a union over its three wasm
+ * targets, and the bundler target's severity vocabulary is `hint | information |
+ * warning | error | fatal`.
+ */
+export interface BiomeDiagnostic {
+	severity?: string;
+	category?: string;
+	description?: string;
+}
+
+/**
+ * The severities `formatContent` formats through. Anything else is what biome's
+ * own `errors !== 0` gate refuses to format, and what `format` must refuse to
+ * count as covered. Spelled as the NON-fatal set so a severity biome adds or
+ * renames reads as fatal (a rejected file) rather than as a silent accept — the
+ * same polarity `lib/oxc.ts`'s `oxc_fatal_errors` argues for; `init` proves the
+ * vocabulary still lands (`assert_biome_rejects_invalid`).
+ */
+const BIOME_NON_FATAL_SEVERITIES: ReadonlySet<string> = new Set(['hint', 'information', 'warning']);
+
+/** The diagnostics biome's format gate refuses on — see `BIOME_NON_FATAL_SEVERITIES`. */
+export function biome_fatal_diagnostics(
+	diagnostics: ReadonlyArray<BiomeDiagnostic> | undefined
+): BiomeDiagnostic[] {
+	if (!diagnostics) return [];
+	return diagnostics.filter(
+		(d) => d.severity === undefined || !BIOME_NON_FATAL_SEVERITIES.has(d.severity)
+	);
+}
+
+/** One line naming a diagnostic, for the rejection message the bench records. */
+function biome_diagnostic_summary(d: BiomeDiagnostic): string {
+	return `${d.category ?? 'unknown'}: ${d.description ?? '(no description)'}`;
+}
+
+/**
+ * Assert biome still reports a genuine syntax error as FATAL, failing the impl
+ * loudly when it doesn't.
+ *
+ * The counterpart to the polarity argument on `BIOME_NON_FATAL_SEVERITIES`: that
+ * spelling makes a fabricated accept unreachable through a renamed severity, but
+ * it cannot see biome moving a real syntax error DOWN into the non-fatal set, or
+ * `formatContent` ceasing to return the diagnostics at all — either would put
+ * every unparseable file back into the covered count. Runs once at init, on the
+ * exact call the timed row makes.
+ */
+function assert_biome_rejects_invalid(format: (source: string) => string): void {
+	try {
+		format('const x = ;');
+	} catch {
+		return;
+	}
+	throw new Error(
+		'biome: an invalid source produced no fatal diagnostic — either biome\'s severity vocabulary ' +
+			'has moved or `formatContent` no longer returns diagnostics, so every file would count as ' +
+			'formatted and this row\'s coverage would be fabricated. See `biome_fatal_diagnostics` in lib/biome.ts.'
+	);
+}
+
+/**
  * Biome implementation using WASM.
  *
  * Supports:
@@ -123,6 +184,12 @@ const BIOME_CONFIGURATION: Configuration = {
  * - Parse: unsupported — the `@biomejs/js-api` package exposes no parse entry
  *   point (only `formatContent`/`lintContent`/`fixFile`); Biome parses
  *   internally but never surfaces the AST across the JS boundary.
+ *
+ * `formatContent` is the only in-process format entry, and it opens the file in
+ * biome's workspace, pulls its syntax diagnostics, formats only when there are
+ * none, and closes it — so every timed call carries that wrapper, and `format`
+ * reads the diagnostics to turn a no-op on an unparseable file into a rejection
+ * (see `biome_fatal_diagnostics`).
  *
  * **The wasm module is instantiated BY HAND, and re-instantiated whenever the sweeps
  * it has run have leaked more than a budget into its linear memory (`reset_heap`,
@@ -215,6 +282,8 @@ export class BiomeImplementation extends BaseImplementation {
 				this.format(FORMAT_CONFIG_PROBES[language], language)
 			);
 		}
+		// And that a syntax error is still REJECTED — see `assert_biome_rejects_invalid`.
+		assert_biome_rejects_invalid((source) => this.format(source, 'typescript'));
 	}
 
 	/**
@@ -289,6 +358,16 @@ export class BiomeImplementation extends BaseImplementation {
 			const result = this._biome.formatContent(this._project_key, source, {
 				filePath: `file${LANGUAGE_EXTENSIONS[language]}`
 			});
+			// `formatContent` never throws on a syntax error: the js-api pulls the file's
+			// syntax diagnostics first and formats ONLY when there are none, otherwise
+			// handing the INPUT back unchanged beside the diagnostics. Read them, or a
+			// file biome can't parse is timed as formatted (a parse plus a no-op) and
+			// counted as covered. A throw here is the same rejection every other tool's
+			// parse failure takes, so the file drops out of the group's intersection.
+			const fatal = biome_fatal_diagnostics(result.diagnostics);
+			if (fatal.length > 0) {
+				throw new Error(`Biome syntax error: ${biome_diagnostic_summary(fatal[0]!)}`);
+			}
 			return result.content;
 		} catch (e: unknown) {
 			// Biome WASM panics have minimal info in the error - the full panic message
