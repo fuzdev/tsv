@@ -327,7 +327,24 @@ impl<'a> Printer<'a> {
         // over-width `= {}` / `= () => {}` its one break point (`empty_value_long`).
         // Withholding the layout from them left the binding as the only thing that could
         // shed width.
-        let is_layout_eligible = !has_trailing_comment_expansion && !has_line_comments_in_chain;
+        //
+        // The third exclusion is the shared **retained VALUE shell** rule
+        // ([`Printer::value_shell_forced_open`], the one statement of it — the
+        // `build_assignment_layout` twin overrides its `BreakAfterOperator` with the same
+        // predicate): the author's grouping parens survive because a `//` (or an own-line
+        // comment) in their trailing gap needs them, and the break they then take is the
+        // COMMENT's, not a break point in the value. Excluding the value here withholds
+        // the hang and the fluid marker alike, so the cascade falls through to its last
+        // arm — `" = "` plus the value — which IS the hug this rule asks for:
+        // `const v = (⏎\ta?.b! // c⏎);`. The boundary is the declarator's own end, the
+        // same one both value builders are handed (`build_init_value_doc` at a statement,
+        // `build_for_init_value_doc` under a `for` header), so a header declarator answers
+        // identically. Note the gate's existing wording above already claimed this shape —
+        // "a chain whose own pair RETAINS the run hugging the `=`" — for the narrower
+        // chain spelling alone; the predicate is what makes it true of every value kind.
+        let is_layout_eligible = !has_trailing_comment_expansion
+            && !has_line_comments_in_chain
+            && !self.value_shell_forced_open(init, declarator.span.end);
 
         // RHS expressions that should use break-after-operator layout.
         // Matches Prettier's shouldBreakAfterOperator: poorly breakable chains,

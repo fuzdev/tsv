@@ -227,7 +227,15 @@ Things the published numbers measure that aren't quite what they look like.
   reflect the iterated set, not the full corpus. **`BENCH_MODE=union`** is the
   opt-in escape hatch restoring per-impl iteration (ratios then reflect different
   file sets per impl, and `(Mf)` describes the self impl's count) — useful for
-  auditing what intersection mode hides.
+  auditing what intersection mode hides. The same holds for a file excused in
+  `lib/perf_omit.ts`: an omit entered for ONE tool removes the file from the set
+  EVERY row in its group is timed on, so a group's absolute throughput can move
+  between two reports with no engine change behind it — a large file leaving a
+  small corpus (one harvested stylesheet is a visible share of the CSS bytes)
+  shifts every row's MB/s, tsv's and the canonical row's included. Ratios within
+  the report stay apples-to-apples; an absolute number is comparable across two
+  reports only when their iterated sets match, which `(Mf)` and the omit list are
+  the record of.
 - **Ratio convention (universal).** Every `Nx` in the report is **speedup form**:
   `>1` means self is faster than the named opponent. Column headers spell this
   out (`vs prettier (speedup)`, `vs Best (speedup)`). The only exception is
@@ -507,7 +515,16 @@ prettier. Load-bearing on two axes:
   sections are separate, so proving one proves only its own row, and the svelte
   probe is also what catches a lost `experimentalFullSupportEnabled` (biome then
   returns empty output, which a timed row reads as success). See the pinning bullet
-  in [Fairness caveats](#fairness-caveats).
+  in [Fairness caveats](#fairness-caveats). Like oxc it does not throw its verdict:
+  `formatContent` formats only a file with no syntax diagnostics and otherwise hands
+  the **input back unformatted**, so an accept is defined as "no FATAL diagnostic"
+  (`biome_fatal_diagnostics` in `lib/biome.ts`, a non-fatal denylist for the same
+  conservative-degradation reason as oxc's, with an `init` probe proving a genuine
+  syntax error still reports as fatal). Reading the returned string alone would
+  count a no-op as a formatted file — a free file in biome's timed sweep and a
+  fabricated 100% in its coverage. The real-corpus files it rejects are catalogued
+  in `lib/perf_omit.ts`; each one leaves the whole group's timed set, not just
+  biome's (see the intersection bullet in [Fairness caveats](#fairness-caveats)).
 - **dprint (WASM)** — formatter; **TypeScript, JS only**. This is the engine
   **`deno fmt` runs** for TS/JS (`dprint-plugin-typescript`), loaded in-process as
   its Wasm plugin. Deliberately NOT a `deno fmt` subprocess row: that would exist

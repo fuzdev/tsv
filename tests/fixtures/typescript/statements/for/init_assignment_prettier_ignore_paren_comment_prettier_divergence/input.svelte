@@ -33,18 +33,16 @@
 	// The UNFROZEN forms answer the pair identically — the retained shell is the whole
 	// reason either of them prints just one.
 	for (
-		ccc =
-			(
-				'aaa' in bbb // t
-			);
+		ccc = (
+			'aaa' in bbb // t
+		);
 		;
 	) {}
 
 	for (
-		let eee =
-			(
-				'aaa' in bbb // t
-			);
+		let eee = (
+			'aaa' in bbb // t
+		);
 		;
 	) {}
 
