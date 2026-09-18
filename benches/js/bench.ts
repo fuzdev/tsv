@@ -409,6 +409,14 @@ const REPORT_TAG = IS_CONFORMANCE ? `conformance.${RUNTIME}` : RUNTIME;
  * window for a usable sample count. `BENCH_DURATION` overrides either.
  */
 const BENCH_DURATION = env_int('BENCH_DURATION') ?? (IS_CONFORMANCE ? 15_000 : 5000);
+/**
+ * The sweep floor for the CANONICAL rows (`CANONICAL_FORMATTER_ROW`,
+ * `CANONICAL_PARSER_ROWS`) — double the suite floor, because they are the
+ * denominator of every published ratio and all of them are multi-second sweeps
+ * that stop at the floor rather than the duration budget. See the task loop in
+ * `run_benchmark_group`.
+ */
+const CANONICAL_MIN_ITERATIONS = 16;
 
 /**
  * Coverage-only mode (`BENCH_COVERAGE_ONLY=1`): run pre-flight — which fully
@@ -1909,9 +1917,11 @@ async function run_benchmark_group(
 	const bench = new Benchmark({
 		duration_ms: BENCH_DURATION,
 		warmup_iterations: BENCH_WARMUP,
-		// Suite floor, ONE value for every row (there is no per-task tier — see the
-		// task loop). Fast rows are duration-bound (they hit BENCH_DURATION long
-		// before any floor); the floor exists for the multi-second rows, where the
+		// Suite floor, ONE value for every row but the canonical ones (there is no
+		// per-task tier keyed on timing — see the task loop; the canonical rows get a
+		// higher floor keyed on their NAME, `CANONICAL_MIN_ITERATIONS`). Fast rows are
+		// duration-bound (they hit BENCH_DURATION long before any floor); the floor
+		// exists for the multi-second rows, where the
 		// 5 s budget alone would leave a handful of sweeps. Eight, because that is
 		// what the RAW-timing stability readings need (`DRIFT_MIN_SAMPLES`): with
 		// four a side no single deviant sweep can be a half's median — and the
@@ -1964,11 +1974,25 @@ async function run_benchmark_group(
 		}
 	});
 
+	// The canonical rows are the denominator of every published ratio, and every
+	// one of them is a multi-second sweep that stops AT the floor (prettier on
+	// TypeScript runs ~15 s a sweep, so 8 sweeps is ~2 min and the duration budget
+	// never enters into it — raising BENCH_DURATION would change nothing). Eight
+	// samples under every denominator is thin: the drift detector proves least at
+	// the floor, and these are the rows a leak or a heap tipping over degrades. So
+	// the canonical rows alone get double the floor, keyed on the row NAME — which,
+	// unlike the timing-keyed tier removed below, is the same on every runtime, so
+	// each row still runs one protocol everywhere. Costs ~3.3 min of wall per
+	// runtime, nearly all of it prettier's TypeScript row. The resolved value rides
+	// the row into the report (`min_iterations`) so the two floors are legible.
+	const canonical_rows = new Set([CANONICAL_FORMATTER_ROW, ...Object.values(CANONICAL_PARSER_ROWS)]);
+	const canonical_min_iterations = Math.max(CANONICAL_MIN_ITERATIONS, baselining ? 10 : 8);
+
 	for (const task of tasks) {
 		const task_files = filtered_files_by_task.get(task.tracking_key)!;
 		// ONE protocol per row on every runtime: the suite floor (8; 10 when
-		// baselining), the duration budget, and a warmup sized by TIME from the
-		// row's own pre-flight sweep. There used to be a slow-task tier here (a cold
+		// baselining; 16 on the canonical rows), the duration budget, and a warmup
+		// sized by TIME from the row's own pre-flight sweep. There used to be a slow-task tier here (a cold
 		// pre-flight pass over 5 s raised the floor 5 → 7, and once dropped warmup
 		// 3 → 1) — but the tier was decided by ONE cold pass against a 5 s edge, and
 		// a row straddling it (biome's TS sweep, ~4.5–5.0 s) took the tier on one
@@ -1981,6 +2005,7 @@ async function run_benchmark_group(
 		// a protocol difference would be legible in the report.
 		const preflight_ms = preflight_elapsed_ms.get(task.tracking_key) ?? 0;
 		const warmup_iterations = warmup_iterations_for(preflight_ms);
+		const min_iterations = canonical_rows.has(task.name) ? canonical_min_iterations : undefined;
 		const reset_heap = reset_heap_by_task.get(task.name);
 		const sweep: () => void | Promise<void> = task.is_async
 			? async () => {
@@ -2008,6 +2033,7 @@ async function run_benchmark_group(
 			bench.add({
 				name: task.name,
 				warmup_iterations: 0,
+				min_iterations,
 				setup: async () => {
 					settle_heap();
 					reset_heap();
@@ -2023,6 +2049,7 @@ async function run_benchmark_group(
 			bench.add({
 				name: task.name,
 				warmup_iterations,
+				min_iterations,
 				setup: settle_heap,
 				fn: sweep,
 				async: task.is_async

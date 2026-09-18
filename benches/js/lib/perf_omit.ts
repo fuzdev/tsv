@@ -51,9 +51,11 @@ export interface PerfOmit {
  * entry only for a deliberately-tolerated failure, each with a reason (see the
  * module doc).
  *
- * The current entries all date from admitting `.d.ts` files to the corpus
- * (which tsv and prettier fully handle) and tolerate third-party limitations
- * on declaration-file-only syntax:
+ * Most entries date from admitting `.d.ts` files to the corpus (which tsv and
+ * prettier fully handle) and tolerate third-party limitations on
+ * declaration-file-only syntax; the biome entries are its own parser's limits on
+ * real Svelte and declaration files, surfaced once `lib/biome.ts` began reading
+ * the diagnostics `formatContent` returns beside an unchanged input:
  */
 export const PERF_OMITS: PerfOmit[] = [
 	// kit's runtime/app/{env,environment}/types.d.ts declare ambient consts with
@@ -116,6 +118,61 @@ export const PERF_OMITS: PerfOmit[] = [
 		path: 'svelte/packages/svelte/src/ambient.d.ts',
 		reason:
 			'swc enforces the strict-mode eval/arguments binding early error tsv defers (`export const arguments: never`)'
+	},
+	// biome's `formatContent` reports these as syntax errors and hands the input
+	// back unformatted (see `biome_fatal_diagnostics`). The `.d.ts` pair is the same
+	// ambient-const shape as above, under the same synthetic `file.ts` name;
+	// `motion/public.d.ts` is a class method signature without a body, again
+	// declaration-file-only syntax. The svelte ones are biome's experimental HTML
+	// path rejecting real Svelte: a multi-statement template expression, a snippet
+	// block, `class` parameters, and a `>` selector in a `<style>` block — which
+	// its CSS parser rejects again in the harvested copy of that block.
+	{
+		task: 'format/typescript/biome',
+		path: 'kit/packages/kit/src/runtime/app/env',
+		reason: 'biome rejects ambient consts under the synthetic file.ts name (no path threading in the bench)'
+	},
+	{
+		task: 'format/typescript/biome',
+		path: 'svelte/packages/svelte/src/motion/public.d.ts',
+		reason: 'biome rejects a bodiless class method signature under the synthetic file.ts name'
+	},
+	{
+		task: 'format/svelte/biome',
+		path: 'zzz/src/lib/Picker.svelte',
+		reason: 'biome: template expressions can only contain a single expression'
+	},
+	{
+		task: 'format/svelte/biome',
+		path: 'zzz/src/lib/PickerDialog.svelte',
+		reason: 'biome: template expressions can only contain a single expression'
+	},
+	{
+		task: 'format/svelte/biome',
+		path: 'zzz/src/lib/SortableList.svelte',
+		reason: 'biome: template expressions can only contain a single expression'
+	},
+	{
+		task: 'format/svelte/biome',
+		path: 'fuz_code/src/routes/docs/benchmark/+page.svelte',
+		reason: 'biome: expected a closing block (a snippet block its HTML path does not parse)'
+	},
+	{
+		task: 'format/svelte/biome',
+		path: 'fuz_css/src/routes/docs/classes/+page.svelte',
+		reason: "biome: expected class parameters but found '<' (a class body its HTML path does not parse)"
+	},
+	{
+		task: 'format/svelte/biome',
+		path: 'cosmicplayground/src/routes/StarshipMenu.svelte',
+		reason: "biome: expected a selector but found '>' in a <style> block"
+	},
+	// the same `>` selector again, in the harvested per-collection `<style>`
+	// concatenation that carries StarshipMenu's block (`svelte_styles_harvest.ts`)
+	{
+		task: 'format/css/biome',
+		path: '.cache/svelte_styles/cosmicplayground.css',
+		reason: "biome: expected a selector but found '>' (the harvested StarshipMenu.svelte styles)"
 	}
 ];
 

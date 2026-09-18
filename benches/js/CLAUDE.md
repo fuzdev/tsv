@@ -855,7 +855,9 @@ the median of the second half of the timings against the first's and sees it —
 SIGN is the mechanism, negative still warming up, positive degrading), and the
 protocol the row ran under (`warmup_iterations` / `min_iterations` — warmup is sized
 by time, ≥ `BENCH_WARMUP_MS` from the row's pre-flight sweep, so a fast row no longer
-enters its window still tiering; there is no slow-task tier). **One impl is reset
+enters its window still tiering; there is no timing-keyed slow-task tier — the one
+per-row floor difference is the canonical rows' `CANONICAL_MIN_ITERATIONS` of 16,
+keyed on the row name so it is the same protocol on every runtime). **One impl is reset
 between sweeps**: biome's `Workspace.openFile` retains ~4.5 B of wasm linear memory
 per source byte on every call and `closeFile` frees nothing (a genuine upstream leak,
 not a cache), and linear memory never shrinks, so `lib/biome.ts` re-instantiates the

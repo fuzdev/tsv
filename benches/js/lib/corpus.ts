@@ -658,7 +658,8 @@ function assemble_entries(
 		...snapshot_entries('real'),
 		// Real-authored CSS extracted from the perf-view `.svelte` files' <style>
 		// blocks, concatenated per source collection (bench:harvest:svelte-styles).
-		// Derived but real content: ~3×es the otherwise-tiny standalone-CSS sample with
+		// Derived but real content: more than doubles the otherwise-small standalone-CSS
+		// sample (about three fifths of the CSS bytes at the current snapshot) with
 		// naturally-sized files, and in the gates view exercises the *standalone* CSS
 		// path on real content (embedded CSS rides EmbedContext — a different path).
 		// The same bytes are also timed in the svelte rows; rows are never summed.
