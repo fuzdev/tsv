@@ -170,9 +170,9 @@ function assert_biome_rejects_invalid(format: (source: string) => string): void 
 		return;
 	}
 	throw new Error(
-		'biome: an invalid source produced no fatal diagnostic — either biome\'s severity vocabulary ' +
+		"biome: an invalid source produced no fatal diagnostic — either biome's severity vocabulary " +
 			'has moved or `formatContent` no longer returns diagnostics, so every file would count as ' +
-			'formatted and this row\'s coverage would be fabricated. See `biome_fatal_diagnostics` in lib/biome.ts.'
+			"formatted and this row's coverage would be fabricated. See `biome_fatal_diagnostics` in lib/biome.ts."
 	);
 }
 
