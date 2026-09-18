@@ -76,12 +76,16 @@ impl<'a> Printer<'a> {
     /// This distinguishes `import {} from 'x'` from `import 'x'`.
     /// Also matches braces containing only whitespace and/or comments:
     /// `import { /* c */ } from 'x'`, `import { // c\n } from 'x'`.
-    pub(super) fn has_empty_named_braces(&self, decl: &internal::ImportDeclaration<'_>) -> bool {
+    pub(super) fn has_empty_named_braces(
+        &self,
+        decl: &internal::ImportDeclaration<'_>,
+        span: Span,
+    ) -> bool {
         // A surviving named specifier PROVES the braces are non-empty — decide
         // from the AST whenever the AST can answer, and only fall back to the
         // source scan for the specifier-less case it alone can settle (`import
         // {} from 'x'` vs `import 'x'`, which have the same AST). The scan reads
-        // `decl.span`, so a declaration whose specifier list was rebuilt (the
+        // `span`, so a declaration whose specifier list was rebuilt (the
         // Svelte compiler's type erasure filters out `import { type X, Y }`'s
         // type-only specifiers) would otherwise be judged against the *original*
         // source text, including the specifiers that no longer exist.
@@ -92,7 +96,7 @@ impl<'a> Printer<'a> {
         {
             return false;
         }
-        let text = decl.span.extract(self.source);
+        let text = span.extract(self.source);
         // Find the `from` keyword, skipping comments and not matching inside an
         // identifier — so empty-brace detection isn't fooled by a `from` in a
         // comment (`import // {} from\n'a'`) or a specifier name (`fromage`).
@@ -140,10 +144,11 @@ impl<'a> Printer<'a> {
     pub(super) fn import_header_end(
         &self,
         decl: &internal::ImportDeclaration<'_>,
+        span: Span,
         search_end: u32,
     ) -> u32 {
         let is_type = decl.import_kind == internal::ImportKind::Type;
-        let base = self.module_header_end(is_type, decl.span.start, search_end);
+        let base = self.module_header_end(is_type, span.start, search_end);
         // Skip the phase keyword (`source`/`defer`) for the import-phase proposals so
         // the default-binding / namespace comment scan starts after it.
         //
@@ -168,10 +173,11 @@ impl<'a> Printer<'a> {
     pub(super) fn export_header_end(
         &self,
         decl: &internal::ExportNamedDeclaration<'_>,
+        span: Span,
         search_end: u32,
     ) -> u32 {
         let is_type = decl.export_kind == internal::ExportKind::Type;
-        self.module_header_end(is_type, decl.span.start, search_end)
+        self.module_header_end(is_type, span.start, search_end)
     }
 
     /// Position just past a module declaration's leading keyword(s): after the

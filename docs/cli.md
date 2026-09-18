@@ -294,14 +294,16 @@ inline slot was never where the node lives: the expression parser threads an
 arena, and naming it by reference removes work rather than adding an allocation. That is
 how `Property` (an object literal's `key: value`, and a destructuring pattern's) and
 `VariableDeclarator` went from 160 B to 32, and how every `Expression`-holding statement
-head followed (`ExpressionStatement` 88 → 24, `IfStatement` / `SwitchStatement` /
-`SwitchCase` 96 → 32, `WhileStatement` / `DoWhileStatement` 88 → 24, `ReturnStatement` /
-`ThrowStatement` 80 → 16). With those heads narrowed, `ImportDeclaration` (6.8–11.7% of
-statements) and `ExportNamedDeclaration` (2.4–4.0%) were the only variants left setting
+head followed (with the span now in `Statement`'s header: `ExpressionStatement` 16 B,
+`IfStatement` / `SwitchStatement` 24, `WhileStatement` / `DoWhileStatement` /
+`WithStatement` 16, `ReturnStatement` / `ThrowStatement` 8; `SwitchCase`, which keeps its
+own span, 32). With those heads narrowed, `ImportDeclaration` (6.8–11.7% of statements)
+and `ExportNamedDeclaration` (2.4–4.0%) were the only variants left setting
 the enum's width, so they are arena-boxed too — not for rarity but because they are the
 ceiling, and a boxed head copies the same bytes into the arena that it would have moved
-into the enum. Together those take `Statement` to **72 B rather than 544**; the
-next-widest inline variant is `TryStatement` at 64 B, which is where the ladder stops.
+into the enum. Together those take `Statement` to **72 B rather than 544** (an 8-byte
+span header over a 64-byte `StatementKind`); the next-widest inline variant is
+`TryStatement`, which is where the ladder stops.
 
 **The wire has no reader ceiling of its own.** `tsv parse --pretty` re-indents the
 compact wire bytes in one linear pass (`json_utils::indent_json_with_tabs`) rather than

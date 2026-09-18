@@ -78,6 +78,7 @@ use std::collections::HashSet;
 
 use tsv_svelte::ast::internal::{Fragment, FragmentNode, Root};
 use tsv_ts::ast::internal::Statement;
+use tsv_ts::ast::internal::StatementKind;
 
 use crate::analyze::{Bindings, NameSet};
 use crate::attr_refs::each_child_fragment;
@@ -260,9 +261,9 @@ fn collect<'arena>(
     // module refusals (runes / store reads / top-level `await`) are disclaimed —
     // the corpus is module-rune-free, so they never fire in practice.
     if let Some(module) = root.module
-        && module.content.body.iter().any(|stmt| match stmt {
-            Statement::ExportDefaultDeclaration(_) => true,
-            Statement::ExportNamedDeclaration(export) => {
+        && module.content.body.iter().any(|stmt| match &stmt.kind {
+            StatementKind::ExportDefaultDeclaration(_) => true,
+            StatementKind::ExportNamedDeclaration(export) => {
                 crate::validate::export_named_has_default_specifier(export, source)
             }
             _ => false,
@@ -420,17 +421,17 @@ fn collect<'arena>(
     let mut generated_names = crate::destructure::GeneratedNames::new(&store_names);
     for stmt in erased_body {
         if matches!(
-            stmt,
-            Statement::ExportNamedDeclaration(_)
-                | Statement::ExportDefaultDeclaration(_)
-                | Statement::ExportAllDeclaration(_)
-                | Statement::TSNamespaceExportDeclaration(_)
-                | Statement::TSExportAssignment(_)
+            &stmt.kind,
+            StatementKind::ExportNamedDeclaration(_)
+                | StatementKind::ExportDefaultDeclaration(_)
+                | StatementKind::ExportAllDeclaration(_)
+                | StatementKind::TSNamespaceExportDeclaration(_)
+                | StatementKind::TSExportAssignment(_)
         ) {
             found.push(Refusal::InstanceScriptExport);
             continue;
         }
-        if let Statement::ImportDeclaration(import) = stmt {
+        if let StatementKind::ImportDeclaration(import) = &stmt.kind {
             if let Err(err) = refuse_runes_invalid_import(import, source) {
                 push_unsupported(found, err);
             }
@@ -471,8 +472,8 @@ fn collect<'arena>(
 fn import_local_names(body: &[Statement<'_>], source: &str) -> NameSet {
     use tsv_ts::ast::internal::ImportSpecifier;
     body.iter()
-        .filter_map(|stmt| match stmt {
-            Statement::ImportDeclaration(import) => Some(import),
+        .filter_map(|stmt| match &stmt.kind {
+            StatementKind::ImportDeclaration(import) => Some(import),
             _ => None,
         })
         .flat_map(|import| import.specifiers)

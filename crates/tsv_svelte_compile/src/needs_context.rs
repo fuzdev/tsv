@@ -42,7 +42,7 @@ use tsv_svelte::ast::internal::{
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ExpressionKind,
     ForInOfLeft, ForInit, FunctionExpression, ObjectPatternProperty, ObjectProperty, Statement,
-    VariableDeclaration, VariableDeclarationKind,
+    StatementKind, VariableDeclaration, VariableDeclarationKind,
 };
 
 use crate::analyze::{NameSet, RuneInit, classify_rune_init, pattern_binding_names};
@@ -162,7 +162,7 @@ struct Nc<'a> {
     /// reference to `arguments` refuses exactly when this is 0 (see
     /// [`Refusal::InvalidArgumentsUsage`]). Incremented at the three non-arrow
     /// function sites only — `walk_function_expression`, the
-    /// `Statement::FunctionDeclaration` arm, and the
+    /// `StatementKind::FunctionDeclaration` arm, and the
     /// `ExportDefaultValue::FunctionDeclaration` arm — BEFORE the params walk, so a
     /// function parameter default (`function f(g = arguments)`) counts as inside
     /// the function while an arrow's (`(g = arguments) =>`) does not.
@@ -322,8 +322,8 @@ fn plain_name<'s>(id: &tsv_ts::ast::internal::Identifier<'_>, source: &'s str) -
 /// `context_roots` — the roots whose member/call access sets `needs_context`.
 fn collect_context_roots(instance_body: &[Statement<'_>], source: &str, out: &mut NameSet) {
     for stmt in instance_body {
-        match stmt {
-            Statement::ImportDeclaration(import) => {
+        match &stmt.kind {
+            StatementKind::ImportDeclaration(import) => {
                 use tsv_ts::ast::internal::ImportSpecifier;
                 for spec in import.specifiers {
                     let local = match spec {
@@ -336,7 +336,7 @@ fn collect_context_roots(instance_body: &[Statement<'_>], source: &str, out: &mu
                     }
                 }
             }
-            Statement::VariableDeclaration(decl) => {
+            StatementKind::VariableDeclaration(decl) => {
                 for declarator in decl.declarations {
                     let is_props = declarator
                         .init
@@ -382,7 +382,7 @@ fn collect_context_roots(instance_body: &[Statement<'_>], source: &str, out: &mu
 /// with this one.
 fn collect_rest_prop_names(instance_body: &[Statement<'_>], source: &str, out: &mut NameSet) {
     for stmt in instance_body {
-        let Statement::VariableDeclaration(decl) = stmt else {
+        let StatementKind::VariableDeclaration(decl) = &stmt.kind else {
             continue;
         };
         for declarator in decl.declarations {
@@ -443,8 +443,10 @@ pub(crate) fn collect_constant_names(
 
     let mut out = NameSet::default();
     for stmt in instance_body.iter().chain(module_body.iter()) {
-        match stmt {
-            Statement::VariableDeclaration(decl) if decl.kind == VariableDeclarationKind::Const => {
+        match &stmt.kind {
+            StatementKind::VariableDeclaration(decl)
+                if decl.kind == VariableDeclarationKind::Const =>
+            {
                 for declarator in decl.declarations {
                     // Best-effort: a pattern this cannot enumerate is one
                     // `analyze_declarator` refuses anyway, so nothing reaches a
@@ -455,7 +457,7 @@ pub(crate) fn collect_constant_names(
                     }
                 }
             }
-            Statement::ImportDeclaration(import) => {
+            StatementKind::ImportDeclaration(import) => {
                 for spec in import.specifiers {
                     let local = match spec {
                         ImportSpecifier::Default(s) => &s.local,
@@ -765,7 +767,7 @@ fn declare_js_ident(id: &tsv_ts::ast::internal::Identifier<'_>, nc: &mut Nc<'_>)
 /// and the backward scan finds either — so the two paths are left independent.
 fn hoist_block_consts(stmts: &[Statement<'_>], nc: &mut Nc<'_>) {
     for stmt in stmts {
-        if let Statement::VariableDeclaration(decl) = stmt
+        if let StatementKind::VariableDeclaration(decl) = &stmt.kind
             && decl.kind == VariableDeclarationKind::Const
         {
             for declarator in decl.declarations {
@@ -1175,9 +1177,9 @@ fn walk_for_left(left: &ForInOfLeft<'_>, nc: &mut Nc<'_>) {
 /// instance statements — where a declaration's own name is a component binding,
 /// not a shadow; everywhere else (nested scopes, template) it is true.
 fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
-    match stmt {
-        Statement::VariableDeclaration(d) => walk_var_decl(d, nc, shadow),
-        Statement::FunctionDeclaration(f) => {
+    match &stmt.kind {
+        StatementKind::VariableDeclaration(d) => walk_var_decl(d, nc, shadow),
+        StatementKind::FunctionDeclaration(f) => {
             // The declaration's own name binds in the ENCLOSING scope, so it is
             // recorded before the mark; the parameters and body are its own.
             if shadow && let Some(id) = &f.id {
@@ -1197,16 +1199,16 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
             nc.nonarrow_fn_depth -= 1;
             nc.fn_depth -= 1;
         }
-        Statement::ClassDeclaration(c) => {
+        StatementKind::ClassDeclaration(c) => {
             if shadow && let Some(id) = &c.id {
                 declare_js_ident(id, nc);
             }
             walk_class_body(&c.body, nc);
         }
-        Statement::ExpressionStatement(s) => walk_expr(s.expression, nc),
-        Statement::ReturnStatement(s) => walk_opt(s.argument, nc),
-        Statement::BlockStatement(s) => walk_block(s.body, nc),
-        Statement::IfStatement(s) => {
+        StatementKind::ExpressionStatement(s) => walk_expr(s.expression, nc),
+        StatementKind::ReturnStatement(s) => walk_opt(s.argument, nc),
+        StatementKind::BlockStatement(s) => walk_block(s.body, nc),
+        StatementKind::IfStatement(s) => {
             walk_expr(s.test, nc);
             walk_stmt(s.consequent, nc, true);
             if let Some(alt) = s.alternate {
@@ -1215,7 +1217,7 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
         }
         // A `for`-head binding scopes over the head AND the body, so the mark
         // wraps both.
-        Statement::ForStatement(s) => {
+        StatementKind::ForStatement(s) => {
             let mark = js_scope_mark(nc);
             match &s.init {
                 Some(ForInit::VariableDeclaration(d)) => walk_var_decl(d, nc, true),
@@ -1227,35 +1229,35 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
             walk_stmt(s.body, nc, true);
             js_scope_restore(nc, mark);
         }
-        Statement::ForInStatement(s) => {
+        StatementKind::ForInStatement(s) => {
             let mark = js_scope_mark(nc);
             walk_for_left(s.left, nc);
             walk_expr(s.right, nc);
             walk_stmt(s.body, nc, true);
             js_scope_restore(nc, mark);
         }
-        Statement::ForOfStatement(s) => {
+        StatementKind::ForOfStatement(s) => {
             let mark = js_scope_mark(nc);
             walk_for_left(s.left, nc);
             walk_expr(s.right, nc);
             walk_stmt(s.body, nc, true);
             js_scope_restore(nc, mark);
         }
-        Statement::WhileStatement(s) => {
+        StatementKind::WhileStatement(s) => {
             walk_expr(s.test, nc);
             walk_stmt(s.body, nc, true);
         }
-        Statement::DoWhileStatement(s) => {
+        StatementKind::DoWhileStatement(s) => {
             walk_stmt(s.body, nc, true);
             walk_expr(s.test, nc);
         }
         // Unreachable in practice: a Svelte `<script>` is Module code, so it is strict
         // and the parser refuses `with` there.
-        Statement::WithStatement(s) => {
+        StatementKind::WithStatement(s) => {
             walk_expr(s.object, nc);
             walk_stmt(s.body, nc, true);
         }
-        Statement::SwitchStatement(s) => {
+        StatementKind::SwitchStatement(s) => {
             walk_expr(s.discriminant, nc);
             // The oracle gives a `switch` ONE block scope shared by ALL its cases
             // (`phases/scope.js`: `SwitchStatement: create_block_scope`), so a
@@ -1277,7 +1279,7 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
             }
             js_scope_restore(nc, mark);
         }
-        Statement::TryStatement(s) => {
+        StatementKind::TryStatement(s) => {
             walk_block(s.block.body, nc);
             if let Some(handler) = &s.handler {
                 let mark = js_scope_mark(nc);
@@ -1292,14 +1294,14 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
                 walk_block(finalizer.body, nc);
             }
         }
-        Statement::ThrowStatement(s) => walk_expr(s.argument, nc),
-        Statement::LabeledStatement(s) => walk_stmt(s.body, nc, true),
-        Statement::ExportNamedDeclaration(s) => {
+        StatementKind::ThrowStatement(s) => walk_expr(s.argument, nc),
+        StatementKind::LabeledStatement(s) => walk_stmt(s.body, nc, true),
+        StatementKind::ExportNamedDeclaration(s) => {
             if let Some(decl) = &s.declaration {
                 walk_stmt(decl, nc, shadow);
             }
         }
-        Statement::ExportDefaultDeclaration(s) => match &s.declaration {
+        StatementKind::ExportDefaultDeclaration(s) => match &s.declaration {
             ExportDefaultValue::Expression(e) => walk_expr(e, nc),
             ExportDefaultValue::FunctionDeclaration(f) => {
                 nc.fn_depth += 1;
@@ -1319,23 +1321,23 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
             ExportDefaultValue::TSDeclareFunction(_)
             | ExportDefaultValue::TSInterfaceDeclaration(_) => {}
         },
-        Statement::TSExportAssignment(s) => walk_expr(&s.expression, nc),
+        StatementKind::TSExportAssignment(s) => walk_expr(&s.expression, nc),
         // No trigger-bearing children, or refused elsewhere (TS enum/module are
         // refused by type erasure before this analysis runs; the rune guard
         // refuses them too as its own defense in depth).
-        Statement::BreakStatement(_)
-        | Statement::ContinueStatement(_)
-        | Statement::EmptyStatement(_)
-        | Statement::DebuggerStatement(_)
-        | Statement::ImportDeclaration(_)
-        | Statement::ExportAllDeclaration(_)
-        | Statement::TSNamespaceExportDeclaration(_)
-        | Statement::TSImportEqualsDeclaration(_)
-        | Statement::TSTypeAliasDeclaration(_)
-        | Statement::TSInterfaceDeclaration(_)
-        | Statement::TSDeclareFunction(_)
-        | Statement::TSEnumDeclaration(_)
-        | Statement::TSModuleDeclaration(_) => {}
+        StatementKind::BreakStatement(_)
+        | StatementKind::ContinueStatement(_)
+        | StatementKind::EmptyStatement(_)
+        | StatementKind::DebuggerStatement(_)
+        | StatementKind::ImportDeclaration(_)
+        | StatementKind::ExportAllDeclaration(_)
+        | StatementKind::TSNamespaceExportDeclaration(_)
+        | StatementKind::TSImportEqualsDeclaration(_)
+        | StatementKind::TSTypeAliasDeclaration(_)
+        | StatementKind::TSInterfaceDeclaration(_)
+        | StatementKind::TSDeclareFunction(_)
+        | StatementKind::TSEnumDeclaration(_)
+        | StatementKind::TSModuleDeclaration(_) => {}
     }
 }
 

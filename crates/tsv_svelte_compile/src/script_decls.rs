@@ -13,7 +13,7 @@
 //! any transform emits.
 
 use tsv_ts::ast::internal::{
-    Expression, ExpressionKind, ImportDeclaration, ImportSpecifier, Statement,
+    Expression, ExpressionKind, ImportDeclaration, ImportSpecifier, Statement, StatementKind,
 };
 
 /// Which of a script's `var` declarations [`each_script_declaration`] reports.
@@ -158,8 +158,8 @@ fn script_declarations_of<'arena, E>(
         };
     }
 
-    match stmt {
-        Statement::VariableDeclaration(decl) => {
+    match &stmt.kind {
+        StatementKind::VariableDeclaration(decl) => {
             if top || (descend && decl.kind == VariableDeclarationKind::Var) {
                 for declarator in decl.declarations {
                     f(ScriptDeclaration::Declarator {
@@ -169,13 +169,13 @@ fn script_declarations_of<'arena, E>(
                 }
             }
         }
-        Statement::FunctionDeclaration(fun) => {
+        StatementKind::FunctionDeclaration(fun) => {
             if top && let Some(id) = fun.id.as_ref() {
                 f(ScriptDeclaration::Function(id))?;
             }
             // A function BODY is a new function scope — no `var` escapes it.
         }
-        Statement::ClassDeclaration(class) => {
+        StatementKind::ClassDeclaration(class) => {
             if top && let Some(id) = class.id.as_ref() {
                 f(ScriptDeclaration::Class(id))?;
             }
@@ -183,7 +183,7 @@ fn script_declarations_of<'arena, E>(
             // function. A static block's `var` genuinely does reach script scope
             // in the oracle; `script_contains_static_block` is what covers it.
         }
-        Statement::ImportDeclaration(import) => {
+        StatementKind::ImportDeclaration(import) => {
             for spec in import.specifiers {
                 let local = match spec {
                     ImportSpecifier::Default(s) => &s.local,
@@ -201,7 +201,7 @@ fn script_declarations_of<'arena, E>(
         // folds a template `{a}`), so recurse into the exported declaration at
         // the SAME level. (`export { a }` / `export … from` carry no
         // `declaration` and bind no new name.)
-        Statement::ExportNamedDeclaration(export) => {
+        StatementKind::ExportNamedDeclaration(export) => {
             if let Some(decl) = export.declaration {
                 script_declarations_of(decl, var_scope, top, porous, f)?;
             }
@@ -210,52 +210,52 @@ fn script_declarations_of<'arena, E>(
         // export and a module `export default` each refuse on their own path
         // (`Refusal::ModuleDefaultExport` / the instance-export refusal), so no
         // consumer of this walk can reach one.
-        Statement::ExportDefaultDeclaration(_) => {}
+        StatementKind::ExportDefaultDeclaration(_) => {}
         // Statement bodies that are NOT a new function scope: a `var` declared
         // inside one is function-scoped and lands in THIS script's scope.
-        Statement::BlockStatement(block) => {
+        StatementKind::BlockStatement(block) => {
             for s in block.body {
                 nested_porous!(s);
             }
         }
-        Statement::IfStatement(stmt) => {
+        StatementKind::IfStatement(stmt) => {
             nested!(stmt.consequent);
             if let Some(alternate) = stmt.alternate {
                 nested!(alternate);
             }
         }
-        Statement::ForStatement(stmt) => {
+        StatementKind::ForStatement(stmt) => {
             if let Some(ForInit::VariableDeclaration(decl)) = stmt.init.as_ref() {
                 head_declaration!(decl);
             }
             nested_porous!(stmt.body);
         }
-        Statement::ForInStatement(stmt) => {
+        StatementKind::ForInStatement(stmt) => {
             if let ForInOfLeft::VariableDeclaration(decl) = &stmt.left {
                 head_declaration!(decl);
             }
             nested_porous!(stmt.body);
         }
-        Statement::ForOfStatement(stmt) => {
+        StatementKind::ForOfStatement(stmt) => {
             if let ForInOfLeft::VariableDeclaration(decl) = &stmt.left {
                 head_declaration!(decl);
             }
             nested_porous!(stmt.body);
         }
-        Statement::WhileStatement(stmt) => nested!(stmt.body),
-        Statement::DoWhileStatement(stmt) => nested!(stmt.body),
+        StatementKind::WhileStatement(stmt) => nested!(stmt.body),
+        StatementKind::DoWhileStatement(stmt) => nested!(stmt.body),
         // Unreachable in practice: a Svelte `<script>` is Module code, so it is strict
         // and the parser refuses `with` there.
-        Statement::WithStatement(stmt) => nested!(stmt.body),
-        Statement::LabeledStatement(stmt) => nested!(stmt.body),
-        Statement::SwitchStatement(stmt) => {
+        StatementKind::WithStatement(stmt) => nested!(stmt.body),
+        StatementKind::LabeledStatement(stmt) => nested!(stmt.body),
+        StatementKind::SwitchStatement(stmt) => {
             for case in stmt.cases {
                 for s in case.consequent {
                     nested_porous!(s);
                 }
             }
         }
-        Statement::TryStatement(stmt) => {
+        StatementKind::TryStatement(stmt) => {
             for s in stmt.block.body {
                 nested_porous!(s);
             }
@@ -275,25 +275,25 @@ fn script_declarations_of<'arena, E>(
         // family (see the ⚠️ note above), so no expression position is visited.
         // (A `return` only occurs inside a function, which is a scope boundary
         // this walk never enters.)
-        Statement::ExpressionStatement(_)
-        | Statement::ThrowStatement(_)
-        | Statement::ReturnStatement(_)
-        | Statement::BreakStatement(_)
-        | Statement::ContinueStatement(_)
-        | Statement::EmptyStatement(_)
-        | Statement::DebuggerStatement(_)
-        | Statement::ExportAllDeclaration(_) => {}
+        StatementKind::ExpressionStatement(_)
+        | StatementKind::ThrowStatement(_)
+        | StatementKind::ReturnStatement(_)
+        | StatementKind::BreakStatement(_)
+        | StatementKind::ContinueStatement(_)
+        | StatementKind::EmptyStatement(_)
+        | StatementKind::DebuggerStatement(_)
+        | StatementKind::ExportAllDeclaration(_) => {}
         // TypeScript-only statements. Type erasure runs before every consumer of
         // this walk, so none of these survive to reach it; the arms exist so a
         // new variant still fails compilation here.
-        Statement::TSTypeAliasDeclaration(_)
-        | Statement::TSInterfaceDeclaration(_)
-        | Statement::TSDeclareFunction(_)
-        | Statement::TSEnumDeclaration(_)
-        | Statement::TSModuleDeclaration(_)
-        | Statement::TSExportAssignment(_)
-        | Statement::TSNamespaceExportDeclaration(_)
-        | Statement::TSImportEqualsDeclaration(_) => {}
+        StatementKind::TSTypeAliasDeclaration(_)
+        | StatementKind::TSInterfaceDeclaration(_)
+        | StatementKind::TSDeclareFunction(_)
+        | StatementKind::TSEnumDeclaration(_)
+        | StatementKind::TSModuleDeclaration(_)
+        | StatementKind::TSExportAssignment(_)
+        | StatementKind::TSNamespaceExportDeclaration(_)
+        | StatementKind::TSImportEqualsDeclaration(_) => {}
     }
     Ok(())
 }

@@ -6,14 +6,16 @@ use super::statements::{write_block_statement, write_statement, write_variable_d
 use super::{
     Ctx, JsonWriter, close_node, node_header, write_array, write_identifier_plain, write_or_null,
 };
+use tsv_lang::Span;
 
 /// Emits an `IfStatement` node.
 pub(super) fn write_if_statement(
     w: &mut JsonWriter,
     if_stmt: &internal::IfStatement<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "IfStatement", if_stmt.span, ctx);
+    node_header(w, "IfStatement", span, ctx);
     w.raw(",\"test\":");
     write_expression(w, if_stmt.test, ctx);
     w.raw(",\"consequent\":");
@@ -22,16 +24,17 @@ pub(super) fn write_if_statement(
     write_or_null(w, if_stmt.alternate.as_ref(), |w, alt| {
         write_statement(w, alt, ctx);
     });
-    close_node(w, "IfStatement", if_stmt.span, ctx);
+    close_node(w, "IfStatement", span, ctx);
 }
 
 /// Emits a `ForStatement` node. `init`/`test`/`update` are nullable.
 pub(super) fn write_for_statement(
     w: &mut JsonWriter,
     for_stmt: &internal::ForStatement<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "ForStatement", for_stmt.span, ctx);
+    node_header(w, "ForStatement", span, ctx);
     w.raw(",\"init\":");
     match &for_stmt.init {
         Some(internal::ForInit::VariableDeclaration(decl)) => {
@@ -50,7 +53,7 @@ pub(super) fn write_for_statement(
     });
     w.raw(",\"body\":");
     write_statement(w, for_stmt.body, ctx);
-    close_node(w, "ForStatement", for_stmt.span, ctx);
+    close_node(w, "ForStatement", span, ctx);
 }
 
 /// Emit a `for`-`in`/`for`-`of` `left` (an untagged declaration-or-pattern).
@@ -67,16 +70,17 @@ fn write_for_in_of_left(w: &mut JsonWriter, left: &internal::ForInOfLeft<'_>, ct
 pub(super) fn write_for_in_statement(
     w: &mut JsonWriter,
     for_in: &internal::ForInStatement<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "ForInStatement", for_in.span, ctx);
+    node_header(w, "ForInStatement", span, ctx);
     w.raw(",\"left\":");
     write_for_in_of_left(w, for_in.left, ctx);
     w.raw(",\"right\":");
     write_expression(w, for_in.right, ctx);
     w.raw(",\"body\":");
     write_statement(w, for_in.body, ctx);
-    close_node(w, "ForInStatement", for_in.span, ctx);
+    close_node(w, "ForInStatement", span, ctx);
 }
 
 /// Emits a `ForOfStatement` node. Field order: `await`, `left`, `right`,
@@ -84,9 +88,10 @@ pub(super) fn write_for_in_statement(
 pub(super) fn write_for_of_statement(
     w: &mut JsonWriter,
     for_of: &internal::ForOfStatement<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "ForOfStatement", for_of.span, ctx);
+    node_header(w, "ForOfStatement", span, ctx);
     w.raw(",\"await\":");
     w.bool(for_of.r#await);
     w.raw(",\"left\":");
@@ -95,58 +100,62 @@ pub(super) fn write_for_of_statement(
     write_expression(w, for_of.right, ctx);
     w.raw(",\"body\":");
     write_statement(w, for_of.body, ctx);
-    close_node(w, "ForOfStatement", for_of.span, ctx);
+    close_node(w, "ForOfStatement", span, ctx);
 }
 
 /// Emits a `WhileStatement` node.
 pub(super) fn write_while_statement(
     w: &mut JsonWriter,
     while_stmt: &internal::WhileStatement<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "WhileStatement", while_stmt.span, ctx);
+    node_header(w, "WhileStatement", span, ctx);
     w.raw(",\"test\":");
     write_expression(w, while_stmt.test, ctx);
     w.raw(",\"body\":");
     write_statement(w, while_stmt.body, ctx);
-    close_node(w, "WhileStatement", while_stmt.span, ctx);
+    close_node(w, "WhileStatement", span, ctx);
 }
 
 /// Emits a `WithStatement` node. Field order: `object`, `body`.
 pub(super) fn write_with_statement(
     w: &mut JsonWriter,
     with_stmt: &internal::WithStatement<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "WithStatement", with_stmt.span, ctx);
+    node_header(w, "WithStatement", span, ctx);
     w.raw(",\"object\":");
     write_expression(w, with_stmt.object, ctx);
     w.raw(",\"body\":");
     write_statement(w, with_stmt.body, ctx);
-    close_node(w, "WithStatement", with_stmt.span, ctx);
+    close_node(w, "WithStatement", span, ctx);
 }
 
 /// Emits a `DoWhileStatement` node. Field order: `body`, `test`.
 pub(super) fn write_do_while_statement(
     w: &mut JsonWriter,
     do_while: &internal::DoWhileStatement<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "DoWhileStatement", do_while.span, ctx);
+    node_header(w, "DoWhileStatement", span, ctx);
     w.raw(",\"body\":");
     write_statement(w, do_while.body, ctx);
     w.raw(",\"test\":");
     write_expression(w, do_while.test, ctx);
-    close_node(w, "DoWhileStatement", do_while.span, ctx);
+    close_node(w, "DoWhileStatement", span, ctx);
 }
 
 /// Emits a `SwitchStatement` node (each case a `SwitchCase`).
 pub(super) fn write_switch_statement(
     w: &mut JsonWriter,
     switch_stmt: &internal::SwitchStatement<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "SwitchStatement", switch_stmt.span, ctx);
+    node_header(w, "SwitchStatement", span, ctx);
     w.raw(",\"discriminant\":");
     write_expression(w, switch_stmt.discriminant, ctx);
     w.raw(",\"cases\":");
@@ -161,7 +170,7 @@ pub(super) fn write_switch_statement(
         write_or_null(w, case.test.as_ref(), |w, t| write_expression(w, t, ctx));
         close_node(w, "SwitchCase", case.span, ctx);
     });
-    close_node(w, "SwitchStatement", switch_stmt.span, ctx);
+    close_node(w, "SwitchStatement", span, ctx);
 }
 
 /// Emits a `TryStatement` node (its `handler` a `CatchClause`). `handler` and
@@ -169,9 +178,10 @@ pub(super) fn write_switch_statement(
 pub(super) fn write_try_statement(
     w: &mut JsonWriter,
     try_stmt: &internal::TryStatement<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "TryStatement", try_stmt.span, ctx);
+    node_header(w, "TryStatement", span, ctx);
     w.raw(",\"block\":");
     write_block_statement(w, &try_stmt.block, ctx);
     w.raw(",\"handler\":");
@@ -187,60 +197,64 @@ pub(super) fn write_try_statement(
     write_or_null(w, try_stmt.finalizer.as_ref(), |w, f| {
         write_block_statement(w, f, ctx);
     });
-    close_node(w, "TryStatement", try_stmt.span, ctx);
+    close_node(w, "TryStatement", span, ctx);
 }
 
 /// Emits a `ThrowStatement` node.
 pub(super) fn write_throw_statement(
     w: &mut JsonWriter,
     throw_stmt: &internal::ThrowStatement<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "ThrowStatement", throw_stmt.span, ctx);
+    node_header(w, "ThrowStatement", span, ctx);
     w.raw(",\"argument\":");
     write_expression(w, throw_stmt.argument, ctx);
-    close_node(w, "ThrowStatement", throw_stmt.span, ctx);
+    close_node(w, "ThrowStatement", span, ctx);
 }
 
 /// Emits a `BreakStatement` node. `label` is nullable.
 pub(super) fn write_break_statement(
     w: &mut JsonWriter,
     break_stmt: &internal::BreakStatement<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "BreakStatement", break_stmt.span, ctx);
+    node_header(w, "BreakStatement", span, ctx);
     w.raw(",\"label\":");
     write_or_null(w, break_stmt.label.as_ref(), |w, id| {
         write_identifier_plain(w, id, ctx);
     });
-    close_node(w, "BreakStatement", break_stmt.span, ctx);
+    close_node(w, "BreakStatement", span, ctx);
 }
 
 /// Emits a `ContinueStatement` node. `label` is nullable.
 pub(super) fn write_continue_statement(
     w: &mut JsonWriter,
     continue_stmt: &internal::ContinueStatement<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "ContinueStatement", continue_stmt.span, ctx);
+    node_header(w, "ContinueStatement", span, ctx);
     w.raw(",\"label\":");
     write_or_null(w, continue_stmt.label.as_ref(), |w, id| {
         write_identifier_plain(w, id, ctx);
     });
-    close_node(w, "ContinueStatement", continue_stmt.span, ctx);
+    close_node(w, "ContinueStatement", span, ctx);
 }
 
 /// Emits a `LabeledStatement` node.
 pub(super) fn write_labeled_statement(
     w: &mut JsonWriter,
     labeled: &internal::LabeledStatement<'_>,
+    span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "LabeledStatement", labeled.span, ctx);
+    node_header(w, "LabeledStatement", span, ctx);
     // acorn assigns `body` before `label`, so it serializes first.
     w.raw(",\"body\":");
     write_statement(w, labeled.body, ctx);
     w.raw(",\"label\":");
     write_identifier_plain(w, &labeled.label, ctx);
-    close_node(w, "LabeledStatement", labeled.span, ctx);
+    close_node(w, "LabeledStatement", span, ctx);
 }

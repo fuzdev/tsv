@@ -1318,7 +1318,7 @@ impl<'a> Printer<'a> {
             // (`export default function main(): void;`) is printed by its own signature
             // printer, which keeps the gap. Reading it as one kind double-printed every
             // ambient default overload.
-            if let internal::Statement::ExportDefaultDeclaration(decl) = stmt {
+            if let internal::StatementKind::ExportDefaultDeclaration(decl) = &stmt.kind {
                 return matches!(
                     decl.declaration,
                     internal::ExportDefaultValue::Expression(_)
@@ -1485,9 +1485,9 @@ impl<'a> Printer<'a> {
     fn delegated_statement<'s, 'arena>(
         stmt: &'s internal::Statement<'arena>,
     ) -> Option<&'s internal::Statement<'arena>> {
-        match stmt {
-            internal::Statement::ExportNamedDeclaration(decl) => decl.declaration,
-            internal::Statement::LabeledStatement(stmt) => Some(stmt.body),
+        match &stmt.kind {
+            internal::StatementKind::ExportNamedDeclaration(decl) => decl.declaration,
+            internal::StatementKind::LabeledStatement(stmt) => Some(stmt.body),
             _ => None,
         }
     }
@@ -1505,26 +1505,28 @@ impl<'a> Printer<'a> {
     fn own_statement_terminator<'s, 'arena>(
         stmt: &'s internal::Statement<'arena>,
     ) -> Result<FrozenTerminator, &'s internal::Statement<'arena>> {
-        Ok(match stmt {
-            internal::Statement::VariableDeclaration(_)
-            | internal::Statement::BreakStatement(_)
-            | internal::Statement::ContinueStatement(_)
-            | internal::Statement::DebuggerStatement(_) => FrozenTerminator::Always,
-            internal::Statement::ExpressionStatement(_)
-            | internal::Statement::ReturnStatement(_)
-            | internal::Statement::ThrowStatement(_)
-            | internal::Statement::DoWhileStatement(_)
-            | internal::Statement::ImportDeclaration(_)
-            | internal::Statement::ExportNamedDeclaration(_)
-            | internal::Statement::ExportDefaultDeclaration(_)
-            | internal::Statement::ExportAllDeclaration(_) => FrozenTerminator::IfAuthored,
-            internal::Statement::IfStatement(s) => return Err(s.alternate.unwrap_or(s.consequent)),
-            internal::Statement::ForStatement(s) => return Err(s.body),
-            internal::Statement::ForInStatement(s) => return Err(s.body),
-            internal::Statement::ForOfStatement(s) => return Err(s.body),
-            internal::Statement::WhileStatement(s) => return Err(s.body),
-            internal::Statement::WithStatement(s) => return Err(s.body),
-            internal::Statement::LabeledStatement(s) => return Err(s.body),
+        Ok(match &stmt.kind {
+            internal::StatementKind::VariableDeclaration(_)
+            | internal::StatementKind::BreakStatement(_)
+            | internal::StatementKind::ContinueStatement(_)
+            | internal::StatementKind::DebuggerStatement(_) => FrozenTerminator::Always,
+            internal::StatementKind::ExpressionStatement(_)
+            | internal::StatementKind::ReturnStatement(_)
+            | internal::StatementKind::ThrowStatement(_)
+            | internal::StatementKind::DoWhileStatement(_)
+            | internal::StatementKind::ImportDeclaration(_)
+            | internal::StatementKind::ExportNamedDeclaration(_)
+            | internal::StatementKind::ExportDefaultDeclaration(_)
+            | internal::StatementKind::ExportAllDeclaration(_) => FrozenTerminator::IfAuthored,
+            internal::StatementKind::IfStatement(s) => {
+                return Err(s.alternate.unwrap_or(s.consequent));
+            }
+            internal::StatementKind::ForStatement(s) => return Err(s.body),
+            internal::StatementKind::ForInStatement(s) => return Err(s.body),
+            internal::StatementKind::ForOfStatement(s) => return Err(s.body),
+            internal::StatementKind::WhileStatement(s) => return Err(s.body),
+            internal::StatementKind::WithStatement(s) => return Err(s.body),
+            internal::StatementKind::LabeledStatement(s) => return Err(s.body),
             _ => FrozenTerminator::Never,
         })
     }

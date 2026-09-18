@@ -47,7 +47,7 @@ pub(crate) fn skip_identifier_at(bytes: &[u8], pos: usize, end: usize) -> usize 
 /// decide between the empty-body and normal rendering paths.
 pub(crate) fn is_effectively_empty_body(body: &[internal::Statement<'_>]) -> bool {
     body.iter()
-        .all(|s| matches!(s, internal::Statement::EmptyStatement(_)))
+        .all(|s| matches!(&s.kind, internal::StatementKind::EmptyStatement(_)))
 }
 
 /// The start of the next statement after `index` that will actually be printed
@@ -79,7 +79,7 @@ pub(crate) fn next_printed_stmt<'s, 'arena>(
 ) -> Option<&'s internal::Statement<'arena>> {
     body[index + 1..]
         .iter()
-        .find(|s| !matches!(s, internal::Statement::EmptyStatement(_)))
+        .find(|s| !matches!(&s.kind, internal::StatementKind::EmptyStatement(_)))
 }
 
 /// The slot floor for `body[index]`'s trailing gap: past the last dropped
@@ -91,7 +91,7 @@ pub(crate) fn next_printed_stmt<'s, 'arena>(
 pub(crate) fn statement_gap_floor(body: &[internal::Statement<'_>], index: usize) -> u32 {
     body[index + 1..]
         .iter()
-        .take_while(|s| matches!(s, internal::Statement::EmptyStatement(_)))
+        .take_while(|s| matches!(&s.kind, internal::StatementKind::EmptyStatement(_)))
         .last()
         .map_or_else(|| body[index].span().end, |s| s.span().end)
 }

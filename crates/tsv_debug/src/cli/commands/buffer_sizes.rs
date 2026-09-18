@@ -6,7 +6,7 @@ use crate::cli::commands::profile::{percentile, resolve_profile_files};
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::Comment;
 use tsv_lang::estimated_ast_arena_capacity;
-use tsv_ts::ast::internal::{ImportSpecifier, Statement};
+use tsv_ts::ast::internal::{ImportSpecifier, Statement, StatementKind};
 
 /// Histogram the print-time buffer-size distributions used to tune the TS
 /// printer's `SmallVec` inline capacities.
@@ -202,7 +202,7 @@ fn printer_stats_json_fields(stats: &tsv_ts::BufferStats) -> String {
 /// Count Named specifiers per import declaration in a statement body.
 fn collect_imports(body: &[Statement<'_>], named_specs: &mut Vec<usize>) {
     for stmt in body {
-        if let Statement::ImportDeclaration(decl) = stmt {
+        if let StatementKind::ImportDeclaration(decl) = &stmt.kind {
             // Count every import: the buffer is created per-import regardless, so
             // 0-named (default/namespace-only) imports belong in the spill-rate
             // denominator.

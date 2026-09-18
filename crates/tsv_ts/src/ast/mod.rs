@@ -7,6 +7,6 @@ pub mod precedence;
 
 pub use internal::{
     Comment, Expression, ExpressionKind, ExpressionStatement, Identifier, Literal, LiteralValue,
-    Program, Statement, TSKeywordKind, TSKeywordType, TSType, TSTypeAnnotation,
+    Program, Statement, StatementKind, TSKeywordKind, TSKeywordType, TSType, TSTypeAnnotation,
     VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
 };

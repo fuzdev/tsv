@@ -7,10 +7,11 @@
 // this file sits beside `loops/` rather than in it.
 
 use super::{HeadChainGrouping, OpenParenLineBlockComment};
-use crate::ast::internal::{self, Statement};
+use crate::ast::internal::{self, Statement, StatementKind};
 use crate::printer::Printer;
 use crate::printer::statements::StatementContext;
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
 
 /// What parts `with` from `while` in the layout they otherwise share: the keyword, whether
@@ -44,11 +45,12 @@ impl<'a> Printer<'a> {
     pub(in crate::printer::statements) fn build_while_statement_doc(
         &self,
         stmt: &internal::WhileStatement<'_>,
+        span: Span,
         ctx: StatementContext,
     ) -> DocId {
         self.build_paren_head_statement_doc(
             ParenHeadKind::WHILE,
-            stmt.span.start,
+            span.start,
             stmt.test,
             stmt.body,
             ctx,
@@ -71,11 +73,12 @@ impl<'a> Printer<'a> {
     pub(in crate::printer::statements) fn build_with_statement_doc(
         &self,
         stmt: &internal::WithStatement<'_>,
+        span: Span,
         ctx: StatementContext,
     ) -> DocId {
         self.build_paren_head_statement_doc(
             ParenHeadKind::WITH,
-            stmt.span.start,
+            span.start,
             stmt.object,
             stmt.body,
             ctx,
@@ -100,7 +103,7 @@ impl<'a> Printer<'a> {
         let (mut parts, paren_end) =
             self.build_paren_condition_head(kind.keyword, stmt_start, head, kind.grouping);
 
-        if let Statement::BlockStatement(block) = body {
+        if let StatementKind::BlockStatement(block) = &body.kind {
             // Block body: while (cond) { ... }
             // Uses append_close_paren_with_comments for consistency with if/for-in/for-of:
             // block comments stay inline, line comments become trailing.
@@ -113,7 +116,7 @@ impl<'a> Printer<'a> {
                 }
             }));
             d.group(d.concat(&parts))
-        } else if matches!(body, Statement::EmptyStatement(_)) {
+        } else if matches!(&body.kind, StatementKind::EmptyStatement(_)) {
             // Empty statement: `while (cond);` or `while (cond) /* comment */ ;`
             let empty_start = body.span().start;
             self.append_close_paren_empty_stmt_with_comments(&mut parts, paren_end, empty_start);
@@ -136,13 +139,14 @@ impl<'a> Printer<'a> {
     pub(in crate::printer::statements) fn build_do_while_statement_doc(
         &self,
         stmt: &internal::DoWhileStatement<'_>,
+        span: Span,
         ctx: StatementContext,
     ) -> DocId {
         let d = self.d();
-        let is_block = matches!(stmt.body, Statement::BlockStatement(_));
+        let is_block = matches!(&stmt.body.kind, StatementKind::BlockStatement(_));
 
         // Check for comments between `do` keyword and body
-        let do_end = stmt.span.start + "do".len() as u32;
+        let do_end = span.start + "do".len() as u32;
         let body_start = stmt.body.span().start;
         // The body's container facts: the `while` CONTINUES on the tail's flush line,
         // and only the broken header→body arm below wraps the body in an indent — the
@@ -181,7 +185,7 @@ impl<'a> Printer<'a> {
                 p.push(body_doc);
             }
             p
-        } else if matches!(stmt.body, Statement::EmptyStatement(_)) {
+        } else if matches!(&stmt.body.kind, StatementKind::EmptyStatement(_)) {
             // Prettier's `adjustClause` returns `";"` directly for an empty body
             // → `do;`, not `do ;`.
             smallvec![d.text("do"), body_doc]
@@ -249,12 +253,7 @@ impl<'a> Printer<'a> {
         // `push_semicolon_with_gap_comments`.
         if let Some(close) = close_paren {
             parts.push(d.text(")"));
-            self.push_statement_semicolon(
-                &mut parts,
-                close + 1,
-                stmt.span.end,
-                ctx.terminator_gap(),
-            );
+            self.push_statement_semicolon(&mut parts, close + 1, span.end, ctx.terminator_gap());
         } else {
             parts.push(d.text(");"));
         }

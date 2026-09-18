@@ -303,6 +303,7 @@ pub(crate) fn board() -> Vec<TypeRow> {
             ts::LabeledStatement<'static>,
             ts::ReturnStatement<'static>,
             ts::Statement<'static>,
+            ts::StatementKind<'static>,
             ts::SwitchCase<'static>,
             ts::SwitchStatement<'static>,
             ts::ThrowStatement<'static>,

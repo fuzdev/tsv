@@ -51,8 +51,9 @@ use tsv_ts::ast::internal::{
     ExportDefaultValue, ExportKind, Expression, ExpressionKind, ForInOfLeft, ForInit,
     FunctionDeclaration, FunctionExpression, Identifier, ImportKind, ImportSpecifier,
     MethodDefinition, MethodKind, ObjectPattern, ObjectPatternProperty, ObjectProperty, Property,
-    PropertyDefinition, PropertyKind, PropertyModifier, RestElement, Statement, StaticBlock,
-    SwitchCase, TSModuleDeclarationBody, TemplateLiteral, VariableDeclaration, VariableDeclarator,
+    PropertyDefinition, PropertyKind, PropertyModifier, RestElement, Statement, StatementKind,
+    StaticBlock, SwitchCase, TSModuleDeclarationBody, TemplateLiteral, VariableDeclaration,
+    VariableDeclarator,
 };
 
 use crate::CompileError;
@@ -389,9 +390,10 @@ impl<'arena> Eraser<'arena, '_> {
         Ok(match self.statement(stmt)? {
             StmtOut::Keep => None,
             StmtOut::Replace(new) => Some(self.arena.alloc(new)),
-            StmtOut::Drop => Some(self.arena.alloc(Statement::EmptyStatement(EmptyStatement {
-                span: stmt.span(),
-            }))),
+            StmtOut::Drop => Some(self.arena.alloc(Statement {
+                span: stmt.span,
+                kind: StatementKind::EmptyStatement(EmptyStatement),
+            })),
         })
     }
 
@@ -412,26 +414,33 @@ impl<'arena> Eraser<'arena, '_> {
     ///   they survive into the component function as invalid JS) — tsv refuses
     ///   rather than reproduce that.
     fn statement(&mut self, stmt: &Statement<'arena>) -> Result<StmtOut<'arena>, CompileError> {
-        Ok(match stmt {
+        // The header span: the drop-set payloads below carry none of their own, and
+        // a rebuilt statement keeps the original's.
+        let span = stmt.span;
+        Ok(match &stmt.kind {
             // ── TypeScript-only statements: dropped whole ──────────────────
-            Statement::TSTypeAliasDeclaration(decl) => {
+            StatementKind::TSTypeAliasDeclaration(_) => {
+                self.drop_region(span);
+                StmtOut::Drop
+            }
+            StatementKind::TSInterfaceDeclaration(decl) => {
                 self.drop_region(decl.span);
                 StmtOut::Drop
             }
-            Statement::TSInterfaceDeclaration(decl) => {
-                self.drop_region(decl.span);
-                StmtOut::Drop
-            }
-            Statement::TSDeclareFunction(decl) => {
+            StatementKind::TSDeclareFunction(decl) => {
                 self.drop_region(decl.span);
                 StmtOut::Drop
             }
 
             // ── Refuse-don't-erase: runtime semantics, or an oracle bug ────
-            Statement::TSEnumDeclaration(_) => return unsupported(Refusal::TsEnum),
-            Statement::TSImportEqualsDeclaration(_) => return unsupported(Refusal::TsImportEquals),
-            Statement::TSExportAssignment(_) => return unsupported(Refusal::TsExportAssignment),
-            Statement::TSNamespaceExportDeclaration(_) => {
+            StatementKind::TSEnumDeclaration(_) => return unsupported(Refusal::TsEnum),
+            StatementKind::TSImportEqualsDeclaration(_) => {
+                return unsupported(Refusal::TsImportEquals);
+            }
+            StatementKind::TSExportAssignment(_) => {
+                return unsupported(Refusal::TsExportAssignment);
+            }
+            StatementKind::TSNamespaceExportDeclaration(_) => {
                 return unsupported(Refusal::TsNamespaceExport);
             }
 
@@ -439,7 +448,7 @@ impl<'arena> Eraser<'arena, '_> {
             // any surviving member means it lowers to an IIFE at runtime, which
             // the oracle rejects (`namespaces with non-type nodes`) — with no
             // `declare` carve-out either way.
-            Statement::TSModuleDeclaration(decl) => {
+            StatementKind::TSModuleDeclaration(decl) => {
                 let mark = self.regions.len();
                 let type_only = self.module_body_is_type_only(decl.body.as_ref())?;
                 // The whole declaration's span subsumes whatever its body
@@ -453,7 +462,7 @@ impl<'arena> Eraser<'arena, '_> {
             }
 
             // ── Ordinary statements ────────────────────────────────────────
-            Statement::VariableDeclaration(decl) => {
+            StatementKind::VariableDeclaration(decl) => {
                 // `declare const x: T;` is ambient — dropped whole.
                 if decl.declare {
                     self.drop_region(decl.span);
@@ -461,41 +470,46 @@ impl<'arena> Eraser<'arena, '_> {
                 }
                 match self.variable_declaration(decl)? {
                     None => StmtOut::Keep,
-                    Some(new) => StmtOut::Replace(Statement::VariableDeclaration(new)),
+                    Some(new) => StmtOut::Replace(Statement::from_variable_declaration(new)),
                 }
             }
-            Statement::ExpressionStatement(stmt) => match self.expr_ref(stmt.expression)? {
+            StatementKind::ExpressionStatement(stmt) => match self.expr_ref(stmt.expression)? {
                 None => StmtOut::Keep,
-                Some(expression) => StmtOut::Replace(Statement::ExpressionStatement(
-                    tsv_ts::ast::internal::ExpressionStatement {
-                        expression,
-                        ..stmt.clone()
-                    },
-                )),
-            },
-            Statement::ReturnStatement(stmt) => match stmt.argument {
-                Some(argument) => match self.expr_ref(argument)? {
-                    None => StmtOut::Keep,
-                    Some(argument) => StmtOut::Replace(Statement::ReturnStatement(
-                        tsv_ts::ast::internal::ReturnStatement {
-                            argument: Some(argument),
+                Some(expression) => StmtOut::Replace(Statement {
+                    span,
+                    kind: StatementKind::ExpressionStatement(
+                        tsv_ts::ast::internal::ExpressionStatement {
+                            expression,
                             ..stmt.clone()
                         },
-                    )),
+                    ),
+                }),
+            },
+            StatementKind::ReturnStatement(stmt) => match stmt.argument {
+                Some(argument) => match self.expr_ref(argument)? {
+                    None => StmtOut::Keep,
+                    Some(argument) => StmtOut::Replace(Statement {
+                        span,
+                        kind: StatementKind::ReturnStatement(
+                            tsv_ts::ast::internal::ReturnStatement {
+                                argument: Some(argument),
+                            },
+                        ),
+                    }),
                 },
                 None => StmtOut::Keep,
             },
-            Statement::BlockStatement(block) => match self.block(block)? {
+            StatementKind::BlockStatement(block) => match self.block(block)? {
                 None => StmtOut::Keep,
-                Some(new) => StmtOut::Replace(Statement::BlockStatement(new)),
+                Some(new) => StmtOut::Replace(Statement::from_block_statement(new)),
             },
-            Statement::FunctionDeclaration(decl) => match self.function_declaration(decl)? {
+            StatementKind::FunctionDeclaration(decl) => match self.function_declaration(decl)? {
                 None => StmtOut::Keep,
                 Some(new) => {
-                    StmtOut::Replace(Statement::FunctionDeclaration(self.arena.alloc(new)))
+                    StmtOut::Replace(Statement::from_function_declaration(self.arena.alloc(new)))
                 }
             },
-            Statement::ClassDeclaration(decl) => {
+            StatementKind::ClassDeclaration(decl) => {
                 // `declare class C {}` is ambient — dropped whole.
                 if decl.declare {
                     self.drop_region(decl.span);
@@ -504,14 +518,14 @@ impl<'arena> Eraser<'arena, '_> {
                 match self.class_declaration(decl)? {
                     None => StmtOut::Keep,
                     Some(new) => {
-                        StmtOut::Replace(Statement::ClassDeclaration(self.arena.alloc(new)))
+                        StmtOut::Replace(Statement::from_class_declaration(self.arena.alloc(new)))
                     }
                 }
             }
-            Statement::ImportDeclaration(decl) => {
+            StatementKind::ImportDeclaration(decl) => {
                 // `import type { X } from 'm'` — the whole declaration.
                 if decl.import_kind == ImportKind::Type {
-                    self.drop_region(decl.span);
+                    self.drop_region(span);
                     return Ok(StmtOut::Drop);
                 }
                 // A per-specifier `type` marker (`import { type X, Y }`). A list
@@ -543,20 +557,23 @@ impl<'arena> Eraser<'arena, '_> {
                 if kept.is_empty() {
                     // Subsumed by the whole-declaration region.
                     self.regions.truncate(mark);
-                    self.drop_region(decl.span);
+                    self.drop_region(span);
                     return Ok(StmtOut::Drop);
                 }
-                StmtOut::Replace(Statement::ImportDeclaration(self.arena.alloc(
-                    tsv_ts::ast::internal::ImportDeclaration {
-                        specifiers: kept.into_bump_slice(),
-                        ..(*decl).clone()
-                    },
-                )))
+                StmtOut::Replace(Statement {
+                    span,
+                    kind: StatementKind::ImportDeclaration(self.arena.alloc(
+                        tsv_ts::ast::internal::ImportDeclaration {
+                            specifiers: kept.into_bump_slice(),
+                            ..(*decl).clone()
+                        },
+                    )),
+                })
             }
-            Statement::ExportNamedDeclaration(decl) => {
+            StatementKind::ExportNamedDeclaration(decl) => {
                 // `export type { X }` / `export type * …` — the whole statement.
                 if decl.export_kind == ExportKind::Type {
-                    self.drop_region(decl.span);
+                    self.drop_region(span);
                     return Ok(StmtOut::Drop);
                 }
                 // `export interface X {}` / `export type X = …` / `export
@@ -568,17 +585,18 @@ impl<'arena> Eraser<'arena, '_> {
                         StmtOut::Keep => StmtOut::Keep,
                         StmtOut::Drop => {
                             self.regions.truncate(mark);
-                            self.drop_region(decl.span);
+                            self.drop_region(span);
                             StmtOut::Drop
                         }
-                        StmtOut::Replace(new) => {
-                            StmtOut::Replace(Statement::ExportNamedDeclaration(self.arena.alloc(
+                        StmtOut::Replace(new) => StmtOut::Replace(Statement {
+                            span,
+                            kind: StatementKind::ExportNamedDeclaration(self.arena.alloc(
                                 tsv_ts::ast::internal::ExportNamedDeclaration {
                                     declaration: Some(self.arena.alloc(new)),
                                     ..(*decl).clone()
                                 },
-                            )))
-                        }
+                            )),
+                        }),
                     });
                 }
                 // `export { type A, b }` — the inline type marker.
@@ -601,17 +619,20 @@ impl<'arena> Eraser<'arena, '_> {
                 }
                 if kept.is_empty() {
                     self.regions.truncate(mark);
-                    self.drop_region(decl.span);
+                    self.drop_region(span);
                     return Ok(StmtOut::Drop);
                 }
-                StmtOut::Replace(Statement::ExportNamedDeclaration(self.arena.alloc(
-                    tsv_ts::ast::internal::ExportNamedDeclaration {
-                        specifiers: kept.into_bump_slice(),
-                        ..(*decl).clone()
-                    },
-                )))
+                StmtOut::Replace(Statement {
+                    span,
+                    kind: StatementKind::ExportNamedDeclaration(self.arena.alloc(
+                        tsv_ts::ast::internal::ExportNamedDeclaration {
+                            specifiers: kept.into_bump_slice(),
+                            ..(*decl).clone()
+                        },
+                    )),
+                })
             }
-            Statement::ExportDefaultDeclaration(decl) => {
+            StatementKind::ExportDefaultDeclaration(decl) => {
                 let declaration = match &decl.declaration {
                     ExportDefaultValue::Expression(expr) => {
                         self.expr(expr)?.map(ExportDefaultValue::Expression)
@@ -633,25 +654,24 @@ impl<'arena> Eraser<'arena, '_> {
                 };
                 match declaration {
                     None => StmtOut::Keep,
-                    Some(declaration) => StmtOut::Replace(Statement::ExportDefaultDeclaration(
-                        self.arena
-                            .alloc(tsv_ts::ast::internal::ExportDefaultDeclaration {
-                                declaration,
-                                ..(*decl).clone()
-                            }),
-                    )),
+                    Some(declaration) => StmtOut::Replace(Statement {
+                        span,
+                        kind: StatementKind::ExportDefaultDeclaration(self.arena.alloc(
+                            tsv_ts::ast::internal::ExportDefaultDeclaration { declaration },
+                        )),
+                    }),
                 }
             }
-            Statement::ExportAllDeclaration(decl) => {
+            StatementKind::ExportAllDeclaration(decl) => {
                 if decl.export_kind == ExportKind::Type {
-                    self.drop_region(decl.span);
+                    self.drop_region(span);
                     return Ok(StmtOut::Drop);
                 }
                 StmtOut::Keep
             }
 
             // ── Control flow ───────────────────────────────────────────────
-            Statement::IfStatement(stmt) => {
+            StatementKind::IfStatement(stmt) => {
                 let test = self.expr_ref(stmt.test)?;
                 let consequent = self.statement_ref(stmt.consequent)?;
                 let alternate = match stmt.alternate {
@@ -661,14 +681,16 @@ impl<'arena> Eraser<'arena, '_> {
                 if test.is_none() && consequent.is_none() && alternate.is_none() {
                     return Ok(StmtOut::Keep);
                 }
-                StmtOut::Replace(Statement::IfStatement(tsv_ts::ast::internal::IfStatement {
-                    test: test.unwrap_or(stmt.test),
-                    consequent: consequent.unwrap_or(stmt.consequent),
-                    alternate: alternate.unwrap_or(stmt.alternate),
-                    span: stmt.span,
-                }))
+                StmtOut::Replace(Statement {
+                    span,
+                    kind: StatementKind::IfStatement(tsv_ts::ast::internal::IfStatement {
+                        test: test.unwrap_or(stmt.test),
+                        consequent: consequent.unwrap_or(stmt.consequent),
+                        alternate: alternate.unwrap_or(stmt.alternate),
+                    }),
+                })
             }
-            Statement::ForStatement(stmt) => {
+            StatementKind::ForStatement(stmt) => {
                 let init = match &stmt.init {
                     Some(init) => self.for_init(init)?.map(Some),
                     None => None,
@@ -685,8 +707,9 @@ impl<'arena> Eraser<'arena, '_> {
                 if init.is_none() && test.is_none() && update.is_none() && body.is_none() {
                     return Ok(StmtOut::Keep);
                 }
-                StmtOut::Replace(Statement::ForStatement(
-                    tsv_ts::ast::internal::ForStatement {
+                StmtOut::Replace(Statement {
+                    span,
+                    kind: StatementKind::ForStatement(tsv_ts::ast::internal::ForStatement {
                         init: match init {
                             Some(v) => v.map(|x| &*self.arena.alloc(x)),
                             None => stmt.init,
@@ -700,19 +723,19 @@ impl<'arena> Eraser<'arena, '_> {
                             None => stmt.update,
                         },
                         body: body.unwrap_or(stmt.body),
-                        span: stmt.span,
-                    },
-                ))
+                    }),
+                })
             }
-            Statement::ForInStatement(stmt) => {
+            StatementKind::ForInStatement(stmt) => {
                 let left = self.for_in_of_left(stmt.left)?;
                 let right = self.expr(stmt.right)?;
                 let body = self.statement_ref(stmt.body)?;
                 if left.is_none() && right.is_none() && body.is_none() {
                     return Ok(StmtOut::Keep);
                 }
-                StmtOut::Replace(Statement::ForInStatement(
-                    tsv_ts::ast::internal::ForInStatement {
+                StmtOut::Replace(Statement {
+                    span,
+                    kind: StatementKind::ForInStatement(tsv_ts::ast::internal::ForInStatement {
                         left: match left {
                             Some(x) => self.arena.alloc(x),
                             None => stmt.left,
@@ -722,19 +745,19 @@ impl<'arena> Eraser<'arena, '_> {
                             None => stmt.right,
                         },
                         body: body.unwrap_or(stmt.body),
-                        span: stmt.span,
-                    },
-                ))
+                    }),
+                })
             }
-            Statement::ForOfStatement(stmt) => {
+            StatementKind::ForOfStatement(stmt) => {
                 let left = self.for_in_of_left(stmt.left)?;
                 let right = self.expr(stmt.right)?;
                 let body = self.statement_ref(stmt.body)?;
                 if left.is_none() && right.is_none() && body.is_none() {
                     return Ok(StmtOut::Keep);
                 }
-                StmtOut::Replace(Statement::ForOfStatement(
-                    tsv_ts::ast::internal::ForOfStatement {
+                StmtOut::Replace(Statement {
+                    span,
+                    kind: StatementKind::ForOfStatement(tsv_ts::ast::internal::ForOfStatement {
                         left: match left {
                             Some(x) => self.arena.alloc(x),
                             None => stmt.left,
@@ -745,69 +768,71 @@ impl<'arena> Eraser<'arena, '_> {
                         },
                         body: body.unwrap_or(stmt.body),
                         ..stmt.clone()
-                    },
-                ))
+                    }),
+                })
             }
-            Statement::WhileStatement(stmt) => {
+            StatementKind::WhileStatement(stmt) => {
                 let test = self.expr_ref(stmt.test)?;
                 let body = self.statement_ref(stmt.body)?;
                 if test.is_none() && body.is_none() {
                     return Ok(StmtOut::Keep);
                 }
-                StmtOut::Replace(Statement::WhileStatement(
-                    tsv_ts::ast::internal::WhileStatement {
+                StmtOut::Replace(Statement {
+                    span,
+                    kind: StatementKind::WhileStatement(tsv_ts::ast::internal::WhileStatement {
                         test: test.unwrap_or(stmt.test),
                         body: body.unwrap_or(stmt.body),
-                        span: stmt.span,
-                    },
-                ))
+                    }),
+                })
             }
             // Unreachable in practice: a Svelte `<script>` is Module code, so it is
             // strict and the parser refuses `with` there. The arm is a walk all the
             // same, so the variant is never silently dropped.
-            Statement::WithStatement(stmt) => {
+            StatementKind::WithStatement(stmt) => {
                 let object = self.expr_ref(stmt.object)?;
                 let body = self.statement_ref(stmt.body)?;
                 if object.is_none() && body.is_none() {
                     return Ok(StmtOut::Keep);
                 }
-                StmtOut::Replace(Statement::WithStatement(
-                    tsv_ts::ast::internal::WithStatement {
+                StmtOut::Replace(Statement {
+                    span,
+                    kind: StatementKind::WithStatement(tsv_ts::ast::internal::WithStatement {
                         object: object.unwrap_or(stmt.object),
                         body: body.unwrap_or(stmt.body),
-                        span: stmt.span,
-                    },
-                ))
+                    }),
+                })
             }
-            Statement::DoWhileStatement(stmt) => {
+            StatementKind::DoWhileStatement(stmt) => {
                 let body = self.statement_ref(stmt.body)?;
                 let test = self.expr_ref(stmt.test)?;
                 if test.is_none() && body.is_none() {
                     return Ok(StmtOut::Keep);
                 }
-                StmtOut::Replace(Statement::DoWhileStatement(
-                    tsv_ts::ast::internal::DoWhileStatement {
-                        body: body.unwrap_or(stmt.body),
-                        test: test.unwrap_or(stmt.test),
-                        span: stmt.span,
-                    },
-                ))
+                StmtOut::Replace(Statement {
+                    span,
+                    kind: StatementKind::DoWhileStatement(
+                        tsv_ts::ast::internal::DoWhileStatement {
+                            body: body.unwrap_or(stmt.body),
+                            test: test.unwrap_or(stmt.test),
+                        },
+                    ),
+                })
             }
-            Statement::SwitchStatement(stmt) => {
+            StatementKind::SwitchStatement(stmt) => {
                 let discriminant = self.expr_ref(stmt.discriminant)?;
                 let cases = map_slice!(self, stmt.cases, switch_case);
                 if discriminant.is_none() && cases.is_none() {
                     return Ok(StmtOut::Keep);
                 }
-                StmtOut::Replace(Statement::SwitchStatement(
-                    tsv_ts::ast::internal::SwitchStatement {
+                StmtOut::Replace(Statement {
+                    span,
+                    kind: StatementKind::SwitchStatement(tsv_ts::ast::internal::SwitchStatement {
                         discriminant: discriminant.unwrap_or(stmt.discriminant),
                         cases: cases.unwrap_or(stmt.cases),
-                        span: stmt.span,
-                    },
-                ))
+                    }),
+                })
             }
-            Statement::TryStatement(stmt) => {
+            StatementKind::TryStatement(stmt) => {
                 let block = self.block(&stmt.block)?;
                 let handler = match &stmt.handler {
                     Some(handler) => self.catch_clause(handler)?.map(Some),
@@ -820,42 +845,45 @@ impl<'arena> Eraser<'arena, '_> {
                 if block.is_none() && handler.is_none() && finalizer.is_none() {
                     return Ok(StmtOut::Keep);
                 }
-                StmtOut::Replace(Statement::TryStatement(
-                    tsv_ts::ast::internal::TryStatement {
+                StmtOut::Replace(Statement {
+                    span,
+                    kind: StatementKind::TryStatement(tsv_ts::ast::internal::TryStatement {
                         block: block.unwrap_or_else(|| stmt.block.clone()),
                         handler: match handler {
                             Some(v) => v.map(|x| &*self.arena.alloc(x)),
                             None => stmt.handler,
                         },
                         finalizer: finalizer.unwrap_or_else(|| stmt.finalizer.clone()),
-                        span: stmt.span,
-                    },
-                ))
+                    }),
+                })
             }
-            Statement::ThrowStatement(stmt) => match self.expr_ref(stmt.argument)? {
+            StatementKind::ThrowStatement(stmt) => match self.expr_ref(stmt.argument)? {
                 None => StmtOut::Keep,
-                Some(argument) => StmtOut::Replace(Statement::ThrowStatement(
-                    tsv_ts::ast::internal::ThrowStatement {
+                Some(argument) => StmtOut::Replace(Statement {
+                    span,
+                    kind: StatementKind::ThrowStatement(tsv_ts::ast::internal::ThrowStatement {
                         argument,
-                        span: stmt.span,
-                    },
-                )),
+                    }),
+                }),
             },
-            Statement::LabeledStatement(stmt) => match self.statement_ref(stmt.body)? {
+            StatementKind::LabeledStatement(stmt) => match self.statement_ref(stmt.body)? {
                 None => StmtOut::Keep,
-                Some(body) => StmtOut::Replace(Statement::LabeledStatement(
-                    tsv_ts::ast::internal::LabeledStatement {
-                        body,
-                        ..stmt.clone()
-                    },
-                )),
+                Some(body) => StmtOut::Replace(Statement {
+                    span,
+                    kind: StatementKind::LabeledStatement(
+                        tsv_ts::ast::internal::LabeledStatement {
+                            body,
+                            ..stmt.clone()
+                        },
+                    ),
+                }),
             },
 
             // ── No TypeScript-bearing children ─────────────────────────────
-            Statement::BreakStatement(_)
-            | Statement::ContinueStatement(_)
-            | Statement::EmptyStatement(_)
-            | Statement::DebuggerStatement(_) => StmtOut::Keep,
+            StatementKind::BreakStatement(_)
+            | StatementKind::ContinueStatement(_)
+            | StatementKind::EmptyStatement(_)
+            | StatementKind::DebuggerStatement(_) => StmtOut::Keep,
         })
     }
 

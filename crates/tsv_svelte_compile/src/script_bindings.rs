@@ -13,7 +13,7 @@
 
 use tsv_ts::ast::internal::{
     Expression, ExpressionKind, ImportDeclaration, ImportSpecifier, LiteralValue, ModuleExportName,
-    Statement, VariableDeclarator,
+    Statement, StatementKind, VariableDeclarator,
 };
 
 use crate::analyze::{
@@ -80,10 +80,10 @@ pub(crate) fn analyze_module_script<'arena>(
     let mut nested = NameSet::default();
     let derived = NameSet::default();
     for stmt in body {
-        if matches!(stmt, Statement::ExportDefaultDeclaration(_)) {
+        if matches!(&stmt.kind, StatementKind::ExportDefaultDeclaration(_)) {
             return Err(unsupported(Refusal::ModuleDefaultExport));
         }
-        if let Statement::ImportDeclaration(import) = stmt {
+        if let StatementKind::ImportDeclaration(import) = &stmt.kind {
             refuse_runes_invalid_import(import, source)?;
         }
         let mut ctx = WalkCtx::new(source, &mut updated, &mut nested, &derived);

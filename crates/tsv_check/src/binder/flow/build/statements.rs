@@ -13,7 +13,7 @@ use tsv_ts::ast::internal::{
     BreakStatement, ClassDeclaration, ClassMember, ContinueStatement, Decorator, DoWhileStatement,
     Expression, ExpressionKind, ForInOfLeft, ForInit, ForStatement, FunctionDeclaration,
     Identifier, IfStatement, LabeledStatement, MethodDefinition, MethodKind, ObjectPatternProperty,
-    Statement, SwitchCase, SwitchStatement, TSModuleDeclarationBody, TryStatement,
+    Statement, StatementKind, SwitchCase, SwitchStatement, TSModuleDeclarationBody, TryStatement,
     VariableDeclarator, WhileStatement,
 };
 
@@ -37,17 +37,17 @@ impl<'a> FlowBuilder<'a> {
         if is_statement_range(stmt) {
             self.flow_of_node[id.index()] = Some(self.current_flow);
         }
-        match stmt {
-            Statement::ExpressionStatement(s) => {
+        match &stmt.kind {
+            StatementKind::ExpressionStatement(s) => {
                 self.visit_expression(s.expression);
                 self.maybe_bind_expression_flow_if_call(s.expression);
             }
-            Statement::VariableDeclaration(d) => {
+            StatementKind::VariableDeclaration(d) => {
                 for decl in d.declarations {
                     self.bind_variable_declaration_flow(decl);
                 }
             }
-            Statement::ReturnStatement(s) => {
+            StatementKind::ReturnStatement(s) => {
                 // `bindReturnStatement` (binder.go:1939).
                 if let Some(a) = &s.argument {
                     self.visit_expression(a);
@@ -59,28 +59,28 @@ impl<'a> FlowBuilder<'a> {
                 self.has_explicit_return = true;
                 self.has_flow_effects = true;
             }
-            Statement::ThrowStatement(s) => {
+            StatementKind::ThrowStatement(s) => {
                 // `bindThrowStatement` (binder.go:1949).
                 self.visit_expression(s.argument);
                 self.current_flow = self.unreachable_flow;
                 self.has_flow_effects = true;
             }
             // --- F1b: branching control-flow topology ---------------------
-            Statement::IfStatement(s) => self.bind_if_statement(s),
-            Statement::WhileStatement(s) => self.bind_while_statement(id, s),
-            Statement::DoWhileStatement(s) => self.bind_do_statement(id, s),
-            Statement::ForStatement(s) => self.bind_for_statement(id, s),
-            Statement::ForInStatement(s) => {
+            StatementKind::IfStatement(s) => self.bind_if_statement(s),
+            StatementKind::WhileStatement(s) => self.bind_while_statement(id, s),
+            StatementKind::DoWhileStatement(s) => self.bind_do_statement(id, s),
+            StatementKind::ForStatement(s) => self.bind_for_statement(id, s),
+            StatementKind::ForInStatement(s) => {
                 self.bind_for_in_or_of(id, s.left, s.right, s.body);
             }
-            Statement::ForOfStatement(s) => {
+            StatementKind::ForOfStatement(s) => {
                 self.bind_for_in_or_of(id, s.left, s.right, s.body);
             }
-            Statement::BreakStatement(s) => self.bind_break_statement(s),
-            Statement::ContinueStatement(s) => self.bind_continue_statement(s),
-            Statement::SwitchStatement(s) => self.bind_switch_statement(id, s),
-            Statement::TryStatement(s) => self.bind_try_statement(s),
-            Statement::LabeledStatement(s) => self.bind_labeled_statement(s),
+            StatementKind::BreakStatement(s) => self.bind_break_statement(s),
+            StatementKind::ContinueStatement(s) => self.bind_continue_statement(s),
+            StatementKind::SwitchStatement(s) => self.bind_switch_statement(id, s),
+            StatementKind::TryStatement(s) => self.bind_try_statement(s),
+            StatementKind::LabeledStatement(s) => self.bind_labeled_statement(s),
             // Everything else (declarations, blocks, exports, modules, and `with` —
             // which shapes no flow: tsc's binder has no `bindWithStatement`, so the
             // statement falls to `bindEachChild` there) threads flow linearly through
@@ -100,9 +100,9 @@ impl<'a> FlowBuilder<'a> {
     /// in `visit_statement`. Containers nested here still open their own `Start`
     /// regions, so a function body stays reachable even in dead code.
     fn descend_children_generic(&mut self, stmt: &Statement<'_>) {
-        match stmt {
-            Statement::ExpressionStatement(s) => self.visit_expression(s.expression),
-            Statement::VariableDeclaration(d) => {
+        match &stmt.kind {
+            StatementKind::ExpressionStatement(s) => self.visit_expression(s.expression),
+            StatementKind::VariableDeclaration(d) => {
                 for decl in d.declarations {
                     self.visit_expression(decl.id);
                     if let Some(init) = &decl.init {
@@ -110,28 +110,28 @@ impl<'a> FlowBuilder<'a> {
                     }
                 }
             }
-            Statement::FunctionDeclaration(f) => {
+            StatementKind::FunctionDeclaration(f) => {
                 let id = self.require(addr_of(stmt), statement_kind(stmt));
                 self.visit_function_declaration(f, id);
             }
-            Statement::ClassDeclaration(c) => self.visit_class_decl(c),
-            Statement::ReturnStatement(s) => {
+            StatementKind::ClassDeclaration(c) => self.visit_class_decl(c),
+            StatementKind::ReturnStatement(s) => {
                 if let Some(a) = &s.argument {
                     self.visit_expression(a);
                 }
             }
-            Statement::ThrowStatement(s) => self.visit_expression(s.argument),
-            Statement::BlockStatement(b) => self.visit_statement_list(b.body),
+            StatementKind::ThrowStatement(s) => self.visit_expression(s.argument),
+            StatementKind::BlockStatement(b) => self.visit_statement_list(b.body),
             // --- dead-path linear descent for the branching kinds (their real
             //     topology lives in `visit_statement`; reached only when dead) ---
-            Statement::IfStatement(s) => {
+            StatementKind::IfStatement(s) => {
                 self.visit_expression(s.test);
                 self.visit_statement(s.consequent);
                 if let Some(alt) = s.alternate {
                     self.visit_statement(alt);
                 }
             }
-            Statement::ForStatement(s) => {
+            StatementKind::ForStatement(s) => {
                 match &s.init {
                     Some(ForInit::VariableDeclaration(d)) => {
                         for decl in d.declarations {
@@ -152,29 +152,29 @@ impl<'a> FlowBuilder<'a> {
                 }
                 self.visit_statement(s.body);
             }
-            Statement::ForInStatement(s) => {
+            StatementKind::ForInStatement(s) => {
                 self.visit_for_left(s.left);
                 self.visit_expression(s.right);
                 self.visit_statement(s.body);
             }
-            Statement::ForOfStatement(s) => {
+            StatementKind::ForOfStatement(s) => {
                 self.visit_for_left(s.left);
                 self.visit_expression(s.right);
                 self.visit_statement(s.body);
             }
-            Statement::WhileStatement(s) => {
+            StatementKind::WhileStatement(s) => {
                 self.visit_expression(s.test);
                 self.visit_statement(s.body);
             }
-            Statement::DoWhileStatement(s) => {
+            StatementKind::DoWhileStatement(s) => {
                 self.visit_statement(s.body);
                 self.visit_expression(s.test);
             }
-            Statement::WithStatement(s) => {
+            StatementKind::WithStatement(s) => {
                 self.visit_expression(s.object);
                 self.visit_statement(s.body);
             }
-            Statement::SwitchStatement(s) => {
+            StatementKind::SwitchStatement(s) => {
                 self.visit_expression(s.discriminant);
                 for case in s.cases {
                     if let Some(t) = &case.test {
@@ -183,7 +183,7 @@ impl<'a> FlowBuilder<'a> {
                     self.visit_statement_list(case.consequent);
                 }
             }
-            Statement::TryStatement(s) => {
+            StatementKind::TryStatement(s) => {
                 self.visit_statement_list(s.block.body);
                 if let Some(handler) = &s.handler {
                     if let Some(param) = &handler.param {
@@ -195,43 +195,43 @@ impl<'a> FlowBuilder<'a> {
                     self.visit_statement_list(finalizer.body);
                 }
             }
-            Statement::LabeledStatement(s) => {
+            StatementKind::LabeledStatement(s) => {
                 // Dead-path fallback; the reachable topology lives in
                 // `bind_labeled_statement`.
                 self.visit_identifier(&s.label);
                 self.visit_statement(s.body);
             }
-            Statement::BreakStatement(s) => {
+            StatementKind::BreakStatement(s) => {
                 if let Some(label) = &s.label {
                     self.visit_identifier(label);
                 }
             }
-            Statement::ContinueStatement(s) => {
+            StatementKind::ContinueStatement(s) => {
                 if let Some(label) = &s.label {
                     self.visit_identifier(label);
                 }
             }
-            Statement::ExportNamedDeclaration(e) => {
+            StatementKind::ExportNamedDeclaration(e) => {
                 if let Some(inner) = e.declaration {
                     self.visit_statement(inner);
                 }
                 // export specifiers / source are non-value (skipped).
             }
-            Statement::ExportDefaultDeclaration(e) => self.visit_export_default(e),
-            Statement::TSExportAssignment(ea) => self.visit_expression(&ea.expression),
-            Statement::TSModuleDeclaration(m) => self.visit_module(m),
+            StatementKind::ExportDefaultDeclaration(e) => self.visit_export_default(e),
+            StatementKind::TSExportAssignment(ea) => self.visit_expression(&ea.expression),
+            StatementKind::TSModuleDeclaration(m) => self.visit_module(m),
             // No value content (types / imports / enum bodies / empty): skipped,
             // per the "types are not descended" scope note. See module docs.
-            Statement::TSTypeAliasDeclaration(_)
-            | Statement::TSInterfaceDeclaration(_)
-            | Statement::TSDeclareFunction(_)
-            | Statement::TSEnumDeclaration(_)
-            | Statement::ImportDeclaration(_)
-            | Statement::TSImportEqualsDeclaration(_)
-            | Statement::ExportAllDeclaration(_)
-            | Statement::TSNamespaceExportDeclaration(_)
-            | Statement::EmptyStatement(_)
-            | Statement::DebuggerStatement(_) => {}
+            StatementKind::TSTypeAliasDeclaration(_)
+            | StatementKind::TSInterfaceDeclaration(_)
+            | StatementKind::TSDeclareFunction(_)
+            | StatementKind::TSEnumDeclaration(_)
+            | StatementKind::ImportDeclaration(_)
+            | StatementKind::TSImportEqualsDeclaration(_)
+            | StatementKind::ExportAllDeclaration(_)
+            | StatementKind::TSNamespaceExportDeclaration(_)
+            | StatementKind::EmptyStatement(_)
+            | StatementKind::DebuggerStatement(_) => {}
         }
     }
 

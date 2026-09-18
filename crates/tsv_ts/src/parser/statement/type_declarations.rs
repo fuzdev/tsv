@@ -26,8 +26,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         debug_assert!(self.current_value() == "type");
         self.advance()?;
 
-        let decl = self.parse_type_alias_declaration_body(start, false)?;
-        Ok(Statement::TSTypeAliasDeclaration(self.arena.alloc(decl)))
+        self.parse_type_alias_declaration_body(start, false)
     }
 
     /// Parse type alias declaration with an external start position (for `declare type`)
@@ -39,8 +38,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         debug_assert!(self.current_value() == "type");
         self.advance()?;
 
-        let decl = self.parse_type_alias_declaration_body(start, true)?;
-        Ok(Statement::TSTypeAliasDeclaration(self.arena.alloc(decl)))
+        self.parse_type_alias_declaration_body(start, true)
     }
 
     /// Parse type alias declaration inner - assumes 'type' keyword already consumed
@@ -50,8 +48,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         type_start: usize,
     ) -> Result<Statement<'arena>, ParseError> {
-        let decl = self.parse_type_alias_declaration_body(type_start, false)?;
-        Ok(Statement::TSTypeAliasDeclaration(self.arena.alloc(decl)))
+        self.parse_type_alias_declaration_body(type_start, false)
     }
 
     /// Parse type alias body - the part after 'type' keyword
@@ -59,7 +56,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: usize,
         declare: bool,
-    ) -> Result<TSTypeAliasDeclaration<'arena>, ParseError> {
+    ) -> Result<Statement<'arena>, ParseError> {
         // Parse type name — a `BindingIdentifier`, so contextual type keywords
         // (`type any = …`) are valid names, matching acorn/tsc.
         let Some(id) = self.take_binding_identifier()? else {
@@ -76,12 +73,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let type_annotation = self.parse_type()?.clone();
         let end = self.semicolon_end()?;
 
-        Ok(TSTypeAliasDeclaration {
-            id,
-            type_parameters,
-            type_annotation,
-            declare,
+        Ok(Statement {
             span: Span::new(start as u32, end),
+            kind: StatementKind::TSTypeAliasDeclaration(self.arena.alloc(TSTypeAliasDeclaration {
+                id,
+                type_parameters,
+                type_annotation,
+                declare,
+            })),
         })
     }
 
@@ -110,7 +109,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         declare: bool,
     ) -> Result<Statement<'arena>, ParseError> {
         let decl = self.parse_interface_declaration_struct(start, declare)?;
-        Ok(Statement::TSInterfaceDeclaration(self.arena.alloc(decl)))
+        Ok(Statement::from_ts_interface_declaration(
+            self.arena.alloc(decl),
+        ))
     }
 
     /// Parse an interface declaration into its struct, without wrapping in
@@ -378,15 +379,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse declare variable: `declare const x: T;`, `declare let x: T;`, `declare var x: T;`
     fn parse_declare_variable(&mut self, start: usize) -> Result<Statement<'arena>, ParseError> {
         // Parse as a variable declaration but mark as declare
-        let mut decl = self.parse_variable_declaration()?;
+        let decl = self.parse_variable_declaration()?;
+        let Statement {
+            kind: StatementKind::VariableDeclaration(mut var_decl),
+            ..
+        } = decl
+        else {
+            return Ok(decl);
+        };
 
-        // Mark as declare
-        if let Statement::VariableDeclaration(ref mut var_decl) = decl {
-            var_decl.declare = true;
-            var_decl.span = Span::new(start as u32, var_decl.span.end);
-        }
-
-        Ok(decl)
+        // Mark as declare, widening the span over the `declare` keyword, then re-wrap so
+        // the header takes the widened span from the payload
+        var_decl.declare = true;
+        var_decl.span = Span::new(start as u32, var_decl.span.end);
+        Ok(Statement::from_variable_declaration(var_decl))
     }
 
     /// Parse a top-level `declare function` — always a **bodiless** signature
@@ -446,7 +452,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let end = self.semicolon_end()?;
 
-        Ok(Statement::TSDeclareFunction(self.arena.alloc(
+        Ok(Statement::from_ts_declare_function(self.arena.alloc(
             TSDeclareFunction {
                 id,
                 type_parameters,
@@ -606,7 +612,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<Statement<'arena>, ParseError> {
         let class =
             self.parse_class_declaration_inner_with_start(true, is_abstract, start, true)?;
-        Ok(Statement::ClassDeclaration(self.arena.alloc(class)))
+        Ok(Statement::from_class_declaration(self.arena.alloc(class)))
     }
 
     //
@@ -665,15 +671,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?;
 
-        Ok(Statement::TSEnumDeclaration(self.arena.alloc(
-            TSEnumDeclaration {
+        Ok(Statement {
+            span: Span::new(start as u32, end as u32),
+            kind: StatementKind::TSEnumDeclaration(self.arena.alloc(TSEnumDeclaration {
                 id,
                 members: members.into_bump_slice(),
                 r#const: is_const,
                 declare: is_declare,
-                span: Span::new(start as u32, end as u32),
-            },
-        )))
+            })),
+        })
     }
 
     /// Parse a single enum member: `A`, `A = 1`, `A = "value"`, `"computed" = 1`
@@ -811,7 +817,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             (Some(block), end)
         };
 
-        Ok(Statement::TSModuleDeclaration(self.arena.alloc(
+        Ok(Statement::from_ts_module_declaration(self.arena.alloc(
             TSModuleDeclaration {
                 id,
                 body,
@@ -878,7 +884,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             (None, self.semicolon_end()?)
         };
 
-        Ok(Statement::TSModuleDeclaration(self.arena.alloc(
+        Ok(Statement::from_ts_module_declaration(self.arena.alloc(
             TSModuleDeclaration {
                 id,
                 body,
@@ -906,7 +912,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let body = TSModuleDeclarationBody::TSModuleDeclaration(self.alloc(nested));
         let end = module_body_end(&body);
 
-        Ok(Statement::TSModuleDeclaration(self.arena.alloc(
+        Ok(Statement::from_ts_module_declaration(self.arena.alloc(
             TSModuleDeclaration {
                 id: TSModuleName::Identifier(outer_id),
                 body: Some(body),

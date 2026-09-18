@@ -47,7 +47,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &self,
         declaration: &Statement<'arena>,
     ) -> Result<(), ParseError> {
-        if let Statement::TSModuleDeclaration(module) = declaration
+        if let StatementKind::TSModuleDeclaration(module) = &declaration.kind
             && module.global
             && module.body.is_none()
         {
@@ -68,14 +68,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         export_kind: ExportKind,
     ) -> Statement<'arena> {
         let end = declaration.span().end;
-        Statement::ExportNamedDeclaration(self.arena.alloc(ExportNamedDeclaration {
-            declaration: Some(self.alloc(declaration)),
-            specifiers: &[],
-            source: None,
-            attributes: None,
-            export_kind,
+        Statement {
             span: Span::new(start as u32, end),
-        }))
+            kind: StatementKind::ExportNamedDeclaration(self.arena.alloc(ExportNamedDeclaration {
+                declaration: Some(self.alloc(declaration)),
+                specifiers: &[],
+                source: None,
+                attributes: None,
+                export_kind,
+            })),
+        }
     }
 
     pub(super) fn parse_export_declaration(
@@ -101,12 +103,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.advance()?; // consume '='
                 let expression = self.parse_expression()?;
                 let end = self.semicolon_end()?;
-                Ok(Statement::TSExportAssignment(self.arena.alloc(
-                    TSExportAssignment {
-                        expression,
-                        span: Span::new(start as u32, end),
-                    },
-                )))
+                Ok(Statement {
+                    span: Span::new(start as u32, end),
+                    kind: StatementKind::TSExportAssignment(
+                        self.arena.alloc(TSExportAssignment { expression }),
+                    ),
+                })
             }
             // export import X = ... (TypeScript import-equals re-export). The only
             // valid `export import` form is import-equals, so the binding (after an
@@ -169,12 +171,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.advance()?;
                 let id = Identifier::simple(name, Span::new(id_start as u32, id_end as u32));
                 let end = self.semicolon_end()?;
-                Ok(Statement::TSNamespaceExportDeclaration(
-                    TSNamespaceExportDeclaration {
-                        id,
-                        span: Span::new(start as u32, end),
-                    },
-                ))
+                Ok(Statement {
+                    span: Span::new(start as u32, end),
+                    kind: StatementKind::TSNamespaceExportDeclaration(
+                        TSNamespaceExportDeclaration { id },
+                    ),
+                })
             }
             // export default ...
             TokenKind::Keyword(KeywordKind::Default) => {
@@ -257,7 +259,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     decorators,
                     DecoratedClassExport::BeforeOrAbsent,
                 )?;
-                let class = Statement::ClassDeclaration(self.arena.alloc(class));
+                let class = Statement::from_class_declaration(self.arena.alloc(class));
                 Ok(self.export_named(start, class, ExportKind::Value))
             }
             // export type X = T or export interface X { } or export declare function/class
@@ -467,21 +469,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Expression
                 let expr = self.parse_expression()?;
                 let end = self.semicolon_end()?;
-                return Ok(Statement::ExportDefaultDeclaration(self.arena.alloc(
-                    ExportDefaultDeclaration {
-                        declaration: ExportDefaultValue::Expression(expr),
-                        span: Span::new(start, end),
-                    },
-                )));
+                return Ok(Statement {
+                    span: Span::new(start, end),
+                    kind: StatementKind::ExportDefaultDeclaration(self.arena.alloc(
+                        ExportDefaultDeclaration {
+                            declaration: ExportDefaultValue::Expression(expr),
+                        },
+                    )),
+                });
             }
         };
 
-        Ok(Statement::ExportDefaultDeclaration(self.arena.alloc(
-            ExportDefaultDeclaration {
-                declaration,
-                span: Span::new(start, end),
-            },
-        )))
+        Ok(Statement {
+            span: Span::new(start, end),
+            kind: StatementKind::ExportDefaultDeclaration(
+                self.arena.alloc(ExportDefaultDeclaration { declaration }),
+            ),
+        })
     }
 
     /// Parse a `ModuleExportName` at the current token — the ONE implementation of
@@ -729,15 +733,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let attributes = self.parse_import_attributes()?;
         let end = self.semicolon_end()?;
 
-        Ok(Statement::ExportAllDeclaration(self.arena.alloc(
-            ExportAllDeclaration {
+        Ok(Statement {
+            span: Span::new(start, end),
+            kind: StatementKind::ExportAllDeclaration(self.arena.alloc(ExportAllDeclaration {
                 exported,
                 source,
                 attributes,
                 export_kind,
-                span: Span::new(start, end),
-            },
-        )))
+            })),
+        })
     }
 
     /// Parse export specifiers `{ x, y as z }` with optional `from "source"`:
@@ -825,16 +829,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let end = self.semicolon_end()?;
 
-        Ok(Statement::ExportNamedDeclaration(self.arena.alloc(
-            ExportNamedDeclaration {
+        Ok(Statement {
+            span: Span::new(start, end),
+            kind: StatementKind::ExportNamedDeclaration(self.arena.alloc(ExportNamedDeclaration {
                 declaration: None,
                 specifiers: specifiers.into_bump_slice(),
                 source,
                 attributes,
                 export_kind,
-                span: Span::new(start, end),
-            },
-        )))
+            })),
+        })
     }
 
     /// Parse an export specifier: `local`, `local as exported`, or `default`.
@@ -1020,16 +1024,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let attributes = self.parse_import_attributes()?;
             let end = self.semicolon_end()?;
 
-            return Ok(Statement::ImportDeclaration(self.arena.alloc(
-                ImportDeclaration {
+            return Ok(Statement {
+                span: Span::new(start as u32, end),
+                kind: StatementKind::ImportDeclaration(self.arena.alloc(ImportDeclaration {
                     specifiers: &[],
                     source,
                     attributes,
                     import_kind: ImportKind::Value,
                     phase,
-                    span: Span::new(start as u32, end),
-                },
-            )));
+                })),
+            });
         }
 
         // Check for `import type` (type-only import)
@@ -1246,16 +1250,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let end = self.semicolon_end()?;
 
-        Ok(Statement::ImportDeclaration(self.arena.alloc(
-            ImportDeclaration {
+        Ok(Statement {
+            span: Span::new(start as u32, end),
+            kind: StatementKind::ImportDeclaration(self.arena.alloc(ImportDeclaration {
                 specifiers: specifiers.into_bump_slice(),
                 source,
                 attributes,
                 import_kind,
                 phase,
-                span: Span::new(start as u32, end),
-            },
-        )))
+            })),
+        })
     }
 
     /// Parse import attributes: `with { type: "json" }`.
@@ -1452,14 +1456,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let end = self.semicolon_end()?;
 
-        Ok(Statement::TSImportEqualsDeclaration(self.arena.alloc(
-            TSImportEqualsDeclaration {
-                id,
-                module_reference,
-                import_kind,
-                is_export,
-                span: Span::new(start as u32, end),
-            },
-        )))
+        Ok(Statement {
+            span: Span::new(start as u32, end),
+            kind: StatementKind::TSImportEqualsDeclaration(self.arena.alloc(
+                TSImportEqualsDeclaration {
+                    id,
+                    module_reference,
+                    import_kind,
+                    is_export,
+                },
+            )),
+        })
     }
 }

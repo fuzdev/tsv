@@ -23,20 +23,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // The `1+2` becomes an unreachable expression statement.
         if self.eat(TokenKind::Semicolon) || self.can_insert_semicolon() {
             let end = self.prev_token_end() as u32;
-            return Ok(Statement::ReturnStatement(ReturnStatement {
-                argument: None,
+            return Ok(Statement {
                 span: Span::new(start as u32, end),
-            }));
+                kind: StatementKind::ReturnStatement(ReturnStatement { argument: None }),
+            });
         }
 
         // No ASI - parse the return value expression
         let argument = self.parse_expression_ref()?;
         let end = self.semicolon_end()?;
 
-        Ok(Statement::ReturnStatement(ReturnStatement {
-            argument: Some(argument),
+        Ok(Statement {
             span: Span::new(start as u32, end),
-        }))
+            kind: StatementKind::ReturnStatement(ReturnStatement {
+                argument: Some(argument),
+            }),
+        })
     }
 
     pub(super) fn parse_function_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
@@ -105,7 +107,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Function overload signature - parse as TSDeclareFunction
             let end = self.semicolon_end()?;
 
-            Ok(Statement::TSDeclareFunction(self.arena.alloc(
+            Ok(Statement::from_ts_declare_function(self.arena.alloc(
                 TSDeclareFunction {
                     id,
                     type_parameters,
@@ -122,7 +124,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let body = self.with_fn_context(is_async, is_generator, Self::parse_function_body)?;
             let end = body.span.end;
 
-            Ok(Statement::FunctionDeclaration(self.arena.alloc(
+            Ok(Statement::from_function_declaration(self.arena.alloc(
                 FunctionDeclaration {
                     id: Some(id),
                     type_parameters,

@@ -77,8 +77,8 @@ pub use statements::{
     BlockStatement, BreakStatement, CatchClause, ContinueStatement, DebuggerStatement,
     DoWhileStatement, EmptyStatement, ExpressionStatement, ForInOfLeft, ForInStatement, ForInit,
     ForOfStatement, ForStatement, FunctionDeclaration, IfStatement, LabeledStatement,
-    ReturnStatement, Statement, SwitchCase, SwitchStatement, ThrowStatement, TryStatement,
-    VariableDeclaration, VariableDeclarationKind, VariableDeclarator, WhileStatement,
+    ReturnStatement, Statement, StatementKind, SwitchCase, SwitchStatement, ThrowStatement,
+    TryStatement, VariableDeclaration, VariableDeclarationKind, VariableDeclarator, WhileStatement,
     WithStatement,
 };
 
@@ -122,9 +122,9 @@ pub use expressions::{
 // The LIST-ELEMENT containers whose own width was inline `Expression`s —
 // `Property` (an object literal's `key: value`, and a destructuring pattern's),
 // `VariableDeclarator`, and every `Expression`-holding `Statement` head
-// (`ExpressionStatement` 24 B, `IfStatement` / `SwitchStatement` / `SwitchCase` 32,
-// `WhileStatement` / `DoWhileStatement` / `WithStatement` 24,
-// `ReturnStatement` / `ThrowStatement` 16)
+// (`ExpressionStatement` 16 B, `IfStatement` / `SwitchStatement` 24, `SwitchCase` 32,
+// `WhileStatement` / `DoWhileStatement` / `WithStatement` 16,
+// `ReturnStatement` / `ThrowStatement` 8)
 // — instead hold those slots by reference, which is not the same trade: the parser's
 // expression spine already returns an arena-allocated `&Expression`,
 // so an inline slot is a COPY OUT of the arena rather than a place the node lives.
@@ -136,15 +136,16 @@ pub use expressions::{
 // reference there would ADD an allocation, and `CatchClause` is reached only through
 // `Option<&CatchClause>` so its width sets nothing.
 //
-// `Expression` itself is a header over its variant (`span` + `ExpressionKind`), so a
-// span read is a field load rather than a dispatch; the variant payloads shed their
-// own spans to pay for the header, which is why the width holds at 72.
+// `Expression` and `Statement` are each a header over their variant (`span` +
+// `ExpressionKind` / `StatementKind`), so a span read is a field load rather than a
+// dispatch; the variant payloads shed their own spans to pay for the header, which is
+// why both widths hold at 72.
 //
 // Pinned so a variant that widens any of them shows up as a failed build rather
 // than as a silently lower nesting ceiling and a fatter element slot. The counts are
-// pointer-width-relative and the doc's measurements are x86-64; `Expression` is also
-// pinned on wasm32 (a 4 B pointer, but an 8 B-aligned payload), and its `Option` must
-// stay niche-packed on both.
+// pointer-width-relative and the doc's measurements are x86-64; `Expression` and
+// `Statement` are also pinned on wasm32 (a 4 B pointer; `Expression`'s payload is 8 B
+// aligned, `Statement`'s 4 B), and each one's `Option` must stay niche-packed on both.
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(size_of::<Expression<'static>>() == 72);
 #[cfg(target_pointer_width = "64")]
@@ -154,6 +155,11 @@ const _: () = assert!(size_of::<Expression<'static>>() == 48);
 const _: () = assert!(size_of::<Option<Expression<'static>>>() == size_of::<Expression<'static>>());
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(size_of::<Statement<'static>>() == 72);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<StatementKind<'static>>() == 64);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(size_of::<Statement<'static>>() == 48);
+const _: () = assert!(size_of::<Option<Statement<'static>>>() == size_of::<Statement<'static>>());
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(size_of::<Property<'static>>() == 32);
 #[cfg(target_pointer_width = "64")]

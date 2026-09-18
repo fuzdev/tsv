@@ -30,7 +30,7 @@ use tsv_svelte::ast::internal::{
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ClassBody, ClassMember, Expression, ExpressionKind, ForInOfLeft, ForInit,
     FunctionExpression, Identifier, ObjectPatternProperty, ObjectProperty, Statement,
-    VariableDeclaration,
+    StatementKind, VariableDeclaration,
 };
 
 use crate::analyze::{NameSet, pattern_binding_names};
@@ -735,9 +735,9 @@ impl<'s> Collector<'s> {
     }
 
     fn stmt(&mut self, stmt: &Statement<'_>) {
-        match stmt {
-            Statement::VariableDeclaration(d) => self.var_decl(d),
-            Statement::FunctionDeclaration(f) => {
+        match &stmt.kind {
+            StatementKind::VariableDeclaration(d) => self.var_decl(d),
+            StatementKind::FunctionDeclaration(f) => {
                 if let Some(id) = &f.id {
                     self.ident_local(id);
                 }
@@ -747,27 +747,27 @@ impl<'s> Collector<'s> {
                 }
                 self.stmts(f.body.body);
             }
-            Statement::ClassDeclaration(c) => {
+            StatementKind::ClassDeclaration(c) => {
                 if let Some(id) = &c.id {
                     self.ident_local(id);
                 }
                 self.class_body(&c.body);
             }
-            Statement::ExpressionStatement(s) => self.expr(s.expression),
-            Statement::ReturnStatement(s) => {
+            StatementKind::ExpressionStatement(s) => self.expr(s.expression),
+            StatementKind::ReturnStatement(s) => {
                 if let Some(arg) = &s.argument {
                     self.expr(arg);
                 }
             }
-            Statement::BlockStatement(s) => self.stmts(s.body),
-            Statement::IfStatement(s) => {
+            StatementKind::BlockStatement(s) => self.stmts(s.body),
+            StatementKind::IfStatement(s) => {
                 self.expr(s.test);
                 self.stmt(s.consequent);
                 if let Some(alt) = s.alternate {
                     self.stmt(alt);
                 }
             }
-            Statement::ForStatement(s) => {
+            StatementKind::ForStatement(s) => {
                 match &s.init {
                     Some(ForInit::VariableDeclaration(d)) => self.var_decl(d),
                     Some(ForInit::Expression(e)) => self.expr(e),
@@ -781,31 +781,31 @@ impl<'s> Collector<'s> {
                 }
                 self.stmt(s.body);
             }
-            Statement::ForInStatement(s) => {
+            StatementKind::ForInStatement(s) => {
                 self.for_left(s.left);
                 self.expr(s.right);
                 self.stmt(s.body);
             }
-            Statement::ForOfStatement(s) => {
+            StatementKind::ForOfStatement(s) => {
                 self.for_left(s.left);
                 self.expr(s.right);
                 self.stmt(s.body);
             }
-            Statement::WhileStatement(s) => {
+            StatementKind::WhileStatement(s) => {
                 self.expr(s.test);
                 self.stmt(s.body);
             }
-            Statement::DoWhileStatement(s) => {
+            StatementKind::DoWhileStatement(s) => {
                 self.stmt(s.body);
                 self.expr(s.test);
             }
             // Unreachable in practice: a Svelte `<script>` is Module code, so it is
             // strict and the parser refuses `with` there.
-            Statement::WithStatement(s) => {
+            StatementKind::WithStatement(s) => {
                 self.expr(s.object);
                 self.stmt(s.body);
             }
-            Statement::SwitchStatement(s) => {
+            StatementKind::SwitchStatement(s) => {
                 self.expr(s.discriminant);
                 for case in s.cases {
                     if let Some(test) = &case.test {
@@ -814,7 +814,7 @@ impl<'s> Collector<'s> {
                     self.stmts(case.consequent);
                 }
             }
-            Statement::TryStatement(s) => {
+            StatementKind::TryStatement(s) => {
                 self.stmts(s.block.body);
                 if let Some(handler) = &s.handler {
                     if let Some(param) = &handler.param {
@@ -826,25 +826,25 @@ impl<'s> Collector<'s> {
                     self.stmts(finalizer.body);
                 }
             }
-            Statement::ThrowStatement(s) => self.expr(s.argument),
-            Statement::LabeledStatement(s) => self.stmt(s.body),
+            StatementKind::ThrowStatement(s) => self.expr(s.argument),
+            StatementKind::LabeledStatement(s) => self.stmt(s.body),
             // No reference-bearing children, or refused before emission.
-            Statement::BreakStatement(_)
-            | Statement::ContinueStatement(_)
-            | Statement::EmptyStatement(_)
-            | Statement::DebuggerStatement(_)
-            | Statement::ImportDeclaration(_)
-            | Statement::ExportNamedDeclaration(_)
-            | Statement::ExportDefaultDeclaration(_)
-            | Statement::ExportAllDeclaration(_)
-            | Statement::TSNamespaceExportDeclaration(_)
-            | Statement::TSImportEqualsDeclaration(_)
-            | Statement::TSExportAssignment(_)
-            | Statement::TSTypeAliasDeclaration(_)
-            | Statement::TSInterfaceDeclaration(_)
-            | Statement::TSDeclareFunction(_)
-            | Statement::TSEnumDeclaration(_)
-            | Statement::TSModuleDeclaration(_) => {}
+            StatementKind::BreakStatement(_)
+            | StatementKind::ContinueStatement(_)
+            | StatementKind::EmptyStatement(_)
+            | StatementKind::DebuggerStatement(_)
+            | StatementKind::ImportDeclaration(_)
+            | StatementKind::ExportNamedDeclaration(_)
+            | StatementKind::ExportDefaultDeclaration(_)
+            | StatementKind::ExportAllDeclaration(_)
+            | StatementKind::TSNamespaceExportDeclaration(_)
+            | StatementKind::TSImportEqualsDeclaration(_)
+            | StatementKind::TSExportAssignment(_)
+            | StatementKind::TSTypeAliasDeclaration(_)
+            | StatementKind::TSInterfaceDeclaration(_)
+            | StatementKind::TSDeclareFunction(_)
+            | StatementKind::TSEnumDeclaration(_)
+            | StatementKind::TSModuleDeclaration(_) => {}
         }
     }
 

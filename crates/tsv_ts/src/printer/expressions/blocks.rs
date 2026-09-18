@@ -773,7 +773,7 @@ impl<'a> Printer<'a> {
             // `printStatementSequence` never prints them), but any comments
             // attached to one must survive — printed as orphaned comments
             // with nothing following them in this iteration to glue to.
-            if matches!(stmt, internal::Statement::EmptyStatement(_)) {
+            if matches!(&stmt.kind, internal::StatementKind::EmptyStatement(_)) {
                 let stmt_end = stmt.span().end;
                 // A block body has no seam past its end that could re-place a trailing run's
                 // comments, so every slot here claims — [`Printer::orphan_semi_slot`].

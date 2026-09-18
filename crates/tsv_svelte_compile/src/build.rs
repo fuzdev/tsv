@@ -48,8 +48,8 @@ use tsv_ts::ast::internal::{
     ExpressionStatement, FunctionDeclaration, IdentName, Identifier, IfStatement,
     ImportDeclaration, ImportKind, ImportNamespaceSpecifier, ImportPhase, ImportSpecifier, Literal,
     LiteralValue, MemberExpression, ObjectExpression, Property, PropertyKind, Statement,
-    StringCooked, TemplateCooked, TemplateElement, TemplateLiteral, UnaryExpression, UnaryOperator,
-    UpdateExpression, UpdateOperator, VariableDeclaration, VariableDeclarationKind,
+    StatementKind, StringCooked, TemplateCooked, TemplateElement, TemplateLiteral, UnaryExpression,
+    UnaryOperator, UpdateExpression, UpdateOperator, VariableDeclaration, VariableDeclarationKind,
     VariableDeclarator,
 };
 
@@ -151,7 +151,7 @@ impl<'arena> Builder<'arena> {
     }
 
     /// `import * as <local> from '<specifier>';`
-    pub fn import_namespace(&mut self, local: &str, specifier: &str) -> ImportDeclaration<'arena> {
+    pub fn import_namespace(&mut self, local: &str, specifier: &str) -> Statement<'arena> {
         let start = self.mint("import * as ").start;
         let local = self.ident(local);
         let local_span = local.span;
@@ -163,13 +163,15 @@ impl<'arena> Builder<'arena> {
             local,
             span: local_span,
         }));
-        ImportDeclaration {
-            specifiers: specifiers.into_bump_slice(),
-            source,
-            attributes: None,
-            import_kind: ImportKind::Value,
-            phase: ImportPhase::None,
+        Statement {
             span: Span::new(start, end),
+            kind: StatementKind::ImportDeclaration(self.arena.alloc(ImportDeclaration {
+                specifiers: specifiers.into_bump_slice(),
+                source,
+                attributes: None,
+                import_kind: ImportKind::Value,
+                phase: ImportPhase::None,
+            })),
         }
     }
 
@@ -549,11 +551,13 @@ impl<'arena> Builder<'arena> {
     /// (`transform_server`'s `$$renderer.component` wrapper).
     pub fn expression_statement(&self, expression: Expression<'arena>) -> Statement<'arena> {
         let span = expression.span();
-        Statement::ExpressionStatement(ExpressionStatement {
-            expression: self.arena.alloc(expression),
+        Statement {
             span,
-            is_directive: false,
-        })
+            kind: StatementKind::ExpressionStatement(ExpressionStatement {
+                expression: self.arena.alloc(expression),
+                is_directive: false,
+            }),
+        }
     }
 
     /// `$$renderer.push('<text>')` — a block anchor push with a *string-literal*
@@ -739,7 +743,7 @@ impl<'arena> Builder<'arena> {
             span,
         };
         let decls = std::slice::from_ref(self.arena.alloc(declarator));
-        Statement::VariableDeclaration(VariableDeclaration {
+        Statement::from_variable_declaration(VariableDeclaration {
             kind: VariableDeclarationKind::Var,
             declarations: decls,
             declare: false,
@@ -757,12 +761,14 @@ impl<'arena> Builder<'arena> {
         let call = self.member_call("$", "unsubscribe_stores", std::slice::from_ref(subs_arg));
         let call_span = call.span();
         let consequent = self.arena.alloc(self.expression_statement(call));
-        Statement::IfStatement(IfStatement {
-            test: self.arena.alloc(test),
-            consequent,
-            alternate: None,
+        Statement {
             span: Span::new(test_start, call_span.end),
-        })
+            kind: StatementKind::IfStatement(IfStatement {
+                test: self.arena.alloc(test),
+                consequent,
+                alternate: None,
+            }),
+        }
     }
 
     /// `function <name>(<params>) { <body> }` — a named function declaration
@@ -788,7 +794,7 @@ impl<'arena> Builder<'arena> {
         let params_start = self.mint("(").start;
         self.mint(") {");
         let end = self.mint("}").end;
-        Statement::FunctionDeclaration(self.arena.alloc(FunctionDeclaration {
+        Statement::from_function_declaration(self.arena.alloc(FunctionDeclaration {
             id: Some(id),
             type_parameters: None,
             params,

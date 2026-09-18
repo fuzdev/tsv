@@ -55,7 +55,7 @@ use tsv_svelte::ast::internal::{Element, Root, SpecialElement};
 use tsv_ts::ast::internal::{
     BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, Expression, ExpressionKind,
     ExpressionStatement, FunctionDeclaration, ObjectExpression, ObjectProperty, Statement,
-    VariableDeclaration, VariableDeclarationKind,
+    StatementKind, VariableDeclaration, VariableDeclarationKind,
 };
 
 use crate::analyze::{Bindings, NameSet, RuneInit, Scope, ScopeEntry, classify_rune_init};
@@ -491,8 +491,8 @@ fn analyze<'arena>(
     let import_names: NameSet = instance_body
         .iter()
         .chain(module_body.iter())
-        .filter_map(|stmt| match stmt {
-            Statement::ImportDeclaration(import) => Some(import),
+        .filter_map(|stmt| match &stmt.kind {
+            StatementKind::ImportDeclaration(import) => Some(import),
             _ => None,
         })
         .flat_map(|import| import.specifiers)
@@ -615,7 +615,7 @@ fn analyze<'arena>(
     // component emits a static call where the oracle guards it — a MISMATCH.
     let mut state_names = NameSet::default();
     for stmt in instance_body {
-        if let Statement::VariableDeclaration(decl) = stmt {
+        if let StatementKind::VariableDeclaration(decl) = &stmt.kind {
             for declarator in decl.declarations {
                 if matches!(
                     declarator
@@ -729,16 +729,16 @@ pub(crate) fn compile_server<'arena>(
         // `export * from`; passing any of them through verbatim would nest
         // an `export` inside the component function (invalid JS).
         if matches!(
-            stmt,
-            Statement::ExportNamedDeclaration(_)
-                | Statement::ExportDefaultDeclaration(_)
-                | Statement::ExportAllDeclaration(_)
-                | Statement::TSNamespaceExportDeclaration(_)
-                | Statement::TSExportAssignment(_)
+            &stmt.kind,
+            StatementKind::ExportNamedDeclaration(_)
+                | StatementKind::ExportDefaultDeclaration(_)
+                | StatementKind::ExportAllDeclaration(_)
+                | StatementKind::TSNamespaceExportDeclaration(_)
+                | StatementKind::TSExportAssignment(_)
         ) {
             return Err(unsupported(Refusal::InstanceScriptExport));
         }
-        if let Statement::ImportDeclaration(import) = stmt {
+        if let StatementKind::ImportDeclaration(import) = &stmt.kind {
             refuse_runes_invalid_import(import, source)?;
             user_imports.push(stmt.clone());
             continue;
@@ -780,15 +780,19 @@ pub(crate) fn compile_server<'arena>(
         // split. A multi-declarator source carrying such an expansion would need
         // per-source-declarator grouping the flat accumulator has lost, so it
         // refuses upstream (in `rewrite_script_statement`).
-        let source_multi =
-            matches!(stmt, Statement::VariableDeclaration(src) if src.declarations.len() > 1);
-        match rewritten {
-            Statement::VariableDeclaration(decl) if source_multi && decl.declarations.len() > 1 => {
+        let source_multi = matches!(
+            &stmt.kind,
+            StatementKind::VariableDeclaration(src) if src.declarations.len() > 1
+        );
+        match &rewritten.kind {
+            StatementKind::VariableDeclaration(decl)
+                if source_multi && decl.declarations.len() > 1 =>
+            {
                 if has_comments {
                     return Err(unsupported(Refusal::CommentsAlongsideMultiDeclarator));
                 }
                 for declarator in decl.declarations {
-                    body.push(Statement::VariableDeclaration(VariableDeclaration {
+                    body.push(Statement::from_variable_declaration(VariableDeclaration {
                         kind: decl.kind,
                         declarations: std::slice::from_ref(declarator),
                         declare: decl.declare,
@@ -796,7 +800,7 @@ pub(crate) fn compile_server<'arena>(
                     }));
                 }
             }
-            other => body.push(other),
+            _ => body.push(rewritten),
         }
     }
     // The oracle wraps the whole body in `$$renderer.component(($$renderer) => …)`
@@ -1095,11 +1099,13 @@ pub(crate) fn compile_server<'arena>(
         // through `Builder::expression_statement`: that helper takes the span
         // from the expression, which is exactly the span this site must NOT
         // have.
-        outer.push(Statement::ExpressionStatement(ExpressionStatement {
-            expression: env.b.arena.alloc(call),
+        outer.push(Statement {
             span: Span::new(0, env.b.buffer.len() as u32),
-            is_directive: false,
-        }));
+            kind: StatementKind::ExpressionStatement(ExpressionStatement {
+                expression: env.b.arena.alloc(call),
+                is_directive: false,
+            }),
+        });
         outer.into_bump_slice()
     } else {
         body
@@ -1141,9 +1147,11 @@ pub(crate) fn compile_server<'arena>(
         params_start,
         span: Span::new(0, rbrace_end),
     };
-    let export = ExportDefaultDeclaration {
-        declaration: ExportDefaultValue::FunctionDeclaration(function),
+    let export = Statement {
         span: Span::new(0, rbrace_end),
+        kind: StatementKind::ExportDefaultDeclaration(arena.alloc(ExportDefaultDeclaration {
+            declaration: ExportDefaultValue::FunctionDeclaration(function),
+        })),
     };
 
     // The module scaffold: the `$` runtime import, then the user's hoisted
@@ -1151,7 +1159,7 @@ pub(crate) fn compile_server<'arena>(
     // low-anchor→appendix window can sweep a host comment (the reason the import
     // and export programs stay separate).
     let mut import_body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
-    import_body.push(Statement::ImportDeclaration(arena.alloc(import)));
+    import_body.push(import);
     for user_import in user_imports {
         import_body.push(user_import);
     }
@@ -1201,7 +1209,7 @@ pub(crate) fn compile_server<'arena>(
     };
 
     let mut export_body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
-    export_body.push(Statement::ExportDefaultDeclaration(arena.alloc(export)));
+    export_body.push(export);
     let export_program = tsv_ts::ast::internal::Program {
         body: export_body.into_bump_slice(),
         comments: arena.alloc_slice_copy(&script_comments),

@@ -22,7 +22,7 @@ use crate::binder::{BoundFile, NodeKind, addr_of};
 use predicates::{is_false_keyword, is_true_keyword};
 use smallvec::SmallVec;
 use tsv_ts::ast::Program;
-use tsv_ts::ast::internal::{Expression, Statement};
+use tsv_ts::ast::internal::{Expression, Statement, StatementKind};
 
 #[cfg(test)]
 pub(super) use predicates::is_narrowable_reference;
@@ -589,12 +589,12 @@ impl<'a> FlowBuilder<'a> {
 
     fn visit_statement_list(&mut self, stmts: &[Statement<'_>]) {
         for stmt in stmts {
-            if matches!(stmt, Statement::FunctionDeclaration(_)) {
+            if matches!(&stmt.kind, StatementKind::FunctionDeclaration(_)) {
                 self.visit_statement(stmt);
             }
         }
         for stmt in stmts {
-            if !matches!(stmt, Statement::FunctionDeclaration(_)) {
+            if !matches!(&stmt.kind, StatementKind::FunctionDeclaration(_)) {
                 self.visit_statement(stmt);
             }
         }

@@ -57,7 +57,7 @@ use tsv_ts::ast::internal::{
     ClassExpression, ClassMember, Expression, ExpressionKind, ForInOfLeft, ForInit,
     FunctionDeclaration, FunctionExpression, Identifier, MemberExpression, MethodDefinition,
     ObjectPattern, ObjectPatternProperty, ObjectProperty, Property, PropertyDefinition,
-    RestElement, Statement, StaticBlock, SwitchCase, UpdateOperator,
+    RestElement, Statement, StatementKind, StaticBlock, SwitchCase, UpdateOperator,
 };
 
 use crate::CompileError;
@@ -271,35 +271,42 @@ impl<'arena> StoreRewriter<'_, 'arena> {
         stmt: &Statement<'arena>,
     ) -> Result<Option<Statement<'arena>>, CompileError> {
         use tsv_ts::ast::internal as ast;
-        Ok(match stmt {
-            Statement::ExpressionStatement(s) => self.expr_ref(s.expression)?.map(|expression| {
-                Statement::ExpressionStatement(ast::ExpressionStatement {
-                    expression,
-                    ..s.clone()
+        // The header span: a rebuilt statement keeps the original's.
+        let span = stmt.span;
+        Ok(match &stmt.kind {
+            StatementKind::ExpressionStatement(s) => {
+                self.expr_ref(s.expression)?.map(|expression| Statement {
+                    span,
+                    kind: StatementKind::ExpressionStatement(ast::ExpressionStatement {
+                        expression,
+                        ..s.clone()
+                    }),
                 })
-            }),
-            Statement::VariableDeclaration(decl) => {
+            }
+            StatementKind::VariableDeclaration(decl) => {
                 map_slice!(self, decl.declarations, variable_declarator).map(|declarations| {
-                    Statement::VariableDeclaration(ast::VariableDeclaration {
+                    Statement::from_variable_declaration(ast::VariableDeclaration {
                         declarations,
                         ..decl.clone()
                     })
                 })
             }
-            Statement::ReturnStatement(s) => match s.argument {
-                Some(argument) => self.expr_ref(argument)?.map(|argument| {
-                    Statement::ReturnStatement(ast::ReturnStatement {
+            StatementKind::ReturnStatement(s) => match s.argument {
+                Some(argument) => self.expr_ref(argument)?.map(|argument| Statement {
+                    span,
+                    kind: StatementKind::ReturnStatement(ast::ReturnStatement {
                         argument: Some(argument),
-                        ..s.clone()
-                    })
+                    }),
                 }),
                 None => None,
             },
-            Statement::BlockStatement(block) => self.block(block)?.map(Statement::BlockStatement),
-            Statement::FunctionDeclaration(decl) => self
+            StatementKind::BlockStatement(block) => {
+                self.block(block)?.map(Statement::from_block_statement)
+            }
+            StatementKind::FunctionDeclaration(decl) => self
                 .function_declaration(decl)?
-                .map(|d| Statement::FunctionDeclaration(self.b.arena.alloc(d))),
-            Statement::ClassDeclaration(decl) => {
+                .map(|d| Statement::from_function_declaration(self.b.arena.alloc(d))),
+            StatementKind::ClassDeclaration(decl) => {
                 let super_class = match decl.super_class {
                     Some(sc) => self.expr_ref(sc)?.map(Some),
                     None => None,
@@ -308,7 +315,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                 if super_class.is_none() && body.is_none() {
                     None
                 } else {
-                    Some(Statement::ClassDeclaration(self.b.arena.alloc(
+                    Some(Statement::from_class_declaration(self.b.arena.alloc(
                         ClassDeclaration {
                             super_class: super_class.unwrap_or(decl.super_class),
                             body: body.unwrap_or_else(|| decl.body.clone()),
@@ -317,7 +324,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                     )))
                 }
             }
-            Statement::IfStatement(s) => {
+            StatementKind::IfStatement(s) => {
                 let test = self.expr_ref(s.test)?;
                 let consequent = self.statement_ref(s.consequent)?;
                 let alternate = match s.alternate {
@@ -327,15 +334,17 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                 if test.is_none() && consequent.is_none() && alternate.is_none() {
                     None
                 } else {
-                    Some(Statement::IfStatement(ast::IfStatement {
-                        test: test.unwrap_or(s.test),
-                        consequent: consequent.unwrap_or(s.consequent),
-                        alternate: alternate.unwrap_or(s.alternate),
-                        span: s.span,
-                    }))
+                    Some(Statement {
+                        span,
+                        kind: StatementKind::IfStatement(ast::IfStatement {
+                            test: test.unwrap_or(s.test),
+                            consequent: consequent.unwrap_or(s.consequent),
+                            alternate: alternate.unwrap_or(s.alternate),
+                        }),
+                    })
                 }
             }
-            Statement::ForStatement(s) => {
+            StatementKind::ForStatement(s) => {
                 let init = match &s.init {
                     Some(init) => self.for_init(init)?.map(Some),
                     None => None,
@@ -352,121 +361,136 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                 if init.is_none() && test.is_none() && update.is_none() && body.is_none() {
                     None
                 } else {
-                    Some(Statement::ForStatement(ast::ForStatement {
-                        init: match init {
-                            Some(v) => v.map(|x| &*self.b.arena.alloc(x)),
-                            None => s.init,
-                        },
-                        test: match test {
-                            Some(v) => v.map(|x| &*self.b.arena.alloc(x)),
-                            None => s.test,
-                        },
-                        update: match update {
-                            Some(v) => v.map(|x| &*self.b.arena.alloc(x)),
-                            None => s.update,
-                        },
-                        body: body.unwrap_or(s.body),
-                        span: s.span,
-                    }))
+                    Some(Statement {
+                        span,
+                        kind: StatementKind::ForStatement(ast::ForStatement {
+                            init: match init {
+                                Some(v) => v.map(|x| &*self.b.arena.alloc(x)),
+                                None => s.init,
+                            },
+                            test: match test {
+                                Some(v) => v.map(|x| &*self.b.arena.alloc(x)),
+                                None => s.test,
+                            },
+                            update: match update {
+                                Some(v) => v.map(|x| &*self.b.arena.alloc(x)),
+                                None => s.update,
+                            },
+                            body: body.unwrap_or(s.body),
+                        }),
+                    })
                 }
             }
-            Statement::ForInStatement(s) => {
+            StatementKind::ForInStatement(s) => {
                 let left = self.for_in_of_left(s.left)?;
                 let right = self.expr(s.right)?;
                 let body = self.statement_ref(s.body)?;
                 if left.is_none() && right.is_none() && body.is_none() {
                     None
                 } else {
-                    Some(Statement::ForInStatement(ast::ForInStatement {
-                        left: match left {
-                            Some(x) => self.b.arena.alloc(x),
-                            None => s.left,
-                        },
-                        right: match right {
-                            Some(x) => self.b.arena.alloc(x),
-                            None => s.right,
-                        },
-                        body: body.unwrap_or(s.body),
-                        span: s.span,
-                    }))
+                    Some(Statement {
+                        span,
+                        kind: StatementKind::ForInStatement(ast::ForInStatement {
+                            left: match left {
+                                Some(x) => self.b.arena.alloc(x),
+                                None => s.left,
+                            },
+                            right: match right {
+                                Some(x) => self.b.arena.alloc(x),
+                                None => s.right,
+                            },
+                            body: body.unwrap_or(s.body),
+                        }),
+                    })
                 }
             }
-            Statement::ForOfStatement(s) => {
+            StatementKind::ForOfStatement(s) => {
                 let left = self.for_in_of_left(s.left)?;
                 let right = self.expr(s.right)?;
                 let body = self.statement_ref(s.body)?;
                 if left.is_none() && right.is_none() && body.is_none() {
                     None
                 } else {
-                    Some(Statement::ForOfStatement(ast::ForOfStatement {
-                        left: match left {
-                            Some(x) => self.b.arena.alloc(x),
-                            None => s.left,
-                        },
-                        right: match right {
-                            Some(x) => self.b.arena.alloc(x),
-                            None => s.right,
-                        },
-                        body: body.unwrap_or(s.body),
-                        ..s.clone()
-                    }))
+                    Some(Statement {
+                        span,
+                        kind: StatementKind::ForOfStatement(ast::ForOfStatement {
+                            left: match left {
+                                Some(x) => self.b.arena.alloc(x),
+                                None => s.left,
+                            },
+                            right: match right {
+                                Some(x) => self.b.arena.alloc(x),
+                                None => s.right,
+                            },
+                            body: body.unwrap_or(s.body),
+                            ..s.clone()
+                        }),
+                    })
                 }
             }
-            Statement::WhileStatement(s) => {
+            StatementKind::WhileStatement(s) => {
                 let test = self.expr_ref(s.test)?;
                 let body = self.statement_ref(s.body)?;
                 if test.is_none() && body.is_none() {
                     None
                 } else {
-                    Some(Statement::WhileStatement(ast::WhileStatement {
-                        test: test.unwrap_or(s.test),
-                        body: body.unwrap_or(s.body),
-                        span: s.span,
-                    }))
+                    Some(Statement {
+                        span,
+                        kind: StatementKind::WhileStatement(ast::WhileStatement {
+                            test: test.unwrap_or(s.test),
+                            body: body.unwrap_or(s.body),
+                        }),
+                    })
                 }
             }
             // Unreachable in practice: a Svelte `<script>` is Module code, so it is
             // strict and the parser refuses `with` there.
-            Statement::WithStatement(s) => {
+            StatementKind::WithStatement(s) => {
                 let object = self.expr_ref(s.object)?;
                 let body = self.statement_ref(s.body)?;
                 if object.is_none() && body.is_none() {
                     None
                 } else {
-                    Some(Statement::WithStatement(ast::WithStatement {
-                        object: object.unwrap_or(s.object),
-                        body: body.unwrap_or(s.body),
-                        span: s.span,
-                    }))
+                    Some(Statement {
+                        span,
+                        kind: StatementKind::WithStatement(ast::WithStatement {
+                            object: object.unwrap_or(s.object),
+                            body: body.unwrap_or(s.body),
+                        }),
+                    })
                 }
             }
-            Statement::DoWhileStatement(s) => {
+            StatementKind::DoWhileStatement(s) => {
                 let body = self.statement_ref(s.body)?;
                 let test = self.expr_ref(s.test)?;
                 if body.is_none() && test.is_none() {
                     None
                 } else {
-                    Some(Statement::DoWhileStatement(ast::DoWhileStatement {
-                        body: body.unwrap_or(s.body),
-                        test: test.unwrap_or(s.test),
-                        span: s.span,
-                    }))
+                    Some(Statement {
+                        span,
+                        kind: StatementKind::DoWhileStatement(ast::DoWhileStatement {
+                            body: body.unwrap_or(s.body),
+                            test: test.unwrap_or(s.test),
+                        }),
+                    })
                 }
             }
-            Statement::SwitchStatement(s) => {
+            StatementKind::SwitchStatement(s) => {
                 let discriminant = self.expr_ref(s.discriminant)?;
                 let cases = map_slice!(self, s.cases, switch_case);
                 if discriminant.is_none() && cases.is_none() {
                     None
                 } else {
-                    Some(Statement::SwitchStatement(ast::SwitchStatement {
-                        discriminant: discriminant.unwrap_or(s.discriminant),
-                        cases: cases.unwrap_or(s.cases),
-                        span: s.span,
-                    }))
+                    Some(Statement {
+                        span,
+                        kind: StatementKind::SwitchStatement(ast::SwitchStatement {
+                            discriminant: discriminant.unwrap_or(s.discriminant),
+                            cases: cases.unwrap_or(s.cases),
+                        }),
+                    })
                 }
             }
-            Statement::TryStatement(s) => {
+            StatementKind::TryStatement(s) => {
                 let block = self.block(&s.block)?;
                 let handler = match &s.handler {
                     Some(handler) => self.catch_clause(handler)?.map(Some),
@@ -479,26 +503,34 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                 if block.is_none() && handler.is_none() && finalizer.is_none() {
                     None
                 } else {
-                    Some(Statement::TryStatement(ast::TryStatement {
-                        block: block.unwrap_or_else(|| s.block.clone()),
-                        handler: match handler {
-                            Some(v) => v.map(|x| &*self.b.arena.alloc(x)),
-                            None => s.handler,
-                        },
-                        finalizer: finalizer.unwrap_or_else(|| s.finalizer.clone()),
-                        span: s.span,
-                    }))
+                    Some(Statement {
+                        span,
+                        kind: StatementKind::TryStatement(ast::TryStatement {
+                            block: block.unwrap_or_else(|| s.block.clone()),
+                            handler: match handler {
+                                Some(v) => v.map(|x| &*self.b.arena.alloc(x)),
+                                None => s.handler,
+                            },
+                            finalizer: finalizer.unwrap_or_else(|| s.finalizer.clone()),
+                        }),
+                    })
                 }
             }
-            Statement::ThrowStatement(s) => self.expr_ref(s.argument)?.map(|argument| {
-                Statement::ThrowStatement(ast::ThrowStatement {
-                    argument,
-                    span: s.span,
+            StatementKind::ThrowStatement(s) => {
+                self.expr_ref(s.argument)?.map(|argument| Statement {
+                    span,
+                    kind: StatementKind::ThrowStatement(ast::ThrowStatement { argument }),
                 })
-            }),
-            Statement::LabeledStatement(s) => self.statement_ref(s.body)?.map(|body| {
-                Statement::LabeledStatement(ast::LabeledStatement { body, ..s.clone() })
-            }),
+            }
+            StatementKind::LabeledStatement(s) => {
+                self.statement_ref(s.body)?.map(|body| Statement {
+                    span,
+                    kind: StatementKind::LabeledStatement(ast::LabeledStatement {
+                        body,
+                        ..s.clone()
+                    }),
+                })
+            }
 
             // No store-bearing children, or a statement kind that cannot appear
             // in the erased/rune-rewritten body this pass runs over: imports are
@@ -506,22 +538,22 @@ impl<'arena> StoreRewriter<'_, 'arena> {
             // erased upstream (a surviving one is caught by the erase self-check,
             // never a silent miss here). Exhaustive on purpose — a NEW statement
             // variant fails compilation rather than silently skipping the rewrite.
-            Statement::BreakStatement(_)
-            | Statement::ContinueStatement(_)
-            | Statement::EmptyStatement(_)
-            | Statement::DebuggerStatement(_)
-            | Statement::ImportDeclaration(_)
-            | Statement::ExportNamedDeclaration(_)
-            | Statement::ExportDefaultDeclaration(_)
-            | Statement::ExportAllDeclaration(_)
-            | Statement::TSNamespaceExportDeclaration(_)
-            | Statement::TSImportEqualsDeclaration(_)
-            | Statement::TSExportAssignment(_)
-            | Statement::TSTypeAliasDeclaration(_)
-            | Statement::TSInterfaceDeclaration(_)
-            | Statement::TSDeclareFunction(_)
-            | Statement::TSEnumDeclaration(_)
-            | Statement::TSModuleDeclaration(_) => None,
+            StatementKind::BreakStatement(_)
+            | StatementKind::ContinueStatement(_)
+            | StatementKind::EmptyStatement(_)
+            | StatementKind::DebuggerStatement(_)
+            | StatementKind::ImportDeclaration(_)
+            | StatementKind::ExportNamedDeclaration(_)
+            | StatementKind::ExportDefaultDeclaration(_)
+            | StatementKind::ExportAllDeclaration(_)
+            | StatementKind::TSNamespaceExportDeclaration(_)
+            | StatementKind::TSImportEqualsDeclaration(_)
+            | StatementKind::TSExportAssignment(_)
+            | StatementKind::TSTypeAliasDeclaration(_)
+            | StatementKind::TSInterfaceDeclaration(_)
+            | StatementKind::TSDeclareFunction(_)
+            | StatementKind::TSEnumDeclaration(_)
+            | StatementKind::TSModuleDeclaration(_) => None,
         })
     }
 

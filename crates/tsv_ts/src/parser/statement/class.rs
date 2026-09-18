@@ -4,8 +4,8 @@ use crate::ast::internal::{
     Accessibility, BlockStatement, ClassBody, ClassDeclaration, ClassExpression, ClassMember,
     Decorator, ExportDefaultDeclaration, ExportDefaultValue, ExportKind, ExportNamedDeclaration,
     Expression, ExpressionKind, FunctionExpression, Identifier, Literal, LiteralValue,
-    MethodDefinition, MethodKind, PropertyDefinition, PropertyModifier, Statement, StaticBlock,
-    TSIndexSignature, TSInterfaceHeritage, TSTypeParameterDeclaration,
+    MethodDefinition, MethodKind, PropertyDefinition, PropertyModifier, Statement, StatementKind,
+    StaticBlock, TSIndexSignature, TSInterfaceHeritage, TSTypeParameterDeclaration,
     TSTypeParameterInstantiation,
 };
 use crate::lexer::{KeywordKind, TokenKind};
@@ -95,7 +95,7 @@ struct ClassHead<'arena> {
 impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_class_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
         let class = self.parse_class_declaration_inner(true, false)?;
-        Ok(Statement::ClassDeclaration(self.arena.alloc(class)))
+        Ok(Statement::from_class_declaration(self.arena.alloc(class)))
     }
 
     /// Parse an abstract class declaration: `abstract class Foo { ... }`
@@ -118,7 +118,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let class =
             self.parse_class_declaration_inner_with_start(true, true, abstract_start, false)?;
-        Ok(Statement::ClassDeclaration(self.arena.alloc(class)))
+        Ok(Statement::from_class_declaration(self.arena.alloc(class)))
     }
 
     /// Parse a decorated class: `@decorator class Foo { }`
@@ -172,12 +172,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if is_export {
             if is_default {
                 let end = class.span.end;
-                Ok(Statement::ExportDefaultDeclaration(self.arena.alloc(
-                    ExportDefaultDeclaration {
-                        declaration: ExportDefaultValue::ClassDeclaration(class),
-                        span: Span::new(start as u32, end),
-                    },
-                )))
+                Ok(Statement {
+                    span: Span::new(start as u32, end),
+                    kind: StatementKind::ExportDefaultDeclaration(self.arena.alloc(
+                        ExportDefaultDeclaration {
+                            declaration: ExportDefaultValue::ClassDeclaration(class),
+                        },
+                    )),
+                })
             } else {
                 let end = class.span.end;
                 // An exported *ambient* declaration is a type export to acorn, exactly
@@ -187,20 +189,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 } else {
                     ExportKind::Value
                 };
-                let class_decl = Statement::ClassDeclaration(self.arena.alloc(class));
-                Ok(Statement::ExportNamedDeclaration(self.arena.alloc(
-                    ExportNamedDeclaration {
-                        declaration: Some(self.alloc(class_decl)),
-                        specifiers: &[],
-                        source: None,
-                        attributes: None,
-                        export_kind,
-                        span: Span::new(start as u32, end),
-                    },
-                )))
+                let class_decl = Statement::from_class_declaration(self.arena.alloc(class));
+                Ok(Statement {
+                    span: Span::new(start as u32, end),
+                    kind: StatementKind::ExportNamedDeclaration(self.arena.alloc(
+                        ExportNamedDeclaration {
+                            declaration: Some(self.alloc(class_decl)),
+                            specifiers: &[],
+                            source: None,
+                            attributes: None,
+                            export_kind,
+                        },
+                    )),
+                })
             }
         } else {
-            Ok(Statement::ClassDeclaration(self.arena.alloc(class)))
+            Ok(Statement::from_class_declaration(self.arena.alloc(class)))
         }
     }
 

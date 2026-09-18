@@ -1,7 +1,7 @@
 // try/catch/finally, throw, break/continue, and labeled statement printing
 
 use super::{HeadChainGrouping, OpenParenLineBlockComment};
-use crate::ast::internal::{self, Statement};
+use crate::ast::internal::{self, StatementKind};
 use crate::printer::statements::StatementContext;
 use crate::printer::statements::TerminatorGap;
 use crate::printer::{CommentVec, LeadingGlue, Printer};
@@ -130,11 +130,12 @@ impl<'a> Printer<'a> {
     pub(in crate::printer::statements) fn build_try_statement_doc(
         &self,
         stmt: &internal::TryStatement<'_>,
+        span: Span,
     ) -> DocId {
         let d = self.d();
 
         // try keyword to block: `try /* comment */ {`
-        let try_keyword_end = stmt.span.start + "try".len() as u32;
+        let try_keyword_end = span.start + "try".len() as u32;
         let block_start = stmt.block.span.start;
         let mut parts = d.pooled_docbuf();
         parts.push(d.text("try"));
@@ -195,25 +196,28 @@ impl<'a> Printer<'a> {
     pub(in crate::printer::statements) fn build_throw_statement_doc(
         &self,
         stmt: &internal::ThrowStatement<'_>,
+        span: Span,
         gap: TerminatorGap,
     ) -> DocId {
-        self.build_keyword_argument_doc("throw", stmt.span.start, stmt.span.end, stmt.argument, gap)
+        self.build_keyword_argument_doc("throw", span.start, span.end, stmt.argument, gap)
     }
 
     pub(in crate::printer::statements) fn build_break_statement_doc(
         &self,
         stmt: &internal::BreakStatement<'_>,
+        span: Span,
         gap: TerminatorGap,
     ) -> DocId {
-        self.build_jump_statement_doc("break", stmt.span, stmt.label.as_ref(), gap)
+        self.build_jump_statement_doc("break", span, stmt.label.as_ref(), gap)
     }
 
     pub(in crate::printer::statements) fn build_continue_statement_doc(
         &self,
         stmt: &internal::ContinueStatement<'_>,
+        span: Span,
         gap: TerminatorGap,
     ) -> DocId {
-        self.build_jump_statement_doc("continue", stmt.span, stmt.label.as_ref(), gap)
+        self.build_jump_statement_doc("continue", span, stmt.label.as_ref(), gap)
     }
 
     /// Shared builder for break/continue statements with optional label and trailing comments.
@@ -315,7 +319,7 @@ impl<'a> Printer<'a> {
             tail_parts.push(self.build_statement_doc(stmt.body, ctx.labeled_body()));
         } else {
             // No space before empty statement: `label:;` not `label: ;`
-            let separator = if matches!(stmt.body, Statement::EmptyStatement(_)) {
+            let separator = if matches!(&stmt.body.kind, StatementKind::EmptyStatement(_)) {
                 ":"
             } else {
                 ": "

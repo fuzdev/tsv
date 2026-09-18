@@ -74,7 +74,7 @@ use tsv_lang::{FxHashMap, Span};
 use tsv_ts::ast::Program;
 use tsv_ts::ast::internal::{
     ExportDefaultValue, Expression, ExpressionKind, Identifier, Literal, LiteralValue,
-    ModuleExportName, Statement, TSTypeParameterDeclaration,
+    ModuleExportName, Statement, StatementKind, TSTypeParameterDeclaration,
 };
 
 /// The container kinds that route member declarations (a subset of tsgo's node
@@ -526,15 +526,15 @@ struct KeyInfo {
 /// Whether a statement is a function declaration (possibly `export`-wrapped) —
 /// the set tsgo's `bindEachStatementFunctionsFirst` binds first.
 fn is_function_statement(stmt: &Statement<'_>) -> bool {
-    match stmt {
-        Statement::FunctionDeclaration(_) | Statement::TSDeclareFunction(_) => true,
-        Statement::ExportNamedDeclaration(e) => e.declaration.is_some_and(|inner| {
+    match &stmt.kind {
+        StatementKind::FunctionDeclaration(_) | StatementKind::TSDeclareFunction(_) => true,
+        StatementKind::ExportNamedDeclaration(e) => e.declaration.is_some_and(|inner| {
             matches!(
-                inner,
-                Statement::FunctionDeclaration(_) | Statement::TSDeclareFunction(_)
+                &inner.kind,
+                StatementKind::FunctionDeclaration(_) | StatementKind::TSDeclareFunction(_)
             )
         }),
-        Statement::ExportDefaultDeclaration(e) => matches!(
+        StatementKind::ExportDefaultDeclaration(e) => matches!(
             e.declaration,
             ExportDefaultValue::FunctionDeclaration(_) | ExportDefaultValue::TSDeclareFunction(_)
         ),

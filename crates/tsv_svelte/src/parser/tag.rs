@@ -139,8 +139,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let tag_content_start = self.current_end;
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
-        let tsv_ts::Statement::VariableDeclaration(declaration) =
-            self.parse_ts_statement(tag_content, tag_content_start)?
+        let tsv_ts::StatementKind::VariableDeclaration(declaration) = self
+            .parse_ts_statement(tag_content, tag_content_start)?
+            .kind
         else {
             return Err(
                 self.error_msg_at("expected a `const` or `let` declaration", tag_content_start)

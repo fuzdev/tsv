@@ -21,7 +21,7 @@ use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
 use tsv_ts::ast::internal::{
     ClassBody, ClassDeclaration, ClassMember, Expression, ExpressionKind, PropertyDefinition,
-    Statement, VariableDeclaration, VariableDeclarator,
+    Statement, StatementKind, VariableDeclaration, VariableDeclarator,
 };
 
 use crate::analyze::{NameSet, RuneInit, classify_rune_init, is_effect_call, is_inspect_call};
@@ -152,7 +152,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
     // `$` label inside a function (an ordinary JS label) and clones it
     // through, as does the fallback below. An escaped label name can't be
     // classified from its raw span, so it refuses conservatively.
-    if let Statement::LabeledStatement(labeled) = stmt {
+    if let StatementKind::LabeledStatement(labeled) = &stmt.kind {
         let label = &labeled.label;
         let is_dollar = label.escaped_name.is_some() || {
             let start = label.span.start as usize;
@@ -167,7 +167,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
     // callback is still guard-walked so stray runes inside refuse. A comment inside
     // is NOT a dropped region: the oracle keeps it (its printer writes it in the gap
     // the statement leaves), and so does the positional carry.
-    if let Statement::ExpressionStatement(expr_stmt) = stmt
+    if let StatementKind::ExpressionStatement(expr_stmt) = &stmt.kind
         && let Some(callback) = is_effect_call(expr_stmt.expression, source)
     {
         *has_effects = true;
@@ -185,7 +185,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
     // which the oracle rejects) or a derived read refuses; the `$inspect` callee
     // itself is exempt at this recognized position. A comment inside is kept, as
     // for `$effect`.
-    if let Statement::ExpressionStatement(expr_stmt) = stmt
+    if let StatementKind::ExpressionStatement(expr_stmt) = &stmt.kind
         && let Some(guarded) = is_inspect_call(expr_stmt.expression, source)
     {
         let mut ctx = script_walk_ctx(source, updated, nested_declared, derived_names, store_names);
@@ -201,7 +201,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
     // nested class — takes the normal refusing guard walk, so the guard-exempt set
     // equals the unwrap set: reach-matched by construction (see
     // `rewrite_class_state_fields`).
-    if let Statement::ClassDeclaration(class) = stmt {
+    if let StatementKind::ClassDeclaration(class) = &stmt.kind {
         return rewrite_class_state_fields(
             b,
             class,
@@ -215,7 +215,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
         .map(Some);
     }
 
-    let Statement::VariableDeclaration(decl) = stmt else {
+    let StatementKind::VariableDeclaration(decl) = &stmt.kind else {
         let mut ctx = script_walk_ctx(source, updated, nested_declared, derived_names, store_names);
         walk_statement_guarded(stmt, &mut ctx, 0)?;
         return Ok(Some(stmt.clone()));
@@ -516,12 +516,14 @@ pub(crate) fn rewrite_script_statement<'arena>(
     if declarations.is_empty() {
         return Ok(None);
     }
-    Ok(Some(Statement::VariableDeclaration(VariableDeclaration {
-        kind: decl.kind,
-        declarations: declarations.into_bump_slice(),
-        declare: decl.declare,
-        span: decl.span,
-    })))
+    Ok(Some(Statement::from_variable_declaration(
+        VariableDeclaration {
+            kind: decl.kind,
+            declarations: declarations.into_bump_slice(),
+            declare: decl.declare,
+            span: decl.span,
+        },
+    )))
 }
 
 /// The gap after a rune call's kept argument when the call carries a trailing comma
@@ -548,7 +550,7 @@ fn trailing_comma_region(source: &str, arg_span: Span, init_span: Span) -> Optio
 /// position takes. So a member is exempted from refusal iff it is unwrapped here:
 /// there is no reach gap where the guard would pass a `$state` field the transform
 /// leaves referencing an undefined `$state` (a MISMATCH). The reach is structural
-/// — only a top-level `Statement::ClassDeclaration` reaches this function.
+/// — only a top-level `StatementKind::ClassDeclaration` reaches this function.
 ///
 /// Oracle shape: `field = $state(v)` → `field = v`; a no-arg `field = $state()` →
 /// a BARE field `field;` (the value dropped, NOT `void 0` — the divergence from the
@@ -659,14 +661,16 @@ fn rewrite_class_state_fields<'arena>(
 
     match out {
         // No `$state` field — allocated nothing; the class node passes through.
-        None => Ok(Statement::ClassDeclaration(class)),
-        Some(members) => Ok(Statement::ClassDeclaration(arena.alloc(ClassDeclaration {
-            body: ClassBody {
-                body: members.into_bump_slice(),
-                span: class.body.span,
+        None => Ok(Statement::from_class_declaration(class)),
+        Some(members) => Ok(Statement::from_class_declaration(arena.alloc(
+            ClassDeclaration {
+                body: ClassBody {
+                    body: members.into_bump_slice(),
+                    span: class.body.span,
+                },
+                ..class.clone()
             },
-            ..class.clone()
-        }))),
+        ))),
     }
 }
 

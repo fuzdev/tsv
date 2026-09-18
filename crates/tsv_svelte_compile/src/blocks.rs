@@ -16,8 +16,8 @@ use tsv_svelte::ast::internal::{
 };
 use tsv_ts::ast::internal::{
     BinaryOperator, BlockStatement, Expression, ExpressionKind, ForInit, ForStatement, IfStatement,
-    ObjectExpression, ObjectProperty, Statement, UpdateOperator, VariableDeclaration,
-    VariableDeclarationKind, VariableDeclarator,
+    ObjectExpression, ObjectProperty, Statement, StatementKind, UpdateOperator,
+    VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
 };
 
 use crate::analyze::{Binding, BindingKind, Initial, ScopeEntry, pattern_binding_names};
@@ -428,7 +428,7 @@ pub(crate) fn declaration_stmt<'arena>(
         span,
     };
     let decls = std::slice::from_ref(b.arena.alloc(declarator));
-    Statement::VariableDeclaration(VariableDeclaration {
+    Statement::from_variable_declaration(VariableDeclaration {
         kind,
         declarations: decls,
         declare: false,
@@ -447,7 +447,7 @@ fn fold_block_marker<'arena>(
     marker: &str,
     body: &'arena [Statement<'arena>],
 ) -> &'arena [Statement<'arena>] {
-    let Some(Statement::ExpressionStatement(first)) = body.get(1) else {
+    let Some(StatementKind::ExpressionStatement(first)) = body.get(1).map(|stmt| &stmt.kind) else {
         return body;
     };
     let ExpressionKind::CallExpression(call) = &first.expression.kind else {
@@ -504,14 +504,17 @@ fn fold_block_marker<'arena>(
     stmts.into_bump_slice()
 }
 
-/// Wrap a finished statement slice in a `Statement::BlockStatement` (`{ … }`).
+/// Wrap a finished statement slice in a `BlockStatement` (`{ … }`).
 fn block_stmt<'arena>(
     b: &Builder<'arena>,
     body: &'arena [Statement<'arena>],
 ) -> &'arena Statement<'arena> {
     let span = b.here();
     b.arena
-        .alloc(Statement::BlockStatement(BlockStatement { body, span }))
+        .alloc(Statement::from_block_statement(BlockStatement {
+            body,
+            span,
+        }))
 }
 
 /// Emit `{@const name = init}` into the current fragment: a hoisted `const`
@@ -664,9 +667,11 @@ pub(crate) fn emit_if_block<'arena>(
             test: arena.alloc(test),
             consequent: cons,
             alternate: Some(alternate),
-            span: here,
         };
-        alternate = arena.alloc(Statement::IfStatement(if_stmt));
+        alternate = arena.alloc(Statement {
+            span: here,
+            kind: StatementKind::IfStatement(if_stmt),
+        });
     }
 
     out.push_statement(&mut env.b, arena, (*alternate).clone());
@@ -839,13 +844,15 @@ pub(crate) fn emit_each_block<'arena>(
 
     let for_body = block_stmt(&env.b, body_stmts);
     let for_here = env.b.here();
-    let for_loop = Statement::ForStatement(ForStatement {
-        init: Some(arena.alloc(ForInit::VariableDeclaration(init_decl))),
-        test: Some(arena.alloc(test)),
-        update: Some(arena.alloc(update)),
-        body: for_body,
+    let for_loop = Statement {
         span: for_here,
-    });
+        kind: StatementKind::ForStatement(ForStatement {
+            init: Some(arena.alloc(ForInit::VariableDeclaration(init_decl))),
+            test: Some(arena.alloc(test)),
+            update: Some(arena.alloc(update)),
+            body: for_body,
+        }),
+    };
 
     if let Some(fallback) = &each.fallback {
         out.push_statement(&mut env.b, arena, const_each);
@@ -877,12 +884,14 @@ pub(crate) fn emit_each_block<'arena>(
             .b
             .binary(len_cond, BinaryOperator::BangEqualsEquals, zero_cond);
         let if_here = env.b.here();
-        let if_stmt = Statement::IfStatement(IfStatement {
-            test: arena.alloc(cond),
-            consequent: if_branch,
-            alternate: Some(else_branch),
+        let if_stmt = Statement {
             span: if_here,
-        });
+            kind: StatementKind::IfStatement(IfStatement {
+                test: arena.alloc(cond),
+                consequent: if_branch,
+                alternate: Some(else_branch),
+            }),
+        };
         out.push_statement(&mut env.b, arena, if_stmt);
     } else {
         // Opener merges into the preceding template; then const + for loop.

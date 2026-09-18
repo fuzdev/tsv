@@ -976,9 +976,14 @@ pub struct Program<'arena> {
     // from source[span]; the rare escaped name carries an &'arena str
 }
 
-pub enum Statement<'arena> {
+pub struct Statement<'arena> {
+    pub span: Span, // hoisted out of the variants: a span read is a field load
+    pub kind: StatementKind<'arena>,
+}
+
+pub enum StatementKind<'arena> {
     VariableDeclaration(VariableDeclaration<'arena>), // small → inline by value
-    IfStatement(IfStatement<'arena>),                 // test inline; consequent: &'arena Statement
+    IfStatement(IfStatement<'arena>), // test: &'arena Expression; consequent: &'arena Statement
     // …
 }
 ```
@@ -1096,10 +1101,22 @@ narrowed, the only variants left setting `Statement`'s width were `ImportDeclara
 They are boxed anyway, because a boxed head's construction copies the same bytes into
 the arena that it would otherwise have moved into the enum, so the cost is one bump
 pointer and the return is 24 bytes off *every other* statement slot. That takes
-`Statement` to **72 B**; the next-widest inline variant is `TryStatement` at 64, which
-is where the ladder stops. The trade is settled by measurement, not by the rarity
+`Statement` to **72 B**; the next-widest inline variant is `TryStatement`, which is
+where the ladder stops. The trade is settled by measurement, not by the rarity
 argument, and it is the only place in any of the three enums where that argument does
 not apply.
+
+`Statement` is a header over its variant, as `Expression` is —
+`struct Statement { span, kind: StatementKind }` (`StatementKind` 64 B, set by
+`TryStatement` at 56) — so reading a statement's span is a field load rather than a
+dispatch over the variants. A variant struct carries no span of its own unless some node
+also holds that type outside a `Statement` (`VariableDeclaration`, `BlockStatement`,
+`FunctionDeclaration`, `TSDeclareFunction`, `ClassDeclaration`,
+`TSInterfaceDeclaration`, `TSModuleDeclaration`); those are wrapped only through the
+`Statement::from_*` constructors, which take the header's span from the node's own. Both
+spans are `pub`; they stay equal because that is the only way the wrapped form is built
+and no span write reaches one of those payloads after it is wrapped, and a debug build
+asserts the agreement on every `Statement::span()` read. On wasm32 `Statement` is 48 B.
 
 `parse_expression_ref` / `parse_assignment_expression_ref` are the spine's
 ref-returning entry points these fields are filled from. The read side does pay one
