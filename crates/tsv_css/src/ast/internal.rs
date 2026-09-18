@@ -516,7 +516,7 @@ pub enum CssValue<'arena> {
     /// printer applies number normalization; the numeric value and unit text are
     /// recovered verbatim from `span` at print time (`build_dimension_doc`), so they
     /// are not stored — span-for-verbatim (see the arena string-representation idiom).
-    Dimension { value: f64, span: Span },
+    Dimension { span: Span },
 
     /// Color - various formats (rgb, hsl, hex, named)
     Color { color: Color, span: Span },
@@ -593,7 +593,7 @@ impl CssValue<'_> {
             CssValue::Identifier { span, .. } => *span,
             CssValue::Operator { span, .. } => *span,
             CssValue::String { span, .. } => *span,
-            CssValue::Dimension { span, .. } => *span,
+            CssValue::Dimension { span } => *span,
             CssValue::Color { span, .. } => *span,
             CssValue::Function { span, .. } => *span,
             CssValue::SupportsCondition { span, .. } => *span,

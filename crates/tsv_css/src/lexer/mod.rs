@@ -364,9 +364,9 @@ impl<'a> Lexer<'a> {
             b'\'' => read_string(self.source, &mut self.pos, '\''),
 
             // Numbers (including percentage and dimension)
-            _ if b.is_ascii_digit() => read_number(self.source, &mut self.pos),
+            _ if b.is_ascii_digit() => Ok(read_number(self.source, &mut self.pos)),
             b'.' if self.peek_byte(1).is_some_and(|b| b.is_ascii_digit()) => {
-                read_number(self.source, &mut self.pos)
+                Ok(read_number(self.source, &mut self.pos))
             }
             // Negative numbers: -10px, -100%, -.5em (lookahead to distinguish from identifier)
             // Note: -. must be followed by digit (-.5), otherwise it's identifier prefix (-.class is combinator + class)
@@ -374,7 +374,7 @@ impl<'a> Lexer<'a> {
                 || (self.peek_byte(1) == Some(b'.')
                     && self.peek_byte(2).is_some_and(|b| b.is_ascii_digit())) =>
             {
-                read_number(self.source, &mut self.pos)
+                Ok(read_number(self.source, &mut self.pos))
             }
             // Positive numbers with explicit + sign: +10px, +100%, +.5em
             // Note: +. must be followed by digit (+.5), otherwise it's combinator + class (+.class)
@@ -382,7 +382,7 @@ impl<'a> Lexer<'a> {
                 || (self.peek_byte(1) == Some(b'.')
                     && self.peek_byte(2).is_some_and(|b| b.is_ascii_digit())) =>
             {
-                read_number(self.source, &mut self.pos)
+                Ok(read_number(self.source, &mut self.pos))
             }
 
             // Braces and delimiters

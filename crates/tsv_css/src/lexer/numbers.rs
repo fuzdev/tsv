@@ -1,14 +1,12 @@
 use super::identifiers::IDENT_CONTINUE_LUT;
-use super::lex_err;
 use super::token::{Token, TokenKind};
 use crate::number::{continues_unit, exponent_len};
-use tsv_lang::ParseError;
 
 /// Read a CSS number, percentage, or dimension
 /// Numbers: 42, 1.5, .5, -42, +1.5
 /// Percentages: 50%, -100%
 /// Dimensions: 16px, 1.5em, -2.5rem
-pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseError> {
+pub(crate) fn read_number(source: &str, pos: &mut usize) -> Token {
     let start = *pos;
     let bytes = source.as_bytes();
     let len = bytes.len();
@@ -67,21 +65,26 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseE
     let num_end = p;
     *pos = p;
 
-    // Validate number (parseable as f64)
-    let num_str = &source[start..num_end];
-    num_str
-        .parse::<f64>()
-        .map_err(|_| lex_err(format!("Invalid number: {num_str}"), start))?;
+    // No validation parse: the dispatch enters here only at a digit, a `.` then a digit, or
+    // a sign then a digit or a `.` and a digit, so the scan above always
+    // holds a digit in the integer or fraction part, and every string it can accept —
+    // `[+-]? (\d+ (\.\d*)? | \.\d+) ([eE][+-]?\d+)?` — is in Rust's `f64` grammar (an
+    // out-of-range one parses to infinity rather than failing).
+    debug_assert!(
+        source[start..num_end].parse::<f64>().is_ok(),
+        "read_number scanned a non-number: {:?}",
+        &source[start..num_end]
+    );
 
     // Check for percentage
     if bytes.get(p) == Some(&b'%') {
         p += 1;
         *pos = p;
-        return Ok(Token {
+        return Token {
             kind: TokenKind::Percentage,
             start: start as u32,
             end: p as u32,
-        });
+        };
     }
 
     // Check for dimension (unit). A unit is an identifier, so its body continues on the
@@ -109,13 +112,13 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseE
         let unit_len = p - unit_start;
         if unit_len > 0 {
             *pos = p;
-            return Ok(Token {
+            return Token {
                 kind: TokenKind::Dimension {
                     unit_len: unit_len as u8,
                 },
                 start: start as u32,
                 end: p as u32,
-            });
+            };
         }
 
         // Reset position if we didn't find a valid unit
@@ -124,9 +127,9 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseE
 
     // Just a number
     *pos = p;
-    Ok(Token {
+    Token {
         kind: TokenKind::Number,
         start: start as u32,
         end: p as u32,
-    })
+    }
 }
