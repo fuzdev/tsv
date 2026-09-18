@@ -116,7 +116,7 @@ pub(super) fn write_new_expression(
     write_expression(w, new_expr.callee, ctx);
     write_type_arguments_field(w, new_expr.type_arguments.as_ref(), ctx);
     w.raw(",\"arguments\":");
-    write_expressions(w, new_expr.arguments, ctx);
+    write_expressions(w, new_expr.arguments.iter().copied(), ctx);
     close_node(w, "NewExpression", span, ctx);
 }
 
@@ -151,7 +151,7 @@ pub(super) fn write_call_expression(
         },
     );
     w.raw(",\"arguments\":");
-    write_expressions(w, call.arguments, ctx);
+    write_expressions(w, call.arguments.iter().copied(), ctx);
     write_type_arguments_field(w, call.type_arguments.as_ref(), ctx);
     if strip_optional {
         // Omitted along an unparenthesized decorator's call/member spine.

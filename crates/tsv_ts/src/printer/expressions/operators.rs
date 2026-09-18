@@ -1921,7 +1921,7 @@ impl<'a> Printer<'a> {
         // run this closure never assembles.
         let body = self.build_doc_with_outermost_owned_comment_at(
             seq_span.start,
-            seq.expressions.first(),
+            seq.expressions.first().copied(),
             || {
                 self.build_sequence_operand_run_doc(
                     seq,
@@ -2132,7 +2132,7 @@ impl<'a> Printer<'a> {
         } else {
             self.build_doc_with_outermost_owned_comment_at(
                 span.start,
-                seq.expressions.first(),
+                seq.expressions.first().copied(),
                 || {
                     self.build_sequence_line_comment_run_doc(
                         seq,

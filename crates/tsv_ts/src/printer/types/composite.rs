@@ -2110,7 +2110,7 @@ impl<'a> Printer<'a> {
         if has_leading_line_comment
             || self.has_line_comments_in_delimited_list(
                 t.element_types,
-                tuple_elem_span,
+                |ty| tuple_elem_span(ty),
                 t.span.end - 1,
             )
             // A `//` inside a shell at an element's leading printed EDGE is in that
@@ -2122,7 +2122,7 @@ impl<'a> Printer<'a> {
             || self.has_own_line_block_comments_in_bracket_list(
                 t.span,
                 t.element_types,
-                tuple_elem_span,
+                |ty| tuple_elem_span(ty),
             )
         {
             return self.build_tuple_type_doc_with_line_comments(t);
@@ -2244,7 +2244,7 @@ impl<'a> Printer<'a> {
         // line/own-line comment is itself what forces this path. Tuple types have
         // no elision, so the first element is always present. See
         // conformance_prettier_ts_comments.md §Comment relocation (Tuple type `[`).
-        let elem_span_at = |i: usize| tuple_elem_span(&t.element_types[i]);
+        let elem_span_at = |i: usize| tuple_elem_span(t.element_types[i]);
         // Each element's freeze verdict, leading-edge claim and PRINTED start, resolved
         // ahead of the loop because two of the gap emitters read the NEXT element's start:
         // the `[`-line prefix reads the first element's, the comma emitter each
@@ -2264,10 +2264,8 @@ impl<'a> Printer<'a> {
         let elem_heads: SmallVec<[TupleElementHead; 8]> = (0..t.element_types.len())
             .map(|i| {
                 let frozen = self.list_item_frozen(t.span.start + 1, &elem_span_at, i);
-                let (claim, start) = self.leading_edge_claim_and_start(
-                    frozen,
-                    unwrap_parenthesized(&t.element_types[i]),
-                );
+                let (claim, start) = self
+                    .leading_edge_claim_and_start(frozen, unwrap_parenthesized(t.element_types[i]));
                 TupleElementHead {
                     frozen,
                     claim,

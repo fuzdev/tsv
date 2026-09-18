@@ -204,7 +204,7 @@ fn snapshot_call_arg<'arena>(
     {
         return None;
     }
-    call.arguments.first()
+    call.arguments.first().copied()
 }
 
 /// Whether `expr` contains a rewrite target — a bare `$derived` read (→ `d()`),
@@ -232,9 +232,11 @@ fn contains_rewrite_target(
         |e: &Expression<'_>| contains_rewrite_target(source, derived_names, store_names, e);
     match &expr.kind {
         ExpressionKind::CallExpression(c) => {
-            contains(c.callee) || c.arguments.iter().any(&contains)
+            contains(c.callee) || c.arguments.iter().copied().any(&contains)
         }
-        ExpressionKind::NewExpression(n) => contains(n.callee) || n.arguments.iter().any(&contains),
+        ExpressionKind::NewExpression(n) => {
+            contains(n.callee) || n.arguments.iter().copied().any(&contains)
+        }
         ExpressionKind::BinaryExpression(b) => contains(b.left) || contains(b.right),
         ExpressionKind::MemberExpression(m) => {
             contains(m.object) || (m.computed && contains(m.property))
@@ -244,12 +246,10 @@ fn contains_rewrite_target(
         }
         ExpressionKind::UnaryExpression(u) => contains(u.argument),
         ExpressionKind::ParenthesizedExpression(p) => contains(p.expression),
-        ExpressionKind::SequenceExpression(s) => s.expressions.iter().any(&contains),
+        ExpressionKind::SequenceExpression(s) => s.expressions.iter().copied().any(&contains),
         ExpressionKind::SpreadElement(s) => contains(s.argument),
-        ExpressionKind::ArrayExpression(a) => {
-            a.elements.iter().any(|e| e.as_ref().is_some_and(&contains))
-        }
-        ExpressionKind::TemplateLiteral(t) => t.expressions.iter().any(&contains),
+        ExpressionKind::ArrayExpression(a) => a.elements.iter().any(|e| e.is_some_and(&contains)),
+        ExpressionKind::TemplateLiteral(t) => t.expressions.iter().copied().any(&contains),
         _ => false,
     }
 }
@@ -394,17 +394,16 @@ fn rebuild_value<'arena>(
 }
 
 /// Rewrite each expression of a slice (call arguments, sequence, template
-/// expressions), returning a fresh arena slice (shallow clones — pointers, never
-/// subtrees).
+/// expressions), returning a fresh arena slice of references.
 fn rewrite_value_slice<'arena>(
     env: &mut EmitEnv<'arena, '_>,
-    exprs: &'arena [Expression<'arena>],
-) -> Result<&'arena [Expression<'arena>], CompileError> {
+    exprs: &'arena [&'arena Expression<'arena>],
+) -> Result<&'arena [&'arena Expression<'arena>], CompileError> {
     let arena = env.b.arena;
-    let mut out: BumpVec<'arena, Expression<'arena>> =
+    let mut out: BumpVec<'arena, &'arena Expression<'arena>> =
         BumpVec::with_capacity_in(exprs.len(), arena);
     for expr in exprs {
-        out.push(rewrite_template_value(env, expr)?.clone());
+        out.push(rewrite_template_value(env, expr)?);
     }
     Ok(out.into_bump_slice())
 }
@@ -413,14 +412,14 @@ fn rewrite_value_slice<'arena>(
 /// `None`), returning a fresh arena slice.
 fn rewrite_opt_slice<'arena>(
     env: &mut EmitEnv<'arena, '_>,
-    elements: &'arena [Option<Expression<'arena>>],
-) -> Result<&'arena [Option<Expression<'arena>>], CompileError> {
+    elements: &'arena [Option<&'arena Expression<'arena>>],
+) -> Result<&'arena [Option<&'arena Expression<'arena>>], CompileError> {
     let arena = env.b.arena;
-    let mut out: BumpVec<'arena, Option<Expression<'arena>>> =
+    let mut out: BumpVec<'arena, Option<&'arena Expression<'arena>>> =
         BumpVec::with_capacity_in(elements.len(), arena);
     for element in elements {
         match element {
-            Some(expr) => out.push(Some(rewrite_template_value(env, expr)?.clone())),
+            Some(expr) => out.push(Some(rewrite_template_value(env, expr)?)),
             None => out.push(None),
         }
     }

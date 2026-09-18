@@ -306,9 +306,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// for contexts where comma is a separator (function args, array elements, etc.)
     pub(super) fn parse_expression(&mut self) -> Result<Expression<'arena>, ParseError> {
         // The spine returns an arena ref; this owned form (shallow clone — children are
-        // refs) serves the callers that store the value: a template literal's expression
-        // slice, the by-value `export =` / `export default` fields, and the pattern path
-        // (`parse_expression_unbounded`), which converts it to a binding pattern.
+        // refs) serves the callers that store the value: the by-value `export =` /
+        // `export default` fields, and the pattern path (`parse_expression_unbounded`),
+        // which converts it to a binding pattern.
         Ok(self.parse_expression_bp(BP_COMMA)?.clone())
     }
 
@@ -321,6 +321,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - Variable initializers: `const x = expr` - comma would be ambiguous with declarators
     ///
     /// To use the comma operator in these contexts, wrap in parens: `foo((a, b))`
+    ///
+    /// This owned form (a shallow clone of the spine's arena node) serves the callers that
+    /// store the value by value — a computed member key, an enum member initializer; a
+    /// slot or list element that holds `&'arena Expression` (call arguments, array
+    /// elements, property values, initializers) takes `parse_assignment_expression_ref`.
     pub(super) fn parse_assignment_expression(&mut self) -> Result<Expression<'arena>, ParseError> {
         // Use BP_ASSIGNMENT to skip comma handling (which only triggers at BP_COMMA)
         Ok(self.parse_expression_bp(BP_ASSIGNMENT)?.clone())
@@ -336,7 +341,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// stops before `,`, then `expect(']')` fails on it); the spread parses as a primary
     /// expression tsv accepts in array/object/call positions, so it needs an explicit
     /// guard. A member-access *subscript* (`obj[a, b]`) is a full `Expression` and uses
-    /// `parse_expression` directly — not this helper.
+    /// `parse_expression_ref` directly — not this helper.
     pub(super) fn parse_computed_member_key(&mut self) -> Result<Expression<'arena>, ParseError> {
         if matches!(self.current_kind(), TokenKind::DotDotDot) {
             return Err(self.error_msg("A computed property name cannot be a spread element"));
@@ -733,14 +738,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // function calls, array literals, and object literals
         if min_bp == BP_COMMA && self.check(&TokenKind::Comma) {
             let mut expressions = self.bvec();
-            // SequenceExpression stores its elements by value; clone the arena refs
-            // (shallow) into the slice. Sequence expressions are rare.
-            expressions.push(left.clone());
+            expressions.push(left);
 
             while self.eat(TokenKind::Comma) {
                 // Parse next expression - use BP_ASSIGNMENT to stop before next comma
                 let next = self.parse_expression_bp(BP_ASSIGNMENT)?;
-                expressions.push(next.clone());
+                expressions.push(next);
             }
 
             // the last element's last consumed token (a trailing grouping paren included)
@@ -961,7 +964,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Returns the arguments and the end position of the closing `)`.
     pub(super) fn parse_call_arguments(
         &mut self,
-    ) -> Result<(bumpalo::collections::Vec<'arena, Expression<'arena>>, usize), ParseError> {
+    ) -> Result<
+        (
+            bumpalo::collections::Vec<'arena, &'arena Expression<'arena>>,
+            usize,
+        ),
+        ParseError,
+    > {
         self.enter_grouping();
         let mut arguments = self.bvec();
 
@@ -2663,7 +2672,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // `Arguments` grouping delimiter, so it shares `parse_call_arguments` (which
         // bumps `grouping_depth`) — `in` is a binary operator inside the arguments even
         // in a for-header init, matching call arguments (ecma262 `ArgumentList[+In]`).
-        let (arguments, end): (&'arena [Expression<'arena>], u32) =
+        let (arguments, end): (&'arena [&'arena Expression<'arena>], u32) =
             if self.eat(TokenKind::ParenOpen) {
                 let (args, paren_end) = self.parse_call_arguments()?;
                 (args.into_bump_slice(), paren_end as u32)
@@ -2933,16 +2942,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// lists build their own spread/rest nodes inline).
     pub(super) fn parse_spread_or_assignment_element(
         &mut self,
-    ) -> Result<Expression<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
         if matches!(self.current_kind(), TokenKind::DotDotDot) {
             self.parse_spread_element()
         } else {
-            self.parse_assignment_expression()
+            self.parse_assignment_expression_ref()
         }
     }
 
     /// Parse spread element: `...expr`
-    fn parse_spread_element(&mut self) -> Result<Expression<'arena>, ParseError> {
+    fn parse_spread_element(&mut self) -> Result<&'arena Expression<'arena>, ParseError> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::DotDotDot)?; // consume '...'
 
@@ -2952,9 +2961,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let end = self.prev_token_end() as u32;
         debug_assert_encloses(start as u32, end, argument, argument);
 
-        Ok(Expression::from_spread_element(SpreadElement {
-            argument,
-            span: Span::new(start as u32, end),
-        }))
+        Ok(self
+            .arena
+            .alloc(Expression::from_spread_element(SpreadElement {
+                argument,
+                span: Span::new(start as u32, end),
+            })))
     }
 }

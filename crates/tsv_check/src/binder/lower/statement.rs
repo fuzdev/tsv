@@ -38,7 +38,7 @@ impl SoaWalk {
             StatementKind::TSTypeAliasDeclaration(t) => {
                 self.visit_identifier(&t.id, id);
                 self.visit_type_params(t.type_parameters.as_ref(), id);
-                self.visit_type(&t.type_annotation, id);
+                self.visit_type(t.type_annotation, id);
             }
             StatementKind::TSInterfaceDeclaration(i) => self.descend_interface(i, id),
             StatementKind::TSEnumDeclaration(e) => {

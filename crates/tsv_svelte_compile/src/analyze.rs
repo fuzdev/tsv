@@ -980,7 +980,7 @@ pub(crate) fn classify_rune_init<'arena>(
         return None;
     }
     let keypath = callee_keypath(call.callee, source)?;
-    let arg = call.arguments.first();
+    let arg = call.arguments.first().copied();
     match keypath.as_str() {
         "$props" if call.arguments.is_empty() => Some(RuneInit::Props),
         "$props.id" if call.arguments.is_empty() => Some(RuneInit::PropsId),
@@ -1007,7 +1007,7 @@ pub(crate) fn is_effect_call<'arena>(
     };
     let keypath = callee_keypath(call.callee, source)?;
     if (keypath == "$effect" || keypath == "$effect.pre") && call.arguments.len() == 1 {
-        call.arguments.first()
+        call.arguments.first().copied()
     } else {
         None
     }
@@ -1044,7 +1044,7 @@ pub(crate) fn is_inspect_call<'arena>(
         ExpressionKind::Identifier(_) => (callee_keypath(call.callee, source).as_deref()
             == Some("$inspect")
             && !call.arguments.is_empty())
-        .then(|| call.arguments.iter().collect()),
+        .then(|| call.arguments.to_vec()),
         // `$inspect(args).with(cb)` — exactly one `.with`, carrying exactly one
         // argument, over the `$inspect(...)` call. A second `.with` or any other
         // method leaves the outer call un-rewritten in the oracle → invalid JS;
@@ -1061,8 +1061,8 @@ pub(crate) fn is_inspect_call<'arena>(
             {
                 return None;
             }
-            let mut guarded: Vec<&'arena Expression<'arena>> = inner.arguments.iter().collect();
-            guarded.extend(call.arguments.iter());
+            let mut guarded: Vec<&'arena Expression<'arena>> = inner.arguments.to_vec();
+            guarded.extend(call.arguments.iter().copied());
             Some(guarded)
         }
         _ => None,

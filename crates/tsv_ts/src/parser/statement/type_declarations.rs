@@ -70,7 +70,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::Equals)?;
 
         // Parse the type
-        let type_annotation = self.parse_type()?.clone();
+        let type_annotation = self.parse_type()?;
         let end = self.semicolon_end()?;
 
         Ok(Statement {

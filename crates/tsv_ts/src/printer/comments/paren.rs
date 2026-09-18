@@ -817,7 +817,7 @@ impl<'a> Printer<'a> {
     /// (the same reach `any_comment_forces_expansion` already has per argument).
     pub(crate) fn any_spread_paren_comment_forces_expansion(
         &self,
-        elements: &[internal::Expression<'_>],
+        elements: &[&internal::Expression<'_>],
     ) -> bool {
         elements
             .iter()

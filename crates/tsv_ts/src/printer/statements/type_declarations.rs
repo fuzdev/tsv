@@ -323,11 +323,9 @@ impl<'a> Printer<'a> {
             // A single-member union / intersection prints transparently as its member
             // (prettier drops the node in postprocess), so the `=` asks the member —
             // `= | (A // c)` collapses to the retained shell, which hugs.
-            TSType::Union(u) if u.types.len() == 1 => {
-                self.value_owns_its_comment_break(&u.types[0])
-            }
+            TSType::Union(u) if u.types.len() == 1 => self.value_owns_its_comment_break(u.types[0]),
             TSType::Intersection(x) if x.types.len() == 1 => {
-                self.value_owns_its_comment_break(&x.types[0])
+                self.value_owns_its_comment_break(x.types[0])
             }
             TSType::Literal(internal::TSLiteralType::TemplateLiteral(t)) => {
                 self.template_literal_type_breaks_for_comment(t)
@@ -365,7 +363,7 @@ impl<'a> Printer<'a> {
         // whole leading run through the force-break emission below, and the paren-stripped
         // INNER freezes — so the shelled and bare authorings reach one fixed point. The
         // head carries that verdict as `routed`, which the union hand-off below reads.
-        let head = self.keyword_value_head(eq_pos + 1, &decl.type_annotation);
+        let head = self.keyword_value_head(eq_pos + 1, decl.type_annotation);
         let type_start = head.value_start;
         let value_type = head.value_type;
         let mut parts: DocBuf = smallvec![d.text(if lead_space { " =" } else { "=" })];
@@ -487,7 +485,7 @@ impl<'a> Printer<'a> {
                 // pair a stripped shell owes whatever builds inside it.
                 self.with_stripped_shell_value(
                     head.claimed_shell,
-                    &decl.type_annotation,
+                    decl.type_annotation,
                     head.value_type,
                     TrailingBlock::Inline,
                     || self.build_union_value_doc(eq_pos + 1, u).doc,
@@ -600,7 +598,7 @@ impl<'a> Printer<'a> {
             let build_value = || -> DocId {
                 self.with_stripped_shell_value(
                     head.claimed_shell,
-                    &decl.type_annotation,
+                    decl.type_annotation,
                     head.value_type,
                     TrailingBlock::Inline,
                     || self.build_type_doc(value_type),
@@ -611,7 +609,7 @@ impl<'a> Printer<'a> {
             let build_intersection = |i: &internal::TSIntersectionType<'_>| -> DocId {
                 self.with_stripped_shell_value(
                     head.claimed_shell,
-                    &decl.type_annotation,
+                    decl.type_annotation,
                     head.value_type,
                     TrailingBlock::Inline,
                     || self.intersection_hanging_with_indent(i),
@@ -730,9 +728,9 @@ impl<'a> Printer<'a> {
                         // member collapsing to a union breaks from the union's own
                         // leading-`|` layout, which is what the hang indents.
                         || (u.types.len() == 1
-                            && (self.value_owns_its_comment_break(&u.types[0])
+                            && (self.value_owns_its_comment_break(u.types[0])
                                 || (matches!(
-                                    unwrap_parenthesized(&u.types[0]),
+                                    unwrap_parenthesized(u.types[0]),
                                     TSType::Intersection(_)
                                 ) && d.will_break(type_doc))))
                     );

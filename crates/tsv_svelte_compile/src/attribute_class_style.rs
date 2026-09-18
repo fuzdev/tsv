@@ -462,7 +462,7 @@ fn build_style_directives_arg<'arena>(
         return Ok(normal_obj);
     }
     // Any `|important` → the partitioned `[ {normal}, {important} ]` array.
-    let normal_alloc = arena.alloc(normal_obj);
+    let normal_alloc: &'arena Expression<'arena> = arena.alloc(normal_obj);
     let iobrace = env.b.mint("{").start;
     let icbrace = env.b.mint("}").end;
     let important_obj = Expression {
@@ -472,12 +472,12 @@ fn build_style_directives_arg<'arena>(
             spread_trailing_comma: false,
         }),
     };
-    let important_alloc = arena.alloc(important_obj);
+    let important_alloc: &'arena Expression<'arena> = arena.alloc(important_obj);
     let lbracket = env.b.mint("[").start;
     let rbracket = env.b.mint("]").end;
-    let mut elements: BumpVec<'arena, Option<Expression<'arena>>> = BumpVec::new_in(arena);
-    elements.push(Some(normal_alloc.clone()));
-    elements.push(Some(important_alloc.clone()));
+    let mut elements: BumpVec<'arena, Option<&'arena Expression<'arena>>> = BumpVec::new_in(arena);
+    elements.push(Some(normal_alloc));
+    elements.push(Some(important_alloc));
     Ok(Expression {
         span: Span::new(lbracket, rbracket),
         kind: ExpressionKind::ArrayExpression(ArrayExpression {

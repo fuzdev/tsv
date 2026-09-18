@@ -769,7 +769,7 @@ impl<'a> Printer<'a> {
             // one-member composite before this arm is asked; delete once a planted panic
             // here also survives `ignore:audit` and `gaps:audit`.
             if self.has_line_comments_between(colon_end, first_type_start) {
-                let child = &intersection.types[0];
+                let child = intersection.types[0];
                 let value_doc = if self.single_child_frozen(colon_end, child) {
                     self.build_frozen_single_child_doc(child)
                 } else {
@@ -783,7 +783,7 @@ impl<'a> Printer<'a> {
             {
                 parts.push(comments_doc);
             }
-            parts.push(self.build_type_doc(&intersection.types[0]));
+            parts.push(self.build_type_doc(intersection.types[0]));
             return d.concat(&parts);
         }
 

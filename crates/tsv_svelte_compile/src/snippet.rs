@@ -565,7 +565,7 @@ impl<'s> Collector<'s> {
 
     // ── Expression walk ──────────────────────────────────────────────────────
 
-    fn exprs(&mut self, exprs: &[Expression<'_>]) {
+    fn exprs(&mut self, exprs: &[&Expression<'_>]) {
         for expr in exprs {
             self.expr(expr);
         }

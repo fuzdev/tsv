@@ -147,7 +147,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let span = arr
                         .elements
                         .last()
-                        .and_then(|e| e.as_ref())
+                        .and_then(|e| *e)
                         .map_or(expr.span, Expression::span);
                     return Err(self.rest_trailing_comma_error(span.start_usize()));
                 }
@@ -168,7 +168,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                                     e.span().start_usize(),
                                 ));
                             }
-                            Some(self.to_assignable(e.clone(), context)?)
+                            Some(self.to_assignable((*e).clone(), context)?)
                         }
                         None => None,
                     };

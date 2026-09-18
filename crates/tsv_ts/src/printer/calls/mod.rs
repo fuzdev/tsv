@@ -246,7 +246,7 @@ fn call_paren_split(
 pub(super) fn paren_split_for(
     printer: &Printer<'_>,
     gap_start: u32,
-    arguments: &[internal::Expression<'_>],
+    arguments: &[&internal::Expression<'_>],
 ) -> Option<(u32, u32)> {
     let first_arg_start = arguments.first()?.span().start;
     let paren = printer.find_char_outside_comments(gap_start, first_arg_start, b'(')?;
@@ -296,7 +296,7 @@ fn split_strands_directive(
     printer: &Printer<'_>,
     gap_start: u32,
     arg_side_start: u32,
-    arguments: &[internal::Expression<'_>],
+    arguments: &[&internal::Expression<'_>],
 ) -> bool {
     !arguments.is_empty()
         && printer.args_frozen_span(gap_start, arguments, 0).is_some()
@@ -538,7 +538,11 @@ impl<'a> Printer<'a> {
             // ordinary leading comment does — prettier's `shouldExpandLastArg` sees it.
             let call_has_comments = self.has_comments_on_page_between(paren_open, span.end);
             if call.arguments.len() >= 2
-                && call.arguments.last().is_some_and(is_block_function)
+                && call
+                    .arguments
+                    .last()
+                    .copied()
+                    .is_some_and(is_block_function)
                 && !any_arg_empty_line
                 && !(call_has_comments
                     && any_comment_forces_expansion(call, span, self, paren_open))

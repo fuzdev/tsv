@@ -2063,7 +2063,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn composite_head_region_claimed(
         &self,
         span_start: u32,
-        types: &[TSType<'_>],
+        types: &[&TSType<'_>],
     ) -> bool {
         // Keyed on the member's OWN start: a claim over only the composite's head gap
         // ends there ([`HeadRegion::region_end`]), and a claim that also covers the
@@ -3036,9 +3036,9 @@ impl<'a> Printer<'a> {
         ty: &'t TSType<'t>,
     ) -> Option<&'t TSType<'t>> {
         match ty {
-            TSType::Union(u) if self.sole_member_peels(u.span.start, u.types) => Some(&u.types[0]),
+            TSType::Union(u) if self.sole_member_peels(u.span.start, u.types) => Some(u.types[0]),
             TSType::Intersection(i) if self.sole_member_peels(i.span.start, i.types) => {
-                Some(&i.types[0])
+                Some(i.types[0])
             }
             _ => None,
         }
@@ -3048,7 +3048,7 @@ impl<'a> Printer<'a> {
     /// and no format-ignore directive in the composite's head gap freezes it — a frozen
     /// sole member is the composite's own verbatim slice, `|` included
     /// (`union_prettier_ignore_single_member`), so the seam must keep seeing the composite.
-    fn sole_member_peels(&self, head: u32, types: &[TSType<'_>]) -> bool {
+    fn sole_member_peels(&self, head: u32, types: &[&TSType<'_>]) -> bool {
         types.len() == 1 && self.composite_leading_run_freeze(head, types).is_none()
     }
 

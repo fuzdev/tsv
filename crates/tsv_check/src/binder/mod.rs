@@ -468,12 +468,14 @@ fn expr_contains_import_meta(expr: &Expression<'_>) -> bool {
                 || expr_contains_import_meta(c.consequent)
                 || expr_contains_import_meta(c.alternate)
         }
-        E::SequenceExpression(s) => s.expressions.iter().any(expr_contains_import_meta),
+        E::SequenceExpression(s) => s.expressions.iter().copied().any(expr_contains_import_meta),
         E::CallExpression(c) => {
-            expr_contains_import_meta(c.callee) || c.arguments.iter().any(expr_contains_import_meta)
+            expr_contains_import_meta(c.callee)
+                || c.arguments.iter().copied().any(expr_contains_import_meta)
         }
         E::NewExpression(n) => {
-            expr_contains_import_meta(n.callee) || n.arguments.iter().any(expr_contains_import_meta)
+            expr_contains_import_meta(n.callee)
+                || n.arguments.iter().copied().any(expr_contains_import_meta)
         }
         E::MemberExpression(m) => {
             expr_contains_import_meta(m.object) || expr_contains_import_meta(m.property)
@@ -481,7 +483,12 @@ fn expr_contains_import_meta(expr: &Expression<'_>) -> bool {
         E::TSNonNullExpression(t) => expr_contains_import_meta(t.expression),
         E::TSAsExpression(t) => expr_contains_import_meta(t.expression),
         E::TSSatisfiesExpression(t) => expr_contains_import_meta(t.expression),
-        E::ArrayExpression(a) => a.elements.iter().flatten().any(expr_contains_import_meta),
+        E::ArrayExpression(a) => a
+            .elements
+            .iter()
+            .flatten()
+            .copied()
+            .any(expr_contains_import_meta),
         _ => false,
     }
 }

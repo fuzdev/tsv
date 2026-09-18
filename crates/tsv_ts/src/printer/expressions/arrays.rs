@@ -234,7 +234,7 @@ impl<'a> Printer<'a> {
             .iter()
             .enumerate()
             .rev()
-            .find_map(|(idx, e)| e.as_ref().map(|e| (idx, e)))
+            .find_map(|(idx, e)| e.map(|e| (idx, e)))
     }
 
     /// Does this **block** comment trail the element before it, rather than lead the one after?
@@ -1122,7 +1122,7 @@ impl<'a> Printer<'a> {
             // which is exactly when the authored blank inside the parens must be dropped,
             // the elision's line break being structure rather than authorship.
             if !is_last && elem.is_some() {
-                pending_spread_share = elem.as_ref();
+                pending_spread_share = *elem;
             }
             if !matches!(arr.elements.get(i + 1), Some(None))
                 && let Some(e) = pending_spread_share.take()

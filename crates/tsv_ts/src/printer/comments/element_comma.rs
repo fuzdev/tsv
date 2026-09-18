@@ -29,6 +29,7 @@
 use super::{CommentVec, Printer};
 use crate::ast::internal::Expression;
 use smallvec::SmallVec;
+use std::borrow::Borrow;
 use tsv_lang::Comment;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
@@ -80,13 +81,16 @@ pub(in crate::printer) fn run_defers_line(run: &[&Comment]) -> bool {
 /// ⚠️ **The BLANK-line scan does not end here** — it stops earlier, at
 /// [`Printer::hole_slot_comma`]. Two questions, two far ends, and answering either with
 /// the other's is a bug pointing the opposite way.
-pub(in crate::printer) fn next_real_element_start(
-    elements: &[Option<Expression<'_>>],
+///
+/// Generic over the slot's element so the array literal (`Option<&Expression>`) and the
+/// array pattern (`Option<Expression>`) share it.
+pub(in crate::printer) fn next_real_element_start<'a, E: Borrow<Expression<'a>>>(
+    elements: &[Option<E>],
     idx: usize,
 ) -> Option<u32> {
     elements[idx + 1..]
         .iter()
-        .find_map(|e| e.as_ref().map(|e| e.span().start))
+        .find_map(|e| e.as_ref().map(|e| e.borrow().span().start))
 }
 
 /// Trailing comments collected for a list element (property or array element)

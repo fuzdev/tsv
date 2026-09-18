@@ -1274,7 +1274,7 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
         for entry in tag.identifiers {
             match &entry.unwrap_jsdoc_casts().kind {
                 tsv_ts::ExpressionKind::SequenceExpression(seq) => {
-                    flat.extend(seq.expressions.iter().cloned());
+                    flat.extend(seq.expressions.iter().map(|e| (*e).clone()));
                 }
                 _ => flat.push(entry.clone()),
             }

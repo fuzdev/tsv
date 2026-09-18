@@ -30,9 +30,12 @@ pub struct TSTypeAnnotation<'arena> {
 /// `Infer` — for the density reason `Statement` and `Expression` take: each is wide
 /// enough to set the enum's size on its own (`TSImportType` 112 B, `TSConstructorType`
 /// and `TSInferType` 80) and rare enough that the allocation is free, while the width
-/// is paid on every element of every `&[TSType]` and every by-value holder. (The type
-/// parser's precedence ladder does not pay it: each level returns an `&'arena TSType`
-/// — see `Parser::parse_type`.) Boxed, `TSType` is 80 B rather than 112; the next-widest
+/// is paid by every type node's own arena allocation. That allocation is the only place
+/// a `TSType` lives: no AST field holds one by value — every holder, slices included
+/// (union / intersection members, tuple elements, type arguments, template-literal
+/// types, as `&'arena [&'arena TSType]`), points at the node the type parser's
+/// precedence ladder already allocated, since each level returns an `&'arena TSType`
+/// (see `Parser::parse_type`). Boxed, `TSType` is 80 B rather than 112; the next-widest
 /// inline variants are `TSTypeReference` / `TSTypeQuery` / `TSMappedType` /
 /// `TSFunctionType` at 72, and `TSTypeReference` is the common case, so the ladder
 /// stops there.
@@ -292,7 +295,7 @@ impl TSKeywordKind {
 pub struct TSTypeAliasDeclaration<'arena> {
     pub id: Identifier<'arena>,
     pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
-    pub type_annotation: TSType<'arena>,
+    pub type_annotation: &'arena TSType<'arena>,
     pub declare: bool,
 }
 
@@ -333,7 +336,7 @@ impl<'arena> TSLiteralType<'arena> {
 #[derive(Debug, Clone)]
 pub struct TemplateLiteralType<'arena> {
     pub quasis: &'arena [TemplateElement<'arena>],
-    pub types: &'arena [TSType<'arena>],
+    pub types: &'arena [&'arena TSType<'arena>],
     pub span: Span,
 }
 
@@ -344,14 +347,14 @@ pub struct TemplateLiteralType<'arena> {
 /// Union type: `A | B | C`
 #[derive(Debug, Clone)]
 pub struct TSUnionType<'arena> {
-    pub types: &'arena [TSType<'arena>],
+    pub types: &'arena [&'arena TSType<'arena>],
     pub span: Span,
 }
 
 /// Intersection type: `A & B & C`
 #[derive(Debug, Clone)]
 pub struct TSIntersectionType<'arena> {
-    pub types: &'arena [TSType<'arena>],
+    pub types: &'arena [&'arena TSType<'arena>],
     pub span: Span,
 }
 
@@ -390,7 +393,7 @@ pub struct TSQualifiedName<'arena> {
 /// Type parameter instantiation: `<T, U>` (for type arguments)
 #[derive(Debug, Clone)]
 pub struct TSTypeParameterInstantiation<'arena> {
-    pub params: &'arena [TSType<'arena>],
+    pub params: &'arena [&'arena TSType<'arena>],
     pub span: Span,
 }
 
@@ -621,7 +624,7 @@ pub struct TSConstructorType<'arena> {
 /// Tuple type: `[T, U, V]`
 #[derive(Debug, Clone)]
 pub struct TSTupleType<'arena> {
-    pub element_types: &'arena [TSType<'arena>],
+    pub element_types: &'arena [&'arena TSType<'arena>],
     pub span: Span,
 }
 

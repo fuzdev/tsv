@@ -87,7 +87,7 @@ impl ArgOwner {
 /// no state below can hug, and the caller's general path prints it whole.
 pub(super) fn try_expand_last_arg(
     printer: &Printer<'_>,
-    arguments: &[internal::Expression<'_>],
+    arguments: &[&internal::Expression<'_>],
     callee: DocId,
     paren_open: u32,
     call_end: u32,
@@ -100,7 +100,7 @@ pub(super) fn try_expand_last_arg(
     }
     let opener = ArgOpener::Callee(callee);
 
-    let last_arg = arguments.last();
+    let last_arg = arguments.last().copied();
     let last_is_function = matches!(
         last_arg,
         Some(internal::Expression {

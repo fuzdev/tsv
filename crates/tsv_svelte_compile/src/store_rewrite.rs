@@ -862,7 +862,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
             // ── Recursion ──────────────────────────────────────────────────
             ExpressionKind::CallExpression(call) => {
                 let callee = self.expr_ref(call.callee)?;
-                let arguments = map_slice!(self, call.arguments, expr);
+                let arguments = map_slice!(self, call.arguments, expr_element);
                 if callee.is_none() && arguments.is_none() {
                     None
                 } else {
@@ -878,7 +878,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
             }
             ExpressionKind::NewExpression(new) => {
                 let callee = self.expr_ref(new.callee)?;
-                let arguments = map_slice!(self, new.arguments, expr);
+                let arguments = map_slice!(self, new.arguments, expr_element);
                 if callee.is_none() && arguments.is_none() {
                     None
                 } else {
@@ -959,7 +959,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                 })
             }
             ExpressionKind::ArrayExpression(arr) => {
-                map_slice!(self, arr.elements, opt_expr).map(|elements| Expression {
+                map_slice!(self, arr.elements, opt_expr_element).map(|elements| Expression {
                     span: expr.span,
                     kind: ExpressionKind::ArrayExpression(ast::ArrayExpression {
                         elements,
@@ -1000,7 +1000,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                 })
             }
             ExpressionKind::TemplateLiteral(template) => {
-                map_slice!(self, template.expressions, expr).map(|expressions| {
+                map_slice!(self, template.expressions, expr_element).map(|expressions| {
                     Expression::from_template_literal(ast::TemplateLiteral {
                         expressions,
                         ..template.clone()
@@ -1009,7 +1009,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
             }
             ExpressionKind::TaggedTemplateExpression(tagged) => {
                 let tag = self.expr_ref(tagged.tag)?;
-                let quasi = map_slice!(self, tagged.quasi.expressions, expr);
+                let quasi = map_slice!(self, tagged.quasi.expressions, expr_element);
                 if tag.is_none() && quasi.is_none() {
                     None
                 } else {
@@ -1048,7 +1048,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                 None => None,
             },
             ExpressionKind::SequenceExpression(seq) => {
-                map_slice!(self, seq.expressions, expr).map(|expressions| Expression {
+                map_slice!(self, seq.expressions, expr_element).map(|expressions| Expression {
                     span: expr.span,
                     kind: ExpressionKind::SequenceExpression(ast::SequenceExpression {
                         expressions,
@@ -1147,6 +1147,35 @@ impl<'arena> StoreRewriter<'_, 'arena> {
             | ExpressionKind::TSNonNullExpression(_)
             | ExpressionKind::TSParameterProperty(_)
             | ExpressionKind::JsdocCast(_) => None,
+        })
+    }
+
+    /// An element of a reference slice (call / `new` arguments, sequence and template
+    /// expressions) — the `map_slice!` contract with `T = &Expression`: a rebuilt
+    /// element is arena-allocated so the rebuilt slice holds references too.
+    fn expr_element(
+        &mut self,
+        expr: &'arena Expression<'arena>,
+    ) -> Result<Option<&'arena Expression<'arena>>, CompileError> {
+        Ok(self.expr(expr)?.map(|new| &*self.b.arena.alloc(new)))
+    }
+
+    /// An array-literal element slot (`Option<&Expression>`, `None` a hole) — the
+    /// reference twin of `opt_expr`, whose array-pattern slots hold the element by
+    /// value; a rebuilt element is arena-allocated. `&Option<&_>` is the `map_slice!`
+    /// contract's `&T` in.
+    #[expect(
+        clippy::option_option,
+        clippy::trivially_copy_pass_by_ref,
+        clippy::ref_option_ref
+    )]
+    fn opt_expr_element(
+        &mut self,
+        element: &Option<&'arena Expression<'arena>>,
+    ) -> Result<Option<Option<&'arena Expression<'arena>>>, CompileError> {
+        Ok(match element {
+            Some(expr) => self.expr_element(expr)?.map(Some),
+            None => None,
         })
     }
 

@@ -43,7 +43,7 @@ impl<'a> Printer<'a> {
         args: &internal::TSTypeParameterInstantiation<'_>,
         has_comments: bool,
     ) -> DocId {
-        let type_doc = self.build_type_doc(&args.params[0]);
+        let type_doc = self.build_type_doc(args.params[0]);
         self.build_single_type_arg_inline_with(args, has_comments, type_doc)
     }
 
@@ -59,7 +59,7 @@ impl<'a> Printer<'a> {
         type_doc: DocId,
     ) -> DocId {
         let d = self.d();
-        let param = &args.params[0];
+        let param = args.params[0];
         // Rule A: an alone-on-line directive before the sole argument freezes it whole
         // (`//` spellings route to the expansion builder before this; an alone-on-line
         // block spelling can reach this inline path).
@@ -105,7 +105,7 @@ impl<'a> Printer<'a> {
         if !has_comments {
             return false;
         }
-        let param = &args.params[0];
+        let param = args.params[0];
         // Read past a redundant shell carrying only leading comments
         // ([`Self::leading_paren_unwrapped`]): the shell strips, so its run is this gap's
         // — and exactly where the reparse reads it. Asked of the shell's `(` instead, the
@@ -215,7 +215,7 @@ impl<'a> Printer<'a> {
         // — so both readings force expansion and the router cannot disagree with the
         // emitter (which does hold the per-item verdict).
         let arg_span =
-            |ty: &TSType<'_>| self.list_item_printed_span(false, self.leading_paren_unwrapped(ty));
+            |ty: &&TSType<'_>| self.list_item_printed_span(false, self.leading_paren_unwrapped(ty));
         self.has_expanding_comments_in_bracket_list(args.span, args.params, arg_span)
     }
 
@@ -263,7 +263,7 @@ impl<'a> Printer<'a> {
         // the `<…>` a break point of its own — as does a hugging one whose comment run breaks
         // after ([`Self::single_type_arg_run_breaks_after`]).
         if args.params.len() == 1
-            && self.type_arg_hugs(args.span.start + 1, &args.params[0])
+            && self.type_arg_hugs(args.span.start + 1, args.params[0])
             && !self.single_type_arg_run_breaks_after(args, has_comments)
         {
             return self.build_single_type_arg_inline(args, has_comments);
@@ -295,8 +295,8 @@ impl<'a> Printer<'a> {
             |i| args.params[i].span(),
             |i, frozen, gap_start| {
                 if frozen {
-                    self.build_frozen_list_member_doc(&args.params[i])
-                } else if let TSType::Union(u) = &args.params[i] {
+                    self.build_frozen_list_member_doc(args.params[i])
+                } else if let TSType::Union(u) = args.params[i] {
                     // The `<`/`,`→argument gap is this seam's: a block run glued to
                     // the union's first member is handed in (`build_union_value_doc`),
                     // declining the hug and landing after the pipe once the argument
@@ -304,11 +304,11 @@ impl<'a> Printer<'a> {
                     // emitter stopped at the claim below.
                     self.build_union_value_doc(gap_start, u).doc
                 } else {
-                    self.build_type_arg_doc(&args.params[i], true)
+                    self.build_type_arg_doc(args.params[i], true)
                 }
             },
-            |i, gap_start| self.union_seam_run_handoff(gap_start, &args.params[i]),
-            |i| self.frozen_list_member_multiline(&args.params[i]),
+            |i, gap_start| self.union_seam_run_handoff(gap_start, args.params[i]),
+            |i| self.frozen_list_member_multiline(args.params[i]),
             has_comments,
         ))
     }
@@ -327,7 +327,7 @@ impl<'a> Printer<'a> {
         args: &internal::TSTypeParameterInstantiation<'_>,
     ) -> DocId {
         let is_multi = args.params.len() > 1;
-        let param_at = |i: usize| self.leading_paren_unwrapped(&args.params[i]);
+        let param_at = |i: usize| self.leading_paren_unwrapped(args.params[i]);
         // Rule A, asked on each argument's OWN span. It decides whether the printed span
         // may widen over a leading-edge shell, so it is resolved here rather than inside
         // the list core — reading it from the widened span would let a frozen argument

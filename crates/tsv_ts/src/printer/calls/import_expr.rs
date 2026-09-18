@@ -304,7 +304,7 @@ pub(super) fn build_import_expression_doc(
     if let Some((split_start, paren)) = super::paren_split_for(
         printer,
         leading_scan_start,
-        std::slice::from_ref(import_expr.source),
+        std::slice::from_ref(&import_expr.source),
     ) {
         // The argument side opens AT the `(`, so its scans no longer see the half the head
         // has taken.
@@ -337,7 +337,7 @@ fn build_import_args_doc(
         && let Some(doc) = try_hug_multiline_template_arg(
             printer,
             head,
-            std::slice::from_ref(import_expr.source),
+            std::slice::from_ref(&import_expr.source),
             leading_scan_start,
             span.end,
         )

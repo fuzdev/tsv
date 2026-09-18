@@ -7,6 +7,7 @@
 use crate::ast::internal::{EachBlock, EachKey, FragmentNode};
 use crate::printer::{CommentRun, HeadExpr, Printer};
 use smallvec::{SmallVec, smallvec};
+use std::borrow::Borrow;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -482,11 +483,12 @@ impl<'a> Printer<'a> {
     /// formatter. Comments thread through every gap (after `[`, around each `,`, before
     /// `]`); a hole (`[a, , b]`) has no element span to anchor against, so its separator
     /// stays a bare comma. Shared by the `ArrayPattern` (binding) and `ArrayExpression`
-    /// (default-value) arms, which carry identical `Vec<Option<Expression>>` elements.
+    /// (default-value) arms — generic over the slot's element, since the pattern holds
+    /// `Option<Expression>` and the literal `Option<&Expression>`.
     /// Claims the owned leading comment for the same reason its object twin does.
-    fn build_array_brackets(
+    fn build_array_brackets<'e, E: Borrow<Expression<'e>>>(
         &self,
-        elements: &[Option<Expression<'_>>],
+        elements: &[Option<E>],
         span_start: u32,
         span_end: u32,
     ) -> DocId {
@@ -494,6 +496,7 @@ impl<'a> Printer<'a> {
         let mut parts: DocBuf = smallvec![d.text("[")];
         let mut prev_end = span_start + 1; // past `[`
         for (i, elem) in elements.iter().enumerate() {
+            let elem = elem.as_ref().map(Borrow::borrow);
             if i == 0 {
                 if let Some(e) = elem {
                     parts.push(self.build_pattern_leading_comments(prev_end, e.span().start));

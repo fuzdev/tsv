@@ -734,6 +734,7 @@ fn needs_parens_expression_statement(expr: &Expression<'_>) -> bool {
         ExpressionKind::SequenceExpression(seq) => seq
             .expressions
             .first()
+            .copied()
             .is_some_and(needs_parens_expression_statement),
         _ => false,
     }

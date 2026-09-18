@@ -725,7 +725,7 @@ impl<'a> Printer<'a> {
         // (`single_type_arg_run_breaks_after`), as the type-position builder does.
         if inst.params.len() == 1
             && !self.single_type_arg_run_breaks_after(inst, has_comments)
-            && let Some(type_doc) = self.try_build_hugging_curly_type_doc(&inst.params[0])
+            && let Some(type_doc) = self.try_build_hugging_curly_type_doc(inst.params[0])
         {
             // The `<`→arg / arg→`>` gaps may hold inline block comments (a glued
             // format-ignore directive included) — the shared single-arg emission
@@ -748,8 +748,8 @@ impl<'a> Printer<'a> {
         // remain — the shared `build_single_type_arg_inline` preserves them. (The single
         // brace-delimited object/mapped type is handled by the curly-hug case above.)
         if inst.params.len() == 1
-            && (is_simple_type_arg(&inst.params[0])
-                || self.type_arg_union_prints_hugged(inst.span.start + 1, &inst.params[0]))
+            && (is_simple_type_arg(inst.params[0])
+                || self.type_arg_union_prints_hugged(inst.span.start + 1, inst.params[0]))
             && !self.single_type_arg_run_breaks_after(inst, has_comments)
         {
             return self.build_single_type_arg_inline(inst, has_comments);

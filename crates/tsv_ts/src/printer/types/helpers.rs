@@ -137,7 +137,7 @@ pub fn is_simple_type_arg(ty: &TSType<'_>) -> bool {
 /// [`union_hug_shape`]'s [`is_object_like_type`]. The two are clauses of one gate and must
 /// agree about a parenthesized member, or the gate reads two ways about one union.
 pub(super) fn union_has_brace_member(union: &TSUnionType<'_>) -> bool {
-    union.types.iter().any(is_huggable_type)
+    union.types.iter().copied().any(is_huggable_type)
 }
 
 /// The retained-paren shell around `ts_type` — its **outermost** `TSParenthesizedType`
@@ -312,7 +312,11 @@ fn is_void_type(ts_type: &TSType<'_>) -> bool {
 pub(in crate::printer) fn intersection_has_huggable_last_type(
     intersection: &TSIntersectionType<'_>,
 ) -> bool {
-    intersection.types.last().is_some_and(is_huggable_type)
+    intersection
+        .types
+        .last()
+        .copied()
+        .is_some_and(is_huggable_type)
 }
 
 /// Check if the first type in an intersection is "expanding" (like TypeLiteral or MappedType).
@@ -324,7 +328,11 @@ pub(in crate::printer) fn intersection_has_huggable_last_type(
 pub(in crate::printer) fn intersection_has_expanding_first_type(
     intersection: &TSIntersectionType<'_>,
 ) -> bool {
-    intersection.types.first().is_some_and(is_huggable_type)
+    intersection
+        .types
+        .first()
+        .copied()
+        .is_some_and(is_huggable_type)
 }
 
 //

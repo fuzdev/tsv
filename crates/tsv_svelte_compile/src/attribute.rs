@@ -418,9 +418,10 @@ fn build_mixed_attr_value<'arena>(
     if exprs.is_empty() {
         return Ok(MixedAttrValue::Folded(raw));
     }
-    Ok(MixedAttrValue::Template(
-        env.b.template_literal(&texts, exprs.into_bump_slice()),
-    ))
+    Ok(MixedAttrValue::Template(env.b.template_literal(
+        &texts,
+        env.b.expr_refs(exprs.into_bump_slice()),
+    )))
 }
 
 /// [`build_mixed_attr_value`] as the oracle's bare `build_attribute_value` result:

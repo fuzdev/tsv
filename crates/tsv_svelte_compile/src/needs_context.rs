@@ -874,7 +874,7 @@ fn check_root(access: &Expression<'_>, nc: &mut Nc<'_>) {
     }
 }
 
-fn walk_exprs(exprs: &[Expression<'_>], nc: &mut Nc<'_>) {
+fn walk_exprs(exprs: &[&Expression<'_>], nc: &mut Nc<'_>) {
     for expr in exprs {
         walk_expr(expr, nc);
     }
@@ -1037,7 +1037,7 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
         }
         ExpressionKind::ArrayExpression(arr) => {
             for element in arr.elements {
-                walk_opt(element.as_ref(), nc);
+                walk_opt(*element, nc);
             }
         }
         ExpressionKind::UnaryExpression(u) => walk_expr(u.argument, nc),

@@ -259,7 +259,7 @@ impl<'a> Printer<'a> {
                 // the `&` spelling's indent shell broke the literal after `=` on pass 1
                 // only — two fixed points for one program
                 // (`template_literal_interp_single_member_head_line_comment`).
-                let t = self.transparent_value(&template.types[i]);
+                let t = self.transparent_value(template.types[i]);
                 let dollar_brace_end = Self::interp_dollar_brace_end(quasi);
                 // The freeze verdict and the (possibly paren-stripped) type, from the one
                 // resolver the break gate above also reads.

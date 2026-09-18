@@ -607,7 +607,7 @@ pub(super) fn prebuild_expand_last_obj_array_body(
 /// - last_arg_doc: the last argument doc
 /// - all_args_broken: all args joined with comma_line() for fallback (includes inline block comments)
 pub(super) fn build_args_split_last(
-    arguments: &[internal::Expression<'_>],
+    arguments: &[&internal::Expression<'_>],
     printer: &Printer<'_>,
     paren_open: u32,
     has_comments: bool,
@@ -719,7 +719,7 @@ pub(super) fn build_args_split_last(
 /// expressions instead.
 pub(super) fn try_hook_deps_args_doc(
     printer: &Printer<'_>,
-    args: &[internal::Expression<'_>],
+    args: &[&internal::Expression<'_>],
     paren_open: u32,
     call_end: u32,
     has_comments: bool,
@@ -737,7 +737,7 @@ pub(super) fn try_hook_deps_args_doc(
 /// the call never wraps around them.
 fn build_hook_deps_args_doc(
     printer: &Printer<'_>,
-    args: &[internal::Expression<'_>],
+    args: &[&internal::Expression<'_>],
     paren_open: u32,
     prefix: DocId,
 ) -> DocId {
@@ -1796,12 +1796,12 @@ pub(super) fn build_expand_last_obj_array_doc(
 pub(super) fn build_expand_first_arg_doc(
     printer: &Printer<'_>,
     opener: ArgOpener,
-    arguments: &[internal::Expression<'_>],
+    arguments: &[&internal::Expression<'_>],
     paren_open: u32,
     call_end: u32,
 ) -> DocId {
     let d = printer.d();
-    let first_arg_doc = printer.build_arg_expression_doc(&arguments[0]);
+    let first_arg_doc = printer.build_arg_expression_doc(arguments[0]);
 
     let mut tail_parts = DocBuf::new();
     let mut prev_end = arguments[0].span().end;
@@ -1837,9 +1837,9 @@ pub(super) fn build_expand_first_arg_doc(
 /// Prettier disables expand-last-arg hug state when `penultimateArg.type === lastArg.type`
 /// (`couldExpandArg`, `print/call-arguments.js`). This covers both arrays, both objects, and also both TSAsExpression,
 /// both TSSatisfiesExpression, etc.
-pub(super) fn last_two_args_same_type(args: &[internal::Expression<'_>]) -> bool {
-    let last = &args[args.len() - 1];
-    let penultimate = &args[args.len() - 2];
+pub(super) fn last_two_args_same_type(args: &[&internal::Expression<'_>]) -> bool {
+    let last = args[args.len() - 1];
+    let penultimate = args[args.len() - 2];
     std::mem::discriminant(&last.kind) == std::mem::discriminant(&penultimate.kind)
 }
 
@@ -2026,7 +2026,7 @@ pub(super) fn build_arrow_call_body_states(
 /// [`wrap_call_with_hard_breaks_paren_line`].
 pub(super) fn build_args_joined_with_comments(
     printer: &Printer<'_>,
-    arguments: &[internal::Expression<'_>],
+    arguments: &[&internal::Expression<'_>],
     paren_open: u32,
     paren_close: u32,
     join: ArgsJoin,
@@ -2137,7 +2137,7 @@ pub(super) fn build_args_joined_with_comments(
 pub(super) fn build_call_args_expanded(
     printer: &Printer<'_>,
     opener: ArgOpener,
-    arguments: &[internal::Expression<'_>],
+    arguments: &[&internal::Expression<'_>],
     paren_open: u32,
     paren_close: u32,
 ) -> DocId {
@@ -2207,10 +2207,10 @@ impl ArgsJoin {
 pub(super) fn build_joined_argument_doc(
     printer: &Printer<'_>,
     paren_open: u32,
-    args: &[internal::Expression<'_>],
+    args: &[&internal::Expression<'_>],
     i: usize,
 ) -> DocId {
-    build_printed_argument_doc(printer, &args[i], || {
+    build_printed_argument_doc(printer, args[i], || {
         printer.build_arg_item_doc(paren_open, args, i)
     })
 }
@@ -2223,7 +2223,7 @@ pub(super) fn build_joined_argument_doc(
 /// - Result: first arg expands, tail args stay inline after closing `}`
 pub(super) fn should_expand_first_arg(
     printer: &Printer<'_>,
-    args: &[internal::Expression<'_>],
+    args: &[&internal::Expression<'_>],
 ) -> bool {
     // Need exactly 2 args (first is function, second is short)
     if args.len() != 2 {
@@ -2231,7 +2231,7 @@ pub(super) fn should_expand_first_arg(
     }
 
     // First arg must be a function with block body
-    if !is_block_function(&args[0]) {
+    if !is_block_function(args[0]) {
         return false;
     }
 
@@ -2244,7 +2244,7 @@ pub(super) fn should_expand_first_arg(
     //
     // **on page**: `hasComment` is a pure layout question, so an owned annotation blocks the
     // hug just like any other comment.
-    is_short_second_arg_for_expand_first(&args[1], args[0].span().end, |start, end| {
+    is_short_second_arg_for_expand_first(args[1], args[0].span().end, |start, end| {
         printer.has_comments_on_page_between(start, end)
     })
 }
@@ -2266,7 +2266,7 @@ pub(super) fn should_expand_first_arg(
 /// here would expand a list prettier hugs.
 pub(super) fn first_arg_signature_refuses_expand_first(
     printer: &Printer<'_>,
-    args: &[internal::Expression<'_>],
+    args: &[&internal::Expression<'_>],
 ) -> bool {
     matches!(
         args.first(),
@@ -2334,11 +2334,11 @@ pub(super) fn build_empty_args_doc(
 /// [`try_hug_multiline_template_arg`].
 pub(super) fn multiline_template_hug_applies(
     printer: &Printer<'_>,
-    args: &[internal::Expression<'_>],
+    args: &[&internal::Expression<'_>],
     gap_start: u32,
 ) -> bool {
     args.len() == 1
-        && is_multiline_template_expression(&args[0])
+        && is_multiline_template_expression(args[0])
         // Prettier's `isTemplateOnItsOwnLine`: a template the author put on a line of its
         // own declines, and the caller falls through to the expanded layout.
         && !has_newline_before_position(printer.source, args[0].span().start)
@@ -2384,7 +2384,7 @@ pub(super) fn multiline_template_hug_applies(
 pub(super) fn try_hug_multiline_template_arg(
     printer: &Printer<'_>,
     callee: DocId,
-    args: &[internal::Expression<'_>],
+    args: &[&internal::Expression<'_>],
     gap_start: u32,
     paren_close: u32,
 ) -> Option<DocId> {
@@ -2395,7 +2395,7 @@ pub(super) fn try_hug_multiline_template_arg(
     let d = printer.d();
     // Argument context, matching what the member chain's twin arm splices — a no-op for a
     // template either way, and the shape the rule is stated in.
-    let arg_doc = printer.build_arg_expression_doc(&args[0]);
+    let arg_doc = printer.build_arg_expression_doc(args[0]);
     let mut parts: DocBuf = smallvec![callee, d.text("(")];
     // The `(`-line gap. Emitted here or DROPPED — this builder reassembles the call from
     // two texts plus the argument's doc, so nothing outside can see in (hazard 4 in
@@ -2437,7 +2437,7 @@ pub(super) fn try_hug_multiline_template_arg(
 pub(super) fn build_call_args_with_blank_lines(
     printer: &Printer<'_>,
     callee: DocId,
-    args: &[internal::Expression<'_>],
+    args: &[&internal::Expression<'_>],
     paren_open: u32,
     paren_close: u32,
 ) -> DocId {

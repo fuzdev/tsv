@@ -443,7 +443,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 ExpressionKind::SequenceExpression(seq) => {
                     for element in seq.expressions {
                         self.require_debug_identifier(element)?;
-                        identifiers.push(element.clone());
+                        identifiers.push((*element).clone());
                     }
                 }
                 _ => {

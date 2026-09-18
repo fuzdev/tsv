@@ -594,7 +594,7 @@ fn census_class_body(body: &ClassBody<'_>, census: &mut BlockCensus) {
     }
 }
 
-fn census_exprs(exprs: &[Expression<'_>], census: &mut BlockCensus) {
+fn census_exprs(exprs: &[&Expression<'_>], census: &mut BlockCensus) {
     for expr in exprs {
         census_expr(expr, census);
     }
