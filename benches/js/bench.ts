@@ -1985,7 +1985,10 @@ async function run_benchmark_group(
 	// each row still runs one protocol everywhere. Costs ~3.3 min of wall per
 	// runtime, nearly all of it prettier's TypeScript row. The resolved value rides
 	// the row into the report (`min_iterations`) so the two floors are legible.
-	const canonical_rows = new Set([CANONICAL_FORMATTER_ROW, ...Object.values(CANONICAL_PARSER_ROWS)]);
+	const canonical_rows = new Set([
+		CANONICAL_FORMATTER_ROW,
+		...Object.values(CANONICAL_PARSER_ROWS)
+	]);
 	const canonical_min_iterations = Math.max(CANONICAL_MIN_ITERATIONS, baselining ? 10 : 8);
 
 	for (const task of tasks) {

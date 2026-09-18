@@ -130,7 +130,8 @@ export const PERF_OMITS: PerfOmit[] = [
 	{
 		task: 'format/typescript/biome',
 		path: 'kit/packages/kit/src/runtime/app/env',
-		reason: 'biome rejects ambient consts under the synthetic file.ts name (no path threading in the bench)'
+		reason:
+			'biome rejects ambient consts under the synthetic file.ts name (no path threading in the bench)'
 	},
 	{
 		task: 'format/typescript/biome',
@@ -160,7 +161,8 @@ export const PERF_OMITS: PerfOmit[] = [
 	{
 		task: 'format/svelte/biome',
 		path: 'fuz_css/src/routes/docs/classes/+page.svelte',
-		reason: "biome: expected class parameters but found '<' (a class body its HTML path does not parse)"
+		reason:
+			"biome: expected class parameters but found '<' (a class body its HTML path does not parse)"
 	},
 	{
 		task: 'format/svelte/biome',
