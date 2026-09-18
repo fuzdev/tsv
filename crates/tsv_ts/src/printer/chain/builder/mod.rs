@@ -73,7 +73,7 @@ fn call_has_breaking_single_arg(call: &CallExpression<'_>, printer: &Printer<'_>
     let d = printer.arena();
     match &call.arguments[0].kind {
         ExpressionKind::ObjectExpression(_) | ExpressionKind::ArrayExpression(_) => {
-            let arg_doc = printer.build_expression_doc(&call.arguments[0]);
+            let arg_doc = printer.build_expression_doc(call.arguments[0]);
             d.will_break(arg_doc)
         }
         // Object/array-body arrows (typed or not) are expandable per prettier's

@@ -633,14 +633,14 @@ impl<'a> Printer<'a> {
     ) -> IntersectionMemberFacts {
         let frozen =
             self.list_member_frozen(intersection.span.start, intersection.types, i, freeze_first);
-        let Some(prev) = i.checked_sub(1).map(|p| &intersection.types[p]) else {
+        let Some(prev) = i.checked_sub(1).map(|p| intersection.types[p]) else {
             return IntersectionMemberFacts {
                 frozen,
                 separator: None,
                 shell_run: None,
             };
         };
-        let member = &intersection.types[i];
+        let member = intersection.types[i];
         let separator = has_comments
             .then(|| {
                 find_separator_position(self.source, prev.span().end, member.span().start, b'&')
@@ -1353,7 +1353,7 @@ impl<'a> Printer<'a> {
     }
 
     fn union_member_has_leading_comments(&self, union: &TSUnionType<'_>, i: usize) -> bool {
-        let member = &union.types[i];
+        let member = union.types[i];
         let member_start = member.span().start;
         if self
             .has_comments_to_emit_between(member_start, unwrap_parenthesized(member).span().start)
@@ -1548,7 +1548,7 @@ impl<'a> Printer<'a> {
         if !has_comments {
             return None;
         }
-        self.intersection_member_hoisted_shell(&intersection.types[0], member_parens)
+        self.intersection_member_hoisted_shell(intersection.types[0], member_parens)
     }
 
     /// Prettier's `hasLeadingOwnLineComment(originalText, node)` disjunct
@@ -1942,7 +1942,7 @@ impl<'a> Printer<'a> {
         if union.types.len() == 1
             && self.list_member_frozen(union.span.start, union.types, 0, freeze_first)
             && !matches!(
-                unwrap_parenthesized(&union.types[0]),
+                unwrap_parenthesized(union.types[0]),
                 TSType::Union(_) | TSType::Intersection(_)
             )
         {
@@ -2103,7 +2103,7 @@ impl<'a> Printer<'a> {
         // single-member predicate here, so any required parens come from the parent one
         // level up.
         if union.types.len() == 1 {
-            let member = &union.types[0];
+            let member = union.types[0];
             // A single-member union collapses to its member. When frozen, the resolution
             // is handled above, at the leaf/object arm of the `len() == 1` branch (whole
             // union frozen, `|` kept); a composite sole member falls through here and
@@ -2932,11 +2932,16 @@ impl<'a> Printer<'a> {
     ///
     /// **Axis**: on-page, like every other clause of that layout gate.
     fn union_member_shell_holds_comment(&self, union: &TSUnionType<'_>) -> bool {
-        union.types.iter().filter_map(outermost_paren).any(|shell| {
-            let (leading, trailing) = paren_shell_gaps(shell);
-            self.has_comments_on_page_between(leading.start, leading.end)
-                || self.has_comments_on_page_between(trailing.start, trailing.end)
-        })
+        union
+            .types
+            .iter()
+            .copied()
+            .filter_map(outermost_paren)
+            .any(|shell| {
+                let (leading, trailing) = paren_shell_gaps(shell);
+                self.has_comments_on_page_between(leading.start, leading.end)
+                    || self.has_comments_on_page_between(trailing.start, trailing.end)
+            })
     }
 
     /// Whether any comment sits in a gap *between* two consecutive members — the
@@ -3330,7 +3335,7 @@ impl<'a> Printer<'a> {
         if intersection.types.len() == 1
             && self.list_member_frozen(intersection.span.start, intersection.types, 0, freeze_first)
             && !matches!(
-                unwrap_parenthesized(&intersection.types[0]),
+                unwrap_parenthesized(intersection.types[0]),
                 TSType::Union(_) | TSType::Intersection(_)
             )
         {
@@ -3548,7 +3553,7 @@ impl<'a> Printer<'a> {
 
         // Build first type separately (not indented)
         let mut first_parts = DocBuf::new();
-        let first_type = &intersection.types[0];
+        let first_type = intersection.types[0];
         let first_type_start = first_type.span().start;
         let first_type_end = first_type.span().end;
 
@@ -3676,16 +3681,16 @@ impl<'a> Printer<'a> {
         let mut freeze_multiline = freeze_first_multiline
             || self.frozen_member_forces_break(first_frozen, first_type, member_parens);
         for i in 1..intersection.types.len() {
-            let prev_type = &intersection.types[i - 1];
+            let prev_type = intersection.types[i - 1];
             let prev_is_object = is_huggable_type(prev_type);
-            let cur_is_object = is_huggable_type(&intersection.types[i]);
+            let cur_is_object = is_huggable_type(intersection.types[i]);
             let neither_is_object = !prev_is_object && !cur_is_object;
             // Everything the boundary rules below read about this member, resolved once
             // by the seam the forced-multiline twin also calls
             // ([`Self::intersection_member_facts`]).
             let facts = self.intersection_member_facts(intersection, i, has_comments, false);
             let frozen = facts.frozen;
-            if self.frozen_member_forces_break(frozen, &intersection.types[i], member_parens) {
+            if self.frozen_member_forces_break(frozen, intersection.types[i], member_parens) {
                 freeze_multiline = true;
             }
 
@@ -3719,7 +3724,7 @@ impl<'a> Printer<'a> {
             if !breaks
                 && self.intersection_boundary_opens_for_shell_run(
                     prev_type,
-                    &intersection.types[i],
+                    intersection.types[i],
                     facts.shell_run.as_ref(),
                     held_trailing_run.is_some() || (i > 1 && prev_indent_member),
                 )
@@ -3837,7 +3842,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let freeze_first = leading_freeze.is_some();
-        let first_member = &intersection.types[0];
+        let first_member = intersection.types[0];
         let first_frozen =
             self.list_member_frozen(intersection.span.start, intersection.types, 0, freeze_first);
         let head = self.intersection_first_member_head_run(intersection, first_frozen);
@@ -4588,7 +4593,7 @@ impl<'a> Printer<'a> {
         member_parens: TypeParenRule,
         facts: IntersectionMemberFacts,
     ) -> IntersectionMemberBody {
-        let t = &intersection.types[i];
+        let t = intersection.types[i];
         let type_start = t.span().start;
         let type_end = t.span().end;
         let is_last = i == intersection.types.len() - 1;

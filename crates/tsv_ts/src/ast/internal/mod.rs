@@ -104,7 +104,7 @@ pub use expressions::{
 //
 // Both enums are also the ELEMENT WIDTH of the containers that hold them, which is
 // the larger cost: an `Expression` slot is paid on every element of every
-// `&[Expression]` (call arguments, array elements, parameters), so the enum's width
+// `&[Expression]` (parameters, array-pattern elements), so the enum's width
 // multiplies through the whole tree. Both are held down the same way — the variants
 // wide enough to set the size on their own, and rare enough that an arena allocation
 // for each is free, hold their payload by `&'arena` reference: `Expression`'s five
@@ -134,7 +134,13 @@ pub use expressions::{
 // `parse_expression_ref`. `CatchClause` keeps its inline `param` deliberately: that
 // one is built by the parser as an owned value rather than through the spine, so a
 // reference there would ADD an allocation, and `CatchClause` is reached only through
-// `Option<&CatchClause>` so its width sets nothing.
+// `Option<&CatchClause>` so its width sets nothing. The expression LISTS whose
+// elements come off the spine take the reference per element, since there too the
+// reference keeps the spine's allocation rather than copying out of it — call and
+// `new` arguments, sequence and template expressions (`&[&Expression]`) and
+// array-literal elements (`&[Option<&Expression>]`); the parameter lists and
+// `ArrayPattern`'s elements are built as owned values, `CatchClause`'s case, and stay
+// by value.
 //
 // `Expression` and `Statement` are each a header over their variant (`span` +
 // `ExpressionKind` / `StatementKind`), so a span read is a field load rather than a

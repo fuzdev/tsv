@@ -395,7 +395,7 @@ impl<'arena> ObjectProperty<'arena> {
 /// where missing elements are represented as None.
 #[derive(Debug, Clone)]
 pub struct ArrayExpression<'arena> {
-    pub elements: &'arena [Option<Expression<'arena>>],
+    pub elements: &'arena [Option<&'arena Expression<'arena>>],
     /// `true` when a trailing comma follows a final spread element (`[...a,]`).
     /// Valid in an array *literal*, but a syntax error once the literal is
     /// refined to an array pattern — the grammar's rest element admits no
@@ -675,7 +675,7 @@ impl<'arena> BinaryExpression<'arena> {
 pub struct CallExpression<'arena> {
     pub callee: &'arena Expression<'arena>,
     pub type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
-    pub arguments: &'arena [Expression<'arena>],
+    pub arguments: &'arena [&'arena Expression<'arena>],
     pub optional: bool, // true for `foo?.()` (optional chaining)
 }
 
@@ -688,7 +688,7 @@ pub struct CallExpression<'arena> {
 pub struct NewExpression<'arena> {
     pub callee: &'arena Expression<'arena>,
     pub type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
-    pub arguments: &'arena [Expression<'arena>],
+    pub arguments: &'arena [&'arena Expression<'arena>],
 }
 
 /// Dynamic import expression: `import('module')` or `import('module', options)`,
@@ -866,7 +866,7 @@ pub struct Property<'arena> {
 #[derive(Debug, Clone)]
 pub struct TemplateLiteral<'arena> {
     pub quasis: &'arena [TemplateElement<'arena>],
-    pub expressions: &'arena [Expression<'arena>],
+    pub expressions: &'arena [&'arena Expression<'arena>],
     pub span: Span,
 }
 
@@ -1003,7 +1003,7 @@ pub struct YieldExpression<'arena> {
 /// Created by the comma operator at expression level.
 #[derive(Debug, Clone)]
 pub struct SequenceExpression<'arena> {
-    pub expressions: &'arena [Expression<'arena>],
+    pub expressions: &'arena [&'arena Expression<'arena>],
 }
 
 /// Regular expression literal: `/pattern/flags`

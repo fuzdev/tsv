@@ -69,7 +69,7 @@ pub(super) fn write_type_alias_declaration(
     write_identifier_plain(w, &type_alias.id, ctx);
     write_type_parameters_field(w, type_alias.type_parameters.as_ref(), ctx);
     w.raw(",\"typeAnnotation\":");
-    write_type(w, &type_alias.type_annotation, ctx);
+    write_type(w, type_alias.type_annotation, ctx);
     if type_alias.declare {
         w.raw(",\"declare\":true");
     }

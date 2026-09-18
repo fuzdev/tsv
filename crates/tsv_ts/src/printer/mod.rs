@@ -825,7 +825,7 @@ impl<'a> Printer<'a> {
                 && self.frozen_slice_hands_header_a_bare_in(child, slice_end)
         };
         match &expr.kind {
-            E::SequenceExpression(seq) => seq.expressions.iter().any(&mut reaches),
+            E::SequenceExpression(seq) => seq.expressions.iter().copied().any(&mut reaches),
             E::AssignmentExpression(assign) => reaches(assign.right),
             E::BinaryExpression(binary) => reaches(binary.left) || reaches(binary.right),
             E::ConditionalExpression(cond) => reaches(cond.test) || reaches(cond.alternate),

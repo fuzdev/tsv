@@ -506,7 +506,7 @@ impl<'arena> Extractor<'_, 'arena> {
     fn rest_keys(
         &mut self,
         properties: &'arena [ObjectPatternProperty<'arena>],
-    ) -> Result<&'arena [Option<Expression<'arena>>], CompileError> {
+    ) -> Result<&'arena [Option<&'arena Expression<'arena>>], CompileError> {
         let mut names: Vec<String> = Vec::new();
         for prop in properties {
             if let ObjectPatternProperty::Property(p) = prop {
@@ -522,10 +522,11 @@ impl<'arena> Extractor<'_, 'arena> {
                 names.push(name);
             }
         }
-        let mut elems: BumpVec<'arena, Option<Expression<'arena>>> =
+        let mut elems: BumpVec<'arena, Option<&'arena Expression<'arena>>> =
             BumpVec::with_capacity_in(names.len(), self.b.arena);
         for name in names {
-            elems.push(Some(self.b.string_literal_expr(&name)));
+            let key = self.b.string_literal_expr(&name);
+            elems.push(Some(self.b.arena.alloc(key)));
         }
         Ok(elems.into_bump_slice())
     }
@@ -534,7 +535,7 @@ impl<'arena> Extractor<'_, 'arena> {
     fn exclude_from_object(
         &mut self,
         expr: &'arena Expression<'arena>,
-        keys: &'arena [Option<Expression<'arena>>],
+        keys: &'arena [Option<&'arena Expression<'arena>>],
     ) -> &'arena Expression<'arena> {
         let array = self.b.array_of(keys);
         let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(self.b.arena);

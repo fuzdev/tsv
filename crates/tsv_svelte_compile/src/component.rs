@@ -390,7 +390,7 @@ fn build_component_props<'arena>(
     // element construction so the array span encloses the minted object spans.
     let last_is_props = matches!(groups.last(), Some(PropGroup::Props(_)));
     let lbracket = env.b.mint("[").start;
-    let mut elements: BumpVec<'arena, Option<Expression<'arena>>> = BumpVec::new_in(arena);
+    let mut elements: BumpVec<'arena, Option<&'arena Expression<'arena>>> = BumpVec::new_in(arena);
     let group_count = groups.len();
     for (i, group) in groups.iter().enumerate() {
         let element_expr = match group {
@@ -409,11 +409,11 @@ fn build_component_props<'arena>(
                 wrap_value_expr(env, expr)?[0].clone()
             }
         };
-        elements.push(Some(element_expr));
+        elements.push(Some(arena.alloc(element_expr)));
     }
     // A trailing spread with synthetic props needs its own props object appended.
     if !last_is_props && let Some(plan) = synthetic {
-        elements.push(Some(build_props_object(env, &[], Some(plan))?));
+        elements.push(Some(arena.alloc(build_props_object(env, &[], Some(plan))?)));
     }
     let rbracket = env.b.mint("]").end;
     let array = Expression {

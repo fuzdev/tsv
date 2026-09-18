@@ -51,7 +51,7 @@ pub(super) fn mark_boolean_coercion_argument(
     call: &internal::CallExpression<'_>,
 ) {
     if is_boolean_type_coercion(call, printer) {
-        printer.mark_flat_chain(&call.arguments[0]);
+        printer.mark_flat_chain(call.arguments[0]);
     }
 }
 
@@ -156,7 +156,7 @@ enum CallLikeArguments<'a> {
     /// A call's or `new`'s callee and argument list.
     Called {
         callee: &'a Expression<'a>,
-        arguments: &'a [Expression<'a>],
+        arguments: &'a [&'a Expression<'a>],
     },
     /// A dynamic import's specifier and optional options object. It has **no callee**, and
     /// prettier's simplicity test skips the callee arm for it rather than failing on it.
@@ -205,7 +205,7 @@ impl<'a> CallLikeArguments<'a> {
     /// Whether every argument satisfies `predicate`.
     fn all(self, mut predicate: impl FnMut(&'a Expression<'a>) -> bool) -> bool {
         match self {
-            Self::Called { arguments, .. } => arguments.iter().all(predicate),
+            Self::Called { arguments, .. } => arguments.iter().copied().all(predicate),
             Self::Imported { source, options } => {
                 predicate(source) && options.is_none_or(predicate)
             }
@@ -329,7 +329,7 @@ pub(super) fn is_expandable_object(expr: &Expression<'_>) -> bool {
 /// Check if the last argument is an array or object expression (unwrapping type assertions)
 #[inline]
 pub(super) fn last_arg_is_array_or_object(
-    arguments: &[Expression<'_>],
+    arguments: &[&Expression<'_>],
     printer: &Printer<'_>,
 ) -> bool {
     arguments
@@ -437,7 +437,7 @@ pub(super) fn is_block_function(expr: &Expression<'_>) -> bool {
 /// ON-PAGE axis, since an owned annotation glued to an argument is a comment prettier's
 /// `hasComment` sees.
 pub(super) fn is_react_hook_call_with_deps_array<F>(
-    args: &[Expression<'_>],
+    args: &[&Expression<'_>],
     arg_gap_has_comment: F,
 ) -> bool
 where
@@ -449,7 +449,7 @@ where
         _ => return false,
     };
 
-    is_hook_callback_with_deps(&args[base], &args[base + 1]) && !arg_gap_has_comment()
+    is_hook_callback_with_deps(args[base], args[base + 1]) && !arg_gap_has_comment()
 }
 
 /// The shape half of [`is_react_hook_call_with_deps_array`] — prettier's
@@ -633,7 +633,7 @@ pub(super) fn lone_arg_params_render_flat(arg: &Expression<'_>) -> bool {
 ///   any argument is a call expression containing a function/arrow argument
 ///
 /// This triggers `allArgsBrokenOut()` in Prettier to expand all arguments.
-pub(super) fn is_function_composition_args(arguments: &[Expression<'_>]) -> bool {
+pub(super) fn is_function_composition_args(arguments: &[&Expression<'_>]) -> bool {
     if arguments.len() <= 1 {
         return false;
     }
@@ -680,7 +680,7 @@ mod tests {
     }
 
     /// Parse a call expression and return its argument list.
-    fn args_of<'a>(arena: &'a Bump, src: &str) -> &'a [Expression<'a>] {
+    fn args_of<'a>(arena: &'a Bump, src: &str) -> &'a [&'a Expression<'a>] {
         match parse_expr(arena, src) {
             Expression {
                 kind: ExpressionKind::CallExpression(call),

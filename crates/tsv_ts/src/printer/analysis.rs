@@ -116,7 +116,7 @@ pub(crate) fn is_module_path_fluid_call(expr: &internal::Expression<'_>, source:
     };
 
     // Must have exactly 1 argument that is a string literal
-    if call.arguments.len() != 1 || !is_string_literal(&call.arguments[0]) {
+    if call.arguments.len() != 1 || !is_string_literal(call.arguments[0]) {
         return false;
     }
 

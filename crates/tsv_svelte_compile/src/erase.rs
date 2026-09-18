@@ -1653,7 +1653,7 @@ impl<'arena> Eraser<'arena, '_> {
                     self.drop_region_from(call.callee.span().start, type_arguments.span);
                 }
                 let callee = self.expr_ref(call.callee)?;
-                let arguments = map_slice!(self, call.arguments, expr);
+                let arguments = map_slice!(self, call.arguments, expr_element);
                 if call.type_arguments.is_none() && callee.is_none() && arguments.is_none() {
                     None
                 } else {
@@ -1675,7 +1675,7 @@ impl<'arena> Eraser<'arena, '_> {
                     self.drop_region_from(new.callee.span().start, type_arguments.span);
                 }
                 let callee = self.expr_ref(new.callee)?;
-                let arguments = map_slice!(self, new.arguments, expr);
+                let arguments = map_slice!(self, new.arguments, expr_element);
                 if new.type_arguments.is_none() && callee.is_none() && arguments.is_none() {
                     None
                 } else {
@@ -1742,7 +1742,7 @@ impl<'arena> Eraser<'arena, '_> {
                 })
             }
             ExpressionKind::ArrayExpression(arr) => {
-                map_slice!(self, arr.elements, opt_expr).map(|elements| Expression {
+                map_slice!(self, arr.elements, opt_expr_element).map(|elements| Expression {
                     span: expr.span,
                     kind: ExpressionKind::ArrayExpression(tsv_ts::ast::internal::ArrayExpression {
                         elements,
@@ -1858,7 +1858,7 @@ impl<'arena> Eraser<'arena, '_> {
                 None => None,
             },
             ExpressionKind::SequenceExpression(seq) => {
-                map_slice!(self, seq.expressions, expr).map(|expressions| Expression {
+                map_slice!(self, seq.expressions, expr_element).map(|expressions| Expression {
                     span: expr.span,
                     kind: ExpressionKind::SequenceExpression(
                         tsv_ts::ast::internal::SequenceExpression { expressions },
@@ -2033,6 +2033,35 @@ impl<'arena> Eraser<'arena, '_> {
         }))
     }
 
+    /// An element of a reference slice (call / `new` arguments, sequence and template
+    /// expressions) — the `map_slice!` contract with `T = &Expression`: a rebuilt
+    /// element is arena-allocated so the rebuilt slice holds references too.
+    fn expr_element(
+        &mut self,
+        expr: &'arena Expression<'arena>,
+    ) -> Result<Option<&'arena Expression<'arena>>, CompileError> {
+        Ok(self.expr(expr)?.map(|new| &*self.arena.alloc(new)))
+    }
+
+    /// An array-literal element slot (`Option<&Expression>`, `None` a hole) — the
+    /// reference twin of `opt_expr`, whose array-pattern slots hold the element by
+    /// value; a rebuilt element is arena-allocated. `&Option<&_>` is the `map_slice!`
+    /// contract's `&T` in.
+    #[expect(
+        clippy::option_option,
+        clippy::trivially_copy_pass_by_ref,
+        clippy::ref_option_ref
+    )]
+    fn opt_expr_element(
+        &mut self,
+        element: &Option<&'arena Expression<'arena>>,
+    ) -> Result<Option<Option<&'arena Expression<'arena>>>, CompileError> {
+        Ok(match element {
+            Some(expr) => self.expr_element(expr)?.map(Some),
+            None => None,
+        })
+    }
+
     /// An array/array-pattern element slot — `None` is a hole (`[a, , b]`). The
     /// nesting is the `map_slice!` contract (`&T` in, `Option<T>` out, with
     /// `T = Option<Expression>`), not a modelling choice.
@@ -2146,9 +2175,11 @@ impl<'arena> Eraser<'arena, '_> {
         template: &TemplateLiteral<'arena>,
     ) -> Result<Option<TemplateLiteral<'arena>>, CompileError> {
         Ok(
-            map_slice!(self, template.expressions, expr).map(|expressions| TemplateLiteral {
-                expressions,
-                ..template.clone()
+            map_slice!(self, template.expressions, expr_element).map(|expressions| {
+                TemplateLiteral {
+                    expressions,
+                    ..template.clone()
+                }
             }),
         )
     }

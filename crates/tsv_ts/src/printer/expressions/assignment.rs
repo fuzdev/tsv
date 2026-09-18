@@ -472,7 +472,7 @@ fn is_call_with_complex_type_arguments(
     // unconditional list sees the union directly. Reading the shell instead classified
     // `f<(A | B)>()` as simple where the bare `f<A | B>()` was complex — one authoring of
     // one type reaching two layouts.
-    match type_args.params.first().map(unwrap_parenthesized) {
+    match type_args.params.first().copied().map(unwrap_parenthesized) {
         Some(TSType::TypeLiteral(_) | TSType::Union(_) | TSType::Intersection(_)) => true,
         Some(TSType::Mapped(m)) => m.span.extract(printer.source).contains('\n'),
         _ => false,
@@ -555,7 +555,7 @@ fn is_poorly_breakable_chain_recursive(
             // allowed to expand args instead of breaking at the assignment operator.
             let is_trivial_call = call.arguments.is_empty()
                 || (call.arguments.len() == 1
-                    && is_short_arg(&call.arguments[0], printer.source)
+                    && is_short_arg(call.arguments[0], printer.source)
                     && !call_arg_has_comments(call, expr.span, printer));
 
             if !is_trivial_call {
@@ -816,7 +816,7 @@ pub fn is_type_assertion_call(expr: &Expression<'_>, source: &str) -> bool {
     // Non-trivial = multiple args OR single long arg
     // (Trivial = empty args OR single short arg)
     !(call.arguments.is_empty()
-        || call.arguments.len() == 1 && is_short_arg(&call.arguments[0], source))
+        || call.arguments.len() == 1 && is_short_arg(call.arguments[0], source))
 }
 
 /// Check if an expression is a member-only chain (no calls).

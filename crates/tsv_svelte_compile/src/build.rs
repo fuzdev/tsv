@@ -175,6 +175,15 @@ impl<'arena> Builder<'arena> {
         }
     }
 
+    /// A node's expression-list slice over an owned list: call arguments and template
+    /// expressions are held by reference, one pointer per element of `exprs`.
+    pub(crate) fn expr_refs(
+        &self,
+        exprs: &'arena [Expression<'arena>],
+    ) -> &'arena [&'arena Expression<'arena>] {
+        self.arena.alloc_slice_fill_iter(exprs.iter())
+    }
+
     /// `<object>.<property>(<arguments>)` — a call on a synthetic member chain.
     /// The arguments slice may hold borrowed expressions (host spans).
     pub fn member_call(
@@ -203,7 +212,7 @@ impl<'arena> Builder<'arena> {
             kind: ExpressionKind::CallExpression(CallExpression {
                 callee,
                 type_arguments: None,
-                arguments,
+                arguments: self.expr_refs(arguments),
                 optional: false,
             }),
         }
@@ -218,7 +227,7 @@ impl<'arena> Builder<'arena> {
     pub fn template_literal(
         &mut self,
         texts: &[String],
-        expressions: &'arena [Expression<'arena>],
+        expressions: &'arena [&'arena Expression<'arena>],
     ) -> Expression<'arena> {
         debug_assert_eq!(texts.len(), expressions.len() + 1);
         let start = self.mint("`").start;
@@ -268,7 +277,7 @@ impl<'arena> Builder<'arena> {
             kind: ExpressionKind::CallExpression(CallExpression {
                 callee,
                 type_arguments: None,
-                arguments,
+                arguments: self.expr_refs(arguments),
                 optional: false,
             }),
         }
@@ -291,7 +300,7 @@ impl<'arena> Builder<'arena> {
             kind: ExpressionKind::CallExpression(CallExpression {
                 callee,
                 type_arguments: None,
-                arguments,
+                arguments: self.expr_refs(arguments),
                 optional,
             }),
         }
@@ -359,7 +368,7 @@ impl<'arena> Builder<'arena> {
             kind: ExpressionKind::CallExpression(CallExpression {
                 callee,
                 type_arguments: None,
-                arguments,
+                arguments: self.expr_refs(arguments),
                 optional: false,
             }),
         }
@@ -514,7 +523,7 @@ impl<'arena> Builder<'arena> {
     /// `$.exclude_from_object(o, ['a', 'b'])`.
     pub fn array_of(
         &mut self,
-        elements: &'arena [Option<Expression<'arena>>],
+        elements: &'arena [Option<&'arena Expression<'arena>>],
     ) -> Expression<'arena> {
         let start = self.mint("[").start;
         let end = self.mint("]").end;

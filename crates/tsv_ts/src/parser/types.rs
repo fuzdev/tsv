@@ -87,11 +87,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// dispatcher returns the bare `TSType` enum. A by-value `TSType` (80 B) comes back
     /// through a caller stack slot at every level of this deep ladder, and a dispatcher
     /// reserves one such slot per arm in every frame; an `&'arena TSType` return is a
-    /// two-scalar `Result` (see the size assert at the top of this file). The consumers
-    /// that hold a type by reference — most of them — keep the allocation; the few
-    /// by-value holders (a union / intersection / tuple / type-argument /
-    /// template-literal slice element, the type alias's right-hand side) take a shallow
-    /// clone, the same 80 B copy the by-value return moved.
+    /// two-scalar `Result` (see the size assert at the top of this file). Every consumer
+    /// holds a type by reference and keeps that allocation — a union / intersection /
+    /// tuple / type-argument / template-literal slice is a slice of these references
+    /// (`&'arena [&'arena TSType]`), and the type alias's right-hand side is one — so no
+    /// type is copied out of the node its builder allocated.
     pub(in crate::parser) fn parse_type(&mut self) -> Result<&'arena TSType<'arena>, ParseError> {
         debug_assert!(self.pending_conditional_extends.is_none());
         self.with_full_type_context(|p| {
@@ -172,12 +172,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         let mut types = self.bvec();
-        types.push(first.clone());
+        types.push(first);
         while self.eat(TokenKind::Pipe) {
-            types.push(
-                self.with_fn_type_disallowed(true, Self::parse_intersection_type)?
-                    .clone(),
-            );
+            types.push(self.with_fn_type_disallowed(true, Self::parse_intersection_type)?);
         }
 
         let end = types.last().map_or_else(|| start as u32, |t| t.span().end);
@@ -211,12 +208,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         let mut types = self.bvec();
-        types.push(first.clone());
+        types.push(first);
         while self.eat(TokenKind::Ampersand) {
-            types.push(
-                self.with_fn_type_disallowed(true, Self::parse_array_type)?
-                    .clone(),
-            );
+            types.push(self.with_fn_type_disallowed(true, Self::parse_array_type)?);
         }
 
         let end = types.last().map_or_else(|| start as u32, |t| t.span().end);
@@ -870,13 +864,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let mut params = self.bvec();
         if !self.check_greater_than_in_type() {
-            params.push(self.parse_type()?.clone());
+            params.push(self.parse_type()?);
             while self.eat(TokenKind::Comma) {
                 // Allow trailing comma - check for closing > before parsing another type
                 if self.check_greater_than_in_type() {
                     break;
                 }
-                params.push(self.parse_type()?.clone());
+                params.push(self.parse_type()?);
             }
         }
 
@@ -1478,12 +1472,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let mut element_types = self.bvec();
         if !self.check(&TokenKind::BracketClose) {
-            element_types.push(self.parse_tuple_element()?.clone());
+            element_types.push(self.parse_tuple_element()?);
             while self.eat(TokenKind::Comma) {
                 if self.check(&TokenKind::BracketClose) {
                     break; // trailing comma
                 }
-                element_types.push(self.parse_tuple_element()?.clone());
+                element_types.push(self.parse_tuple_element()?);
             }
         }
 
@@ -1722,7 +1716,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 loop {
                     // Parse the interpolated type (not expression!)
                     let ts_type = self.parse_type()?;
-                    types.push(ts_type.clone());
+                    types.push(ts_type);
 
                     // Expect closing } of the interpolation
                     if !self.check(&TokenKind::BraceClose) {
@@ -1954,7 +1948,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let mut params = self.bvec();
         loop {
             let ts_type = self.parse_type()?;
-            params.push(ts_type.clone());
+            params.push(ts_type);
 
             if !self.eat(TokenKind::Comma) {
                 break;

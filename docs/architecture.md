@@ -1030,12 +1030,14 @@ payload by `&'arena` reference:
   the parameter parser), which lands on array and object patterns, carrying no second span.
   On wasm32 `Expression` is 48 B.
 - `TSType` is **80 B**, not 112 — `TSImportType`, `TSConstructorType` and
-  `TSInferType` are boxed. The width is paid on slice elements (union and
-  intersection members, tuple elements, type arguments, template-literal types) and
-  the few by-value holders; the type parser's deep precedence ladder does not pay it,
-  because every level returns an `&'arena TSType` allocated at its builder's tail
+  `TSInferType` are boxed. No field holds a `TSType` by value: the type parser's deep
+  precedence ladder returns an `&'arena TSType` allocated at each builder's tail
   (`Parser::parse_type`) — the second rule below, applied to a return instead of a
-  field.
+  field — and every holder keeps that reference, the slices included (union and
+  intersection members, tuple elements, type arguments and template-literal types are
+  `&'arena [&'arena TSType]`, a pointer-width element — 8 B native, 4 B on wasm32 —
+  where a by-value one would be the whole node), so the width is paid once per type
+  node, by its own allocation.
 - `Statement`'s rare declaration heads are boxed for the same reason
   (`TSTypeAliasDeclaration`, `ExportDefaultDeclaration`, `ClassDeclaration`,
   `FunctionDeclaration`, `TSInterfaceDeclaration`, `TSDeclareFunction`,
@@ -1094,6 +1096,16 @@ whose own width was two such slots take it:
   `Result<FragmentNode>`, and `parse_children` wraps each parsed element in one), where
   `CatchClause`'s width reaches nothing past its `Option<&>`. `{#snippet}`'s parameters
   and `{@debug}`'s identifiers stay by-value slices.
+- the expression LISTS whose elements come off the ladder take it per element: call and
+  `new` arguments, sequence and template-literal expressions are
+  `&'arena [&'arena Expression]`, and array-literal elements
+  `&'arena [Option<&'arena Expression>]` (a hole stays `None`; the `Option` is
+  niche-packed) — a pointer-width element where a by-value one is the whole
+  `Expression` (72 B native, 48 on wasm32). A spread
+  element, built fresh rather than returned by the ladder, is allocated once to join
+  them. The parameter lists and `ArrayPattern`'s elements stay by-value slices: their
+  elements are built by the parser as owned values (a binding pattern, or an expression
+  converted to one), so a reference there would add an allocation.
 
 **The one exception to "rarity is the whole of the argument".** Once those heads
 narrowed, the only variants left setting `Statement`'s width were `ImportDeclaration`

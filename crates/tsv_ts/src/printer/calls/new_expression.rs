@@ -322,7 +322,7 @@ impl<'a> Printer<'a> {
                     kind: internal::ExpressionKind::FunctionExpression(_),
                     ..
                 } if !single_arg_leading_on_page_comment => {
-                    let arg_doc = self.build_expression_doc(&new_expr.arguments[0]);
+                    let arg_doc = self.build_expression_doc(new_expr.arguments[0]);
                     return ArgOpener::Callee(callee_with_types).lone_hug_ladder(d, arg_doc, false);
                 }
                 // Block arrow (or expandable arrow chain): use conditional_group to let Doc decide hug vs wrap

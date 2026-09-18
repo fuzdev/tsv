@@ -1047,7 +1047,7 @@ impl<'a> Printer<'a> {
         // prints it too. Only the BREAK differs, and the two agree once it is gone.
         self.build_doc_with_outermost_owned_comment_at(
             seq_span.start,
-            seq.expressions.first(),
+            seq.expressions.first().copied(),
             || {
                 let d = self.d();
                 let last = seq.expressions.len() - 1;

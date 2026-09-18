@@ -250,7 +250,7 @@ fn mark_own_call_layout(nodes: &mut [ChainNode<'_>], source: &str) {
 /// `printMemberChain` redirect below it.
 fn template_preempts_chain_redirect(call: &internal::CallExpression<'_>, source: &str) -> bool {
     call.arguments.len() == 1
-        && is_multiline_template_expression(&call.arguments[0])
+        && is_multiline_template_expression(call.arguments[0])
         && !has_newline_before_position(source, call.arguments[0].span().start)
 }
 

@@ -75,7 +75,7 @@ impl<'arena> BodyBuilder<'arena> {
         }
         let texts = std::mem::replace(&mut self.texts, vec![String::new()]);
         let exprs = std::mem::replace(&mut self.exprs, BumpVec::new_in(arena));
-        let template = b.template_literal(&texts, exprs.into_bump_slice());
+        let template = b.template_literal(&texts, b.expr_refs(exprs.into_bump_slice()));
         let template_alloc = arena.alloc(template);
         let push_call = b.member_call("$$renderer", "push", std::slice::from_ref(template_alloc));
         // Pushed directly rather than through `push_statement`: this IS the flush.

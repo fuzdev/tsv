@@ -21,7 +21,7 @@ pub(super) fn is_module_path_no_break(
     printer: &Printer<'_>,
 ) -> bool {
     // Must have exactly 1 argument that is a string literal
-    if call.arguments.len() != 1 || !is_string_literal(&call.arguments[0]) {
+    if call.arguments.len() != 1 || !is_string_literal(call.arguments[0]) {
         return false;
     }
 
@@ -51,7 +51,7 @@ pub(super) fn get_module_path_chain_break<'a>(
     printer: &Printer<'_>,
 ) -> Option<(&'a internal::Expression<'a>, &'a internal::Identifier<'a>)> {
     // Must have exactly 1 argument that is a string literal
-    if call.arguments.len() != 1 || !is_string_literal(&call.arguments[0]) {
+    if call.arguments.len() != 1 || !is_string_literal(call.arguments[0]) {
         return None;
     }
 

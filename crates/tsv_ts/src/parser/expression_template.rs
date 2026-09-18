@@ -214,7 +214,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Parse expressions and remaining template parts
                 loop {
                     // Parse the interpolated expression
-                    let expr = self.parse_expression()?;
+                    let expr = self.parse_expression_ref()?;
                     expressions.push(expr);
 
                     // Expect closing } of the interpolation

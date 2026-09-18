@@ -97,7 +97,7 @@ impl<'a> CheckWalk<'a> {
             StatementKind::TSInterfaceDeclaration(i) => self.check_interface_common(i),
             StatementKind::TSTypeAliasDeclaration(t) => {
                 self.visit_type_params(t.type_parameters.as_ref());
-                self.visit_type(&t.type_annotation);
+                self.visit_type(t.type_annotation);
             }
             StatementKind::TSEnumDeclaration(e) => {
                 for member in e.members {

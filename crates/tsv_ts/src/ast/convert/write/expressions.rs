@@ -269,7 +269,7 @@ pub(super) fn write_expression_inner(
         internal::ExpressionKind::SequenceExpression(seq) => {
             node_header(w, "SequenceExpression", expr.span, ctx);
             w.raw(",\"expressions\":");
-            write_expressions(w, seq.expressions, ctx);
+            write_expressions(w, seq.expressions.iter().copied(), ctx);
             close_node(w, "SequenceExpression", expr.span, ctx);
         }
         internal::ExpressionKind::RegexLiteral(regex) => {

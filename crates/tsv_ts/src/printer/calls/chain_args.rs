@@ -1274,7 +1274,7 @@ fn build_chain_args_multi(
     // will_break() recurses into the block body's hardlines and forces break
     // without trying fits(). conditional_group uses fits() directly.
     if call.arguments.len() >= 2
-        && call.arguments.last().is_some_and(is_block_function)
+        && call.arguments.last().copied().is_some_and(is_block_function)
         && !comments_force_expansion
         // `has_any_comment_text`, not `has_any_comments`: refusing the expand-last hug is a
         // LAYOUT decision, so it must see a comment the last argument owns and prints
@@ -1332,8 +1332,11 @@ fn build_chain_args_multi(
         // Expand-last arrow with a call body: build the body ONCE and inject it so the
         // whole-arrow arg doc reuses it (the break-body state below reuses it too) —
         // building it in both places recurses into itself → O(2^depth).
-        let body_reuse =
-            prebuild_expand_last_break_body(printer, call.arguments.last(), has_any_comments);
+        let body_reuse = prebuild_expand_last_break_body(
+            printer,
+            call.arguments.last().copied(),
+            has_any_comments,
+        );
         let inject_prev = body_reuse.map(|(span, doc)| printer.inject_arrow_body(span, doc));
 
         let (head_parts, last_arg_doc, all_args_broken) =

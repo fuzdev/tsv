@@ -819,7 +819,7 @@ fn walk_opt(expr: Option<&Expression<'_>>, ctx: &mut WalkCtx<'_>) -> Result<(), 
     }
 }
 
-fn walk_expressions(exprs: &[Expression<'_>], ctx: &mut WalkCtx<'_>) -> Result<(), CompileError> {
+fn walk_expressions(exprs: &[&Expression<'_>], ctx: &mut WalkCtx<'_>) -> Result<(), CompileError> {
     for expr in exprs {
         walk_expression(expr, ctx)?;
     }
@@ -1018,7 +1018,7 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
         }
         ExpressionKind::ArrayExpression(arr) => {
             for element in arr.elements {
-                walk_opt(element.as_ref(), ctx)?;
+                walk_opt(*element, ctx)?;
             }
             Ok(())
         }

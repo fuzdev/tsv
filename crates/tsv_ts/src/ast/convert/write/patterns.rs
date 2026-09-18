@@ -39,7 +39,7 @@ pub(super) fn write_template_literal(
 ) {
     node_header(w, "TemplateLiteral", template.span, ctx);
     w.raw(",\"expressions\":");
-    write_expressions(w, template.expressions, ctx);
+    write_expressions(w, template.expressions.iter().copied(), ctx);
     w.raw(",\"quasis\":");
     write_array(w, template.quasis, |w, q| write_template_element(w, q, ctx));
     close_node(w, "TemplateLiteral", template.span, ctx);

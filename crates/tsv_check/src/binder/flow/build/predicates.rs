@@ -92,7 +92,11 @@ pub(in crate::binder::flow) fn is_narrowable_reference(node: &Expression<'_>) ->
                 || (is_entity_name_expression(m.property) && is_narrowable_reference(m.object))
         }
         E::AssignmentExpression(a) => is_left_hand_side_expression(a.left),
-        E::SequenceExpression(s) => s.expressions.last().is_some_and(is_narrowable_reference),
+        E::SequenceExpression(s) => s
+            .expressions
+            .last()
+            .copied()
+            .is_some_and(is_narrowable_reference),
         _ => false,
     }
 }
@@ -201,7 +205,10 @@ pub(super) fn is_narrowing_expression(expr: &Expression<'_>) -> bool {
         E::Identifier(_) | E::ThisExpression(_) => true,
         E::MemberExpression(_) => contains_narrowable_reference(expr),
         E::CallExpression(c) => {
-            c.arguments.iter().any(contains_narrowable_reference)
+            c.arguments
+                .iter()
+                .copied()
+                .any(contains_narrowable_reference)
                 || matches!(&c.callee.kind, E::MemberExpression(m)
                     if !m.computed && contains_narrowable_reference(m.object))
         }
@@ -227,7 +234,11 @@ pub(super) fn is_narrowing_expression(expr: &Expression<'_>) -> bool {
         }
         // The `isNarrowingBinaryExpression` comma case (`isNarrowingExpression`
         // of the last operand).
-        E::SequenceExpression(s) => s.expressions.last().is_some_and(is_narrowing_expression),
+        E::SequenceExpression(s) => s
+            .expressions
+            .last()
+            .copied()
+            .is_some_and(is_narrowing_expression),
         _ => false,
     }
 }
@@ -281,9 +292,11 @@ fn is_narrowable_operand(expr: &Expression<'_>) -> bool {
         ExpressionKind::AssignmentExpression(a) if a.operator == AssignmentOperator::Assign => {
             is_narrowable_operand(a.left)
         }
-        ExpressionKind::SequenceExpression(s) => {
-            s.expressions.last().is_some_and(is_narrowable_operand)
-        }
+        ExpressionKind::SequenceExpression(s) => s
+            .expressions
+            .last()
+            .copied()
+            .is_some_and(is_narrowable_operand),
         _ => contains_narrowable_reference(expr),
     }
 }
