@@ -1,0 +1,50 @@
+<script lang="ts">
+	// A `//` inside the value's own grouping parens keeps those parens, and the break the
+	// shell then takes is the comment's — not a break point inside the value — so the
+	// operator HUGS the shell instead of hanging it as well.
+	x = (a.b // c1
+	);
+
+	// a binary value, which reaches the hang by a different arm and answers the same
+	x = (a + b // c2
+	);
+
+	// the two-segment assignment chain routes through the same layout
+	x = y = (a.b.c // c3
+	);
+
+	// a compound operator
+	x += (this.p.q! // c4
+	);
+
+	// the declarator, whose own layout cascade reads the same rule
+	const v = (a.b() // c5
+	);
+
+	// a comment the author gave a line of its own keeps the shell open too
+	x = (a.b
+	// c6
+	);
+
+	// and an own-line block, which is not a `//` but still occupies a line
+	x = (a.b
+	/* c7 */
+	);
+
+	// Control: a trailing block that shares the value's line needs no shell — it does not
+	// end its line, so deferring it past the `;` is lossless and both formatters do it.
+	x = a.b; /* c8 */
+
+	// Control: a SEQUENCE value is outside the retention. It supplies its own pair on every
+	// path, so the author's shell is never the one that would be kept and the `//` defers
+	// past the `;` — prettier's answer, and the operator takes no break either.
+	x = ((a, b) // c9
+	);
+
+	// The same carve-out where the deferred run has somewhere to land: inside a sequence
+	// container the run rides the operand's own indentation, which is the layout reading
+	// the shell rule must not reach for.
+	x = ((a, b) // c10
+	// c11
+	), y = 1;
+</script>

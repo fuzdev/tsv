@@ -1258,6 +1258,8 @@ impl<'a> Printer<'a> {
     ///   by [`Self::build_arrow_signature_doc`] — the same region the default arrow layout
     ///   delegates to that builder, [`Self::append_pre_arrow_comments`] owning the complement;
     /// - each inner head's leading **`=>`→body gap**, via [`Self::arrow_gap_leading_run`];
+    /// - the **terminal `=>`→body gap**, whose run rides the terminal body glued — but only
+    ///   when every comment in it CAN glue ([`Self::terminal_arrow_gap_emitted`]);
     /// - the **terminal body**'s own span, printed by `build_arrow_body_doc` /
     ///   `build_block_statement_doc`.
     ///
@@ -1284,6 +1286,7 @@ impl<'a> Printer<'a> {
             return false;
         }
         let mut emitted: SmallVec<[(u32, u32); 8]> = SmallVec::new();
+        let mut terminal_gap_start = head_span.start;
         let terminal = walk_arrow_chain(head, head_span, |current, current_span, gap_start| {
             emitted.push((
                 current_span.start,
@@ -1292,8 +1295,12 @@ impl<'a> Printer<'a> {
             if let Some(gap_start) = gap_start {
                 emitted.push((gap_start, current_span.start));
             }
+            terminal_gap_start = arrow_token_end(current);
         });
         let body = terminal.span();
+        if self.terminal_arrow_gap_emitted(terminal_gap_start, body.start) {
+            emitted.push((terminal_gap_start, body.start));
+        }
         // ⚠️ The terminal body's emitted region stops where its DOC stops printing, which is
         // not its span end for a SEQUENCE: the span overshoots the operands by the grouping
         // shell the parser erased from the LAST one, and the chain's `build_arrow_body_doc`
@@ -1316,6 +1323,32 @@ impl<'a> Printer<'a> {
                     .iter()
                     .any(|&(start, end)| comment.span.start >= start && comment.span.end <= end)
             })
+    }
+
+    /// Whether [`Printer::build_arrow_chain_doc`] emits the **terminal** `=>`→body gap —
+    /// the one gap the chain spans that the inter-head emitter cannot reach, since the
+    /// terminal body is not a head.
+    ///
+    /// The chain has exactly one place to put that run: glued ahead of the body, which the
+    /// body part hands to [`Self::build_arrow_body_doc_with_leading`] so it lands on the
+    /// correct side of whatever parens the body takes. A comment that cannot ride a glued
+    /// run — a `//`, or one the author gave a line of its own — has no home there, so the
+    /// gap stays unemitted and the whole chain falls through to the default arrow layout,
+    /// which owns that shape (arm 1 of [`Self::build_arrow_expression_body`]).
+    ///
+    /// ⚠️ **Not a widening of the positional rule, and not the own-line rake either.** The
+    /// region is emitted or not by what the SOURCE holds between `=>` and the body
+    /// ([`Self::has_own_line_post_arrow_comment`]), never by what this layout renders. It
+    /// has to exist at all because the gap's comment is invisible here exactly when the
+    /// body's first token OWNS it — a glued block binds to the token after it, so the
+    /// author's redundant grouping parens around the body (`=> /* c */ (z)`) hand the
+    /// binding to the `(` instead and the same comment, in the same position, reads as
+    /// unemitted and refused the layout. Since the shell is stripped on the way out, one
+    /// pass later the comment is owned and the layout is taken: two forms of one authoring,
+    /// two passes apart. A redundant paren carries no authoring signal, so at this gap both
+    /// format alike, and the layout the pair agrees on is the one prettier prints.
+    fn terminal_arrow_gap_emitted(&self, gap_start: u32, body_start: u32) -> bool {
+        !self.has_own_line_post_arrow_comment(gap_start, body_start)
     }
 
     /// The leading-comment run for an arrow-adjacent gap that is **already broken** — the
@@ -1482,6 +1515,10 @@ impl<'a> Printer<'a> {
         // against `sig_docs` one behind: `gap_tails[i]` sits between head `i` and head
         // `i + 1`.
         let mut gap_tails: DocBuf = DocBuf::new();
+        // Where the TERMINAL `=>`→body gap opens. The walk hands each head the gap before
+        // it; the last head's own `=>` closes the one before the body, which no head
+        // consumes — so it is tracked here and emitted by the body part below.
+        let mut terminal_gap_start = span.start;
         let terminal = walk_arrow_chain(head, span, |current, current_span, gap_start| {
             // Each signature is its own group so its params break independently of
             // the chain (prettier wraps each `printArrowFunctionSignature` in a
@@ -1524,6 +1561,7 @@ impl<'a> Printer<'a> {
                 }
             };
             sig_docs.push(sig);
+            terminal_gap_start = arrow_token_end(current);
         });
 
         // Prettier's `shouldBreakChain` — a head carrying a return type with params, type
@@ -1591,13 +1629,23 @@ impl<'a> Printer<'a> {
         // content lands one level deeper); when the heads stayed on the `=` line,
         // the body keeps the base indent. Mirrors prettier's
         // `indentIfBreak(bodyDoc, { groupId: chainGroupId })`.
+        // The terminal `=>`→body gap's run, glued ahead of the body. Only a run that CAN
+        // glue reaches here — the legality test refuses the layout for anything needing a
+        // line of its own ([`Self::terminal_arrow_gap_emitted`], which states why the gap
+        // has an emitter at all) — and a comment the body's first token OWNS rides the
+        // body's own doc, which is what keeps the *emit* axis here from printing it twice.
+        let terminal_run =
+            self.build_rhs_comments_glued_opt(terminal_gap_start, terminal.span().start);
         let body_part = match terminal {
             internal::ArrowFunctionBody::Expression(b) => {
                 let expr = b;
                 if self.arrow_body_hugs(expr) {
                     // Object/array/template/sequence body: hugs the last head, supplies its
                     // own internal indent, and does so however the chain broke.
-                    d.concat(&[d.text(" "), self.build_arrow_body_doc(expr)])
+                    d.concat(&[
+                        d.text(" "),
+                        self.build_arrow_body_doc_with_leading(expr, terminal_run),
+                    ])
                 } else if matches!(
                     expr.kind,
                     internal::ExpressionKind::ConditionalExpression(_)
@@ -1614,7 +1662,12 @@ impl<'a> Printer<'a> {
                     // already given up on that: the heads are stacked, so the body hangs
                     // bare beneath the last one (`() =>⏎  test ? 1 : 2`) rather than
                     // rendering a delimiter for a rendering that no longer happens.
-                    let body_doc = self.build_expression_doc(expr);
+                    // The run rides INSIDE these layout parens — the side
+                    // `build_arrow_body_doc_with_leading` picks for a ternary — so the two
+                    // renderings cannot disagree about what the comment leads, and a run
+                    // that breaks takes the paren-less arm with the body.
+                    let body_doc =
+                        prepend_leading(d, terminal_run, self.build_expression_doc(expr));
                     if d.will_break(body_doc) {
                         // No own group — the body's line is governed by the outer
                         // chain group below (prettier's `indent([line, bodyDoc])`).
@@ -1628,12 +1681,13 @@ impl<'a> Printer<'a> {
                     // outer chain group below, so the body hangs whenever the heads
                     // break (matching prettier's `indent([line, bodyDoc])` inside
                     // the outer `group([…])`), not on an independent fit check.
-                    d.indent_line(self.build_arrow_body_doc(expr))
+                    d.indent_line(self.build_arrow_body_doc_with_leading(expr, terminal_run))
                 }
             }
-            internal::ArrowFunctionBody::BlockStatement(block) => {
-                d.concat(&[d.text(" "), self.build_block_statement_doc(block)])
-            }
+            internal::ArrowFunctionBody::BlockStatement(block) => d.concat(&[
+                d.text(" "),
+                prepend_leading(d, terminal_run, self.build_block_statement_doc(block)),
+            ]),
         };
 
         // Outer group, mirroring prettier's `printArrowFunction` return

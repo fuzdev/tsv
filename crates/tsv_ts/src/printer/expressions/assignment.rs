@@ -986,6 +986,28 @@ impl<'a> Printer<'a> {
             && d.can_break(left_doc);
         let mut layout = choose_layout(right_expr, left, can_break_left, self);
 
+        // The value's own grouping shell is RETAINED and forced open by the comment in its
+        // trailing gap ([`Printer::value_shell_forced_open`], the one statement of the
+        // rule — the declarator's twin reads it through its `is_layout_eligible` gate).
+        // That break is the comment's, not a break point in the value, so the operator
+        // hugs the shell instead of hanging it: `x = (⏎\ta?.b! // c⏎);`.
+        //
+        // Only `BreakAfterOperator` is overridden. `Fluid` and `BreakLhs` already keep the
+        // value on the operator's line for this authoring (an object-literal value, a
+        // fluid call, a ternary, a complex destructuring target all land there today), and
+        // `NeverBreakAfterOperator` is the target form.
+        //
+        // Placed AHEAD of the two gap overrides below on purpose: they speak for the
+        // operator→value gap, whose `//` must end the operator's line whatever the shell
+        // does, so a comment there still wins.
+        if layout == AssignmentLayout::BreakAfterOperator
+            && rhs_info
+                .boundary
+                .is_some_and(|boundary| self.value_shell_forced_open(right_expr, boundary))
+        {
+            layout = AssignmentLayout::NeverBreakAfterOperator;
+        }
+
         // Override layout based on comments:
         //
         // Line comments between operator and RHS (e.g., `a = // comment\n  b`)
@@ -1139,6 +1161,20 @@ impl<'a> Printer<'a> {
         //   multiline blocks) each missed one. (The VariableDeclarator path prints through
         //   its own layout and never reaches this assert; the assignment-expression /
         //   object-property / pattern / class-field callers do.)
+        //   ⚠️ The RHS doc's extent is not the RHS node's. With a stripped-paren boundary
+        //   it is built over `rhs_span.start..boundary`
+        //   ([`Printer::build_expression_doc_with_paren_comments`]), so a comment in the
+        //   grouping shell's TRAILING gap (`x = (a.b // c⏎);`) prints inside `right_doc`
+        //   from a position the node's span ends before — reading the node span alone
+        //   asked about a doc nobody built. That region is added on its own, tighter
+        //   terms rather than by widening the span: only a comment that OCCUPIES A LINE
+        //   there can force the doc open — a `//` or an own-line comment, which retain
+        //   the shell and expand it ([`Printer::value_shell_forced_open`]), or a
+        //   multi-line block, whose interior newline must print whether the shell is
+        //   retained or stripped inline (a `for` header's clause tail, which defers
+        //   nothing). A same-line single-line block renders inline or rides a zero-width
+        //   `line_suffix` past the `;` and forces nothing, so it must not buy the assert
+        //   off — every assignment carrying one would otherwise be unguarded.
         //   TODO: for a multiline block comment in a chain gap there is no layout override
         //   yet — tsv breaks after the operator AND at the comment
         //   (`a =⏎ b /* a⏎b */⏎ .map(fn);`) where prettier keeps the chain on the operator
@@ -1154,8 +1190,13 @@ impl<'a> Printer<'a> {
             {
                 let core_expr = unwrap_expression(right_expr);
                 let rhs_span = right_expr.span();
+                let shell_gap_forces_break = rhs_info.boundary.is_some_and(|boundary| {
+                    self.value_shell_forced_open(right_expr, boundary)
+                        || self.has_multiline_block_comments_on_page_between(rhs_span.end, boundary)
+                });
                 self.owned_leading_comment_at(rhs_span.start).is_some()
                     || self.has_comments_on_page_between(rhs_span.start, rhs_span.end)
+                    || shell_gap_forces_break
                     || chain_has_multiline_string_arg(core_expr, self.source)
                     || !is_poorly_breakable_chain(core_expr, self)
                     || !d.will_break(right_doc)

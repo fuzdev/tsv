@@ -1782,14 +1782,34 @@ impl<'a> Printer<'a> {
         boundary_end: u32,
         position_parens: bool,
     ) -> bool {
-        // A sequence self-parenthesizes on every path, so it never takes the caller's
-        // pair and is excluded rather than reported here.
-        if matches!(expr.kind, internal::ExpressionKind::SequenceExpression(_)) {
-            return false;
-        }
-        let expr_end = expr.span().end;
-        self.has_trailing_paren_comments(expr_end, boundary_end)
-            && self.shell_gap_retains_parens(expr_end, boundary_end, position_parens)
+        // The gap's own content forces the pair open, whatever the position does — the
+        // stronger half, spelled once ([`Self::value_shell_forced_open`]) and read from here
+        // so a shell this predicate reports as retained is exactly one that seam can act on.
+        self.value_shell_forced_open(expr, boundary_end)
+            // Or the calling position parenthesizes this value anyway, so the pair is in the
+            // output whatever the builder does and nothing in the gap may cross it — a
+            // same-line block included. That pair never OPENS, which is why the seams that
+            // choose the operator's layout read the disjunct above instead of this.
+            || (position_parens && self.value_shell_pair_in_question(expr, boundary_end))
+    }
+
+    /// Whether the author's grouping pair around this value is one the shell builder decides
+    /// about at all: there is a comment in its trailing gap to decide for, and the value is
+    /// not one that supplies its own pair regardless.
+    ///
+    /// A **sequence self-parenthesizes on every path**, so its shell is never the retained
+    /// one — the builder claims it at its own arm ([`Self::build_shell_value_doc`]) and a
+    /// caller that wraps reads `false` here rather than doubling the pair. The exclusion is
+    /// spelled once, for both retention predicates: giving it to only one had a sequence
+    /// value answer "the shell is forced open" where nothing had retained a shell, which
+    /// changed the operator's layout under a comment that still deferred past the `;`.
+    fn value_shell_pair_in_question(
+        &self,
+        expr: &internal::Expression<'_>,
+        boundary_end: u32,
+    ) -> bool {
+        !matches!(expr.kind, internal::ExpressionKind::SequenceExpression(_))
+            && self.has_trailing_paren_comments(expr.span().end, boundary_end)
     }
 
     /// Add a value position's clarity parens around a shell-built value — unless the shell
@@ -1852,6 +1872,48 @@ impl<'a> Printer<'a> {
     fn shell_gap_holds_unplaceable_comment(&self, expr_end: u32, boundary_end: u32) -> bool {
         self.comments_on_page_between(expr_end, boundary_end)
             .any(|c| !c.is_block || self.has_newline_between(expr_end, c.span.start))
+    }
+
+    /// Whether the value's own grouping shell is RETAINED **and forced open** by what sits
+    /// in its trailing gap — a `//`, or a comment the author gave a line of its own
+    /// ([`Self::shell_gap_holds_unplaceable_comment`]).
+    ///
+    /// **The assignment family's layout rule, stated once.** That break is the COMMENT's,
+    /// not a break point inside the value, so the operator must not take one as well: the
+    /// assignment HUGS the shell (`x = (⏎\ta?.b! // c⏎);`) rather than hanging it below the
+    /// operator (`x =⏎\t(⏎\t\ta?.b! // c⏎\t);`), which spends two indents on one comment and
+    /// puts the `(` on a line of its own. It is the answer the shapes that never reach a
+    /// hang already give — an object-literal value, a fluid call, a ternary — and the one
+    /// `return` / `throw` / `export default` / an arrow body / a bare expression statement
+    /// give at the same authoring.
+    ///
+    /// ⚠️ **"Retained VALUE shell", never "the doc starts with `(`".** The question is about
+    /// the pair the AUTHOR wrote around this value and the comment that keeps it; a doc that
+    /// merely opens with a parenthesis — an arrow's parameter list, a call's arguments — is
+    /// not this, and hugging on that reading moves layouts that have nothing to do with the
+    /// shell.
+    ///
+    /// Read by the two seams that hang a value under an operator, so they cannot answer it
+    /// differently: [`crate::printer::Printer::build_assignment_layout`] (assignment
+    /// expressions, class fields, object values) and the declarator's hand-rolled twin
+    /// (`statements/variable.rs`, through its `is_layout_eligible` gate). Deliberately NOT
+    /// keyed on the value's kind — the shell's break belongs to the comment whatever the
+    /// value is.
+    ///
+    /// This is the STRONGER half of [`Self::shell_value_keeps_own_parens`], which reads it as
+    /// its first disjunct so the implication holds by construction: a forced-open shell is a
+    /// retained one. What it drops is that predicate's `position_parens` arm — a pair the
+    /// POSITION prints anyway survives a same-line block too (`const k = (a = b /* c */);`),
+    /// and that shell never opens, so it is no reason to change the operator's layout. The
+    /// value-kind exclusion is shared ([`Self::value_shell_pair_in_question`]): a sequence
+    /// retains no shell here, so it forces none open either.
+    pub(in crate::printer) fn value_shell_forced_open(
+        &self,
+        expr: &internal::Expression<'_>,
+        boundary_end: u32,
+    ) -> bool {
+        self.value_shell_pair_in_question(expr, boundary_end)
+            && self.shell_gap_holds_unplaceable_comment(expr.span().end, boundary_end)
     }
 
     /// The `for`-header init counterpart of
