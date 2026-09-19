@@ -930,34 +930,17 @@ impl<'a> Printer<'a> {
             });
         } else if should_hug {
             // Hugged body (possibly with inline block comments):
-            // `() => ({...})` or `() => /* c */ ({...})`
-            //
-            // A block run glued to `=>` that the author broke after, before a body
-            // that WILL break, takes prettier's break-after-operator form instead
-            // of the hug — the run own-line under `=>`, the body below it (the `=`
-            // seams' rule; the shared gate + emitter). A body that fits declines
-            // and keeps the glued hug, whose flat render is the same bytes
-            // prettier's collapsed `line` produces.
-            //
-            // The geometry is [`Self::arrow_gap_broke_after_run`] rather than this arm's
-            // own reading, because the enclosing CALL must ask the identical question to
-            // know whether its `)` drops with the body — see that predicate.
-            let broken = self
-                .arrow_gap_broke_after_run(arrow, arrow_span, arrow_end, body_start)
-                .and_then(|run| {
-                    let body_doc = self.build_arrow_body_doc(expr);
-                    d.will_break(body_doc)
-                        .then(|| self.break_after_operator_run_doc(&run, body_start, body_doc))
-                });
-            if let Some(doc) = broken {
-                parts.push(doc);
-            } else {
-                parts.push(d.text(" "));
-                if let Some(run) = gap_run() {
-                    parts.push(run);
-                }
-                parts.push(build_body(&|| self.build_arrow_body_doc(expr)));
-            }
+            // `() => ({...})` or `() => /* c */ ({...})`. The whole arm is
+            // [`Self::arrow_hug_body_doc`], which the curried-chain layout's terminal
+            // hug arm calls too.
+            parts.push(self.arrow_hug_body_doc(
+                arrow,
+                arrow_span,
+                arrow_end,
+                expr,
+                hoisted_run,
+                gap_run(),
+            ));
         } else if is_arrow_body && (chain_should_break || self.in_stacked_arrow_chain.get()) {
             // Curried arrow chain - all arrows break without indent so they align:
             // const f = (x: T): H => (y) => expr   // outer has return type
@@ -1107,6 +1090,63 @@ impl<'a> Printer<'a> {
                 },
             );
         }
+    }
+
+    /// The `=>`→body emission for a HUG-eligible body — an object / array / sequence /
+    /// same-line template — with the gap's run already read on both axes by the caller.
+    ///
+    /// **Both arrow layouts print their hug arm through here**, which is what holds the
+    /// curried chain's terminal hug to the single arrow's: the chain's own copy of this
+    /// cascade drifted, feeding its terminal gap the SOFT broke-after run
+    /// ([`Printer::push_leading_run_with_soft_line`]) where this arm feeds the glued one, so
+    /// a run the author broke after landed its own forced break inside the hug's
+    /// `concat([" ", …])` — no group, no indent — and printed flush at column 0, a second
+    /// fixed point one pass away.
+    ///
+    /// A block run glued to `=>` that the author broke after, before a body that WILL break,
+    /// takes prettier's break-after-operator form instead of the hug — the run own-line under
+    /// `=>`, the body below it (the `=` seams' rule; the shared gate + emitter). A body that
+    /// FITS declines and keeps the glued hug, whose flat render is the same bytes prettier's
+    /// collapsed `line` produces.
+    ///
+    /// The geometry is [`Self::arrow_gap_broke_after_run`] rather than this arm's own
+    /// reading, because the enclosing CALL must ask the identical question to know whether
+    /// its `)` drops with the body — see that predicate.
+    ///
+    /// `gap_run` is the caller's glued-or-hoisted run and `hoisted_run` the hoist half of it,
+    /// so the fallback body is built under the hoist's paired suppression
+    /// ([`Printer::build_value_under_hoist`]). The broken arm needs neither: the hoist fires
+    /// only on a run glued through to the body and `arrow_gap_broke_after_run` only on one
+    /// the author broke after, so the two are disjoint by construction.
+    fn arrow_hug_body_doc(
+        &self,
+        arrow: &internal::ArrowFunctionExpression<'_>,
+        arrow_span: Span,
+        gap_start: u32,
+        expr: &internal::Expression<'_>,
+        hoisted_run: Option<DocId>,
+        gap_run: Option<DocId>,
+    ) -> DocId {
+        let d = self.d();
+        let body_start = expr.span().start;
+        let broken = self
+            .arrow_gap_broke_after_run(arrow, arrow_span, gap_start, body_start)
+            .and_then(|run| {
+                let body_doc = self.build_arrow_body_doc(expr);
+                d.will_break(body_doc)
+                    .then(|| self.break_after_operator_run_doc(&run, body_start, body_doc))
+            });
+        if let Some(doc) = broken {
+            return doc;
+        }
+        let mut parts: DocBuf = smallvec![d.text(" ")];
+        if let Some(run) = gap_run {
+            parts.push(run);
+        }
+        parts.push(
+            self.build_value_under_hoist(hoisted_run, expr, || self.build_arrow_body_doc(expr)),
+        );
+        d.concat(&parts)
     }
 
     /// Emit the body of an arrow with a block-statement body (the `=>` already
@@ -1298,7 +1338,7 @@ impl<'a> Printer<'a> {
             terminal_gap_start = arrow_token_end(current);
         });
         let body = terminal.span();
-        if self.terminal_arrow_gap_emitted(terminal_gap_start, body.start) {
+        if self.terminal_arrow_gap_emitted(terminal_gap_start, body) {
             emitted.push((terminal_gap_start, body.start));
         }
         // ⚠️ The terminal body's emitted region stops where its DOC stops printing, which is
@@ -1329,26 +1369,36 @@ impl<'a> Printer<'a> {
     /// the one gap the chain spans that the inter-head emitter cannot reach, since the
     /// terminal body is not a head.
     ///
-    /// The chain has exactly one place to put that run: glued ahead of the body, which the
-    /// body part hands to [`Self::build_arrow_body_doc_with_leading`] so it lands on the
-    /// correct side of whatever parens the body takes. A comment that cannot ride a glued
-    /// run — a `//`, or one the author gave a line of its own — has no home there, so the
-    /// gap stays unemitted and the whole chain falls through to the default arrow layout,
-    /// which owns that shape (arm 1 of [`Self::build_arrow_expression_body`]).
+    /// The body part answers that gap with the **same emitters** the default arrow layout's
+    /// `=>`→body arms use — the glued run, the owned-comment hoist, the broke-after pair, and
+    /// the own-line arm's [`Self::push_arrow_gap_tail`] — so every comment in it has a home
+    /// and the region is emitted for every authoring but one.
     ///
-    /// ⚠️ **Not a widening of the positional rule, and not the own-line rake either.** The
-    /// region is emitted or not by what the SOURCE holds between `=>` and the body
-    /// ([`Self::has_own_line_post_arrow_comment`]), never by what this layout renders. It
-    /// has to exist at all because the gap's comment is invisible here exactly when the
-    /// body's first token OWNS it — a glued block binds to the token after it, so the
-    /// author's redundant grouping parens around the body (`=> /* c */ (z)`) hand the
-    /// binding to the `(` instead and the same comment, in the same position, reads as
-    /// unemitted and refused the layout. Since the shell is stripped on the way out, one
-    /// pass later the comment is owned and the layout is taken: two forms of one authoring,
-    /// two passes apart. A redundant paren carries no authoring signal, so at this gap both
-    /// format alike, and the layout the pair agrees on is the one prettier prints.
-    fn terminal_arrow_gap_emitted(&self, gap_start: u32, body_start: u32) -> bool {
-        !self.has_own_line_post_arrow_comment(gap_start, body_start)
+    /// ⚠️ **The exception is a FROZEN body head**, not a comment kind. An alone-on-line
+    /// format-ignore directive in this gap freezes the whole body
+    /// ([`Printer::value_head_frozen_span`]), and the frozen slice is built from the
+    /// directive's own span by the default layout's own-line arm, which resolves that span
+    /// above its cascade. The chain reassembles the body through builders that know nothing
+    /// of it, so a freeze here would print the body reformatted and no gate would see it —
+    /// the wrong output is its own fixed point. That one gap routes to the default layout,
+    /// which owns it.
+    ///
+    /// ⚠️ **Deciding this by comment KIND is the own-line rake, and it bit.** While the gap's
+    /// own-line runs were refused, this layout's own forced broke-after emission
+    /// (`=> /* a */⏎/**⏎ * b⏎ */ v`, whose break prettier keeps) *produced* an own-line run on
+    /// pass 1, which pass 2 then read as a refusal — one authoring, two layouts, two head
+    /// indents, forever. A region this layout emits must be decided by something its own
+    /// output cannot manufacture; a freeze is such a thing, an own-line comment is not.
+    ///
+    /// The gap needs an emitter at all because its comment is invisible on the *emit* axis
+    /// exactly when the body's first token OWNS it — a glued block binds to the token after
+    /// it, so the author's redundant grouping parens around the body (`=> /* c */ (z)`) hand
+    /// the binding to the `(` instead and the same comment, in the same position, reads as
+    /// unemitted. Since the shell is stripped on the way out, one pass later the comment is
+    /// owned: two forms of one authoring, two passes apart. A redundant paren carries no
+    /// authoring signal, so at this gap both format alike.
+    fn terminal_arrow_gap_emitted(&self, gap_start: u32, body_span: Span) -> bool {
+        self.value_head_frozen_span(gap_start, body_span).is_none()
     }
 
     /// The leading-comment run for an arrow-adjacent gap that is **already broken** — the
@@ -1519,6 +1569,11 @@ impl<'a> Printer<'a> {
         // it; the last head's own `=>` closes the one before the body, which no head
         // consumes — so it is tracked here and emitted by the body part below.
         let mut terminal_gap_start = span.start;
+        // The LAST head — the arrow the terminal body belongs to. The hug arm below hands it
+        // to the single arrow's own emitter, which asks the arrow-shaped questions
+        // ([`Self::arrow_gap_broke_after_run`]: the hug test, the retained-paren gate and the
+        // `=>`→body freeze) of exactly the arrow whose `=>` opens the terminal gap.
+        let mut terminal_arrow = (head, span);
         let terminal = walk_arrow_chain(head, span, |current, current_span, gap_start| {
             // Each signature is its own group so its params break independently of
             // the chain (prettier wraps each `printArrowFunctionSignature` in a
@@ -1562,6 +1617,7 @@ impl<'a> Printer<'a> {
             };
             sig_docs.push(sig);
             terminal_gap_start = arrow_token_end(current);
+            terminal_arrow = (current, current_span);
         });
 
         // Prettier's `shouldBreakChain` — a head carrying a return type with params, type
@@ -1629,23 +1685,135 @@ impl<'a> Printer<'a> {
         // content lands one level deeper); when the heads stayed on the `=` line,
         // the body keeps the base indent. Mirrors prettier's
         // `indentIfBreak(bodyDoc, { groupId: chainGroupId })`.
-        // The terminal `=>`→body gap's run, glued ahead of the body. Only a run that CAN
-        // glue reaches here — the legality test refuses the layout for anything needing a
-        // line of its own ([`Self::terminal_arrow_gap_emitted`], which states why the gap
-        // has an emitter at all) — and a comment the body's first token OWNS rides the
-        // body's own doc, which is what keeps the *emit* axis here from printing it twice.
-        let terminal_run =
-            self.build_rhs_comments_glued_opt(terminal_gap_start, terminal.span().start);
+        // ⚠️ **The terminal `=>`→body gap is answered by the SAME emitters the default arrow
+        // layout's `=>`→body arms use**, so the gap and body print as they would on a single
+        // arrow with the same gap and body — modulo this layout's own head indent, which is
+        // the only thing it owns. Every body kind routes there: a BLOCK body hands the whole
+        // gap to [`Self::build_arrow_block_body`] and a HUG-eligible one to
+        // [`Self::arrow_hug_body_doc`], the two arms the single arrow prints through; the
+        // ternary and normal-expression arms below reassemble the body (they own the chain's
+        // hanging `line`) and so ask the gap's questions themselves, one emitter each: a
+        // glued run rides the body glued ([`Printer::build_rhs_comments_glued_opt`]), a
+        // MULTI-LINE block the body owns is hoisted out of its group
+        // ([`Printer::hoisted_owned_value_gap_run_opt`]), and a run the author BROKE AFTER
+        // takes the `=` seams' broke-after pair ([`Printer::value_gap_soft_broke_after_run`])
+        // — forced onto its own line when the break is paid for
+        // ([`Printer::broke_after_run_break_is_forced`]: the body's doc breaks, or the run
+        // holds a multi-line block), collapsed to the glued bytes when it is not. Deciding
+        // chain-vs-default by predicting that machinery instead is what traded cells between
+        // the two layouts on every pass; the only gap still refused the layout is a FROZEN
+        // body head ([`Self::terminal_arrow_gap_emitted`]).
+        //
+        // ⚠️ **Mirroring an arm rather than calling it is what drifts.** The hug arm was a
+        // copy of the default's, and its fallback took the SOFT broke-after run where the
+        // original takes the glued one, so the run's own forced break landed inside
+        // `concat([" ", …])` — no group, no indent — and printed flush at column 0. The block
+        // arm was a copy of the glued half alone, so an own-line run welded onto the `=>`
+        // line and un-indented the `{`. Both are one call now.
+        //
+        // ⚠️ **The terminal `=>`→body gap is a VALUE gap, and this is its eighth route into
+        // it**, so it owes the same hoist every other value gap reads
+        // ([`Printer::hoisted_owned_value_gap_run_opt`]; the default arrow layout asks it in
+        // [`Self::build_arrow_expression_body`]). A MULTI-LINE block the body's first token
+        // OWNS travels INSIDE the body's doc, where its reprinted `MultilineText` force-breaks
+        // the body's own group and a chain body prettier keeps flat explodes. The emit-axis
+        // run below cannot see that comment by definition, which is why reading it alone made
+        // the layout turn on OWNERSHIP: with the author's redundant parens around the body the
+        // comment binds to the `(` instead, the emit axis sees it, the body stays flat — and
+        // the next pass, the shell stripped, reaches the owned form and breaks.
+        //
+        // `or`, never a concat — the hoisted run is this same gap read on the wider (on-page)
+        // axis, so emitting both prints every un-owned comment in it twice. A block body owns
+        // nothing (ownership is an `Expression` property), so it asks no hoist.
+        //
+        // ⚠️ Declined for an INJECTED body, the default layout's guard and for its reason: a
+        // call printer that pre-built the body doc elsewhere ([`Printer::with_arrow_body_inject`])
+        // built it without this suppression, so the comment is already inside it and hoisting
+        // would print it twice. The chain reaches that state through an object / array terminal
+        // a single-argument hug pre-builds (`prebuild_expand_last_obj_array_body`), which the
+        // walk above lands on exactly like any other terminal.
         let body_part = match terminal {
-            internal::ArrowFunctionBody::Expression(b) => {
-                let expr = b;
-                if self.arrow_body_hugs(expr) {
+            internal::ArrowFunctionBody::Expression(expr) => {
+                let hoisted_run = self
+                    .arrow_body_inject
+                    .get()
+                    .is_none_or(|(span, _)| span != expr.span().start)
+                    .then(|| {
+                        self.hoisted_owned_value_gap_run_opt(
+                            terminal_gap_start,
+                            expr,
+                            self.needs_parens(expr, ParenContext::ArrowBody),
+                        )
+                    })
+                    .flatten();
+                // The glued-or-hoisted run, and — when the author BROKE AFTER it — the run
+                // read as the `=` seams read it. Disjoint by construction: the hoist fires
+                // only on a run glued through to the body, this one only on a run that is
+                // not.
+                let glued_run = hoisted_run.or_else(|| {
+                    self.build_rhs_comments_glued_opt(terminal_gap_start, expr.span().start)
+                });
+                let broke_run: Option<CommentVec<'a>> =
+                    self.value_gap_soft_broke_after_run(terminal_gap_start, expr.span().start);
+                // The run as the reassembling arms take it: the SOFT broke-after form when
+                // the author broke after it — the run plus its newline-after `line`, which
+                // collapses to the glued bytes flat and holds its own line when this layout's
+                // group breaks — else the glued run. The forced half is a shape, not a
+                // separator, so each arm asks for it once it holds the body doc that decides
+                // it. ⚠️ The hug arm does NOT take this form: its own layout has no group
+                // around the gap, so a soft `line` there renders as a bare break at column 0.
+                let terminal_run = match &broke_run {
+                    Some(run) => {
+                        let mut run_parts = DocBuf::new();
+                        self.push_leading_run_with_soft_line(&mut run_parts, run);
+                        Some(d.concat(&run_parts))
+                    }
+                    None => glued_run,
+                };
+                // ⚠️ Every arm that reassembles the body builds it under the hoist's paired
+                // suppression, or the hoisted comment is printed twice — the emit and the
+                // suppression are one call (`docs/comments.md` §Owned comments).
+                let build_body = |build: &dyn Fn() -> DocId| -> DocId {
+                    self.build_value_under_hoist(hoisted_run, expr, build)
+                };
+                if self.has_own_line_post_arrow_comment(terminal_gap_start, expr.span().start) {
+                    // A `//`, or a block the author gave a line of its own: the gap breaks,
+                    // and it breaks through the default layout's own-line arm — the run the
+                    // author GLUED to `=>` keeps that line, the rest resumes below
+                    // ([`Self::push_arrow_gap_tail`]). A frozen head never reaches here
+                    // ([`Self::terminal_arrow_gap_emitted`]), so the builder's `frozen` is
+                    // `None` by construction.
+                    let mut gap_parts = DocBuf::new();
+                    self.push_arrow_gap_tail(
+                        &mut gap_parts,
+                        terminal_gap_start,
+                        expr.span().start,
+                        |resume| {
+                            build_body(&|| {
+                                self.build_arrow_body_with_comments_doc(
+                                    expr,
+                                    resume,
+                                    expr.span().start,
+                                    None,
+                                )
+                            })
+                        },
+                    );
+                    d.concat(&gap_parts)
+                } else if self.arrow_body_hugs(expr) {
                     // Object/array/template/sequence body: hugs the last head, supplies its
-                    // own internal indent, and does so however the chain broke.
-                    d.concat(&[
-                        d.text(" "),
-                        self.build_arrow_body_doc_with_leading(expr, terminal_run),
-                    ])
+                    // own internal indent, and does so however the chain broke — through the
+                    // single arrow's own hug arm, so the two cannot part on it. The arrow it
+                    // is asked about is the LAST head, whose `=>` opens this gap.
+                    let (arrow, arrow_span) = terminal_arrow;
+                    self.arrow_hug_body_doc(
+                        arrow,
+                        arrow_span,
+                        terminal_gap_start,
+                        expr,
+                        hoisted_run,
+                        glued_run,
+                    )
                 } else if matches!(
                     expr.kind,
                     internal::ExpressionKind::ConditionalExpression(_)
@@ -1666,14 +1834,32 @@ impl<'a> Printer<'a> {
                     // `build_arrow_body_doc_with_leading` picks for a ternary — so the two
                     // renderings cannot disagree about what the comment leads, and a run
                     // that breaks takes the paren-less arm with the body.
-                    let body_doc =
-                        prepend_leading(d, terminal_run, self.build_expression_doc(expr));
-                    if d.will_break(body_doc) {
-                        // No own group — the body's line is governed by the outer
-                        // chain group below (prettier's `indent([line, bodyDoc])`).
-                        d.indent_line(body_doc)
-                    } else {
-                        d.concat(&[d.text(" "), ternary_body_parens_group(d, body_doc)])
+                    //
+                    // A run whose break is FORCED takes the break-after-operator form and
+                    // the ternary hangs paren-less below it, exactly as the default
+                    // layout's ternary arm prints the same gap — including its claim: a
+                    // multi-line comment the body owns prints OUTSIDE the ternary's own
+                    // group, or its hard break explodes a ternary prettier keeps flat
+                    // ([`Printer::build_value_with_outermost_owned_comment`]).
+                    let raw_body =
+                        build_body(&|| self.build_expression_doc_claiming_outermost(expr));
+                    match broke_run
+                        .as_ref()
+                        .filter(|run| self.broke_after_run_break_is_forced(run, raw_body))
+                    {
+                        Some(run) => {
+                            self.break_after_operator_run_doc(run, expr.span().start, raw_body)
+                        }
+                        None => {
+                            let body_doc = prepend_leading(d, terminal_run, raw_body);
+                            if d.will_break(body_doc) {
+                                // No own group — the body's line is governed by the outer
+                                // chain group below (prettier's `indent([line, bodyDoc])`).
+                                d.indent_line(body_doc)
+                            } else {
+                                d.concat(&[d.text(" "), ternary_body_parens_group(d, body_doc)])
+                            }
+                        }
                     }
                 } else {
                     // Other expression body: hang on the next line when the chain
@@ -1681,13 +1867,36 @@ impl<'a> Printer<'a> {
                     // outer chain group below, so the body hangs whenever the heads
                     // break (matching prettier's `indent([line, bodyDoc])` inside
                     // the outer `group([…])`), not on an independent fit check.
-                    d.indent_line(self.build_arrow_body_doc_with_leading(expr, terminal_run))
+                    //
+                    // A run whose break is FORCED takes the break-after-operator form, the
+                    // default layout's normal-expression arm over the same gap — its own
+                    // hardline, so it carries the break rather than reading this layout's
+                    // group.
+                    let forced = broke_run.as_ref().and_then(|run| {
+                        let body_doc = build_body(&|| self.build_arrow_body_doc(expr));
+                        self.broke_after_run_break_is_forced(run, body_doc)
+                            .then(|| {
+                                self.break_after_operator_run_doc(run, expr.span().start, body_doc)
+                            })
+                    });
+                    match forced {
+                        Some(doc) => doc,
+                        None => d.indent_line(build_body(&|| {
+                            self.build_arrow_body_doc_with_leading(expr, terminal_run)
+                        })),
+                    }
                 }
             }
-            internal::ArrowFunctionBody::BlockStatement(block) => d.concat(&[
-                d.text(" "),
-                prepend_leading(d, terminal_run, self.build_block_statement_doc(block)),
-            ]),
+            // A BLOCK body hands the whole gap to the single arrow's own block-body arm —
+            // the freeze, the own-line route ([`Self::push_arrow_gap_tail`], whose `//` keeps
+            // its line and drops the `{` below it) and the glued-comment route, all in one
+            // call. Read on its own the gap looked glue-only, and the glued half copied here
+            // welded an own-line run onto the `=>` line with the `{` left flush behind it.
+            internal::ArrowFunctionBody::BlockStatement(block) => {
+                let mut block_parts = DocBuf::new();
+                self.build_arrow_block_body(&mut block_parts, block, terminal_gap_start);
+                d.concat(&block_parts)
+            }
         };
 
         // Outer group, mirroring prettier's `printArrowFunction` return
