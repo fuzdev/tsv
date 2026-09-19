@@ -1590,6 +1590,21 @@ impl<'a> Printer<'a> {
             .map(|close| (operand_end, close))
     }
 
+    /// Whether neither gap of a paren pair holds a comment on the page: `leading` is the
+    /// `(`→operand window, `trailing` the operand→`)` one (`None` where the pair has no
+    /// trailing gap of its own). What a callee pair's caller hands
+    /// `CalleeParens::build_body_doc`, and the chain base's twin of it — a curried arrow
+    /// chain's callee shape opens the pair from inside the operand's doc, so a comment in
+    /// either gap leaves the pair to the shell builders.
+    pub(in crate::printer) fn pair_gaps_are_comment_free(
+        &self,
+        leading: (u32, u32),
+        trailing: Option<(u32, u32)>,
+    ) -> bool {
+        !self.has_comments_on_page_between(leading.0, leading.1)
+            && trailing.is_none_or(|(start, end)| !self.has_comments_on_page_between(start, end))
+    }
+
     /// Where the window AFTER an operand opens: past the `)` of a pair that emitted its
     /// own trailing gap, or the operand's own span end where there is no such pair.
     ///

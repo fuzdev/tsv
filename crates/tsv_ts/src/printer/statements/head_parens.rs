@@ -133,14 +133,22 @@ impl<'a> Printer<'a> {
         ) {
             return Some(leftmost.span());
         }
-        if let Some(span) = self.let_bracket_head_target(expression) {
-            return Some(span);
-        }
+        self.let_bracket_head_target(expression)
+            .or_else(|| self.cast_head_keyword_target(expression, is_statement_ambiguous_keyword))
+    }
+
+    /// The identifier heading an `as` / `satisfies` cast chain, when `is_ambiguous` names
+    /// it a word that would open a declaration at the caller's position — or `None`.
+    fn cast_head_keyword_target(
+        &self,
+        expression: &Expression<'_>,
+        is_ambiguous: fn(&str) -> bool,
+    ) -> Option<Span> {
         match strip_statement_casts(expression) {
             Some(Expression {
                 kind: ExpressionKind::Identifier(id),
                 ..
-            }) if self.with_ident_name(id, is_statement_ambiguous_keyword) => Some(id.span),
+            }) if self.with_ident_name(id, is_ambiguous) => Some(id.span),
             _ => None,
         }
     }
@@ -183,15 +191,8 @@ impl<'a> Printer<'a> {
         &self,
         expression: &Expression<'_>,
     ) -> Option<Span> {
-        self.let_bracket_head_target(expression).or_else(|| {
-            match strip_statement_casts(expression) {
-                Some(Expression {
-                    kind: ExpressionKind::Identifier(id),
-                    ..
-                }) if self.with_ident_name(id, is_for_init_ambiguous_keyword) => Some(id.span),
-                _ => None,
-            }
-        })
+        self.let_bracket_head_target(expression)
+            .or_else(|| self.cast_head_keyword_target(expression, is_for_init_ambiguous_keyword))
     }
 
     /// The `let` identifier a for-in / for-of LEFT must keep its parens around, or `None`.

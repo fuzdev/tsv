@@ -170,11 +170,9 @@ fn build_call_head(
                         |parens| {
                             parens.build_body_doc(
                                 printer,
-                                trailing_gap.is_none_or(|(start, close)| {
-                                    !printer.has_comments_on_page_between(start, close)
-                                }) && !printer.has_comments_on_page_between(
-                                    span.start,
-                                    call.callee.span().start,
+                                printer.pair_gaps_are_comment_free(
+                                    (span.start, call.callee.span().start),
+                                    trailing_gap,
                                 ),
                             )
                         },

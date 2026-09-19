@@ -156,12 +156,6 @@ pub(crate) fn print_node_inner<'a>(
                 // Asked BEFORE any base doc is built — building one can re-mark the
                 // target from a nested value position inside the ternary's own branches.
                 let base_ternary = printer.chain_base_ternary(expr);
-                // The plain expression doc, memoized lazily: every arm consumes it EXCEPT
-                // a binary base's common path, which builds the chain-for-parens operand
-                // doc instead — eager, a parenthesized binary base paid two full doc
-                // builds for one rendered doc. The rare trailing-gap branch still
-                // consumes it (the line-comment layout's broken body), which is why it is
-                // a memo rather than moved into the arms that use it.
                 // Resolved BEFORE the bodies, because the claim below takes both and this is
                 // what says whether there are two. The window it opens is documented at the
                 // emitter call below, with the rest of the pair's gap reading.
@@ -173,11 +167,14 @@ pub(crate) fn print_node_inner<'a>(
                 // of the pair's gaps leaves the pair to the shell builders instead.
                 let callee_chain = is_curried_arrow_chain(expr)
                     && paren_leading_start.is_some_and(|start| {
-                        !printer.has_comments_on_page_between(start, base_start)
-                    })
-                    && trailing_gap.is_none_or(|(start, end)| {
-                        !printer.has_comments_on_page_between(start, end)
+                        printer.pair_gaps_are_comment_free((start, base_start), trailing_gap)
                     });
+                // The plain expression doc, memoized lazily: every arm consumes it EXCEPT
+                // a binary base's common path, which builds the chain-for-parens operand
+                // doc instead — eager, a parenthesized binary base paid two full doc
+                // builds for one rendered doc. The rare trailing-gap branch still
+                // consumes it (the line-comment layout's broken body), which is why it is
+                // a memo rather than moved into the arms that use it.
                 let mut inner_memo = None;
                 let mut inner = || -> DocId {
                     *inner_memo.get_or_insert_with(|| {
