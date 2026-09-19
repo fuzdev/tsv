@@ -2138,7 +2138,8 @@ impl<'a> Printer<'a> {
                 //
                 // The init is a statement-head position for the `let [` lookahead
                 // restriction too (`for ((let)[0] = 1; ;)`), so a `let` heading it keeps
-                // its parens.
+                // its parens — as does a `using` / `let` heading a cast chain, which bare
+                // would open a declaration (`for ((using) as T; ;)`).
                 //
                 // TODO: the clause value is built with no shell builder, so a grouping
                 // shell the author wrote around the WHOLE clause has its trailing gap
@@ -2148,7 +2149,7 @@ impl<'a> Printer<'a> {
                 // source). A header DECLARATOR answers the same shell inside the construct
                 // ([`Printer::build_for_init_value_doc`]), as does a sequence clause's last
                 // operand; the bare clause and the update clause want that routing too.
-                self.with_expr_stmt_paren_target(self.let_bracket_head_target(expr), || {
+                self.with_expr_stmt_paren_target(self.for_init_head_target(expr), || {
                     self.build_for_expr_clause(expr, |e| {
                         self.wrap_for_init_in(e, self.build_expression_doc(e))
                     })

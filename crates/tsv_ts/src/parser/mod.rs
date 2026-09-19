@@ -1895,9 +1895,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// keyword-lexed contextual name (`async`, `undefined`, …) — except the
     /// words that continue the *expression* reading of `using` instead:
     /// the word-shaped binary operators (`using in b`, `using instanceof C`)
-    /// and the cast keywords (`using as T`, `using satisfies T` — acorn reads
-    /// these as casts of the identifier `using`; tsc commits to a declaration
-    /// with a binding named `as`/`satisfies`, but the drop-in oracle wins).
+    /// and the cast keywords (`using as T`, `using satisfies T` — acorn at the
+    /// canonical parsers' ES2025, where `using` is no keyword, reads these as
+    /// casts of the identifier `using`; tsc and acorn at ES2026 commit to a
+    /// declaration binding `as`/`satisfies`. The drop-in oracle wins, and the
+    /// printer keeps a pair around the word so every edition reads its output
+    /// as the cast — `head_parens.rs`'s statement-head set).
     /// Reserved words (`function`, `let`, …) pass the gate and are rejected by
     /// the binding parser, matching acorn's rejection of both readings. The
     /// one-past-peek sibling is `peek_followed_by_same_line_binding_word`.
@@ -1963,9 +1966,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // `await using in b` / `await using instanceof C` are await
                 // expressions (`in`/`instanceof` are the word-shaped binary
                 // operators), and `await using as T` / `await using satisfies T`
-                // are casts of `await using` (acorn's reading; tsc would commit
-                // to a declaration binding `as`/`satisfies`, but the drop-in
-                // oracle wins). Every other word is a binding attempt — including
+                // are casts of `await using` (acorn's reading at the canonical
+                // ES2025; tsc would commit to a declaration binding
+                // `as`/`satisfies`, but the drop-in oracle wins). Every other word
+                // is a binding attempt — including
                 // contextual keywords that are valid binding names (`async`,
                 // `undefined`, `of`). Mirrors `peek_is_same_line_binding_word`.
                 let end = scan::skip_identifier(bytes, pos);

@@ -1170,7 +1170,17 @@ impl<'a> Printer<'a> {
         match shell {
             AsiOperandShell::Shell(shell) => parts.push(shell),
             AsiOperandShell::Bare(shell_run) => {
-                let needs_parens = self.needs_parens(expression, ParenContext::TypeAssertion);
+                // An `async` operand keeps its pair at every position: bare, `async as T` /
+                // `async satisfies T` puts a same-line word after `async`, which acorn reads
+                // as an async arrow head (`async as => …`) and then rejects — tsc and tsv read
+                // the cast. A name question, so it lives here rather than in `needs_parens`,
+                // which sees no source.
+                let needs_parens = self.needs_parens(expression, ParenContext::TypeAssertion)
+                    || matches!(
+                        &expression.kind,
+                        ExpressionKind::Identifier(id)
+                            if self.with_ident_name(id, |name| name == "async")
+                    );
                 if needs_parens {
                     parts.push(d.text("("));
                 }
