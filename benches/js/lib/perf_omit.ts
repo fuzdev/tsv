@@ -31,7 +31,7 @@
 
 /**
  * WHY a tool fails a file, as a closed vocabulary — so "is any omit hiding a tsv
- * failure?" is a grep (`tsv_failure`) rather than a reading of seventeen sentences,
+ * failure?" is a grep (`tsv_failure`) rather than a reading of every `reason`,
  * and the published report can group the omissions.
  *
  * - `tool_limit` — the tool's own limit on valid input: a missing mode, a bug, an
@@ -56,17 +56,20 @@ export type PerfOmitCategory =
 	| 'tsv_failure';
 
 /**
- * HOW the tool's refusal arrives — which is what decides whether a wrapper can
- * see it at all (`lib/reject_probe.ts`).
- *
- * - `throw` — the call throws. Visible to any wrapper.
- * - `error_recovered` — a PARSER returns a tree beside error diagnostics, and the
- *   wrapper turns the diagnostics into the rejection (oxc, yuku).
- * - `no_op` — a FORMATTER hands the INPUT back beside diagnostics (biome's
- *   `formatContent`, oxfmt's `format`): read without them, a free file in the
- *   timed sweep and an accept in the coverage.
+ * A `ToolOmissions.categories` key: a `PerfOmitCategory`, or `unlisted` for a failure no
+ * entry claims. In PUBLISHED order — the record is built in this order rather than in
+ * the order the corpus happens to list the failing files, so a corpus reorder cannot
+ * reshuffle the committed JSON under identical counts.
  */
-export type PerfOmitFailure = 'throw' | 'error_recovered' | 'no_op';
+export const OMISSION_CATEGORIES = [
+	'tool_limit',
+	'unsupported_syntax',
+	'harness_path_threading',
+	'harvest_artifact',
+	'tsv_failure',
+	'unlisted'
+] as const satisfies ReadonlyArray<PerfOmitCategory | 'unlisted'>;
+export type OmissionCategory = (typeof OMISSION_CATEGORIES)[number];
 
 export interface PerfOmit {
 	/**
@@ -82,8 +85,6 @@ export interface PerfOmit {
 	path: string;
 	/** Why the tool fails it — see `PerfOmitCategory`. */
 	category: PerfOmitCategory;
-	/** How the refusal arrives — see `PerfOmitFailure`. */
-	failure: PerfOmitFailure;
 	/** Why this failure is tolerated — keeps the list a reviewed catalogue, never a silent suppressor. */
 	reason: string;
 }
@@ -114,14 +115,12 @@ export const PERF_OMITS: PerfOmit[] = [
 		task: 'parse/typescript/canonical',
 		path: 'kit/packages/kit/src/runtime/app/env',
 		category: 'tool_limit',
-		failure: 'throw',
 		reason: 'acorn-typescript cannot parse ambient const declarations (no .d.ts mode)'
 	},
 	{
 		task: 'parse/typescript/oxc',
 		path: 'kit/packages/kit/src/runtime/app/env',
 		category: 'harness_path_threading',
-		failure: 'error_recovered',
 		reason:
 			'oxc (native + wasm) rejects ambient consts under the synthetic file.ts name (no path threading in the bench)'
 	},
@@ -129,7 +128,6 @@ export const PERF_OMITS: PerfOmit[] = [
 		task: 'format/typescript/oxfmt',
 		path: 'kit/packages/kit/src/runtime/app/env',
 		category: 'harness_path_threading',
-		failure: 'no_op',
 		reason:
 			'oxfmt rejects ambient consts under the synthetic file.ts name (no path threading in the bench)'
 	},
@@ -142,7 +140,6 @@ export const PERF_OMITS: PerfOmit[] = [
 		task: 'parse/typescript/yuku',
 		path: 'kit/packages/kit/src/runtime/app/env',
 		category: 'harness_path_threading',
-		failure: 'error_recovered',
 		reason:
 			'yuku (native + wasm) rejects ambient consts under the pinned `lang: ts` (its `dts` mode needs path threading the bench does not do)'
 	},
@@ -152,7 +149,6 @@ export const PERF_OMITS: PerfOmit[] = [
 		task: 'parse/typescript/canonical',
 		path: 'svelte/packages/svelte/src/ambient.d.ts',
 		category: 'tool_limit',
-		failure: 'throw',
 		reason: 'acorn-typescript enforces an early error tsv defers (arguments in class field init)'
 	},
 	// swc on the same two declaration-file shapes as the entries above. It differs
@@ -165,14 +161,12 @@ export const PERF_OMITS: PerfOmit[] = [
 		task: 'parse/typescript/swc',
 		path: 'kit/packages/kit/src/runtime/app/env',
 		category: 'tool_limit',
-		failure: 'throw',
 		reason: 'swc rejects ambient const declarations even with its own `dts` mode enabled'
 	},
 	{
 		task: 'parse/typescript/swc',
 		path: 'svelte/packages/svelte/src/ambient.d.ts',
 		category: 'tool_limit',
-		failure: 'throw',
 		reason:
 			'swc enforces the strict-mode eval/arguments binding early error tsv defers (`export const arguments: never`)'
 	},
@@ -188,7 +182,6 @@ export const PERF_OMITS: PerfOmit[] = [
 		task: 'format/typescript/biome',
 		path: 'kit/packages/kit/src/runtime/app/env',
 		category: 'harness_path_threading',
-		failure: 'no_op',
 		reason:
 			'biome rejects ambient consts under the synthetic file.ts name (no path threading in the bench)'
 	},
@@ -196,42 +189,36 @@ export const PERF_OMITS: PerfOmit[] = [
 		task: 'format/typescript/biome',
 		path: 'svelte/packages/svelte/src/motion/public.d.ts',
 		category: 'harness_path_threading',
-		failure: 'no_op',
 		reason: 'biome rejects a bodiless class method signature under the synthetic file.ts name'
 	},
 	{
 		task: 'format/svelte/biome',
 		path: 'zzz/src/lib/Picker.svelte',
 		category: 'unsupported_syntax',
-		failure: 'no_op',
 		reason: 'biome: template expressions can only contain a single expression'
 	},
 	{
 		task: 'format/svelte/biome',
 		path: 'zzz/src/lib/PickerDialog.svelte',
 		category: 'unsupported_syntax',
-		failure: 'no_op',
 		reason: 'biome: template expressions can only contain a single expression'
 	},
 	{
 		task: 'format/svelte/biome',
 		path: 'zzz/src/lib/SortableList.svelte',
 		category: 'unsupported_syntax',
-		failure: 'no_op',
 		reason: 'biome: template expressions can only contain a single expression'
 	},
 	{
 		task: 'format/svelte/biome',
 		path: 'fuz_code/src/routes/docs/benchmark/+page.svelte',
 		category: 'unsupported_syntax',
-		failure: 'no_op',
 		reason: 'biome: expected a closing block (a snippet block its HTML path does not parse)'
 	},
 	{
 		task: 'format/svelte/biome',
 		path: 'fuz_css/src/routes/docs/classes/+page.svelte',
 		category: 'unsupported_syntax',
-		failure: 'no_op',
 		reason:
 			"biome: expected class parameters but found '<' (a class body its HTML path does not parse)"
 	},
@@ -239,7 +226,6 @@ export const PERF_OMITS: PerfOmit[] = [
 		task: 'format/svelte/biome',
 		path: 'cosmicplayground/src/routes/StarshipMenu.svelte',
 		category: 'unsupported_syntax',
-		failure: 'no_op',
 		reason: "biome: expected a selector but found '>' in a <style> block"
 	},
 	// the same `>` selector again, in the harvested per-collection `<style>`
@@ -248,7 +234,6 @@ export const PERF_OMITS: PerfOmit[] = [
 		task: 'format/css/biome',
 		path: '.cache/svelte_styles/cosmicplayground.css',
 		category: 'harvest_artifact',
-		failure: 'no_op',
 		reason: "biome: expected a selector but found '>' (the harvested StarshipMenu.svelte styles)"
 	}
 ];
@@ -344,7 +329,7 @@ export interface ToolOmissions {
 	 * counts under `unlisted` — unreachable on a run `enforce_perf_coverage` passed,
 	 * and named rather than dropped so the counts always sum to `files`.
 	 */
-	categories: Record<string, number>;
+	categories: Partial<Record<OmissionCategory, number>>;
 }
 
 /**
@@ -352,9 +337,9 @@ export interface ToolOmissions {
  *
  * A file any timed row fails leaves EVERY row's timed set (the group is timed on
  * its all-rows intersection), so an omit written against one tool moves every
- * published number in the group — and a file count understates it badly: one
- * harvested stylesheet biome rejects is ~11% of the `format/css` group's bytes.
- * Hence bytes beside files, and the group's totals beside both.
+ * published number in the group — and a file count understates it badly when the
+ * file is large (a harvested per-collection stylesheet is one file). Hence bytes
+ * beside files, and the group's totals beside both.
  *
  * `omitted_*` is the UNION over rows, not the sum: two rows failing one file omit
  * it once. `by_tool` is per row, so its counts can sum past it.
@@ -375,7 +360,9 @@ export interface GroupOmissions {
  *
  * Pure, so the arithmetic the published disclosure rests on is testable without a
  * corpus. The caller passes TIMED rows only: a coverage-only row never narrows the
- * intersection, so its failures omit nothing.
+ * intersection, so its failures omit nothing. A failure is categorized by the FIRST
+ * entry that claims it, which is the only one on a run `enforce_perf_coverage` passed:
+ * it fails any failure two entries claim.
  *
  * @param group - the group's `operation/language` name
  * @param files - every file the group loaded
@@ -385,13 +372,14 @@ export interface GroupOmissions {
 export function summarize_group_omissions(
 	group: string,
 	files: ReadonlyArray<{ path: string; bytes: number }>,
-	rows: ReadonlyArray<{ name: string; tracking_key: string; failed: Iterable<string> }>,
+	rows: ReadonlyArray<{ name: string; tracking_key: string; failed: readonly string[] }>,
 	omits: readonly PerfOmit[]
 ): GroupOmissions {
 	const bytes_by_path = new Map(files.map((f) => [f.path, f.bytes]));
 	const omitted = new Set<string>();
 	const by_tool: ToolOmissions[] = [];
 	for (const row of rows) {
+		const counts = new Map<OmissionCategory, number>();
 		const tool: ToolOmissions = { name: row.name, files: 0, bytes: 0, categories: {} };
 		for (const path of row.failed) {
 			// A failure on a file outside `files` is not this group's to report.
@@ -402,7 +390,11 @@ export function summarize_group_omissions(
 			tool.bytes += bytes;
 			const matches = perf_omit_matches(omits, row.tracking_key, path);
 			const category = matches.length > 0 ? matches[0].category : 'unlisted';
-			tool.categories[category] = (tool.categories[category] ?? 0) + 1;
+			counts.set(category, (counts.get(category) ?? 0) + 1);
+		}
+		for (const category of OMISSION_CATEGORIES) {
+			const count = counts.get(category);
+			if (count !== undefined) tool.categories[category] = count;
 		}
 		if (tool.files > 0) by_tool.push(tool);
 	}
@@ -416,4 +408,33 @@ export function summarize_group_omissions(
 		omitted_bytes,
 		by_tool
 	};
+}
+
+/**
+ * Per-group line naming what the intersection LEFT OUT — the same fact the
+ * `Coverage:` line implies, stated for the GROUP: a file one row fails leaves every
+ * row's timed set, so this is the share of the group no published number here
+ * measured. Bytes lead, because a file count understates it (a harvested
+ * per-collection stylesheet is one file). `null` when nothing was omitted.
+ */
+export function generate_group_omissions_markdown(
+	omissions: GroupOmissions | undefined
+): string | null {
+	if (!omissions || omissions.omitted_files === 0) return null;
+	const share = (part: number, whole: number): string =>
+		whole === 0 ? '0%' : `${((part / whole) * 100).toFixed(1)}%`;
+	const tools = omissions.by_tool
+		.map((t) => {
+			const categories = Object.entries(t.categories)
+				.map(([category, count]) => `${count} ${category}`)
+				.join(', ');
+			return `${t.name} ${t.files} (${categories})`;
+		})
+		.join('; ');
+	return (
+		`**Omitted from every row's timed set:** ${omissions.omitted_files} of ` +
+		`${omissions.files_total} files, ${share(omissions.omitted_bytes, omissions.bytes_total)} ` +
+		`of the group's bytes (${share(omissions.omitted_files, omissions.files_total)} of its ` +
+		`files) — by row: ${tools}. Each is a reviewed entry in \`lib/perf_omit.ts\`.`
+	);
 }

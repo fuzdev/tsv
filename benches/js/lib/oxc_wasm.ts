@@ -11,6 +11,7 @@
 import { BaseImplementation, type Language, LANGUAGE_EXTENSIONS, type ParseGoal } from './types.ts';
 import type { OxcWasmVersions } from './versions.ts';
 import { assert_oxc_rejects_invalid, type OxcDiagnostic, oxc_fatal_errors } from './oxc.ts';
+import { assert_parser_rejects_invalid } from './reject_probe.ts';
 import { current_runtime } from './runtime.ts';
 
 /** oxc-parser WASM module types (same API as native) */
@@ -76,6 +77,12 @@ export class OxcWasmImplementation extends BaseImplementation {
 		// That disagreement is exactly how this row broke once before — a different
 		// cause (the consume-once `errors` getter above), the same shape.
 		assert_oxc_rejects_invalid(this._parser, 'oxc-parser-wasm');
+		// And through this wrapper's own `parse`, which is where that break lived: the
+		// raw-module probe reads `errors` once itself, so a regression to a double read
+		// HERE would pass it (`lib/reject_probe.ts`).
+		assert_parser_rejects_invalid('oxc-parser-wasm', this.parse_languages, (s, l, goal) =>
+			this.parse(s, l, goal)
+		);
 	}
 
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {

@@ -15,7 +15,9 @@ import {
 import type { OxcVersions } from './versions.ts';
 import { assert_format_config_landed, FORMAT_CONFIG_PROBES } from './format_config_probe.ts';
 import {
+	assert_parser_rejects_invalid,
 	assert_tool_rejects_invalid_async,
+	INVALID_SOURCES,
 	surface_embedded_format_errors
 } from './reject_probe.ts';
 
@@ -120,8 +122,7 @@ export function assert_oxc_rejects_invalid(
 	parser: Pick<OxcParserModule, 'parseSync'>,
 	binding: string
 ): void {
-	// Invalid at every goal, and shallow enough that no grammar change makes it valid.
-	const result = parser.parseSync('file.ts', 'const x = ;');
+	const result = parser.parseSync('file.ts', INVALID_SOURCES.typescript);
 	if (oxc_fatal_errors(result.errors).length > 0) return;
 	throw new Error(
 		`${binding}: an invalid source produced no fatal diagnostic — oxc's severity vocabulary has ` +
@@ -199,6 +200,12 @@ export class OxcImplementation extends BaseImplementation {
 		// is a second registry entry per binding — and disclosed rather than silent:
 		// `unavailable[].rows` names every row the failure removed.
 		assert_oxc_rejects_invalid(this._parser, 'oxc-parser');
+		// That reads the raw module, so it names a moved vocabulary precisely — and proves
+		// nothing about THIS wrapper turning the diagnostics into a throw. Ask the row's
+		// own call too, at every goal it is handed (`lib/reject_probe.ts`).
+		assert_parser_rejects_invalid('oxc-parser', this.parse_languages, (s, l, goal) =>
+			this.parse(s, l, goal)
+		);
 		// Per LANGUAGE, and through `format_async` rather than the raw module call:
 		// one options bag drives all three here (unlike biome's per-language sections),
 		// so the extra two are corroboration — but they run the exact call the timed

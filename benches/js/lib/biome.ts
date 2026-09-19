@@ -13,6 +13,7 @@ import type { BiomeVersions } from './versions.ts';
 // (see there) so a load-time crash can't escape the registry's skip.
 import type { Biome, Configuration } from '@biomejs/js-api';
 import { assert_format_config_landed, FORMAT_CONFIG_PROBES } from './format_config_probe.ts';
+import { assert_tool_rejects_invalid } from './reject_probe.ts';
 
 /**
  * The wasm-bindgen glue module (`biome_wasm_bg.js`): the JS half of the binding,
@@ -132,8 +133,12 @@ export interface BiomeDiagnostic {
  * own `errors !== 0` gate refuses to format, and what `format` must refuse to
  * count as covered. Spelled as the NON-fatal set so a severity biome adds or
  * renames reads as fatal (a rejected file) rather than as a silent accept — the
- * same polarity `lib/oxc.ts`'s `oxc_fatal_errors` argues for; `init` proves the
- * vocabulary still lands (`assert_biome_rejects_invalid`).
+ * same polarity `lib/oxc.ts`'s `oxc_fatal_errors` argues for. That spelling makes a
+ * fabricated accept unreachable through a RENAMED severity, but it cannot see biome
+ * moving a real syntax error DOWN into the non-fatal set, or `formatContent` ceasing
+ * to return the diagnostics at all — either would put every unparseable file back
+ * into the covered count — so `init` proves the vocabulary still lands, per language
+ * (biome's JS, CSS and HTML parsers are three engines with three sets of diagnostics).
  */
 const BIOME_NON_FATAL_SEVERITIES: ReadonlySet<string> = new Set(['hint', 'information', 'warning']);
 
@@ -150,30 +155,6 @@ export function biome_fatal_diagnostics(
 /** One line naming a diagnostic, for the rejection message the bench records. */
 function biome_diagnostic_summary(d: BiomeDiagnostic): string {
 	return `${d.category ?? 'unknown'}: ${d.description ?? '(no description)'}`;
-}
-
-/**
- * Assert biome still reports a genuine syntax error as FATAL, failing the impl
- * loudly when it doesn't.
- *
- * The counterpart to the polarity argument on `BIOME_NON_FATAL_SEVERITIES`: that
- * spelling makes a fabricated accept unreachable through a renamed severity, but
- * it cannot see biome moving a real syntax error DOWN into the non-fatal set, or
- * `formatContent` ceasing to return the diagnostics at all — either would put
- * every unparseable file back into the covered count. Runs once at init, on the
- * exact call the timed row makes.
- */
-function assert_biome_rejects_invalid(format: (source: string) => string): void {
-	try {
-		format('const x = ;');
-	} catch {
-		return;
-	}
-	throw new Error(
-		"biome: an invalid source produced no fatal diagnostic — either biome's severity vocabulary " +
-			'has moved or `formatContent` no longer returns diagnostics, so every file would count as ' +
-			"formatted and this row's coverage would be fabricated. See `biome_fatal_diagnostics` in lib/biome.ts."
-	);
 }
 
 /**
@@ -281,9 +262,16 @@ export class BiomeImplementation extends BaseImplementation {
 				language,
 				this.format(FORMAT_CONFIG_PROBES[language], language)
 			);
+			// And that a syntax error is still REJECTED — see `BIOME_NON_FATAL_SEVERITIES`.
+			assert_tool_rejects_invalid(
+				'biome',
+				'format',
+				language,
+				(source) => this.format(source, language),
+				"Either biome's severity vocabulary has moved or `formatContent` no longer returns " +
+					'diagnostics — see `biome_fatal_diagnostics` in lib/biome.ts.'
+			);
 		}
-		// And that a syntax error is still REJECTED — see `assert_biome_rejects_invalid`.
-		assert_biome_rejects_invalid((source) => this.format(source, 'typescript'));
 	}
 
 	/**

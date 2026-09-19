@@ -90,6 +90,7 @@ import {
 } from './lib/corpus.ts';
 import { detect_corpus_snapshot, enrich_source_repos } from './lib/corpus_repos.ts';
 import {
+	generate_group_omissions_markdown,
 	type GroupOmissions,
 	PERF_OMITS,
 	type PerfOmit,
@@ -115,7 +116,6 @@ import {
 	generate_effective_corpus_report,
 	generate_group_bench_table_markdown,
 	generate_group_coverage_markdown,
-	generate_group_omissions_markdown,
 	generate_group_coverage_only_markdown,
 	generate_group_files_markdown,
 	generate_group_throughput_markdown,
@@ -433,7 +433,8 @@ const CANONICAL_MIN_ITERATIONS = 16;
  * Coverage-only mode (`BENCH_COVERAGE_ONLY=1`): run pre-flight — which fully
  * determines per-tool parse coverage — and emit the report straight from it,
  * SKIPPING the timed benchmark phase entirely. That phase costs a fixed floor
- * of ≥8 full-corpus sweeps per row (≥3 warmup + ≥5 measured) no matter how low
+ * of full-corpus sweeps per row (the warmup floor plus the measured floor — the
+ * canonical rows' is `CANONICAL_MIN_ITERATIONS`) no matter how low
  * `BENCH_DURATION` goes, yet the conformance surface's coverage consumers (the
  * site's per-engine table, `derive_conformance_groups`) read only the
  * pre-flight counts — so on a coverage refresh the whole timing cost is wasted.
@@ -742,8 +743,10 @@ function surface_disclosure_lines(registered: Set<string>): {
 // Resolve the conformance report's row-composition disclosures HERE — before the
 // pre-flight and timed phases — so a stale claim fails immediately, rather than at
 // report time after a full run whose output the throw would then discard.
-// Both checks below ask the same registry, so it is built ONCE — two calls would
-// invite them to answer from different sets after a future edit.
+// The first two checks below ask the same registry, so it is built ONCE — two calls
+// would invite them to answer from different sets after a future edit. (The payload-tier
+// check further down asks a PARSE-scoped one of its own: a `DefinedRow` carries no
+// operation to filter this one by.)
 //
 // The rows this surface DEFINES, not the rows this machine can run: both questions
 // below are about policy, and answering them from the live set makes an `excluded`
@@ -1139,14 +1142,17 @@ const same_engine_pair_versions = (
  * The `-internal` rows are excluded because they parse without serializing and
  * return nothing — there is no output to grade, and pretending otherwise would put
  * a pair in the graded set that can never carry digests, which is exactly the shape
- * the vacuity guard in `check_variant_parity` exists to catch.
+ * the vacuity guard in `check_variant_parity` exists to catch. `tsv-forced-async` is
+ * excluded for the neighbouring reason: it has no `tsv-wasm-forced-async` sibling to be
+ * graded against (it is `tsv`'s own call behind an await, and `tsv` is graded), so
+ * digesting it is work nothing compares.
  *
  * ⚠️ This names the BASE row of a pair. The pre-flight must digest BOTH sides, so it
  * derives its row set from this plus `same_engine_sibling_name` rather than from a
  * second hand-written predicate — see `run_preflight`.
  */
 const sibling_outputs_must_match = (name: string): boolean =>
-	is_native_tsv_row(name) && !name.endsWith('-internal');
+	is_native_tsv_row(name) && !name.endsWith('-internal') && name !== 'tsv-forced-async';
 
 /**
  * Digest one pre-flight result for byte-parity comparison, or `null` when the
@@ -1602,17 +1608,21 @@ function warmup_iterations_for(preflight_ms: number): number {
 }
 
 /**
- * The verdict an impl gives by returning NOTHING: a `''` for a non-empty input is a
- * declined file, not a formatted one, and a timed sweep that accepted it would drop
+ * The verdict an impl gives by returning NOTHING: a whitespace-only result for an input
+ * that is not is a declined file, not a formatted one, and a timed sweep that accepted it would drop
  * that file's whole cost from the row — on the canonical row, from the denominator of
  * every published `Nx`. The in-process prettier is documented to do exactly this
  * intermittently under load (`CLAUDE.md` §Known Issues), and every other consumer of
- * it guards for it; the bench did not. A `null` return is the `-internal` shape and
+ * it guards for it, on the same SEMANTICALLY-empty test as here (`lib/prettier_cache.ts`,
+ * `corpus_compare_format.ts`) — a byte-zero test alone misses a tool declining with a bare
+ * newline. A `null` return is the `-internal` shape and
  * is not graded. Returns the error to record (pre-flight records it as a skip against
  * the tool) or `null` when the output is present.
  */
 function empty_output_error(task_name: string, file: SourceFile, result: unknown): Error | null {
-	if (file.bytes > 0 && typeof result === 'string' && result.length === 0) {
+	// `/\S/.test` rather than `trim()`: this also runs per file inside the timed loop, and
+	// the test stops at the first character of any real output without allocating.
+	if (typeof result === 'string' && !/\S/.test(result) && /\S/.test(file.content)) {
 		return new Error(
 			`${task_name} returned empty output for a ${file.bytes}-byte input (${file.path}) — a ` +
 				`silently declined file, which would read as zero cost in a timed sweep`
@@ -2384,7 +2394,8 @@ interface Baseline {
 	 * files and BYTES, against the group's totals, with each row's failures by
 	 * `PerfOmitCategory` (see `GroupOmissions`). A file any timed row fails leaves
 	 * EVERY row's timed set, so one tool's omit moves every number in the group, and
-	 * a file count understates it: one harvested stylesheet is ~11% of `format/css`.
+	 * a file count understates it (one harvested stylesheet can be a visible share of a
+	 * group's bytes).
 	 * A group nothing failed is listed with zeroes, so an absent group means
 	 * "not measured" rather than "nothing omitted".
 	 *
@@ -2505,17 +2516,6 @@ const NULL_STATS = {
 	min_iterations: null
 } as const;
 
-/**
- * Coverage-only entries, synthesized from pre-flight state (no timed run). One
- * row per impl per group, carrying the per-tool coverage counts with null
- * timing — the shape `derive_conformance_groups` reads. Iterates
- * `LANGUAGES × OPERATIONS` for a stable order matching pre-flight.
- *
- * Two callers, distinguished by `only_coverage_only_tasks`: a coverage-only RUN
- * (`BENCH_COVERAGE_ONLY=1`) synthesizes every row because nothing was timed,
- * while a timed run synthesizes only the coverage-only IMPLS — the rows the
- * bench library never produced a result for (see `BenchmarkTask.coverage_only`).
- */
 /** `BaselineEntry.payload` for a row: parse groups only — see the field. */
 function row_payload(group_name: string, row_name: string): PayloadTier | null {
 	return group_name.startsWith('parse/') ? parse_payload_tier(row_name) : null;
@@ -2540,8 +2540,11 @@ function build_omissions(): GroupOmissions[] | undefined {
 				.map(([name, tracking_key]) => ({
 					name,
 					tracking_key,
-					failed: skipped_files.get(tracking_key)?.keys() ?? []
+					failed: [...(skipped_files.get(tracking_key)?.keys() ?? [])]
 				}));
+			// Nothing timed is "not measured", which the field spells as an absent group —
+			// zeroes would claim an intersection that never existed.
+			if (rows.length === 0) continue;
 			omissions.push(
 				summarize_group_omissions(group_name, files_by_language[language], rows, PERF_OMITS)
 			);
@@ -2550,6 +2553,17 @@ function build_omissions(): GroupOmissions[] | undefined {
 	return omissions;
 }
 
+/**
+ * Coverage-only entries, synthesized from pre-flight state (no timed run). One
+ * row per impl per group, carrying the per-tool coverage counts with null
+ * timing — the shape `derive_conformance_groups` reads. Iterates
+ * `LANGUAGES × OPERATIONS` for a stable order matching pre-flight.
+ *
+ * Two callers, distinguished by `only_coverage_only_tasks`: a coverage-only RUN
+ * (`BENCH_COVERAGE_ONLY=1`) synthesizes every row because nothing was timed,
+ * while a timed run synthesizes only the coverage-only IMPLS — the rows the
+ * bench library never produced a result for (see `BenchmarkTask.coverage_only`).
+ */
 function build_coverage_entries(only_coverage_only_tasks: boolean): BaselineEntry[] {
 	const entries: BaselineEntry[] = [];
 	for (const language of LANGUAGES) {

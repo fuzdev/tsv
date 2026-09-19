@@ -18,7 +18,7 @@ import {
 import type { CanonicalVersions } from './versions.ts';
 import { assert_format_config_landed, FORMAT_CONFIG_PROBES } from './format_config_probe.ts';
 import {
-	assert_tool_rejects_invalid,
+	assert_parser_rejects_invalid,
 	assert_tool_rejects_invalid_async,
 	surface_embedded_format_errors
 } from './reject_probe.ts';
@@ -171,8 +171,9 @@ export class CanonicalImplementation extends BaseImplementation {
 			// The three oracle parsers, on the same terms: each reference row's accept is
 			// "it did not throw", and on the conformance surface that accept set is what
 			// the published coverage is graded against.
-			assert_tool_rejects_invalid(CANONICAL_PARSER_ROWS[language], 'parse', language, (source) =>
-				this.parse(source, language)
+			// At every goal: an explicit one re-parses TypeScript past the default parser.
+			assert_parser_rejects_invalid(CANONICAL_PARSER_ROWS[language], [language], (s, l, goal) =>
+				this.parse(s, l, goal)
 			);
 		}
 	}

@@ -39,7 +39,7 @@
  */
 
 import { BaseImplementation, type Language, type ParseGoal } from './types.ts';
-import { assert_tool_rejects_invalid } from './reject_probe.ts';
+import { assert_parser_rejects_invalid } from './reject_probe.ts';
 
 /** One entry of tsc's internal parse-diagnostics array. */
 export interface TscParseDiagnostic {
@@ -133,11 +133,9 @@ export class TscImplementation extends BaseImplementation {
 		// into the throw — so prove that reading still fires on a plain syntax error
 		// (a moved field is already loud; an EMPTY one would read every file as
 		// accepted). See `lib/reject_probe.ts`.
-		for (const language of this.parse_languages) {
-			assert_tool_rejects_invalid('tsc', 'parse', language, (source) =>
-				this.parse(source, language)
-			);
-		}
+		assert_parser_rejects_invalid('tsc', this.parse_languages, (s, l, goal) =>
+			this.parse(s, l, goal)
+		);
 	}
 
 	/** `goal` is accepted for interface parity and ignored — see the module doc. */

@@ -59,7 +59,7 @@
 
 import { createRequire } from 'node:module';
 import { BaseImplementation, type Language } from './types.ts';
-import { assert_tool_rejects_invalid } from './reject_probe.ts';
+import { assert_parser_rejects_invalid } from './reject_probe.ts';
 import type { RsvelteParseVersions } from './versions.ts';
 
 /** The subset of the addon's surface this row drives. */
@@ -153,17 +153,15 @@ export class RsvelteParseImplementation extends BaseImplementation {
 		this._native = native;
 		// Both rows decide success by the absence of a throw, so prove a syntax error
 		// still arrives as one on each — see `lib/reject_probe.ts`.
-		for (const language of this.parse_languages) {
-			assert_tool_rejects_invalid('rsvelte-parse', 'parse', language, (source) =>
-				this.parse(source, language)
-			);
-			assert_tool_rejects_invalid(
-				'rsvelte-parse-skip-expr-loc',
-				'parse_skip_expression_loc',
-				language,
-				(source) => this.parse_skip_expression_loc(source, language)
-			);
-		}
+		assert_parser_rejects_invalid('rsvelte-parse', this.parse_languages, (s, l) =>
+			this.parse(s, l)
+		);
+		assert_parser_rejects_invalid(
+			'rsvelte-parse-skip-expr-loc',
+			this.parse_languages,
+			(s, l) => this.parse_skip_expression_loc(s, l),
+			'parse_skip_expression_loc'
+		);
 	}
 
 	parse(source: string, language: Language): unknown {
