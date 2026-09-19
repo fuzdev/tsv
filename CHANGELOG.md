@@ -13,6 +13,8 @@ Each `## Unreleased` section must be non-empty and carry a
 ## Unreleased
 <!-- bump: patch -->
 
+## 0.4.1
+
 - fix: various formatting and parsing fixes
 - chore: track Svelte 5.57.0
 
