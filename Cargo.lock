@@ -619,7 +619,7 @@ dependencies = [
 
 [[package]]
 name = "tsv"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "bumpalo",
  "futures-util",
@@ -637,7 +637,7 @@ dependencies = [
 
 [[package]]
 name = "tsv_arena"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "bumpalo",
  "tsv_lang",
@@ -645,7 +645,7 @@ dependencies = [
 
 [[package]]
 name = "tsv_check"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "bumpalo",
  "smallvec",
@@ -655,7 +655,7 @@ dependencies = [
 
 [[package]]
 name = "tsv_cli"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "argh",
  "bumpalo",
@@ -669,7 +669,7 @@ dependencies = [
 
 [[package]]
 name = "tsv_css"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "bumpalo",
  "phf",
@@ -678,7 +678,7 @@ dependencies = [
 
 [[package]]
 name = "tsv_debug"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "argh",
  "bumpalo",
@@ -703,14 +703,14 @@ dependencies = [
 
 [[package]]
 name = "tsv_discover"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "tsv_ignore",
 ]
 
 [[package]]
 name = "tsv_ffi"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "serde_json",
  "tsv_arena",
@@ -722,7 +722,7 @@ dependencies = [
 
 [[package]]
 name = "tsv_html"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "phf",
  "serde_json",
@@ -730,11 +730,11 @@ dependencies = [
 
 [[package]]
 name = "tsv_ignore"
-version = "0.4.0"
+version = "0.4.1"
 
 [[package]]
 name = "tsv_lang"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "serde_json",
  "smallvec",
@@ -745,7 +745,7 @@ dependencies = [
 
 [[package]]
 name = "tsv_napi"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "napi",
  "napi-build",
@@ -762,7 +762,7 @@ dependencies = [
 
 [[package]]
 name = "tsv_svelte"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "bumpalo",
  "serde_json",
@@ -775,7 +775,7 @@ dependencies = [
 
 [[package]]
 name = "tsv_svelte_compile"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "bumpalo",
  "thiserror",
@@ -789,7 +789,7 @@ dependencies = [
 
 [[package]]
 name = "tsv_ts"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "bumpalo",
  "smallvec",
@@ -799,7 +799,7 @@ dependencies = [
 
 [[package]]
 name = "tsv_wasm"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "js-sys",
  "talc",
