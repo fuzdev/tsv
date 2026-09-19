@@ -615,11 +615,18 @@ impl<'a> Printer<'a> {
         expr: &Expression<'_>,
         frozen: bool,
         embed: &EmbedContext,
+        value_owns_operator_break: bool,
     ) -> DocId {
         if frozen {
             self.build_frozen_node_doc(expr.span())
         } else {
-            tsv_ts::build_assignment_value_expression_doc(self.d(), expr, &self.ts_inputs(), *embed)
+            tsv_ts::build_assignment_value_expression_doc(
+                self.d(),
+                expr,
+                &self.ts_inputs(),
+                *embed,
+                value_owns_operator_break,
+            )
         }
     }
 

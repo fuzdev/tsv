@@ -973,16 +973,34 @@ pub fn expression_printed_start(
 /// - Nothing else is marked: the target is keyed by `expression`'s own span and the printer
 ///   is fresh per call, so a nested binary (a ternary's test, an operand's own sub-chain)
 ///   reads `false` exactly as it does inside a `<script>`.
+///
+/// `value_owns_operator_break` is the host's layout verdict for a **curried arrow chain**,
+/// the one value whose shape depends on it. `true`: the host leaves the break after its
+/// operator to the value, so the chain takes the assignment-RHS shape and owns that break
+/// itself (`=⏎(a) =>⏎(b) =>`, the heads at one indent). `false`: the host has placed the
+/// value itself — it broke after its operator for a comment in the gap, or keeps a
+/// commented value on the operator's line — and the chain takes the default shape. A chain
+/// whose heads force the break ([`curried_chain_breaks_after_operator`]) owns no break of
+/// its own either way: the host breaks after its operator for it.
 pub fn build_assignment_value_expression_doc(
     arena: &DocArena,
     expression: &Expression<'_>,
     inputs: &PrinterInputs<'_>,
     embed: EmbedContext,
+    value_owns_operator_break: bool,
 ) -> DocId {
     with_doc_printer(arena, inputs, embed, |printer| {
-        printer.mark_assignment_value(expression);
-        printer.build_root_expression_doc(expression)
+        printer.build_assignment_value_root_doc(expression, value_owns_operator_break)
     })
+}
+
+/// Whether `expression` is a curried arrow chain whose heads force the break after the
+/// operator of the assignment it is the value of — prettier's `shouldBreakChain` read at
+/// its `chooseLayout` site (`chain-tail-arrow-chain`): a head with type parameters, a
+/// return type over parameters, or a non-identifier parameter. The host owes such a value a
+/// mandatory break after its operator; the heads then stack under it.
+pub fn curried_chain_breaks_after_operator(expression: &Expression<'_>) -> bool {
+    printer::curried_chain_breaks_after_operator(expression)
 }
 
 /// Build a DocId for a single comment (`/* … */` / `// …`) in the caller's arena,

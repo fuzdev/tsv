@@ -629,7 +629,7 @@ impl<'a> Printer<'a> {
             // union); own-line comments stay on their own lines (not merged);
             // the value is indented on the next line. `= // comment\n      c`.
             parts.push(d.text(" ="));
-            let expr_doc = build_value();
+            let expr_doc = self.build_hung_value_doc(value, eq_pos + 1, build_value);
             self.append_keyword_value_line_comments(parts, eq_pos + 1, value_start, expr_doc);
         } else {
             // Use assignment layout for proper line-breaking (handles

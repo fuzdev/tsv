@@ -67,7 +67,10 @@ rule for one shell rather than two half-rules that disagree about `( // b⏎x //
 (where the trailing comment survived and the leading one did not). A `//` on the
 `(` line stays on it (`( // c12`); every other leading comment takes the ordinary
 run, so an own-line block keeps its own line and a glued one leads the operand
-inline.
+inline. The one leading run that keeps no shell is the one the bare form can still
+place: a lone single-line block glued through to the operand (`(/* c */ (x)) as A`)
+leads it inline, as the owned spelling `(/* c */ x) as A` does —
+[as_satisfies_operand_shell_glued_block_comment](../as_satisfies_operand_shell_glued_block_comment/).
 
 A **block** comment forces nothing (`x /* c11 */ as A` stays inline without parens,
 matching prettier) — it is pinned here as the control for the line-comment rule.

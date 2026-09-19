@@ -741,9 +741,12 @@ impl<'a> Printer<'a> {
                     if hoisted_run.is_none()
                         && self.has_line_comments_between(colon_pos + 1, value_start)
                     {
-                        let value_doc = self.build_gap_value_doc(None, prop.value, || {
-                            self.build_object_property_value_doc(prop.value, value_frozen)
-                        });
+                        let value_doc =
+                            self.build_hung_value_doc(prop.value, colon_pos + 1, || {
+                                self.build_gap_value_doc(None, prop.value, || {
+                                    self.build_object_property_value_doc(prop.value, value_frozen)
+                                })
+                            });
                         let value_doc = if needs_parens {
                             d.parens(value_doc)
                         } else {
@@ -766,8 +769,10 @@ impl<'a> Printer<'a> {
                     if needs_parens {
                         value_parts.push(d.text("("));
                     }
-                    value_parts.push(self.build_gap_value_doc(hoisted_run, prop.value, || {
-                        self.build_object_property_value_doc(prop.value, value_frozen)
+                    value_parts.push(self.build_hung_value_doc(prop.value, colon_pos + 1, || {
+                        self.build_gap_value_doc(hoisted_run, prop.value, || {
+                            self.build_object_property_value_doc(prop.value, value_frozen)
+                        })
                     }));
                     if needs_parens {
                         value_parts.push(d.text(")"));

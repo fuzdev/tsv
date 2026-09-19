@@ -36,7 +36,7 @@ pub(in crate::printer) use self::conditional::ChainBaseTernary;
 use self::operators::{OperatorBuf, SeqLayout};
 use crate::ast::internal::{BinaryExpression, Expression, ExpressionKind, TSType};
 use crate::printer::ShareTag;
-use crate::printer::comments::{CommentFilter, CommentSpacing};
+use crate::printer::comments::{AsiOperandShell, CommentFilter, CommentSpacing};
 use crate::printer::ignore::FrozenOperandPair;
 use crate::printer::types::TrailingBlock;
 use crate::printer::types::helpers::unwrap_parenthesized;
@@ -1156,67 +1156,71 @@ impl<'a> Printer<'a> {
         // leading trigger needs a `(` BEFORE the operand, which needs room for one.
         let gap_has_comments =
             keyword_pos.is_some_and(|kw| self.has_comments_to_emit_between(expr_end, kw));
-        let shell = if gap_has_comments || cast_start < expression.span().start {
-            keyword_pos.and_then(|kw| {
-                self.build_asi_operand_shell_doc(
+        let shell = match keyword_pos {
+            Some(kw) if gap_has_comments || cast_start < expression.span().start => self
+                .build_asi_operand_shell_doc(
                     cast_start,
                     expression,
                     kw,
                     ParenContext::TypeAssertion,
-                )
-            })
-        } else {
-            None
+                ),
+            _ => AsiOperandShell::Bare(None),
         };
 
-        if let Some(shell) = shell {
-            parts.push(shell);
-        } else {
-            let needs_parens = self.needs_parens(expression, ParenContext::TypeAssertion);
-            if needs_parens {
-                parts.push(d.text("("));
-            }
-            // A ternary operand reached from one of prettier's `ancestorNameMap` value
-            // positions expands its parens instead of hanging the `?`/`:` arms — the
-            // shape a member base already takes. See `mark_ternary_extra_indent`.
-            //
-            // Asked BEFORE the operand's doc is built: building it recurses into the
-            // ternary's own branches, and a nested value position there (a declarator in
-            // an arrow body, an inner `await`) re-marks the target, so a read afterwards
-            // would see the nested answer instead of this operand's.
-            let expands = needs_parens && self.ternary_takes_extra_indent(expression);
-            // A MULTI-LINE block the operand OWNS prints just inside the `(`, outside the
-            // operand's own group ([`Printer::build_value_with_outermost_owned_comment`]);
-            // left inside, its body's forced break explodes an operand prettier keeps flat.
-            // Asked only where the pair is KEPT — see that seam's ⚠️.
-            // The cast's own erased-paren freeze: `cast_start` opens at the grouping `(`
-            // the parser dropped, so an alone-on-line directive inside it is the cast's to
-            // honor ([`Printer::build_left_spine_operand_doc`]).
-            let operand = self.build_left_spine_operand_doc(
-                cast_start,
-                expression,
-                FrozenOperandPair::Emitted,
-                || {
-                    if needs_parens {
-                        self.build_expression_doc_claiming_outermost(expression)
-                    } else {
-                        self.build_expression_doc(expression)
-                    }
-                },
-            );
-            parts.push(if expands {
-                self.build_expanding_parens_body_doc(operand)
-            } else {
-                operand
-            });
-            if needs_parens {
-                parts.push(d.text(")"));
-            }
+        match shell {
+            AsiOperandShell::Shell(shell) => parts.push(shell),
+            AsiOperandShell::Bare(shell_run) => {
+                let needs_parens = self.needs_parens(expression, ParenContext::TypeAssertion);
+                if needs_parens {
+                    parts.push(d.text("("));
+                }
+                // The stripped shell's glued block leads the operand inside whatever pair the
+                // operand keeps — where the reparse, which owns it, prints it too.
+                if let Some(run) = shell_run {
+                    parts.push(run);
+                }
+                // A ternary operand reached from one of prettier's `ancestorNameMap` value
+                // positions expands its parens instead of hanging the `?`/`:` arms — the
+                // shape a member base already takes. See `mark_ternary_extra_indent`.
+                //
+                // Asked BEFORE the operand's doc is built: building it recurses into the
+                // ternary's own branches, and a nested value position there (a declarator in
+                // an arrow body, an inner `await`) re-marks the target, so a read afterwards
+                // would see the nested answer instead of this operand's.
+                let expands = needs_parens && self.ternary_takes_extra_indent(expression);
+                // A MULTI-LINE block the operand OWNS prints just inside the `(`, outside the
+                // operand's own group ([`Printer::build_value_with_outermost_owned_comment`]);
+                // left inside, its body's forced break explodes an operand prettier keeps flat.
+                // Asked only where the pair is KEPT — see that seam's ⚠️.
+                // The cast's own erased-paren freeze: `cast_start` opens at the grouping `(`
+                // the parser dropped, so an alone-on-line directive inside it is the cast's to
+                // honor ([`Printer::build_left_spine_operand_doc`]).
+                let operand = self.build_left_spine_operand_doc(
+                    cast_start,
+                    expression,
+                    FrozenOperandPair::Emitted,
+                    || {
+                        if needs_parens {
+                            self.build_expression_doc_claiming_outermost(expression)
+                        } else {
+                            self.build_expression_doc(expression)
+                        }
+                    },
+                );
+                parts.push(if expands {
+                    self.build_expanding_parens_body_doc(operand)
+                } else {
+                    operand
+                });
+                if needs_parens {
+                    parts.push(d.text(")"));
+                }
 
-            // Comments between expression and keyword → place before the keyword. Skip the
-            // `empty()` child on the comment-free `expr as` gap (ubiquitous). Byte-identical.
-            if gap_has_comments && let Some(kw_pos) = keyword_pos {
-                parts.push(self.build_inline_comments_between_doc(expr_end, kw_pos));
+                // Comments between expression and keyword → place before the keyword. Skip the
+                // `empty()` child on the comment-free `expr as` gap (ubiquitous). Byte-identical.
+                if gap_has_comments && let Some(kw_pos) = keyword_pos {
+                    parts.push(self.build_inline_comments_between_doc(expr_end, kw_pos));
+                }
             }
         }
 

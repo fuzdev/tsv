@@ -60,6 +60,7 @@ use comments::{
     next_significant_byte,
 };
 use decorators::class_expr_has_decorators;
+pub(crate) use expressions::assignment::is_curried_arrow_chain_that_breaks as curried_chain_breaks_after_operator;
 pub use expressions::assignment::should_inline_logical_expression;
 use expressions::assignment::{
     arrow_chain_should_break, is_curried_arrow_chain, is_curried_arrow_chain_that_breaks,
@@ -141,7 +142,22 @@ pub(crate) enum ArrowChainContext {
     /// Assignment RHS (`const f = (a) => (b) => …`). The heads join into one
     /// breakable group indented one level after `=` (a leading softline is the
     /// break-after-`=`); all heads share the same indent when they break.
-    AssignmentRhs,
+    ///
+    /// `leading_run` is the seam's operator→value comment run, handed IN so it prints
+    /// after that softline — leading the first head on whichever line the heads land on.
+    /// Printed ahead of the chain instead, the run stays on the operator's line while the
+    /// heads break below it (`= /* c */⏎(a) =>`), and the next pass reads that as a run the
+    /// author broke after. The seam hands it over through
+    /// [`Printer::build_led_curried_chain_doc`], which takes it back when no chain layout
+    /// consumed it.
+    AssignmentRhs { leading_run: Option<DocId> },
+    /// Assignment RHS whose seam has ALREADY broken after the operator and indented — a
+    /// comment in the operator→value gap forced it (`const f = // c⏎(a) => (b) => …`), or
+    /// the seam hangs the value itself. The [`Self::AssignmentRhs`] shape minus what the
+    /// seam supplied: the heads join into one breakable group at the indent they stand
+    /// at, with no leading softline and no indent of their own, so a commented chain
+    /// stacks its heads exactly as the comment-free one does.
+    AssignmentRhsHung,
     /// Call argument or binaryish operand (`fn((a) => (b) => …)`,
     /// `x ?? ((a) => (b) => …)`) — prettier handles both in one
     /// `printArrowFunctionSignatures` branch. Progressive indent: the first head

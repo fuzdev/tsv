@@ -91,9 +91,10 @@ pub(crate) struct ParenLeadingValue {
 ///
 /// Prettier's walk also descends a cast's and a postfix update's operand
 /// (`isBinaryCastExpression`, `UpdateExpression && !prefix`); this one does not, on
-/// purpose. Those two positions RETAIN a shell whose leading gap holds a comment
-/// ([`Printer::build_asi_operand_shell_doc`] — the cataloged "a leading comment alone
-/// still keeps the shell that holds it"), unconditionally, so they have no hoisted left
+/// purpose. Those two positions answer a shell whose leading gap holds a comment
+/// themselves ([`Printer::build_asi_operand_shell_doc`] — RETAINED, the cataloged "a
+/// leading comment alone still keeps the shell that holds it", or printed inline ahead of
+/// the operand, [`AsiOperandShell::Bare`]) and never hoist it, so they have no hoisted left
 /// side at all and are excluded here rather than at the pair gate.
 fn left_side_child<'e>(expr: &'e internal::Expression<'e>) -> Option<&'e internal::Expression<'e>> {
     use internal::ExpressionKind;
@@ -226,6 +227,19 @@ pub(crate) fn paren_shell_close_after(source: &str, operand_end: u32) -> Option<
     let bytes = source.as_bytes();
     let pos = next_significant_byte(source, operand_end, bytes.len() as u32)?;
     (bytes[pos] == b')').then_some(pos as u32 + 1)
+}
+
+/// What an ASI-sensitive operand's grouping-paren shell comes to
+/// ([`Printer::build_asi_operand_shell_doc`]).
+pub(crate) enum AsiOperandShell {
+    /// The shell is kept: the operand rendered inside it, both of its gaps emitted. It
+    /// supplies whatever parens the operand needs, so the caller adds none.
+    Shell(DocId),
+    /// No shell: the caller takes its ordinary inline path. The run is the shell's
+    /// leading gap when it holds a comment the bare form can still place — the caller
+    /// prints it ahead of the operand, inside any pair it adds, and owes it: no other
+    /// emitter covers that gap.
+    Bare(Option<DocId>),
 }
 
 impl<'a> Printer<'a> {
@@ -1147,6 +1161,23 @@ impl<'a> Printer<'a> {
     /// retaining there would expand a pair that is not the ASI question at all. A SEQUENCE is
     /// the case `needs_parens` cannot answer for us — it reports false because the sequence's
     /// own printer emits the pair rather than because there is none — so it is named.
+    fn redundant_shell_holds_line_spanning_owned_comment(
+        &self,
+        leading_start: u32,
+        expr: &internal::Expression<'_>,
+        operand_ctx: ParenContext,
+    ) -> bool {
+        // A SEQUENCE's own parens ARE the grouping — `needs_parens` says false because the
+        // sequence's printer emits them itself, not because the pair is redundant — so the
+        // comment is already inside a pair that prints flat around it and nothing is at risk
+        // (`const s1 = (/* c⏎d */ b, c) as T;`).
+        !matches!(expr.kind, internal::ExpressionKind::SequenceExpression(_))
+            && !self.needs_parens(expr, operand_ctx)
+            && self
+                .comments_in_source_between(leading_start, expr.span().start)
+                .any(|c| c.multiline)
+    }
+
     /// The operand of an ASI-sensitive gap (an `as`/`satisfies` keyword, a postfix
     /// `++`/`--`) rendered inside the grouping-paren shell that holds its comments,
     /// emitting **both** of the shell's gaps — `(`→operand and operand→`)`.
@@ -1181,30 +1212,25 @@ impl<'a> Printer<'a> {
     /// operand takes its start from (`docs/comments.md` hazard 3). Emitting the window as
     /// one run instead would have carried the outside comment *into* the parens, and the
     /// all-or-nothing gate that preceded this dropped both runs outright.
-    fn redundant_shell_holds_line_spanning_owned_comment(
-        &self,
-        leading_start: u32,
-        expr: &internal::Expression<'_>,
-        operand_ctx: ParenContext,
-    ) -> bool {
-        // A SEQUENCE's own parens ARE the grouping — `needs_parens` says false because the
-        // sequence's printer emits them itself, not because the pair is redundant — so the
-        // comment is already inside a pair that prints flat around it and nothing is at risk
-        // (`const s1 = (/* c⏎d */ b, c) as T;`).
-        !matches!(expr.kind, internal::ExpressionKind::SequenceExpression(_))
-            && !self.needs_parens(expr, operand_ctx)
-            && self
-                .comments_in_source_between(leading_start, expr.span().start)
-                .any(|c| c.multiline)
-    }
-
+    ///
+    /// ⚠️ **Whether the shell exists may not turn on OWNERSHIP**, which is what the third
+    /// answer ([`AsiOperandShell::Bare`] carrying a run) is for. A single-line block the
+    /// author glued to a paren the printer strips (`(/* c */ (x)) as A`) is not owned — no
+    /// node begins at that `(` — so the EMIT axis sees it and the shell above would open
+    /// for it; but the shell's own output glues the comment to the operand, where the
+    /// reparse OWNS it, the emit axis goes blind, and the second pass prints the bare form
+    /// ([`Self::leading_run_reparses_owned`]). So that run takes the bare form at
+    /// once: the caller prints it ahead of the operand, inside any pair the operand needs —
+    /// the bytes the owned spelling `(/* c */ x) as A` already reaches. Returning the run
+    /// rather than `None` is what keeps the gap's one emitter from forgetting it: the gap
+    /// "belongs to no node at all", so a caller that drops the run DROPS the comment.
     pub(crate) fn build_asi_operand_shell_doc(
         &self,
         node_start: u32,
         expr: &internal::Expression<'_>,
         boundary_end: u32,
         operand_ctx: ParenContext,
-    ) -> Option<DocId> {
+    ) -> AsiOperandShell {
         let expr_start = expr.span().start;
         // The trailing gap opens where the operand's doc stops printing, which for a
         // sequence is its last operand ([`shell_content_end`]).
@@ -1225,8 +1251,43 @@ impl<'a> Printer<'a> {
                     expr,
                     operand_ctx,
                 ));
-        if !has_leading && !self.asi_gap_needs_parens(expr_end, boundary_end) {
-            return None;
+        let needs_trailing = self.asi_gap_needs_parens(expr_end, boundary_end);
+        if !has_leading && !needs_trailing {
+            return AsiOperandShell::Bare(None);
+        }
+        // A shell the TRAILING gap keeps holds this run either way — glued inside it, the
+        // comment is owned on the reparse and the same shell prints the same bytes.
+        if !needs_trailing && self.leading_run_reparses_owned(leading_start, expr_start) {
+            let run = self
+                .build_inline_comments_between_doc_trailing_space_opt(leading_start, expr_start);
+            // A SEQUENCE's own pair is the one that survives, and the run is inside it —
+            // ahead of the first operand, where the reparse's owner prints it. Left to the
+            // caller it would lead the sequence's `(` instead, a form that holds only until
+            // the cast takes a pair of its own (`y && (/* c */ (a, b) as T)` hoists the
+            // comment out of that pair on the next pass). So this state composes the pair
+            // itself, flat, with the operands riding bare — the expanded shell's layering.
+            if let (internal::ExpressionKind::SequenceExpression(seq), Some(run)) =
+                (&expr.kind, run)
+            {
+                let d = self.d();
+                let mut pair: DocBuf = smallvec![
+                    d.text("("),
+                    run,
+                    self.build_sequence_doc_bare(seq, expr.span, expr_end),
+                    d.text(")"),
+                ];
+                // The operand→keyword window holds single-line blocks at most here (the
+                // trailing gap needed no shell), and the sequence's own envelope floats
+                // those out past its `)` — so they trail the pair, wherever the author
+                // put them relative to the closers this state collapses.
+                if let Some(trailing) =
+                    self.build_inline_comments_between_doc_opt(expr_end, boundary_end)
+                {
+                    pair.push(trailing);
+                }
+                return AsiOperandShell::Shell(d.concat(&pair));
+            }
+            return AsiOperandShell::Bare(run);
         }
 
         // The pair's `)` splits the window into the run it holds and the run the
@@ -1241,7 +1302,7 @@ impl<'a> Printer<'a> {
         if matches!(expr.kind, internal::ExpressionKind::SequenceExpression(_)) && !has_leading {
             let seq =
                 self.build_expression_doc_keep_paren_comments(expr, inner_end, SeqLayout::Aligned);
-            return Some(self.append_shell_outside_run(seq, close, boundary_end));
+            return AsiOperandShell::Shell(self.append_shell_outside_run(seq, close, boundary_end));
         }
 
         // The shell's `(` is the statement's first token whenever the statement's leftmost
@@ -1300,7 +1361,37 @@ impl<'a> Printer<'a> {
         }
 
         let shell = self.compose_expanded_shell_doc(paren_trailing, &body, ")");
-        Some(self.append_shell_outside_run(shell, close, boundary_end))
+        AsiOperandShell::Shell(self.append_shell_outside_run(shell, close, boundary_end))
+    }
+
+    /// Whether a paren pair's leading gap holds exactly the run the REPARSE would hand to
+    /// the operand: one single-line block comment the author glued to what follows it,
+    /// with nothing between it and the operand's first token but the grouping `(`s the
+    /// printer strips (and whatever whitespace the author left inside them).
+    ///
+    /// Printed, that comment lands glued to the operand, which is the parser's ownership
+    /// rule (`bind_leading_comment`) — so the next pass finds no comment this gap EMITS, and
+    /// whatever the gap decides for it now has to be what the owned spelling gets then, or
+    /// the two passes disagree. Every pair whose rendering turns on "does this gap emit a
+    /// comment" asks it: the ASI operand shell ([`Self::build_asi_operand_shell_doc`]) and
+    /// the required pairs' expand-or-fold ([`Self::build_required_pair_leading_shell_doc`]).
+    ///
+    /// The glue is the comment's own ([`Self::comment_hugs_next`]), never a distance to the
+    /// operand: a line break the author put INSIDE a stripped `(` is erased with it, so
+    /// `(/* c */ (⏎x))` reaches the operand glued all the same. Deliberately no wider: a
+    /// second comment in the gap stays emit-visible on the reparse too (only the LAST one
+    /// can glue to the operand), a multi-line one keeps an ASI shell
+    /// ([`Self::redundant_shell_holds_line_spanning_owned_comment`]), and a comment the
+    /// author broke after is not glued at all — each of those is stable as it stands.
+    fn leading_run_reparses_owned(&self, gap_start: u32, operand_start: u32) -> bool {
+        let mut run = self.comments_in_source_between(gap_start, operand_start);
+        let (Some(comment), None) = (run.next(), run.next()) else {
+            return false;
+        };
+        comment.is_block
+            && !comment.multiline
+            && !comment.owned_by_node
+            && self.comment_hugs_next(comment)
     }
 
     /// Append the run written PAST a shell's `)` — the enclosing gap's, not the pair's —
@@ -1417,7 +1508,9 @@ impl<'a> Printer<'a> {
     /// the run occupies a line, so the `(`-glued `//` keeps the `(` line, the operand
     /// takes one indent and `close` comes back out. `None` says this gap does not take
     /// the shell and the caller folds the run flat above the operand instead — the run
-    /// fits on one line (a glued single-line block run), which is the only reason left.
+    /// fits on one line (a glued single-line block run), which is the only reason left,
+    /// and the one run whose newlines are not its own folds with it
+    /// ([`Self::leading_run_reparses_owned`]).
     ///
     /// `trailing_gap` is `[operand_end, boundary_end)`, `None` at a position whose pair
     /// has no trailing gap of its own. A commented one does NOT decline the shell: it
@@ -1432,6 +1525,10 @@ impl<'a> Printer<'a> {
     ) -> Option<DocId> {
         if !self.has_comments_to_emit_between(gap_start, operand_start)
             || !self.has_newline_between(gap_start, operand_start)
+            // A newline AROUND a glued block — ahead of it, or inside a `(` stripped from
+            // behind it — is not the run's: the expanded shell would print the comment
+            // glued to the operand, which the reparse owns and folds.
+            || self.leading_run_reparses_owned(gap_start, operand_start)
         {
             return None;
         }

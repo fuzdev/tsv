@@ -46,7 +46,8 @@ pub(crate) use lists::{BlankRule, MemberGap, StandaloneGlue};
 pub(crate) use member_body::{MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberSeam};
 pub(in crate::printer) use paren::left_side_child_is_parenthesized;
 pub(crate) use paren::{
-    ParenLeadingValue, next_significant_byte, paren_pair_keeps_leading_run, paren_shell_close_after,
+    AsiOperandShell, ParenLeadingValue, next_significant_byte, paren_pair_keeps_leading_run,
+    paren_shell_close_after,
 };
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`.

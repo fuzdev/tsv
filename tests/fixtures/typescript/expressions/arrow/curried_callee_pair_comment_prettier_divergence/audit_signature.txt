@@ -1,0 +1,66 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(output_prettier.<ext>).
+# This file exists when prettier is non-idempotent on output_prettier.* — it pins
+# the full chain so the audit recognizes the case and the validator catches drift.
+# See docs/fixture_overview.md (rule F4) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=2%%
+<script lang="ts">
+	// A comment inside the pair around a curried-chain callee keeps the pair closed against the
+	// chain: the leading block leads the first head, the trailing one trails the body.
+	(
+		/* c */ (aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) =>
+			(bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb) =>
+			(cccccccccccccccccccccccccccccccccc) =>
+				ddddddddd
+
+	)();
+	(
+		(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) =>
+			(bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb) =>
+			(cccccccccccccccccccccccccccccccccc) =>
+				ddddddddd
+
+		/* t */
+	)();
+
+	// null control: with no comment the pair opens onto its own lines, in both formatters
+	(
+		(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) =>
+		(bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb) =>
+		(cccccccccccccccccccccccccccccccccc) =>
+			ddddddddd
+	)();
+</script>
+
+%%PASS=3 (fixed point)%%
+<script lang="ts">
+	// A comment inside the pair around a curried-chain callee keeps the pair closed against the
+	// chain: the leading block leads the first head, the trailing one trails the body.
+	(
+		/* c */ (aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) =>
+			(bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb) =>
+			(cccccccccccccccccccccccccccccccccc) =>
+				ddddddddd
+
+	)();
+	(
+		(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) =>
+			(bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb) =>
+			(cccccccccccccccccccccccccccccccccc) =>
+				ddddddddd
+
+
+		/* t */
+	)();
+
+	// null control: with no comment the pair opens onto its own lines, in both formatters
+	(
+		(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) =>
+		(bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb) =>
+		(cccccccccccccccccccccccccccccccccc) =>
+			ddddddddd
+	)();
+</script>

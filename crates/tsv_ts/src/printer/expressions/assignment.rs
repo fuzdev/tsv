@@ -1089,40 +1089,74 @@ impl<'a> Printer<'a> {
             layout = AssignmentLayout::BreakAfterOperator;
         }
 
-        // Signal the arrow printer that a curried arrow-chain RHS should use the
-        // assignment-RHS chain layout.
-        let chain_context = if is_curried_arrow_chain(right_expr) {
-            ArrowChainContext::AssignmentRhs
-        } else {
-            ArrowChainContext::None
-        };
+        // A curried arrow-chain RHS takes the assignment-RHS chain layout.
+        let is_curried_chain = is_curried_arrow_chain(right_expr);
+        // The hang below supplies the break and the indent itself; whether the chain then
+        // stacks its heads under it is the gap's question
+        // ([`Printer::seam_break_stacks_curried_chain`]).
+        let chain_hangs = layout == AssignmentLayout::BreakAfterOperator;
+        let chain_stacks = chain_hangs
+            && rhs_info
+                .gap
+                .is_some_and(|gap| self.seam_break_stacks_curried_chain(right_expr, gap.start));
         // Every gap routed through this builder is a value gap
         // (`mark_jsdoc_cast_value_gap`), and every value built here is an assignment's.
         self.mark_jsdoc_cast_value_gap(right_expr);
         self.mark_assignment_value(right_expr);
-        // A MULTI-LINE block's run is hoisted OUT of the RHS's doc when the RHS owns it,
-        // so the comment's hard break cannot reach the value's own group
-        // ([`Printer::hoist_owned_value_gap_run`], which asks the licence itself). Asked
-        // only over a real gap; everywhere else `hoisted_run` is `None` and the RHS keeps
-        // its claim.
-        let build_right = || {
-            self.build_with_arrow_chain_context(chain_context, || {
+        // The only pair this seam prints around its RHS is the for-header `[~In]` one
+        // (`wrap_for_init_in` below); a class field and an object property wrap their
+        // position's pair outside this layout and hoist at their own seams.
+        let seam_prints_pair = self.for_init_in_needs_parens(right_expr);
+        // A chain whose heads force the break never reaches the chain layout here — this
+        // seam owns that break — and one under a hang stands where the hang puts it. Any
+        // other chain owns its break-after-operator and PRINTS the gap's run itself
+        // ([`Printer::build_led_curried_chain_doc`]), so it is not prepended below.
+        let chain_leads = is_curried_chain && !is_curried_arrow_chain_that_breaks(right_expr);
+        let chain_prints_run = chain_leads && !chain_hangs;
+        // `hoisted_run` is the gap's run where the RHS owns part of it
+        // ([`Printer::hoist_owned_value_gap_run`], which asks the licence itself and hands
+        // the run to the build, so a chain can take it in). Asked only over a real gap;
+        // everywhere else it is `None` and the RHS keeps its claim.
+        let build_right = |hoisted_run: Option<DocId>| {
+            let build = || {
                 if let Some(boundary) = rhs_info.boundary {
                     self.build_expression_doc_with_paren_comments(right_expr, boundary, false)
                 } else {
                     self.build_expression_doc(right_expr)
                 }
-            })
+            };
+            if !is_curried_chain {
+                build()
+            } else if !chain_leads {
+                self.build_with_arrow_chain_context(
+                    ArrowChainContext::AssignmentRhs { leading_run: None },
+                    build,
+                )
+            } else if chain_hangs {
+                // The hang has already broken and indented, so the assignment shape's own
+                // softline would break a second time under it — a blank line the next pass
+                // reads as the author's and grows again. The chain stacks under the hang
+                // where the gap says so, and otherwise takes the default shape, prettier's
+                // answer under a leading own-line comment.
+                let context = if chain_stacks {
+                    ArrowChainContext::AssignmentRhsHung
+                } else {
+                    ArrowChainContext::None
+                };
+                self.build_with_arrow_chain_context(context, build)
+            } else {
+                // `or`, never a concat — see [`Printer::hoisted_owned_value_gap_run_opt`].
+                let run = hoisted_run.or(rhs_info.comments);
+                let value_start = right_expr.span().start;
+                let gap_start = rhs_info.gap.map_or(value_start, |gap| gap.start);
+                self.build_led_curried_chain_doc(run, (gap_start, value_start), build)
+            }
         };
-        // The only pair this seam prints around its RHS is the for-header `[~In]` one
-        // (`wrap_for_init_in` below); a class field and an object property wrap their
-        // position's pair outside this layout and hoist at their own seams.
-        let seam_prints_pair = self.for_init_in_needs_parens(right_expr);
         let (hoisted_run, right_doc) = match rhs_info.gap {
             Some(gap) => {
                 self.hoist_owned_value_gap_run(gap.start, right_expr, seam_prints_pair, build_right)
             }
-            None => (None, build_right()),
+            None => (None, build_right(None)),
         };
         // Parenthesize an `in` RHS inside a for-header init (`for (a = (b in c);…)`);
         // a no-op elsewhere. The assignment builder is the RHS's only build site and
@@ -1209,7 +1243,10 @@ impl<'a> Printer<'a> {
         // Comments use Trailing spacing (`/* comment */ `) so no extra space needed
         // `or`, never a concat — see [`Printer::hoisted_owned_value_gap_run_opt`].
         let gap_comments = hoisted_run.or(rhs_info.comments);
-        let right_doc_with_comments = if let Some(comments_doc) = gap_comments {
+        let right_doc_with_comments = if chain_prints_run {
+            // Already in `right_doc`, placed by the chain.
+            right_doc
+        } else if let Some(comments_doc) = gap_comments {
             d.concat(&[comments_doc, right_doc])
         } else {
             right_doc

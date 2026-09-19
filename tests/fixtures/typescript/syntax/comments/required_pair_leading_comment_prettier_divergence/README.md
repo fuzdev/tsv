@@ -8,6 +8,18 @@ hoists it out, in front of the whole expression the pair belongs to.
   (`(/* c */ b + c + d) * 2`), a member-call base (`… .toString()`), a non-null
   operand (`…!`)
 - Ours: all four keep the comment after the `(`
+- A **sequence** operand's own pair is the same pair (`(/* c */ b, c) as T` — Prettier:
+  `/* c */ (b, c) as T`)
+- `unformatted_ours_paren_shell.svelte` doubles the shell with the comment glued to the
+  inner `(` (`(/* c */ (b + c + d)) as T`) at the positions that keep the run inside —
+  the cast, the non-null and `typeof`: one pair survives, and the comment is inside it.
+  A binary operand and a member base hoist that authoring instead, onto the form
+  `variant_hoisted.svelte` pins
+- `unformatted_ours_glued_block_shell.svelte` adds the author's line breaks around the
+  glued comment — ahead of it, or inside the `(` stripped from behind it. Neither is the
+  comment's own, so the pair stays flat: the comment prints glued to the operand either
+  way, and a pair expanded for it would fold on the next pass. The same variant rides the
+  cast assignment target, the IIFE callee and the sealed optional chain fixtures
 
 **Prettier's placement is a pipeline artifact, not a rule, and its own exception says
 so.** `print/index.js` adds the `needsParentheses` parens inside `print()`, and
