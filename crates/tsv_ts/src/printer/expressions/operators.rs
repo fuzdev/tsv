@@ -1541,6 +1541,49 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// The operand doc of `await` / `yield`, whose own span covers the operand's `)`: ONE
+    /// pair, from either of two causes.
+    ///
+    /// - **The position's** (`ctx`): precedence for `await x + y`, clarity for `yield (a = b)`.
+    ///   A MULTI-LINE block the operand OWNS is claimed beneath it, outside the operand's own
+    ///   group but inside the `(` ([`Printer::build_value_with_outermost_owned_comment`]).
+    /// - **A retained shell**: a comment in the operand→`)` gap keeps the author's parens even
+    ///   where they were redundant, and stays inside them where the author wrote it. The
+    ///   shell is not optional: the keyword's span covers the `)`, so a stripped form hands
+    ///   the comment to the enclosing terminator gap on reparse. A block comment then lands
+    ///   past the `;` on pass 2, and a `//` merges with whatever already trails that line.
+    ///   Prettier relocates it past the `)` and then past the `;`.
+    ///
+    /// When both hold, the retained shell IS the position's pair. The claim is keyed on the
+    /// position's pair alone, since the shell's `(` is re-added around this body either way.
+    /// The keyword→operand gap's run is the caller's and prints outside the pair.
+    fn build_keyword_operand_pair_doc(
+        &self,
+        operand: &Expression<'_>,
+        ctx: ParenContext,
+        shell_end: u32,
+        build_operand: impl FnOnce() -> DocId,
+    ) -> DocId {
+        let d = self.d();
+        let needs_parens = self.needs_parens(operand, ctx);
+        let inner = if needs_parens {
+            self.build_value_with_outermost_owned_comment(operand, build_operand)
+        } else {
+            build_operand()
+        };
+        let operand_end = operand.span().end;
+        let retained = if self.has_comments_to_emit_between(operand_end, shell_end) {
+            self.build_paren_operand_comment_doc(operand_end, shell_end, inner, inner, ")")
+        } else {
+            None
+        };
+        match retained {
+            Some(shell) => shell,
+            None if needs_parens => d.parens(inner),
+            None => inner,
+        }
+    }
+
     /// Build a Doc for an await expression
     pub(in crate::printer) fn build_await_doc(
         &self,
@@ -1554,11 +1597,6 @@ impl<'a> Printer<'a> {
         // `await` argument — an `ancestorNameMap` value position.
         self.mark_ternary_extra_indent(await_expr.argument);
         let argument_start = await_expr.argument.span().start;
-        let argument_end = await_expr.argument.span().end;
-        // Trailing comments from stripped grouping parens: `await (x /* c */)` → `await x /* c */`
-        let has_trailing_comments =
-            self.has_comments_to_emit_between(argument_end, await_expr_span.end);
-
         // The `await`→operand value head ([`Printer::value_head_frozen_span`]): an own-line
         // directive in the gap freezes the whole operand. Resolved ONCE, above the arms, so
         // every route to the operand's doc carries it — the grouping parens `await` needs are
@@ -1575,47 +1613,15 @@ impl<'a> Printer<'a> {
             )
         };
 
-        let argument_doc = if has_trailing_comments {
-            // The grouping parens are required when the operand needs them (`await`
-            // binds tighter than a binary/ternary operand, so `await x + y` is
-            // `(await x) + y`) — and a comment in the operand→`)` gap RETAINS them even
-            // where they were redundant, through the shared operand-shell emitter. The
-            // comment stays INSIDE them where the author wrote it; prettier relocates it
-            // past `)` and, on the next pass, past the `;`. That second pass is why the
-            // shell is not optional here: `await`'s own span covers the `)`, so a stripped
-            // form hands the comment to the enclosing terminator gap on reparse and the
-            // authoring has no fixed point at all. Mirrors `build_spread_doc`.
-            // A MULTI-LINE block the operand OWNS prints just inside the `(`, outside the
-            // operand's own group ([`Printer::build_value_with_outermost_owned_comment`]).
-            // The retained trailing shell is a pair too, but it is the PRINTER's rather
-            // than the author's and its `(` is re-added around this body either way, so
-            // the precedence pair is what the claim is keyed on.
-            let needs_parens = self.needs_parens(await_expr.argument, ParenContext::AwaitArgument);
-            let inner = if needs_parens {
-                self.build_value_with_outermost_owned_comment(await_expr.argument, operand_doc)
-            } else {
-                operand_doc()
-            };
-            if let Some(shell) = self.build_paren_operand_comment_doc(
-                argument_end,
-                await_expr_span.end,
-                inner,
-                inner,
-                ")",
-            ) {
-                shell
-            } else if needs_parens {
-                d.parens(inner)
-            } else {
-                inner
-            }
-        } else if self.needs_parens(await_expr.argument, ParenContext::AwaitArgument) {
-            let inner =
-                self.build_value_with_outermost_owned_comment(await_expr.argument, operand_doc);
-            d.concat(&[d.text("("), inner, d.text(")")])
-        } else {
-            operand_doc()
-        };
+        // `await` binds tighter than a binary / ternary operand (`await x + y` is
+        // `(await x) + y`), so those take the precedence pair; a trailing comment retains a
+        // redundant one. Mirrors `build_spread_doc`.
+        let argument_doc = self.build_keyword_operand_pair_doc(
+            await_expr.argument,
+            ParenContext::AwaitArgument,
+            await_expr_span.end,
+            operand_doc,
+        );
 
         // The keyword→operand gap, shared with `new`→callee. The run is emitted OUTSIDE
         // any parens the operand needs — the gap belongs to the keyword, not to a pair
@@ -1670,11 +1676,6 @@ impl<'a> Printer<'a> {
         // `yield` argument — an `ancestorNameMap` value position.
         self.mark_ternary_extra_indent(arg);
         let argument_start = arg.span().start;
-        let argument_end = arg.span().end;
-
-        // Trailing comments from stripped grouping parens: `yield (x /* c */)` → `yield x /* c */`
-        let has_trailing_comments =
-            self.has_comments_to_emit_between(argument_end, yield_expr_span.end);
 
         // A comment that forces the break takes the parenthesized form. `yield` is a
         // restricted production (`yield [no LineTerminator here] AssignmentExpression`,
@@ -1705,40 +1706,22 @@ impl<'a> Printer<'a> {
         // keeping the author's break — the break would be ASI, not layout.
         let leading_comments_opt = self.build_rhs_comments_glued_opt(keyword_end, argument_start);
 
-        // A continuation-indent position, exactly as `await`'s is. Every arm below routes
-        // through the one closure, so the parens two of them emit stay outside the operand's
-        // own doc and the three cannot drift.
-        let operand_doc = || self.build_expression_doc(arg);
+        // An assignment operand takes clarity parens (`yield (x ??= y)`); a trailing
+        // comment retains a redundant pair.
+        let argument_doc = self.build_keyword_operand_pair_doc(
+            arg,
+            ParenContext::YieldArgument,
+            yield_expr_span.end,
+            || self.build_expression_doc(arg),
+        );
 
-        if leading_comments_opt.is_some() || has_trailing_comments {
-            let inner = operand_doc();
-            let body = match leading_comments_opt {
-                Some(comments) => d.concat(&[comments, inner]),
-                None => inner,
-            };
-            // The operand→`)` gap retains its shell, exactly as `await`'s does and for the
-            // same reason: `yield`'s span covers the `)`, so a stripped form hands the
-            // comment to the enclosing terminator gap on reparse — a block comment lands
-            // past the `;` on pass 2, and a `//` merges with whatever already trails that
-            // line. An assignment operand's clarity parens are the same pair.
-            parts.push(
-                self.build_paren_operand_comment_doc(
-                    argument_end,
-                    yield_expr_span.end,
-                    body,
-                    body,
-                    ")",
-                )
-                .unwrap_or(body),
-            );
-        } else if self.needs_parens(arg, ParenContext::YieldArgument) {
-            // Assignment needs parens: `yield (x ??= y)`
-            parts.push(d.text("("));
-            parts.push(operand_doc());
-            parts.push(d.text(")"));
-        } else {
-            parts.push(operand_doc());
+        // The keyword→operand run prints OUTSIDE the operand's pair, as at `await`: the gap
+        // belongs to the keyword, and the author wrote it ahead of any `(` there. Asking the
+        // pair of the gap's comment is how `yield /* c */ (a = b)` lost its parens.
+        if let Some(comments) = leading_comments_opt {
+            parts.push(comments);
         }
+        parts.push(argument_doc);
 
         d.concat(&parts)
     }

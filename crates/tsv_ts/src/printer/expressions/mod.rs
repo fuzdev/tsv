@@ -758,6 +758,18 @@ impl<'a> Printer<'a> {
     }
 
     fn build_arg_expression_doc_uncached(&self, expr: &Expression<'_>) -> DocId {
+        // An assignment takes clarity parens here (`fn((a = b))`), and the claim goes
+        // BENEATH them: a multi-line block glued to the assignment prints inside the pair,
+        // as at every other position that parenthesizes one. Claimed around the pair, the
+        // comment sat in front of the `(`, where a `/** @type {T} */` is a JSDoc cast the
+        // author never wrote.
+        if self.needs_parens(expr, ParenContext::Argument) {
+            return self
+                .d()
+                .parens(self.build_value_with_outermost_owned_comment(expr, || {
+                    self.build_expression_doc(expr)
+                }));
+        }
         self.build_value_with_outermost_owned_comment(expr, || {
             self.build_arg_expression_doc_body(expr)
         })
@@ -774,12 +786,6 @@ impl<'a> Printer<'a> {
     /// builder). The wrapper above is the claim those arms owe, stated once here rather than
     /// per arm.
     fn build_arg_expression_doc_body(&self, expr: &Expression<'_>) -> DocId {
-        let d = self.d();
-        // Assignment expressions need parens in argument context for clarity
-        if self.needs_parens(expr, ParenContext::Argument) {
-            return d.parens(self.build_expression_doc(expr));
-        }
-
         match &expr.kind {
             // A `Boolean()` coercion's lone argument — the one argument position in
             // prettier's `shouldNotIndent` — arrives marked by its call printer

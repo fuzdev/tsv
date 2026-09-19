@@ -1,0 +1,676 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 537,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " an assignment value keeps its clarity parens under every comment layout the",
+			"start": 32,
+			"end": 110,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " property's other values take",
+			"start": 113,
+			"end": 144,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 2
+				},
+				"end": {
+					"line": 4,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own-line block comment: stays on its own line, the value hangs below it",
+			"start": 147,
+			"end": 221,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 231,
+			"end": 238,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 3
+				},
+				"end": {
+					"line": 7,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " indentable block comment: breaks after `=`, the value stays glued to `*/`",
+			"start": 253,
+			"end": 329,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 2
+				},
+				"end": {
+					"line": 9,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * c\n ",
+			"start": 339,
+			"end": 357,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 3
+				},
+				"end": {
+					"line": 13,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment: trails the `=`, the value hangs below it",
+			"start": 369,
+			"end": 426,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 2
+				},
+				"end": {
+					"line": 14,
+					"column": 59
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 433,
+			"end": 437,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 6
+				},
+				"end": {
+					"line": 15,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " glued single-line block comment: stays inline",
+			"start": 452,
+			"end": 500,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 2
+				},
+				"end": {
+					"line": 17,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 507,
+			"end": 514,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 6
+				},
+				"end": {
+					"line": 18,
+					"column": 13
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 536,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 527,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 20,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 20,
+					"end": 526,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 26,
+						"end": 27,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 7
+							},
+							"end": {
+								"line": 2,
+								"column": 8
+							}
+						},
+						"name": "C"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 28,
+						"end": 526,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 9
+							},
+							"end": {
+								"line": 19,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 224,
+								"end": 250,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 11
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 224,
+									"end": 225,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 2
+										},
+										"end": {
+											"line": 6,
+											"column": 3
+										}
+									},
+									"name": "a"
+								},
+								"value": {
+									"type": "AssignmentExpression",
+									"start": 243,
+									"end": 248,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 4
+										},
+										"end": {
+											"line": 8,
+											"column": 9
+										}
+									},
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 243,
+										"end": 244,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 4
+											},
+											"end": {
+												"line": 8,
+												"column": 5
+											}
+										},
+										"name": "b"
+									},
+									"right": {
+										"type": "Identifier",
+										"start": 247,
+										"end": 248,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 8
+											},
+											"end": {
+												"line": 8,
+												"column": 9
+											}
+										},
+										"name": "c"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 231,
+											"end": 238
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " an assignment value keeps its clarity parens under every comment layout the",
+										"start": 32,
+										"end": 110
+									},
+									{
+										"type": "Line",
+										"value": " property's other values take",
+										"start": 113,
+										"end": 144
+									},
+									{
+										"type": "Line",
+										"value": " own-line block comment: stays on its own line, the value hangs below it",
+										"start": 147,
+										"end": 221
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 332,
+								"end": 366,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 15
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 332,
+									"end": 333,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 2
+										},
+										"end": {
+											"line": 10,
+											"column": 3
+										}
+									},
+									"name": "d"
+								},
+								"value": {
+									"type": "AssignmentExpression",
+									"start": 359,
+									"end": 364,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 8
+										},
+										"end": {
+											"line": 13,
+											"column": 13
+										}
+									},
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 359,
+										"end": 360,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 8
+											},
+											"end": {
+												"line": 13,
+												"column": 9
+											}
+										},
+										"name": "e"
+									},
+									"right": {
+										"type": "Identifier",
+										"start": 363,
+										"end": 364,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 12
+											},
+											"end": {
+												"line": 13,
+												"column": 13
+											}
+										},
+										"name": "f"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": "*\n * c\n ",
+											"start": 339,
+											"end": 357
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " indentable block comment: breaks after `=`, the value stays glued to `*/`",
+										"start": 253,
+										"end": 329
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 429,
+								"end": 449,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 11
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 429,
+									"end": 430,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 2
+										},
+										"end": {
+											"line": 15,
+											"column": 3
+										}
+									},
+									"name": "g"
+								},
+								"value": {
+									"type": "AssignmentExpression",
+									"start": 442,
+									"end": 447,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 4
+										},
+										"end": {
+											"line": 16,
+											"column": 9
+										}
+									},
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 442,
+										"end": 443,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 4
+											},
+											"end": {
+												"line": 16,
+												"column": 5
+											}
+										},
+										"name": "h"
+									},
+									"right": {
+										"type": "Identifier",
+										"start": 446,
+										"end": 447,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 8
+											},
+											"end": {
+												"line": 16,
+												"column": 9
+											}
+										},
+										"name": "i"
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 433,
+											"end": 437
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " line comment: trails the `=`, the value hangs below it",
+										"start": 369,
+										"end": 426
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 503,
+								"end": 523,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 22
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 503,
+									"end": 504,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 2
+										},
+										"end": {
+											"line": 18,
+											"column": 3
+										}
+									},
+									"name": "j"
+								},
+								"value": {
+									"type": "AssignmentExpression",
+									"start": 516,
+									"end": 521,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 15
+										},
+										"end": {
+											"line": 18,
+											"column": 20
+										}
+									},
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 516,
+										"end": 517,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 15
+											},
+											"end": {
+												"line": 18,
+												"column": 16
+											}
+										},
+										"name": "k"
+									},
+									"right": {
+										"type": "Identifier",
+										"start": 520,
+										"end": 521,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 19
+											},
+											"end": {
+												"line": 18,
+												"column": 20
+											}
+										},
+										"name": "l"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 507,
+											"end": 514
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " glued single-line block comment: stays inline",
+										"start": 452,
+										"end": 500
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

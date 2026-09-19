@@ -631,25 +631,17 @@ impl<'a> Printer<'a> {
             // other own-line comment does — even though this gap emits nothing for it (the
             // value's own node prints it, and the `comments_doc` below is empty).
             //
-            // Split into its two rules rather than one fused per-comment test, because they
-            // are not the same rule and only one of them is this family's: the indentable
-            // half is prettier's `chooseLayout` fourth disjunct
-            // ([`Printer::indentable_block_leads_value`], shared verbatim with the declarator
-            // and `build_assignment_layout` so the seams cannot drift), the own-line half is
-            // `hasLeadingOwnLineComment`, which every operator→value gap asks. Splitting an
-            // existence test over a disjunction preserves it exactly, and the first half is
-            // then the value the layout below is handed.
+            // Two rules, not one fused per-comment test, because only one of them is this
+            // family's: the indentable half is prettier's `chooseLayout` fourth disjunct
+            // ([`Printer::indentable_block_leads_value`], shared with the declarator and
+            // `build_assignment_layout`, and handed to the layout below), the own-line half
+            // is `hasLeadingOwnLineComment`, which every operator→value gap asks
+            // ([`Printer::comment_hangs_value_after_operator`]). The class field's paren arm
+            // asks the same pair.
             let indentable_leads_value =
                 self.indentable_block_leads_value(colon_pos + 1, value_start);
             let has_own_line_comment_post_colon = indentable_leads_value
-                || self.any_comment_on_page(colon_pos + 1, value_start, |c| {
-                    // The glue half is [`Printer::comment_hugs_next`] — the comment's own
-                    // neighbours, never the distance to the value, which sits inside any
-                    // grouping paren the author wrote (see
-                    // `Printer::comment_hangs_value_after_operator`). It subsumes the
-                    // `!c.is_block` arm: a line comment never hugs what follows it.
-                    !self.comment_hugs_next(c)
-                });
+                || self.comment_hangs_value_after_operator(colon_pos + 1, value_start);
 
             // The `:`→value head: an own-line directive there freezes the whole value.
             let value_frozen = self.value_head_frozen_span(colon_pos + 1, prop.value.span());
