@@ -36,6 +36,10 @@ names as its deciding test, and the comment census measures it directly
 `+`, so even a binary operand's parens are redundant there (`yield (a + b /* c
 */)`), while `await` binds tighter and keeps them ([grouped_operand_comment](../grouped_operand_comment_prettier_divergence/)).
 
+A comment the author wrote **ahead** of the parens (`yield /* c1 */ (a /* c2 */)`) stays
+ahead of the retained shell, at `await` and `yield` alike. The shell holds only what was
+written inside it, and the keyword→operand gap keeps its own run.
+
 Retention is the comment's doing — a redundant paren pair with nothing in the
 gap still strips (`await (x)` → `await x`), which the `unformatted_ours_*`
 variants pin. The same rule already holds at the unary operators (`!(y /* c

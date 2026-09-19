@@ -17,7 +17,7 @@ use crate::printer::types::{
 };
 use crate::printer::{
     CommentFilter, CommentSpacing, CommentVec, ContinuationValue, HeritageKeyword, LeadingGlue,
-    MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberSeam,
+    MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberSeam, ParenContext,
 };
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -1447,11 +1447,22 @@ impl<'a> Printer<'a> {
             // whole gap run is glued through, so it can never collide with an emit-axis arm
             // below — `build_eq_comment_break_rhs` returns `None` for exactly that gap, and
             // a value-head freeze needs an own-line directive, which never glues.
-            // An enum member prints no pair of its own around its value.
-            let hoisted_run = self.hoisted_owned_value_gap_run_opt(eq_pos + 1, init, false);
+            //
+            // The position's own pair (`A = (a = b)`) is asked ONCE and read twice: the hoist
+            // declines at it, and the wrap below adds it. The value's fallback claim is built
+            // inside the wrap, so a multi-line comment the author wrote in the pair stays in
+            // it; the frozen slice takes the same pair, as the declarator's does.
+            let position_parens = self.needs_parens(init, ParenContext::EnumMemberInit);
+            let hoisted_run =
+                self.hoisted_owned_value_gap_run_opt(eq_pos + 1, init, position_parens);
             let init_doc = self.build_value_head_doc(eq_pos + 1, init, || {
                 self.build_gap_value_doc(hoisted_run, init, || self.build_expression_doc(init))
             });
+            let init_doc = if position_parens {
+                d.parens(init_doc)
+            } else {
+                init_doc
+            };
 
             // The post-`=` value content (shared by the inline and the continuation
             // forms); any `=`→value block comment leads it. A binary's wrapped

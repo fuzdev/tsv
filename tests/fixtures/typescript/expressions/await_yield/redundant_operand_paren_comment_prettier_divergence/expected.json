@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1161,
+	"end": 1506,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -300,16 +300,64 @@
 		},
 		{
 			"type": "Line",
-			"value": " `yield` binds looser than `+`, so even a binary operand's parens are redundant.",
-			"start": 812,
-			"end": 894,
+			"value": " A comment the author wrote ahead of the parens stays ahead of the retained shell.",
+			"start": 790,
+			"end": 874,
 			"loc": {
 				"start": {
-					"line": 36,
+					"line": 34,
 					"column": 2
 				},
 				"end": {
-					"line": 36,
+					"line": 34,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 883,
+			"end": 891,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 8
+				},
+				"end": {
+					"line": 35,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 895,
+			"end": 903,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 20
+				},
+				"end": {
+					"line": 35,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `yield` binds looser than `+`, so even a binary operand's parens are redundant.",
+			"start": 931,
+			"end": 1013,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 2
+				},
+				"end": {
+					"line": 39,
 					"column": 84
 				}
 			}
@@ -317,15 +365,15 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 910,
-			"end": 917,
+			"start": 1029,
+			"end": 1036,
 			"loc": {
 				"start": {
-					"line": 37,
+					"line": 40,
 					"column": 15
 				},
 				"end": {
-					"line": 37,
+					"line": 40,
 					"column": 22
 				}
 			}
@@ -333,15 +381,15 @@
 		{
 			"type": "Line",
 			"value": " The line spelling, likewise retained.",
-			"start": 923,
-			"end": 963,
+			"start": 1042,
+			"end": 1082,
 			"loc": {
 				"start": {
-					"line": 39,
+					"line": 42,
 					"column": 2
 				},
 				"end": {
-					"line": 39,
+					"line": 42,
 					"column": 42
 				}
 			}
@@ -349,15 +397,15 @@
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 979,
-			"end": 983,
+			"start": 1098,
+			"end": 1102,
 			"loc": {
 				"start": {
-					"line": 41,
+					"line": 44,
 					"column": 5
 				},
 				"end": {
-					"line": 41,
+					"line": 44,
 					"column": 9
 				}
 			}
@@ -365,15 +413,15 @@
 		{
 			"type": "Line",
 			"value": " The delegate form answers alike.",
-			"start": 992,
-			"end": 1027,
+			"start": 1111,
+			"end": 1146,
 			"loc": {
 				"start": {
-					"line": 44,
+					"line": 47,
 					"column": 2
 				},
 				"end": {
-					"line": 44,
+					"line": 47,
 					"column": 37
 				}
 			}
@@ -381,15 +429,15 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 1040,
-			"end": 1047,
+			"start": 1159,
+			"end": 1166,
 			"loc": {
 				"start": {
-					"line": 45,
+					"line": 48,
 					"column": 12
 				},
 				"end": {
-					"line": 45,
+					"line": 48,
 					"column": 19
 				}
 			}
@@ -397,15 +445,15 @@
 		{
 			"type": "Line",
 			"value": " An assignment operand's clarity parens are the same single pair.",
-			"start": 1053,
-			"end": 1120,
+			"start": 1172,
+			"end": 1239,
 			"loc": {
 				"start": {
-					"line": 47,
+					"line": 50,
 					"column": 2
 				},
 				"end": {
-					"line": 47,
+					"line": 50,
 					"column": 69
 				}
 			}
@@ -413,16 +461,112 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 1138,
-			"end": 1145,
+			"start": 1257,
+			"end": 1264,
 			"loc": {
 				"start": {
-					"line": 48,
+					"line": 51,
 					"column": 17
 				},
 				"end": {
-					"line": 48,
+					"line": 51,
 					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A comment the author wrote ahead of the parens stays ahead of the retained shell,",
+			"start": 1270,
+			"end": 1354,
+			"loc": {
+				"start": {
+					"line": 53,
+					"column": 2
+				},
+				"end": {
+					"line": 53,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " for a redundant pair and for an assignment's clarity pair alike.",
+			"start": 1357,
+			"end": 1424,
+			"loc": {
+				"start": {
+					"line": 54,
+					"column": 2
+				},
+				"end": {
+					"line": 54,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 1433,
+			"end": 1441,
+			"loc": {
+				"start": {
+					"line": 55,
+					"column": 8
+				},
+				"end": {
+					"line": 55,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 1445,
+			"end": 1453,
+			"loc": {
+				"start": {
+					"line": 55,
+					"column": 20
+				},
+				"end": {
+					"line": 55,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 1464,
+			"end": 1472,
+			"loc": {
+				"start": {
+					"line": 56,
+					"column": 8
+				},
+				"end": {
+					"line": 56,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 1482,
+			"end": 1490,
+			"loc": {
+				"start": {
+					"line": 56,
+					"column": 26
+				},
+				"end": {
+					"line": 56,
+					"column": 34
 				}
 			}
 		}
@@ -430,19 +574,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 1160,
+		"end": 1505,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 1151,
+			"end": 1496,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 50,
+					"line": 58,
 					"column": 9
 				}
 			},
@@ -450,14 +594,14 @@
 				{
 					"type": "FunctionDeclaration",
 					"start": 10,
-					"end": 789,
+					"end": 908,
 					"loc": {
 						"start": {
 							"line": 2,
 							"column": 1
 						},
 						"end": {
-							"line": 33,
+							"line": 36,
 							"column": 2
 						}
 					},
@@ -484,14 +628,14 @@
 					"body": {
 						"type": "BlockStatement",
 						"start": 31,
-						"end": 789,
+						"end": 908,
 						"loc": {
 							"start": {
 								"line": 2,
 								"column": 22
 							},
 							"end": {
-								"line": 33,
+								"line": 36,
 								"column": 2
 							}
 						},
@@ -888,8 +1032,70 @@
 										"start": 680,
 										"end": 748
 									}
-								],
-								"trailingComments": [
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 877,
+								"end": 905,
+								"loc": {
+									"start": {
+										"line": 35,
+										"column": 2
+									},
+									"end": {
+										"line": 35,
+										"column": 30
+									}
+								},
+								"expression": {
+									"type": "AwaitExpression",
+									"start": 877,
+									"end": 904,
+									"loc": {
+										"start": {
+											"line": 35,
+											"column": 2
+										},
+										"end": {
+											"line": 35,
+											"column": 29
+										}
+									},
+									"argument": {
+										"type": "Identifier",
+										"start": 893,
+										"end": 894,
+										"loc": {
+											"start": {
+												"line": 35,
+												"column": 18
+											},
+											"end": {
+												"line": 35,
+												"column": 19
+											}
+										},
+										"name": "x",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 883,
+												"end": 891
+											}
+										],
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c2 ",
+												"start": 895,
+												"end": 903
+											}
+										]
+									}
+								},
+								"leadingComments": [
 									{
 										"type": "Block",
 										"value": " c1 ",
@@ -901,6 +1107,12 @@
 										"value": " c2",
 										"start": 776,
 										"end": 781
+									},
+									{
+										"type": "Line",
+										"value": " A comment the author wrote ahead of the parens stays ahead of the retained shell.",
+										"start": 790,
+										"end": 874
 									}
 								]
 							}
@@ -909,29 +1121,29 @@
 				},
 				{
 					"type": "FunctionDeclaration",
-					"start": 792,
-					"end": 1150,
+					"start": 911,
+					"end": 1495,
 					"loc": {
 						"start": {
-							"line": 35,
+							"line": 38,
 							"column": 1
 						},
 						"end": {
-							"line": 49,
+							"line": 57,
 							"column": 2
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 802,
-						"end": 805,
+						"start": 921,
+						"end": 924,
 						"loc": {
 							"start": {
-								"line": 35,
+								"line": 38,
 								"column": 11
 							},
 							"end": {
-								"line": 35,
+								"line": 38,
 								"column": 14
 							}
 						},
@@ -943,73 +1155,73 @@
 					"params": [],
 					"body": {
 						"type": "BlockStatement",
-						"start": 808,
-						"end": 1150,
+						"start": 927,
+						"end": 1495,
 						"loc": {
 							"start": {
-								"line": 35,
+								"line": 38,
 								"column": 17
 							},
 							"end": {
-								"line": 49,
+								"line": 57,
 								"column": 2
 							}
 						},
 						"body": [
 							{
 								"type": "ExpressionStatement",
-								"start": 897,
-								"end": 919,
+								"start": 1016,
+								"end": 1038,
 								"loc": {
 									"start": {
-										"line": 37,
+										"line": 40,
 										"column": 2
 									},
 									"end": {
-										"line": 37,
+										"line": 40,
 										"column": 24
 									}
 								},
 								"expression": {
 									"type": "YieldExpression",
-									"start": 897,
-									"end": 918,
+									"start": 1016,
+									"end": 1037,
 									"loc": {
 										"start": {
-											"line": 37,
+											"line": 40,
 											"column": 2
 										},
 										"end": {
-											"line": 37,
+											"line": 40,
 											"column": 23
 										}
 									},
 									"delegate": false,
 									"argument": {
 										"type": "BinaryExpression",
-										"start": 904,
-										"end": 909,
+										"start": 1023,
+										"end": 1028,
 										"loc": {
 											"start": {
-												"line": 37,
+												"line": 40,
 												"column": 9
 											},
 											"end": {
-												"line": 37,
+												"line": 40,
 												"column": 14
 											}
 										},
 										"left": {
 											"type": "Identifier",
-											"start": 904,
-											"end": 905,
+											"start": 1023,
+											"end": 1024,
 											"loc": {
 												"start": {
-													"line": 37,
+													"line": 40,
 													"column": 9
 												},
 												"end": {
-													"line": 37,
+													"line": 40,
 													"column": 10
 												}
 											},
@@ -1018,15 +1230,15 @@
 										"operator": "+",
 										"right": {
 											"type": "Identifier",
-											"start": 908,
-											"end": 909,
+											"start": 1027,
+											"end": 1028,
 											"loc": {
 												"start": {
-													"line": 37,
+													"line": 40,
 													"column": 13
 												},
 												"end": {
-													"line": 37,
+													"line": 40,
 													"column": 14
 												}
 											},
@@ -1036,8 +1248,8 @@
 											{
 												"type": "Block",
 												"value": " c ",
-												"start": 910,
-												"end": 917
+												"start": 1029,
+												"end": 1036
 											}
 										]
 									}
@@ -1046,51 +1258,51 @@
 									{
 										"type": "Line",
 										"value": " `yield` binds looser than `+`, so even a binary operand's parens are redundant.",
-										"start": 812,
-										"end": 894
+										"start": 931,
+										"end": 1013
 									}
 								]
 							},
 							{
 								"type": "ExpressionStatement",
-								"start": 966,
-								"end": 988,
+								"start": 1085,
+								"end": 1107,
 								"loc": {
 									"start": {
-										"line": 40,
+										"line": 43,
 										"column": 2
 									},
 									"end": {
-										"line": 42,
+										"line": 45,
 										"column": 4
 									}
 								},
 								"expression": {
 									"type": "YieldExpression",
-									"start": 966,
-									"end": 987,
+									"start": 1085,
+									"end": 1106,
 									"loc": {
 										"start": {
-											"line": 40,
+											"line": 43,
 											"column": 2
 										},
 										"end": {
-											"line": 42,
+											"line": 45,
 											"column": 3
 										}
 									},
 									"delegate": false,
 									"argument": {
 										"type": "Identifier",
-										"start": 977,
-										"end": 978,
+										"start": 1096,
+										"end": 1097,
 										"loc": {
 											"start": {
-												"line": 41,
+												"line": 44,
 												"column": 3
 											},
 											"end": {
-												"line": 41,
+												"line": 44,
 												"column": 4
 											}
 										},
@@ -1099,8 +1311,8 @@
 											{
 												"type": "Line",
 												"value": " c",
-												"start": 979,
-												"end": 983
+												"start": 1098,
+												"end": 1102
 											}
 										]
 									}
@@ -1109,51 +1321,51 @@
 									{
 										"type": "Line",
 										"value": " The line spelling, likewise retained.",
-										"start": 923,
-										"end": 963
+										"start": 1042,
+										"end": 1082
 									}
 								]
 							},
 							{
 								"type": "ExpressionStatement",
-								"start": 1030,
-								"end": 1049,
+								"start": 1149,
+								"end": 1168,
 								"loc": {
 									"start": {
-										"line": 45,
+										"line": 48,
 										"column": 2
 									},
 									"end": {
-										"line": 45,
+										"line": 48,
 										"column": 21
 									}
 								},
 								"expression": {
 									"type": "YieldExpression",
-									"start": 1030,
-									"end": 1048,
+									"start": 1149,
+									"end": 1167,
 									"loc": {
 										"start": {
-											"line": 45,
+											"line": 48,
 											"column": 2
 										},
 										"end": {
-											"line": 45,
+											"line": 48,
 											"column": 20
 										}
 									},
 									"delegate": true,
 									"argument": {
 										"type": "Identifier",
-										"start": 1038,
-										"end": 1039,
+										"start": 1157,
+										"end": 1158,
 										"loc": {
 											"start": {
-												"line": 45,
+												"line": 48,
 												"column": 10
 											},
 											"end": {
-												"line": 45,
+												"line": 48,
 												"column": 11
 											}
 										},
@@ -1162,8 +1374,8 @@
 											{
 												"type": "Block",
 												"value": " c ",
-												"start": 1040,
-												"end": 1047
+												"start": 1159,
+												"end": 1166
 											}
 										]
 									}
@@ -1172,66 +1384,66 @@
 									{
 										"type": "Line",
 										"value": " The delegate form answers alike.",
-										"start": 992,
-										"end": 1027
+										"start": 1111,
+										"end": 1146
 									}
 								]
 							},
 							{
 								"type": "ExpressionStatement",
-								"start": 1123,
-								"end": 1147,
+								"start": 1242,
+								"end": 1266,
 								"loc": {
 									"start": {
-										"line": 48,
+										"line": 51,
 										"column": 2
 									},
 									"end": {
-										"line": 48,
+										"line": 51,
 										"column": 26
 									}
 								},
 								"expression": {
 									"type": "YieldExpression",
-									"start": 1123,
-									"end": 1146,
+									"start": 1242,
+									"end": 1265,
 									"loc": {
 										"start": {
-											"line": 48,
+											"line": 51,
 											"column": 2
 										},
 										"end": {
-											"line": 48,
+											"line": 51,
 											"column": 25
 										}
 									},
 									"delegate": false,
 									"argument": {
 										"type": "AssignmentExpression",
-										"start": 1130,
-										"end": 1137,
+										"start": 1249,
+										"end": 1256,
 										"loc": {
 											"start": {
-												"line": 48,
+												"line": 51,
 												"column": 9
 											},
 											"end": {
-												"line": 48,
+												"line": 51,
 												"column": 16
 											}
 										},
 										"operator": "??=",
 										"left": {
 											"type": "Identifier",
-											"start": 1130,
-											"end": 1131,
+											"start": 1249,
+											"end": 1250,
 											"loc": {
 												"start": {
-													"line": 48,
+													"line": 51,
 													"column": 9
 												},
 												"end": {
-													"line": 48,
+													"line": 51,
 													"column": 10
 												}
 											},
@@ -1239,15 +1451,15 @@
 										},
 										"right": {
 											"type": "Identifier",
-											"start": 1136,
-											"end": 1137,
+											"start": 1255,
+											"end": 1256,
 											"loc": {
 												"start": {
-													"line": 48,
+													"line": 51,
 													"column": 15
 												},
 												"end": {
-													"line": 48,
+													"line": 51,
 													"column": 16
 												}
 											},
@@ -1257,8 +1469,8 @@
 											{
 												"type": "Block",
 												"value": " c ",
-												"start": 1138,
-												"end": 1145
+												"start": 1257,
+												"end": 1264
 											}
 										]
 									}
@@ -1267,10 +1479,182 @@
 									{
 										"type": "Line",
 										"value": " An assignment operand's clarity parens are the same single pair.",
-										"start": 1053,
-										"end": 1120
+										"start": 1172,
+										"end": 1239
 									}
 								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 1427,
+								"end": 1455,
+								"loc": {
+									"start": {
+										"line": 55,
+										"column": 2
+									},
+									"end": {
+										"line": 55,
+										"column": 30
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 1427,
+									"end": 1454,
+									"loc": {
+										"start": {
+											"line": 55,
+											"column": 2
+										},
+										"end": {
+											"line": 55,
+											"column": 29
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 1443,
+										"end": 1444,
+										"loc": {
+											"start": {
+												"line": 55,
+												"column": 18
+											},
+											"end": {
+												"line": 55,
+												"column": 19
+											}
+										},
+										"name": "a",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 1433,
+												"end": 1441
+											}
+										],
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c2 ",
+												"start": 1445,
+												"end": 1453
+											}
+										]
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " A comment the author wrote ahead of the parens stays ahead of the retained shell,",
+										"start": 1270,
+										"end": 1354
+									},
+									{
+										"type": "Line",
+										"value": " for a redundant pair and for an assignment's clarity pair alike.",
+										"start": 1357,
+										"end": 1424
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 1458,
+								"end": 1492,
+								"loc": {
+									"start": {
+										"line": 56,
+										"column": 2
+									},
+									"end": {
+										"line": 56,
+										"column": 36
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 1458,
+									"end": 1491,
+									"loc": {
+										"start": {
+											"line": 56,
+											"column": 2
+										},
+										"end": {
+											"line": 56,
+											"column": 35
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "AssignmentExpression",
+										"start": 1474,
+										"end": 1481,
+										"loc": {
+											"start": {
+												"line": 56,
+												"column": 18
+											},
+											"end": {
+												"line": 56,
+												"column": 25
+											}
+										},
+										"operator": "??=",
+										"left": {
+											"type": "Identifier",
+											"start": 1474,
+											"end": 1475,
+											"loc": {
+												"start": {
+													"line": 56,
+													"column": 18
+												},
+												"end": {
+													"line": 56,
+													"column": 19
+												}
+											},
+											"name": "a"
+										},
+										"right": {
+											"type": "Identifier",
+											"start": 1480,
+											"end": 1481,
+											"loc": {
+												"start": {
+													"line": 56,
+													"column": 24
+												},
+												"end": {
+													"line": 56,
+													"column": 25
+												}
+											},
+											"name": "b"
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 1464,
+												"end": 1472
+											}
+										],
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c2 ",
+												"start": 1482,
+												"end": 1490
+											}
+										]
+									}
+								}
 							}
 						]
 					}

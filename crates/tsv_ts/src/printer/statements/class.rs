@@ -6,6 +6,7 @@ use crate::printer::class_common::ClassHeaderOptions;
 use crate::printer::class_common::ClassTypeParamsGap;
 use crate::printer::comments::ValueGap;
 use crate::printer::expressions::assignment::{AssignmentLeft, RhsCommentInfo};
+use crate::printer::layout::hang_after_operator;
 use crate::printer::{
     ClassMemberModifiers, ContinuationValue, MemberBlankScan, MemberBody, MemberFloor,
     MemberFreeze, MemberSeam,
@@ -658,12 +659,28 @@ impl<'a> Printer<'a> {
             }
             let left_doc = d.concat(&parts[..]);
             let assignment_doc = if position_parens {
-                let value_doc = build_value();
-                let value_doc = match rhs_comments {
+                // The pair takes the value out of `build_assignment_layout`, so this arm owes
+                // that builder's hang, the object property's paren arm's two rules: an
+                // indentable block leading the value (`chooseLayout`'s fourth disjunct) or a
+                // comment the author gave a line of its own (`hasLeadingOwnLineComment`).
+                // Inline, the own-line authoring pulled its comment onto the `=` line and
+                // left the value at the member's indent, which the next pass reflowed.
+                let hangs = self.indentable_block_leads_value(eq_pos + 1, value_start)
+                    || self.comment_hangs_value_after_operator(eq_pos + 1, value_start);
+                let value_doc = if hangs {
+                    self.build_hung_value_doc(value, eq_pos + 1, build_value)
+                } else {
+                    build_value()
+                };
+                let rhs_doc = match rhs_comments {
                     Some(comments_doc) => d.concat(&[comments_doc, value_doc]),
                     None => value_doc,
                 };
-                d.concat(&[left_doc, d.text(" = "), value_doc])
+                if hangs {
+                    d.group(d.concat(&[left_doc, d.text(" ="), hang_after_operator(d, rhs_doc)]))
+                } else {
+                    d.concat(&[left_doc, d.text(" = "), rhs_doc])
+                }
             } else {
                 self.build_assignment_layout(
                     left_doc,

@@ -30,6 +30,9 @@
 			x
 			/* c1 */ // c2
 		);
+
+		// A comment the author wrote ahead of the parens stays ahead of the retained shell.
+		await /* c1 */ (x /* c2 */);
 	}
 
 	function* fn2() {
@@ -46,5 +49,10 @@
 
 		// An assignment operand's clarity parens are the same single pair.
 		yield (a ??= b /* c */);
+
+		// A comment the author wrote ahead of the parens stays ahead of the retained shell,
+		// for a redundant pair and for an assignment's clarity pair alike.
+		yield /* c1 */ (a /* c2 */);
+		yield /* c1 */ (a ??= b /* c2 */);
 	}
 </script>

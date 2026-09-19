@@ -46,6 +46,13 @@ pub enum ParenContext {
     /// ([`export_default_needs_parens`]) — nothing here can reparse as a declaration.
     ExportAssignment,
 
+    /// Enum member initializer: `enum E { A = <expr> }`
+    ///
+    /// Prettier's assignment rule parenthesizes by default and `TSEnumMember` is not among
+    /// its exemptions, so an assignment value takes clarity parens here as at a declarator
+    /// init (`A = (a = b)`).
+    EnumMemberInit,
+
     /// Expression statement: `<expr>;`
     ExpressionStatement,
 
@@ -178,13 +185,34 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         return true;
     }
     match ctx {
-        // Assignment as value needs parens: `const x = (y = z);`,
-        // `for (const x of (y = z))`, `export = (y = z);`. A sequence supplies its own
-        // pair, and every other operand here (`??`, `as`, a ternary, `await`) is bare in
-        // prettier too.
+        // Clarity parens around an assignment, and nothing else: prettier's
+        // `AssignmentExpression` rule, default-true ([`assignment_value_needs_parens`]).
+        // A sequence supplies its own pair, and every other operand at these positions
+        // (`??`, `as`, a ternary, `await`) is bare in prettier too.
+        // - a declarator init, a `for`-in/of iterable, `export =`, an enum member:
+        //   `const x = (y = z);`, `for (const x of (y = z))`, `export = (y = z);`,
+        //   `enum E { A = (y = z) }`
+        // - an object property value (not in an `ObjectPattern`, which the caller never
+        //   asks): `{key: (a = b)}`
+        // - a parameter / pattern default or a class property value:
+        //   `(a = (b = c)) =>`, `a = (this.a = b);`
+        // - a call / array / `new` argument, a template literal expression, a computed
+        //   key or index: `fn((a = b))`, `[(a = b)]`, `${(a = b)}`, `{[(a = b)]: c}`
+        // - a `yield` argument (unlike `await`, `yield` is looser than a binary or a
+        //   ternary, so those stay bare): `yield (x ??= y)`
+        // - a statement test, where the doubled pair signals an intentional assignment
+        //   rather than a typo for `==`: `while ((x = y))`, `if ((x = getValue()))`
         ParenContext::VariableInit
         | ParenContext::ForInOfRight
-        | ParenContext::ExportAssignment => assignment_value_needs_parens(expr),
+        | ParenContext::ExportAssignment
+        | ParenContext::EnumMemberInit
+        | ParenContext::ObjectPropertyValue
+        | ParenContext::DefaultValue
+        | ParenContext::Argument
+        | ParenContext::TemplateLiteralExpression
+        | ParenContext::ComputedPropertyKey
+        | ParenContext::YieldArgument
+        | ParenContext::StatementTest => assignment_value_needs_parens(expr),
 
         // Object pattern assignment needs parens: `({a} = x);`
         ParenContext::ExpressionStatement => needs_parens_expression_statement(expr),
@@ -393,10 +421,6 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
                 )
         }
 
-        // Yield argument: `yield (x ??= y)` — assignment needs parens for clarity
-        // Unlike await, yield has lower precedence than binary/conditional, so those don't need parens
-        ParenContext::YieldArgument => matches!(expr.kind, ExpressionKind::AssignmentExpression(_)),
-
         // Arrow body: `() => ({})`, `() => (x = y)`, `() => (@dec class {})`
         // Note: ConditionalExpression is handled specially in build_arrow_body_doc
         // using if_break - parens only when inline, not when on new line
@@ -410,30 +434,6 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
             ExpressionKind::ClassExpression(c) => class_expr_has_decorators(c),
             _ => false,
         },
-
-        // Object property value: `{key: (a = b)}`
-        // Assignment expressions need parens in object literals (not in ObjectPattern)
-        ParenContext::ObjectPropertyValue => {
-            matches!(expr.kind, ExpressionKind::AssignmentExpression(_))
-        }
-
-        // Assignment as a default/class-property value keeps its parens:
-        // `(a = (b = c)) =>`, `a = (this.a = b);`
-        ParenContext::DefaultValue => matches!(expr.kind, ExpressionKind::AssignmentExpression(_)),
-
-        // These contexts all need parens around assignment expressions for clarity:
-        // - Call/array/new argument: `fn((a = b))`, `[(a = b)]`, `new Fn((a = b))`
-        // - Template literal expression: `${(a = b)}`
-        // - Computed property key: `{[(a = b)]: c}`
-        ParenContext::Argument
-        | ParenContext::TemplateLiteralExpression
-        | ParenContext::ComputedPropertyKey => {
-            matches!(expr.kind, ExpressionKind::AssignmentExpression(_))
-        }
-
-        // Statement test: `while ((x = y))`, `if ((x = getValue()))`, `for (;(x = y);)`
-        // Double-parens signal intentional assignment (not a typo for ==)
-        ParenContext::StatementTest => matches!(expr.kind, ExpressionKind::AssignmentExpression(_)),
 
         // Superclass: `extends (a + b)`, `extends (a ? b : c)`, `extends (await x)`,
         // `extends ((a) => b)`, `extends (x as T)`, `extends (-x)`. The
@@ -842,15 +842,16 @@ pub(crate) fn export_default_needs_parens(expr: &Expression<'_>) -> bool {
 /// An assignment used as a VALUE takes clarity parens (`const x = (y = z);`).
 ///
 /// Prettier's rule for `AssignmentExpression` is default-TRUE with a short exemption
-/// list, so this is the shape of nearly every value position: the declarator init, a
-/// `for`-in/of iterable, `export =`, and `export default`. The exemptions it does grant —
+/// list, so this is the whole answer at every position that asks only it — the
+/// `needs_parens` arm naming them, plus `export default`. The exemptions it does grant —
 /// a C-style `for` header's own init/update clause, an expression statement, a chained
 /// assignment's RHS, an object-pattern property value — are each answered by *their*
 /// context arm returning false, never here.
 ///
-/// One predicate rather than a `matches!` per position: the four sites were four separate
-/// answers, and three of them were missing (`for (let i = (a = b); ;)`,
-/// `for (const x of (a = b))`, `export = (a = b)` all dropped the pair).
+/// One predicate and one arm rather than a `matches!` per position: spelled per
+/// position, a position that never asked was a silent miss (`for (let i = (a = b); ;)`,
+/// `for (const x of (a = b))`, `export = (a = b)` and an enum member's `A = (a = b)` all
+/// dropped the pair).
 fn assignment_value_needs_parens(expr: &Expression<'_>) -> bool {
     matches!(expr.kind, ExpressionKind::AssignmentExpression(_))
 }
