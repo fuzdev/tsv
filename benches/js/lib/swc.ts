@@ -51,6 +51,7 @@
 
 import { createRequire } from 'node:module';
 import { BaseImplementation, type Language, type ParseGoal } from './types.ts';
+import { assert_tool_rejects_invalid } from './reject_probe.ts';
 import type { SwcVersions } from './versions.ts';
 
 interface SwcParseOptions {
@@ -126,6 +127,16 @@ export class SwcImplementation extends BaseImplementation {
 		}
 
 		this._swc = swc;
+		// The goal probe above shows swc can throw; this shows a plain SYNTAX error
+		// still does, at both goals, through the call the timed row makes — a throw is
+		// this row's only rejection signal (`lib/reject_probe.ts`).
+		for (const language of this.parse_languages) {
+			for (const goal of ['module', 'script'] as const) {
+				assert_tool_rejects_invalid('swc', `parse[${goal}]`, language, (source) =>
+					this.parse(source, language, goal)
+				);
+			}
+		}
 	}
 
 	/**

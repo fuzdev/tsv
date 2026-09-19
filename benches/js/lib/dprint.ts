@@ -29,6 +29,7 @@
 import { readFile } from 'node:fs/promises';
 import { BaseImplementation, type Language, LANGUAGE_EXTENSIONS } from './types.ts';
 import { assert_format_config_landed, FORMAT_CONFIG_PROBES } from './format_config_probe.ts';
+import { assert_tool_rejects_invalid } from './reject_probe.ts';
 import type { DprintVersions } from './versions.ts';
 // Type-only — `import type` is erased, so naming `Formatter` here does NOT load
 // the Wasm plugin at this module's import. The value imports are deferred to
@@ -99,6 +100,12 @@ export class DprintImplementation extends BaseImplementation {
 				'dprint',
 				language,
 				this.format(FORMAT_CONFIG_PROBES[language], language)
+			);
+			// And that a syntax error still THROWS: `format` has no other success test,
+			// so a plugin that began handing its input back would publish free files
+			// and a full coverage — see `lib/reject_probe.ts`.
+			assert_tool_rejects_invalid('dprint', 'format', language, (source) =>
+				this.format(source, language)
 			);
 		}
 	}

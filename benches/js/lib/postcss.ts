@@ -31,6 +31,7 @@
 
 import { createRequire } from 'node:module';
 import { BaseImplementation, type Language } from './types.ts';
+import { assert_tool_rejects_invalid } from './reject_probe.ts';
 import type { PostcssVersions } from './versions.ts';
 
 interface PostcssModule {
@@ -67,6 +68,14 @@ export class PostcssImplementation extends BaseImplementation {
 		}
 		postcss.parse('a{color:red}');
 		this._postcss = postcss;
+		// A thrown `CssSyntaxError` is this row's only rejection signal — the property
+		// that won postcss the slot over css-tree (module doc) — so prove it still
+		// arrives: see `lib/reject_probe.ts`.
+		for (const language of this.parse_languages) {
+			assert_tool_rejects_invalid('postcss', 'parse', language, (source) =>
+				this.parse(source, language)
+			);
+		}
 	}
 
 	parse(source: string, language: Language): unknown {

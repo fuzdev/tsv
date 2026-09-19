@@ -14,6 +14,10 @@ import {
 } from './types.ts';
 import type { OxcVersions } from './versions.ts';
 import { assert_format_config_landed, FORMAT_CONFIG_PROBES } from './format_config_probe.ts';
+import {
+	assert_tool_rejects_invalid_async,
+	surface_embedded_format_errors
+} from './reject_probe.ts';
 
 /**
  * One entry of an oxc `errors` array — the two fields this wrapper reads.
@@ -175,6 +179,11 @@ export class OxcImplementation extends BaseImplementation {
 	}
 
 	async init(): Promise<void> {
+		// oxfmt's svelte path is a bundled prettier-plugin-svelte, with the same
+		// echo-the-block-verbatim fallback — see `lib/reject_probe.ts`. Set here as
+		// well as in `lib/canonical.ts` so this impl does not depend on init order.
+		surface_embedded_format_errors();
+
 		const [parser_mod, formatter_mod] = await Promise.all([import('oxc-parser'), import('oxfmt')]);
 
 		this._parser = parser_mod as OxcParserModule;
@@ -201,6 +210,13 @@ export class OxcImplementation extends BaseImplementation {
 				'oxfmt',
 				language,
 				await this.format_async(FORMAT_CONFIG_PROBES[language], language)
+			);
+			// And the FORMAT half's rejection surface, per language, since it is two
+			// engines behind one call: the native formatter reports through `errors`
+			// (TS/JS), the bundled-prettier fallback by throwing (css, svelte). Neither
+			// is covered by the parser probe above — see `lib/reject_probe.ts`.
+			await assert_tool_rejects_invalid_async('oxfmt', 'format_async', language, (source) =>
+				this.format_async(source, language)
 			);
 		}
 	}

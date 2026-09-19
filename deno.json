@@ -160,7 +160,7 @@
 		"conformance:all": "deno task conformance:test262 && deno task conformance",
 		"divergence:audit": "deno run --allow-read benches/js/divergence_audit.ts",
 		"//test:deno": "The node-modules-free deno tests, so they can gate in `deno task check` (CI installs no node_modules): the harness's own pure half plus `scripts/`'s (`changelog_test.ts`, the grammar publish.ts writes and release_notes.ts reads). Named paths rather than `benches/js/lib/`, which would sweep in `canonical_test.ts` — that one loads prettier and needs the sidecar install, which is why it has its own task. A new pure test here — a `scripts/*_test.ts` too — has to be added by name; the alternative is a directory that silently stops being node-modules-free.",
-		"test:deno": "deno test --allow-read benches/js/lib/divergence/ benches/js/lib/format_config_probe_test.ts benches/js/lib/gate_counts_test.ts scripts/changelog_test.ts",
+		"test:deno": "deno test --allow-read benches/js/lib/divergence/ benches/js/lib/format_config_probe_test.ts benches/js/lib/gate_counts_test.ts benches/js/lib/perf_omit_test.ts scripts/changelog_test.ts",
 		"test:deno:canonical": "deno test --config benches/js/deno.json --allow-read --allow-env --allow-sys benches/js/lib/canonical_test.ts",
 
 		"test:npm": "deno task build:npm:format && deno task test:npm:run",

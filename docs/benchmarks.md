@@ -192,7 +192,11 @@ Things the published numbers measure that aren't quite what they look like.
   One nuance cuts the other way: the persistent buffers amortize across the warm
   loop, so a cold one-shot consumer pays a first-call allocation the warm
   per-call figure doesn't include — negligible next to process/module startup,
-  but the warm number is a warm number.
+  but the warm number is a warm number. That binding is also the one piece of
+  glue in the table the harness AUTHORS: `lib/ffi.ts` is written for this bench,
+  where every other row — tsv's own N-API and WASM rows included — runs the glue
+  its package ships. Under Node and Bun the native row is the shipped N-API addon,
+  which is the row the site's headlines read.
   (b) The async impls (`prettier`, `oxfmt`) are `await`ed per file
   (`process_corpus_async`), carrying a per-file microtask cost the sync impls
   skip. The opt-in **`tsv-forced-async`** control row (`BENCH_FORCED_ASYNC=1` —
@@ -235,12 +239,42 @@ Things the published numbers measure that aren't quite what they look like.
   shifts every row's MB/s, tsv's and the canonical row's included. Ratios within
   the report stay apples-to-apples; an absolute number is comparable across two
   reports only when their iterated sets match, which `(Mf)` and the omit list are
-  the record of.
+  the record of. The report states it per group rather than leaving it to be
+  derived: `omissions` in `report.<runtime>.json` (and an **Omitted from every row's
+  timed set** line in the `.md`) gives the files and the BYTES the intersection left
+  out against the group's totals, and each row's failures by omit category
+  (`lib/perf_omit.ts` `PerfOmitCategory` — a tool's own limit, syntax it does not
+  implement, the harness's synthetic file name, a harvest artifact; no entry
+  tolerates a failure of tsv's own, which a test pins). Bytes lead because a file
+  count understates it.
+- **What counts as an accept.** A row's coverage, and the free ride a rejected file
+  would otherwise get in its timed sweep, are only as good as the wrapper's way of
+  SEEING a refusal, and tools refuse in three ways: some throw, some return a tree
+  beside error diagnostics (oxc, yuku, tsc), and some hand the INPUT back beside
+  diagnostics (biome's `formatContent`, oxfmt's `format`). On a corpus that is
+  mostly already formatted, output equal to input is the expected result, so the
+  last kind is invisible unless the wrapper reads the diagnostics. Every wrapper
+  therefore proves at init that an invalid source is still REPORTED through the
+  call its row makes (`lib/reject_probe.ts`; the diagnostic readers keep theirs
+  beside the reader, `lib/oxc.ts` and `lib/biome.ts`), and a failed probe withdraws
+  the impl's rows into `unavailable`. One refusal needed switching on rather than
+  reading: prettier-plugin-svelte echoes an embedded `<script>` or `<style>` it
+  could not format and returns normally — in the baseline, and in oxfmt's bundled
+  copy — so the harness sets `PRETTIER_DEBUG`, which turns that catch into a throw
+  (`surface_embedded_format_errors`). It is read only inside the catch, so it costs
+  a formatted file nothing.
 - **Ratio convention (universal).** Every `Nx` in the report is **speedup form**:
   `>1` means self is faster than the named opponent. Column headers spell this
   out (`vs prettier (speedup)`, `vs Best (speedup)`). The only exception is
   `JSON overhead` rows, explicitly labeled `json_ns / internal_ns` (higher = more
-  cost) because overhead is inherently a slowdown ratio.
+  cost) because overhead is inherently a slowdown ratio. Every `Nx` is a ratio of
+  MEANS — the right rate estimator — and each group table carries the same ratio
+  over the medians beside it (`by p50`) as a reading aid: on a stationary row the
+  two agree to a fraction of a percent, and where they part one side's sweep
+  times are skewed. A ratio between two PARSE rows also integrates what each hands
+  JS, so every parse row carries a `payload` tier in the JSON (`drop_in`,
+  `span_only`, `own_shape`, `none` — `lib/report.ts` `PayloadTier`): two rows are
+  payload-matched iff their tiers are equal and not `own_shape`.
 - **Task order, and the inter-task heap settle.** Within a group the tasks run
   sequentially in registration order (canonical first, then tsv's rows, then the
   alternatives) with the timing library's inter-task cooldown disabled — a

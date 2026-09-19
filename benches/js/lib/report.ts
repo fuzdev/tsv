@@ -7,6 +7,7 @@ import { benchmark_format_number } from '@fuzdev/fuz_util/benchmark_format.ts';
 import { time_format, time_unit_detect_best, TIME_UNIT_DISPLAY } from '@fuzdev/fuz_util/time.ts';
 
 import { CANONICAL_FORMATTER_ROW, CANONICAL_PARSER_ROWS, type Language } from './types.ts';
+import type { GroupOmissions } from './perf_omit.ts';
 import { OXC_WASI_BINDING } from './versions.ts';
 
 /** Results from a benchmark group */
@@ -155,6 +156,62 @@ const DISPLAY_ORDER = [
  */
 export function rows_missing_from_display_order(names: Iterable<string>): string[] {
 	return [...names].filter((name) => !DISPLAY_ORDER.includes(name));
+}
+
+/**
+ * What a PARSE row hands JS — the axis a throughput ratio between two parse rows
+ * silently integrates, since most of a `-json` row's time is materializing the
+ * product (benches/js/CLAUDE.md §Known Issues).
+ *
+ * - `drop_in` — the canonical parser's own AST shape (loc-bearing for TS and Svelte;
+ *   `parseCss` emits no `loc`). The oracle rows, tsv's `-json` wires, and
+ *   `rsvelte-parse`, measured within ~1.5% of tsv's bytes.
+ * - `span_only` — `start`/`end` and no per-node `loc`: tsv's `no-locations` wires,
+ *   and oxc's and yuku's default ASTs.
+ * - `own_shape` — a product that is neither: its own AST dialect (swc, postcss,
+ *   tsc's `SourceFile`) or its own reduction (rsvelte's `skipExpressionLoc`).
+ * - `none` — parse-only, nothing materialized in JS (`tsv-internal`).
+ *
+ * A ratio between two rows is PAYLOAD-MATCHED iff their tiers are equal and not
+ * `own_shape`. The report's prose already argues each pairing; this is that
+ * argument as data, so a consumer rendering an `Nx` from `report.json` can say when
+ * the two products differ instead of needing the docs to.
+ */
+export type PayloadTier = 'drop_in' | 'span_only' | 'own_shape' | 'none';
+
+const PARSE_PAYLOAD_TIERS: Readonly<Record<string, PayloadTier>> = {
+	...Object.fromEntries(Object.values(CANONICAL_PARSER_ROWS).map((row) => [row, 'drop_in'])),
+	'tsv-json': 'drop_in',
+	'tsv-wasm-json': 'drop_in',
+	'rsvelte-parse': 'drop_in',
+	'tsv-json-no-locations': 'span_only',
+	'tsv-wasm-json-no-locations': 'span_only',
+	'oxc-parser': 'span_only',
+	'oxc-parser-wasm': 'span_only',
+	'yuku-parser': 'span_only',
+	'yuku-parser-wasm': 'span_only',
+	'rsvelte-parse-skip-expr-loc': 'own_shape',
+	swc: 'own_shape',
+	postcss: 'own_shape',
+	tsc: 'own_shape',
+	'tsv-internal': 'none',
+	'tsv-wasm-internal': 'none'
+};
+
+/** A parse row's `PayloadTier`, or `null` for a row the table does not list. */
+export function parse_payload_tier(name: string): PayloadTier | null {
+	return PARSE_PAYLOAD_TIERS[name] ?? null;
+}
+
+/**
+ * The PARSE rows in `names` with no `PARSE_PAYLOAD_TIERS` entry — each would
+ * publish `payload: null`, which a consumer can only read as "unknown".
+ *
+ * The fourth registry-checked list in this module, on `DISPLAY_ORDER`'s terms: asked
+ * of the rows a surface DEFINES, one direction only, and a warning at the call site.
+ */
+export function rows_missing_from_payload_tiers(parse_names: Iterable<string>): string[] {
+	return [...parse_names].filter((name) => !(name in PARSE_PAYLOAD_TIERS));
 }
 
 /** Sort results by stable display order */
@@ -914,6 +971,12 @@ function format_ratio(r: number): string {
  * group-level annotation (see `generate_group_files_markdown`) rather than per
  * cell — same value across all rows in default intersection mode, so the
  * repetition was pure noise.
+ *
+ * The last column is the same ratio taken over the MEDIANS (`baseline p50 / row
+ * p50`). The mean is the right rate estimator and stays the headline — on a
+ * stationary row the two agree to a fraction of a percent — so the second column is
+ * a reading aid, not a second claim: where they part, one side's sweep times are
+ * skewed (a GC tail, a row still warming), and the gap says which cells lean on it.
  */
 export function generate_group_bench_table_markdown(
 	results: BenchmarkResult[],
@@ -942,6 +1005,7 @@ export function generate_group_bench_table_markdown(
 		vs_header = 'vs Best (speedup)';
 	}
 	const baseline_ops = results[baseline_index].stats.ops_per_second;
+	const baseline_p50_ns = results[baseline_index].stats.p50_ns;
 
 	const rows: string[][] = [];
 	// "sweeps/sec", not "ops/sec": one timed iteration is one full pass over the
@@ -959,7 +1023,8 @@ export function generate_group_bench_table_markdown(
 		`p99 (${unit_str})`,
 		`min (${unit_str})`,
 		`max (${unit_str})`,
-		vs_header
+		vs_header,
+		'by p50'
 	]);
 
 	for (let row_index = 0; row_index < results.length; row_index++) {
@@ -968,6 +1033,7 @@ export function generate_group_bench_table_markdown(
 		const is_baseline = row_index === baseline_index;
 		const speedup = r.stats.ops_per_second / baseline_ops;
 		const vs_cell = is_baseline ? 'baseline' : format_ratio(speedup);
+		const vs_p50_cell = is_baseline ? '—' : format_ratio(baseline_p50_ns / r.stats.p50_ns);
 		// p95/p99 from <10 samples is essentially `max` (R-7 interpolation
 		// collapses to the last sorted index). Render `—` so readers don't
 		// misread interpolated noise as tail-latency data.
@@ -983,7 +1049,8 @@ export function generate_group_bench_table_markdown(
 			tail_cell(r.stats.p99_ns),
 			fmt(r.stats.min_ns),
 			fmt(r.stats.max_ns),
-			vs_cell
+			vs_cell,
+			vs_p50_cell
 		]);
 	}
 
@@ -1364,6 +1431,35 @@ export function generate_group_coverage_markdown(
 	// Section presence already signals "some impl skipped"; per-row ⚠ added
 	// no signal when every row was sub-100% (the common case).
 	return format_coverage_line(entries);
+}
+
+/**
+ * Per-group line naming what the intersection LEFT OUT — the same fact the
+ * `Coverage:` line implies, stated for the GROUP: a file one row fails leaves every
+ * row's timed set, so this is the share of the group no published number here
+ * measured. Bytes lead, because a file count understates it (one harvested
+ * stylesheet is a tenth of `format/css`). `null` when nothing was omitted.
+ */
+export function generate_group_omissions_markdown(
+	omissions: GroupOmissions | undefined
+): string | null {
+	if (!omissions || omissions.omitted_files === 0) return null;
+	const share = (part: number, whole: number): string =>
+		whole === 0 ? '0%' : `${((part / whole) * 100).toFixed(1)}%`;
+	const tools = omissions.by_tool
+		.map((t) => {
+			const categories = Object.entries(t.categories)
+				.map(([category, count]) => `${count} ${category}`)
+				.join(', ');
+			return `${t.name} ${t.files} (${categories})`;
+		})
+		.join('; ');
+	return (
+		`**Omitted from every row’s timed set:** ${omissions.omitted_files} of ` +
+		`${omissions.files_total} files, ${share(omissions.omitted_bytes, omissions.bytes_total)} ` +
+		`of the group’s bytes (${share(omissions.omitted_files, omissions.files_total)} of its ` +
+		`files) — by row: ${tools}. Each is a reviewed entry in \`lib/perf_omit.ts\`.`
+	);
 }
 
 /**

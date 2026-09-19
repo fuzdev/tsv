@@ -89,7 +89,14 @@ import {
 	group_by_language
 } from './lib/corpus.ts';
 import { detect_corpus_snapshot, enrich_source_repos } from './lib/corpus_repos.ts';
-import { PERF_OMITS, type PerfOmit, perf_omit_matches, stale_perf_omits } from './lib/perf_omit.ts';
+import {
+	type GroupOmissions,
+	PERF_OMITS,
+	type PerfOmit,
+	perf_omit_matches,
+	stale_perf_omits,
+	summarize_group_omissions
+} from './lib/perf_omit.ts';
 import {
 	get_alternative_versions,
 	get_benchmark_tasks,
@@ -108,6 +115,7 @@ import {
 	generate_effective_corpus_report,
 	generate_group_bench_table_markdown,
 	generate_group_coverage_markdown,
+	generate_group_omissions_markdown,
 	generate_group_coverage_only_markdown,
 	generate_group_files_markdown,
 	generate_group_throughput_markdown,
@@ -118,8 +126,11 @@ import {
 	generate_summary_report,
 	generate_versions_info,
 	type GroupResults,
+	parse_payload_tier,
+	type PayloadTier,
 	rows_missing_from_comparisons,
 	rows_missing_from_display_order,
+	rows_missing_from_payload_tiers,
 	type SourceCoverageCell,
 	alternative_version_parts,
 	type ReportVersions
@@ -778,6 +789,21 @@ if (uncompared_rows.length > 0) {
 			`COMPARISON_SECTIONS nor excused in COMPARISON_EXCLUSIONS, so ${
 				uncompared_rows.length === 1 ? 'it appears' : 'they appear'
 			} in no Comparisons table`
+	);
+}
+
+// The parse rows' payload tiers (`report.ts` `PARSE_PAYLOAD_TIERS`), asked the same
+// way: an unlisted parse row publishes `payload: null`, which a consumer can read
+// only as "unknown" — and an `Nx` it renders from that row then carries no word on
+// whether the two products match.
+const untiered_rows = rows_missing_from_payload_tiers(
+	get_defined_rows(impls, ['parse'], TASK_OPTIONS).map((r) => r.name)
+);
+if (untiered_rows.length > 0) {
+	log(
+		`⚠ ${untiered_rows.join(', ')} — no entry in report.ts PARSE_PAYLOAD_TIERS, so ${
+			untiered_rows.length === 1 ? 'it publishes' : 'they publish'
+		} \`payload: null\``
 	);
 }
 
@@ -2199,6 +2225,15 @@ interface BaselineEntry {
 	 */
 	files_iterated: number | null;
 	/**
+	 * What a PARSE row hands JS (`report.ts` `PayloadTier`) — a ratio between two
+	 * parse rows is payload-matched iff these are equal and not `own_shape`. `null`
+	 * on every format row (the product is a string either way) and on a parse row
+	 * the tier table does not list, which the run warns about at init.
+	 *
+	 * Since `version` 16.
+	 */
+	payload: PayloadTier | null;
+	/**
 	 * The JS runtime that produced this row (`deno` | `node` | `bun`). Every row
 	 * carries it so a reader never has to guess what produced a number — the
 	 * runtime-labeled sibling reports (`report.deno.*` / `report.node.*`) compose
@@ -2259,8 +2294,13 @@ interface BaselineVersions extends ReportVersions {
  * that is neither mode — `drift` and `cv_raw` see the raw series the cleaner does not
  * report; two runtimes tiering one row differently are two protocols, not one ratio;
  * and equal `files_iterated` counts never proved equal sets.
+ *
+ * 16: `omissions` — per timed group, the files and bytes its intersection left out
+ * and the rows that left them, by `PerfOmitCategory` (perf surface only); and a
+ * per-row `payload` tier on the parse rows, so an `Nx` built from two rows can say
+ * whether their products match.
  */
-const REPORT_SCHEMA_VERSION = 15;
+const REPORT_SCHEMA_VERSION = 16;
 
 interface Baseline {
 	/** See `REPORT_SCHEMA_VERSION`. */
@@ -2339,6 +2379,20 @@ interface Baseline {
 	 * Since `version` 11.
 	 */
 	binary_sizes_absent: string[];
+	/**
+	 * Per timed group, what its intersection LEFT OUT and which rows left it out —
+	 * files and BYTES, against the group's totals, with each row's failures by
+	 * `PerfOmitCategory` (see `GroupOmissions`). A file any timed row fails leaves
+	 * EVERY row's timed set, so one tool's omit moves every number in the group, and
+	 * a file count understates it: one harvested stylesheet is ~11% of `format/css`.
+	 * A group nothing failed is listed with zeroes, so an absent group means
+	 * "not measured" rather than "nothing omitted".
+	 *
+	 * Perf surface, intersection mode, timed runs only; `undefined` elsewhere.
+	 *
+	 * Since `version` 16.
+	 */
+	omissions?: GroupOmissions[];
 	entries: BaselineEntry[];
 	/**
 	 * Counts of stderr noise from third-party impls that the harness silenced
@@ -2462,6 +2516,40 @@ const NULL_STATS = {
  * while a timed run synthesizes only the coverage-only IMPLS — the rows the
  * bench library never produced a result for (see `BenchmarkTask.coverage_only`).
  */
+/** `BaselineEntry.payload` for a row: parse groups only — see the field. */
+function row_payload(group_name: string, row_name: string): PayloadTier | null {
+	return group_name.startsWith('parse/') ? parse_payload_tier(row_name) : null;
+}
+
+/**
+ * `Baseline.omissions`: per timed group, the files its intersection left out and
+ * the rows that left them (`summarize_group_omissions`). Perf surface, intersection
+ * mode, timed run — the only place an omission exists: a coverage run times nothing,
+ * and under `BENCH_MODE=union` a file one row fails leaves no other row's set.
+ */
+function build_omissions(): GroupOmissions[] | undefined {
+	if (COVERAGE_ONLY || !USE_INTERSECTION || CORPUS_MODE !== 'perf') return undefined;
+	const omissions: GroupOmissions[] = [];
+	for (const language of LANGUAGES) {
+		for (const operation of OPERATIONS) {
+			const group_name = `${operation}/${language}`;
+			const tracking = task_tracking_by_group.get(group_name);
+			if (!tracking) continue;
+			const rows = [...tracking]
+				.filter(([, tracking_key]) => !coverage_only_keys.has(tracking_key))
+				.map(([name, tracking_key]) => ({
+					name,
+					tracking_key,
+					failed: skipped_files.get(tracking_key)?.keys() ?? []
+				}));
+			omissions.push(
+				summarize_group_omissions(group_name, files_by_language[language], rows, PERF_OMITS)
+			);
+		}
+	}
+	return omissions;
+}
+
 function build_coverage_entries(only_coverage_only_tasks: boolean): BaselineEntry[] {
 	const entries: BaselineEntry[] = [];
 	for (const language of LANGUAGES) {
@@ -2481,6 +2569,7 @@ function build_coverage_entries(only_coverage_only_tasks: boolean): BaselineEntr
 					files_total: coverage?.total ?? null,
 					files_iterated: iterated ?? null,
 					files_iterated_digest: null,
+					payload: row_payload(group_name, name),
 					runtime: RUNTIME
 				});
 			}
@@ -2541,6 +2630,7 @@ async function build_results_data(
 					files_iterated: iterated ?? null,
 					files_iterated_digest:
 						(tracking_key ? iterated_files_digest.get(tracking_key) : undefined) ?? null,
+					payload: row_payload(group.name, result.name),
 					runtime: RUNTIME
 				});
 			}
@@ -2569,6 +2659,7 @@ async function build_results_data(
 		versions,
 		binary_sizes: collected_sizes.sizes,
 		binary_sizes_absent: collected_sizes.absent,
+		omissions: build_omissions(),
 		entries,
 		suppressed_noise: Object.fromEntries(suppressed_noise),
 		output_digest_ungraded: serialize_ungraded_digests(),
@@ -2718,6 +2809,11 @@ function generate_markdown_report(data: Baseline, groups: GroupResults[]): strin
 
 		const coverage = generate_group_coverage_markdown(group.results, tracking, effective_size);
 		if (coverage) lines.push(coverage, '');
+
+		const omitted = generate_group_omissions_markdown(
+			data.omissions?.find((o) => o.group === group.name)
+		);
+		if (omitted) lines.push(omitted, '');
 
 		// Coverage-only impls have no row in the tables above (nothing timed them),
 		// so their measurement is rendered here or nowhere.

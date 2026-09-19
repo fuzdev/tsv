@@ -41,6 +41,7 @@
  */
 
 import { BaseImplementation, type Language, type ParseGoal } from './types.ts';
+import { assert_tool_rejects_invalid } from './reject_probe.ts';
 import type { YukuVersions } from './versions.ts';
 
 /** A yuku diagnostic (the subset the bench reads). */
@@ -272,6 +273,14 @@ export class YukuImplementation extends BaseImplementation {
 		const parser = (await import(YUKU_BINDINGS[this.name])) as YukuParserModule;
 		assert_options_land(parser, this.name);
 		this._parser = parser;
+		// The option probes above read the raw module's diagnostics; this asks the ROW's
+		// call, which is where an error-tolerant parser's diagnostics become the throw
+		// the harness counts — see `lib/reject_probe.ts`.
+		for (const language of this.parse_languages) {
+			assert_tool_rejects_invalid(this.name, 'parse', language, (source) =>
+				this.parse(source, language)
+			);
+		}
 	}
 
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {

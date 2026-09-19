@@ -158,7 +158,7 @@ deno task typecheck:bench-core # the bench modules that are DELIBERATELY node-mo
 #                          transitive imports) or `test:deno`. NOT the maximal checkable set: the impl
 #                          wrappers qualify only because their npm imports are dynamic. See deno.json's `//` note
 deno task test           # cargo test
-deno task test:deno      # deno test over the node-modules-free deno tests: the bench harness's core (divergence detectors, format-config probe, gate_counts) + scripts/'s (`changelog_test.ts`, the changelog grammar publish.ts writes and release_notes.ts reads); gates in `check`
+deno task test:deno      # deno test over the node-modules-free deno tests: the bench harness's core (divergence detectors, format-config probe, gate_counts, the perf-omit summary) + scripts/'s (`changelog_test.ts`, the changelog grammar publish.ts writes and release_notes.ts reads); gates in `check`
 deno task test:audits    # cargo test -p tsv_lang --features audits — the `swallow_check` + `comment_check` seams' own tests (compiled out by default); gates in `check`
 deno task lint           # cargo clippy
 cargo fmt                # format Rust code

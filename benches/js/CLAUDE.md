@@ -831,8 +831,8 @@ below, field for field and version note for version note, so a new top-level fie
 here is a change there too — it declares them optional and degrades on an older
 report, which is what makes the drift silent rather than loud.
 
-The committed JSON (per-runtime `version: 14` — the combined compose report carries
-its own `version: 14`; coverage-only runs add `coverage_by_source`) carries, beyond
+The committed JSON (per-runtime `version: 16` — the combined compose report carries
+its own version; coverage-only runs add `coverage_by_source`) carries, beyond
 timing stats: top-level
 `runtime`; a `machine` block (`cpu_model` + `os`/`arch` + `runtime_version` — the
 numbers are machine-relative, so this travels with them; excludes hostname and
@@ -899,7 +899,17 @@ is identifiable by `files_iterated: null` — it was timed on nothing, rather th
 timed on the group's intersection. A consumer that reads `entries[]` as speeds must
 skip a row with null `ops_per_second`, not treat it as a zero. Top-level
 `suppressed_noise` records silenced third-party stderr crashes as `{pattern:
-count}`; top-level `output_digest_ungraded` records files a byte-graded row
+count}`; top-level `omissions` (perf surface, from `version` 16) records, per timed
+group, what the intersection LEFT OUT — files and BYTES against the group's totals,
+and each row's failures by `PerfOmitCategory` — because a file any timed row fails
+leaves EVERY row's timed set, and a file count understates it (one harvested
+stylesheet is about a tenth of `format/css`'s bytes); a group nothing failed is
+listed with zeroes, and the `.md` prints the same fact as an **Omitted from every
+row's timed set** line under the group. Each parse `entries[]` row also carries a
+`payload` tier (`report.ts` `PayloadTier`, a registry-checked table like
+`DISPLAY_ORDER`: an unlisted parse row warns at init and publishes `null`), so a
+consumer building an `Nx` from two rows can say whether their products match;
+top-level `output_digest_ungraded` records files a byte-graded row
 ACCEPTED whose output the byte-parity check could not digest, as `{"<group>/<row>":
 count}` — the one known cause is a pathologically deep AST overflowing V8's
 recursive `JSON.stringify` (tsc's `binderBinaryExpressionStress.ts`), and it is the
@@ -1319,13 +1329,20 @@ benches/js/
     ├── oxc.ts             # OXC native wrappers (oxc-parser + oxfmt)
     ├── oxc_wasm.ts        # OXC WASM wrapper (oxc-parser via wasm32-wasi; per-runtime entry)
     ├── parse_sanctions.ts # Shared parse-parity vocabulary: Sanction (keep) + KnownGap (fix)
-    ├── perf_omit.ts       # PERF_OMITS — the only excused per-file failures on the perf view
+    ├── perf_omit.ts       # PERF_OMITS — the only excused per-file failures on the perf view, each
+    │                      # typed by WHY the tool fails (`category`) and HOW the refusal arrives
+    │                      # (`failure`) — plus the per-group omissions summary the report publishes
+    │                      # (unit-tested by perf_omit_test.ts, which also pins that no entry
+    │                      # tolerates a failure of tsv's own)
     ├── postcss.ts         # postcss wrapper (parse-only, CSS — the parser behind prettier's CSS printer)
     ├── prettier_cache.ts  # Content-addressed prettier-output cache for the format comparison
-    ├── reject_probe.ts    # Behavioral "does this binding still REPORT a rejection" check,
-    │                      # shared by tsv's three front-ends (FFI decides by the `out_status`
+    ├── reject_probe.ts    # Behavioral "is a rejection still REPORTED" check, asked at every
+    │                      # wrapper's init: tsv's three front-ends (FFI decides by the `out_status`
     │                      # word, so a misread status would fabricate 100% coverage; an
-    │                      # UNWRITTEN one is caught by ffi.ts's per-call sentinel instead)
+    │                      # UNWRITTEN one is caught by ffi.ts's per-call sentinel instead) and
+    │                      # every third-party wrapper that decides success by the absence of a
+    │                      # throw. Also the `PRETTIER_DEBUG` switch that stops the svelte plugin
+    │                      # echoing a block it could not format
     ├── report.ts          # Summary report generation
     ├── rsvelte.ts         # rsvelte-fmt wrapper (Svelte only; COVERAGE-ONLY, never timed)
     ├── rsvelte_parse.ts   # rsvelte PARSE wrapper (N-API addon — a DIFFERENT package from rsvelte.ts,
@@ -1505,7 +1522,12 @@ internal state), the coverage report and skip counts make it visible without
   any construct in a `<script>` block (e.g. `@(a?.b)()` decorators crash prettier's
   typescript parser), the plugin emits the whole block verbatim — a corpus diff on
   such a file is prettier's error fallback, not a real style divergence. See
-  ../../docs/conformance_prettier.md §Tooling for the triage procedure.
+  ../../docs/conformance_prettier.md §Tooling for the triage procedure. The fallback
+  is also a silent NO-OP — the call returns normally — and oxfmt's bundled copy of
+  the plugin has it too, so in the bench it would hand either row a free file;
+  `PRETTIER_DEBUG` turns it into a throw, and both wrappers set it at init
+  (`lib/reject_probe.ts` `surface_embedded_format_errors`), with a rejection probe
+  that fails the impl if it ever stops taking.
 - **oxfmt × Deno timer interaction (workaround in place)**: once `oxfmt.format` runs
   once, Deno's timer wheel processes exactly one further `setTimeout` callback and
   then stalls all subsequent timers indefinitely. Repro: `await
