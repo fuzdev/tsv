@@ -94,13 +94,17 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Shared assignment-tag layout for `{@const}` and `{const}`/`{let}` (with init).
+    /// The `{@const}` tag's assignment layout. (`{const}` / `{let}` print through `tsv_ts`'s
+    /// own declarator instead — [`Self::build_declaration_tag_doc`].)
     ///
     /// Prettier formats these as an AssignmentExpression, using its assignment
-    /// layout to decide whether to break at `=`. Three layouts:
+    /// layout to decide whether to break at `=`. Layouts:
+    /// - a curried chain stacked under a gap comment: `tsv_ts` builds the whole ` = …`
+    ///   side (`tsv_ts::build_stacked_curried_chain_rhs_doc`)
+    /// - break-after-operator: `{… id =\n\tinit}` (group with line at `=`)
+    /// - a chain whose heads force the break: `{… id =\n\tinit}` (mandatory)
     /// - will_break: `{… id = init}` (init has hardlines, keep together)
     /// - fluid: `{… id = init}` or `{… id =\n\tinit}` (marker group)
-    /// - break-after-operator: `{… id =\n\tinit}` (group with line at `=`)
     fn build_assignment_tag_doc(
         &self,
         prefix: &'static str,
@@ -127,21 +131,60 @@ impl<'a> Printer<'a> {
         // To the init's PRINTED start ([`Printer::head_gap_end`]): a comment in a stripped
         // left-spine shell (`{@const y = ( // c⏎a).b}`) is hoisted ahead of the init and hangs
         // the value exactly as one written before it does.
+        let gap_end = self.head_gap_end(init);
         let break_after_op = Self::const_should_break_after_op(init)
-            || self.gap_comment_hangs_value(binding_end, self.head_gap_end(init));
-        // A curried chain takes the `<script>` declarator's layout: heads that force the
-        // break take it after the `=`, mandatorily, and stack under it; any other chain owns
-        // its break-after-`=` itself (`tsv_ts::build_assignment_value_expression_doc`). Only
-        // over a gap that is comment-free ON PAGE — a comment there is placed by this tag
-        // (above the value, or glued ahead of it), and the chain then stands where that
-        // placement puts it, in its default shape.
-        let value_owns_operator_break = !break_after_op
-            && self
-                .comments_on_page_between(binding_end, self.head_gap_end(init))
-                .next()
-                .is_none();
+            || self.gap_comment_hangs_value(binding_end, gap_end);
+        // An own-line directive anywhere in the binding→value gap freezes the whole value.
+        // The window is the whole gap rather than the part past the `=`, because this tag has
+        // no separate before-`=` emitter — `leading_comment_docs` prints every comment in it
+        // directly above the value, and the directive that freezes a value is the one printed
+        // above it.
+        let frozen = self.honored_directive_in_gap(binding_end, init.span().start);
+        let close = d.text("}");
+
+        // A curried chain takes the `<script>` declarator's layout, and so does the comment
+        // run in its `=`→value gap: a comment is not a layout instruction. Where the gap
+        // stacks the chain under the break it forces — a `//` on the `=` line, an indentable
+        // block leading the value — `tsv_ts` builds the whole ` = …` side through the
+        // declarator's own arms, the run included, and this tag prints none of it. Its
+        // trailing run goes inside the value's indent with the `}` one level out, so a
+        // run-final `//` breaks for the `}` at the tag's column (`closer_owns_break`).
+        if !frozen
+            && let Some(rhs) = tsv_ts::build_stacked_curried_chain_rhs_doc(
+                d,
+                init,
+                &self.ts_inputs(),
+                self.const_init_embed(),
+                self.assignment_operator_pos(binding_end),
+                || {
+                    let (trailing_docs, _) =
+                        self.trailing_comment_docs(init.span().end, span.end - 1, true);
+                    d.concat(&trailing_docs)
+                },
+            )
+        {
+            return d.concat(&[d.text(prefix), id_doc, rhs, close]);
+        }
+
+        // Every other curried chain owns its break-after-`=` itself
+        // (`tsv_ts::build_assignment_value_expression_doc`), and heads that force the break
+        // take it after the `=`, mandatorily, and stack under it. The chain is handed the gap
+        // wherever the value owns that break: a comment-free gap, or — for a chain that owns
+        // the break — a run of single-line blocks glued through to it, which the chain prints
+        // behind its own break, leading the first head. The run the author gave a line of its
+        // own, and a preserved multi-line block, are placed by this tag instead (above the
+        // value, or glued ahead of it on the `=` line), and the chain stands where that
+        // placement puts it, in its default shape — prettier's form for both.
+        let mut gap_comments = self
+            .comments_on_page_between(binding_end, gap_end)
+            .peekable();
+        let chain_takes_gap = gap_comments.peek().is_none()
+            || (tsv_ts::curried_chain_owns_operator_break(init)
+                && !gap_comments.any(|c| c.is_block && c.multiline));
+        let value_gap_start =
+            (!break_after_op && !frozen && chain_takes_gap).then_some(binding_end);
         let chain_breaks_after_op =
-            value_owns_operator_break && tsv_ts::curried_chain_breaks_after_operator(init);
+            value_gap_start.is_some() && tsv_ts::curried_chain_breaks_after_operator(init);
 
         // Build init with LayoutMode::Standalone so a ROOT binary init is NOT forced onto
         // ContinuationIndent by the embedded-root question. The init is an assignment
@@ -151,11 +194,11 @@ impl<'a> Printer<'a> {
             init,
             binding_end, // scan from after the binding so a comment between `=` and init survives
             span.end - 1, // before "}"
+            frozen,
             // Both arms put the init inside an `indent(…)` with the `}` outside it.
             break_after_op || chain_breaks_after_op,
-            value_owns_operator_break,
+            value_gap_start,
         );
-        let close = d.text("}");
 
         // Choose layout matching prettier's assignment layout selection.
         if break_after_op {
@@ -274,14 +317,13 @@ impl<'a> Printer<'a> {
     /// @const assignment layout handles indentation, and ContinuationIndent would stack on
     /// top of it.
     ///
-    /// The `=`→value head: an own-line directive anywhere in the binding→value gap
-    /// freezes the whole value. The window is the whole gap rather than the part past
-    /// the `=`, because this tag has no separate before-`=` emitter — `leading_docs`
-    /// prints every comment in it directly above the value, and the directive that
-    /// freezes a value is the one printed above it.
+    /// `frozen` is the caller's value-head freeze verdict (`build_assignment_tag_doc` states
+    /// the window).
     ///
-    /// `value_owns_operator_break` is the caller's other layout verdict, which only a
-    /// curried chain reads (`tsv_ts::build_assignment_value_expression_doc`).
+    /// `value_gap_start` is the caller's other layout verdict, which only a curried chain
+    /// reads (`tsv_ts::build_assignment_value_expression_doc`): `Some` hands the chain the
+    /// binding→value gap, so the gap's comments are the value's to print and this builder
+    /// prints none of them.
     ///
     /// `closer_owns_break` is the caller's layout verdict, forwarded to
     /// [`Printer::trailing_comment_docs`] — the init is inside an `indent(…)` with the tag's
@@ -292,28 +334,29 @@ impl<'a> Printer<'a> {
         expr: &Expression<'_>,
         span_start: u32,
         span_end: u32,
+        frozen: bool,
         closer_owns_break: bool,
-        value_owns_operator_break: bool,
+        value_gap_start: Option<u32>,
     ) -> DocId {
         let expr_start = expr.span().start;
         let expr_end = expr.span().end;
-        let frozen = self.honored_directive_in_gap(span_start, expr_start);
 
-        let leading_docs = self.leading_comment_docs(span_start, expr_start);
-
-        // mode defaults to Standalone: the embedded-root question does not fire, so a root
-        // binary takes whatever its own position says rather than ContinuationIndent
-        let embed = tsv_lang::EmbedContext {
-            first_line_offset: 0,
-            ..self.embed
+        let leading_docs = if value_gap_start.is_some() {
+            DocBuf::new()
+        } else {
+            self.leading_comment_docs(span_start, expr_start)
         };
 
         // No clarity parens (`wrap_value_clarity_parens`, which this site deliberately does
         // not call): here the paren is fully redundant and prettier drops it (`{@const a = (b = c)}` →
         // `{@const a = b = c}`), so the frozen arm drops it too — consistent with this
         // site's own unfrozen normalization, which is what the freeze must not contradict.
-        let expr_doc =
-            self.build_assignment_value_doc(expr, frozen, &embed, value_owns_operator_break);
+        let expr_doc = self.build_assignment_value_doc(
+            expr,
+            frozen,
+            &self.const_init_embed(),
+            value_gap_start,
+        );
 
         // The run's last comment supplies the break the tag's `}` reuses —
         // `build_assignment_tag_doc` places that `}` in all three of its layouts, and
@@ -321,6 +364,28 @@ impl<'a> Printer<'a> {
         let (trailing_docs, _) = self.trailing_comment_docs(expr_end, span_end, closer_owns_break);
 
         self.concat_with_surrounding_comments(leading_docs, expr_doc, trailing_docs)
+    }
+
+    /// The [`tsv_lang::EmbedContext`] a `{@const}` init is built under. `mode` stays the
+    /// host's Standalone: the embedded-root question does not fire, so a root binary takes
+    /// whatever its own position says rather than ContinuationIndent.
+    fn const_init_embed(&self) -> tsv_lang::EmbedContext {
+        tsv_lang::EmbedContext {
+            first_line_offset: 0,
+            ..self.embed
+        }
+    }
+
+    /// The byte offset of the `{@const}` declarator's `=`: the first byte past the binding
+    /// that is not whitespace. Svelte crosses the binding→`=` gap with `allow_whitespace`
+    /// alone and the parser rejects a comment there (`reject_binding_comments`), so nothing
+    /// else can stand between them.
+    fn assignment_operator_pos(&self, binding_end: u32) -> u32 {
+        let rest = &self.source[binding_end as usize..];
+        let pos =
+            binding_end + (rest.len() - tsv_lang::trim_start_js_whitespace(rest).len()) as u32;
+        debug_assert_eq!(self.source.as_bytes().get(pos as usize), Some(&b'='));
+        pos
     }
 
     /// Build a doc for {@debug vars}

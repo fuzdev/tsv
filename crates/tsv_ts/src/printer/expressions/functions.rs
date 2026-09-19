@@ -12,13 +12,17 @@ use crate::printer::LeadingGlue;
 use crate::printer::class_common::ClassHeaderOptions;
 use crate::printer::class_common::ClassTypeParamsGap;
 use crate::printer::class_expr_has_decorators;
+use crate::printer::expressions::assignment::{
+    is_curried_arrow_chain, is_curried_arrow_chain_owning_break, is_curried_arrow_chain_that_breaks,
+};
 use crate::printer::expressions::operators::SeqLayout;
 use crate::printer::layout::hang_after_operator;
 use crate::printer::needs_parens::leftmost_no_lookahead;
 use crate::printer::statements::function::FunctionHeadModifier;
 use crate::printer::types::helpers::is_huggable_type;
 use crate::printer::{
-    CommentVec, ParenContext, Printer, is_multiline_template_expression, unwrap_parenthesized,
+    CommentFilter, CommentSpacing, CommentVec, ParenContext, Printer,
+    is_multiline_template_expression, unwrap_parenthesized,
 };
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
@@ -603,7 +607,7 @@ impl<'a> Printer<'a> {
         value: &internal::Expression<'_>,
         gap_start: u32,
     ) -> bool {
-        if !crate::printer::expressions::assignment::is_curried_arrow_chain(value) {
+        if !is_curried_arrow_chain(value) {
             return false;
         }
         let value_start = value.span().start;
@@ -639,24 +643,109 @@ impl<'a> Printer<'a> {
     /// The root doc of an EMBEDDER's assignment value
     /// ([`crate::build_assignment_value_expression_doc`], which states the contract): the
     /// assignment-value mark, then — where the host leaves the break after its operator to
-    /// the value — a curried chain's assignment-RHS shape.
+    /// the value, handing it the operator→value gap that opens at `value_gap_start` — a
+    /// curried chain's assignment-RHS shape, printing the gap's run itself.
+    ///
+    /// The run is placed exactly as `build_assignment_layout`'s fluid chain arm places it:
+    /// hoisted whole off the page ([`Self::hoist_owned_value_gap_run`] — a chain that owns
+    /// its break is that hoist's second licence), else the gap's emit-axis block run, and
+    /// handed to [`Self::build_led_curried_chain_doc`], which puts it behind the chain's
+    /// own softline.
     pub(crate) fn build_assignment_value_root_doc(
         &self,
         expression: &internal::Expression<'_>,
-        value_owns_operator_break: bool,
+        value_gap_start: Option<u32>,
     ) -> DocId {
         self.mark_assignment_value(expression);
         let build = || self.build_root_expression_doc(expression);
-        if value_owns_operator_break
-            && crate::printer::expressions::assignment::is_curried_arrow_chain(expression)
-        {
-            self.build_with_arrow_chain_context(
+        let Some(gap_start) = value_gap_start.filter(|_| is_curried_arrow_chain(expression)) else {
+            return build();
+        };
+        if is_curried_arrow_chain_that_breaks(expression) {
+            // The host breaks after its operator for such a chain; the context only makes
+            // the arrow printer decline a break of its own.
+            return self.build_with_arrow_chain_context(
                 ArrowChainContext::AssignmentRhs { leading_run: None },
                 build,
-            )
-        } else {
-            build()
+            );
         }
+        let value_start = expression.span().start;
+        self.hoist_owned_value_gap_run(gap_start, expression, false, |hoisted| {
+            // `or`, never a concat — see [`Printer::hoisted_owned_value_gap_run_opt`]. The
+            // emit-axis run is built only where the hoist declined.
+            let run = hoisted.or_else(|| {
+                self.build_comments_between_filtered_opt(
+                    gap_start,
+                    value_start,
+                    CommentSpacing::Trailing,
+                    CommentFilter::BlockOnly,
+                )
+            });
+            self.build_led_curried_chain_doc(run, (gap_start, value_start), build)
+        })
+        .1
+    }
+
+    /// The whole `" =" …` right-hand side of an EMBEDDER's assignment seam whose
+    /// operator→value gap stacks a curried chain under the break it forces
+    /// ([`Self::seam_break_stacks_curried_chain`]: a `//` on the operator's line, an
+    /// indentable block leading the value), or `None` where it does not — the host then
+    /// keeps its own layout. [`crate::build_stacked_curried_chain_rhs_doc`] states the
+    /// contract.
+    ///
+    /// The declarator's own arms, in the declarator's order
+    /// (`Printer::build_declarator_init_doc`): the broke-after block run, the
+    /// comment-forced break ([`Self::build_eq_comment_break_rhs`], which keeps a `//` on the
+    /// operator's line), then the indentable hang with the run hoisted out of the value. Each
+    /// prints the gap's whole run, so the host prints none of it. `build_suffix` is built
+    /// once, only on `Some`, and rides after the value inside whatever indent the arm opened.
+    pub(crate) fn build_stacked_curried_chain_rhs_doc(
+        &self,
+        expression: &internal::Expression<'_>,
+        operator_pos: u32,
+        build_suffix: impl FnOnce() -> DocId,
+    ) -> Option<DocId> {
+        let gap_start = operator_pos + 1;
+        if !is_curried_arrow_chain_owning_break(expression)
+            || !self.seam_break_stacks_curried_chain(expression, gap_start)
+        {
+            return None;
+        }
+        let d = self.d();
+        let suffix = build_suffix();
+        self.mark_assignment_value(expression);
+        let value_start = expression.span().start;
+        let hoisted_run = self.hoisted_owned_value_gap_run_opt(gap_start, expression, false);
+        let hung_value = || {
+            let value = self.build_hung_value_doc(expression, gap_start, || {
+                self.build_gap_value_doc(hoisted_run, expression, || {
+                    self.build_root_expression_doc(expression)
+                })
+            });
+            d.concat(&[value, suffix])
+        };
+        let emit_run = self.build_comments_between_filtered_opt(
+            gap_start,
+            value_start,
+            CommentSpacing::Trailing,
+            CommentFilter::BlockOnly,
+        );
+        if emit_run.is_some()
+            && let Some(rhs) = self.broke_after_operator_rhs_doc(gap_start, value_start, hung_value)
+        {
+            return Some(d.concat(&[d.text(" ="), rhs]));
+        }
+        if let Some(rhs) =
+            self.build_eq_comment_break_rhs(operator_pos, value_start, " =", hung_value)
+        {
+            return Some(rhs);
+        }
+        let value = hung_value();
+        let value = match hoisted_run.or(emit_run) {
+            Some(run) => d.concat(&[run, value]),
+            None => value,
+        };
+        Some(d.concat(&[d.text(" ="), hang_after_operator(d, value)]))
     }
 
     /// Run `build` with [`Printer::in_stacked_arrow_chain`] set to `value`, restoring the

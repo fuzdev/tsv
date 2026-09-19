@@ -14,9 +14,7 @@
 
 use crate::ast::internal::{self, Expression, ExpressionKind};
 use crate::printer::Printer;
-use crate::printer::expressions::assignment::{
-    is_curried_arrow_chain, is_curried_arrow_chain_that_breaks,
-};
+use crate::printer::expressions::assignment::is_curried_arrow_chain_owning_break;
 use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan;
@@ -416,7 +414,7 @@ impl<'a> Printer<'a> {
         // printed ahead of the value the bytes are the ones the claim printed.
         if !self.has_owned_comments
             || !(self.has_multiline_block_comments_on_page_between(gap_start, value.span().start)
-                || (is_curried_arrow_chain(value) && !is_curried_arrow_chain_that_breaks(value)))
+                || is_curried_arrow_chain_owning_break(value))
         {
             return None;
         }

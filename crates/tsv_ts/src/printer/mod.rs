@@ -60,6 +60,7 @@ use comments::{
     next_significant_byte,
 };
 use decorators::class_expr_has_decorators;
+pub(crate) use expressions::assignment::is_curried_arrow_chain_owning_break;
 pub(crate) use expressions::assignment::is_curried_arrow_chain_that_breaks as curried_chain_breaks_after_operator;
 pub use expressions::assignment::should_inline_logical_expression;
 use expressions::assignment::{
