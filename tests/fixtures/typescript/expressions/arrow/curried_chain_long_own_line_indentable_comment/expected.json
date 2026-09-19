@@ -1,0 +1,546 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 568,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An indentable block on lines of its own above a curried chain too long for its line is a",
+			"start": 20,
+			"end": 111,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 92
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " leading own-line comment like any other: the chain takes its default shape below it.",
+			"start": 113,
+			"end": 200,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * c\n ",
+			"start": 214,
+			"end": 230,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 7,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * c\n ",
+			"start": 392,
+			"end": 410,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 3
+				},
+				"end": {
+					"line": 17,
+					"column": 6
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 567,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 558,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 23,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 202,
+					"end": 370,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 208,
+							"end": 369,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 208,
+								"end": 209,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 233,
+								"end": 369,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 5
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 234,
+										"end": 268,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 3
+											},
+											"end": {
+												"line": 8,
+												"column": 37
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									}
+								],
+								"body": {
+									"type": "ArrowFunctionExpression",
+									"start": 276,
+									"end": 369,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 3
+										},
+										"end": {
+											"line": 11,
+											"column": 5
+										}
+									},
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 277,
+											"end": 316,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 4
+												},
+												"end": {
+													"line": 9,
+													"column": 43
+												}
+											},
+											"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+										}
+									],
+									"body": {
+										"type": "ArrowFunctionExpression",
+										"start": 324,
+										"end": 369,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 3
+											},
+											"end": {
+												"line": 11,
+												"column": 5
+											}
+										},
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 325,
+												"end": 359,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 4
+													},
+													"end": {
+														"line": 10,
+														"column": 38
+													}
+												},
+												"name": "cccccccccccccccccccccccccccccccccc"
+											}
+										],
+										"body": {
+											"type": "Identifier",
+											"start": 368,
+											"end": 369,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 4
+												},
+												"end": {
+													"line": 11,
+													"column": 5
+												}
+											},
+											"name": "d"
+										}
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "*\n * c\n ",
+										"start": 214,
+										"end": 230
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An indentable block on lines of its own above a curried chain too long for its line is a",
+							"start": 20,
+							"end": 111
+						},
+						{
+							"type": "Line",
+							"value": " leading own-line comment like any other: the chain takes its default shape below it.",
+							"start": 113,
+							"end": 200
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 373,
+					"end": 557,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 379,
+						"end": 380,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 7
+							},
+							"end": {
+								"line": 13,
+								"column": 8
+							}
+						},
+						"name": "C"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 381,
+						"end": 557,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 9
+							},
+							"end": {
+								"line": 22,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 385,
+								"end": 554,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 21,
+										"column": 7
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 385,
+									"end": 386,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 2
+										},
+										"end": {
+											"line": 14,
+											"column": 3
+										}
+									},
+									"name": "p"
+								},
+								"value": {
+									"type": "ArrowFunctionExpression",
+									"start": 414,
+									"end": 553,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 3
+										},
+										"end": {
+											"line": 21,
+											"column": 6
+										}
+									},
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 415,
+											"end": 449,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 4
+												},
+												"end": {
+													"line": 18,
+													"column": 38
+												}
+											},
+											"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+										}
+									],
+									"body": {
+										"type": "ArrowFunctionExpression",
+										"start": 458,
+										"end": 553,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 4
+											},
+											"end": {
+												"line": 21,
+												"column": 6
+											}
+										},
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 459,
+												"end": 498,
+												"loc": {
+													"start": {
+														"line": 19,
+														"column": 5
+													},
+													"end": {
+														"line": 19,
+														"column": 44
+													}
+												},
+												"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+											}
+										],
+										"body": {
+											"type": "ArrowFunctionExpression",
+											"start": 507,
+											"end": 553,
+											"loc": {
+												"start": {
+													"line": 20,
+													"column": 4
+												},
+												"end": {
+													"line": 21,
+													"column": 6
+												}
+											},
+											"id": null,
+											"expression": true,
+											"generator": false,
+											"async": false,
+											"params": [
+												{
+													"type": "Identifier",
+													"start": 508,
+													"end": 542,
+													"loc": {
+														"start": {
+															"line": 20,
+															"column": 5
+														},
+														"end": {
+															"line": 20,
+															"column": 39
+														}
+													},
+													"name": "cccccccccccccccccccccccccccccccccc"
+												}
+											],
+											"body": {
+												"type": "Identifier",
+												"start": 552,
+												"end": 553,
+												"loc": {
+													"start": {
+														"line": 21,
+														"column": 5
+													},
+													"end": {
+														"line": 21,
+														"column": 6
+													}
+												},
+												"name": "d"
+											}
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": "*\n * c\n ",
+											"start": 392,
+											"end": 410
+										}
+									]
+								}
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

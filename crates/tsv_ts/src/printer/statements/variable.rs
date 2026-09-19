@@ -2,6 +2,7 @@
 
 use super::Printer;
 use crate::ast::internal::{self, Expression, ExpressionKind};
+use crate::printer::expressions::functions::HeadForcedChainLead;
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::statements::TerminatorGap;
 use crate::printer::{
@@ -199,25 +200,25 @@ impl<'a> Printer<'a> {
         // adds (`build_init_value_doc`) — `build_gap_value_doc` would prepend it outside
         // the pair, and a `@type` block outside a `(` is a cast.
         //
-        // A `shouldBreakChain` curried chain is built under the `AssignmentRhs` context at
-        // EVERY arm below, which is why it is set here rather than at the arm that names the
-        // chain: the context is what makes the arrow printer DECLINE its own chain layout
-        // (`should_use_arrow_chain_layout`) so this `=` can own the break and the indent. An
-        // arm that reached the chain first — a comment after `=` forces its own break — would
-        // otherwise hand it over with no context, which reads as a chain in no chain
-        // position at all and indents the heads a second time. `build_assignment_layout`
-        // sets the context for every curried chain and leans on the same decline; if that
-        // decline ever moves, both sites move.
+        // A `shouldBreakChain` curried chain's context is set HERE, for every arm below,
+        // rather than at the arm that names the chain: the `AssignmentRhs` context is what
+        // makes the arrow printer DECLINE its own chain layout
+        // (`should_use_arrow_chain_layout`) so this `=` can own the break and the indent,
+        // and an arm that reached the chain first — a `//` on the `=` line forces its own
+        // break — would otherwise hand it over with no context and indent the heads a
+        // second time. Which context is the gap's question
+        // ([`Printer::head_forced_chain_lead`], shared with `build_assignment_layout`): the
+        // heads stack under the `=` as with no comment, except below a run the author gave
+        // lines of its own and behind a preserved multi-line block, where the chain takes
+        // its default shape.
         let chain_breaks = is_curried_arrow_chain_that_breaks(init);
+        let chain_lead =
+            chain_breaks.then(|| self.head_forced_chain_lead(init, rhs_comments_start));
         let build_value = &|| {
             let build = || self.build_value_under_hoist(hoisted_run, init, value);
-            if chain_breaks {
-                self.build_with_arrow_chain_context(
-                    crate::printer::ArrowChainContext::AssignmentRhs { leading_run: None },
-                    build,
-                )
-            } else {
-                build()
+            match chain_lead {
+                Some(lead) => self.build_with_arrow_chain_context(lead.chain_context(), build),
+                None => build(),
             }
         };
         // The value under an arm that has ALREADY broken after the `=` and indented — every
@@ -521,6 +522,15 @@ impl<'a> Printer<'a> {
                 parts.push(inline);
             }
             parts.push(d.indent_hardline(prepend_hoisted(value())));
+        } else if chain_lead == Some(HeadForcedChainLead::PreservedBlock) {
+            // A PRESERVED multi-line block leads the chain from the `=` line, and the chain
+            // takes no break after the `=`: the comment's own lines are the break, so the
+            // first head rides its closing line and the rest indent under it
+            // ([`HeadForcedChainLead::PreservedBlock`]; `build_value` lays the chain out
+            // with no chain context).
+            parts.push(lhs_doc_with_comments(id_doc));
+            parts.push(d.text(" = "));
+            parts.push(make_init_doc(value()));
         } else if is_curried_arrow {
             // Mandatory break after `=`; the arrow printer stacks the heads under it.
             // The chain is built under the `AssignmentRhs` context (`build_value` above), so

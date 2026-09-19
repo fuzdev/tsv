@@ -6,16 +6,25 @@ does not move that break** — the chain prints exactly as it does with no comme
 comment leading the first head. Prettier's answer instead changes with the comment's
 kind:
 
-- preserved multi-line block — Prettier: `const a = /* x⏎y */ ({}) =>` (no break after `=`)
 - single-line block — Prettier: `const c = /* x */ ({}) =>` (no break after `=`)
 - indentable block — Prettier breaks after `=` **and** indents the chain one level deeper
 - line comment — Prettier breaks after `=` and **fabricates a blank line** below it
 - no comment — Prettier breaks after `=`, and we match (the null control)
 
-Four answers to one question, one of them inserting a blank line the author did not
+Three answers to one question, one of them inserting a blank line the author did not
 write, and the no-comment control showing that prettier's own rule for this chain is the
 break we keep. A comment is not a layout instruction, so tsv gives one answer at every
 kind.
+
+A **preserved multi-line block** (`a`) is the boundary of the rule, and there tsv takes
+prettier's form: `const a = /* x⏎y */ ({}) =>`, the chain led from the `=` line with no break
+after it. The comment's own lines are the break, and it is the answer a chain that breaks for
+width gets too ([curried_chain_long_leading_comment](../curried_chain_long_leading_comment_prettier_divergence/)),
+so the two break causes agree — at every assignment seam
+([curried_head_break_preserved_block_comment](../curried_head_break_preserved_block_comment/)).
+The other boundary is a run the author gave **lines of its own** above the chain
+(`const a =⏎/* x */⏎({}) =>`): prettier's leading own-line comment, whose default chain shape
+tsv matches ([curried_head_break_own_line_comment](../curried_head_break_own_line_comment/)).
 
 The comment's placement — with the value, on the line below the `=` — is not a choice
 this arm makes either: the comment is glued to the first head's `(`, so the arrow OWNS it

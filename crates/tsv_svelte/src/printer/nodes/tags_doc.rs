@@ -166,21 +166,44 @@ impl<'a> Printer<'a> {
             return d.concat(&[d.text(prefix), id_doc, rhs, close]);
         }
 
+        // A block run the author broke AFTER (`{@const v = /* c */⏎value}`) takes the
+        // `<script>` declarator's broke-after arm: it collapses onto the `=` line when the
+        // value fits behind it and keeps its own line when it does not. Read as a hang by
+        // `gap_comment_hangs_value` alone, it broke after the `=` at every width. The arm
+        // prints the run, so the value is built with none of it — only what it owns — and
+        // the value sits inside the arm's indent with the `}` one level out.
+        if !frozen
+            && let Some(rhs) = tsv_ts::build_broke_after_operator_rhs_doc(
+                d,
+                init,
+                &self.ts_inputs(),
+                self.const_init_embed(),
+                self.assignment_operator_pos(binding_end),
+                || {
+                    let init_start = init.span().start;
+                    self.build_const_init_doc(init, init_start, span.end - 1, false, true, None)
+                },
+            )
+        {
+            return d.concat(&[d.text(prefix), id_doc, rhs, close]);
+        }
+
         // Every other curried chain owns its break-after-`=` itself
         // (`tsv_ts::build_assignment_value_expression_doc`), and heads that force the break
         // take it after the `=`, mandatorily, and stack under it. The chain is handed the gap
-        // wherever the value owns that break: a comment-free gap, or — for a chain that owns
-        // the break — a run of single-line blocks glued through to it, which the chain prints
-        // behind its own break, leading the first head. The run the author gave a line of its
-        // own, and a preserved multi-line block, are placed by this tag instead (above the
-        // value, or glued ahead of it on the `=` line), and the chain stands where that
-        // placement puts it, in its default shape — prettier's form for both.
+        // wherever the value owns that break: a comment-free gap, or a run of single-line
+        // blocks, which the chain prints behind the break, leading the first head — whether
+        // the chain owns that break or its heads force it, as in a `<script>`. The run the
+        // author gave a line of its own, and a preserved multi-line block, are placed by this
+        // tag instead (above the value, or glued ahead of it on the `=` line), and the chain
+        // stands where that placement puts it, in its default shape — prettier's form for
+        // both.
         let mut gap_comments = self
             .comments_on_page_between(binding_end, gap_end)
             .peekable();
         let chain_takes_gap = gap_comments.peek().is_none()
-            || (tsv_ts::curried_chain_owns_operator_break(init)
-                && !gap_comments.any(|c| c.is_block && c.multiline));
+            || tsv_ts::is_curried_arrow_chain(init)
+                && !gap_comments.any(|c| c.is_block && c.multiline);
         let value_gap_start =
             (!break_after_op && !frozen && chain_takes_gap).then_some(binding_end);
         let chain_breaks_after_op =

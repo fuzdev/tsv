@@ -2,9 +2,8 @@
 	// A leading comment in the `=`→value gap does not move where a breaking curried chain
 	// breaks: the heads stack under the `=` exactly as they do with no comment.
 
-	// preserved multi-line block
-	const a =
-		/* x
+	// preserved multi-line block: leads the chain from the `=` line
+	const a = /* x
 y */ ({}) =>
 		() =>
 			test;

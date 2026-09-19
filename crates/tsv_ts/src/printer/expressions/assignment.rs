@@ -21,6 +21,7 @@ use crate::printer::chain::chain_paren_leading_gap;
 use crate::printer::class_expr_has_decorators;
 use crate::printer::comments::ValueGap;
 use crate::printer::conditional_should_break_after_op;
+use crate::printer::expressions::functions::HeadForcedChainLead;
 use crate::printer::expressions::literals::format_string_literal_from_ast;
 use crate::printer::is_string_literal;
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
@@ -1122,6 +1123,25 @@ impl<'a> Printer<'a> {
         // ([`Printer::build_led_curried_chain_doc`]), so it is not prepended below.
         let chain_leads = is_curried_arrow_chain_owning_break(right_expr);
         let chain_prints_run = chain_leads && !chain_hangs;
+        // A chain whose heads force the break asks the gap how its run places it
+        // ([`Printer::head_forced_chain_lead`], shared with the declarator's twin): stacked
+        // under this seam's break as with no comment, in its default shape below a run the
+        // author gave lines of its own, or — behind a PRESERVED multi-line block, whose own
+        // lines are the break — led from the operator's line with no break after it.
+        let forced_chain_lead = (is_curried_chain && !chain_leads).then(|| {
+            rhs_info.gap.map_or(HeadForcedChainLead::Stacked, |gap| {
+                self.head_forced_chain_lead(right_expr, gap.start)
+            })
+        });
+        // Past every reader of the hang above (`chain_hangs`, which only a chain that owns
+        // its break asks), so the override moves the final shape and nothing else. Only the
+        // hang is overridden: a layout that already keeps the value on the operator's line
+        // (a retained shell, a chain's own line comment) stands.
+        if forced_chain_lead == Some(HeadForcedChainLead::PreservedBlock)
+            && layout == AssignmentLayout::BreakAfterOperator
+        {
+            layout = AssignmentLayout::NeverBreakAfterOperator;
+        }
         // `hoisted_run` is the gap's run where the RHS owns part of it
         // ([`Printer::hoist_owned_value_gap_run`], which asks the licence itself and hands
         // the run to the build, so a chain can take it in). Asked only over a real gap;
@@ -1136,11 +1156,8 @@ impl<'a> Printer<'a> {
             };
             if !is_curried_chain {
                 build()
-            } else if !chain_leads {
-                self.build_with_arrow_chain_context(
-                    ArrowChainContext::AssignmentRhs { leading_run: None },
-                    build,
-                )
+            } else if let Some(lead) = forced_chain_lead {
+                self.build_with_arrow_chain_context(lead.chain_context(), build)
             } else if chain_hangs {
                 // The hang has already broken and indented, so the assignment shape's own
                 // softline would break a second time under it — a blank line the next pass
