@@ -1,0 +1,1981 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1437,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " The TAIL of a `=>`→body comment run the author BROKE AFTER is glued to the body's",
+			"start": 20,
+			"end": 104,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " first token, so the body OWNS it: it travels inside the body's own doc, where the",
+			"start": 106,
+			"end": 190,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " reprint force-breaks a group prettier keeps flat. The arrow body claims such a",
+			"start": 192,
+			"end": 273,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment outside that group — the value gap's fallback where the hoist declines — so",
+			"start": 275,
+			"end": 361,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the body stays flat below the run, exactly as under a run glued through",
+			"start": 363,
+			"end": 437,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " (`body_multiline_block_comment_flat`).",
+			"start": 439,
+			"end": 480,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 42
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a single-line block broken after, ahead of a multi-line block glued to a binary body",
+			"start": 483,
+			"end": 570,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 593,
+			"end": 600,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 2
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * d\n ",
+			"start": 603,
+			"end": 619,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 14,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a logical chain asks the same question",
+			"start": 636,
+			"end": 677,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 42
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 700,
+			"end": 707,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 2
+				},
+				"end": {
+					"line": 18,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * d\n ",
+			"start": 710,
+			"end": 726,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 2
+				},
+				"end": {
+					"line": 21,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the glued tail preserved (non-indentable)",
+			"start": 745,
+			"end": 789,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 812,
+			"end": 819,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 2
+				},
+				"end": {
+					"line": 25,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " d\ne ",
+			"start": 822,
+			"end": 831,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 2
+				},
+				"end": {
+					"line": 27,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a longer run: the glued pair keeps its line, the break survives, the member chain",
+			"start": 848,
+			"end": 932,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " below stays flat",
+			"start": 934,
+			"end": 953,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 1
+				},
+				"end": {
+					"line": 30,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * c\n ",
+			"start": 976,
+			"end": 992,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 2
+				},
+				"end": {
+					"line": 34,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 993,
+			"end": 1000,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 6
+				},
+				"end": {
+					"line": 34,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * e\n ",
+			"start": 1003,
+			"end": 1019,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 2
+				},
+				"end": {
+					"line": 37,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the same body as a call argument",
+			"start": 1041,
+			"end": 1076,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 1
+				},
+				"end": {
+					"line": 39,
+					"column": 36
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1096,
+			"end": 1103,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 3
+				},
+				"end": {
+					"line": 42,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * d\n ",
+			"start": 1107,
+			"end": 1125,
+			"loc": {
+				"start": {
+					"line": 43,
+					"column": 3
+				},
+				"end": {
+					"line": 45,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " null control: a run glued through takes the hoist instead, and is flat already",
+			"start": 1145,
+			"end": 1226,
+			"loc": {
+				"start": {
+					"line": 48,
+					"column": 1
+				},
+				"end": {
+					"line": 48,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1249,
+			"end": 1256,
+			"loc": {
+				"start": {
+					"line": 50,
+					"column": 2
+				},
+				"end": {
+					"line": 50,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * d\n ",
+			"start": 1257,
+			"end": 1273,
+			"loc": {
+				"start": {
+					"line": 50,
+					"column": 10
+				},
+				"end": {
+					"line": 52,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " null control: a single-line tail owns nothing multi-line, so nothing is claimed",
+			"start": 1290,
+			"end": 1372,
+			"loc": {
+				"start": {
+					"line": 54,
+					"column": 1
+				},
+				"end": {
+					"line": 54,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1395,
+			"end": 1402,
+			"loc": {
+				"start": {
+					"line": 56,
+					"column": 2
+				},
+				"end": {
+					"line": 56,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 1405,
+			"end": 1412,
+			"loc": {
+				"start": {
+					"line": 57,
+					"column": 2
+				},
+				"end": {
+					"line": 57,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1436,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1427,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 58,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 572,
+					"end": 633,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 19
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 578,
+							"end": 632,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 14,
+									"column": 18
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 578,
+								"end": 580,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 10,
+										"column": 9
+									}
+								},
+								"name": "a1"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 583,
+								"end": 632,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 12
+									},
+									"end": {
+										"line": 14,
+										"column": 18
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 584,
+										"end": 586,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 13
+											},
+											"end": {
+												"line": 10,
+												"column": 15
+											}
+										},
+										"name": "x1"
+									}
+								],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 620,
+									"end": 632,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 6
+										},
+										"end": {
+											"line": 14,
+											"column": 18
+										}
+									},
+									"left": {
+										"type": "BinaryExpression",
+										"start": 620,
+										"end": 627,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 6
+											},
+											"end": {
+												"line": 14,
+												"column": 13
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 620,
+											"end": 622,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 6
+												},
+												"end": {
+													"line": 14,
+													"column": 8
+												}
+											},
+											"name": "b1"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 625,
+											"end": 627,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 11
+												},
+												"end": {
+													"line": 14,
+													"column": 13
+												}
+											},
+											"name": "c1"
+										}
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 630,
+										"end": 632,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 16
+											},
+											"end": {
+												"line": 14,
+												"column": 18
+											}
+										},
+										"name": "d1"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 593,
+											"end": 600
+										},
+										{
+											"type": "Block",
+											"value": "*\n * d\n ",
+											"start": 603,
+											"end": 619
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The TAIL of a `=>`→body comment run the author BROKE AFTER is glued to the body's",
+							"start": 20,
+							"end": 104
+						},
+						{
+							"type": "Line",
+							"value": " first token, so the body OWNS it: it travels inside the body's own doc, where the",
+							"start": 106,
+							"end": 190
+						},
+						{
+							"type": "Line",
+							"value": " reprint force-breaks a group prettier keeps flat. The arrow body claims such a",
+							"start": 192,
+							"end": 273
+						},
+						{
+							"type": "Line",
+							"value": " comment outside that group — the value gap's fallback where the hoist declines — so",
+							"start": 275,
+							"end": 361
+						},
+						{
+							"type": "Line",
+							"value": " the body stays flat below the run, exactly as under a run glued through",
+							"start": 363,
+							"end": 437
+						},
+						{
+							"type": "Line",
+							"value": " (`body_multiline_block_comment_flat`).",
+							"start": 439,
+							"end": 480
+						},
+						{
+							"type": "Line",
+							"value": " a single-line block broken after, ahead of a multi-line block glued to a binary body",
+							"start": 483,
+							"end": 570
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 679,
+					"end": 742,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 21
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 685,
+							"end": 741,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 7
+								},
+								"end": {
+									"line": 21,
+									"column": 20
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 685,
+								"end": 687,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 7
+									},
+									"end": {
+										"line": 17,
+										"column": 9
+									}
+								},
+								"name": "a2"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 690,
+								"end": 741,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 12
+									},
+									"end": {
+										"line": 21,
+										"column": 20
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 691,
+										"end": 693,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 13
+											},
+											"end": {
+												"line": 17,
+												"column": 15
+											}
+										},
+										"name": "x2"
+									}
+								],
+								"body": {
+									"type": "LogicalExpression",
+									"start": 727,
+									"end": 741,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 6
+										},
+										"end": {
+											"line": 21,
+											"column": 20
+										}
+									},
+									"left": {
+										"type": "LogicalExpression",
+										"start": 727,
+										"end": 735,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 6
+											},
+											"end": {
+												"line": 21,
+												"column": 14
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 727,
+											"end": 729,
+											"loc": {
+												"start": {
+													"line": 21,
+													"column": 6
+												},
+												"end": {
+													"line": 21,
+													"column": 8
+												}
+											},
+											"name": "b2"
+										},
+										"operator": "&&",
+										"right": {
+											"type": "Identifier",
+											"start": 733,
+											"end": 735,
+											"loc": {
+												"start": {
+													"line": 21,
+													"column": 12
+												},
+												"end": {
+													"line": 21,
+													"column": 14
+												}
+											},
+											"name": "c2"
+										}
+									},
+									"operator": "&&",
+									"right": {
+										"type": "Identifier",
+										"start": 739,
+										"end": 741,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 18
+											},
+											"end": {
+												"line": 21,
+												"column": 20
+											}
+										},
+										"name": "d2"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 700,
+											"end": 707
+										},
+										{
+											"type": "Block",
+											"value": "*\n * d\n ",
+											"start": 710,
+											"end": 726
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a logical chain asks the same question",
+							"start": 636,
+							"end": 677
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 791,
+					"end": 845,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 18
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 797,
+							"end": 844,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 7
+								},
+								"end": {
+									"line": 27,
+									"column": 17
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 797,
+								"end": 799,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 7
+									},
+									"end": {
+										"line": 24,
+										"column": 9
+									}
+								},
+								"name": "a3"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 802,
+								"end": 844,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 12
+									},
+									"end": {
+										"line": 27,
+										"column": 17
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 803,
+										"end": 805,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 13
+											},
+											"end": {
+												"line": 24,
+												"column": 15
+											}
+										},
+										"name": "x3"
+									}
+								],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 832,
+									"end": 844,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 5
+										},
+										"end": {
+											"line": 27,
+											"column": 17
+										}
+									},
+									"left": {
+										"type": "BinaryExpression",
+										"start": 832,
+										"end": 839,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 5
+											},
+											"end": {
+												"line": 27,
+												"column": 12
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 832,
+											"end": 834,
+											"loc": {
+												"start": {
+													"line": 27,
+													"column": 5
+												},
+												"end": {
+													"line": 27,
+													"column": 7
+												}
+											},
+											"name": "b3"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 837,
+											"end": 839,
+											"loc": {
+												"start": {
+													"line": 27,
+													"column": 10
+												},
+												"end": {
+													"line": 27,
+													"column": 12
+												}
+											},
+											"name": "c3"
+										}
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 842,
+										"end": 844,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 15
+											},
+											"end": {
+												"line": 27,
+												"column": 17
+											}
+										},
+										"name": "d3"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 812,
+											"end": 819
+										},
+										{
+											"type": "Block",
+											"value": " d\ne ",
+											"start": 822,
+											"end": 831
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the glued tail preserved (non-indentable)",
+							"start": 745,
+							"end": 789
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 955,
+					"end": 1038,
+					"loc": {
+						"start": {
+							"line": 31,
+							"column": 1
+						},
+						"end": {
+							"line": 37,
+							"column": 24
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 961,
+							"end": 1037,
+							"loc": {
+								"start": {
+									"line": 31,
+									"column": 7
+								},
+								"end": {
+									"line": 37,
+									"column": 23
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 961,
+								"end": 963,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 7
+									},
+									"end": {
+										"line": 31,
+										"column": 9
+									}
+								},
+								"name": "a4"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 966,
+								"end": 1037,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 12
+									},
+									"end": {
+										"line": 37,
+										"column": 23
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 967,
+										"end": 969,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 13
+											},
+											"end": {
+												"line": 31,
+												"column": 15
+											}
+										},
+										"name": "x4"
+									}
+								],
+								"body": {
+									"type": "CallExpression",
+									"start": 1020,
+									"end": 1037,
+									"loc": {
+										"start": {
+											"line": 37,
+											"column": 6
+										},
+										"end": {
+											"line": 37,
+											"column": 23
+										}
+									},
+									"callee": {
+										"type": "MemberExpression",
+										"start": 1020,
+										"end": 1035,
+										"loc": {
+											"start": {
+												"line": 37,
+												"column": 6
+											},
+											"end": {
+												"line": 37,
+												"column": 21
+											}
+										},
+										"object": {
+											"type": "CallExpression",
+											"start": 1020,
+											"end": 1032,
+											"loc": {
+												"start": {
+													"line": 37,
+													"column": 6
+												},
+												"end": {
+													"line": 37,
+													"column": 18
+												}
+											},
+											"callee": {
+												"type": "MemberExpression",
+												"start": 1020,
+												"end": 1030,
+												"loc": {
+													"start": {
+														"line": 37,
+														"column": 6
+													},
+													"end": {
+														"line": 37,
+														"column": 16
+													}
+												},
+												"object": {
+													"type": "CallExpression",
+													"start": 1020,
+													"end": 1027,
+													"loc": {
+														"start": {
+															"line": 37,
+															"column": 6
+														},
+														"end": {
+															"line": 37,
+															"column": 13
+														}
+													},
+													"callee": {
+														"type": "MemberExpression",
+														"start": 1020,
+														"end": 1025,
+														"loc": {
+															"start": {
+																"line": 37,
+																"column": 6
+															},
+															"end": {
+																"line": 37,
+																"column": 11
+															}
+														},
+														"object": {
+															"type": "Identifier",
+															"start": 1020,
+															"end": 1022,
+															"loc": {
+																"start": {
+																	"line": 37,
+																	"column": 6
+																},
+																"end": {
+																	"line": 37,
+																	"column": 8
+																}
+															},
+															"name": "b4"
+														},
+														"property": {
+															"type": "Identifier",
+															"start": 1023,
+															"end": 1025,
+															"loc": {
+																"start": {
+																	"line": 37,
+																	"column": 9
+																},
+																"end": {
+																	"line": 37,
+																	"column": 11
+																}
+															},
+															"name": "c4"
+														},
+														"computed": false,
+														"optional": false
+													},
+													"arguments": [],
+													"optional": false
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 1028,
+													"end": 1030,
+													"loc": {
+														"start": {
+															"line": 37,
+															"column": 14
+														},
+														"end": {
+															"line": 37,
+															"column": 16
+														}
+													},
+													"name": "d4"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [],
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 1033,
+											"end": 1035,
+											"loc": {
+												"start": {
+													"line": 37,
+													"column": 19
+												},
+												"end": {
+													"line": 37,
+													"column": 21
+												}
+											},
+											"name": "e4"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"arguments": [],
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": "*\n * c\n ",
+											"start": 976,
+											"end": 992
+										},
+										{
+											"type": "Block",
+											"value": " d ",
+											"start": 993,
+											"end": 1000
+										},
+										{
+											"type": "Block",
+											"value": "*\n * e\n ",
+											"start": 1003,
+											"end": 1019
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a longer run: the glued pair keeps its line, the break survives, the member chain",
+							"start": 848,
+							"end": 932
+						},
+						{
+							"type": "Line",
+							"value": " below stays flat",
+							"start": 934,
+							"end": 953
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1078,
+					"end": 1142,
+					"loc": {
+						"start": {
+							"line": 40,
+							"column": 1
+						},
+						"end": {
+							"line": 46,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 1078,
+						"end": 1141,
+						"loc": {
+							"start": {
+								"line": 40,
+								"column": 1
+							},
+							"end": {
+								"line": 46,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 1078,
+							"end": 1081,
+							"loc": {
+								"start": {
+									"line": 40,
+									"column": 1
+								},
+								"end": {
+									"line": 40,
+									"column": 4
+								}
+							},
+							"name": "fn1"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 1085,
+								"end": 1138,
+								"loc": {
+									"start": {
+										"line": 41,
+										"column": 2
+									},
+									"end": {
+										"line": 45,
+										"column": 19
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 1086,
+										"end": 1088,
+										"loc": {
+											"start": {
+												"line": 41,
+												"column": 3
+											},
+											"end": {
+												"line": 41,
+												"column": 5
+											}
+										},
+										"name": "x5"
+									}
+								],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 1126,
+									"end": 1138,
+									"loc": {
+										"start": {
+											"line": 45,
+											"column": 7
+										},
+										"end": {
+											"line": 45,
+											"column": 19
+										}
+									},
+									"left": {
+										"type": "BinaryExpression",
+										"start": 1126,
+										"end": 1133,
+										"loc": {
+											"start": {
+												"line": 45,
+												"column": 7
+											},
+											"end": {
+												"line": 45,
+												"column": 14
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 1126,
+											"end": 1128,
+											"loc": {
+												"start": {
+													"line": 45,
+													"column": 7
+												},
+												"end": {
+													"line": 45,
+													"column": 9
+												}
+											},
+											"name": "b5"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 1131,
+											"end": 1133,
+											"loc": {
+												"start": {
+													"line": 45,
+													"column": 12
+												},
+												"end": {
+													"line": 45,
+													"column": 14
+												}
+											},
+											"name": "c5"
+										}
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 1136,
+										"end": 1138,
+										"loc": {
+											"start": {
+												"line": 45,
+												"column": 17
+											},
+											"end": {
+												"line": 45,
+												"column": 19
+											}
+										},
+										"name": "d5"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 1096,
+											"end": 1103
+										},
+										{
+											"type": "Block",
+											"value": "*\n * d\n ",
+											"start": 1107,
+											"end": 1125
+										}
+									]
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same body as a call argument",
+							"start": 1041,
+							"end": 1076
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1228,
+					"end": 1287,
+					"loc": {
+						"start": {
+							"line": 49,
+							"column": 1
+						},
+						"end": {
+							"line": 52,
+							"column": 19
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1234,
+							"end": 1286,
+							"loc": {
+								"start": {
+									"line": 49,
+									"column": 7
+								},
+								"end": {
+									"line": 52,
+									"column": 18
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1234,
+								"end": 1236,
+								"loc": {
+									"start": {
+										"line": 49,
+										"column": 7
+									},
+									"end": {
+										"line": 49,
+										"column": 9
+									}
+								},
+								"name": "a6"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 1239,
+								"end": 1286,
+								"loc": {
+									"start": {
+										"line": 49,
+										"column": 12
+									},
+									"end": {
+										"line": 52,
+										"column": 18
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 1240,
+										"end": 1242,
+										"loc": {
+											"start": {
+												"line": 49,
+												"column": 13
+											},
+											"end": {
+												"line": 49,
+												"column": 15
+											}
+										},
+										"name": "x6"
+									}
+								],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 1274,
+									"end": 1286,
+									"loc": {
+										"start": {
+											"line": 52,
+											"column": 6
+										},
+										"end": {
+											"line": 52,
+											"column": 18
+										}
+									},
+									"left": {
+										"type": "BinaryExpression",
+										"start": 1274,
+										"end": 1281,
+										"loc": {
+											"start": {
+												"line": 52,
+												"column": 6
+											},
+											"end": {
+												"line": 52,
+												"column": 13
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 1274,
+											"end": 1276,
+											"loc": {
+												"start": {
+													"line": 52,
+													"column": 6
+												},
+												"end": {
+													"line": 52,
+													"column": 8
+												}
+											},
+											"name": "b6"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 1279,
+											"end": 1281,
+											"loc": {
+												"start": {
+													"line": 52,
+													"column": 11
+												},
+												"end": {
+													"line": 52,
+													"column": 13
+												}
+											},
+											"name": "c6"
+										}
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 1284,
+										"end": 1286,
+										"loc": {
+											"start": {
+												"line": 52,
+												"column": 16
+											},
+											"end": {
+												"line": 52,
+												"column": 18
+											}
+										},
+										"name": "d6"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 1249,
+											"end": 1256
+										},
+										{
+											"type": "Block",
+											"value": "*\n * d\n ",
+											"start": 1257,
+											"end": 1273
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " null control: a run glued through takes the hoist instead, and is flat already",
+							"start": 1145,
+							"end": 1226
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1374,
+					"end": 1426,
+					"loc": {
+						"start": {
+							"line": 55,
+							"column": 1
+						},
+						"end": {
+							"line": 57,
+							"column": 23
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1380,
+							"end": 1425,
+							"loc": {
+								"start": {
+									"line": 55,
+									"column": 7
+								},
+								"end": {
+									"line": 57,
+									"column": 22
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1380,
+								"end": 1382,
+								"loc": {
+									"start": {
+										"line": 55,
+										"column": 7
+									},
+									"end": {
+										"line": 55,
+										"column": 9
+									}
+								},
+								"name": "a7"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 1385,
+								"end": 1425,
+								"loc": {
+									"start": {
+										"line": 55,
+										"column": 12
+									},
+									"end": {
+										"line": 57,
+										"column": 22
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 1386,
+										"end": 1388,
+										"loc": {
+											"start": {
+												"line": 55,
+												"column": 13
+											},
+											"end": {
+												"line": 55,
+												"column": 15
+											}
+										},
+										"name": "x7"
+									}
+								],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 1413,
+									"end": 1425,
+									"loc": {
+										"start": {
+											"line": 57,
+											"column": 10
+										},
+										"end": {
+											"line": 57,
+											"column": 22
+										}
+									},
+									"left": {
+										"type": "BinaryExpression",
+										"start": 1413,
+										"end": 1420,
+										"loc": {
+											"start": {
+												"line": 57,
+												"column": 10
+											},
+											"end": {
+												"line": 57,
+												"column": 17
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 1413,
+											"end": 1415,
+											"loc": {
+												"start": {
+													"line": 57,
+													"column": 10
+												},
+												"end": {
+													"line": 57,
+													"column": 12
+												}
+											},
+											"name": "b7"
+										},
+										"operator": "+",
+										"right": {
+											"type": "Identifier",
+											"start": 1418,
+											"end": 1420,
+											"loc": {
+												"start": {
+													"line": 57,
+													"column": 15
+												},
+												"end": {
+													"line": 57,
+													"column": 17
+												}
+											},
+											"name": "c7"
+										}
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 1423,
+										"end": 1425,
+										"loc": {
+											"start": {
+												"line": 57,
+												"column": 20
+											},
+											"end": {
+												"line": 57,
+												"column": 22
+											}
+										},
+										"name": "d7"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 1395,
+											"end": 1402
+										},
+										{
+											"type": "Block",
+											"value": " d ",
+											"start": 1405,
+											"end": 1412
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " null control: a single-line tail owns nothing multi-line, so nothing is claimed",
+							"start": 1290,
+							"end": 1372
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

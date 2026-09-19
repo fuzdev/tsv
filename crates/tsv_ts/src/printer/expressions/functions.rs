@@ -2487,10 +2487,35 @@ impl<'a> Printer<'a> {
         // "ArrowFunctionExpression"`, `shouldNotIndent` in `print/binaryish.js`), so its binary chain's
         // continuation lines stay at the body's own column — the `=>` already put the body
         // one level in.
+        //
+        // ⚠️ **The `=>`→body gap is a value gap, so a MULTI-LINE block the body OWNS is
+        // claimed HERE**, outside the body's own group — the CLAIM half of the fallback every
+        // value gap takes where the hoist declines ([`Printer::build_gap_value_doc`]; its
+        // suppression half reaches this builder one level up, through the body closure the
+        // layouts build under the hoist), spelled at this builder because the arrow claims
+        // BENEATH the leading run it prepends rather than around it (`docs/comments.md`
+        // §Owned comments). The hoist
+        // ([`Printer::hoisted_owned_value_gap_run_opt`]) covers a run glued through to the
+        // body; a run the author BROKE AFTER routes to a different emitter, and its glued
+        // TAIL is owned all the same — claimed by the innermost node, its reprinted
+        // `MultilineText` force-breaks a binary / logical / member body both formatters
+        // keep flat, while the same comment written ahead of the author's redundant body
+        // parens is gap-emitted and leaves it flat: one authoring, two forms, two passes
+        // apart. Stated once here, so the default layout and the curried-chain layout —
+        // which reaches every body kind through this builder — cannot part on it, and the
+        // ternary arm above carries the same rule inside its own pair.
+        //
+        // The paren arm declines for the hoist's reason: the pair the position prints
+        // stands between the comment and the value, so a claim outside it would carry the
+        // comment in front of the `(`. A sequence declines on its own (`outermost_claim_child`),
+        // and a claim the hoist already made is refused by the shared gate, so the two
+        // cannot double-print.
         if self.needs_parens(expr, ParenContext::ArrowBody) {
             prepend(d.parens(self.build_flat_chain_expression_doc(expr)))
         } else {
-            prepend(self.build_flat_chain_expression_doc(expr))
+            prepend(self.build_value_with_outermost_owned_comment(expr, || {
+                self.build_flat_chain_expression_doc(expr)
+            }))
         }
     }
 
