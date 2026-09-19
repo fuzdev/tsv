@@ -13,6 +13,9 @@ Each `## Unreleased` section must be non-empty and carry a
 ## Unreleased
 <!-- bump: patch -->
 
+- fix: various formatting and parsing fixes
+- chore: track Svelte 5.57.0
+
 ## 0.4.0
 
 - **breaking** chore: the three WASM packages are renamed to kebab-case — `@fuzdev/tsv_wasm` →
