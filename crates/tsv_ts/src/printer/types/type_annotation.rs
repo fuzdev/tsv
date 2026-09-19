@@ -6,7 +6,7 @@
 // - Return type annotations
 
 use super::helpers::{TypeParenRule, type_args_should_wrap_for_return_type, unwrap_parenthesized};
-use super::{CommentSpacing, Printer, TrailingBlock, UnionValueDoc};
+use super::{CommentSpacing, Printer, ShiftRescan, TrailingBlock, UnionValueDoc};
 use crate::ast::internal::{self, TSType};
 use crate::printer::ignore::RoutedScope;
 use crate::printer::layout::hang_after_operator;
@@ -684,7 +684,7 @@ impl<'a> Printer<'a> {
             {
                 parts.push(name_ta_comments);
             }
-            parts.push(self.build_type_arguments_doc(type_args));
+            parts.push(self.build_type_arguments_doc(type_args, ShiftRescan::Splits));
             return d.concat(&parts);
         }
 

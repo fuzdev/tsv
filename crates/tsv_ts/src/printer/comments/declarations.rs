@@ -9,6 +9,7 @@ use super::layout::hang_after_operator;
 use super::{CommentFilter, CommentSpacing, CommentVec, LeadingGlue, Printer};
 use crate::ast::internal;
 use crate::printer::analysis;
+use crate::printer::types::ShiftRescan;
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -1648,7 +1649,7 @@ impl<'a> Printer<'a> {
                     ) {
                         h_parts.push(doc);
                     }
-                    h_parts.push(self.build_type_arguments_doc(type_args));
+                    h_parts.push(self.build_type_arguments_doc(type_args, ShiftRescan::Never));
                 }
                 if let Some(next) = items.get(i + 1) {
                     let item_end = heritage_item_end(heritage);

@@ -5,7 +5,9 @@
 // - Type parameter instantiation (type arguments): `<T, U>`
 
 use super::helpers::{TypeParenRule, is_simple_type_arg, unwrap_parenthesized};
-use super::{BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer, TrailingBlock};
+use super::{
+    BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer, ShiftRescan, TrailingBlock,
+};
 use crate::ast::internal::{
     self, TSType, TSTypeParameter, TSTypeParameterDeclaration, TSTypeParameterModifier,
 };
@@ -103,6 +105,7 @@ impl<'a> Printer<'a> {
             |_, _| None,
             |i| !self.is_same_line(decl.params[i].span.start, decl.params[i].span.end),
             has_comments,
+            false, // a type parameter never opens with `<`
         )
     }
 
@@ -766,7 +769,10 @@ impl<'a> Printer<'a> {
         // deferred run must not escape the construct it was written in, but inside a
         // `<…>` the enclosing list is itself a retained bracketed construct that the run
         // flushes safely inside of (see `build_type_doc_for_type_arg`).
-        self.build_type_arguments_group_doc(inst, has_comments)
+        //
+        // [`ShiftRescan::Splits`]: a call, `new`, an instantiation and a tagged template all
+        // reach tsc's list through its re-scan, so the pair prints glued here.
+        self.build_type_arguments_group_doc(inst, has_comments, ShiftRescan::Splits)
     }
 
     /// The shared width-decided angle-list body: `<` + softline-indented,
@@ -806,6 +812,7 @@ impl<'a> Printer<'a> {
         item_run_claim: impl Fn(usize, u32) -> Option<u32>,
         frozen_forces_break: impl Fn(usize) -> bool,
         has_comments: bool,
+        open_separated: bool,
     ) -> DocId {
         let d = self.d();
         let mut inner_parts = DocBuf::new();
@@ -885,13 +892,14 @@ impl<'a> Printer<'a> {
             }
         }
 
-        bracketed_list_body(
-            d,
-            d.text("<"),
-            d.text(">"),
-            d.concat(&inner_parts),
-            force_break,
-        )
+        let inner = d.concat(&inner_parts);
+        if open_separated && !force_break {
+            // The `<`→first-item break point prints a SPACE while the list is flat: the
+            // item opens with a `<` of its own at a position tsc never splits a `<<` in
+            // ([`Self::angle_open_meets_angle`]). Broken, it is the same line break.
+            return d.concat(&[d.text("<"), d.indent_line(inner), d.softline(), d.text(">")]);
+        }
+        bracketed_list_body(d, d.text("<"), d.text(">"), inner, force_break)
     }
 
     /// Render a type-argument list `<…>` that breaks onto multiple lines because it

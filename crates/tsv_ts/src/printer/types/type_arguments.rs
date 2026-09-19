@@ -6,7 +6,54 @@ use crate::ast::internal::{self, TSType};
 use smallvec::smallvec;
 use tsv_lang::doc::arena::DocId;
 
+/// Whether tsc re-scans a `<<` token into `<` `<` at the position a `<…>` opens in — the
+/// one fact that decides if the list's `<` may print glued to a first type that opens with
+/// its own `<` (a generic function type, the only type that does).
+///
+/// tsc re-scans wherever it parses the list through `reScanLessThanToken` — a call, `new`,
+/// an instantiation, a tagged template, a type reference, an import type — and those print
+/// glued (`fn<<T>() => U>(x)`), as prettier does. Where it parses with the token as lexed —
+/// a `typeof` query's list, a heritage clause's, an angle-bracket assertion — the glued
+/// pair is a shift to it, so the printer keeps the two apart
+/// ([`Printer::angle_open_meets_angle`]). See conformance_prettier_ts.md §TypeScript
+/// (`<` `<` kept apart where tsc never splits a `<<`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::printer) enum ShiftRescan {
+    /// tsc splits a `<<` here: the pair prints glued.
+    Splits,
+    /// tsc reads a `<<` here as lexed: the pair takes a space while it shares a line.
+    Never,
+}
+
 impl<'a> Printer<'a> {
+    /// Whether the type printed straight after an opening `<` — at `open_end`, the byte
+    /// past it — opens with a `<` of its own, so the two would lex as one `<<` token.
+    ///
+    /// Asked of what PRINTS, not of the node: a redundant paren shell strips here (a
+    /// trailing-comment one included — its comment prints after the type), and a
+    /// one-member union prints as its member, so all of them put a generic function type's
+    /// `<` first. A comment anywhere between the `<` and that type prints between them and
+    /// is separator enough (`</* c */ <T>() => R>x`), a format-ignore directive among them.
+    /// A constructor type opens with `new` / `abstract` and is never in the class.
+    pub(in crate::printer) fn angle_open_meets_angle(
+        &self,
+        open_end: u32,
+        first: &TSType<'_>,
+    ) -> bool {
+        let mut ty = first;
+        loop {
+            ty = match ty {
+                TSType::Parenthesized(p) => p.type_annotation,
+                other => match self.transparent_sole_member(other) {
+                    Some(member) => member,
+                    None => break,
+                },
+            };
+        }
+        matches!(ty, TSType::Function(f) if f.type_parameters.is_some())
+            && !self.has_comments_on_page_between(open_end, ty.span().start)
+    }
+
     /// Build doc for a type used as a type argument.
     ///
     /// For single type arg contexts, uses normal doc (allows object types to break).
@@ -237,9 +284,15 @@ impl<'a> Printer<'a> {
     /// would create Break-mode Line nodes in `fits()` rest_commands, causing upstream groups
     /// (like arrays in Fluid assignment layout) to incorrectly appear to "fit" — Line in Break
     /// mode returns true from `fits()`, short-circuiting the width check.
-    pub(crate) fn build_type_arguments_doc(
+    ///
+    /// `rescan` is the caller's position ([`ShiftRescan`]): a `typeof` query's list and a
+    /// heritage clause's pass [`ShiftRescan::Never`] and keep their `<` off a first
+    /// argument that opens with its own; a type reference's and an import type's split.
+    /// Every caller names it, so a new position cannot default into the glued form.
+    pub(in crate::printer) fn build_type_arguments_doc(
         &self,
         args: &internal::TSTypeParameterInstantiation<'_>,
+        rescan: ShiftRescan,
     ) -> DocId {
         let d = self.d();
         if args.params.is_empty() {
@@ -269,7 +322,7 @@ impl<'a> Printer<'a> {
             return self.build_single_type_arg_inline(args, has_comments);
         }
 
-        self.build_type_arguments_group_doc(args, has_comments)
+        self.build_type_arguments_group_doc(args, has_comments, rescan)
     }
 
     /// The width-decided `<…>` tail, shared by **both** type-argument families — the
@@ -287,8 +340,13 @@ impl<'a> Printer<'a> {
         &self,
         args: &internal::TSTypeParameterInstantiation<'_>,
         has_comments: bool,
+        rescan: ShiftRescan,
     ) -> DocId {
         let d = self.d();
+        // The only layout that can glue the pair: the expansion builder starts every
+        // argument on its own line, and a function type never takes the inline hug.
+        let open_separated = rescan == ShiftRescan::Never
+            && self.angle_open_meets_angle(args.span.start + 1, args.params[0]);
         d.group(self.build_angle_list_doc(
             args.span,
             args.params.len(),
@@ -310,6 +368,7 @@ impl<'a> Printer<'a> {
             |i, gap_start| self.union_seam_run_handoff(gap_start, args.params[i]),
             |i| self.frozen_list_member_multiline(args.params[i]),
             has_comments,
+            open_separated,
         ))
     }
 

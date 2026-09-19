@@ -18,6 +18,7 @@ use crate::printer::CommentSpacing;
 use crate::printer::HeritageKeyword;
 use crate::printer::Printer;
 use crate::printer::class_expr_has_decorators;
+use crate::printer::types::ShiftRescan;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -322,7 +323,7 @@ impl<'a> Printer<'a> {
                     ) {
                         value_parts.push(doc);
                     }
-                    value_parts.push(self.build_type_arguments_doc(type_args));
+                    value_parts.push(self.build_type_arguments_doc(type_args, ShiftRescan::Never));
                 }
                 let value_doc = d.concat(&value_parts);
                 let mut ext_parts = smallvec![d.text("extends")];
@@ -356,7 +357,7 @@ impl<'a> Printer<'a> {
             ) {
                 ext_parts.push(doc);
             }
-            ext_parts.push(self.build_type_arguments_doc(type_args));
+            ext_parts.push(self.build_type_arguments_doc(type_args, ShiftRescan::Never));
         }
         Some(d.concat(&ext_parts))
     }
