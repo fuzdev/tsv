@@ -31,7 +31,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Pin agreement](#canonical-pin-agreement-audit-pinsaudit) | `pins:audit` | the five canonical-oracle pin sites disagreeing — including the lockfile, which alone pins the oracle's own transitive deps | `deno task check` |
 | [Checkout alignment](#checkout-alignment-audit-pinsauditcheckouts) | `pins:audit:checkouts` | a present `../svelte` / `../acorn-typescript` clone that is not the pinned version; checkout drift (warn — HEAD, or the `../corpora` snapshot's `collections/` tree id) | `deno task conformance` (preflight) |
 | [Authoring independence](#authoring-independence-audit-authoringaudit) | `authoring:audit` | two render-equivalent authorings settling on two fixed points; non-idempotency | `deno task check`; `audit:corpus` (real code) |
-| [Paren authoring](#paren-authoring-independence-audit-parenaudit) | `paren:audit` | a same-operator logical chain formatting differently from its redundantly-parenthesized twin — the class a rule left on the raw `binary.right` falls into, invisible on every paren-free authoring | `deno task check`; `audit:corpus` (real code) |
+| [Paren authoring](#paren-authoring-independence-audit-parenaudit) | `paren:audit` | a same-operator logical chain formatting differently from its redundantly-parenthesized twin — the class a rule left on the raw `binary.right` falls into, invisible on every paren-free authoring — and the relational `<`…`>` chain, whose pair is decided by a BYTE read a redundant shell can move | `deno task check` (with `--require-relational`); `audit:corpus` (real code, without it) |
 | [Razor sweep](#print-width-razor-sweep-razoraudit) | `razor:audit` | width-keyed layout bugs — an F1 break at some column, and the stray line-head boundary space that is its OWN fixed point | `deno task check` |
 | [Round-trip](#formatreparse-round-trip-audit-roundtripaudit) | `roundtrip:audit` · `roundtrip:audit:prettier` | formatted output the parser rejects (delimiter/structure corruption), or that DROPS / duplicates a node (the population census) | `deno task check` (fixtures always; the prettier suites when `../prettier` is present); `audit:corpus` (real code) |
 | [Binding](#commenttoken-binding-audit-bindingaudit) | `binding:audit` | a glued comment re-bound to a different subtree by a migrating paren | `deno task check`; `audit:corpus` (real code) |
@@ -1256,7 +1256,13 @@ cargo run -p tsv_debug authoring_audit ../corpora/collections/zzz/src --prettier
 
 ## Paren-Authoring Independence Audit (`paren:audit`)
 
-The sibling of the whitespace audit above, on a different equivalence: `a ?? b ?? c` and
+The sibling of the whitespace audit above, on a different equivalence: a redundant paren
+carries no authoring signal, so the two spellings of one document must reach one fixed point.
+**Two site classes**, sharing the verdict, the containment and the zero tolerance and
+differing only in the splice: same-operator **logical re-association** (below) and the
+**relational `<`…`>` chain** ([its own subsection](#the-relational-chain-class)).
+
+Start with the logical one: `a ?? b ?? c` and
 `a ?? (b ?? c)` are **one document**, so tsv must format them to one output. Prettier says so
 structurally — its parse postprocess (`../prettier/src/language-js/parse/postprocess/index.js`,
 `onLeave(LogicalExpression)` → `rebalanceLogicalTree`) rewrites `a op (b op c)` into
@@ -1277,10 +1283,80 @@ bug539 was exactly that (one half of `should_inline_logical_expression`): it pas
 fixtures *and* the whole 9,305-file `corpus:compare:format` gate, and only a hand-written
 paren-nested twin exposed it. Nothing else enumerates that twin.
 
+### The relational chain class
+
+A `>` whose left operand is a `<` gets a paren pair around that operand whenever the `<`…`>`
+region would re-lex as a type-argument list once printed
+([conformance_prettier_ts.md §Relational chain type-argument parens](./conformance_prettier_ts.md)).
+That rule reads **bytes** — which head the region opens with, and where its scan stops — so a
+redundant paren is exactly what can move its answer while leaving the program alone. **Two
+splices per such node**, each a pure insertion around a whole operand:
+
+- **the chain** — `a < X > c` against `(a < X) > c`, the shell the printer strips, which moves
+  where the region's scan stops;
+- **the operand** — `a < X > c` against `a < (X) > c`, which moves which HEAD the lookahead
+  dispatches on.
+
+The second is where a byte-reading head test is most exposed: a `(` head arm that grades
+nothing commits every parenthesized operand, so `a < (arr[b - 1]) > c` would take a pair its own
+paren-free twin does not — and no other standing gate can see that, since each authoring is
+idempotent on its own and only a twin shows the two fixed points. Nothing re-associates here, so
+the logical splice's re-association argument has no counterpart; what the splice preserves, and
+what it does not, is `ParenAuditCommand::twin_exclusion_reason`'s subject (below).
+
+**The guard split this class sits in.** The re-lex rule owes two properties, and only one of
+them is gated here (both are stated on `TypeArgScan` in `crates/tsv_ts/src/parser/expression_type_args.rs`):
+
+- **Soundness** — if tsv's own parse reads a type-argument region at the `<` of `format(D)`,
+  the printer must have put a pair there. **Nothing gates it**: `gaps:audit` grades the fixture
+  tree as authored plus its injections, and no fixture can hold the shapes that break it — a
+  fixture input must format to itself, and the broken form is one only the printer produces.
+- **Independence** — the relaxed reading must agree with ITSELF across the redundant-paren
+  spellings of one program, since `a < X > c` and `a < (X) > c` are one document and owe one
+  verdict. **That is this audit**, and it is soundness's dual: a `(` arm that graded nothing
+  would give a parenthesized operand a pair its bare twin lacks.
+
+**Excluded sites: a twin that is not the same document.** The relational splice is
+tree-preserving *in the language* — parenthesizing a whole operand changes no program — but not
+under tsv's own parse, because a paren around a `<` operand can still move it: the
+type-argument lookahead's `(` head arm grades the shell's CONTENT, so a twin whose content opens
+a type-argument list opens a region its paren-free twin does not. Where that content parses as a
+type the twin is a DIFFERENT TREE (`p < (readonly.a) > (t, u)`, a call with type arguments to
+tsv and a comparison chain to acorn); where the content opens a region whose body then fails to
+parse as a type, tsv REJECTS the twin (`p < (keyof.a) > (t, u)`, which acorn reads as the
+comparison chain its paren-free twin is, and which tsc rejects outright). An arithmetic twin
+such as `x < (1 + 2) > (t, u)` is not one of these: both authorings read as the chain.
+Either way it is a parse-oracle divergence rather than a formatting question, so the
+site is excluded and **counted in the report** — the way a comment-bound one is. That count is
+not pinned: it is a function of whichever seed set the invocation was handed. The excluded
+sites are ENUMERATED, not only counted — each one (path, line, column, class, reason, the twin's
+own text) is emitted in `--json` (`excluded_sites`) and printed by `--list-excluded` — because a
+class that stops being the same document on both spellings is indistinguishable, from the count
+alone, from a fresh tsv-only over-rejection. The two reasons are named apart: `rejected` (tsv's
+parser refuses a spelling the bare one accepts) and `different tree` (both parse and the shell
+moved the reading). `twin_exclusion_reason`
+is asked of the relational classes only; the logical splice re-associates a tree acorn builds
+the same either way, so a twin that fails to parse there stays the loud `variant parse error`
+finding it always was.
+
+**Two vacuity floors, and the second is opt-in.** Both classes share the total floor (every
+site, `check_graded_nonzero`), which holds on any corpus: a logical chain is ordinary code. The
+relational rows get a second, **per-class** floor spelled `--require-relational`, because a
+vacuity floor is a claim about the SEED SET rather than about the audit. Nobody writes
+`a < b > c` in real code: over the `../corpora` snapshot both relational rows are legitimately
+**0**, and that zero is the corpus's shape, not a class that stopped enumerating. The class
+lives in the fixture tree (`tests/fixtures/typescript/expressions/binary/relational_*`), so the
+**fixture-tree gate** — `deno task paren:audit`, which `deno task check` runs — is the one
+invocation that passes the flag, and the **real-code leg** of `audit:corpus` deliberately does
+not. A flag rather than a `paths`-contains-`tests/fixtures` sniff: an explicit switch is
+greppable and cannot silently mean the wrong thing on a subtree run, and a **narrowed** run
+under the flag fails its floor, like a ratchet's refusal of a narrowed `:update`.
+
 ```bash
 # paren_audit - for every same-operator logical chain in the formatted base, insert the
-# redundant parens that re-associate it one level (`a op b op c` -> `a op (b op c)`) and
-# require the twin to format back to the base, byte for byte. Pure Rust, no sidecar —
+# redundant parens that re-associate it one level (`a op b op c` -> `a op (b op c)`), and for
+# every relational `<`…`>` chain insert each of its two shells, then require the twin to format
+# back to the base, byte for byte. Pure Rust, no sidecar —
 # one format per site. Defaults to tests/fixtures; pass dirs/files to audit real code.
 # Exits 1 on any finding. ~1.4 s over tests/fixtures.
 cargo run --profile corpus -p tsv_debug --features audits paren_audit
@@ -1290,15 +1366,17 @@ cargo run --profile corpus -p tsv_debug --features audits paren_audit ../corpora
 # the same four files `authoring_audit --dump-dir` writes), which is the seed a fixture is
 # made from without re-deriving the splice by hand.
 #
-# The mutation is a pure two-character insertion, and each of its three soundness facts is a
-# property of the acorn wire rather than an assumption about the text: both offsets are token
+# The LOGICAL mutation is a pure two-character insertion, and each of its three soundness
+# facts is a property of the acorn wire rather than an assumption about the text: both offsets are token
 # boundaries; the close offset is the OUTER node's end (`lastTokEnd`), so it lands past every
 # closing paren the node holds, and a group opened inside the spliced range also closes inside
 # it; and `&&` / `||` / `??` re-associate (all three short-circuit left to right). `LogicalExpression`
 # carries exactly those three operators, which is why the walk keys on the node TYPE and not on an
 # operator list — a `BinaryExpression` (`+`, `&`) is not re-associable and prettier does not
-# rebalance it. The walk is over the WIRE, so one enumerator covers a `.ts` module and a Svelte
-# component's <script>, template expression, block head, attribute and `{@const}` alike.
+# rebalance it. The RELATIONAL splices are insertions too, with none of that argument to make —
+# nothing re-associates; their own precondition is that tsv reads the twin as the same document,
+# which is checked per site. The walk is over the WIRE, so one enumerator covers a `.ts` module
+# and a Svelte component's <script>, template expression, block head, attribute and `{@const}` alike.
 #
 # Verdicts: converge / DIVERGE (dual-stable) / DIVERGE (non-idempotent) / variant parse error.
 # Everything but converge FAILS — there is no sanctioned remainder here. A variant parse error
@@ -1316,25 +1394,46 @@ cargo run --profile corpus -p tsv_debug --features audits paren_audit ../corpora
 ```
 
 **Graded as a hard gate, not a ratchet — measured before deciding.** Zero findings over
-`tests/fixtures` (1,269 sites), the `../corpora` snapshot (2,530), `../prettier/tests/format`
-(225), `../svelte/packages/svelte/src` (684) and `../acorn-typescript` (116), with all three
-operators exercised in each. The per-operator table is printed for exactly that reason: a zero
-row is a corpus gap, not a pass.
+`tests/fixtures` (1,377 logical sites), the `../corpora`
+snapshot (2,530), `../prettier/tests/format` (225),
+`../svelte/packages/svelte/src` (684) and `../acorn-typescript` (116), with all three
+operators exercised in each. The per-class table is printed for exactly that reason: a zero
+row is a corpus gap, not a pass — which is also why the relational rows carry a floor of their
+own rather than reading their real-code zero as coverage.
 
 It gates twice, on `tests/fixtures` in `deno task check` and over **real code** as a leg of
-[`audit:corpus`](#the-corpus-bundle-auditcorpus) — the real-code corpus carries twice the
-fixture tree's chains (2,532 sites), and the class it grades is one no corpus of formatted code
-can show on its own. The prettier suites are deliberately not a seed there: six of their files
+[`audit:corpus`](#the-corpus-bundle-auditcorpus) — the real-code corpus carries more logical
+chains than the fixture tree (2,532 sites), and the class it grades is one no corpus of
+formatted code can show on its own. The prettier suites are deliberately not a seed there: six of their files
 are not tsv F1 fixed points, which this audit reports as a failure of its own, and that question
 belongs to the bundle's F1 sweep.
 
-**Positive control.** Reverting bug539's one-line fix (`binary.rebalanced_right()` →
+**Positive control (the logical class).** Reverting bug539's one-line fix
+(`binary.rebalanced_right()` →
 `binary.right`) turns the fixtures run red with **30 findings across 11 files**, ten of which
 are ordinary fixtures that predate the bug — so this audit would have caught it automatically,
 from the corpus as it already stood. The `../corpora` snapshot also goes red (2 findings), on
 the same corpus that `corpus:compare:format --all` passed clean at the time.
 
+**Positive control (the relational class).** Reverting the `(` head arm's relaxed look-through
+in `type_arg_head_commits` — so a parenthesized `<` operand commits on bracket matching and the
+follow token alone, the shape a head test that grades nothing has — turns the fixtures run red
+with **22 findings across 6 files**, every one on the `< > operand` row: `a < (arr[b - 1]) > c`
+then takes a pair its paren-free twin does not. Nothing else enumerates that twin — each
+authoring is idempotent on its own, so the two fixed points are invisible until one document is
+spelled both ways.
+
 **Blind spots.**
+
+- **The relational class probes `<` under `>` only** — the one join the rule is keyed on. A `<`
+  under any other operator, and a `>` over any other operand, take no pair, so a shell there is
+  the general redundant-paren question the last bullet names.
+- **A relational site whose twin tsv does not read as the same document is excluded**
+  (`twin_exclusion_reason`, above). Counted in the report, not dropped silently. The divergence
+  itself is a parse question, but no parse gate sees these twins — the audit synthesizes them,
+  and no fixture or corpus file holds them — so the count printed here is where they surface.
+- **CSS has no expression grammar**, so `.css` seeds hold no sites at all; the audit's subject
+  filter is the Svelte + TypeScript families.
 
 - **Only the paren-INSERTING direction.** Sites are enumerated from tsv's own fixed point, which
   normalizes the parens away, so a chain reaches this audit paren-free. Were tsv's fixed point

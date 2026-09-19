@@ -12,7 +12,7 @@ governs every entry here live in [conformance_prettier.md](./conformance_prettie
 - Return type generic union — ◆print_width — [return_type_generic_union_long](../tests/fixtures/typescript/declarations/function/return_type_generic_union_long_prettier_divergence/)
 - Module path calls — ◆print_width — [path_calls_long](../tests/fixtures/typescript/modules/imports/path_calls_long_prettier_divergence/)
 - Instantiation expression parens — ◆prettier_bug — [instantiation_parens](../tests/fixtures/typescript/typescript_specific/assertions/instantiation_parens_prettier_divergence/), [export_default_instantiation](../tests/fixtures/typescript/modules/exports/default_wrappable_leftmost_operators/instantiation_prettier_divergence/), [instantiation_paren_follow](../tests/fixtures/typescript/typescript_specific/generics/instantiation_paren_follow_prettier_divergence/)
-- Relational chain type-argument parens — ◆prettier_bug — [relational_chain_type_arg_parens](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_prettier_divergence/), [relational_chain_type_arg_parens_object_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_object_long_prettier_divergence/), [relational_chain_type_arg_parens_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_long_prettier_divergence/), [relational_chain_type_arg_parens_close_follow](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_close_follow_prettier_divergence/)
+- Relational chain type-argument parens — ◆prettier_bug — [relational_chain_type_arg_parens](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_prettier_divergence/), [relational_chain_type_arg_parens_object_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_object_long_prettier_divergence/), [relational_chain_type_arg_parens_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_long_prettier_divergence/), [relational_chain_type_arg_parens_close_follow](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_close_follow_prettier_divergence/), [relational_chain_type_arg_parens_kept_shell](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_kept_shell_prettier_divergence/), [relational_chain_type_arg_parens_kept_shell_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_kept_shell_long_prettier_divergence/)
 - Non-null parenthesized base — ◆design_choice — [non_null_paren_base_long](../tests/fixtures/typescript/expressions/member/non_null_paren_base_long_prettier_divergence/)
 - Parenthesized binary member base — ◆design_choice ◆print_width — [paren_binary_base_long](../tests/fixtures/typescript/expressions/member/paren_binary_base_long_prettier_divergence/)
 - Constrained infer extends-operand parens — ◆prettier_bug — [constrained_extends_parens](../tests/fixtures/typescript/types/infer/constrained_extends_parens_prettier_divergence/)
@@ -80,17 +80,52 @@ and `p < string$ ? q : r > (t, u)`, the sets
 and [less_than_keyword_boundary](../tests/fixtures/typescript/syntax/disambiguation/less_than_keyword_boundary/)
 pin from the bare side.
 
-Region-keyed means the **head** is graded, not its punctuation. A `{` or `[` head opens the
-region whatever its body holds, so `a < [1, 2] > c`, `a < { x: B } > c`,
-`a < { [k]: 1 } > c` and `a < [...s] > c` take the pair — a tuple, a type literal, a
-computed key and a rest element are types to every parser — and so do `a < { ...s } > c`
-and `a < [b, c++] > c`, whose bodies are values to tsc and acorn but whose REGION is a
-type-argument list to a parser that grades no body. tsv's own is one: its bracketed head
-arms commit on any matching `>` that a line terminator, a `(` or a template follows, so it reads
-`x < { ...s } >⏎c` and `x < { ...s } > (c, d)` as type-argument lists and then rejects both. A bare output there is one tsv cannot reparse,
-which is the **soundness** property stated on `TypeArgScan` — so the relaxed reading grades
-no body and the pair stands. (The over-rejection itself is the parser's, not the formatter's,
-and belongs to the parse oracles.)
+Region-keyed means the head is graded, and at a `{` or `[` head its punctuation is the whole
+of it. Either opens the region whatever its body holds, so `a < [1, 2] > c`,
+`a < { x: B } > c`, `a < { [k]: 1 } > c` and `a < [...s] > c` take the pair — a tuple, a type
+literal, a computed key and a rest element are types to every parser — and so do
+`a < { ...s } > c` and `a < [b, c++] > c`, whose bodies are values to tsc and acorn but whose
+REGION is a type-argument list to a parser that grades no body. tsv's own is one at these two
+heads: they commit on any matching `>` that a line terminator, a `(` or a template follows, so
+tsv reads `x < { ...s } >⏎c` and `x < { ...s } > (c, d)` as type-argument lists and then
+rejects both. A bare output there is one tsv cannot reparse — the **soundness** property
+stated on `TypeArgScan` — so the pair stands at every bracketed head.
+
+**The `(` head is the exception, because it is the one head whose own shell carries
+soundness.** Its BODY is graded (`paren_type_head_close`), so `a < (b || c) > (t, u)`,
+`a < (b++) > (t, u)` and `a < (await b) > (t, u)` read as the comparison chain tsc and
+acorn-typescript both read. Grading it is sound because a region the grade refuses never
+reaches tsv's parser bare: where the printer keeps the operand's shell the region's first
+printed byte is that `(` and the kept-shell disjunct below puts a pair around the `>`'s left
+operand, and where the printer strips it the shell is not in the printed form at all and the
+relaxed reading looks through it at the content. Neither `{` nor `[` has that property —
+neither is a shell the printer strips, neither opens a region the kept-shell rule answers, and
+the printer parenthesizes freely inside both bodies (a spread argument, an `as` left operand,
+a for-init `in`), moving a refused token one level deeper than a grade looks. Their
+over-rejection is the parser's rather than the formatter's and belongs to the parse oracles,
+filed as a known gap in
+[conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md) and pinned by
+[relational_bracketed_head_ungraded_body](../tests/fixtures/typescript/expressions/binary/relational_bracketed_head_ungraded_body_svelte_divergence/).
+
+**What the `(` grade refuses is tsc's answer, not a judgment about types.** tsc does not guess
+at a `<`: `parseTypeArgumentsInExpression` parses the list with
+`parseDelimitedList(TypeArguments, parseType)`, which is error-RECOVERING — a token no element
+can start is skipped and the parse resumes — and it claims the region whenever that recovery
+still lands on the `>`, errors and all. Only the bodies tsc ABANDONS are comparison chains, and
+those are the cells that refuse; `grade_body_token` states the table. The two sides are pinned
+together by
+[relational_paren_head_value_body](../tests/fixtures/typescript/expressions/binary/relational_paren_head_value_body/)
+(the bodies tsc abandons, at a committing follower),
+[relational_bracketed_head_recovered_list](../tests/fixtures/typescript/expressions/binary/relational_bracketed_head_recovered_list_svelte_divergence/)
+(the bodies its recovery carries to the `>`),
+[relational_paren_head_param_list](../tests/fixtures/typescript/expressions/binary/relational_paren_head_param_list_svelte_divergence/)
+(the group tsc claims for a function type before reading any body) and
+[less_than_bracketed_head_type_body](../tests/fixtures/typescript/syntax/disambiguation/less_than_bracketed_head_type_body/)
+(the generic syntax no refusal may reach).
+
+The grade is a **refusal list, not a whitelist**, and deliberately: a body wrongly refused
+turns a real generic call into a comparison chain — a silent wrong tree on code that parses
+either way — where a body wrongly admitted is a loud parse error on a shape no generic has.
 
 A **paren shell the printer STRIPS is not part of the head at all** — so
 `a < (arr[b - 1]) > c` is graded as the arithmetic its own paren-free twin is, and
@@ -98,18 +133,17 @@ A **paren shell the printer STRIPS is not part of the head at all** — so
 the two authorings of one chain reach one fixed point (`deno task paren:audit`'s
 `< > operand` class enumerates exactly that pair).
 
-A shell the printer **KEEPS** is a different question, and it is the one open hole in the
-rule. `x < (a = b) > c` is printed with its `(` intact, so the relaxed reading and tsv's own
-parse are no longer looking at one text: the relaxed reading grades the shell's CONTENT
-(`a = b`, no type, no pair) while the parse that reads the output grades the `(`-headed
-REGION (a bracketed head, which commits on any matching `>` that a line terminator follows,
-or a `(` or a template follows on the same line). They disagree at both triggers. With no break at
-all, a follower that commits unconditionally is enough: `(x < (a = b)) > (c, d)` prints as
-`x < (a = b) > (c, d)`, which tsv's own parser rejects (`Expected ')', found '='`, and tsc
-reports `'=>' expected.` on it too) — so does the same line with a template or an
-arrow-in-parens follower. And at a width where the `>` ends a line, any follower does it.
-Neither is an over-rejection of anything an author wrote — **each is a document tsv itself
-prints**:
+A shell the printer **KEEPS** is the other half of the same rule, and it is decided in the
+printer rather than by that reading. `x < (a = b) > c` is printed with its `(` intact, so
+the relaxed reading and the parse that reads the output are no longer looking at one text:
+the relaxed reading grades the shell's CONTENT (`a = b`, no type) while the output's reader
+grades the `(`-headed REGION — a bracketed head, which commits on any matching `>` that a
+line terminator follows, or a `(` or a template follows on the same line. Both triggers are
+reachable. With no break at all, a follower that commits unconditionally is enough:
+`x < (a = b) > (c, d)` is rejected flat by tsv's own parser (`Expected ')', found '='`) and
+by tsc (`'=>' expected.`), as is the same line with a template or an arrow-in-parens
+follower. And at a width where the `>` ends a line, any follower does it — the bare spelling
+being:
 
 ```
 const zzzzzzzzzzzzzzzz =
@@ -118,16 +152,64 @@ const zzzzzzzzzzzzzzzz =
 	cccccccccccccccccccc;
 ```
 
-tsv's own parser rejects that output too. The rule is therefore **not** "tsv's output always
-reparses"; the class is every operand whose shell survives printing and whose content is no
-type — assignment and compound assignment, a conditional, `||` / `&&` / `??`, equality, `^`,
-`in` / `instanceof`, `await`, `yield`, `as` / `satisfies`. A kept shell whose content happens
-to SPELL a type is not in it (a sequence spells the argument separator, `&` and `|` a type
-intersection or union, and `() =>` a function type), so there the pair stands as everywhere
-else. The underlying defect is the `Parse`-side bracketed head — the same over-rejection the
-`{` / `[` heads have — and it belongs to the parse oracles; until it is fixed no fixture can
-pin a cell here, since the cell's expected output is one tsv cannot reparse. Finally, a
-non-null `!`
+Which shells survive printing is only the printer's to know, so the pair's condition asks it
+there — `needs_parens`'s `relational_region_opens_on_a_kept_shell` disjunct, the same
+predicate that decides the operand's own shell — and the chain takes the pair on every one:
+assignment and compound assignment, a conditional, `||` / `&&` / `??`, equality, `^`,
+`in` / `instanceof`, `await`, `yield`, `as` / `satisfies`, and a JSDoc cast, whose pair is
+required by the cast rather than by the position. Only two of those families are still
+REJECTED by tsv's own parse at a `(` head — a group whose content spells a parameter list, and
+one tsc's error recovery carries to the `>` (`(a << b)`) — the rest are comparison chains to
+every parser, the pair being the printer's insurance
+([relational_chain_type_arg_parens_kept_shell](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_kept_shell_prettier_divergence/);
+the width half, [relational_chain_type_arg_parens_kept_shell_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_kept_shell_long_prettier_divergence/)).
+
+The readers the pair answers are not the same at every shell. Where the content reads as a
+function type's parameter list — an assignment `(a = b)` spells a default, a conditional
+`(a ? b : q)` an optional parameter, a sequence `(a, b)` two parameters — **tsc** commits the region too and reports
+`'=>' expected.` on the bare form, at a committing follower and at a `>` that ends a line
+alike (and down the computed-member spine, `x < (a = b)[0] > (t, u)`); there the bare
+spelling prettier prints is one the language's own parser rejects (acorn-typescript, which
+backs off a failed type list, reads even these as the chain). At every other shell —
+compound assignment, `||` / `&&` / `??`, equality, `^`, `in` / `instanceof`, `await`,
+`as` / `satisfies` — tsc and acorn-typescript both read the bare form as the comparison
+chain it is, and so does tsv: the `(` head grades its body, so it reads the chain on the
+authored bytes exactly as the two oracles do. The pair there is **soundness insurance** rather
+than a reading — the bare output would open a `(`-headed region for whichever parser reads it
+next, and which shells survive printing is only the printer's to know. The rule is therefore
+not split along that line: it fires on every kept shell, and at the families tsv itself
+rejects it is what keeps the pair standing at all.
+
+The question is the region's **first printed byte**, not the operand node, so it reaches
+down the operand's leftmost printed spine: `x < (a = b)[0] > (t, u)` inherits the `(` from
+its member's object and opens the same region. How far down is a grammar fact rather than an
+accident. A `(` only opens a *type-argument* region if the type grammar can carry on past
+its matching `)`, and the only postfix a parenthesized type takes is `[`…`]` — so the rule
+descends exactly one hop kind, the object of a plain **computed** member, the one node that
+prints `[` and nothing else between its object and the rest of the region. Every other spine
+hop puts a token there that no type continues: a `.` (a qualified name needs an identifier
+head, never a `)`), a call's `(`, a template's backtick, an operator, and an optional
+member's `?`. A hop that could put a type SEPARATOR there instead (`,`, `|`, `&`, a nested
+`<`) is unreachable without the operand ROOT taking a pair first, since each binds looser
+than `<` and a sequence self-parenthesizes. The one token in that list whose answer is a
+tsv position rather than a grammar fact is the non-null `!` — tsc's `JSDocNonNullableType`,
+which acorn-typescript and so tsv's own parse decline; a parse that admitted it after a `)`
+would put the non-null hop in the walk.
+
+Over-approximating within the admitted hops costs nothing: a pair around the `>`'s left
+operand ends the region on a `)`, which continues no type-argument list, so a pair on a
+chain whose bare form would have re-parsed is noise and never a hazard. A kept shell whose
+content happens to SPELL a type takes the pair through the region-keyed reading anyway (a
+sequence spells the argument separator, `&` and `|` a type intersection or union, and
+`() =>` a function type), so the disjunction is redundant there. What it still covers
+is the shell the reading declines and the printer keeps: `x < (a || b) > (c, d)` is the
+comparison chain acorn and tsc read, and tsv reads it too — the parenthesized content is graded
+exactly as its paren-free twin is. The pair the disjunct puts there is redundant rather than
+load-bearing on every shell whose content tsc abandons; it stays load-bearing on the two
+families tsv still refuses — a group whose content spells a parameter list (`(a = b)`,
+`(a ? b : q)`, `(a, b)`, `(a: T)`), and one tsc's error recovery carries to the `>`
+(`(a << b)`) — and it is what makes grading the `(` head's body sound in the first place.
+Finally, a non-null `!`
 **does** open one, prefix and postfix: `T!` is tsc's `JSDocNonNullableType`, so
 `a < b! >⏎c` is an instantiation plus a statement where acorn-typescript — and so tsv's own
 parse — reads the comparison chain the flat line is. tsv follows acorn when it parses, and
@@ -234,8 +316,14 @@ adds, a paren shell it strips) and one token the two oracles type differently (t
 **soundness** — a `<` tsv's own parse reads as a type-argument region in tsv's own OUTPUT
 must have got a pair, since tsv's parser is one of that output's readers — and
 **independence** — the relaxed reading must reach one verdict across the redundant-paren
-spellings of one program. Independence is gated (`deno task paren:audit`); soundness is not
-gated at all, and the kept-shell hole above is where it currently fails.
+spellings of one program. At a `(` head soundness is carried by the head's own shell — a kept
+shell earns the comparison a pair, a stripped one is not in the printed form and is read
+through — which is what lets that head grade its body at all; at a `{` or `[` head there is no
+such shell, so the grade stays off and the pair stands unconditionally. Independence is gated (`deno task paren:audit`); soundness has no
+gate of its own — no fixture can carry the shape, which exists only in printer output — and
+rests on the two printer disjuncts above together with the as-authored reparse legs
+(`roundtrip:audit`, `gaps:audit`, `fuzz:audit`), which see it only on the documents they
+hold.
 
 **Arrow-body leftmost decorated class parens**: An arrow's concise body cannot START with
 `@` — the grammar admits a decorator only ahead of a class in a declaration-ish position —
