@@ -415,13 +415,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Run `f` as a **body** — an arrow's block body, a function's params + body,
-    /// or a class body: `[+In]` ([`Parser::with_allow_in`]) and a conditional
+    /// or a class body: `[+In]` ([`Parser::with_allow_in`]), a conditional
     /// consequent's return-type bar lifted
-    /// ([`Parser::with_arrow_return_type_allowed`]), both restored afterward (even
-    /// on error). The two flags share this boundary — a body is where tsc's
-    /// `allowReturnTypeInArrowFunction` goes back to `true` without a delimiter
-    /// opening, and it is `[+In]` for the same reason — so the three sites take one
-    /// call rather than nesting two.
+    /// ([`Parser::with_arrow_return_type_allowed`]), and the open `<` region handed down
+    /// to the body's statements ([`Parser::with_lt_region_inherited`]), all restored
+    /// afterward (even on error). The first two share this boundary — a body is where
+    /// tsc's `allowReturnTypeInArrowFunction` goes back to `true` without a delimiter
+    /// opening, and it is `[+In]` for the same reason — so the three sites take one call
+    /// rather than nesting three.
     ///
     /// The ternary consequent is the one `[+In]` production that instead BARS the
     /// return type, so it takes `with_allow_in` and
@@ -431,7 +432,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
     ) -> Result<T, ParseError> {
-        self.with_allow_in(|p| p.with_arrow_return_type_allowed(f))
+        self.with_allow_in(|p| p.with_arrow_return_type_allowed(|p| p.with_lt_region_inherited(f)))
     }
 
     /// Fold a trailing TypeScript `as` / `satisfies` type assertion at the current
@@ -646,7 +647,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 });
             }
 
+            // Read BEFORE the operator is consumed and the right operand parsed: the
+            // question is whether a `<` stands AHEAD of this `>`, and a `<` inside its own
+            // right operand does not (`BinaryExpression::may_close_type_arguments`).
+            let may_close_type_arguments =
+                operator == BinaryOperator::GreaterThan && self.lt_region_open_before(expr_start);
+            // Span coordinates, as `expr_start` is — the two are only ever compared.
+            let operator_pos = self.current_pos().0;
+
             self.advance()?; // consume operator
+
+            // A `<<` opens a region as a `<` does — tsc re-scans it to one where it looks
+            // for type arguments (`reScanLessThanToken`).
+            if matches!(
+                operator,
+                BinaryOperator::LessThan | BinaryOperator::LeftShift
+            ) {
+                self.open_lt_region(operator_pos);
+            }
 
             // Parse right-hand side with right binding power
             let right = self.parse_expression_bp(right_bp)?;
@@ -664,6 +682,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     right,
                     // Set only by the lazy `>` reading above, which re-allocates the node.
                     relexes_as_type_arguments: false,
+                    may_close_type_arguments,
                 }),
             });
         }
@@ -1909,7 +1928,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Capture the end position of ')' before consuming it
         let (_, paren_end) = self.current_pos();
         self.expect(&TokenKind::ParenClose)?; // consume ')'
-        self.exit_grouping();
+        // The one delimiter the printer may strip, so a `<` region opened inside it is
+        // not closed by this `)`.
+        self.exit_stripped_grouping();
         debug_assert_encloses(paren_start as u32, paren_end as u32, parsed, parsed);
 
         // Grouping parens are normally discarded (the inner's own allocation flows

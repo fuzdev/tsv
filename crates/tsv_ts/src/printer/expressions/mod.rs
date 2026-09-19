@@ -33,7 +33,7 @@ mod template_literal;
 /// more than the chain has any business seeing.
 pub(in crate::printer) use self::conditional::ChainBaseTernary;
 
-use self::operators::{OperatorBuf, SeqLayout};
+use self::operators::{ChainOperator, OperatorBuf, SeqLayout};
 use crate::ast::internal::{BinaryExpression, Expression, ExpressionKind, TSType};
 use crate::printer::ShareTag;
 use crate::printer::comments::{AsiOperandShell, CommentFilter, CommentSpacing};
@@ -1793,6 +1793,19 @@ impl<'a> Printer<'a> {
                 } else {
                     parts.push(op_and_operand);
                 }
+            } else if operators[i - 1].leads_line {
+                // The operator leads the continuation line instead of ending the one
+                // before ([`ChainOperator::leads_line`]).
+                let continuation = d.indent_line(d.concat(&[
+                    d.text(operators[i - 1].as_str()),
+                    d.text(" "),
+                    *operand,
+                ]));
+                parts.push(if should_group {
+                    d.group(continuation)
+                } else {
+                    continuation
+                });
             } else if should_group {
                 // Sub-group for independent fitting
                 parts.push(d.group(d.concat(&[
@@ -1866,7 +1879,7 @@ impl<'a> Printer<'a> {
         }
 
         // Add current operator
-        operators.push(expr.operator);
+        operators.push(ChainOperator::of(expr));
 
         // Also flatten the right side where prettier REBALANCES it, removing the redundant
         // parens ([`BinaryOperator::rebalances_with`] — logical operators only; arithmetic
@@ -1915,18 +1928,8 @@ impl<'a> Printer<'a> {
         // leave a parenthesized logical base breaking its operands where the
         // arithmetic one holds them together — see conformance_prettier_ts.md §TypeScript
         // (Parenthesized binary member base).
-        if operands.len() == 2 {
-            return d.group(d.concat(&[
-                operands[0],
-                d.text(" "),
-                d.text(operators[0].as_str()),
-                d.line(),
-                operands[1],
-            ]));
-        }
-
-        // For 3+ operand chains, use line breaks between operands:
-        // operand1 " /", line, operand2 " /", line, operand3
+        // `operand1 " /", line, operand2 " /", line, operand3` — or, for an operator that
+        // leads its line ([`ChainOperator::leads_line`]), `operand1, line, "> " operand2`.
         let mut parts: DocBuf = DocBuf::new();
 
         for (i, operand) in operands.iter().enumerate() {
@@ -1934,16 +1937,32 @@ impl<'a> Printer<'a> {
                 // First operand
                 parts.push(*operand);
             } else {
-                // Subsequent operands: line break then operand
-                parts.push(d.line()); // space in flat, newline in break
+                let operator = operators[i - 1];
+                if operator.leads_line {
+                    parts.push(d.line());
+                    parts.push(d.text(operator.as_str()));
+                    parts.push(d.text(" "));
+                } else {
+                    parts.push(d.text(" "));
+                    parts.push(d.text(operator.as_str()));
+                    parts.push(d.line()); // space in flat, newline in break
+                }
                 parts.push(*operand);
             }
+        }
 
-            // Add operator after operand (except for last)
-            if i < operators.len() {
-                parts.push(d.text(" "));
-                parts.push(d.text(operators[i].as_str()));
-            }
+        // A 2-operand chain takes a group of its own, so the binary can independently
+        // decide whether to break at the operator. The group stays flat when the operands
+        // fit; when they don't, its `line` fires and breaks at the operator (e.g.
+        // `left +\nright`), preventing the operands' internal break points (like member
+        // chain dots) from firing instead.
+        //
+        // Applies to every operator family. Excluding a logical operator here would
+        // leave a parenthesized logical base breaking its operands where the
+        // arithmetic one holds them together — see conformance_prettier_ts.md §TypeScript
+        // (Parenthesized binary member base).
+        if operands.len() == 2 {
+            return d.group(d.concat(&parts));
         }
 
         d.concat(&parts)

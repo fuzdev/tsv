@@ -734,6 +734,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// (a decorator's TS1206, a body's TS1183) to diagnostics — see
     /// `parse_class_declaration_inner_with_start` and `finish_method_member`.
     fn parse_class_member(&mut self) -> Result<ClassMember<'arena>, ParseError> {
+        // A member boundary ends a `<` region as a statement's does.
+        self.reset_lt_region_for_statement();
         let (start, _) = self.current_pos();
 
         // Parse any decorators on this member. Ambient (`declare class`) members parse

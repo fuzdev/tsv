@@ -51,6 +51,13 @@ use tsv_lang::source_scan::{TriviaProfile, skip_template_literal, skip_trivia};
 ///   parens are decided, so [`Relex`] asks about the REGION alone and skips the follower
 ///   entirely ([`scan_for_closing_angle_bracket`]).
 ///
+///   That is the `>` which CLOSES the chain. A lone `>` the region reaches before it — tsc's
+///   recovering list parse stops at the first token the type grammar cannot take, so the
+///   `>` inside `x < (a > b)`, or a comma sibling's in `fn(x < q, a > b)` — is no reading's
+///   to answer, since no pair can end a region ahead of a token inside it. It takes a
+///   LAYOUT answer instead: the printer never lets it end a line
+///   (`BinaryExpression::may_close_type_arguments`).
+///
 /// **One token the two ORACLES read differently**, no printer move involved: the non-null
 /// `!`. `T!` is tsc's `JSDocNonNullableType` — prefix and postfix — so `<b!>` is a
 /// type-argument list to the compiler, where acorn-typescript reads a comparison and tsv's

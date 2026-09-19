@@ -12,7 +12,7 @@ governs every entry here live in [conformance_prettier.md](./conformance_prettie
 - Return type generic union — ◆print_width — [return_type_generic_union_long](../tests/fixtures/typescript/declarations/function/return_type_generic_union_long_prettier_divergence/)
 - Module path calls — ◆print_width — [path_calls_long](../tests/fixtures/typescript/modules/imports/path_calls_long_prettier_divergence/)
 - Instantiation expression parens — ◆prettier_bug — [instantiation_parens](../tests/fixtures/typescript/typescript_specific/assertions/instantiation_parens_prettier_divergence/), [export_default_instantiation](../tests/fixtures/typescript/modules/exports/default_wrappable_leftmost_operators/instantiation_prettier_divergence/), [instantiation_paren_follow](../tests/fixtures/typescript/typescript_specific/generics/instantiation_paren_follow_prettier_divergence/)
-- Relational chain type-argument parens — ◆prettier_bug — [relational_chain_type_arg_parens](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_prettier_divergence/), [relational_chain_type_arg_parens_object_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_object_long_prettier_divergence/), [relational_chain_type_arg_parens_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_long_prettier_divergence/), [relational_chain_type_arg_parens_close_follow](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_close_follow_prettier_divergence/), [relational_chain_type_arg_parens_kept_shell](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_kept_shell_prettier_divergence/), [relational_chain_type_arg_parens_kept_shell_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_kept_shell_long_prettier_divergence/), [relational_paren_head_value_body_pair](../tests/fixtures/typescript/expressions/binary/relational_paren_head_value_body_pair_prettier_divergence/)
+- Relational chain type-argument parens — ◆prettier_bug — [relational_chain_type_arg_parens](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_prettier_divergence/), [relational_chain_type_arg_parens_object_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_object_long_prettier_divergence/), [relational_chain_type_arg_parens_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_long_prettier_divergence/), [relational_chain_type_arg_parens_close_follow](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_close_follow_prettier_divergence/), [relational_chain_type_arg_parens_kept_shell](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_kept_shell_prettier_divergence/), [relational_chain_type_arg_parens_kept_shell_long](../tests/fixtures/typescript/expressions/binary/relational_chain_type_arg_parens_kept_shell_long_prettier_divergence/), [relational_paren_head_value_body_pair](../tests/fixtures/typescript/expressions/binary/relational_paren_head_value_body_pair_prettier_divergence/), [relational_region_inner_gt_break_long](../tests/fixtures/typescript/expressions/binary/relational_region_inner_gt_break_long_prettier_divergence/)
 - Non-null parenthesized base — ◆design_choice — [non_null_paren_base_long](../tests/fixtures/typescript/expressions/member/non_null_paren_base_long_prettier_divergence/)
 - Parenthesized binary member base — ◆design_choice ◆print_width — [paren_binary_base_long](../tests/fixtures/typescript/expressions/member/paren_binary_base_long_prettier_divergence/)
 - Constrained infer extends-operand parens — ◆prettier_bug — [constrained_extends_parens](../tests/fixtures/typescript/types/infer/constrained_extends_parens_prettier_divergence/)
@@ -304,6 +304,64 @@ Two things do bound it, both from the bare side and both pinned by
 an operand that is arithmetic rather than a type (`a < arr[b - 1] > c`), and a `>>` / `>>>`
 run or a `>=` — one token each, which the printer cannot split, so no break can land at the
 join.
+
+**A `>` the region reaches before its own close takes a LAYOUT answer, not a pair.** Everything
+above is about the `>` that closes a chain. tsc's list parse does not look for that one: it is
+`parseDelimitedList(TypeArguments, parseType)` run from the `<` with error recovery — a missing
+`)`, `]` or `}` is reported and stepped over, a comma starts the next argument — and it stops at
+the first token the type grammar cannot take. When that token is a lone `>` the follower question
+is asked THERE, and a follower past a line break commits the list. So `x < (a > b)` is the
+comparison it looks like while `b` shares the `>`'s line, and `x<(a>` plus wreckage
+(`')' expected.`) once a break stands between them — and width alone puts one there, on both
+formatters:
+
+```
+const k =
+	x <
+	(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa >
+		bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb);
+```
+
+The class is far wider than the kept shell it was first seen in, because what carries the parse to
+the `>` is tsc's recovery rather than any one shape: an arrow's concise body (a function type), a
+sequence (a second argument), a conditional's branch (an optional parameter), an index
+(`q[a > b]`, an indexed access type), an array or object head (a tuple, a type literal), the
+member spine past the shell, and a **block body** written inside the region — the arrow's braces
+read as a type literal and `return (` as a method signature. It needs no outer `>`
+(`x < (a > b);`), and no shell either: a comma is the type-argument separator, so a later
+sibling's `>` closes the region an earlier sibling's `<` opened, and `fn(x < q, aaa… >⏎bbb…)` is
+a generic call missing a comma to tsc, to acorn-typescript **and to tsv's own parse** — the
+famous `f(a < b, c > d)`, reached by width. A `<<` opens the region too (tsc re-scans it to a
+`<`). The pair above does not help: it ends the OUTER `>`'s region on a `)`, and this `>` is met
+first. Nor can anything between the two tokens be reworded, and a `(` or a template past the `>`
+commits on any line — those authorings are tsc's rejects as written, as is a comment that forces
+the follower down (`a > // c⏎b`), whose only repair would be a comment relocation.
+
+So the one free choice is where the line breaks, and tsv breaks AHEAD of such a `>`
+(`aaa…⏎> bbb…`): its follower shares its line, which is the comparison to every parser at every
+width, a fixed point by construction, and never over the print width. `>=`, `>>` and `>>>` are
+one token each and re-scan to something the list parse abandons, so they end a line as any
+operator does, as does a `>` whose follower is a `+`, `-` or `<` tsc refuses outright — the rule
+does not read the follower, since the break is free either way.
+
+Which `>` that is, is decided in the parser (`BinaryExpression::may_close_type_arguments`), the
+one component that sees the tokens in order, and deliberately as a **superset**: no model of
+which tokens tsc's recovery takes — the block-body row above is what such a model looks like —
+but "a binary `<` stands ahead of this `>`'s left operand, and nothing that provably ends its
+region has been printed since". Two things provably end one, both tokens the type grammar cannot
+take at list level and the printer always prints: the closer of the delimiter the `<` was
+written in (call arguments, `[…]`, `{…}`, `${…}` — but **not** a grouping paren, which the
+printer may strip, so `f((x < q), a > b)` is the comma-sibling case), and a statement or class
+member boundary, which a body inherits the open region across (the parser's `LtRegion`). A
+region opened inside the `>`'s own left operand is the chain the pair rule answers and is not
+this rule's. Erring early is the unsound direction; erring late costs an operator-leading break
+on a shape real code does not hold — the `../corpora` snapshot holds two lines ending in a
+binary `>`, neither behind a `<`. The rule is uniform across a Svelte component: a template
+expression is acorn's to parse, but `svelte-check` hands its text to tsc as written. Prettier
+takes the break after the `>` at every one of these and throws on its own output; pinned at the
+100/101 boundary for the shelled and the shell-free shape, with the bounded side (a statement's
+body, a closed call) as controls, by
+[relational_region_inner_gt_break_long](../tests/fixtures/typescript/expressions/binary/relational_region_inner_gt_break_long_prettier_divergence/).
 
 **Where the verdict is taken.** The question is about BYTES — which tokens a re-lex of the
 printed form would join — and the printer holds a tree, so it is answered in the parser and
