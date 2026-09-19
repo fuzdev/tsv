@@ -194,7 +194,7 @@ pub fn choose_layout(
     // (handled by `is_curried_arrow_chain_that_breaks` below) — the assignment RHS renders
     // that break itself, which is why `should_use_arrow_chain_layout` declines the chain
     // layout here and only here.
-    if is_curried_arrow_chain(right_expr) && !is_curried_arrow_chain_that_breaks(right_expr) {
+    if is_curried_arrow_chain_owning_break(right_expr) {
         return AssignmentLayout::Fluid;
     }
 
@@ -300,6 +300,15 @@ pub fn should_inline_logical_expression(binary: &internal::BinaryExpression<'_>)
 pub fn is_curried_arrow_chain_that_breaks(expr: &Expression<'_>) -> bool {
     is_curried_arrow_chain(expr)
         && matches!(&expr.kind, ExpressionKind::ArrowFunctionExpression(arrow) if arrow_chain_should_break(arrow))
+}
+
+/// A curried chain that OWNS its break after the operator of the assignment it is the value
+/// of — every curried chain but one whose heads force that break
+/// ([`is_curried_arrow_chain_that_breaks`], which the seam breaks for instead). Such a chain
+/// takes the fluid layout and prints the operator→value gap's run behind its own softline
+/// ([`Printer::build_led_curried_chain_doc`]).
+pub fn is_curried_arrow_chain_owning_break(expr: &Expression<'_>) -> bool {
+    is_curried_arrow_chain(expr) && !is_curried_arrow_chain_that_breaks(expr)
 }
 
 /// Check if an expression is a curried arrow function (its body is another
@@ -1111,7 +1120,7 @@ impl<'a> Printer<'a> {
         // seam owns that break — and one under a hang stands where the hang puts it. Any
         // other chain owns its break-after-operator and PRINTS the gap's run itself
         // ([`Printer::build_led_curried_chain_doc`]), so it is not prepended below.
-        let chain_leads = is_curried_chain && !is_curried_arrow_chain_that_breaks(right_expr);
+        let chain_leads = is_curried_arrow_chain_owning_break(right_expr);
         let chain_prints_run = chain_leads && !chain_hangs;
         // `hoisted_run` is the gap's run where the RHS owns part of it
         // ([`Printer::hoist_owned_value_gap_run`], which asks the licence itself and hands

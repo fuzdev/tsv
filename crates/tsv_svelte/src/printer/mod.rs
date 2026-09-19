@@ -615,7 +615,7 @@ impl<'a> Printer<'a> {
         expr: &Expression<'_>,
         frozen: bool,
         embed: &EmbedContext,
-        value_owns_operator_break: bool,
+        value_gap_start: Option<u32>,
     ) -> DocId {
         if frozen {
             self.build_frozen_node_doc(expr.span())
@@ -625,7 +625,7 @@ impl<'a> Printer<'a> {
                 expr,
                 &self.ts_inputs(),
                 *embed,
-                value_owns_operator_break,
+                value_gap_start,
             )
         }
     }
