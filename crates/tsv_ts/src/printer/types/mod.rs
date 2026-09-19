@@ -45,6 +45,7 @@ pub(in crate::printer) use union_intersection::UnionValueDoc;
 // The pair an annotation's POSITION requires around its type — read by the hang seam
 // below as well as by the annotation emitters themselves.
 use type_annotation::AnnotationParens;
+pub(in crate::printer) use type_arguments::ShiftRescan;
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`
 pub(super) use super::StandaloneGlue;
@@ -339,7 +340,7 @@ impl<'a> Printer<'a> {
                         ) {
                             parts.push(doc);
                         }
-                        parts.push(self.build_type_arguments_doc(type_args));
+                        parts.push(self.build_type_arguments_doc(type_args, ShiftRescan::Splits));
                         d.concat(&parts)
                     }
                 }
@@ -692,7 +693,8 @@ impl<'a> Printer<'a> {
                         ) {
                             value_parts.push(doc);
                         }
-                        value_parts.push(self.build_type_arguments_doc(type_args));
+                        value_parts
+                            .push(self.build_type_arguments_doc(type_args, ShiftRescan::Never));
                     }
                     d.concat(&value_parts)
                 };
@@ -736,7 +738,7 @@ impl<'a> Printer<'a> {
                     ) {
                         parts.push(doc);
                     }
-                    parts.push(self.build_type_arguments_doc(type_args));
+                    parts.push(self.build_type_arguments_doc(type_args, ShiftRescan::Never));
                 }
                 d.concat(&parts)
             }
@@ -2339,6 +2341,21 @@ impl<'a> Printer<'a> {
         head: &KeywordValueHead<'_>,
         trailing_block: TrailingBlock,
     ) -> DocId {
+        self.build_keyword_value_doc_with(head, trailing_block, |value| {
+            self.build_annotation_value_doc(value, AnnotationParens::AsWritten)
+        })
+    }
+
+    /// [`Self::build_keyword_value_doc`] with the caller's own builder for the unfrozen
+    /// value — the angle-bracket assertion's, whose union prints flat rather than by the
+    /// annotation's hanging-indent rule. The freeze, the route, the claim and the lift are
+    /// the head's and stay here.
+    pub(in crate::printer) fn build_keyword_value_doc_with<'t>(
+        &self,
+        head: &KeywordValueHead<'t>,
+        trailing_block: TrailingBlock,
+        build: impl FnOnce(&'t TSType<'t>) -> DocId,
+    ) -> DocId {
         if head.frozen {
             self.build_frozen_single_child_doc(head.child)
         } else if head.routed {
@@ -2352,7 +2369,7 @@ impl<'a> Printer<'a> {
                 head.child,
                 head.value_type,
                 trailing_block,
-                || self.build_annotation_value_doc(head.value_type, AnnotationParens::AsWritten),
+                || build(head.value_type),
             )
         }
     }
@@ -2395,7 +2412,7 @@ impl<'a> Printer<'a> {
             ) {
                 parts.push(doc);
             }
-            parts.push(self.build_type_arguments_doc(type_args));
+            parts.push(self.build_type_arguments_doc(type_args, ShiftRescan::Splits));
         }
         d.concat(&parts)
     }

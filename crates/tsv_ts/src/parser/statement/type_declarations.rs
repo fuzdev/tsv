@@ -194,6 +194,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
             let expression = self.parse_type_entity_name()?;
 
+            // A `<<` does not split into `<` `<` here (`implements I<<T>() => U>`): unlike
+            // every other type-argument position, acorn-typescript reads this list off a
+            // relational `<` alone and tsc parses it with the token as lexed, so both
+            // reject the glued spelling and the split would be an over-acceptance with no
+            // oracle behind it. The spaced and parenthesized spellings parse for all three
+            // (`I< <T>() => U>`), and the printer emits the spaced one.
+            if self.check(&TokenKind::LeftShift) {
+                return Err(self.error_expected_found("'<', '{' or ','"));
+            }
+
             // Check for type arguments
             let type_arguments = self.parse_optional_type_arguments()?;
 

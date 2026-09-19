@@ -1,8 +1,8 @@
 <script lang="ts">
 	// a type assertion whose asserted type opens with a generic function type's `<` keeps a
 	// space after its own `<`: tsc never splits a `<<` token at an assertion
-	const a1 = < <T>() => R>x;
-	const a2 = < <T>(v: T) => T>(<U>x);
+	const a1 = <| (<T>() => R)>x;
+	const a2 = <(| (<T>(v: T) => T))>(<U>x);
 	const a3 = < <T>() => R | S>x;
 
 	// a comment at the asserted type's end changes nothing about what follows the `<`

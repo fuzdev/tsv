@@ -17,4 +17,4 @@
 	type Y7 = A<typeof f< <T>() => void>>;
 </script>
 
-{x as typeof f< <T>() => void>}
+{x as typeof f<<T>() => void>}

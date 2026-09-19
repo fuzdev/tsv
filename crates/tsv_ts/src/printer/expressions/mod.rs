@@ -859,20 +859,25 @@ impl<'a> Printer<'a> {
         // past any comment that itself contains a `>` (`<T /* > */>`).
         let open_pos = type_assert_span.start; // the `<`
         let angle_end = open_pos + 1; // after `<`
-        let type_start = type_assert.type_annotation.span().start;
+        // The `<`→type gap is a keyword→value head like `as`'s, resolved by the same seam
+        // ([`Printer::keyword_value_head`]): a transparent one-member composite is its
+        // member (the `|` dropped, its head gap folded into this one), a redundant shell
+        // holding a breaking leading run strips with its run handed to this gap — window
+        // and claim together — and an alone-on-line format-ignore directive freezes the
+        // type verbatim. The broken-cast path below keeps a run own-line
+        // (`build_leading_comments_multiline`), so each answer slots in as the type doc.
+        // Without it the cast built the composite by its own leading-pipe rule, which
+        // under a surviving `|` strips a function-type member's shell and does not
+        // reparse. `build_type_doc`, not the annotation's value builder: a union cast
+        // type prints flat (see below).
+        let head = self.keyword_value_head(angle_end, type_assert.type_annotation);
+        let type_start = head.value_start;
         let type_end = type_assert.type_annotation.span().end;
         let expr_start = type_assert.expression.span().start;
         let close_angle = self.find_assertion_close_angle(type_end, expr_start);
-        // An alone-on-line format-ignore directive in the `<`→type gap freezes a
-        // non-composite cast type verbatim (`single_child_frozen`; a composite
-        // declines and freezes via its own leading-run walk). The broken-cast path
-        // below already keeps the directive own-line (`build_leading_comments_multiline`),
-        // so the freeze slots in as the type doc.
-        let type_doc = if self.single_child_frozen(angle_end, type_assert.type_annotation) {
-            self.build_frozen_single_child_doc(type_assert.type_annotation)
-        } else {
-            self.build_type_doc(type_assert.type_annotation)
-        };
+        let type_doc = self.build_keyword_value_doc_with(&head, TrailingBlock::Inline, |value| {
+            self.build_type_doc(value)
+        });
 
         // Comments in the cast stay where the author wrote them. Block comments hug
         // inline (`</* c */ T>`, `<T /* c */>`, `<T>/* c */ expr`); a `//` runs to
@@ -913,9 +918,18 @@ impl<'a> Printer<'a> {
                 CommentSpacing::Leading,
                 CommentFilter::BlockOnly,
             );
+            // tsc never splits a `<<` token at an assertion, so an asserted type that opens
+            // with its own `<` (a generic function type) takes a SPACE after the cast's `<`
+            // while the two share a line; broken, it is the same line break
+            // ([`Printer::angle_open_meets_angle`]).
+            let open_gap = if self.angle_open_meets_angle(angle_end, head.value_type) {
+                d.line()
+            } else {
+                d.softline()
+            };
             d.group(d.concat(&[
                 d.text("<"),
-                d.indent(d.concat(&[d.softline(), comments_doc, type_doc, before_close_doc])),
+                d.indent(d.concat(&[open_gap, comments_doc, type_doc, before_close_doc])),
                 d.softline(),
                 d.text(">"),
             ]))
