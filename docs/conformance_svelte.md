@@ -1024,7 +1024,10 @@ pins the accepting side. Two families are the exception, and both are **tsc's ow
 
 - **the parameter-list claim.** `isUnambiguouslyStartOfFunctionType` claims `( )`,
   `( ...`, `( ident :`, `( ident ,`, `( ident ?`, `( ident =` and `( ident ) =>` for
-  a function type before any body is read, so tsc commits to the type-argument list
+  a function type before any body is read — and `ident` there stands behind a run of
+  MODIFIERS too, since `skipParameterStart` runs `parseModifiers` first, which is
+  where `( readonly ident :` comes from (acorn-typescript's `tsSkipParameterStart`
+  has no such step). So tsc commits to the type-argument list
   and reports `'=>' expected.` at every committing follower —
   [relational_paren_head_param_list](../tests/fixtures/typescript/expressions/binary/relational_paren_head_param_list_svelte_divergence/).
 - **the recovered list.** `parseTypeArgumentsInExpression` parses the list for real,

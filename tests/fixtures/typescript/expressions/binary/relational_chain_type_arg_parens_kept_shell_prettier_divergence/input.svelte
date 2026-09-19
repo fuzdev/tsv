@@ -68,6 +68,16 @@
 	const k29 = x < (a = b) + 1 > c;
 	const k30 = x < (a = b)?.[0] > c;
 
+	// A REGEX literal inside the shell is the one thing a delimiter scan can misread: an
+	// unescaped `)` in its pattern closes nothing, so the group's own `)` — and the byte
+	// past it, which is what a `(…) =>` reading keys on — are reachable only by a walk
+	// that steps over the literal whole. A character class hides one the same way.
+	const k31 = (x < (a, /\)=>/)) > c;
+	const k32 = (x < (a, /\)=>b/)) > c;
+	const k33 = (x < (a, /[)]=>b/)) > c;
+	const k34 = (x < (/\)=>b/, a)) > c;
+	const k35 = (x < (a, (b, /\)=>c/))) > c;
+
 	// `yield` asks the same question inside its generator.
 	function* fn() {
 		const k19 = (x < (yield a)) > c;
