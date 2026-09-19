@@ -862,10 +862,7 @@ impl<'a> Printer<'a> {
         // window gate below is computed after this point, so the hug searches its two
         // delimiter gaps unconditionally.
         if self.hugs_sole_parameter(params, paren_pos.map(|p| p + 1), close_paren_pos, true) {
-            let inner = self
-                .build_hugged_literal_param_doc(&params[0], true)
-                .unwrap_or_else(|| self.build_function_type_param_expression_doc(&params[0]));
-            return d.parens(inner);
+            return d.parens(self.build_hugged_type_param_doc(&params[0], true));
         }
         let end_boundary =
             close_paren_pos.unwrap_or_else(|| params.last().map_or(0, |p| p.span().end));
@@ -1047,6 +1044,30 @@ impl<'a> Printer<'a> {
             })
     }
 
+    /// The sole parameter a type-side list HUGS ([`Printer::hugs_sole_parameter`]), for both
+    /// callers — the signature path and the function/constructor-type path.
+    ///
+    /// A hugged object pattern takes the parameter's nesting rule
+    /// (`PatternContext::FunctionParameter`, through the value side's own
+    /// [`Printer::build_function_parameter_doc`]), exactly as a function with a body does:
+    /// prettier's hug returns the pattern's contents without its group, which drops the
+    /// `shouldBreak` a nested pattern sets, so `({ a: { b } }: T) => U` stays inline here
+    /// as `function f({ a: { b } }: T) {}` does. Beside a second parameter nothing hugs and
+    /// the pattern is an ordinary one, which a type-side parent breaks.
+    fn build_hugged_type_param_doc(
+        &self,
+        param: &internal::Expression<'_>,
+        window_has_comments: bool,
+    ) -> DocId {
+        self.build_hugged_literal_param_doc(param, window_has_comments)
+            .unwrap_or_else(|| match &param.kind {
+                internal::ExpressionKind::ObjectPattern(_) => {
+                    self.build_function_parameter_doc(param)
+                }
+                _ => self.build_function_type_param_expression_doc(param),
+            })
+    }
+
     /// A type-side parameter list item: the freeze-aware layer over
     /// [`Self::build_function_type_param_expression_doc`]. An alone-on-line
     /// format-ignore directive leading parameter `i` freezes it verbatim (Rule A).
@@ -1170,10 +1191,9 @@ impl<'a> Printer<'a> {
                 close_paren_pos,
                 window_has_comments,
             ) {
-                let inner = self
-                    .build_hugged_literal_param_doc(&params[0], window_has_comments)
-                    .unwrap_or_else(|| self.build_function_type_param_expression_doc(&params[0]));
-                parts.push(d.parens(inner));
+                parts.push(
+                    d.parens(self.build_hugged_type_param_doc(&params[0], window_has_comments)),
+                );
             } else if !window_has_comments {
                 // Zero-comment fast path: plain params joined by `,` + line — no
                 // per-gap comma scans or comment lookups. Renders identically (the
