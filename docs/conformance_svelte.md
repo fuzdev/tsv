@@ -1018,9 +1018,16 @@ asking whether the `:` is an enclosing conditional's.
 `a < { b: c(d) } > (t, u)`. A `<` opening on a `(` is a type-argument list only where
 **tsc** reads one, which tsv grades (`Parser::is_type_arguments_start`'s `(` head arm),
 so `a < (b || c) > (t, u)`, `a < (b++) > (t, u)` and `a < (await b) > (t, u)` all read as
-the comparison chain acorn-typescript and tsc both read —
+the comparison chain acorn-typescript and tsc both read — as do a tagged template
+(``a < (b`c`) > (t, u)``), a class expression, a regex literal (`a < (b, /c<d>/) > (t, u)`),
+an arrow with a bare-name parameter (`a < (b => c) > (t, u)`), an `infer` no binding name
+follows (`a < (infer[b]) > (t, u)`), and a `>` that closes no nested list
+(`a < (b > c) > (t, u)`, `a < (b >> c) > (t, u)`), which is where the compiler's list parse
+stops and asks its follower question early.
 [relational_paren_head_value_body](../tests/fixtures/typescript/expressions/binary/relational_paren_head_value_body/)
-pins the accepting side. Two families are the exception, and both are **tsc's own**:
+pins the accepting side where the printer strips the head's shell, and
+[relational_paren_head_value_body_pair](../tests/fixtures/typescript/expressions/binary/relational_paren_head_value_body_pair_prettier_divergence/)
+where it keeps it. Three families are the exception, and all are **tsc's own**:
 
 - **the parameter-list claim.** `isUnambiguouslyStartOfFunctionType` claims `( )`,
   `( ...`, `( ident :`, `( ident ,`, `( ident ?`, `( ident =` and `( ident ) =>` for
@@ -1038,8 +1045,16 @@ pins the accepting side. Two families are the exception, and both are **tsc's ow
   `a < (await b) > (t, u)` is a comparison chain to tsc where `a < [await b] > (t, u)`
   is a list it then rejects —
   [relational_bracketed_head_recovered_list](../tests/fixtures/typescript/expressions/binary/relational_bracketed_head_recovered_list_svelte_divergence/).
+- **the non-null type.** `!T` and `T!` are tsc's `JSDocNonNullableType`, which its PARSER
+  accepts wherever a type stands — `a < (!b) > (t, u)` is a generic call to the compiler
+  (prettier prints `a<!b>(t, u)`), and the rejection is its checker's (TS8020), in every
+  TypeScript file. tsv has no such type, and an error that is unconditional and local is
+  one its parser rejects rather than defers —
+  [relational_paren_head_non_null](../tests/fixtures/typescript/expressions/binary/relational_paren_head_non_null_svelte_divergence/).
+  The shell-free `a < !b > (t, u)` opens the region on the `!` itself, where tsv's parse
+  follows acorn-typescript and reads the chain.
 
-Both are decisions about what the compiler's own grammar claims, so tsv follows them at
+All three are decisions about what the compiler's own grammar claims, so tsv follows them at
 the `(` head and rejects too; at a `{` or `[` head it reaches the same rejection by
 committing without a grade at all (below), which agrees with the compiler here and not
 everywhere. acorn-typescript backs off the failed list and reads the chain either way. A

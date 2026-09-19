@@ -19,6 +19,20 @@
 	const a12 = a < +1 > (t, u);
 	const a13 = a < b() > `t`;
 
+	// a tagged template, a class expression, a regex literal, an `infer` no binding name
+	// follows, and a `>>` or `>>>` that closes no nested list are value bodies too
+	const a14 = a < b`c` > (t, u);
+	const a15 = a < b.c`d` > (t, u);
+	const a16 = a < typeof b`c` > (t, u);
+	const a17 = a < class {} > (t, u);
+	const a18 = a < class B {} > (t, u);
+	const a19 = a < class extends B {} > (t, u);
+	const a20 = a < /b<c>/ > (t, u);
+	const a21 = a < infer[b] > (t, u);
+	const a22 = a < infer.b > (t, u);
+	const a23 = a < b >> c > (t, u);
+	const a24 = a < b >>> c > (t, u);
+
 	// the same head whose body IS a type stays a type-argument list at the same followers
 	const b1 = a<(B | C) & D>(t, u);
 	const b2 = a<(() => B) | null>(t, u);
