@@ -8,7 +8,9 @@ use super::types::{ChainGroup, ChainNode, NonNullGap, is_numeric_index};
 use crate::ast::internal::{self, Expression, ExpressionKind};
 use crate::printer::expressions::ChainBaseTernary;
 use crate::printer::ignore::FrozenOperandPair;
-use crate::printer::{LeadingGlue, ParenContext, Printer, needs_parens};
+use crate::printer::{
+    ArrowChainContext, LeadingGlue, ParenContext, Printer, is_curried_arrow_chain, needs_parens,
+};
 use tsv_lang::Span;
 use tsv_lang::doc::{
     DocBuf,
@@ -160,14 +162,35 @@ pub(crate) fn print_node_inner<'a>(
                 // builds for one rendered doc. The rare trailing-gap branch still
                 // consumes it (the line-comment layout's broken body), which is why it is
                 // a memo rather than moved into the arms that use it.
-                let mut inner_memo = None;
-                let mut inner = || -> DocId {
-                    *inner_memo.get_or_insert_with(|| printer.build_expression_doc(expr))
-                };
                 // Resolved BEFORE the bodies, because the claim below takes both and this is
                 // what says whether there are two. The window it opens is documented at the
                 // emitter call below, with the rest of the pair's gap reading.
                 let trailing_gap = trailing_gap();
+                // A curried arrow chain that IS a callee (`paren_leading_start`, as below)
+                // takes prettier's callee shape, exactly as the bare-callee path gives it
+                // ([`crate::printer::ArrowChainContext::Callee`]) — and on the same terms: that
+                // shape opens the pair from inside the operand's doc, so a comment in either
+                // of the pair's gaps leaves the pair to the shell builders instead.
+                let callee_chain = is_curried_arrow_chain(expr)
+                    && paren_leading_start.is_some_and(|start| {
+                        !printer.has_comments_on_page_between(start, base_start)
+                    })
+                    && trailing_gap.is_none_or(|(start, end)| {
+                        !printer.has_comments_on_page_between(start, end)
+                    });
+                let mut inner_memo = None;
+                let mut inner = || -> DocId {
+                    *inner_memo.get_or_insert_with(|| {
+                        if callee_chain {
+                            printer
+                                .build_with_arrow_chain_context(ArrowChainContext::Callee, || {
+                                    printer.build_expression_doc(expr)
+                                })
+                        } else {
+                            printer.build_expression_doc(expr)
+                        }
+                    })
+                };
                 // A MULTI-LINE block the base OWNS prints just inside the pair's `(`,
                 // outside the base's own group
                 // ([`Printer::build_value_pair_with_outermost_owned_comment`]) — the pair's
