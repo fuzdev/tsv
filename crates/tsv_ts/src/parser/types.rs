@@ -10,7 +10,7 @@ use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
 
 use super::Parser;
-use super::expression_lookahead::{paren_pattern_then_type_operator, scan_parens_then_arrow};
+use super::expression_lookahead::paren_starts_function_type;
 use super::scan::{
     identifier_starts_at, is_word_at, skip_identifier, skip_whitespace_and_comments,
 };
@@ -392,18 +392,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 match self.current_value() {
                     "keyof" => self.parse_type_operator(TSTypeOperatorKind::Keyof),
                     "unique" => self.parse_type_operator(TSTypeOperatorKind::Unique),
-                    "readonly" => {
-                        // `readonly` could be:
-                        // 1. Type operator: `readonly T[]`
-                        // 2. Part of mapped type: `{ readonly [K in T]: V }` (handled elsewhere)
-                        // 3. Type reference named "readonly" (rare but valid)
-                        // We'll parse as type operator when followed by a type
-                        if self.peek_is_type_start() {
-                            self.parse_type_operator(TSTypeOperatorKind::Readonly)
-                        } else {
-                            self.parse_type_reference()
-                        }
-                    }
+                    // Always the operator, as `keyof` and `unique` are: a `readonly`
+                    // with no operand is a syntax error to tsc, acorn-typescript and
+                    // prettier alike, never a type reference named `readonly`. (The
+                    // mapped-type and member modifier are read by their own parsers.)
+                    "readonly" => self.parse_type_operator(TSTypeOperatorKind::Readonly),
                     "abstract" => {
                         // Check if next token is 'new' for abstract constructor type
                         if matches!(self.peek_kind(), TokenKind::Keyword(KeywordKind::New)) {
@@ -533,18 +526,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             },
             span: Span::new(start as u32, end),
         }))))
-    }
-
-    /// Check if the peek token could start a type
-    fn peek_is_type_start(&mut self) -> bool {
-        matches!(
-            self.peek_kind(),
-            TokenKind::Identifier
-                | TokenKind::ParenOpen
-                | TokenKind::BraceOpen
-                | TokenKind::BracketOpen
-                | TokenKind::Keyword(_)
-        )
     }
 
     /// Check if current position starts an index signature: `[key: type]: T`
@@ -887,56 +868,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         })
     }
 
-    /// Whether the just-opened `(` (the `ParenOpen` already consumed; `paren_offset`
-    /// is its raw byte offset into `self.source`, not a span coordinate) begins a
-    /// function type's parameter list rather than a parenthesized type — the two
-    /// cases where a leading token that [`is_definitely_type_start`] would otherwise
-    /// claim as a type is actually an (ambiguous) parameter. Only meaningful at
-    /// full-type positions; at operand positions (`fn_type_disallowed`) the caller
-    /// short-circuits to a parenthesized type before consulting this.
-    ///
-    /// - a **destructuring pattern** `([a]) => …` / `({ a }) => …`: a leading `[`/`{`
-    ///   with a matching `)` then `=>` (`scan_parens_then_arrow`).
-    ///   `paren_pattern_then_type_operator` additionally rules a leading `{…}`/`[…]`
-    ///   directly followed by `|`/`&` back out (a union/intersection type, never a
-    ///   parameter), e.g. `({ b: B } | C)` / `([B] | C)`.
-    /// - a **contextual type keyword** `(number) => …` (every type keyword except the
-    ///   reserved `void`/`null`, which can't be a parameter name): a parameter when an
-    ///   immediate `:`/`?`/`,` follows (none can appear there in a parenthesized type)
-    ///   or, for a bare single parameter, a `)` then `=>`.
-    ///
-    /// This mirrors acorn-typescript's `tsIsUnambiguouslyStartOfFunctionType`
-    /// lookahead, which likewise runs only at full-type positions. Its byte-scan
-    /// twin — the same rule asked *before* the parser commits to a type, by the
-    /// arrow-vs-parenthesized-expression lookahead — is
-    /// `expression_lookahead::paren_starts_function_type`; the two must move
-    /// together.
-    ///
-    /// [`is_definitely_type_start`]: Self::is_definitely_type_start
-    fn paren_starts_function_type_params(&mut self, paren_offset: usize) -> bool {
-        let source_bytes = self.source.as_bytes();
-
-        // Destructuring-pattern parameter: `([a]) => U`, `({ a }) => U`.
-        let pattern_param = matches!(
-            self.current_kind(),
-            TokenKind::BracketOpen | TokenKind::BraceOpen
-        ) && scan_parens_then_arrow(source_bytes, paren_offset)
-            && !paren_pattern_then_type_operator(source_bytes, paren_offset);
-
-        // Contextual type keyword as a parameter name: `(number) => U`.
-        let type_keyword_param = matches!(
-            self.current_kind(),
-            TokenKind::Keyword(kw)
-                if kw.is_type_keyword() && !matches!(kw, KeywordKind::Void | KeywordKind::Null)
-        ) && match self.peek_kind() {
-            TokenKind::Colon | TokenKind::Question | TokenKind::Comma => true,
-            TokenKind::ParenClose => scan_parens_then_arrow(source_bytes, paren_offset),
-            _ => false,
-        };
-
-        pattern_param || type_keyword_param
-    }
-
     /// Parse parenthesized type `(T)` or function type `(x: T) => U`
     fn parse_parenthesized_or_function_type(
         &mut self,
@@ -948,22 +879,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let start = self.current_pos().0;
         self.expect(&TokenKind::ParenOpen)?;
 
-        // Whether this `(` opens a function type's parameter list. At an operand
-        // position (`fn_type_disallowed`: a union/intersection constituent or
-        // type-operator operand) the grammar has no function types, so it never
-        // does — a following `=>` belongs to an enclosing construct, e.g. the
-        // enclosing arrow function's own `=>` after its return-type annotation
-        // (`(): A & (B) => x`). At full-type positions the ambiguous pattern /
-        // type-keyword cases consult the lookahead helper.
-        let starts_function_params =
-            !self.fn_type_disallowed && self.paren_starts_function_type_params(paren_offset);
-
-        // Parenthesized type: any operand-position `(`, or a full-type-position
-        // `(` on a token that definitely starts a type, not a parameter name
-        // (keywords like typeof/new/import, type operators, brackets, literals).
-        // The inner parse is a full-type position again (`parse_type` clears the
-        // flag), so `A & (() => B)` works.
-        if self.fn_type_disallowed || (!starts_function_params && self.is_definitely_type_start()) {
+        // Whether this `(` opens a function type's parameter list — one rule, asked of
+        // the bytes (`paren_starts_function_type`, acorn-typescript's
+        // `tsIsUnambiguouslyStartOfFunctionType`): `()`, `(...`, or a parameter start
+        // followed by `:` / `,` / `?` / `=`, or by `) =>`. Everything else is a
+        // parenthesized type, whatever its first token — a literal (`(true | A)`),
+        // `this`, an operator word (`(keyof T)`), or a reserved word standing as a
+        // type name (`(default | A)`); the same words are parameter NAMES where the
+        // rule says so (`(keyof) => U`, `(number: T) => U`).
+        //
+        // At an operand position (`fn_type_disallowed`: a union/intersection
+        // constituent or type-operator operand) the grammar has no function types, so
+        // the `(` never opens one — a following `=>` belongs to an enclosing
+        // construct, e.g. the enclosing arrow function's own `=>` after its
+        // return-type annotation (`(): A & (B) => x`). The inner parse is a full-type
+        // position again (`parse_type` clears the flag), so `A & (() => B)` works.
+        if self.fn_type_disallowed
+            || !paren_starts_function_type(self.source.as_bytes(), paren_offset)
+        {
             let inner_type = self.parse_type()?;
             self.expect(&TokenKind::ParenClose)?;
             let end = self.prev_token_end();
@@ -974,48 +907,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             })));
         }
 
-        // Try to parse as function parameters
-        let (params, saw_comma) = self.parse_function_type_params()?;
-        let params: &'arena [Expression<'arena>] = params.into_bump_slice();
+        let params = self.parse_function_type_params()?.into_bump_slice();
         self.expect(&TokenKind::ParenClose)?;
 
-        // A single identifier without type annotation, optional marker, comma,
-        // or a following `=>` is a parenthesized type: a type reference `(T)`,
-        // or the this-type `(this)` — `this` is a valid parameter name
-        // (`parse_function_type_param`), so it lands here too.
-        if !self.check(&TokenKind::Arrow)
-            && !saw_comma
-            && let [
-                Expression {
-                    kind: ExpressionKind::Identifier(id),
-                    ..
-                },
-            ] = params
-            && id.type_annotation().is_none()
-            && !id.optional
-        {
-            let inner = if self.ident_name_is(id, "this") {
-                TSType::ThisType(TSThisType { span: id.span })
-            } else {
-                TSType::TypeReference(TSTypeReference {
-                    type_name: TSEntityName::Identifier(id.clone()),
-                    type_arguments: None,
-                    span: id.span,
-                })
-            };
-            // Use end of closing paren, not end of inner type
-            let end = self.prev_token_end() as u32;
-            return Ok(self.alloc(TSType::Parenthesized(TSParenthesizedType {
-                type_annotation: self.alloc(inner),
-                span: Span::new(start as u32, end),
-            })));
-        }
-
-        // Anything else committed to a function-type parameter list (annotated
-        // — including `this: T` — optional, empty, rest, pattern, trailing
-        // comma, or multiple params), so the `=>` and return type are required
-        // — there is no implicit-void function type (acorn rejects `(x: T)` /
-        // `()` without `=>`). The return type may be a type predicate
+        // Committed to a function-type parameter list, so the `=>` and return type
+        // are required — there is no implicit-void function type (acorn rejects
+        // `(x: T)` / `()` without `=>`). The return type may be a type predicate
         // (asserts x, x is T).
         let arrow_start = self.current_pos().0 as u32;
         self.expect(&TokenKind::Arrow)?;
@@ -1028,61 +925,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return_type,
             span: Span::new(start as u32, end),
         })))
-    }
-
-    /// Check if current token definitely starts a type (not a valid parameter name)
-    fn is_definitely_type_start(&mut self) -> bool {
-        match self.current_kind() {
-            // Keywords that are types, not parameter names
-            TokenKind::Keyword(KeywordKind::Typeof) => true,
-            // Type keywords: string, number, boolean, any, void, never, unknown, object, symbol, bigint, null, undefined
-            TokenKind::Keyword(kw) if kw.is_type_keyword() => true,
-            // Constructor types: new () => T
-            TokenKind::Keyword(KeywordKind::New) => true,
-            // Import types: import("./a").B
-            TokenKind::Keyword(KeywordKind::Import) => true,
-            // `this`-type predicate: `(this is T)` is a parenthesized predicate
-            // type, not a `this` parameter. Bare `this`, `(this: T)`, `(this,`
-            // stay on the function-param path (`this` is a valid parameter name).
-            TokenKind::Keyword(KeywordKind::This) => self.peek_predicate_is_ahead(),
-            // Non-identifier tokens that start types
-            TokenKind::BracketOpen => true, // tuple types
-            TokenKind::BraceOpen => true,   // object types
-            TokenKind::LessThan => true,    // generic function types
-            TokenKind::Minus => true,       // negative number literals
-            TokenKind::ParenOpen => true,   // nested parenthesized types
-            TokenKind::Pipe => true,        // leading pipe in union: (| A | B)
-            TokenKind::Ampersand => true,   // leading ampersand in intersection: (& A & B)
-            // String/number literals are types, not params
-            TokenKind::String | TokenKind::Number => true,
-            // Template literals
-            TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead => true,
-            // Type operators like keyof, readonly, unique, infer, and abstract (for constructor types)
-            TokenKind::Identifier => {
-                let val = self.current_value();
-                if matches!(val, "keyof" | "unique" | "readonly" | "infer") {
-                    return true;
-                }
-                // Abstract constructor types: abstract new () => T
-                if val == "abstract" {
-                    return matches!(self.peek_kind(), TokenKind::Keyword(KeywordKind::New));
-                }
-                // If an identifier is followed by these tokens, it's a type not a param:
-                // (A | B) union, (A & B) intersection, (A<B>) generic,
-                // (A[K]) indexed access, (T extends U ? V : W) conditional,
-                // (ns.X) qualified type reference
-                matches!(
-                    self.peek_kind(),
-                    TokenKind::Pipe
-                        | TokenKind::Ampersand
-                        | TokenKind::LessThan
-                        | TokenKind::BracketOpen
-                        | TokenKind::Keyword(KeywordKind::Extends)
-                        | TokenKind::Dot
-                )
-            }
-            _ => false,
-        }
     }
 
     /// Parse generic function type: `<T>() => U`, `<T, U extends V>(x: T) => U`
@@ -1100,8 +942,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse parameter list
         self.expect(&TokenKind::ParenOpen)?;
-        let (params, _saw_comma) = self.parse_function_type_params()?;
-        let params = params.into_bump_slice();
+        let params = self.parse_function_type_params()?.into_bump_slice();
         self.expect(&TokenKind::ParenClose)?;
 
         // Expect arrow
@@ -1146,8 +987,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse parameter list
         self.expect(&TokenKind::ParenOpen)?;
-        let (params, _saw_comma) = self.parse_function_type_params()?;
-        let params = params.into_bump_slice();
+        let params = self.parse_function_type_params()?.into_bump_slice();
         self.expect(&TokenKind::ParenClose)?;
 
         // Expect arrow
@@ -1169,22 +1009,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         )
     }
 
-    /// Parse function type parameters. The returned flag is whether any comma
-    /// was consumed — a `(T,)` list commits to a function type even though it
-    /// holds a single bare identifier, so the parenthesized-type
-    /// reinterpretation in `parse_parenthesized_or_function_type` needs it.
+    /// Parse function type parameters, up to (not including) the closing `)`.
     fn parse_function_type_params(
         &mut self,
-    ) -> Result<(bumpalo::collections::Vec<'arena, Expression<'arena>>, bool), ParseError> {
+    ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, ParseError> {
         let mut params = self.bvec();
-        let mut saw_comma = false;
 
         if !self.check(&TokenKind::ParenClose) {
             let first = self.parse_function_type_param()?;
             let mut rest_seen = matches!(first.kind, ExpressionKind::RestElement(_));
             params.push(first);
             while self.eat(TokenKind::Comma) {
-                saw_comma = true;
                 // A rest parameter must be last: nothing — not even a trailing
                 // comma — may follow it (see `parse_parameter_list`). In an
                 // ambient (`declare`) context acorn tolerates a single trailing
@@ -1205,7 +1040,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
         }
 
-        Ok((params, saw_comma))
+        Ok(params)
     }
 
     /// Parse a single function type parameter: an identifier (`x: T`), the `this`

@@ -793,52 +793,25 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    /// Whether a name equals `expected` (an ASCII name like `"this"`) — the shared
-    /// core of [`Parser::ident_name_is`] / [`Parser::private_name_is`]. An escaped
-    /// an escaped name compares its arena string (so an escaped `this` still matches); a
-    /// span-identity name compares the `name_len` raw source bytes at `name_start`
-    /// (host coordinates, shifted back to the local slice).
-    fn name_bytes_are(
-        &self,
-        escaped: Option<&str>,
-        name_start: usize,
-        name_len: usize,
-        expected: &str,
-    ) -> bool {
-        match escaped {
-            Some(s) => s == expected,
-            None => {
-                let start = name_start - self.base_offset;
-                self.source.as_bytes().get(start..start + name_len) == Some(expected.as_bytes())
-            }
-        }
-    }
-
-    /// Whether `id`'s name equals `expected` (an ASCII name like `"this"`).
-    pub(super) fn ident_name_is(&self, id: &Identifier<'_>, expected: &str) -> bool {
-        self.name_bytes_are(
-            id.escaped_name,
-            id.span.start as usize,
-            id.name_len as usize,
-            expected,
-        )
-    }
-
-    /// Whether a private identifier's name (the part after `#`) equals `expected`.
-    /// The name begins one byte past the node span's start — the `#` — so it passes
-    /// `span.start + 1`. Used to reject the reserved `#constructor` class-element name.
+    /// Whether a private identifier's name (the part after `#`) equals `expected` (an
+    /// ASCII name like `"constructor"`). An escaped name compares its arena string; a
+    /// span-identity name compares its raw source bytes, which begin one byte past the
+    /// node span's start — the `#` — in host coordinates, shifted back to the local
+    /// slice. Used to reject the reserved `#constructor` class-element name.
     pub(super) fn private_name_is(
         &self,
         pid: &PrivateIdentifier<'_>,
         span: Span,
         expected: &str,
     ) -> bool {
-        self.name_bytes_are(
-            pid.name.escaped,
-            span.start as usize + 1,
-            pid.name.raw_len as usize,
-            expected,
-        )
+        match pid.name.escaped {
+            Some(s) => s == expected,
+            None => {
+                let start = span.start as usize + 1 - self.base_offset;
+                let raw = start..start + pid.name.raw_len as usize;
+                self.source.as_bytes().get(raw) == Some(expected.as_bytes())
+            }
+        }
     }
 
     /// Name channel for the current token as an identifier — the set

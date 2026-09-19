@@ -44,13 +44,6 @@ fn is_greater_equal_op(bytes: &[u8], pos: usize) -> bool {
         && !(pos + 2 < bytes.len() && matches!(bytes[pos + 2], b'>' | b'='))
 }
 
-/// Whether an arrow head opens at `start` — [`scan_arrow_head_close`] for a caller
-/// that wants only the verdict, not the `)`.
-#[inline]
-pub(super) fn scan_parens_then_arrow(bytes: &[u8], start: usize) -> bool {
-    scan_arrow_head_close(bytes, start).is_some()
-}
-
 /// A matched arrow head's byte extents, built by the parser's three head
 /// predicates and read by the consequent-context rule
 /// ([`super::Parser::parse_arrow_or_rewind`]) — which asks two questions of it,
@@ -280,65 +273,6 @@ pub(super) fn matching_paren_close(bytes: &[u8], start: usize) -> Option<usize> 
     None
 }
 
-/// Whether the parenthesized content at `(` (a `(` immediately followed by a
-/// `{`/`[`) is a parenthesized union/intersection *type* rather than a
-/// destructuring-parameter list — i.e. the leading `{…}`/`[…]` is directly
-/// followed (at the paren's top level) by a `|` or `&`.
-///
-/// This disambiguates `({ b: B } | C) => x` / `([B] | C) => x` (a parenthesized
-/// union type sitting inside an enclosing arrow's return type, whose `=>` the
-/// paren-only [`scan_parens_then_arrow`] mistakes for this paren's own arrow)
-/// from a genuine function-type param list `({ a }) => U` / `([a]: T) => U`. A
-/// destructuring parameter can only be followed by `:`, `?`, `,`, or `)`; a
-/// `|`/`&` right after the pattern is never a valid parameter, so it is
-/// unambiguously a union/intersection type. (A `|`/`&` *inside* the pattern's
-/// own type annotation — `({ a }: T | U) => V` — sits after the `:`, past the
-/// balanced pattern, so it is not matched.)
-///
-/// Assumes `bytes[start] == b'('`. Skips strings/templates/comments (and a real
-/// regex, e.g. a `/}/` default) while matching the balanced leading `{…}`/`[…]`.
-pub(super) fn paren_pattern_then_type_operator(bytes: &[u8], start: usize) -> bool {
-    let end = bytes.len();
-    if start >= end || bytes[start] != b'(' {
-        return false;
-    }
-    let mut pos = skip_whitespace_and_comments(bytes, start + 1);
-    let Some(&open @ (b'{' | b'[')) = bytes.get(pos) else {
-        return false;
-    };
-    let close = if open == b'{' { b'}' } else { b']' };
-    let mut depth = 0usize;
-    // The regex-vs-division anchor, rebuilt where a `/` asks for it; `OperandAnchor`
-    // owns the rule. The `(` at `start` is significant and the scan begins past it —
-    // past the leading trivia THIS caller already skipped, which is why the walk's
-    // floor is `pos` rather than the anchor's own value.
-    let mut anchor = OperandAnchor::resumed(start + 1, pos);
-    while pos < end {
-        if let Some(past) = skip_trivia(bytes, pos, end, TriviaProfile::JS) {
-            anchor.skipped_trivia(bytes, pos, past);
-            pos = past;
-            continue;
-        }
-        if bytes[pos] == b'/' && anchor.starts_regex(bytes, pos, start) {
-            pos = skip_regex_literal(bytes, pos, end);
-            anchor.skipped_operand(pos);
-            continue;
-        }
-        let b = bytes[pos];
-        if b == open {
-            depth += 1;
-        } else if b == close {
-            depth -= 1;
-            if depth == 0 {
-                let next = skip_whitespace_and_comments(bytes, pos + 1);
-                return matches!(bytes.get(next), Some(b'|' | b'&'));
-            }
-        }
-        pos += 1;
-    }
-    false
-}
-
 /// Check if `=>` follows (possibly with type annotation `: type`)
 #[inline]
 fn check_arrow_after_paren(bytes: &[u8], pos: usize) -> bool {
@@ -555,8 +489,8 @@ const TYPE_FULL_POSITION_WORDS: &[&[u8]] = &[b"new", b"abstract", b"is"];
 /// True for `()`, `(...`, and a parameter start (identifier, `this`, or a
 /// balanced `{…}`/`[…]` pattern) followed by `:`, `,`, `?`, `=`, or by `) =>`.
 ///
-/// Two callers ask it, at two layers and for two different `(`s, because it is one
-/// question about one shape:
+/// Three callers ask it, for three different `(`s, because it is one question about
+/// one shape:
 ///
 /// - the return-type scan above, deciding whether a `=>` past the group is the type's
 ///   own or the enclosing arrow's;
@@ -565,9 +499,9 @@ const TYPE_FULL_POSITION_WORDS: &[&[u8]] = &[b"new", b"abstract", b"is"];
 ///   where a parameter list behind the `<` makes every byte to the region's own `>` the
 ///   function type's.
 ///
-/// The token-level twin, asked once the parser has committed to parsing a type, is
-/// `Parser::paren_starts_function_type_params` — same acorn rule, same
-/// full-type-position precondition, different layer.
+/// - the type parser's own `(` (`Parser::parse_parenthesized_or_function_type`), at a
+///   full-type position: a parameter list, or else a parenthesized type whatever its
+///   first token is.
 ///
 /// **tsc's `isUnambiguouslyStartOfFunctionType` admits one shape more**: it runs
 /// `parseModifiers` ahead of the parameter start, so `(readonly a: T) => U` and
@@ -718,7 +652,7 @@ pub(super) fn scan_angle_brackets(bytes: &[u8], pos: usize) -> usize {
     while pos < end && depth > 0 {
         // Strings, templates, and comments are opaque (the shared cursor skips
         // all three); an angle inside one isn't significant. No regex skip is
-        // needed (unlike `scan_parens_then_arrow`): this scans type-argument
+        // needed (unlike `matching_paren_close`): this scans type-argument
         // syntax `<…>`, where a `/…/` regex literal can't appear.
         if let Some(past) = skip_trivia(bytes, pos, end, TriviaProfile::JS) {
             pos = past;
@@ -899,7 +833,7 @@ pub(super) fn matching_angle_close(
     while pos < end {
         // Strings, templates, and comments are opaque (the shared cursor skips
         // all three); a `<`/`>`/`;` inside one isn't significant. No regex skip is
-        // needed (unlike `scan_parens_then_arrow`): this verifies a type-argument
+        // needed (unlike `matching_paren_close`): this verifies a type-argument
         // sequence `<…>`, where a `/…/` regex literal can't appear.
         if let Some(past) = skip_trivia(bytes, pos, end, TriviaProfile::JS) {
             pos = past;
