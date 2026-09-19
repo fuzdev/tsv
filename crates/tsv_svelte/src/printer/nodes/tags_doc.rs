@@ -129,6 +129,19 @@ impl<'a> Printer<'a> {
         // the value exactly as one written before it does.
         let break_after_op = Self::const_should_break_after_op(init)
             || self.gap_comment_hangs_value(binding_end, self.head_gap_end(init));
+        // A curried chain takes the `<script>` declarator's layout: heads that force the
+        // break take it after the `=`, mandatorily, and stack under it; any other chain owns
+        // its break-after-`=` itself (`tsv_ts::build_assignment_value_expression_doc`). Only
+        // over a gap that is comment-free ON PAGE — a comment there is placed by this tag
+        // (above the value, or glued ahead of it), and the chain then stands where that
+        // placement puts it, in its default shape.
+        let value_owns_operator_break = !break_after_op
+            && self
+                .comments_on_page_between(binding_end, self.head_gap_end(init))
+                .next()
+                .is_none();
+        let chain_breaks_after_op =
+            value_owns_operator_break && tsv_ts::curried_chain_breaks_after_operator(init);
 
         // Build init with LayoutMode::Standalone so a ROOT binary init is NOT forced onto
         // ContinuationIndent by the embedded-root question. The init is an assignment
@@ -138,7 +151,9 @@ impl<'a> Printer<'a> {
             init,
             binding_end, // scan from after the binding so a comment between `=` and init survives
             span.end - 1, // before "}"
-            break_after_op,
+            // Both arms put the init inside an `indent(…)` with the `}` outside it.
+            break_after_op || chain_breaks_after_op,
+            value_owns_operator_break,
         );
         let close = d.text("}");
 
@@ -158,6 +173,14 @@ impl<'a> Printer<'a> {
             let assignment = d.group(d.concat(&[d.text(" ="), rhs_indented, close]));
 
             d.concat(&[d.text(prefix), id_doc, assignment])
+        } else if chain_breaks_after_op {
+            d.concat(&[
+                d.text(prefix),
+                id_doc,
+                d.text(" ="),
+                d.indent_hardline(init_doc),
+                close,
+            ])
         } else if d.will_break(init_doc) {
             // Init has forced breaks (object/array/template, etc.) that aren't
             // break-after-operator — keep "= init" together, init's own breaks
@@ -257,6 +280,9 @@ impl<'a> Printer<'a> {
     /// prints every comment in it directly above the value, and the directive that
     /// freezes a value is the one printed above it.
     ///
+    /// `value_owns_operator_break` is the caller's other layout verdict, which only a
+    /// curried chain reads (`tsv_ts::build_assignment_value_expression_doc`).
+    ///
     /// `closer_owns_break` is the caller's layout verdict, forwarded to
     /// [`Printer::trailing_comment_docs`] — the init is inside an `indent(…)` with the tag's
     /// `}` outside it in exactly one of `build_assignment_tag_doc`'s layouts, and this
@@ -267,6 +293,7 @@ impl<'a> Printer<'a> {
         span_start: u32,
         span_end: u32,
         closer_owns_break: bool,
+        value_owns_operator_break: bool,
     ) -> DocId {
         let expr_start = expr.span().start;
         let expr_end = expr.span().end;
@@ -285,7 +312,8 @@ impl<'a> Printer<'a> {
         // not call): here the paren is fully redundant and prettier drops it (`{@const a = (b = c)}` →
         // `{@const a = b = c}`), so the frozen arm drops it too — consistent with this
         // site's own unfrozen normalization, which is what the freeze must not contradict.
-        let expr_doc = self.build_assignment_value_doc(expr, frozen, &embed);
+        let expr_doc =
+            self.build_assignment_value_doc(expr, frozen, &embed, value_owns_operator_break);
 
         // The run's last comment supplies the break the tag's `}` reuses —
         // `build_assignment_tag_doc` places that `}` in all three of its layouts, and

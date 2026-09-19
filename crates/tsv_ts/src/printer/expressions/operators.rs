@@ -5,7 +5,7 @@
 // - Clarity-based parens (mixing logical operators, etc.)
 
 use crate::ast::internal::{self, BinaryOperator, Expression, ExpressionKind};
-use crate::printer::comments::CommentSpacing;
+use crate::printer::comments::{AsiOperandShell, CommentSpacing};
 use crate::printer::ignore::FrozenOperandPair;
 use crate::printer::{CommentVec, ParenContext, Printer, RunLeadingBlank};
 use smallvec::{SmallVec, smallvec};
@@ -165,18 +165,27 @@ impl<'a> Printer<'a> {
         // so building one here first would be discarded — and `build_expression_doc` is
         // not side-effect-free (it consumes the expression-statement paren target), which
         // makes a discarded build more than wasted work.
-        if !update.prefix
-            && let Some(shell) = self.build_asi_operand_shell_doc(
+        let shell_run = if update.prefix {
+            None
+        } else {
+            match self.build_asi_operand_shell_doc(
                 update_span.start,
                 update.argument,
                 update_span.end - operator_len,
                 ParenContext::UpdateArgument { postfix: true },
-            )
-        {
-            return d.concat(&[shell, operator_doc]);
-        }
+            ) {
+                AsiOperandShell::Shell(shell) => return d.concat(&[shell, operator_doc]),
+                AsiOperandShell::Bare(run) => run,
+            }
+        };
 
         let inner_doc = self.build_expression_doc(update.argument);
+        // The stripped shell's glued block leads the operand inside whatever pair the
+        // operand keeps — where the reparse, which owns it, prints it too.
+        let inner_doc = match shell_run {
+            Some(run) => d.concat(&[run, inner_doc]),
+            None => inner_doc,
+        };
         // One `needs_parens` call for both spellings — the rule is
         // `ParenContext::UpdateArgument`'s: every operand looser than a member access
         // keeps its pair, and `postfix` decides the instantiation case alone (the ASI

@@ -19,5 +19,8 @@
 	// null control: written outside the pair, both formatters keep it there
 	const a6 = /* c */   (   b   +   c   +   d   )   as   T;
 
-	export {   a1 ,  a2 ,  a3 ,  a4 ,  a5 ,  a6   };
+	// a sequence operand's own pair
+	const a7 = (   /* c */   b ,   c   )   as   T;
+
+	export {   a1 ,  a2 ,  a3 ,  a4 ,  a5 ,  a6 ,  a7   };
 </script>

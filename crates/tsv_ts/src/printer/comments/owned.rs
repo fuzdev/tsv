@@ -14,6 +14,9 @@
 
 use crate::ast::internal::{self, Expression, ExpressionKind};
 use crate::printer::Printer;
+use crate::printer::expressions::assignment::{
+    is_curried_arrow_chain, is_curried_arrow_chain_that_breaks,
+};
 use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan;
@@ -282,6 +285,10 @@ impl<'a> Printer<'a> {
     /// (`build_arrow_params_doc_ungrouped`), which is why it is the one shape in this
     /// family that was already flat.
     ///
+    /// `build_value` is handed the run, for the one value that takes it IN rather than
+    /// behind it: a curried chain, whose own break-after-operator the run must follow
+    /// ([`Self::build_led_curried_chain_doc`]).
+    ///
     /// `seam_prints_pair` is the seam's own paren verdict, and a pair declines the hoist —
     /// the ⚠️ on [`Self::hoisted_owned_value_gap_run_opt`], the run half this wraps.
     pub(in crate::printer) fn hoist_owned_value_gap_run(
@@ -289,10 +296,13 @@ impl<'a> Printer<'a> {
         gap_start: u32,
         value: &Expression<'_>,
         seam_prints_pair: bool,
-        build_value: impl FnOnce() -> DocId,
+        build_value: impl FnOnce(Option<DocId>) -> DocId,
     ) -> (Option<DocId>, DocId) {
         let run = self.hoisted_owned_value_gap_run_opt(gap_start, value, seam_prints_pair);
-        (run, self.build_gap_value_doc(run, value, build_value))
+        (
+            run,
+            self.build_gap_value_doc(run, value, || build_value(run)),
+        )
     }
 
     /// The value build of a gap seam whose closure builds the value ALONE: the hoist's
@@ -397,8 +407,16 @@ impl<'a> Printer<'a> {
         // The document-level flag pays for it: the hoist exists only for a comment the value
         // OWNS, and a document with none has an emit-axis run identical to this on-page one
         // — the caller's `hoisted.or(its_own)` then prints the same bytes either way.
+        //
+        // A CURRIED CHAIN that owns its break-after-operator is the second licence, and for
+        // a different reason: its seam hands the gap's run INTO the chain, behind the chain's
+        // own softline ([`Printer::build_led_curried_chain_doc`]), and a run split between
+        // that hand-in and the head's own claim would leave its owned tail outside the break
+        // the rest of it rode in on. Hoisted, the run is whole. Everywhere the run is simply
+        // printed ahead of the value the bytes are the ones the claim printed.
         if !self.has_owned_comments
-            || !self.has_multiline_block_comments_on_page_between(gap_start, value.span().start)
+            || !(self.has_multiline_block_comments_on_page_between(gap_start, value.span().start)
+                || (is_curried_arrow_chain(value) && !is_curried_arrow_chain_that_breaks(value)))
         {
             return None;
         }

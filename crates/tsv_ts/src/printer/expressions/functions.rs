@@ -536,6 +536,129 @@ impl<'a> Printer<'a> {
         doc
     }
 
+    /// Build a curried chain RHS under [`ArrowChainContext::AssignmentRhs`] and print the
+    /// seam's operator→value comment run (`gap` is its window) with it — exactly once,
+    /// wherever it belongs:
+    ///
+    /// - a run glued through to the chain rides INTO it, behind the chain's own
+    ///   break-after-operator softline, so it leads the first head on whichever line the
+    ///   heads land on. Printed ahead of the chain instead it stays on the operator's line
+    ///   while the heads break below (`= /* c */⏎(a) =>`), which the next pass reads as a run
+    ///   the author broke after. Where no chain layout consumed it — the chain declined,
+    ///   the value froze — the context comes back still holding it and it leads the value;
+    /// - a run holding a MULTI-LINE block leads the chain from the operator's line, and the
+    ///   chain takes no break after the operator at all: inside the chain's group the
+    ///   comment's body would force that break on a chain that fits
+    ///   (`const i = /* a⏎b */ (p) => (q) => p;`), so the first head rides the comment's
+    ///   closing line and the rest indent under it — prettier's own answer for the shape;
+    /// - a run that is not glued through (the author gave part of it a line of its own)
+    ///   leads the chain as built.
+    pub(in crate::printer) fn build_led_curried_chain_doc(
+        &self,
+        leading_run: Option<DocId>,
+        gap: (u32, u32),
+        build: impl FnOnce() -> DocId,
+    ) -> DocId {
+        let d = self.d();
+        let unled = ArrowChainContext::AssignmentRhs { leading_run: None };
+        let Some(run) = leading_run else {
+            return self.build_with_arrow_chain_context(unled, build);
+        };
+        if self.has_multiline_block_comments_on_page_between(gap.0, gap.1) {
+            let doc = self.build_with_arrow_chain_context(ArrowChainContext::None, build);
+            return d.concat(&[run, doc]);
+        }
+        if !self.comment_run_glued_through(gap.0, gap.1) {
+            return d.concat(&[run, self.build_with_arrow_chain_context(unled, build)]);
+        }
+        let prev = self
+            .arrow_chain_context
+            .replace(ArrowChainContext::AssignmentRhs { leading_run });
+        let doc = build();
+        match self.arrow_chain_context.replace(prev) {
+            ArrowChainContext::AssignmentRhs {
+                leading_run: Some(_),
+            } => d.concat(&[run, doc]),
+            _ => doc,
+        }
+    }
+
+    /// Whether a curried chain under a seam that has ALREADY broken after its operator and
+    /// indented — a comment arm's forced break, or a hang — stacks its heads at the one
+    /// indent the comment-free chain gives them ([`ArrowChainContext::AssignmentRhsHung`]).
+    ///
+    /// Two gaps, the two where prettier has no form to match:
+    ///
+    /// - a `//` on the OPERATOR's line (`= // c⏎(a) => (b) => …`), where prettier fabricates
+    ///   a blank line below the comment and indents the chain twice;
+    /// - an indentable block leading the value, which hangs it
+    ///   ([`Printer::indentable_block_leads_value`]) and which prettier likewise indents twice.
+    ///
+    /// A run the author gave lines of its own above the chain (`=⏎// c⏎(a) => …`,
+    /// `= /* c */⏎(a) => …`) is NOT one: prettier prints that chain in its default shape —
+    /// the heads past the first indented under it — stably, and tsv matches it, which is
+    /// the no-context build every such arm already does.
+    pub(in crate::printer) fn seam_break_stacks_curried_chain(
+        &self,
+        value: &internal::Expression<'_>,
+        gap_start: u32,
+    ) -> bool {
+        if !crate::printer::expressions::assignment::is_curried_arrow_chain(value) {
+            return false;
+        }
+        let value_start = value.span().start;
+        self.comments_on_page_between(gap_start, value_start)
+            .next()
+            // The SOURCE question, never a distance from `gap_start`: a seam's gap may open
+            // ahead of its operator (the assignment's, at the target's end), so a line break
+            // the author put before the `=` would read as one before the comment.
+            .is_some_and(|c| !c.is_block && self.comment_follows_content_on_its_line(c))
+            || self.indentable_block_leads_value(gap_start, value_start)
+    }
+
+    /// Build `value`'s doc for a seam that has ALREADY broken after its operator and
+    /// indented, under [`ArrowChainContext::AssignmentRhsHung`] where
+    /// [`Self::seam_break_stacks_curried_chain`] says the chain stacks, and untouched
+    /// otherwise. `gap_start` opens the operator→value gap.
+    ///
+    /// Every `=` / `:` seam with such an arm asks this, so the declarator, the assignment,
+    /// the class field and the object property cannot answer one comment four ways.
+    pub(in crate::printer) fn build_hung_value_doc(
+        &self,
+        value: &internal::Expression<'_>,
+        gap_start: u32,
+        build: impl FnOnce() -> DocId,
+    ) -> DocId {
+        if self.seam_break_stacks_curried_chain(value, gap_start) {
+            self.build_with_arrow_chain_context(ArrowChainContext::AssignmentRhsHung, build)
+        } else {
+            build()
+        }
+    }
+
+    /// The root doc of an EMBEDDER's assignment value
+    /// ([`crate::build_assignment_value_expression_doc`], which states the contract): the
+    /// assignment-value mark, then — where the host leaves the break after its operator to
+    /// the value — a curried chain's assignment-RHS shape.
+    pub(crate) fn build_assignment_value_root_doc(
+        &self,
+        expression: &internal::Expression<'_>,
+        value_owns_operator_break: bool,
+    ) -> DocId {
+        self.mark_assignment_value(expression);
+        let build = || self.build_root_expression_doc(expression);
+        if value_owns_operator_break
+            && crate::printer::expressions::assignment::is_curried_arrow_chain(expression)
+        {
+            self.build_with_arrow_chain_context(
+                ArrowChainContext::AssignmentRhs { leading_run: None },
+                build,
+            )
+        } else {
+            build()
+        }
+    }
+
     /// Run `build` with [`Printer::in_stacked_arrow_chain`] set to `value`, restoring the
     /// prior value afterward. Mirrors `build_with_arrow_chain_context`: the flag is
     /// per-chain layout state that must not leak to sibling arrows nested inside the
@@ -580,6 +703,16 @@ impl<'a> Printer<'a> {
         let chain_context = self.arrow_chain_context.replace(ArrowChainContext::None);
         if self.should_use_arrow_chain_layout(arrow, span, chain_context) {
             return self.build_arrow_chain_doc(arrow, span, chain_context);
+        }
+        // A leading run the seam handed in goes back to it: only the chain layout has a
+        // softline to put it behind ([`Self::build_led_curried_chain_doc`]).
+        if matches!(
+            chain_context,
+            ArrowChainContext::AssignmentRhs {
+                leading_run: Some(_)
+            }
+        ) {
+            self.arrow_chain_context.set(chain_context);
         }
 
         let d = self.d();
@@ -1291,8 +1424,10 @@ impl<'a> Printer<'a> {
         if !body_is_arrow {
             return false;
         }
-        if context == ArrowChainContext::AssignmentRhs
-            && crate::printer::arrow_chain_should_break(arrow)
+        if matches!(
+            context,
+            ArrowChainContext::AssignmentRhs { .. } | ArrowChainContext::AssignmentRhsHung
+        ) && crate::printer::arrow_chain_should_break(arrow)
         {
             return false;
         }
@@ -1656,13 +1791,21 @@ impl<'a> Printer<'a> {
             // breaks (newline after `=`) and indents the heads one level. The
             // enclosing fluid assignment marker stays flat — the break-after-`=`
             // is this softline.
-            ArrowChainContext::AssignmentRhs => {
+            ArrowChainContext::AssignmentRhs { leading_run } => {
                 let inner = d.group(join_arrow_chain_heads(d, &sig_docs, &gap_tails));
-                d.group_with_id(
-                    d.indent(d.concat(&[d.softline(), inner])),
-                    GroupId::ArrowChain,
-                )
+                let led = match leading_run {
+                    Some(run) => d.concat(&[d.softline(), run, inner]),
+                    None => d.concat(&[d.softline(), inner]),
+                };
+                d.group_with_id(d.indent(led), GroupId::ArrowChain)
             }
+            // The assignment shape under a seam that already broke and indented: the
+            // joined heads alone. The body below takes no `indent_if_break` either — it
+            // already stands inside the seam's indent with the heads.
+            ArrowChainContext::AssignmentRhsHung => d.group_with_id(
+                join_arrow_chain_heads(d, &sig_docs, &gap_tails),
+                GroupId::ArrowChain,
+            ),
             // Callee: the assignment shape's joined heads under one indent, behind a
             // leading softline that opens the callee's parens — prettier's
             // `group(indent([softline, group(join(heads), {shouldBreak})]), {shouldBreak:
@@ -1951,12 +2094,12 @@ impl<'a> Printer<'a> {
         } else {
             d.empty()
         };
-        d.group(d.concat(&[
-            heads,
-            d.text(" =>"),
-            d.indent_if_break(body_part, GroupId::ArrowChain),
-            close,
-        ]))
+        let body_part = if context == ArrowChainContext::AssignmentRhsHung {
+            body_part
+        } else {
+            d.indent_if_break(body_part, GroupId::ArrowChain)
+        };
+        d.group(d.concat(&[heads, d.text(" =>"), body_part, close]))
     }
 
     /// Prettier's `shouldPutBodyOnSameLine` for a chain's terminal body, as

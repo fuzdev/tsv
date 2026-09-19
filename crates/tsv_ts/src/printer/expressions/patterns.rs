@@ -347,6 +347,19 @@ impl<'a> Printer<'a> {
             // divergence tsv had chosen. Only the line arm routes here: the block arms
             // already agree with prettier through the assignment layout below
             // (`operator_value_glued_multiline_block_comment`).
+            // The value under either `=`-comment arm, both of which have already broken
+            // after the operator and indented ([`Printer::build_hung_value_doc`]).
+            let build_hung_value = || {
+                self.build_hung_value_doc(assign.right, effective_rhs_start, || {
+                    self.build_value_with_outermost_owned_comment(assign.right, || {
+                        self.build_expression_doc_with_paren_comments(
+                            assign.right,
+                            assign_span.end,
+                            false,
+                        )
+                    })
+                })
+            };
             if rhs_frozen.is_none()
                 && let Some(op_pos) = op_pos
                 && self.has_line_comments_between(effective_rhs_start, rhs_comment_end)
@@ -361,31 +374,18 @@ impl<'a> Printer<'a> {
                     // Both `=`-comment arms print their run outside the value, so a
                     // multi-line comment the value owns prints outside the value's own group
                     // too — the declarator's rule ([`Printer::build_value_with_outermost_owned_comment`]).
-                    || {
-                        self.build_value_with_outermost_owned_comment(assign.right, || {
-                            self.build_expression_doc_with_paren_comments(
-                                assign.right,
-                                assign_span.end,
-                                false,
-                            )
-                        })
-                    },
+                    build_hung_value,
                 )
             {
                 return d.concat(&[left_doc, rhs]);
             }
             if rhs_frozen.is_none()
                 && rhs_comments.is_some()
-                && let Some(rhs_doc) =
-                    self.broke_after_operator_rhs_doc(effective_rhs_start, rhs_comment_end, || {
-                        self.build_value_with_outermost_owned_comment(assign.right, || {
-                            self.build_expression_doc_with_paren_comments(
-                                assign.right,
-                                assign_span.end,
-                                false,
-                            )
-                        })
-                    })
+                && let Some(rhs_doc) = self.broke_after_operator_rhs_doc(
+                    effective_rhs_start,
+                    rhs_comment_end,
+                    build_hung_value,
+                )
             {
                 return d.concat(&[left_doc, assign.operator.doc_with_leading_space(d), rhs_doc]);
             }

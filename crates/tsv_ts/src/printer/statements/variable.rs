@@ -213,14 +213,20 @@ impl<'a> Printer<'a> {
             let build = || self.build_value_under_hoist(hoisted_run, init, value);
             if chain_breaks {
                 self.build_with_arrow_chain_context(
-                    crate::printer::ArrowChainContext::AssignmentRhs,
+                    crate::printer::ArrowChainContext::AssignmentRhs { leading_run: None },
                     build,
                 )
             } else {
                 build()
             }
         };
+        // The value under an arm that has ALREADY broken after the `=` and indented — every
+        // comment arm below ([`Printer::build_hung_value_doc`]). `build_value` rides inside
+        // it: a chain whose heads force the break sets its own context there, and declines
+        // the chain layout under either.
+        let build_hung_value = &|| self.build_hung_value_doc(init, rhs_comments_start, build_value);
         let value: &dyn Fn() -> DocId = build_value;
+        let hung_value: &dyn Fn() -> DocId = build_hung_value;
 
         // Helper: build init doc with optional inline block comments prepended.
         // Comments use Trailing spacing (`/* comment */ `) so no extra space needed.
@@ -268,7 +274,7 @@ impl<'a> Printer<'a> {
         // — the two-half rule, its declines, and what falls through live there).
         if rhs_block_comment_doc.is_some()
             && let Some(rhs_doc) =
-                self.broke_after_operator_rhs_doc(rhs_comments_start, init_start, value)
+                self.broke_after_operator_rhs_doc(rhs_comments_start, init_start, hung_value)
         {
             parts.push(lhs_doc_with_comments(id_doc));
             parts.push(d.text(" ="));
@@ -491,7 +497,8 @@ impl<'a> Printer<'a> {
         let is_curried_arrow = chain_breaks;
 
         if has_comments_after_eq
-            && let Some(rhs) = self.build_eq_comment_break_rhs(equals_pos, init_start, " =", value)
+            && let Some(rhs) =
+                self.build_eq_comment_break_rhs(equals_pos, init_start, " =", hung_value)
         {
             // A comment after `=` forces a break (line comment → partition;
             // own-line / multiline block → break-after-operator hang). Shared
@@ -533,23 +540,17 @@ impl<'a> Printer<'a> {
             // as it does under every hang the twin builds.
             parts.push(lhs_doc_with_comments(id_doc));
             parts.push(d.text(" ="));
-            let init_doc = if is_curried_arrow_chain(init) {
-                self.build_with_arrow_chain_context(
-                    crate::printer::ArrowChainContext::AssignmentRhs,
-                    || make_init_doc(value()),
-                )
-            } else {
-                make_init_doc(value())
-            };
-            parts.push(hang_after_operator(d, init_doc));
+            parts.push(hang_after_operator(d, make_init_doc(hung_value())));
         } else if is_curried_arrow_chain(init) {
             // Every other curried chain: fluid break after `=`. The chain's
             // signature heads break only when they don't fit on the operator
             // line; a hugging body otherwise expands in place. The context tells
             // the arrow printer to use the assignment-RHS chain layout.
-            let init_doc = self.build_with_arrow_chain_context(
-                crate::printer::ArrowChainContext::AssignmentRhs,
-                || make_init_doc(value()),
+            // The gap's run is the chain's to place ([`Printer::build_led_curried_chain_doc`]).
+            let init_doc = self.build_led_curried_chain_doc(
+                gap_comments,
+                (rhs_comments_start, init_start),
+                value,
             );
             parts.push(build_fluid_assignment_doc(
                 d,
