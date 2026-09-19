@@ -198,7 +198,28 @@ impl<'a> Printer<'a> {
         // value claims its owned multi-line comment ITSELF, beneath the pair this position
         // adds (`build_init_value_doc`) — `build_gap_value_doc` would prepend it outside
         // the pair, and a `@type` block outside a `(` is a cast.
-        let build_value = &|| self.build_value_under_hoist(hoisted_run, init, value);
+        //
+        // A `shouldBreakChain` curried chain is built under the `AssignmentRhs` context at
+        // EVERY arm below, which is why it is set here rather than at the arm that names the
+        // chain: the context is what makes the arrow printer DECLINE its own chain layout
+        // (`should_use_arrow_chain_layout`) so this `=` can own the break and the indent. An
+        // arm that reached the chain first — a comment after `=` forces its own break — would
+        // otherwise hand it over with no context, which reads as a chain in no chain
+        // position at all and indents the heads a second time. `build_assignment_layout`
+        // sets the context for every curried chain and leans on the same decline; if that
+        // decline ever moves, both sites move.
+        let chain_breaks = is_curried_arrow_chain_that_breaks(init);
+        let build_value = &|| {
+            let build = || self.build_value_under_hoist(hoisted_run, init, value);
+            if chain_breaks {
+                self.build_with_arrow_chain_context(
+                    crate::printer::ArrowChainContext::AssignmentRhs,
+                    build,
+                )
+            } else {
+                build()
+            }
+        };
         let value: &dyn Fn() -> DocId = build_value;
 
         // Helper: build init doc with optional inline block comments prepended.
@@ -467,7 +488,7 @@ impl<'a> Printer<'a> {
         // after `=` unconditionally; every other curried chain goes fluid below.
         // ⚠️ This pair is the declarator's hand-rolled twin of `choose_layout`'s
         // `Fluid` / `BreakAfterOperator` arms — see the ⚠️ on `build_assignment_layout`.
-        let is_curried_arrow = is_curried_arrow_chain_that_breaks(init);
+        let is_curried_arrow = chain_breaks;
 
         if has_comments_after_eq
             && let Some(rhs) = self.build_eq_comment_break_rhs(equals_pos, init_start, " =", value)
@@ -495,12 +516,8 @@ impl<'a> Printer<'a> {
             parts.push(d.indent_hardline(prepend_hoisted(value())));
         } else if is_curried_arrow {
             // Mandatory break after `=`; the arrow printer stacks the heads under it.
-            // ⚠️ Deliberately does NOT set `ArrowChainContext::AssignmentRhs`, unlike
-            // the arm below — and it is only equivalent to setting it because
-            // `should_use_arrow_chain_layout` declines a `shouldBreakChain` chain in
-            // exactly that context, precisely so this `=` can own the break instead.
-            // `build_assignment_layout` sets the context for EVERY curried chain and
-            // leans on the same decline; if that decline ever moves, both sites move.
+            // The chain is built under the `AssignmentRhs` context (`build_value` above), so
+            // the arrow printer declines its own chain layout and this `=` owns the break.
             //
             // `make_init_doc`, not `prepend_hoisted`: the hardline has already moved the
             // value off the `=` line, so the gap's whole run travels with it (see the ⚠️ on

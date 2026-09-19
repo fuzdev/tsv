@@ -96,7 +96,7 @@ export const GATE_CHECKOUT_IDS: Record<
 	// its manifest.
 	[CORPORA_ROOT]: {
 		tree: CORPORA_TREE,
-		hash: '5f40c547c',
+		hash: '03211c7c4',
 		pins: ['CORPUS_FORMAT_*', 'CORPUS_PARSE_*', 'SVELTE_STYLES_BLOCKS_PIN']
 	},
 	// `../svelte` feeds the conformance view alone (its `tests` tree); its
@@ -498,7 +498,19 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// staged `../corpora/collections` + `../prettier/tests/format` + fixture-tree files: zero
 	// real-code movers, and a `--all --json` bucket set-diff between a baseline `--profile corpus`
 	// FFI build and the tip is file-for-file identical in every other cell of every language.
-	typescript: 5179,
+	//
+	// 5179 → 5183: four prettier-suite files arrive from `unknown`, all curried arrow chains —
+	// `js/arrows/curried.js`, `js/arrows/currying-3.js`, `js/arrows/issue-14563.js` and
+	// `js/comments/issue-11050.js`. A chain in no chain position (`export default`, `return`,
+	// an array element, a ternary branch, …) takes prettier's default chain shape, a chain in
+	// callee position its callee shape, and a force-broken chain stacks every head rather than
+	// hugging the plain ones past the trigger. Measured by a baseline-vs-tip byte A/B over the
+	// staged `../corpora/collections` + `../prettier/tests` trees formatted in place by a
+	// pre-change and a tip CLI: five movers, zero in real code — those four, now byte-identical
+	// to prettier's output, plus `typescript/arrow/16067.ts`, which moves toward prettier and
+	// keeps its bucket. An `--all` run against a baseline `--profile corpus` FFI build reads
+	// 5179 / `unknown` 68 with every other cell of every language as at the tip.
+	typescript: 5183,
 	// ⚠️ A short `svelte_styles` cache understates every css count at once and reads exactly
 	// like a regression: the harvest is a CORPUS INPUT, not a measurement of tsv, and a
 	// standalone `corpus:compare:format --all` is the one entry point that does not chain it
@@ -932,7 +944,10 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// `--profile corpus` FFI build and the tip is file-for-file identical in `unknown`, `partial`
 	// and `safety` for every language, and the byte A/B on the `match` pin above found zero
 	// real-code movers.
-	typescript: 68,
+	//
+	// 68 → 64: the four curried-arrow-chain files named on `CORPUS_FORMAT_MATCH_MIN` leave for
+	// `match`. Reasoning and measurement there.
+	typescript: 64,
 	// 23 → 18: five files LEAVE for `match` (`match` 133 → 138), all of them one language
 	// question — which reader prettier hands an at-rule prelude to, and what that reader
 	// does with the text inside a feature expression.
@@ -1016,7 +1031,14 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// 1 → 2: the author's repos join the pinned corpus; `zzz/src/lib/CapabilityWebsocket.svelte`
 	// arrives (its explained hunk is `spaced_tag_travel`).
-	svelte: 2,
+	//
+	// 2 → 1: the snapshot's zzz refresh re-authors that file — its three spaced-text-then-tag
+	// lines (`websocket {socket.connected …}`, `loading <div …>`, `connecting <div …>`) now put
+	// the tag on its own line — and it leaves for `match`: byte-identical to prettier's output,
+	// no hunk left. A snapshot move, not a formatter one: a baseline `--profile corpus` FFI
+	// build reads the same 1 over the refreshed tree, the styles harvest re-stamps at its
+	// unmoved block pin, and `corpus:compare:parse --all` holds every count.
+	svelte: 1,
 	// 25 → 26: the author's repos join the pinned corpus; `fuz_ui/src/lib/project_stats_data.ts`
 	// arrives (its explained hunk is `fill_101_boundary`).
 	//

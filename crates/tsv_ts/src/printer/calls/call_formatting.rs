@@ -167,7 +167,17 @@ fn build_call_head(
                 .unwrap_or_else(|| {
                     callee_parens.as_ref().map_or_else(
                         || printer.build_expression_doc(call.callee),
-                        |parens| parens.build_body_doc(printer),
+                        |parens| {
+                            parens.build_body_doc(
+                                printer,
+                                trailing_gap.is_none_or(|(start, close)| {
+                                    !printer.has_comments_on_page_between(start, close)
+                                }) && !printer.has_comments_on_page_between(
+                                    span.start,
+                                    call.callee.span().start,
+                                ),
+                            )
+                        },
                     )
                 })
         },

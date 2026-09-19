@@ -127,12 +127,15 @@ const _: () = assert!(ShareTag::ArgExpression as u8 != ShareTag::ExpandLastBody 
 /// through a flattened chain layout, mirroring prettier's
 /// `printArrowFunctionSignatures` parent-context branches. Set by the enclosing
 /// printer (assignment chokepoint, call-argument printer, binary-operand
-/// printer) just before the chain's RHS / argument / operand is built; the
+/// printer, callee printer) just before the chain's RHS / argument / operand is built; the
 /// outermost chain arrow reads and clears it at entry (`replace(None)`) so
 /// nested arrows in the chain don't inherit it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) enum ArrowChainContext {
-    /// No chain context — arrows use the default break-after-operator path.
+    /// No enclosing chain site (`export default`, `return`, an array element, a ternary
+    /// branch, …) — prettier's default branch, `group(indent(join(heads)))`: the heads
+    /// past the first indent one level under it. Also what every arrow reads once the
+    /// outermost chain arrow has consumed the context.
     #[default]
     None,
     /// Assignment RHS (`const f = (a) => (b) => …`). The heads join into one
@@ -145,6 +148,11 @@ pub(crate) enum ArrowChainContext {
     /// stays on the line, the rest indent one level
     /// (`group([sig0, " =>", indent([line, join([" =>", line], rest)])])`).
     CallArgOrBinaryish,
+    /// Callee of a call or `new` (`((a) => (b) => …)()`) — prettier's `isCallee` branch.
+    /// The heads join at one shared indent inside the callee's own parens, which open
+    /// onto their own lines when the chain breaks (`(⏎heads =>⏎body⏎)()`); a body that
+    /// cannot stay on the last head's line forces that break.
+    Callee,
 }
 
 /// Printer state for building output

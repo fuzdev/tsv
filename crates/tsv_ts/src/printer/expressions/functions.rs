@@ -593,11 +593,13 @@ impl<'a> Printer<'a> {
         // Build the signature (async + type params + params + return type) via the
         // shared builder, then append any comment between the signature and `=>`
         // (`(x) /* c */ =>`) — the seam the call-argument states share.
-        let sig_doc = self.append_pre_arrow_comments(
-            arrow,
-            span,
-            self.build_arrow_signature_doc(arrow, span),
-        );
+        //
+        // The stacked-chain flag describes this arrow's place in its chain — the BODY build
+        // below reads it — and says nothing about an arrow nested in the signature (a default
+        // parameter's own curried chain), so the signature is built with it cleared.
+        let sig_doc = self.build_with_stacked_chain(false, || {
+            self.append_pre_arrow_comments(arrow, span, self.build_arrow_signature_doc(arrow, span))
+        });
 
         // Wrap entire signature in a group. In expand-last-arg context, render the
         // signature flat (remove_lines) so the params can't break — prettier's
@@ -811,9 +813,16 @@ impl<'a> Printer<'a> {
         // this is the flag's only live effect: in an expand-last hug (prettier's
         // `expandLastArg`, where `shouldPrintAsChain` is false) the body must stay on the `=>`
         // line rather than break. Dropping the term unhugs every typed curried callback.
+        //
+        // ⚠️ The verdict belongs to the WHOLE chain (prettier accumulates `shouldBreakChain`
+        // over every head before it prints any), and `arrow_chain_should_break` only looks
+        // inwards from the arrow it is handed. A head BELOW the trigger therefore reads the
+        // verdict from the stacked flag its outer heads set, or the plain heads past a
+        // destructured one hug each other on one line (`(b) => (c) =>`).
         let chain_should_break = is_arrow_body
             && !self.skip_arrow_chain.get()
-            && crate::printer::arrow_chain_should_break(arrow);
+            && (self.in_stacked_arrow_chain.get()
+                || crate::printer::arrow_chain_should_break(arrow));
 
         // Check if body arrow has trailing param comments (forces break)
         let body_arrow_param_comment_forces_break = matches!(
@@ -1224,11 +1233,13 @@ impl<'a> Printer<'a> {
     }
 
     /// Whether to render an arrow as a flattened curried chain (prettier's
-    /// `printArrowFunctionSignatures`). Covers the assignment-RHS and
-    /// call-arg/binaryish contexts: the body must be another arrow, and every comment
+    /// `printArrowFunctionSignatures`): the body must be another arrow, and every comment
     /// must sit in a region [`Printer::build_arrow_chain_doc`] emits
-    /// ([`Self::chain_comment_outside_emitted_regions`]). A `None` context (no
-    /// enclosing chain site) routes to the default arrow layout.
+    /// ([`Self::chain_comment_outside_emitted_regions`]). Prettier asks nothing of the
+    /// POSITION — `shouldPrintAsChain` is `!expandLastArg && body is arrow` — so a `None`
+    /// context (no enclosing chain site: `export default`, `return`, an array element, a
+    /// ternary branch, a default parameter, `yield`, `throw`, a cast's operand) takes the
+    /// layout too, in prettier's default shape.
     ///
     /// ⚠️ [`crate::printer::arrow_chain_should_break`] — prettier's `shouldBreakChain` — is a **break**
     /// decision, not a refusal, and it is one here in every context but `AssignmentRhs`.
@@ -1253,22 +1264,23 @@ impl<'a> Printer<'a> {
     /// gives the expanded printing a chain layout, whose own heads then break and FIT, hugging a
     /// run prettier breaks out.
     ///
-    // TODO: the context set is narrower than prettier's rule. `ArrowChainContext` is set at
-    // three sites (assignment RHS, call arguments, binaryish operands), so `None` here also
-    // covers positions prettier DOES chain-layout — `shouldPrintAsChain` asks only
-    // `!expandLastArg && body is arrow`. Measured divergences: array element, `return`,
-    // ternary branch, IIFE callee, sequence operand, `export default`, `yield`, `throw`,
-    // default parameter, and a cast-wrapped call argument (`(chain) satisfies T`, where the
-    // wrapper hides the chain from `is_curried_arrow_chain` — `classify_chain_arg` already
-    // looks through such wrappers for its own question). Object property values, class
-    // properties and arrow bodies are fine: they route via `AssignmentRhs`.
+    /// The one `None` that declines is an INNER head of a chain the assignment site
+    /// stacked: the context was consumed by the head that declined, and the heads below it
+    /// belong to that stacked layout ([`Printer::in_stacked_arrow_chain`]), not to a chain
+    /// of their own.
     fn should_use_arrow_chain_layout(
         &self,
         arrow: &internal::ArrowFunctionExpression<'_>,
         span: Span,
         context: ArrowChainContext,
     ) -> bool {
-        if context == ArrowChainContext::None || self.skip_arrow_chain.get() {
+        if self.skip_arrow_chain.get() {
+            return false;
+        }
+        // Inside a chain the ASSIGNMENT site stacked (its `=` owns the break and the indent),
+        // every inner head is built with the consumed `None` context. Those belong to the
+        // stacked layout already under way, not to a fresh chain of their own.
+        if context == ArrowChainContext::None && self.in_stacked_arrow_chain.get() {
             return false;
         }
         let body_is_arrow = matches!(
@@ -1550,6 +1562,11 @@ impl<'a> Printer<'a> {
     /// - `CallArgOrBinaryish`: progressive indent — the first head stays on the
     ///   line, the rest indent one level (`group([sig0, " =>", indent([line,
     ///   join([" =>", line], rest)])])`).
+    /// - `None`: prettier's default branch, `group(indent(join([" =>", line], sigs)))` —
+    ///   which renders exactly as the progressive shape does (the first head is already on
+    ///   the line, so the indent reaches only the rest), and so shares its arm.
+    /// - `Callee`: the joined heads at one shared indent inside the callee's own parens,
+    ///   which open onto their own lines when the chain breaks.
     fn build_arrow_chain_doc(
         &self,
         head: &internal::ArrowFunctionExpression<'_>,
@@ -1646,12 +1663,35 @@ impl<'a> Printer<'a> {
                     GroupId::ArrowChain,
                 )
             }
+            // Callee: the assignment shape's joined heads under one indent, behind a
+            // leading softline that opens the callee's parens — prettier's
+            // `group(indent([softline, group(join(heads), {shouldBreak})]), {shouldBreak:
+            // !shouldPutBodyOnSameLine})`. The closing softline is emitted after the body
+            // (below), keyed on this same group.
+            ArrowChainContext::Callee => {
+                let joined = join_arrow_chain_heads(d, &sig_docs, &gap_tails);
+                let inner = if should_break_chain {
+                    d.group_break(joined)
+                } else {
+                    d.group(joined)
+                };
+                d.group_with_id_break(
+                    d.indent(d.concat(&[d.softline(), inner])),
+                    GroupId::ArrowChain,
+                    !self.arrow_chain_body_stays_on_head_line(
+                        terminal,
+                        terminal_gap_start,
+                        should_break_chain,
+                    ),
+                )
+            }
             // Call-arg/binaryish: progressive indent. The first head stays on the
             // current line; the rest indent one level and each drop to their own
             // line when the group breaks. Mirrors prettier's
             // `group([sig0, " =>", indent([line, join([" =>", line], rest)])])`.
-            // (`None` is unreachable — `should_use_arrow_chain_layout` gates it —
-            // but falls back to this progressive shape.)
+            // `None` — prettier's default `group(indent(join(heads)))` — renders the
+            // same: the first head already sits on the line, so the indent reaches only
+            // the rest.
             ArrowChainContext::CallArgOrBinaryish | ArrowChainContext::None => {
                 // `split_first` is always `Some` here — a curried chain has ≥2
                 // heads — but matching avoids a panic path; the `None` arm falls
@@ -1904,11 +1944,50 @@ impl<'a> Printer<'a> {
         // The body's hanging `line` is governed by THIS group, so a non-hugging
         // body hangs whenever the chain doesn't fit — even when the body itself is
         // short — while the nested heads group makes its own break decision.
+        // A callee's parens close on their own line when the heads broke — prettier's
+        // `ifBreak(softline, "", { groupId: chainGroupId })`.
+        let close = if context == ArrowChainContext::Callee {
+            d.if_break_with_id(d.softline(), d.empty(), GroupId::ArrowChain)
+        } else {
+            d.empty()
+        };
         d.group(d.concat(&[
             heads,
             d.text(" =>"),
             d.indent_if_break(body_part, GroupId::ArrowChain),
+            close,
         ]))
+    }
+
+    /// Prettier's `shouldPutBodyOnSameLine` for a chain's terminal body, as
+    /// [`Self::build_arrow_chain_doc`]'s body arms answer it: a block, a hugging body
+    /// ([`Self::arrow_body_hugs`]) and — unless the chain is force-broken — a ternary keep
+    /// the last head's line; an own-line comment in the `=>`→body gap denies all of them.
+    ///
+    /// Read by the callee shape alone, where a body that must hang forces the callee's
+    /// parens open.
+    fn arrow_chain_body_stays_on_head_line(
+        &self,
+        terminal: &internal::ArrowFunctionBody<'_>,
+        terminal_gap_start: u32,
+        should_break_chain: bool,
+    ) -> bool {
+        let body_start = terminal.span().start;
+        if self.has_own_line_post_arrow_comment(terminal_gap_start, body_start) {
+            return false;
+        }
+        match terminal {
+            internal::ArrowFunctionBody::BlockStatement(_) => true,
+            internal::ArrowFunctionBody::Expression(expr) => {
+                self.arrow_body_hugs(expr)
+                    || (!should_break_chain
+                        && matches!(
+                            expr.kind,
+                            internal::ExpressionKind::ConditionalExpression(_)
+                        )
+                        && !has_leftmost_arrow_body_parens(expr))
+            }
+        }
     }
 
     /// Build doc for return type annotation in arrow function context

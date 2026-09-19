@@ -42,7 +42,7 @@ pub(crate) use arg_comments::{
 pub(in crate::printer) use import_expr::{ImportOptionsArg, build_import_args_comment_layout};
 
 use super::chain::{self, ChainCall, call_callee_paren_leading_start};
-use super::{ParenContext, Printer};
+use super::{ArrowChainContext, ParenContext, Printer, is_curried_arrow_chain};
 use crate::ast::internal;
 use arg_comments::{any_arg_empty_line, any_comment_forces_expansion, last_arg_has_comments};
 use arg_predicates::is_block_function;
@@ -464,9 +464,24 @@ impl<'a> CalleeParens<'a> {
 
     /// The operand doc this pair wants, which is the ordinary expression doc for every
     /// shape but [`Self::Binary`].
-    pub(super) fn build_body_doc(&self, printer: &Printer<'_>) -> DocId {
+    ///
+    /// `pair_is_comment_free` is the caller's reading of the pair's own two gaps, which only
+    /// it can see. A curried arrow chain takes prettier's callee shape
+    /// ([`ArrowChainContext::Callee`]) when it holds — that shape opens the pair onto its own
+    /// lines from INSIDE the operand's doc, and a comment in either gap hands the pair to a
+    /// shell builder that owns those lines instead.
+    pub(super) fn build_body_doc(
+        &self,
+        printer: &Printer<'_>,
+        pair_is_comment_free: bool,
+    ) -> DocId {
         match self {
             Self::Binary(binary, span) => printer.build_binary_chain_doc_ungrouped(binary, *span),
+            Self::Welded(callee) if pair_is_comment_free && is_curried_arrow_chain(callee) => {
+                printer.build_with_arrow_chain_context(ArrowChainContext::Callee, || {
+                    printer.build_expression_doc(callee)
+                })
+            }
             Self::Welded(callee) | Self::Cast(callee) => printer.build_expression_doc(callee),
         }
     }
