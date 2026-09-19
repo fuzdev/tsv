@@ -226,11 +226,16 @@ export const TS_FIXTURES_PINS: GatePins = { scanned: 226, both_accept: 202, over
  * for the `grammar` sanctions when the whole target of an `=` / for-head stopped
  * converting to an `AssignmentPattern` — a node that exists only as a pattern child,
  * so the head had no wire shape (acorn rejects it too); every other bucket unmoved.
+ *
+ * 20 → 19 `over_acceptance_parser`: `castOfYield.ts` (`<number> yield 0`, TS1109) left it
+ * for reject parity — it got better — when a bare `yield` or arrow function stopped being
+ * accepted as an operand (an `AssignmentExpression` is no `UnaryExpression`); the full-corpus
+ * A/B moved no other TypeScript file, and every other bucket is unmoved.
  */
 export const TS_REPO_PINS = {
 	scanned: 13708,
 	accept_parity: 12282,
-	over_acceptance_parser: 20,
+	over_acceptance_parser: 19,
 	over_acceptance_checker: 467,
 	units_scanned: 7874,
 	units_accept_parity: 7858
