@@ -2241,7 +2241,7 @@ impl<'a> Printer<'a> {
             // of eight or more. ⚠️ Its run distribution is two modes: 80% of the
             // hops are adjacent (a `()`/`))` pair) and the rest average 18.7. The
             // `is_hop_needle` pre-test in front is what makes the first mode
-            // free; see the note on `scan_parens_then_arrow`, which measures the
+            // free; see the note on `matching_paren_close`, which measures the
             // pair with and without it.
             if !is_hop_needle(source[i], PAREN_HOP_NEEDLES) {
                 i = tsv_lang::swar::next_byte_of(&source[..end], i, PAREN_HOP_NEEDLES);

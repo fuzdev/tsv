@@ -152,7 +152,7 @@ const _: () = assert!(covers_trivia_openers(&trivia_hop_needles(b'k')));
 
 /// The bytes a paren-depth scan hops between: its own parens, plus every
 /// [`TRIVIA_OPENERS`] byte. Shared by the two such scans in `tsv_ts` — the
-/// printer's `find_closing_paren` and the parser's `scan_parens_then_arrow` —
+/// printer's `find_closing_paren` and the parser's `matching_paren_close` —
 /// which ask one question of one byte class and must not drift apart in it.
 pub const PAREN_HOP_NEEDLES: [u8; 6] = [b'(', b')', b'"', b'\'', b'`', b'/'];
 

@@ -1321,7 +1321,7 @@ tree-preserving *in the language* — parenthesizing a whole operand changes no 
 under tsv's own parse, because a paren around a `<` operand can still move it: the
 type-argument lookahead's `(` head arm grades the shell's CONTENT, so a twin whose content opens
 a type-argument list opens a region its paren-free twin does not. Where that content parses as a
-type the twin is a DIFFERENT TREE (`p < (readonly.a) > (t, u)`, a call with type arguments to
+type the twin is a DIFFERENT TREE (`p < (readonly(b)) > (t, u)`, a call with type arguments to
 tsv and a comparison chain to acorn); where the content opens a region whose body then fails to
 parse as a type, tsv REJECTS the twin (`p < (keyof.a) > (t, u)`, which acorn reads as the
 comparison chain its paren-free twin is, and which tsc rejects outright). An arithmetic twin

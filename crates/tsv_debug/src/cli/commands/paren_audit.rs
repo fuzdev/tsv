@@ -725,7 +725,7 @@ impl ParenAuditCommand {
     /// operand genuinely can move tsv's PARSE: the type-argument lookahead's `(` head arm
     /// grades the shell's CONTENT, so a twin whose content opens a type-argument list opens a
     /// region its paren-free twin does not. Where that content parses as a type, the twin is
-    /// a DIFFERENT TREE — `p < (readonly.a) > (t, u)`, a call with type arguments to tsv and
+    /// a DIFFERENT TREE — `p < (readonly(b)) > (t, u)`, a call with type arguments to tsv and
     /// a comparison chain to acorn. Where it spells a parameter list, or a body tsc's error
     /// recovery carries to the `>`, tsv REJECTS the twin, following tsc —
     /// `x < (a = b) > (t, u)`, `x < (a << b) > (t, u)`, both the comparison chain to acorn.
@@ -1289,7 +1289,7 @@ mod tests {
         assert!(exclusions_of("const g1 = p < keyof.a > (t, u);").contains(&Some("rejected")));
         // A shell whose content parses as a type moves the reading instead.
         assert!(
-            exclusions_of("const g2 = p < readonly.a > (t, u);").contains(&Some("different tree"))
+            exclusions_of("const g2 = p < readonly(b) > (t, u);").contains(&Some("different tree"))
         );
         // A chain whose twin neither moves nor rejects is probed, so the exclusion is keyed
         // on the twin rather than on the class.
