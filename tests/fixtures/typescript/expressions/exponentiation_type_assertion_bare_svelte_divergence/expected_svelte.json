@@ -1,0 +1,582 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 317,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a bare angle-bracket assertion as the left operand of `**`: tsc rejects it (as it does a",
+			"start": 20,
+			"end": 111,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 92
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " bare unary there), acorn-typescript reads the assertion over the whole exponentiation,",
+			"start": 113,
+			"end": 202,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 90
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " which `expected_svelte.json` records",
+			"start": 204,
+			"end": 243,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 40
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 316,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 307,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 245,
+					"end": 263,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 19
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 249,
+							"end": 262,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 5
+								},
+								"end": {
+									"line": 5,
+									"column": 18
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 249,
+								"end": 250,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 5
+									},
+									"end": {
+										"line": 5,
+										"column": 6
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "TSTypeAssertion",
+								"start": 253,
+								"end": 262,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 9
+									},
+									"end": {
+										"line": 5,
+										"column": 18
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 254,
+									"end": 255,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 10
+										},
+										"end": {
+											"line": 5,
+											"column": 11
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 254,
+										"end": 255,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 10
+											},
+											"end": {
+												"line": 5,
+												"column": 11
+											}
+										},
+										"name": "T"
+									}
+								},
+								"expression": {
+									"type": "BinaryExpression",
+									"start": 256,
+									"end": 262,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 12
+										},
+										"end": {
+											"line": 5,
+											"column": 18
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 256,
+										"end": 257,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 12
+											},
+											"end": {
+												"line": 5,
+												"column": 13
+											}
+										},
+										"name": "x"
+									},
+									"operator": "**",
+									"right": {
+										"type": "Literal",
+										"start": 261,
+										"end": 262,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 17
+											},
+											"end": {
+												"line": 5,
+												"column": 18
+											}
+										},
+										"value": 2,
+										"raw": "2"
+									}
+								}
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a bare angle-bracket assertion as the left operand of `**`: tsc rejects it (as it does a",
+							"start": 20,
+							"end": 111
+						},
+						{
+							"type": "Line",
+							"value": " bare unary there), acorn-typescript reads the assertion over the whole exponentiation,",
+							"start": 113,
+							"end": 202
+						},
+						{
+							"type": "Line",
+							"value": " which `expected_svelte.json` records",
+							"start": 204,
+							"end": 243
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 265,
+					"end": 284,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 20
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 269,
+							"end": 283,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 5
+								},
+								"end": {
+									"line": 6,
+									"column": 19
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 269,
+								"end": 270,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 5
+									},
+									"end": {
+										"line": 6,
+										"column": 6
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "TSTypeAssertion",
+								"start": 273,
+								"end": 283,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 9
+									},
+									"end": {
+										"line": 6,
+										"column": 19
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 274,
+									"end": 275,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 10
+										},
+										"end": {
+											"line": 6,
+											"column": 11
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 274,
+										"end": 275,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 10
+											},
+											"end": {
+												"line": 6,
+												"column": 11
+											}
+										},
+										"name": "T"
+									}
+								},
+								"expression": {
+									"type": "BinaryExpression",
+									"start": 276,
+									"end": 283,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 12
+										},
+										"end": {
+											"line": 6,
+											"column": 19
+										}
+									},
+									"left": {
+										"type": "TSNonNullExpression",
+										"start": 276,
+										"end": 278,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 12
+											},
+											"end": {
+												"line": 6,
+												"column": 14
+											}
+										},
+										"expression": {
+											"type": "Identifier",
+											"start": 276,
+											"end": 277,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 12
+												},
+												"end": {
+													"line": 6,
+													"column": 13
+												}
+											},
+											"name": "x"
+										}
+									},
+									"operator": "**",
+									"right": {
+										"type": "Literal",
+										"start": 282,
+										"end": 283,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 18
+											},
+											"end": {
+												"line": 6,
+												"column": 19
+											}
+										},
+										"value": 2,
+										"raw": "2"
+									}
+								}
+							}
+						}
+					],
+					"kind": "let"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 286,
+					"end": 306,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 21
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 290,
+							"end": 305,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 5
+								},
+								"end": {
+									"line": 7,
+									"column": 20
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 290,
+								"end": 291,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 5
+									},
+									"end": {
+										"line": 7,
+										"column": 6
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "TSTypeAssertion",
+								"start": 294,
+								"end": 305,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 9
+									},
+									"end": {
+										"line": 7,
+										"column": 20
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 295,
+									"end": 296,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 10
+										},
+										"end": {
+											"line": 7,
+											"column": 11
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 295,
+										"end": 296,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 10
+											},
+											"end": {
+												"line": 7,
+												"column": 11
+											}
+										},
+										"name": "T"
+									}
+								},
+								"expression": {
+									"type": "BinaryExpression",
+									"start": 297,
+									"end": 305,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 12
+										},
+										"end": {
+											"line": 7,
+											"column": 20
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 298,
+										"end": 299,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 13
+											},
+											"end": {
+												"line": 7,
+												"column": 14
+											}
+										},
+										"name": "x"
+									},
+									"operator": "**",
+									"right": {
+										"type": "Literal",
+										"start": 304,
+										"end": 305,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 19
+											},
+											"end": {
+												"line": 7,
+												"column": 20
+											}
+										},
+										"value": 2,
+										"raw": "2"
+									}
+								}
+							}
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
