@@ -1070,7 +1070,7 @@ pub fn is_curried_arrow_chain(expression: &Expression<'_>) -> bool {
 /// return type over parameters, or a non-identifier parameter. The host owes such a value a
 /// mandatory break after its operator; the heads then stack under it.
 pub fn curried_chain_breaks_after_operator(expression: &Expression<'_>) -> bool {
-    printer::curried_chain_breaks_after_operator(expression)
+    printer::is_curried_arrow_chain_that_breaks(expression)
 }
 
 /// Build a DocId for a single comment (`/* … */` / `// …`) in the caller's arena,

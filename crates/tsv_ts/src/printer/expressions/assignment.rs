@@ -14,7 +14,6 @@
 // - prettier/src/language-js/print/assignment.js
 
 use crate::ast::internal::{self, AssignmentOperator, Expression, ExpressionKind};
-use crate::printer::ArrowChainContext;
 use crate::printer::Printer;
 use crate::printer::calls::chain_has_calls;
 use crate::printer::chain::chain_paren_leading_gap;
@@ -1101,14 +1100,8 @@ impl<'a> Printer<'a> {
 
         // A curried arrow-chain RHS takes the assignment-RHS chain layout.
         let is_curried_chain = is_curried_arrow_chain(right_expr);
-        // The hang below supplies the break and the indent itself; whether the chain then
-        // stacks its heads under it is the gap's question
-        // ([`Printer::seam_break_stacks_curried_chain`]).
+        // The hang below supplies the break and the indent itself.
         let chain_hangs = layout == AssignmentLayout::BreakAfterOperator;
-        let chain_stacks = chain_hangs
-            && rhs_info
-                .gap
-                .is_some_and(|gap| self.seam_break_stacks_curried_chain(right_expr, gap.start));
         // Every gap routed through this builder is a value gap
         // (`mark_jsdoc_cast_value_gap`), and every value built here is an assignment's.
         self.mark_jsdoc_cast_value_gap(right_expr);
@@ -1162,14 +1155,13 @@ impl<'a> Printer<'a> {
                 // The hang has already broken and indented, so the assignment shape's own
                 // softline would break a second time under it — a blank line the next pass
                 // reads as the author's and grows again. The chain stacks under the hang
-                // where the gap says so, and otherwise takes the default shape, prettier's
-                // answer under a leading own-line comment.
-                let context = if chain_stacks {
-                    ArrowChainContext::AssignmentRhsHung
-                } else {
-                    ArrowChainContext::None
-                };
-                self.build_with_arrow_chain_context(context, build)
+                // where the gap says so ([`Printer::build_hung_value_doc`], the one reading
+                // every already-broken seam takes), and otherwise takes the default shape,
+                // prettier's answer under a leading own-line comment.
+                match rhs_info.gap {
+                    Some(gap) => self.build_hung_value_doc(right_expr, gap.start, build),
+                    None => build(),
+                }
             } else {
                 // `or`, never a concat — see [`Printer::hoisted_owned_value_gap_run_opt`].
                 let run = hoisted_run.or(rhs_info.comments);

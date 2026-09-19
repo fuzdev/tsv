@@ -491,12 +491,10 @@ impl<'a> Printer<'a> {
         // hang has its own arm above this one (`comment_hangs_value`).
         let needs_break_after_operator = is_break_after_op_rhs && !d.will_break(id_doc);
 
-        // A curried chain whose heads trigger `arrow_chain_should_break` breaks
-        // after `=` unconditionally; every other curried chain goes fluid below.
+        // A curried chain whose heads trigger `arrow_chain_should_break` (`chain_breaks`)
+        // breaks after `=` unconditionally; every other curried chain goes fluid below.
         // ⚠️ This pair is the declarator's hand-rolled twin of `choose_layout`'s
         // `Fluid` / `BreakAfterOperator` arms — see the ⚠️ on `build_assignment_layout`.
-        let is_curried_arrow = chain_breaks;
-
         if has_comments_after_eq
             && let Some(rhs) =
                 self.build_eq_comment_break_rhs(equals_pos, init_start, " =", hung_value)
@@ -531,7 +529,7 @@ impl<'a> Printer<'a> {
             parts.push(lhs_doc_with_comments(id_doc));
             parts.push(d.text(" = "));
             parts.push(make_init_doc(value()));
-        } else if is_curried_arrow {
+        } else if chain_breaks {
             // Mandatory break after `=`; the arrow printer stacks the heads under it.
             // The chain is built under the `AssignmentRhs` context (`build_value` above), so
             // the arrow printer declines its own chain layout and this `=` owns the break.

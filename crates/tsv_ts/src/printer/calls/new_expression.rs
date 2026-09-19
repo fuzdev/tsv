@@ -149,13 +149,12 @@ impl<'a> Printer<'a> {
             // The pair's shape and the operand's builder off ONE derivation of the callee's
             // kind — a `new` callee and a call callee are the same position to prettier, so
             // both read it from [`super::CalleeParens`].
-            let pair_is_comment_free = !self
-                .has_comments_on_page_between(span.start, new_expr.callee.span().start)
-                && self
-                    .paren_shell_close_after(new_expr.callee.span().end)
-                    .is_none_or(|close| {
-                        !self.has_comments_on_page_between(new_expr.callee.span().end, close)
-                    });
+            let callee_span = new_expr.callee.span();
+            let pair_is_comment_free = self.pair_gaps_are_comment_free(
+                (span.start, callee_span.start),
+                self.paren_shell_close_after(callee_span.end)
+                    .map(|close| (callee_span.end, close)),
+            );
             parens.build_doc(self, parens.build_body_doc(self, pair_is_comment_free))
         } else {
             self.build_expression_doc(new_expr.callee)

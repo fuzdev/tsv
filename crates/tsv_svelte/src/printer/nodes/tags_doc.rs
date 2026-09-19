@@ -149,13 +149,14 @@ impl<'a> Printer<'a> {
         // declarator's own arms, the run included, and this tag prints none of it. Its
         // trailing run goes inside the value's indent with the `}` one level out, so a
         // run-final `//` breaks for the `}` at the tag's column (`closer_owns_break`).
+        let operator_pos = self.assignment_operator_pos(binding_end);
         if !frozen
             && let Some(rhs) = tsv_ts::build_stacked_curried_chain_rhs_doc(
                 d,
                 init,
                 &self.ts_inputs(),
                 self.const_init_embed(),
-                self.assignment_operator_pos(binding_end),
+                operator_pos,
                 || {
                     let (trailing_docs, _) =
                         self.trailing_comment_docs(init.span().end, span.end - 1, true);
@@ -178,7 +179,7 @@ impl<'a> Printer<'a> {
                 init,
                 &self.ts_inputs(),
                 self.const_init_embed(),
-                self.assignment_operator_pos(binding_end),
+                operator_pos,
                 || {
                     let init_start = init.span().start;
                     self.build_const_init_doc(init, init_start, span.end - 1, false, true, None)

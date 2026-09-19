@@ -268,7 +268,7 @@ fn type_arg_head_commits(bytes: &[u8], pos: usize, scan: TypeArgScan) -> bool {
         // follow-token question of its own: a PARAMETER LIST
         // ([`paren_starts_function_type`] — the single spelling of acorn-typescript's
         // `tsIsUnambiguouslyStartOfFunctionType` this parser has, shared with the
-        // return-type scan and with the type parser's own token-level twin) whose `)` an
+        // return-type scan and with the type parser's own `(`) whose `)` an
         // `=>` follows ([`paren_list_then_arrow`], shared with the construct and
         // generic-function heads). Behind that pair every byte to the region's own `>` is
         // the type's — its parameters, its `=>`, and a return type that may carry a

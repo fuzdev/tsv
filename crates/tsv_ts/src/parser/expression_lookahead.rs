@@ -497,8 +497,7 @@ const TYPE_FULL_POSITION_WORDS: &[&[u8]] = &[b"new", b"abstract", b"is"];
 /// - the type-argument head
 ///   ([`is_type_arguments_start`](super::Parser::is_type_arguments_start)'s `(` arm),
 ///   where a parameter list behind the `<` makes every byte to the region's own `>` the
-///   function type's.
-///
+///   function type's;
 /// - the type parser's own `(` (`Parser::parse_parenthesized_or_function_type`), at a
 ///   full-type position: a parameter list, or else a parenthesized type whatever its
 ///   first token is.

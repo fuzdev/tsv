@@ -1942,16 +1942,6 @@ impl<'a> Printer<'a> {
             BinaryChainLayout::Operands(operands, operators) => (operands, operators),
         };
 
-        // For 2-operand chains, wrap in a group with line() so the binary can
-        // independently decide whether to break at the operator. The group stays flat
-        // when the operands fit; when they don't, line() fires and breaks at the
-        // operator (e.g., `left +\nright`), preventing the operands' internal break
-        // points (like member chain dots) from firing instead.
-        //
-        // Applies to every operator family. Excluding a logical operator here would
-        // leave a parenthesized logical base breaking its operands where the
-        // arithmetic one holds them together — see conformance_prettier_ts.md §TypeScript
-        // (Parenthesized binary member base).
         // `operand1 " /", line, operand2 " /", line, operand3` — or, for an operator that
         // leads its line ([`ChainOperator::leads_line`]), `operand1, line, "> " operand2`.
         let mut parts: DocBuf = DocBuf::new();
