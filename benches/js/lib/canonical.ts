@@ -8,6 +8,7 @@ import { extname } from 'node:path';
 import { PrettierCache, prettier_cache_enabled } from './prettier_cache.ts';
 import {
 	BaseImplementation,
+	CANONICAL_PARSER_ROWS,
 	type Language,
 	LANGUAGE_EXTENSIONS,
 	LANGUAGE_PRETTIER_PARSERS,
@@ -16,6 +17,11 @@ import {
 } from './types.ts';
 import type { CanonicalVersions } from './versions.ts';
 import { assert_format_config_landed, FORMAT_CONFIG_PROBES } from './format_config_probe.ts';
+import {
+	assert_tool_rejects_invalid,
+	assert_tool_rejects_invalid_async,
+	surface_embedded_format_errors
+} from './reject_probe.ts';
 
 /** Prettier module */
 interface PrettierModule {
@@ -91,6 +97,10 @@ export class CanonicalImplementation extends BaseImplementation {
 	}
 
 	async init(): Promise<void> {
+		// Before the first format call: without it the svelte plugin echoes an embedded
+		// block it failed on and returns normally (`lib/reject_probe.ts`).
+		surface_embedded_format_errors();
+
 		// Load dependencies in parallel
 		const [prettier_mod, prettier_svelte_mod, svelte_mod, acorn_mod, acorn_ts_mod] =
 			await Promise.all([
@@ -150,6 +160,19 @@ export class CanonicalImplementation extends BaseImplementation {
 				'prettier',
 				language,
 				await this.format_async(FORMAT_CONFIG_PROBES[language], language)
+			);
+			// And that a syntax error still THROWS on each of the three printers. The
+			// svelte pass is the one with teeth: it fails if the embedded-block fallback
+			// above ever stops being switched off, which would hand the baseline free
+			// files in its timed sweep — the denominator of every published `Nx`.
+			await assert_tool_rejects_invalid_async('prettier', 'format_async', language, (source) =>
+				this.format_async(source, language)
+			);
+			// The three oracle parsers, on the same terms: each reference row's accept is
+			// "it did not throw", and on the conformance surface that accept set is what
+			// the published coverage is graded against.
+			assert_tool_rejects_invalid(CANONICAL_PARSER_ROWS[language], 'parse', language, (source) =>
+				this.parse(source, language)
 			);
 		}
 	}

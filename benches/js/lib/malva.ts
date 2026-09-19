@@ -18,6 +18,7 @@ import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { BaseImplementation, type Language } from './types.ts';
 import { assert_format_config_landed, FORMAT_CONFIG_PROBES } from './format_config_probe.ts';
+import { assert_tool_rejects_invalid } from './reject_probe.ts';
 import type { MalvaVersions } from './versions.ts';
 // Type-only, so naming `Formatter` here does not load the plugin at import time;
 // the value imports are deferred to `init()`. Same posture as lib/dprint.ts.
@@ -79,6 +80,12 @@ export class MalvaImplementation extends BaseImplementation {
 				'malva',
 				language,
 				this.format(FORMAT_CONFIG_PROBES[language], language)
+			);
+			// And that a syntax error still THROWS: `format` has no other success test,
+			// so a plugin that began handing its input back would publish free files
+			// and a full coverage — see `lib/reject_probe.ts`.
+			assert_tool_rejects_invalid('malva', 'format', language, (source) =>
+				this.format(source, language)
 			);
 		}
 	}

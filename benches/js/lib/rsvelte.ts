@@ -30,6 +30,7 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { BaseImplementation, type Language } from './types.ts';
+import { assert_tool_rejects_invalid } from './reject_probe.ts';
 import type { RsvelteVersions } from './versions.ts';
 
 /**
@@ -130,6 +131,14 @@ export class RsvelteImplementation extends BaseImplementation {
 		if (probe.error) throw probe.error;
 		if (probe.status !== 0) {
 			throw new Error(`rsvelte-fmt --version exited ${probe.status}`);
+		}
+
+		// The row is an accept rate and nothing else, decided by the exit status — so
+		// prove a syntax error still exits non-zero (`lib/reject_probe.ts`).
+		for (const language of this.format_languages) {
+			assert_tool_rejects_invalid('rsvelte-fmt', 'format', language, (source) =>
+				this.format(source, language)
+			);
 		}
 	}
 
