@@ -3,8 +3,9 @@
 
 use super::Parser;
 use super::expression_lookahead::{
-    has_line_terminator_between, is_construct_type_start, is_function_type_start,
-    is_generic_function_type_start, matching_delimiter_close, scan_for_closing_angle_bracket,
+    has_line_terminator_between, is_construct_type_start, is_generic_function_type_start,
+    matching_delimiter_close, paren_list_then_arrow, paren_starts_function_type,
+    paren_starts_modified_parameter_list, scan_for_closing_angle_bracket,
 };
 use super::scan::{
     identifier_starts_at, is_word_at, skip_identifier, skip_numeric_literal,
@@ -78,7 +79,10 @@ use tsv_lang::source_scan::{TriviaProfile, skip_template_literal, skip_trivia};
 ///   parenthesized operand a pair its bare twin lacks.
 ///
 /// The bracketed heads are where soundness bites, and it is what splits them: a `(` head
-/// grades its BODY ([`paren_type_head_close`]), a `{` or `[` head grades none.
+/// grades its BODY ([`paren_type_head_close`]), a `{` or `[` head grades none. The grade
+/// is the `(` head's SECOND question — a group that is a parameter list closing on `=>`
+/// is a function type and is claimed ahead of it, since no comparison chain can spell
+/// one — so what the grade reads is every other `(`-headed region.
 ///
 /// **The `(` head can be graded because a region it refuses never reaches this scan bare.**
 /// Where the printer KEEPS the operand's shell, the region's first printed byte is that `(`
@@ -249,17 +253,55 @@ fn type_arg_head_commits(bytes: &[u8], pos: usize, scan: TypeArgScan) -> bool {
             check_identifier_type_arg_pattern(bytes, pos, scan)
         }
 
-        // A type argument starting with `(`: a function type (`<(x: T) => R>`,
-        // `<() => R>`) or a parenthesized type (`<(A | B) & C>`,
-        // `<(() => void) | null>`). `is_function_type_start` fast-paths the arrow
-        // shapes; otherwise skip the balanced group and ask the shared follow-token
+        // A type argument starting with `(`: a function type (`<(a: T) => R>`,
+        // `<() => R>`, `<(...a: T[]) => R>`, `<({ a }: T) => R>`) or a parenthesized type
+        // (`<(A | B) & C>`, `<(() => void) | null>`).
+        //
+        // A **function type** is read first, and it is the one head that asks no
+        // follow-token question of its own: a PARAMETER LIST
+        // ([`paren_starts_function_type`] — the single spelling of acorn-typescript's
+        // `tsIsUnambiguouslyStartOfFunctionType` this parser has, shared with the
+        // return-type scan and with the type parser's own token-level twin) whose `)` an
+        // `=>` follows ([`paren_list_then_arrow`], shared with the construct and
+        // generic-function heads). Behind that pair every byte to the region's own `>` is
+        // the type's — its parameters, its `=>`, and a return type that may carry a
+        // nested argument list closing on `>>`. A parameter list may open on tsc's
+        // MODIFIERS too ([`paren_starts_modified_parameter_list`]) — a parameter property
+        // is a grammar error rather than a parse failure, so the compiler and prettier
+        // both read `f<(readonly a: T) => U>(x)` as a generic call, and tsv claims it and
+        // lets the type parse reject it rather than printing a different program.
+        //
+        // **`(…) =>` after a `<` is never an expression.** An arrow function is an
+        // `AssignmentExpression`, which cannot be a relational operand, so tsc and
+        // acorn-typescript both reject `x < (a) => b`: there is no comparison chain for
+        // the commit to take away, which is why no follower is consulted and why
+        // [`TypeArgScan::Relex`] needs no protection here — no printed form can spell a
+        // region this arm claims either.
+        //
+        // The body grade cannot answer for these heads: its follow-token filter is asked
+        // past the `)`, where the `=>` opening the return type continues a type the filter
+        // has no arm for, and a refusal there reads a whole generic call as a comparison
+        // and REWRITES it (`f<(...a: T[]) => U>(x)` as `f < ((...a: T[]) => U > x)`) —
+        // the silent direction this dispatch may never take.
+        //
+        // Two parameter shapes the claim reaches have no acorn-typescript AST behind them,
+        // because the compiler defers their rule to the checker where acorn refuses the
+        // syntax: a **parameter property** (the modifier run above) and a **parameter
+        // default** (`f<(a = x) => U>(x)`, which tsc parses and acorn rejects at the `=`).
+        // Claiming the region and letting the type parse refuse is the only reading that
+        // is neither a different program nor an AST no oracle has; both are pinned as the
+        // `input_invalid_*` files of
+        // `tests/fixtures/typescript/syntax/disambiguation/less_than_function_type_head`.
+        //
+        // Without that `=>` the group is a parenthesized type or a value, and the ordinary
+        // path decides: skip the balanced group and ask the shared follow-token
         // filter (as the `{`/`[`/literal arms do), so `x < (b)`, `x < (b) > c` and
         // `x < (a) ? q : r > (t, u)` stay comparisons while `callee<(T)>(…)` and
         // `x < (b) > (c)` are type arguments — matching acorn-typescript's follower handling
         // (quoted in `docs/conformance_prettier_ts.md` §Relational chain type-argument parens).
         //
-        // Past the arrow fast path, [`TypeArgScan::Relex`] LOOKS THROUGH the shell instead
-        // of skipping it: a redundant pair is not in the form that reading grades
+        // Past the function-type reading, [`TypeArgScan::Relex`] LOOKS THROUGH the shell
+        // instead of skipping it: a redundant pair is not in the form that reading grades
         // (`a < (arr[b - 1]) > c` prints as `a < arr[b - 1] > c`), so the head question is
         // the CONTENT's, asked with the content's own first byte. Skipping to the follow
         // filter would grade nothing at all there — the filter is the region's only
@@ -267,7 +309,10 @@ fn type_arg_head_commits(bytes: &[u8], pos: usize, scan: TypeArgScan) -> bool {
         // parenthesized operand would commit, type or not. The closing side needs no rule
         // of its own: [`skip_relex_operand_suffixes`] already steps over the `)`.
         b'(' => {
-            if is_function_type_start(bytes, pos) {
+            if (paren_starts_function_type(bytes, pos)
+                || paren_starts_modified_parameter_list(bytes, pos))
+                && paren_list_then_arrow(bytes, pos)
+            {
                 true
             } else if scan.reads_source_as_written() {
                 paren_type_head_close(bytes, pos)

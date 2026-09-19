@@ -197,9 +197,24 @@ fn paren_head_commits_to_signature(bytes: &[u8], paren: usize) -> bool {
 /// that closes it when `=>` follows — `None` where the pattern does not hold.
 ///
 /// Handles nested parentheses, the strings / templates / comments / regexes a
-/// `(` or `)` can hide inside, and an optional return-type annotation after the
-/// `)` (so both `(...) =>` and `(...): type =>` match).
+/// `(` or `)` can hide inside ([`matching_paren_close`]), and an optional
+/// return-type annotation after the `)` (so both `(...) =>` and `(...): type =>`
+/// match).
 pub(super) fn scan_arrow_head_close(bytes: &[u8], start: usize) -> Option<usize> {
+    matching_paren_close(bytes, start).filter(|&close| check_arrow_after_paren(bytes, close + 1))
+}
+
+/// Find the `)` closing the `(` at `start`, stepping over every literal a `(` or `)`
+/// can hide inside — strings, templates, comments, and **regex literals**.
+///
+/// The regex step is what separates this from
+/// [`matching_delimiter_close`]: that walk leaves a `/…/`
+/// significant, so a pattern holding an unescaped `)` (`/\)=>/`) hands it a close the
+/// source does not have. Every caller that acts on the `)` ALONE — with no follow-token
+/// filter behind it to refuse a false one — must use this walk, because a false close
+/// picks up whatever byte follows it as if it were the group's own
+/// ([`paren_list_then_arrow`]'s `=>`).
+pub(super) fn matching_paren_close(bytes: &[u8], start: usize) -> Option<usize> {
     if start >= bytes.len() || bytes[start] != b'(' {
         return None;
     }
@@ -255,7 +270,7 @@ pub(super) fn scan_arrow_head_close(bytes: &[u8], start: usize) -> Option<usize>
             b')' => {
                 depth -= 1;
                 if depth == 0 {
-                    return check_arrow_after_paren(bytes, pos + 1).then_some(pos);
+                    return Some(pos);
                 }
             }
             _ => {}
@@ -540,11 +555,72 @@ const TYPE_FULL_POSITION_WORDS: &[&[u8]] = &[b"new", b"abstract", b"is"];
 /// True for `()`, `(...`, and a parameter start (identifier, `this`, or a
 /// balanced `{…}`/`[…]` pattern) followed by `:`, `,`, `?`, `=`, or by `) =>`.
 ///
-/// The token-level twin of this question, asked once the parser has committed to
-/// parsing a type, is `Parser::paren_starts_function_type_params` — same acorn
-/// rule, same full-type-position precondition, different layer.
-fn paren_starts_function_type(bytes: &[u8], paren: usize) -> bool {
+/// Two callers ask it, at two layers and for two different `(`s, because it is one
+/// question about one shape:
+///
+/// - the return-type scan above, deciding whether a `=>` past the group is the type's
+///   own or the enclosing arrow's;
+/// - the type-argument head
+///   ([`is_type_arguments_start`](super::Parser::is_type_arguments_start)'s `(` arm),
+///   where a parameter list behind the `<` makes every byte to the region's own `>` the
+///   function type's.
+///
+/// The token-level twin, asked once the parser has committed to parsing a type, is
+/// `Parser::paren_starts_function_type_params` — same acorn rule, same
+/// full-type-position precondition, different layer.
+///
+/// **tsc's `isUnambiguouslyStartOfFunctionType` admits one shape more**: it runs
+/// `parseModifiers` ahead of the parameter start, so `(readonly a: T) => U` and
+/// `(public a: T) => U` are function types to the compiler. acorn-typescript's
+/// `tsSkipParameterStart` has no modifier step and rejects both outright, so this —
+/// the rule the AST wire answers to — is acorn's. tsc's extra step is spelled
+/// separately, for the one site that owes it an answer
+/// ([`paren_starts_modified_parameter_list`]).
+pub(super) fn paren_starts_function_type(bytes: &[u8], paren: usize) -> bool {
+    parameter_list_starts_at(bytes, skip_whitespace_and_comments(bytes, paren + 1))
+}
+
+/// [`paren_starts_function_type`] with tsc's MODIFIER step ahead of the parameter
+/// start — `parseModifiers` in `skipParameterStart`, which is what makes
+/// `(readonly a: T) => U` and `(public a: T) => U` function types to the compiler.
+///
+/// Only the type-argument head asks it, and for one reason: a parameter property is
+/// a *grammar* error rather than a parse failure, so the compiler and prettier both
+/// read `f<(readonly a: T) => U>(x)` as a generic call and complain about the
+/// modifier. Reading the region as a comparison instead would print a different
+/// program, so tsv claims it too and lets the type parse produce the rejection.
+/// acorn-typescript rejects the input outright, so there is no wire to match and
+/// nothing is lost by taking tsc's shape here.
+///
+/// A modifier is only one where a parameter start follows it (tsc's
+/// `canFollowModifier`): everywhere else the same word is the parameter's own NAME,
+/// which is what keeps `(readonly: T)`, `(readonly)` and `(readonly, b)` reading
+/// exactly as [`paren_starts_function_type`] reads them, and `(readonly + 1)` /
+/// `(readonly.a)` out of this arm entirely. At least one modifier must be consumed,
+/// so every plain parameter list is the other predicate's alone.
+pub(super) fn paren_starts_modified_parameter_list(bytes: &[u8], paren: usize) -> bool {
     let mut pos = skip_whitespace_and_comments(bytes, paren + 1);
+    let mut modified = false;
+    while identifier_starts_at(bytes, pos) {
+        let word = &bytes[pos..skip_identifier(bytes, pos)];
+        if !PARAM_MODIFIERS.contains(&word) {
+            break;
+        }
+        let after = skip_whitespace_and_comments(bytes, pos + word.len());
+        if !identifier_starts_at(bytes, after) && !matches!(bytes.get(after), Some(b'{' | b'[')) {
+            break;
+        }
+        modified = true;
+        pos = after;
+    }
+    modified && parameter_list_starts_at(bytes, pos)
+}
+
+/// The body of [`paren_starts_function_type`], asked at the first significant byte
+/// INSIDE the `(` rather than at the paren — so the modifier step can re-ask it past
+/// the modifiers it consumed.
+fn parameter_list_starts_at(bytes: &[u8], first: usize) -> bool {
+    let mut pos = first;
     match bytes.get(pos) {
         // `()` and `(...` are unambiguous.
         None => return false,
@@ -662,60 +738,6 @@ pub(super) fn scan_angle_brackets(bytes: &[u8], pos: usize) -> usize {
     if depth == 0 { pos } else { 0 }
 }
 
-/// Check if `(` at `pos` starts a function type (not a grouped expression).
-///
-/// Function type patterns:
-/// - `(identifier:` or `(identifier?:` → parameter with type annotation
-/// - `() =>` → no-params function type
-///
-/// Non-function patterns:
-/// - `(expr)` → grouped expression
-/// - `(a, b)` → tuple or call args (without type annotations)
-pub(super) fn is_function_type_start(bytes: &[u8], pos: usize) -> bool {
-    if pos >= bytes.len() || bytes[pos] != b'(' {
-        return false;
-    }
-
-    let after_paren = skip_whitespace_and_comments(bytes, pos + 1);
-    if after_paren >= bytes.len() {
-        return false;
-    }
-
-    // `(identifier:` or `(identifier?:` → function type parameter
-    if identifier_starts_at(bytes, after_paren) {
-        let after_id = skip_whitespace_and_comments(bytes, skip_identifier(bytes, after_paren));
-        if after_id < bytes.len() {
-            match bytes[after_id] {
-                // `(b: T)` typed parameter
-                b':' => return true,
-                // `(b?: T)` optional parameter — the `?` must be followed by `:`.
-                // Otherwise it's a ternary operand `(b ? c : d)`, i.e. a comparison
-                // `x < (b ? c : d)`, not a function type.
-                b'?' => {
-                    let after_q = skip_whitespace_and_comments(bytes, after_id + 1);
-                    if after_q < bytes.len() && bytes[after_q] == b':' {
-                        return true;
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-
-    // `() =>` or `( /* comment */ ) =>` → no-params function type
-    if bytes[after_paren] == b')' {
-        let after_close = skip_whitespace_and_comments(bytes, after_paren + 1);
-        if after_close + 1 < bytes.len()
-            && bytes[after_close] == b'='
-            && bytes[after_close + 1] == b'>'
-        {
-            return true;
-        }
-    }
-
-    false
-}
-
 /// Scan for closing `>` at angle depth 0, tracking all delimiter depths.
 ///
 /// Used by `is_type_arguments_start` to verify that a sequence like `<T | U>`
@@ -796,14 +818,20 @@ pub(super) fn is_generic_function_type_start(bytes: &[u8], pos: usize) -> bool {
 }
 
 /// Whether the `(` at `paren` opens a parameter list whose matching `)` is
-/// followed by `=>` — the tail shared by a generic function type's split
-/// (`<…>(params) =>`) and a construct type (`new (params) =>`). `paren` must
-/// point at the `(`; comments between `)` and `=>` are skipped. The `=>` is the
-/// signal that separates these types from a shift/comparison chain or a
-/// `new Foo()` value (neither of which has `(…) =>`).
+/// followed by `=>` — the tail shared by a plain function type (`(params) =>`), a
+/// generic function type's split (`<…>(params) =>`) and a construct type
+/// (`new (params) =>`). `paren` must point at the `(`; comments between `)` and
+/// `=>` are skipped. The `=>` is the signal that separates these types from a
+/// shift/comparison chain or a `new Foo()` value (neither of which has `(…) =>`).
+///
+/// The close comes from [`matching_paren_close`], the REGEX-AWARE walk, because the
+/// `=>` this reads is whatever byte follows the `)` — so a pattern holding an
+/// unescaped `)` (`a < (b, /\)=>/) > c`, a comparison chain to both oracles) would
+/// otherwise hand it a close inside the literal and an arrow that is the pattern's own
+/// text.
 #[inline]
-fn paren_list_then_arrow(bytes: &[u8], paren: usize) -> bool {
-    matching_delimiter_close(bytes, paren).is_some_and(|paren_close| {
+pub(super) fn paren_list_then_arrow(bytes: &[u8], paren: usize) -> bool {
+    matching_paren_close(bytes, paren).is_some_and(|paren_close| {
         let after_params = skip_whitespace_and_comments(bytes, paren_close + 1);
         after_params + 1 < bytes.len()
             && bytes[after_params] == b'='
@@ -812,12 +840,12 @@ fn paren_list_then_arrow(bytes: &[u8], paren: usize) -> bool {
 }
 
 /// Whether `pos` begins a construct-signature type `new (params) => R` — the
-/// `new`-prefixed sibling of [`is_function_type_start`]. True iff a whole-word
+/// `new`-prefixed sibling of [`paren_starts_function_type`]. True iff a whole-word
 /// `new` is followed by a parenthesized parameter list whose matching `)` is
 /// followed by `=>`. The `=>` is what separates the construct TYPE from a
 /// `new Foo()` value expression, so `a < new Foo() > (c)` stays a comparison
-/// while `f<new () => T>(x)` is a generic call — mirroring the `=>` requirement
-/// in [`is_function_type_start`] / [`is_generic_function_type_start`]. Callers
+/// while `f<new () => T>(x)` is a generic call — the same [`paren_list_then_arrow`]
+/// tail the plain and generic function-type heads require. Callers
 /// still gate on the closing-`>` follow-token scan, so a construct type only
 /// reads as type arguments when a call/tagged-template/end token actually
 /// follows the `>`. `pos` may point at `new` directly or (for `abstract new`)
