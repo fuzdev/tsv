@@ -143,6 +143,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         position: StatementPosition,
         module_item: Option<ModuleItemContext>,
     ) -> Result<Statement<'arena>, ParseError> {
+        // A `<` region dies at a statement boundary: what came before this statement —
+        // an earlier statement, or the head this one is the body of — cannot reach a
+        // `>` in it (`Parser::lt_region_statement_base`).
+        self.reset_lt_region_for_statement();
+
         // A labeled statement, checked before the keyword dispatch below because a
         // `LabelIdentifier` may be a word the lexer turned into a `Keyword` token
         // (`async: …`, `string: …`, `let: …`) — those never reach the `Identifier`

@@ -104,10 +104,47 @@ fn comment_from_token(
     (comment, has_line_terminator)
 }
 
+/// A `<` region: what tsc's type-argument parse may still be consuming.
+///
+/// It opens at a binary `<` (or a `<<`, which tsc re-scans to one), and a lone `>` reduced
+/// while it is open may be the token that recovering parse stops at — which the printer
+/// must then never let end a line (`BinaryExpression::may_close_type_arguments`). It is a
+/// deliberate SUPERSET — no model of which tokens the recovery takes — and it ends only
+/// where the printed form provably ends it, all of them tokens the type grammar cannot
+/// take at list level:
+///
+/// - the closer of the delimiter the `<` was written in ([`Parser::exit_grouping`], read
+///   against [`LtRegion::floor`] as `no_in_depth` reads its baseline) — call arguments,
+///   `[…]`, `{…}`, `${…}`. **A grouping paren is not one**: the printer may strip it, so
+///   `f((x < q), a > b)` prints as one comma list, and the region re-anchors one level out
+///   instead ([`Parser::exit_stripped_grouping`]);
+/// - a statement or class-member boundary ([`Parser::lt_region_statement_base`]).
+///
+/// Ending it EARLY is the unsound direction (a `>` the printer may then end a line on);
+/// ending it late costs one operator-leading line break on a shape real code does not
+/// hold.
+///
+/// Only the EARLIEST open region is kept: a later one opens at the same depth or deeper,
+/// so it dies no later, and the earliest `<` is the one every reader wants.
+#[derive(Clone, Copy)]
+struct LtRegion {
+    /// The [`Parser::grouping_depth`] the region lives at: it is dead once the depth drops
+    /// below this.
+    floor: u32,
+    /// Where its `<` stands (a span coordinate, as [`Parser::current_pos`] gives). A `>`
+    /// whose own LEFT operand holds the `<` is not this rule's — `(x < q) > c` and
+    /// `x < 1 + 2 > c` are the chain the pair rule answers
+    /// (`BinaryExpression::relexes_as_type_arguments`), which either ends the region on a
+    /// `)` or has graded it no type-argument list — so the reader asks for a `<` standing
+    /// AHEAD of that operand ([`Parser::lt_region_open_before`]).
+    lt_pos: usize,
+}
+
 /// The parser state [`Parser::rewind`] restores after the grammar's one
 /// speculative parse ([`Parser::parse_arrow_or_rewind`]): the lexer cursor, the
 /// one-token window with its decoded values and line-terminator flags, `prev_end`,
-/// a peek's stored lexer error, the comment ledger's length and the grouping depth.
+/// a peek's stored lexer error, the comment ledger's length, the grouping depth and the
+/// open `<` region that is read against it ([`Parser::lt_region`]).
 /// Context flags (`allow_in`, `in_await`, …) are not carried — their combinators
 /// restore them on every path — and neither are arena nodes, which an abandoned
 /// parse simply leaves unreachable.
@@ -132,6 +169,7 @@ pub(super) struct Checkpoint<'arena> {
     lexer_error: Option<ParseError>,
     comments_len: usize,
     grouping_depth: u32,
+    lt_region: Option<LtRegion>,
 }
 
 #[expect(clippy::struct_excessive_bools)]
@@ -252,6 +290,20 @@ pub struct Parser<'a, 'arena> {
     /// body, the conditional's alternate and an assignment's right side, which
     /// inherit it exactly as tsc threads the parameter through those three.
     arrow_return_type_barred_at: Option<u32>,
+    /// The OPEN `<` region, or `None` while none is open — the one input of
+    /// `BinaryExpression::may_close_type_arguments`, where the hazard, tsc's recovering
+    /// list parse, is stated. What a region is, and where one ends: [`LtRegion`].
+    ///
+    /// Carried by [`Checkpoint`], since the speculative arrow head may open one.
+    lt_region: Option<LtRegion>,
+    /// What [`Parser::lt_region`] is reset to where a statement (or a class member)
+    /// begins: the region a **body** inherited. A statement's own regions die with it — a
+    /// head's `<` says nothing about the body (`if (x < q) a > b`) — but a body written
+    /// inside an open region is still inside it, tsc reading an arrow's block as a type
+    /// literal and its `return (` as a method signature
+    /// (`x < (() => { return (a > b); })`). [`Parser::with_lt_region_inherited`] hands the
+    /// open region down and restores both on the way out.
+    lt_region_statement_base: Option<LtRegion>,
     /// The syntactic goal symbol (`Script` vs `Module`) this parse runs against.
     /// Fixed for the whole parse — embedders (Svelte) and the standalone
     /// `parse`/`format` default to `Module`; `parse_with_goal` overrides it.
@@ -482,6 +534,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             allow_in: true,                  // Allow `in` binary operator by default
             no_in_depth: 0,                  // Only read while `allow_in` is false
             arrow_return_type_barred_at: None, // Not inside a conditional consequent
+            lt_region: None,                 // No `<` region open
+            lt_region_statement_base: None,  // The top level inherits none
             goal,
             // Module top level is `[+Await]` (`ModuleItem[+Await]`); Script top
             // level is `[~Await]` (`ScriptBody[~Await]`).
@@ -1072,6 +1126,73 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             "exit_grouping without a matching enter_grouping"
         );
         self.grouping_depth -= 1;
+        // The delimiter a `<` region opened in has closed, and its closer is a token the
+        // printed form always holds ([`LtRegion`]).
+        if self
+            .lt_region
+            .is_some_and(|region| region.floor > self.grouping_depth)
+        {
+            self.lt_region = None;
+        }
+    }
+
+    /// [`Parser::exit_grouping`] for a GROUPING paren, the one delimiter the printer may
+    /// strip: a `<` region opened inside it survives the `)`, re-anchored at the depth the
+    /// paren sat in ([`LtRegion`]).
+    #[inline]
+    pub(super) fn exit_stripped_grouping(&mut self) {
+        let open = self.lt_region;
+        self.exit_grouping();
+        if let Some(region) = open
+            && self.lt_region.is_none()
+        {
+            self.lt_region = Some(LtRegion {
+                floor: self.grouping_depth,
+                ..region
+            });
+        }
+    }
+
+    /// Record a binary `<` / `<<` just consumed, at `lt_pos`: it opens a region unless one
+    /// is already open, whose floor is the lower and so outlives this one ([`LtRegion`]).
+    #[inline]
+    pub(super) fn open_lt_region(&mut self, lt_pos: usize) {
+        self.lt_region.get_or_insert(LtRegion {
+            floor: self.grouping_depth,
+            lt_pos,
+        });
+    }
+
+    /// Whether a `<` region is open at the current token whose `<` stands ahead of
+    /// `operand_start` — the start of the left operand of the `>` being reduced
+    /// ([`LtRegion::lt_pos`]).
+    #[inline]
+    pub(super) fn lt_region_open_before(&self, operand_start: usize) -> bool {
+        self.lt_region
+            .is_some_and(|region| region.lt_pos < operand_start)
+    }
+
+    /// A statement or class member begins: the regions of whatever came before it in this
+    /// body are dead ([`Parser::lt_region_statement_base`]).
+    #[inline]
+    pub(super) fn reset_lt_region_for_statement(&mut self) {
+        self.lt_region = self.lt_region_statement_base;
+    }
+
+    /// Run `f` as a **body** written inside whatever `<` region is open: its statements
+    /// start from that region rather than from none
+    /// ([`Parser::lt_region_statement_base`]), and both are restored afterward (on success
+    /// and error alike), where the body's own regions are dead.
+    pub(super) fn with_lt_region_inherited<T>(
+        &mut self,
+        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        let saved = self.lt_region;
+        let saved_base = std::mem::replace(&mut self.lt_region_statement_base, saved);
+        let result = f(self);
+        self.lt_region_statement_base = saved_base;
+        self.lt_region = saved;
+        result
     }
 
     /// Shared body of the `with_*` context combinators: run `f` with the
@@ -1156,6 +1277,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             lexer_error: self.lexer_error.clone(),
             comments_len: self.comments.len(),
             grouping_depth: self.grouping_depth,
+            lt_region: self.lt_region,
         }
     }
 
@@ -1179,6 +1301,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             lexer_error,
             comments_len,
             grouping_depth,
+            lt_region,
         } = checkpoint;
         self.lexer.rewind(lexer);
         self.current = current;
@@ -1191,6 +1314,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.lexer_error = lexer_error;
         self.comments.truncate(comments_len);
         self.grouping_depth = grouping_depth;
+        self.lt_region = lt_region;
         // Whatever the abandoned parse's type grammar was handing to itself is not
         // for the re-parse to receive (`checkpoint` asserts it was empty).
         self.pending_conditional_extends = None;

@@ -644,6 +644,32 @@ pub struct BinaryExpression<'arena> {
     ///
     /// `false` on every other operator, and free in the struct's existing padding.
     pub relexes_as_type_arguments: bool,
+    /// For a lone `>` only: whether a binary `<` stands AHEAD of it with its region still
+    /// open — so this `>` may be the token tsc's type-argument parse stops at, and must
+    /// never END A LINE.
+    ///
+    /// tsc does not guess at a `<`: `parseTypeArgumentsInExpression` parses a list for
+    /// real, with error recovery, and keeps a truthy result errors and all. The list runs
+    /// from the `<` to the first token the type grammar cannot take — a missing `)`, `]`
+    /// or `}` is reported and stepped over, a comma starts the next argument — and when
+    /// that token is a lone `>` (`>=` / `>>` re-scan to something else) the follower
+    /// question is asked THERE, where a follower past a LINE BREAK commits the list. So
+    /// `x < (a > b)` is a comparison while `b` shares the `>`'s line, and a syntax error
+    /// once a break stands between them; `fn(x < q, a >⏎b)` needs no shell at all (the
+    /// comma is the argument separator) and is a generic call to acorn-typescript and to
+    /// tsv's own parse as well. The pair `relexes_as_type_arguments` earns does not reach
+    /// it: that pair ends the OUTER `>`'s region on a `)`, and this `>` is met first.
+    ///
+    /// Nothing between the two tokens can be reworded, and a `(` or template follower
+    /// commits on any line, so the one free choice is where the line breaks: the printer
+    /// breaks AHEAD of such a `>` (`aaa⏎> bbb`), its follower sharing its line — the
+    /// binary-chain emitters' `ChainOperator::leads_line`.
+    ///
+    /// A deliberate SUPERSET, decided by the parser because only it sees the tokens in
+    /// order: which `<` regions are still open is the parser's `LtRegion`, which states
+    /// where a region provably ends. `false` on every other operator, and free in the
+    /// struct's existing padding.
+    pub may_close_type_arguments: bool,
 }
 
 impl<'arena> BinaryExpression<'arena> {

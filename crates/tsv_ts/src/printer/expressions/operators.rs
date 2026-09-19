@@ -23,7 +23,47 @@ struct ChainOperand {
 /// once per binary expression. The common 2–3 operand chain stays inline
 /// (`ChainOperand` is 12 bytes, `BinaryOperator` 1 byte); longer chains spill.
 type OperandBuf = SmallVec<[ChainOperand; 8]>;
-pub(super) type OperatorBuf = SmallVec<[BinaryOperator; 8]>;
+pub(super) type OperatorBuf = SmallVec<[ChainOperator; 8]>;
+
+/// One operator of a flattened binary chain, with the one layout fact that is the
+/// operator's own rather than the chain's.
+#[derive(Clone, Copy)]
+pub(super) struct ChainOperator {
+    pub(super) op: BinaryOperator,
+    /// The operator LEADS its line when the chain breaks (`aaa⏎> bbb`) rather than ending
+    /// the one before — a lone `>` that may close a type-argument region an earlier `<`
+    /// opened, which a line break past it would commit
+    /// (`BinaryExpression::may_close_type_arguments`). Every chain emitter reads it, since
+    /// a `>` any one of them lets end a line is the same syntax error.
+    pub(super) leads_line: bool,
+}
+
+impl ChainOperator {
+    pub(super) fn of(expr: &internal::BinaryExpression<'_>) -> Self {
+        Self {
+            op: expr.operator,
+            leads_line: expr.may_close_type_arguments,
+        }
+    }
+
+    pub(super) fn as_str(self) -> &'static str {
+        self.op.as_str()
+    }
+}
+
+/// Where [`Printer::push_operand_operator_gap`] left a chain's operator relative to the
+/// line break between its two operands. Anything but [`Self::EndsLine`] means the operator
+/// leads the next operand's line, so that operand hugs it with a space.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum OperatorGap {
+    /// `a +⏎b` — emitted, closing the operand's line; the breakable `line` follows it.
+    EndsLine,
+    /// `a // c⏎+ b` — emitted below a line comment that would otherwise swallow it.
+    ForcedDown,
+    /// `a⏎> b` — NOT emitted: the caller places it behind a breakable `line`
+    /// ([`ChainOperator::leads_line`]).
+    LeadsLine,
+}
 
 /// Style for building binary expression chain docs.
 ///
@@ -882,7 +922,7 @@ impl<'a> Printer<'a> {
     fn build_binary_chain_parts(
         &self,
         operands: &[ChainOperand],
-        operators: &[BinaryOperator],
+        operators: &[ChainOperator],
         should_inline_last: bool,
     ) -> (DocBuf, DocBuf) {
         if operands.is_empty() || operands.len() == 1 {
@@ -909,19 +949,46 @@ impl<'a> Printer<'a> {
         let first_op_pos =
             self.find_operator_position(operands[0].span.end, operands[1].span.start, first_op_str);
 
+        // Build continuation parts
+        let mut continuation_parts: DocBuf = DocBuf::new();
+
+        // shouldInlineLogicalExpression: the last operand (non-empty object/array) uses a
+        // space instead of line(), keeping operator and RHS on the same line.
+        let inlined = |i: usize| i == operands.len() - 1 && should_inline_last;
+
+        // Whether the operator ahead of `operands[i]` leads its line rather than ending the
+        // one before ([`ChainOperator::leads_line`]). It needs a `line` of its own to lead
+        // — an inlined operand has none — and it yields to a comment that already forces
+        // the operand below the operator: that authoring is a syntax error to tsc as
+        // written, and the only repair is a comment relocation.
+        let leads_line = |i: usize, op_end: u32| {
+            operators[i - 1].leads_line
+                && !inlined(i)
+                && !(chain_has_comments
+                    && self.comment_hangs_binary_operand(op_end, operands[i].span.start))
+        };
+
+        // An operator that leads its line opens the CONTINUATION, wherever the gap before
+        // it sat — for the first operator that is the indented half rather than the head.
+        let push_leading_operator = |continuation_parts: &mut DocBuf, op_str: &'static str| {
+            continuation_parts.push(self.d().line());
+            continuation_parts.push(self.d().text(op_str));
+        };
+
         // operand[0] → first operator. A line comment in this gap would swallow the
         // operator if emitted inline; the helper keeps it trailing the operand and
-        // reports whether it forced the operator onto the next line.
-        let mut prev_forced_break = self.push_operand_operator_gap(
+        // reports where the operator went.
+        let mut gap = self.push_operand_operator_gap(
             &mut head_parts,
             operands[0].span.end,
             first_op_pos.start,
             first_op_str,
             chain_has_comments,
+            leads_line(1, first_op_pos.end),
         );
-
-        // Build continuation parts
-        let mut continuation_parts: DocBuf = DocBuf::new();
+        if gap == OperatorGap::LeadsLine {
+            push_leading_operator(&mut continuation_parts, first_op_str);
+        }
 
         // The operand[i-1]→operand[i] operator gap is located once and carried across
         // iterations: iteration i's leading gap is either the first gap (i == 1) or the
@@ -931,18 +998,14 @@ impl<'a> Printer<'a> {
         for i in 1..operands.len() {
             let operand = &operands[i];
 
-            // shouldInlineLogicalExpression: the last operand (non-empty object/array)
-            // uses a space instead of line(), keeping operator and RHS on the same line.
-            let allow_breaks = !(i == operands.len() - 1 && should_inline_last);
-
-            // When the previous operand→operator gap forced a break, the operator now
-            // leads this operand on the same line, so hug it with a space (not a line).
+            // When the operator already leads this operand's line — forced down by a line
+            // comment, or leading by rule — the operand hugs it with a space (not a line).
             self.append_post_operator_parts(
                 &mut continuation_parts,
                 op_pos.end,
                 operand,
-                allow_breaks,
-                prev_forced_break,
+                !inlined(i),
+                gap != OperatorGap::EndsLine,
                 chain_has_comments,
             );
 
@@ -955,13 +1018,17 @@ impl<'a> Printer<'a> {
                     next_op_str,
                 );
 
-                prev_forced_break = self.push_operand_operator_gap(
+                gap = self.push_operand_operator_gap(
                     &mut continuation_parts,
                     operand.span.end,
                     next_op_pos.start,
                     next_op_str,
                     chain_has_comments,
+                    leads_line(i + 1, next_op_pos.end),
                 );
+                if gap == OperatorGap::LeadsLine {
+                    push_leading_operator(&mut continuation_parts, next_op_str);
+                }
 
                 // Carry this trailing gap forward as the next iteration's leading gap.
                 op_pos = next_op_pos;
@@ -987,7 +1054,7 @@ impl<'a> Printer<'a> {
     fn build_binary_chain_flat(
         &self,
         operands: &[ChainOperand],
-        operators: &[BinaryOperator],
+        operators: &[ChainOperator],
         grouped: bool,
         should_group: bool,
         should_inline_last: bool,
@@ -1031,7 +1098,7 @@ impl<'a> Printer<'a> {
     fn build_binary_chain_continuation_indent(
         &self,
         operands: &[ChainOperand],
-        operators: &[BinaryOperator],
+        operators: &[ChainOperator],
         should_inline_last: bool,
         should_group: bool,
     ) -> DocId {
@@ -1056,7 +1123,7 @@ impl<'a> Printer<'a> {
     fn build_binary_chain_continuation_indent_parts(
         &self,
         operands: &[ChainOperand],
-        operators: &[BinaryOperator],
+        operators: &[ChainOperator],
         should_inline_last: bool,
         should_group: bool,
     ) -> DocId {
@@ -1095,8 +1162,8 @@ impl<'a> Printer<'a> {
         d.concat(&[d.concat(&first_parts), continuation_doc])
     }
 
-    /// Emit a binary chain's operand→operator gap, returning whether a line comment
-    /// in the gap forced the operator onto the next line.
+    /// Emit a binary chain's operand→operator gap, reporting where the operator went
+    /// ([`OperatorGap`]).
     ///
     /// Without a line comment the gap renders inline as it always has
     /// (`operand <inline block comments> operator`). With a line comment, emitting it
@@ -1105,10 +1172,15 @@ impl<'a> Printer<'a> {
     /// loss). Instead the comment is kept trailing the operand where the author wrote
     /// it — the first, on the operand's own line, via `line_suffix` (zero width); any
     /// later ones on their own line — and a hardline then forces the operator down to
-    /// hug its right operand (`1 // c⏎+ 2`). Returns `true` in that case so the caller
-    /// hugs the following operand with a space rather than a breakable line (avoiding
-    /// the `1 // c⏎+⏎2` over-break). Prettier instead relocates the comment past the
-    /// operator; see conformance_prettier_ts_comments.md §Comment relocation.
+    /// hug its right operand (`1 // c⏎+ 2`, [`OperatorGap::ForcedDown`], where a breakable
+    /// line after it would over-break to `1 // c⏎+⏎2`). Prettier instead relocates the
+    /// comment past the operator; see conformance_prettier_ts_comments.md §Comment
+    /// relocation.
+    ///
+    /// `leads_line` asks for the third layout ([`ChainOperator::leads_line`]): the gap's
+    /// comments stay with the operand and the operator is NOT emitted — the caller puts it
+    /// behind a breakable `line` of its own ([`OperatorGap::LeadsLine`]). A line comment in
+    /// the gap already forces the operator down, which is the same place.
     fn push_operand_operator_gap(
         &self,
         parts: &mut DocBuf,
@@ -1116,8 +1188,20 @@ impl<'a> Printer<'a> {
         op_start: u32,
         op_str: &'static str,
         chain_has_comments: bool,
-    ) -> bool {
+        leads_line: bool,
+    ) -> OperatorGap {
         let d = self.d();
+        let has_comments =
+            chain_has_comments && self.has_comments_to_emit_between(operand_end, op_start);
+        let has_line_comments =
+            has_comments && self.has_line_comments_between(operand_end, op_start);
+
+        if leads_line && !has_line_comments {
+            if has_comments {
+                parts.push(self.build_inline_comments_between_doc(operand_end, op_start));
+            }
+            return OperatorGap::LeadsLine;
+        }
 
         // Zero-comment fast path: the operand→operator gap holds no comment (the
         // ubiquitous case), so emit just the operator — no empty comment node in the
@@ -1126,18 +1210,18 @@ impl<'a> Printer<'a> {
         // nothing). The gap ⊆ the binary span, so this can only skip work, never a comment.
         // The whole-chain gate short-circuits the per-gap scan when the chain is
         // comment-free (`chain_has_comments` false ⇒ this gap holds none to emit either).
-        if !chain_has_comments || !self.has_comments_to_emit_between(operand_end, op_start) {
+        if !has_comments {
             parts.push(d.text(" "));
             parts.push(d.text(op_str));
-            return false;
+            return OperatorGap::EndsLine;
         }
 
-        if !self.has_line_comments_between(operand_end, op_start) {
+        if !has_line_comments {
             // No line comment — inline gap (block comments stay inline, as before).
             parts.push(self.build_inline_comments_between_doc(operand_end, op_start));
             parts.push(d.text(" "));
             parts.push(d.text(op_str));
-            return false;
+            return OperatorGap::EndsLine;
         }
 
         // Keep each comment where the author wrote it, then break before the operator —
@@ -1146,7 +1230,7 @@ impl<'a> Printer<'a> {
 
         parts.push(d.hardline());
         parts.push(d.text(op_str));
-        true
+        OperatorGap::ForcedDown
     }
 
     /// Append post-operator parts (comments and line breaks) to a parts vector
@@ -1354,7 +1438,7 @@ impl<'a> Printer<'a> {
         }
 
         // Add current operator
-        operators.push(expr.operator);
+        operators.push(ChainOperator::of(expr));
 
         // Also flatten the right side where prettier REBALANCES it, which removes the
         // redundant parens: `a && (b && c)` becomes `a && b && c`
