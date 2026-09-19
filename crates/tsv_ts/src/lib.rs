@@ -983,8 +983,9 @@ pub fn expression_printed_start(
 /// host has placed the value itself — it broke after its operator for a comment in the gap,
 /// or keeps a commented value on the operator's line — and the chain takes the default
 /// shape. A chain whose heads force the break ([`curried_chain_breaks_after_operator`]) owns
-/// no break of its own either way: the host breaks after its operator for it, and hands in
-/// a comment-free gap only.
+/// no break of its own either way: the host breaks after its operator for it, and on `Some`
+/// the gap's run leads the first head below that break, as the `<script>` declarator
+/// prints it.
 pub fn build_assignment_value_expression_doc(
     arena: &DocArena,
     expression: &Expression<'_>,
@@ -1001,8 +1002,9 @@ pub fn build_assignment_value_expression_doc(
 /// operator→value comment run, and the value — for a **curried arrow chain** whose gap
 /// stacks it under the break the comment forces, exactly as a `<script>` declarator does:
 /// a `//` on the operator's line (kept there), or an indentable block leading the value.
-/// The chain's heads then stand at one indent under the operator, as with no comment.
-/// `None` for every other value and gap, and the host keeps its own layout.
+/// The chain's heads then stand at one indent under the operator, as with no comment,
+/// whether the chain breaks for width or because its heads force it. `None` for every other
+/// value and gap, and the host keeps its own layout.
 ///
 /// `operator_pos` is the `=`'s byte offset; the gap runs from past it to the value. On
 /// `Some` the returned doc prints every comment in that gap, so the host must print none
@@ -1022,13 +1024,44 @@ pub fn build_stacked_curried_chain_rhs_doc(
     })
 }
 
-/// Whether `expression` is a curried arrow chain that owns its break after the operator of
-/// the assignment it is the value of — every curried chain but one whose heads force that
-/// break ([`curried_chain_breaks_after_operator`]). Such a chain can take the operator→value
-/// gap's comment run in behind its own break
-/// ([`build_assignment_value_expression_doc`]'s `value_gap_start`).
-pub fn curried_chain_owns_operator_break(expression: &Expression<'_>) -> bool {
-    printer::is_curried_arrow_chain_owning_break(expression)
+/// The whole `" =" …` right-hand side of a host's assignment seam whose operator→value gap
+/// holds a block run the author broke AFTER (`= /* c */⏎value`) — the `<script>`
+/// declarator's broke-after arm (`Printer::broke_after_operator_rhs_doc`), so the two hosts
+/// cannot answer one comment two ways: a value that fits behind the run collapses onto the
+/// operator's line (`= /* c */ value`), one that does not keeps the run on its own line with
+/// the value below it. `None` for every other gap (an empty one, a line comment, a run glued
+/// through to the value, a run holding an own-line comment before a value with no hard
+/// break), and the host keeps its own layout.
+///
+/// `operator_pos` is the `=`'s byte offset; the gap runs from past it to the value's start.
+/// `build_value` builds the value WITHOUT the gap's run — on `Some` the returned doc prints
+/// that run, so the host must print none of it — but with any comment the value owns, which
+/// the run leaves to it. It is called at most once, and its doc is discarded on `None`.
+pub fn build_broke_after_operator_rhs_doc(
+    arena: &DocArena,
+    expression: &Expression<'_>,
+    inputs: &PrinterInputs<'_>,
+    embed: EmbedContext,
+    operator_pos: u32,
+    build_value: impl FnOnce() -> DocId,
+) -> Option<DocId> {
+    with_doc_printer(arena, inputs, embed, |printer| {
+        let rhs = printer.broke_after_operator_rhs_doc(
+            operator_pos + 1,
+            expression.span().start,
+            build_value,
+        )?;
+        Some(arena.concat(&[arena.text(" ="), rhs]))
+    })
+}
+
+/// Whether `expression` is a curried arrow chain (an arrow whose body is another arrow) —
+/// the value that can take the operator→value gap's comment run in behind the break after
+/// its operator ([`build_assignment_value_expression_doc`]'s `value_gap_start`), whether
+/// the chain owns that break or its heads force it
+/// ([`curried_chain_breaks_after_operator`]).
+pub fn is_curried_arrow_chain(expression: &Expression<'_>) -> bool {
+    printer::is_curried_arrow_chain(expression)
 }
 
 /// Whether `expression` is a curried arrow chain whose heads force the break after the

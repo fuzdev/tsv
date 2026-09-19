@@ -13,7 +13,7 @@ use crate::printer::class_common::ClassHeaderOptions;
 use crate::printer::class_common::ClassTypeParamsGap;
 use crate::printer::class_expr_has_decorators;
 use crate::printer::expressions::assignment::{
-    is_curried_arrow_chain, is_curried_arrow_chain_owning_break, is_curried_arrow_chain_that_breaks,
+    is_curried_arrow_chain, is_curried_arrow_chain_that_breaks,
 };
 use crate::printer::expressions::operators::SeqLayout;
 use crate::printer::layout::hang_after_operator;
@@ -442,6 +442,39 @@ fn has_huggable_type_annotation(expr: &internal::Expression<'_>) -> bool {
     }
 }
 
+/// [`Printer::head_forced_chain_lead`]'s verdict.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::printer) enum HeadForcedChainLead {
+    /// The seam breaks after its operator and the heads stack at one indent under it, as
+    /// with no comment: an empty gap, a run of single-line blocks glued through to the
+    /// first head (it leads that head below the break), or a gap that stacks the chain
+    /// under the break it forces ([`Printer::seam_break_stacks_curried_chain`]).
+    Stacked,
+    /// A PRESERVED multi-line block glued through to the value: its own lines are the
+    /// break, so the seam takes none after its operator — the first head rides the
+    /// comment's closing line and the rest indent under it, the chain's default shape.
+    /// The width-driven chain's answer too ([`Printer::build_led_curried_chain_doc`]), and
+    /// prettier's for both.
+    PreservedBlock,
+    /// A run the author gave lines of its own above the chain (`=⏎/* c */⏎({}) => …`,
+    /// `= /* c */⏎({}) => …`): prettier's leading own-line comment. The seam breaks after
+    /// its operator for the run and the chain takes its default shape below it — the heads
+    /// past the first indented under it — as the width-driven chain does.
+    OwnLineRun,
+}
+
+impl HeadForcedChainLead {
+    /// The context the chain is built under: [`ArrowChainContext::AssignmentRhs`] makes the
+    /// arrow printer decline its own chain layout so the seam's break stacks the heads;
+    /// `None` is the default shape.
+    pub(in crate::printer) fn chain_context(self) -> ArrowChainContext {
+        match self {
+            Self::Stacked => ArrowChainContext::AssignmentRhs { leading_run: None },
+            Self::PreservedBlock | Self::OwnLineRun => ArrowChainContext::None,
+        }
+    }
+}
+
 impl<'a> Printer<'a> {
     /// Whether both delimiter gaps around a lone parameter are free of comments to emit —
     /// the shared precondition of the sole-parameter hug at all three parameter builders.
@@ -595,11 +628,13 @@ impl<'a> Printer<'a> {
     ///
     /// - a `//` on the OPERATOR's line (`= // c⏎(a) => (b) => …`), where prettier fabricates
     ///   a blank line below the comment and indents the chain twice;
-    /// - an indentable block leading the value, which hangs it
+    /// - an indentable block GLUED to the first head, which hangs it
     ///   ([`Printer::indentable_block_leads_value`]) and which prettier likewise indents twice.
     ///
     /// A run the author gave lines of its own above the chain (`=⏎// c⏎(a) => …`,
-    /// `= /* c */⏎(a) => …`) is NOT one: prettier prints that chain in its default shape —
+    /// `= /* c */⏎(a) => …`, and an indentable block with the chain on the line BELOW its
+    /// `*/` — the kind does not make an own-line comment anything else) is NOT one: prettier
+    /// prints that chain in its default shape —
     /// the heads past the first indented under it — stably, and tsv matches it, which is
     /// the no-context build every such arm already does.
     pub(in crate::printer) fn seam_break_stacks_curried_chain(
@@ -617,7 +652,40 @@ impl<'a> Printer<'a> {
             // ahead of its operator (the assignment's, at the target's end), so a line break
             // the author put before the `=` would read as one before the comment.
             .is_some_and(|c| !c.is_block && self.comment_follows_content_on_its_line(c))
-            || self.indentable_block_leads_value(gap_start, value_start)
+            || (self.indentable_block_leads_value(gap_start, value_start)
+                && self.comment_run_glued_through(gap_start, value_start))
+    }
+
+    /// How the operator→value gap's comment run places a curried chain whose heads force
+    /// the break ([`is_curried_arrow_chain_that_breaks`]) — the one reading both
+    /// `printAssignment` twins take (`build_declarator_init_doc`,
+    /// [`Printer::build_assignment_layout`]), so the declarator, the assignment, the class
+    /// field and the object property cannot answer one comment four ways. `gap_start` opens
+    /// the gap.
+    ///
+    /// ⚠️ Every arm is a question about the SOURCE, never about which arm of a cascade ran
+    /// first. The declarator reaches its preserved-block arm only past its broke-after and
+    /// own-line arms, so there "a multi-line block is in the gap" implied "glued through";
+    /// the assignment layout has no such order, and the same test pulled a class
+    /// property's OWN-LINE block onto the `=` line with the first head at the member's
+    /// indent — idempotent, so no fixed-point fixture saw it.
+    pub(in crate::printer) fn head_forced_chain_lead(
+        &self,
+        value: &internal::Expression<'_>,
+        gap_start: u32,
+    ) -> HeadForcedChainLead {
+        let value_start = value.span().start;
+        if !self.has_comments_on_page_between(gap_start, value_start)
+            || self.seam_break_stacks_curried_chain(value, gap_start)
+        {
+            HeadForcedChainLead::Stacked
+        } else if !self.comment_run_glued_through(gap_start, value_start) {
+            HeadForcedChainLead::OwnLineRun
+        } else if self.has_multiline_block_comments_on_page_between(gap_start, value_start) {
+            HeadForcedChainLead::PreservedBlock
+        } else {
+            HeadForcedChainLead::Stacked
+        }
     }
 
     /// Build `value`'s doc for a seam that has ALREADY broken after its operator and
@@ -661,26 +729,34 @@ impl<'a> Printer<'a> {
         let Some(gap_start) = value_gap_start.filter(|_| is_curried_arrow_chain(expression)) else {
             return build();
         };
+        let value_start = expression.span().start;
+        // The gap's emit-axis block run — what either arm below leads the chain with.
+        let emit_run = || {
+            self.build_comments_between_filtered_opt(
+                gap_start,
+                value_start,
+                CommentSpacing::Trailing,
+                CommentFilter::BlockOnly,
+            )
+        };
         if is_curried_arrow_chain_that_breaks(expression) {
-            // The host breaks after its operator for such a chain; the context only makes
-            // the arrow printer decline a break of its own.
-            return self.build_with_arrow_chain_context(
+            // The host breaks after its operator for such a chain, so the gap's run leads the
+            // first head below that break — the declarator's own answer, where the arrow
+            // prints the one comment glued to its `(` and the gap prints the rest. The
+            // context only makes the arrow printer decline a break of its own.
+            let doc = self.build_with_arrow_chain_context(
                 ArrowChainContext::AssignmentRhs { leading_run: None },
                 build,
             );
+            return match emit_run() {
+                Some(run) => self.d().concat(&[run, doc]),
+                None => doc,
+            };
         }
-        let value_start = expression.span().start;
         self.hoist_owned_value_gap_run(gap_start, expression, false, |hoisted| {
             // `or`, never a concat — see [`Printer::hoisted_owned_value_gap_run_opt`]. The
             // emit-axis run is built only where the hoist declined.
-            let run = hoisted.or_else(|| {
-                self.build_comments_between_filtered_opt(
-                    gap_start,
-                    value_start,
-                    CommentSpacing::Trailing,
-                    CommentFilter::BlockOnly,
-                )
-            });
+            let run = hoisted.or_else(emit_run);
             self.build_led_curried_chain_doc(run, (gap_start, value_start), build)
         })
         .1
@@ -706,9 +782,7 @@ impl<'a> Printer<'a> {
         build_suffix: impl FnOnce() -> DocId,
     ) -> Option<DocId> {
         let gap_start = operator_pos + 1;
-        if !is_curried_arrow_chain_owning_break(expression)
-            || !self.seam_break_stacks_curried_chain(expression, gap_start)
-        {
+        if !self.seam_break_stacks_curried_chain(expression, gap_start) {
             return None;
         }
         let d = self.d();

@@ -334,10 +334,11 @@ impl<'a> Printer<'a> {
             // two-half rule, its declines, and what falls through live there),
             // applied to the expression statement's operator. Site-specific gates:
             // a frozen RHS keeps the layout below (its bypass owns the directive's
-            // placement), and object property values / class fields deliberately do
-            // NOT take this rule — prettier relocates there and tsv preserves the
-            // authored position (conformance_prettier_ts_comments.md §Comment
-            // normalization, the `value_block_comment_break` family).
+            // placement). A class field takes the same arm at its own seam
+            // (`build_property_assignment_layout`); an object property value does NOT —
+            // prettier relocates there and tsv preserves the authored position
+            // (conformance_prettier_ts_comments.md §Comment relocation, the
+            // `value_block_comment_break` family).
             // A LINE comment in the gap: route to the shared `=`→value partition rather
             // than letting `RhsCommentInfo::has_line_comment` hang the whole run under
             // the operator. That hang made the assignment expression the lone dissenter

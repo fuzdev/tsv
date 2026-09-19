@@ -638,6 +638,24 @@ impl<'a> Printer<'a> {
             // choose_layout still applies (e.g., ternary with binaryish
             // test → BreakAfterOperator).
             let rhs_comments = self.build_value_gap_comments_opt(eq_pos + 1, value_start);
+            // A block run the author broke AFTER (`p = /* c */⏎<value>`): the shared `=`
+            // broke-after arm ([`Printer::broke_after_operator_rhs_doc`]), as at the
+            // declarator and the assignment. The run keeps its place after the `=` either
+            // way; what the arm adds is the half where the value does not fit behind it —
+            // the run on a line of its own with the value hung below, where the layout
+            // builder left the value at the member's indent and, for a curried chain,
+            // fabricated a blank line under the run.
+            if rhs_comments.is_some()
+                && value_frozen.is_none()
+                && let Some(rhs) =
+                    self.broke_after_operator_rhs_doc(eq_pos + 1, value_start, || {
+                        self.build_hung_value_doc(value, eq_pos + 1, build_value)
+                    })
+            {
+                parts.push(d.text(" ="));
+                parts.push(rhs);
+                return;
+            }
             let left_doc = d.concat(&parts[..]);
             let assignment_doc = if position_parens {
                 let value_doc = build_value();
