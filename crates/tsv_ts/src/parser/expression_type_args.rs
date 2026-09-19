@@ -575,8 +575,13 @@ fn graded_paren_close(bytes: &[u8], inner: usize, shells: usize) -> Option<usize
         // so each ends an operand.
         if let Some(past) = skip_trivia(bytes, pos, end, TriviaProfile::JS) {
             if depth == level {
-                grade.after_operand = true;
-                grade.typeof_operand = false;
+                // A template glued to a complete operand is a TAGGED template, which no
+                // type spells (`` (b`c`) ``, `` (typeof b`c`) ``); behind a type operator
+                // the same template is its operand (`` (keyof `c`) ``).
+                if bytes[pos] == b'`' && grade.prev.ends_operand() && !grade.committed {
+                    return None;
+                }
+                grade.prev = PrevToken::Operand;
             }
             pos = past;
             continue;
@@ -587,8 +592,7 @@ fn graded_paren_close(bytes: &[u8], inner: usize, shells: usize) -> Option<usize
                 depths[slot] += 1;
                 depth += 1;
                 if depth == level + 1 {
-                    grade.after_operand = false;
-                    grade.typeof_operand = false;
+                    grade.prev = PrevToken::Other;
                 }
             } else {
                 depths[slot] -= 1;
@@ -608,10 +612,13 @@ fn graded_paren_close(bytes: &[u8], inner: usize, shells: usize) -> Option<usize
                     remaining -= 1;
                     level -= 1;
                     grade = BodyGrade::new();
-                    grade.after_operand = true;
+                    grade.prev = PrevToken::ParenClose;
                 } else if depth == level {
-                    grade.after_operand = true;
-                    grade.typeof_operand = false;
+                    grade.prev = if byte == b')' {
+                        PrevToken::ParenClose
+                    } else {
+                        PrevToken::Operand
+                    };
                 }
             }
             pos += 1;
@@ -642,31 +649,60 @@ const fn delimiter_slot(byte: u8) -> Option<usize> {
     }
 }
 
+/// The body-level token a parenthesized head's walk read last — the one fact of the token
+/// BEHIND it that a token's own grade may turn on.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PrevToken {
+    /// The body's start, an operator, a separator, a nested group's opener, or a word that
+    /// introduces more type past itself ([`TYPE_PREFIX_WORDS`]): no operand has ended.
+    Other,
+    /// A name, a literal, or a nested `[…]` / `{…}` group: an operand has ENDED, which is
+    /// what tells a binary `-` from a literal type's sign, an infix `as` from a type
+    /// reference of the same name, and a tagged template from a template literal type.
+    Operand,
+    /// A `)` — a nested group's close, or a redundant shell's. An ended operand too, and the
+    /// one place a type spells `=>` behind: any other `=>` is an arrow FUNCTION's
+    /// (`(a => b)`, `(async a => b)`).
+    ParenClose,
+    /// The word `typeof`, whose operand is an entity name — the one type position that may
+    /// hold a `this.`, and so the one place that spelling may not refuse
+    /// (`f<(keyof typeof this.x)>(v)`).
+    Typeof,
+    /// A `.`, which makes the word behind it a qualified name's segment whatever it spells
+    /// (`(Ns.infer.T)`, `(Ns.class)`).
+    Dot,
+}
+
+impl PrevToken {
+    /// Whether the token ended an operand.
+    const fn ends_operand(self) -> bool {
+        matches!(self, PrevToken::Operand | PrevToken::ParenClose)
+    }
+}
+
 /// What the walk has read of a parenthesized head's body so far — the facts a token's own
 /// grade may turn on.
 #[derive(Clone, Copy)]
 struct BodyGrade {
-    /// Whether the last body-level token ENDED an operand, which is what tells a binary `-`
-    /// from a literal type's sign, and an infix `as` from a type reference of the same name.
-    after_operand: bool,
+    /// The body-level token read last.
+    prev: PrevToken,
     /// Whether the body has proved itself a PARAMETER LIST, which ends its grading: tsc's
     /// `isUnambiguouslyStartOfFunctionType` claims the whole group for a function type on a
     /// `:` or a bare `=` behind the first parameter, and its parse then carries every token
     /// in the group to the `>` whatever stands there. So nothing past one may refuse.
     committed: bool,
-    /// Whether the last body-level word was `typeof`, whose operand is an entity name —
-    /// the one type position that may hold a `this.`, and so the one place that spelling
-    /// may not refuse (`f<(keyof typeof this.x)>(v)`).
-    typeof_operand: bool,
+    /// How many body-level `<` are still open. A `>` past zero closes no nested argument
+    /// list, and is where tsc's own list parse stops ([`grade_body_token`]).
+    angle_depth: u32,
 }
 
 impl BodyGrade {
     /// A fresh grade for one body.
     const fn new() -> Self {
         BodyGrade {
-            after_operand: false,
+            prev: PrevToken::Other,
             committed: false,
-            typeof_operand: false,
+            angle_depth: 0,
         }
     }
 }
@@ -692,7 +728,15 @@ impl BodyGrade {
 /// | `this .` | refuse, unless it is `typeof`'s operand |
 /// | `\|\|` `&&` `??` `^` | refuse |
 /// | `==` `!=` `===` `!==` `<=` `>=` | refuse |
-/// | `+` `-` `*` `/` `%` past an operand | refuse |
+/// | `+` `-` `*` `%` past an operand | refuse |
+/// | a `/`, which divides or opens a regex literal | refuse |
+/// | a template glued to an operand (a tagged template) | refuse |
+/// | `class` ahead of a body, a name or a heritage clause | refuse |
+/// | `infer` ahead of a `[`, a `.` or a `<` | refuse |
+/// | an `=>` behind anything but a `)` | refuse |
+/// | a `>` closing no nested list, glued to another `>` | refuse |
+/// | a `>` closing no nested list, unless a `(` or a template follows it | refuse |
+/// | a decorator's `@` | refuse |
 /// | a unary `+`, and a `-` on anything but a numeral | refuse |
 /// | `as` `satisfies` `in` `instanceof` past an operand | refuse |
 /// | `await` `void` `yield` `delete` ahead of an operand | refuse |
@@ -702,11 +746,20 @@ impl BodyGrade {
 /// | `?` … `:` conditional | commit |
 /// | `...` | commit |
 /// | `:`, and a bare `=` | commit, and end the grading |
-/// | `<<` `>>` `>>>` `,` `=>` `!` `\|` `&` | commit |
+/// | a `>` closing no nested list, ahead of a `(` or a template | commit |
+/// | `<<`, and a `>>` `>>>` that closes nested lists | commit |
+/// | `,` `!` `\|` `&`, and an `=>` behind a `)` | commit |
 ///
 /// `<<` and `>>` are the two shifts a type grammar re-reads: the type parser re-scans a `<<`
 /// into the `<` of a nested argument list, and a nested list CLOSES with `>>`, so neither
-/// ends a type at all. A `:` and a bare `=` are the converse — tsc's
+/// ends a type at all — which is why the walk counts the body's open `<`s
+/// ([`BodyGrade::angle_depth`]), and a `>` past zero is the comparison operator it looks
+/// like. A `!` is the non-null mark tsc's type grammar carries (`JSDocNonNullableType`), so
+/// the compiler claims the region and its CHECKER rejects it; tsv has no such type and
+/// rejects at the parse
+/// (`tests/fixtures/typescript/expressions/binary/relational_paren_head_non_null_svelte_divergence`).
+///
+/// A `:` and a bare `=` are the converse of the shifts — tsc's
 /// `isUnambiguouslyStartOfFunctionType` reads either behind the first parameter and claims
 /// the whole group for a function type, so its parse carries every token past one to the `>`
 /// ([`BodyGrade::committed`]).
@@ -720,18 +773,38 @@ fn grade_body_token(bytes: &[u8], pos: usize, grade: &mut BodyGrade) -> Option<u
         let word_end = skip_identifier(bytes, pos);
         let word = &bytes[pos..word_end];
         let next = skip_whitespace_and_comments(bytes, word_end);
-        let after_operand = grade.after_operand;
-        let typeof_operand = grade.typeof_operand;
-        grade.typeof_operand = word == b"typeof";
+        let prev = grade.prev;
+        let after_operand = prev.ends_operand();
         // A modifier or type operator introduces more type past itself, so it ends no
         // operand and CLEARS the one behind it — the word after it stands at an operand
         // position, which is what keeps `(readonly as)` a type-argument list
         // ([`TYPE_PREFIX_WORDS`]).
-        grade.after_operand = !TYPE_PREFIX_WORDS.contains(&word);
+        grade.prev = if word == b"typeof" {
+            PrevToken::Typeof
+        } else if TYPE_PREFIX_WORDS.contains(&word) {
+            PrevToken::Other
+        } else {
+            PrevToken::Operand
+        };
+        // Two words that are an expression's whenever more of one follows, read ahead of
+        // everything else — and never behind a `.`, where any word is a name's segment. A
+        // `class` with a body, a name or a heritage clause behind it is a class EXPRESSION
+        // ([`class_expression_follows`]). An `infer` binds a NAME: with a `[`, a `.` or a
+        // `<` there instead it is the ordinary value it is everywhere else
+        // (`(infer[b])`, `(infer.b)`, `(infer < a)`), where tsc still claims a bare
+        // `(infer)` and an `(infer | b)` and reports the missing name.
+        if prev != PrevToken::Dot {
+            if word == b"class" && class_expression_follows(bytes, next) {
+                return None;
+            }
+            if word == b"infer" && matches!(bytes.get(next), Some(b'[' | b'.' | b'<')) {
+                return None;
+            }
+        }
         // `this.` is member access; `this` heads no qualified type name, which is the same
         // rule [`TypeKeywordKind::This`] answers at the head itself. `typeof`'s operand IS
         // an entity name, and is the one type position that holds one.
-        if word == b"this" && bytes.get(next) == Some(&b'.') && !typeof_operand {
+        if word == b"this" && bytes.get(next) == Some(&b'.') && prev != PrevToken::Typeof {
             return None;
         }
         // A call, which no type spells — unless the word is one whose own `(` opens a
@@ -752,9 +825,9 @@ fn grade_body_token(bytes: &[u8], pos: usize, grade: &mut BodyGrade) -> Option<u
         return Some(word_end);
     }
 
-    let after_operand = grade.after_operand;
-    grade.after_operand = false;
-    grade.typeof_operand = false;
+    let prev = grade.prev;
+    let after_operand = prev.ends_operand();
+    grade.prev = PrevToken::Other;
     // An assignment operator is read AHEAD of every refusal below. A COMPOUND one refuses
     // outright: no parameter default spells `+=`, so tsc reads `x < (a += b) > (t, u)` as the
     // comparison chain acorn does. A bare `=` is a parameter default, which tsc claims the
@@ -771,18 +844,21 @@ fn grade_body_token(bytes: &[u8], pos: usize, grade: &mut BodyGrade) -> Option<u
         // A numeric literal type (`(0 | 1)`); the sign is the `-` arm's, since a `-` may
         // equally be arithmetic.
         b'0'..=b'9' => {
-            grade.after_operand = true;
+            grade.prev = PrevToken::Operand;
             Some(skip_numeric_literal(bytes, pos))
         }
         b'.' if matches!(bytes.get(pos + 1), Some(b'0'..=b'9')) => {
-            grade.after_operand = true;
+            grade.prev = PrevToken::Operand;
             Some(skip_numeric_literal(bytes, pos))
         }
         // A rest parameter (`(a: T, ...b: U[]) => V`).
         b'.' if bytes[pos..].starts_with(b"...") => Some(pos + 3),
         // A qualified name's `.` (`(Ns.T)`). An optional chain's `?.` refuses at the `?`
         // below, so a `.` here follows a name and nothing else.
-        b'.' => Some(pos + 1),
+        b'.' => {
+            grade.prev = PrevToken::Dot;
+            Some(pos + 1)
+        }
         // A parameter's type annotation, which proves the group a parameter list and ends
         // the grading ([`BodyGrade::committed`]).
         b':' => {
@@ -808,11 +884,46 @@ fn grade_body_token(bytes: &[u8], pos: usize, grade: &mut BodyGrade) -> Option<u
         // `!=` / `!==` and `==` / `===` are equality operators. The assignment `=` was
         // taken above, so an `=` reaching here carries a second one.
         b'!' | b'=' if bytes.get(pos + 1) == Some(&b'=') => None,
-        // The relational `<=` / `>=`. Their bare twins are a nested argument list's own
-        // delimiters and stay inert.
+        // `=>`, read whole so its `>` closes nothing. A type spells one behind a parameter
+        // list's `)` and nowhere else, so any other is an arrow FUNCTION's — a bare-name
+        // parameter (`(a => b)`, `(async a => b)`, `(a, b => c)`).
+        b'=' if bytes.get(pos + 1) == Some(&b'>') => {
+            (prev == PrevToken::ParenClose).then_some(pos + 2)
+        }
+        // The relational `<=` / `>=`.
         b'<' | b'>' if bytes.get(pos + 1) == Some(&b'=') => None,
+        // A nested argument list's own delimiters. A `<<` is two of them, since the type
+        // parser re-scans it (`(A<<T>(v: T) => void>)`).
+        b'<' => {
+            grade.angle_depth += 1;
+            Some(pos + 1)
+        }
+        b'>' if grade.angle_depth > 0 => {
+            grade.angle_depth -= 1;
+            Some(pos + 1)
+        }
+        // A `>` that closes NO nested list is where tsc's list parse stops: it reports the
+        // group's missing `)`, takes this `>` for the region's own, and asks its follower
+        // question HERE. Glued to another `>` the token re-scans as a shift and the region
+        // is abandoned (`(a >> b)`, `(a<b>>> c)`); alone, only a `(` or a template past it
+        // still claims the region (`(a > (b))`, which tsc then rejects), and every other
+        // follower continues the comparison the `>` is (`(a > b)`, `(() => a > b)`).
+        //
+        // tsc also claims past a LINE BREAK there. This grade does not read one — it is
+        // blind to the breaks the printer moves — so `(a >⏎b)` is the chain acorn reads.
+        b'>' => {
+            let glued = bytes.get(pos + 1) == Some(&b'>');
+            let follower = skip_whitespace_and_comments(bytes, pos + 1);
+            (!glued && matches!(bytes.get(follower), Some(b'(' | b'`'))).then_some(pos + 1)
+        }
+        // A `/` that reaches here opens a REGEX literal or divides (a comment's was skipped
+        // as trivia), and no type spells either. It refuses ahead of its pattern, which may
+        // hold anything — a `<`…`>` pair included (`(a, /b<c>/)`).
+        b'/' => None,
+        // A decorator (`(@dec class {})`).
+        b'@' => None,
         // Arithmetic past a complete operand.
-        b'+' | b'-' | b'*' | b'/' | b'%' if after_operand => None,
+        b'+' | b'-' | b'*' | b'%' if after_operand => None,
         // At an operand position a `-` opens a NEGATIVE LITERAL type (`(-1 | 1)`), which is
         // the only sign a type carries — tsc's own literal type takes a minus and nothing
         // else, so `(+1)` is the comparison chain its unary `+` makes it. Anything else
@@ -827,6 +938,14 @@ fn grade_body_token(bytes: &[u8], pos: usize, grade: &mut BodyGrade) -> Option<u
         // shift is what a type grammar re-reads as one of those.
         _ => Some(pos + 1),
     }
+}
+
+/// Whether what stands at `next`, just past the word `class`, makes it a class EXPRESSION:
+/// a body, a binding name, or a heritage clause. A bare `class` is left to the caller's
+/// ordinary reading, where acorn-typescript takes it for a type name (`f<(class)>(x)`).
+#[inline]
+fn class_expression_follows(bytes: &[u8], next: usize) -> bool {
+    bytes.get(next) == Some(&b'{') || identifier_starts_at(bytes, next)
 }
 
 /// Whether an OPERAND begins at `pos` — an identifier or a literal. A prefix operator word
@@ -985,6 +1104,11 @@ fn check_identifier_type_arg_pattern(bytes: &[u8], pos: usize, scan: TypeArgScan
                 return true;
             }
             // A bare `abstract` is an ordinary type reference — fall through.
+        }
+        // A class EXPRESSION, never a type reference: without this the heritage clause's
+        // `extends` reads as a constraint and commits (`a < class extends B {} > (t, u)`).
+        b"class" if class_expression_follows(bytes, skip_whitespace_and_comments(bytes, end)) => {
+            return false;
         }
         _ => {}
     }
