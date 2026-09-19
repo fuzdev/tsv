@@ -1039,10 +1039,16 @@ fn needs_parens_binary_operand(
     }
 
     // Unary expressions as left operand of ** require parens (ES2016+ syntax rule)
-    // `-2 ** 3` is a syntax error; must be `(-2) ** 3` or `-(2 ** 3)`
+    // `-2 ** 3` is a syntax error; must be `(-2) ** 3` or `-(2 ** 3)`. An angle-bracket
+    // assertion is the TypeScript twin: tsc rejects `<T>x ** 3` with the same diagnostic
+    // family, and acorn-typescript reads it as `<T>(x ** 3)` — a different tree. Prettier
+    // strips this pair, a cataloged ◆prettier_bug.
     if !is_right
         && parent_op == BinaryOperator::StarStar
-        && matches!(expr.kind, ExpressionKind::UnaryExpression(_))
+        && matches!(
+            expr.kind,
+            ExpressionKind::UnaryExpression(_) | ExpressionKind::TSTypeAssertion(_)
+        )
     {
         return true;
     }

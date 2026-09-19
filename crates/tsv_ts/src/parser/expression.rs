@@ -613,6 +613,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     left.span().start as usize,
                 ));
             }
+            // An angle-bracket assertion is the same error in tsc (`A type assertion
+            // expression is not allowed in the left-hand side of an exponentiation
+            // expression`), and prettier, a tsc front end, throws on it. acorn-typescript
+            // reads `<T>x ** y` as `<T>(x ** y)` instead — its assertion operand is a
+            // `parseMaybeUnary`, which consumes the `**` — so tsv rejects rather than build
+            // tsc's `(<T>x) ** y` beside a wire that says otherwise.
+            if operator == BinaryOperator::StarStar
+                && matches!(left.kind, ExpressionKind::TSTypeAssertion(_))
+                && expr_start == left.span().start as usize
+            {
+                return Err(ParseError::invalid_syntax(
+                    "Type assertion cannot be the left operand of ** without parentheses. Use (<T>x) ** y or <T>(x ** y).".to_string(),
+                    left.span().start as usize,
+                ));
+            }
 
             // Ask the RELAXED reading of the same type-argument lookahead that declined
             // the `<` below — the one component that has already read these bytes, and the
