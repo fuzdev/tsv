@@ -1013,6 +1013,62 @@ asserts the trees directly. **Upstream candidate**: acorn-typescript —
 `shouldParseArrow`'s return-type `tryParse` commits on `: type =>` alone, never
 asking whether the `:` is an enclosing conditional's.
 
+**A type-argument region tsc claims and acorn-typescript abandons** —
+`a < (b = c) > (t, u)`, `a < (b << c) > (t, u)`, `a < [b as C] > (t, u)`,
+`a < { b: c(d) } > (t, u)`. A `<` opening on a `(` is a type-argument list only where
+**tsc** reads one, which tsv grades (`Parser::is_type_arguments_start`'s `(` head arm),
+so `a < (b || c) > (t, u)`, `a < (b++) > (t, u)` and `a < (await b) > (t, u)` all read as
+the comparison chain acorn-typescript and tsc both read —
+[relational_paren_head_value_body](../tests/fixtures/typescript/expressions/binary/relational_paren_head_value_body/)
+pins the accepting side. Two families are the exception, and both are **tsc's own**:
+
+- **the parameter-list claim.** `isUnambiguouslyStartOfFunctionType` claims `( )`,
+  `( ...`, `( ident :`, `( ident ,`, `( ident ?`, `( ident =` and `( ident ) =>` for
+  a function type before any body is read, so tsc commits to the type-argument list
+  and reports `'=>' expected.` at every committing follower —
+  [relational_paren_head_param_list](../tests/fixtures/typescript/expressions/binary/relational_paren_head_param_list_svelte_divergence/).
+- **the recovered list.** `parseTypeArgumentsInExpression` parses the list for real,
+  with `parseDelimitedList`'s error RECOVERY: a token no element can start is skipped
+  and the parse resumes, and the region is claimed whenever that recovery still lands
+  on the `>`, errors and all. tsc abandons the region only where the recovery cannot
+  get there, which is why the same body reads two ways under two delimiters —
+  `a < (await b) > (t, u)` is a comparison chain to tsc where `a < [await b] > (t, u)`
+  is a list it then rejects —
+  [relational_bracketed_head_recovered_list](../tests/fixtures/typescript/expressions/binary/relational_bracketed_head_recovered_list_svelte_divergence/).
+
+Both are decisions about what the compiler's own grammar claims, so tsv follows them at
+the `(` head and rejects too; at a `{` or `[` head it reaches the same rejection by
+committing without a grade at all (below), which agrees with the compiler here and not
+everywhere. acorn-typescript backs off the failed list and reads the chain either way. A
+rejection the canonical parser does not share cannot be an `input_invalid_*` fixture, so
+each rides a `tsv_rejects.txt` marker beside the `expected_svelte.json` that records what
+acorn keeps.
+
+**A bracketed type-argument head that grades no body** — `a < { ...s } > (t, u)`,
+`a < [b || c] > (t, u)`, `a < [b++] > (t, u)`. Unlike the `(` head, a `<` opening on a
+`{` or a `[` commits on any matching `>` that a line terminator, a `(` or a template
+follows, without reading the body at all, and the type parse then rejects a region whose
+content is a value. **tsc and acorn-typescript both read the comparison chain here, so
+this is a tsv over-rejection rather than a sanctioned reading** —
+[relational_bracketed_head_ungraded_body](../tests/fixtures/typescript/expressions/binary/relational_bracketed_head_ungraded_body_svelte_divergence/)
+pins it as a known gap.
+
+The reason is the **printer**, not the grammar. A refusal has to hold on tsv's own output
+as well as on the authored bytes, and neither delimiter gives it that: neither is a shell
+the printer strips, so the relaxed reading cannot look through one as it does through a
+`(`; neither opens a region the printer's kept-shell rule puts a paren pair around; and
+the printer parenthesizes freely inside both bodies — a spread argument, an `as` left
+operand, a for-init `in` — which moves a refused token one level deeper than the grade
+looks. A refusal would therefore print a bare chain that tsv's own parse claims back.
+`conformance:ts-repo` would carry a knowingly-kept over-rejection like this in its
+sanctioned ledger the moment a corpus file hit one; none does, so the ledger is silent
+and the fixture is the whole record.
+
+The **printer** side of both entries is unaffected: a chain whose region opens on a
+bracketed head — or on a paren shell the printer keeps — takes a paren pair around the
+`>`'s left operand whatever the region grades as, so tsv never emits one of these bare
+([conformance_prettier_ts.md §Relational chain type-argument parens](./conformance_prettier_ts.md)).
+
 #### Import-phase proposals
 
 The **source-phase imports** and **import defer** proposals — not yet standard — add a

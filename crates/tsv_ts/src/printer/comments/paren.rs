@@ -13,6 +13,7 @@ use crate::printer::chain::chain_paren_leading_gap;
 use crate::printer::expressions::conditional::ternary_test_needs_parens;
 use crate::printer::expressions::operators::SeqLayout;
 use crate::printer::ignore::FrozenOperandPair;
+use crate::printer::needs_parens::needs_parens;
 use crate::printer::statements::TerminatorGap;
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -107,6 +108,45 @@ fn left_side_child<'e>(expr: &'e internal::Expression<'e>) -> Option<&'e interna
         ExpressionKind::SequenceExpression(seq) => seq.expressions.first()?,
         _ => return None,
     })
+}
+
+/// Whether the [`left_side_child`] `child` of `expr` PRINTS inside a paren pair — the
+/// position half of the left-spine walk, where [`left_side_child`] is the structural half.
+///
+/// One table, because "which paren context does a naked left side sit in?" has one answer
+/// per parent kind and two askers with opposite needs:
+/// [`Printer::left_shell_paren_is_emitted`] adds a source-shell precondition and reads it as
+/// "is the erased shell RE-EMITTED", while the relational-chain rule
+/// (`needs_parens`'s `relational_region_opens_on_a_kept_shell`) reads it bare, as "does the
+/// printed form open on a `(`", and so must see a pair the printer SYNTHESIZES too. Split
+/// into two matches, the two would answer one position two ways the first time a builder's
+/// context moved.
+///
+/// Each arm is the context the corresponding builder passes for that child — a member's
+/// object is a [`ParenContext::ChainBase`], a call's callee a [`ParenContext::Callee`], and
+/// so on — except the ternary test, whose pair is its own printer's question
+/// ([`ternary_test_needs_parens`], shared by the inline, line-comment and frozen layouts).
+/// A sequence answers `false`: its operands ride the sequence's OWN envelope, so an operand
+/// never prints a pair of its own — the sequence's envelope is the CALLER's to notice.
+pub(in crate::printer) fn left_side_child_is_parenthesized(
+    expr: &internal::Expression<'_>,
+    child: &internal::Expression<'_>,
+    in_for_init: bool,
+) -> bool {
+    use internal::ExpressionKind;
+    let ctx = match &expr.kind {
+        ExpressionKind::MemberExpression(_) => ParenContext::ChainBase,
+        ExpressionKind::CallExpression(_) => ParenContext::Callee,
+        ExpressionKind::TaggedTemplateExpression(_) => ParenContext::TaggedTemplateTag,
+        ExpressionKind::TSNonNullExpression(_) => ParenContext::NonNull,
+        ExpressionKind::AssignmentExpression(_) => ParenContext::AssignmentTarget,
+        ExpressionKind::BinaryExpression(binary) => ParenContext::BinaryLeft {
+            parent_op: binary.operator,
+        },
+        ExpressionKind::ConditionalExpression(_) => return ternary_test_needs_parens(child),
+        _ => return false,
+    };
+    needs_parens(child, ctx, in_for_init)
 }
 
 /// Where a `SequenceExpression`'s OPERANDS stop — its last operand's end, which its span
@@ -290,29 +330,13 @@ impl<'a> Printer<'a> {
         expr: &internal::Expression<'_>,
         child: &internal::Expression<'_>,
     ) -> bool {
-        use internal::ExpressionKind;
-        // No shell between them at all, so there is no pair to re-emit.
-        if expr.span().start == child.span().start {
-            return false;
-        }
-        let ctx = match &expr.kind {
-            ExpressionKind::MemberExpression(_) => ParenContext::ChainBase,
-            ExpressionKind::CallExpression(_) => ParenContext::Callee,
-            ExpressionKind::TaggedTemplateExpression(_) => ParenContext::TaggedTemplateTag,
-            ExpressionKind::TSNonNullExpression(_) => ParenContext::NonNull,
-            ExpressionKind::AssignmentExpression(_) => ParenContext::AssignmentTarget,
-            ExpressionKind::BinaryExpression(binary) => ParenContext::BinaryLeft {
-                parent_op: binary.operator,
-            },
-            // The ternary test's pair is its printer's own question, not `needs_parens`'
-            // ([`ternary_test_needs_parens`], which the inline, line-comment and frozen
-            // layouts all share).
-            ExpressionKind::ConditionalExpression(_) => return ternary_test_needs_parens(child),
-            // A sequence's operands ride the sequence's OWN envelope, so an operand's
-            // source shell is never re-emitted as a pair of its own.
-            _ => return false,
-        };
-        self.needs_parens(child, ctx)
+        // No shell between them at all, so there is no pair to re-emit. The predicate below
+        // asks only whether the CHILD prints parenthesized at its position, which is a
+        // question about the printed form and not about the erased shell — the two differ
+        // exactly where the printer SYNTHESIZES a pair the author never wrote, and this
+        // caller wants only the re-emitted ones.
+        expr.span().start != child.span().start
+            && left_side_child_is_parenthesized(expr, child, self.in_for_init.get())
     }
 
     /// [`Self::hoisted_left_side_child`] stopped at the first shell the printer re-emits —

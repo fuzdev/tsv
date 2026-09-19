@@ -77,31 +77,58 @@ use tsv_lang::source_scan::{TriviaProfile, skip_template_literal, skip_trivia};
 ///   classes). This is soundness's dual: a `(` arm that graded nothing would give a
 ///   parenthesized operand a pair its bare twin lacks.
 ///
-/// The bracketed heads are where soundness bites first: neither grades its body, so a `>`
-/// with a line terminator past it — or a `(` or a template on the same line — commits them on
-/// any content, and tsv reads `x < { ...s } >⏎c` and `x < { ...s } > (c, d)` as type-argument
-/// lists and then rejects both — where acorn and tsc both read the comparison chain. Grading the body under [`Relex`] alone (a tuple and a type
-/// literal are types, an array of update expressions and an object spread are not) would
-/// therefore print a bare chain tsv itself cannot reparse. The pair stands on every
-/// bracketed head instead; the underlying over-rejection is [`Parse`]'s, and belongs to the
-/// parse oracles.
+/// The bracketed heads are where soundness bites, and it is what splits them: a `(` head
+/// grades its BODY ([`paren_type_head_close`]), a `{` or `[` head grades none.
 ///
-/// **The `(` arm's look-through carries soundness only where the printer STRIPS the shell.**
-/// Where it does, the content IS the printed bytes and the two readings are asking about one
-/// text. Where the printer **keeps** the shell, they are not: [`Relex`] answers about the
-/// content while [`Parse`] answers about the `(`-headed region that is actually printed, and
-/// on any content that is no type they disagree — [`Relex`] declines the pair and `format`
-/// emits a document [`Parse`] then claims as a type-argument list. Two triggers reach it, the
-/// same two the bracketed heads have: a follower that commits the head with no break at all
-/// (`x < (a = b) > (c, d)`, or a template or arrow-in-parens follower, is unreparseable on one
-/// line), and a width at which the `>` ends a line (`x < (a = b) > c` is harmless only while
-/// it fits). The class is every operand whose shell survives printing and whose head and
+/// **The `(` head can be graded because a region it refuses never reaches this scan bare.**
+/// Where the printer KEEPS the operand's shell, the region's first printed byte is that `(`
+/// and the chain takes a pair around the `>`'s left operand (`needs_parens`'s
+/// `relational_region_opens_on_a_kept_shell`), so tsv's own parse meets the pair and not the
+/// region; where the printer STRIPS it, the shell is not in the printed form at all and
+/// [`Relex`] looks THROUGH it at the content, grading the bytes the output will hold. Either
+/// way the verdict is taken on the text that is actually printed, which is a property of the
+/// head's own shell rather than of its body — so no enumeration of what the printer may
+/// parenthesize INSIDE the body is owed, and a wrap that moves a refusing token one level
+/// deeper cannot make the grade unsound.
+///
+/// **The other two heads have no such shell, so they grade no body.** Neither `{` nor `[` is
+/// a shell the printer strips, neither opens a region the kept-shell rule answers, and the
+/// printer parenthesizes freely inside both (a spread argument, an `as` left operand, a
+/// for-init `in`). So they commit on any matching `>` a committing follower stands past, and
+/// tsv reads `x < { ...s } >⏎c` and `x < [b, c++] > (c, d)` as type-argument lists and then
+/// rejects them — where acorn and tsc both read the comparison chain. That over-rejection is
+/// [`Parse`]'s, and belongs to the parse oracles
+/// (`docs/conformance_svelte.md` §TypeScript Corrections).
+///
+/// **What the `(` grade refuses is tsc's answer, not a judgment about types.** tsc parses
+/// the list for real and with error recovery, claiming the region whenever the recovery still
+/// reaches the `>` — so a body that is plainly no type is very often a region the compiler
+/// claims and then rejects, and only the bodies it ABANDONS are comparison chains. Those are
+/// the cells that may refuse, and [`grade_body_token`] states the whole table.
+///
+/// **The `(` arm's look-through carries soundness only where the printer STRIPS the shell,
+/// so the shells it KEEPS are not this reading's to answer.** Where the printer strips, the
+/// content IS the printed bytes and the two readings are asking about one text. Where it
+/// keeps the shell, they are not: [`Relex`] would answer about the content while [`Parse`]
+/// answers about the `(`-headed region that is actually printed, and on any content that is
+/// no type they disagree. That half is settled in the printer instead, where the shell's
+/// fate is known — `needs_parens`'s `relational_region_opens_on_a_kept_shell` disjunct,
+/// which asks whether the region's FIRST PRINTED BYTE is a `(` the operand or its leftmost
+/// printed spine keeps, so soundness holds over the pair of readings rather than over this
+/// one alone.
+/// The class it covers is every operand whose shell survives printing and whose head and
 /// follow token are no type — assignment and compound assignment, a conditional, `||` /
 /// `&&` / `??`, equality, `^`, `in` / `instanceof`, `await`, `yield`, `as` / `satisfies`. A
-/// kept shell whose content happens to SPELL a type is not in it: a sequence spells the
-/// argument separator, `&` and `|` a type intersection or union, and `() =>` a function
-/// type, so [`Relex`] commits and the pair stands. The residual is the same [`Parse`]-side
-/// head over-rejection as the bracketed ones, and it is the parse oracles' subject.
+/// kept shell whose content happens to SPELL a type reaches the pair through this reading
+/// anyway: a sequence spells the argument separator, `&` and `|` a type intersection or
+/// union, and `() =>` a function type, so [`Relex`] commits and the disjunction is
+/// redundant there. What remains is the two families [`Parse`] still refuses to read as a
+/// chain, both of them tsc's own: a group whose content spells a PARAMETER LIST
+/// (`x < (a = b) > (c, d)`), which tsc claims for a function type before reading any body,
+/// and a body its error RECOVERY carries to the `>` (`x < (a << b) > (c, d)`). tsv follows
+/// the compiler on both (`docs/conformance_svelte.md` §TypeScript Corrections), so the
+/// disjunct is what keeps the pair standing over them — and, on every `(`-headed region the
+/// grade refuses, it is what makes grading the body sound at all.
 ///
 /// [`Parse`]: TypeArgScan::Parse
 /// [`Relex`]: TypeArgScan::Relex
@@ -243,7 +270,7 @@ fn type_arg_head_commits(bytes: &[u8], pos: usize, scan: TypeArgScan) -> bool {
             if is_function_type_start(bytes, pos) {
                 true
             } else if scan.reads_source_as_written() {
-                matching_delimiter_close(bytes, pos)
+                paren_type_head_close(bytes, pos)
                     .is_some_and(|close| type_operand_follow_commits(bytes, close + 1, scan))
             } else {
                 type_arg_head_commits(bytes, skip_whitespace_and_comments(bytes, pos + 1), scan)
@@ -266,22 +293,22 @@ fn type_arg_head_commits(bytes: &[u8], pos: usize, scan: TypeArgScan) -> bool {
         b'<' => is_generic_function_type_start(bytes, pos + 1),
 
         // Object/tuple literal types — but `{`/`[` equally start object and array
-        // *value* literals, so `x < {a: 1}` is a comparison. Skip the balanced
-        // group, then only a type-continuing follow token commits: `f<{ a: T }>()`
-        // and `f<[T, U] | null>()` are type arguments, `x < [1] ? q : r > (t, u)`
-        // is a comparison whatever sits past the would-be closing `>`.
+        // *value* literals, so `x < {a: 1}` is a comparison. Skip the balanced group, then
+        // only a type-continuing follow token commits: `f<{ a: T }>()` and
+        // `f<[T, U] | null>()` are type arguments, `x < [1] ? q : r > (t, u)` is a
+        // comparison whatever sits past the would-be closing `>`.
         //
-        // Neither brace nor bracket is a shell the printer strips, so
-        // [`TypeArgScan::Relex`] cannot look through one the way the `(` arm does — and it
-        // deliberately does not grade the BODY either, though tsc's answer turns on it
-        // (`<[1, 2]>` and `<{ x: B }>` are types to the compiler, `<[b, c++]>` and
-        // `<{ ...s }>` are not). Grading it would make the relaxed reading STRICTER than
-        // this one on the same bytes, and that direction is unsound: the head arm here
-        // commits on any matching `>` that a line terminator, a `(` or a template follows, so
-        // tsv's own parser reads `x < { ...s } >⏎c` as a type-argument list and then REJECTS
-        // it — where acorn and tsc both read the comparison chain. A bare output would be one
-        // tsv cannot reparse, so the pair stands on every bracketed head. See
-        // [`TypeArgScan`]'s soundness property.
+        // The BODY is deliberately not graded, though tsc's answer turns on it (`<[1, 2]>`
+        // and `<{ x: B }>` are types to the compiler, `<[b, c++]>` and `<{ ...s }>` are
+        // not). Neither delimiter is a shell the printer strips, so [`TypeArgScan::Relex`]
+        // cannot look through one the way the `(` arm does, and neither opens a region the
+        // printer's kept-shell rule puts a pair around — while the printer parenthesizes
+        // freely INSIDE both bodies, moving a token a grade refused one level deeper. A
+        // refusal here would therefore print a bare chain that tsv's own parse then claims,
+        // which is the unsound direction ([`TypeArgScan`]'s soundness property). So these
+        // arms commit on any matching `>` that a line terminator, a `(` or a template
+        // follows, and tsv reads `x < { ...s } >⏎c` as a type-argument list and then REJECTS
+        // it — where acorn and tsc both read the comparison chain.
         b'{' | b'[' => matching_delimiter_close(bytes, pos)
             .is_some_and(|close| type_operand_follow_commits(bytes, close + 1, scan)),
 
@@ -325,6 +352,471 @@ fn type_arg_head_commits(bytes: &[u8], pos: usize, scan: TypeArgScan) -> bool {
         // Not a recognized type argument start
         _ => false,
     }
+}
+
+/// Where a word stands when it is an OPERATOR rather than a name.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum WordFixity {
+    /// Takes an operand AFTER it (`await b`), so it stands where no operand has ended.
+    Prefix,
+    /// Takes an operand on each side (`a as B`), so it stands where one has.
+    Infix,
+}
+
+/// A word that can only continue an EXPRESSION, and so refuses a parenthesized type-argument
+/// head's body.
+struct OperatorWord {
+    word: &'static [u8],
+    fixity: WordFixity,
+}
+
+/// The expression-only words tsc abandons a `(`-headed region over.
+///
+/// A word REFUSES only where it stands in a genuine operator position — an infix one past a
+/// complete operand, a prefix one ahead of an operand and with none behind it. Everywhere
+/// else the same spelling is a NAME, and every one of them is a legal one: a segment of a
+/// qualified name (`(T.in)`, `(ns.await.T)`), a type operator's operand (`(typeof as)`,
+/// `(typeof await.b)`), a bare type reference (`(satisfies)`). Refusing those is a silent
+/// wrong tree on real generic syntax, which is the direction this grade may never take.
+///
+/// A mapped type's key remapping spells `in` and `as` (`({ [K in T as F<K>]: V })`), and a
+/// conditional's `infer` spells `extends` — all of them inside a nested group this walk steps
+/// over whole, so none of them reaches here.
+const OPERATOR_WORDS: &[OperatorWord] = &[
+    OperatorWord {
+        word: b"as",
+        fixity: WordFixity::Infix,
+    },
+    OperatorWord {
+        word: b"await",
+        fixity: WordFixity::Prefix,
+    },
+    OperatorWord {
+        word: b"delete",
+        fixity: WordFixity::Prefix,
+    },
+    OperatorWord {
+        word: b"in",
+        fixity: WordFixity::Infix,
+    },
+    OperatorWord {
+        word: b"instanceof",
+        fixity: WordFixity::Infix,
+    },
+    OperatorWord {
+        word: b"satisfies",
+        fixity: WordFixity::Infix,
+    },
+    OperatorWord {
+        word: b"void",
+        fixity: WordFixity::Prefix,
+    },
+    OperatorWord {
+        word: b"yield",
+        fixity: WordFixity::Prefix,
+    },
+];
+
+/// Whether `word` is an expression-only operator, and with which fixity.
+fn operator_word_fixity(word: &[u8]) -> Option<WordFixity> {
+    OPERATOR_WORDS
+        .iter()
+        .find(|entry| entry.word == word)
+        .map(|entry| entry.fixity)
+}
+
+/// Words that END NO OPERAND: the type operators, the member modifiers, and the construct
+/// and import heads. Each introduces more type past itself, so the word behind it is still
+/// at an OPERAND position — which is what keeps `(typeof as)` and `(typeof await.b)`
+/// type-argument lists rather than refusals ([`OPERATOR_WORDS`]). The member modifiers ride
+/// along because the list is a lexical fact about the words, not a claim that an object
+/// type's members reach this body.
+///
+/// The same list answers a second question, for the same reason: an identifier glued to a
+/// `(` is a CALL, which no type spells — unless the identifier is one of these, where the
+/// `(` opens a construct signature's parameter list or an import type's specifier.
+const TYPE_PREFIX_WORDS: &[&[u8]] = &[
+    b"abstract",
+    b"asserts",
+    b"extends",
+    b"get",
+    b"import",
+    b"infer",
+    b"is",
+    b"keyof",
+    b"new",
+    b"readonly",
+    b"set",
+    b"typeof",
+    b"unique",
+];
+
+/// Find the `)` closing the parenthesized type-argument head at `open`, requiring its BODY to
+/// read as a type — the graded twin of
+/// [`matching_delimiter_close`],
+/// which answers the same delimiter question and grades nothing.
+///
+/// One walk answers both: the delimiter depths locate the close, and every token at the
+/// body's own level is graded on the way past. Nested groups are stepped over wholesale,
+/// because a nested body's own grammar is not this one — an object type's
+/// `[K in keyof T]` holds an `in` that a parenthesized type may not.
+///
+/// A redundant `(` SHELL the printer strips is not part of the head: `x < ((a || b)) > c`
+/// grades the content its own shell-free twin does, so the two authorings of one chain reach
+/// one verdict (`deno task paren:audit`'s `< > operand` class enumerates exactly that pair),
+/// and [`TypeArgScan::Relex`]'s look-through has the same rule to agree with. The chain of
+/// them is located by ONE descent over the head's leading `(`s and then walked once from the
+/// innermost — never by re-walking the body per shell, which is quadratic in the nesting the
+/// input chose (`x < ((((a)))) > (t, u)`).
+///
+/// The grade is a REFUSAL list, not a whitelist, and deliberately: a body wrongly refused
+/// turns a real generic call into a comparison chain — a silent wrong tree on code that
+/// parses either way — where a body wrongly admitted is a loud parse error on a shape no
+/// generic has. So only tokens that no type carries at a body's top level refuse, and
+/// everything else commits.
+///
+/// Both readings ask this, which is what keeps them at one verdict on one text, and the
+/// grade is blind to WHITESPACE and LINE TERMINATORS for the same reason: the printer folds
+/// and adds breaks and renormalizes spacing, so a grade that read either would answer the
+/// source and the printed form differently.
+fn paren_type_head_close(bytes: &[u8], open: usize) -> Option<usize> {
+    if bytes.get(open) != Some(&b'(') {
+        return None;
+    }
+    // The redundant-shell chain, found in one descent: a shell holds nothing but the next
+    // group, so the chain is exactly the run of `(`s at the head. Whether each one really
+    // holds nothing ELSE is settled by the walk itself, which keeps grading at the shell's
+    // own level when it does.
+    let mut inner = open;
+    let mut shells = 0usize;
+    while bytes.get(skip_whitespace_and_comments(bytes, inner + 1)) == Some(&b'(') {
+        inner = skip_whitespace_and_comments(bytes, inner + 1);
+        shells += 1;
+    }
+    graded_paren_close(bytes, inner, shells)
+}
+
+/// [`paren_type_head_close`]'s walk: the close of the OUTERMOST head, `shells` redundant `(`
+/// levels out from `inner`. `None` where a different delimiter closes unbalanced first, where
+/// the input ends, or where a body-level token refuses the type reading.
+///
+/// The walk grades at ONE level at a time — `level`, the depth whose tokens are the body's
+/// own. Closing that level with shells left to go steps the level out by one and starts the
+/// enclosing body's grade there, so a shell that turns out to hold more than the group is
+/// graded like any other body and the walk still visits each byte once.
+fn graded_paren_close(bytes: &[u8], inner: usize, shells: usize) -> Option<usize> {
+    // paren, bracket, brace — the graded head's own slot opens at one per level, as if this
+    // walk had already stepped over each `open` it starts past.
+    let mut depths = [0i32; 3];
+    depths[PAREN_SLOT] = shells as i32 + 1;
+    // Total nesting, so "at the body's own level" is one compare rather than three.
+    let mut depth = shells as i32 + 1;
+    let mut level = depth;
+    let mut remaining = shells;
+    let mut grade = BodyGrade::new();
+    let end = bytes.len();
+    let mut pos = inner + 1;
+
+    while pos < end {
+        // Whitespace and comments are not tokens: neither ends an operand, so the reading
+        // stays where it stood — which is also what keeps the grade blind to the line
+        // breaks and the spacing the printer moves.
+        let past = skip_whitespace_and_comments(bytes, pos);
+        if past != pos {
+            pos = past;
+            continue;
+        }
+        // Strings and templates are opaque, as in the ungraded twin, and are literal TYPES,
+        // so each ends an operand.
+        if let Some(past) = skip_trivia(bytes, pos, end, TriviaProfile::JS) {
+            if depth == level {
+                grade.after_operand = true;
+                grade.typeof_operand = false;
+            }
+            pos = past;
+            continue;
+        }
+        let byte = bytes[pos];
+        if let Some(slot) = delimiter_slot(byte) {
+            if matches!(byte, b'(' | b'[' | b'{') {
+                depths[slot] += 1;
+                depth += 1;
+                if depth == level + 1 {
+                    grade.after_operand = false;
+                    grade.typeof_operand = false;
+                }
+            } else {
+                depths[slot] -= 1;
+                depth -= 1;
+                if depths[slot] < 0 {
+                    return None; // Unbalanced - a different group ended here
+                }
+                if depth == level - 1 {
+                    if slot != PAREN_SLOT {
+                        return None; // Unbalanced - a different group ended here
+                    }
+                    if remaining == 0 {
+                        return Some(pos);
+                    }
+                    // A redundant shell closed over this level; grade the enclosing body
+                    // from here, where the group it just held has ended an operand.
+                    remaining -= 1;
+                    level -= 1;
+                    grade = BodyGrade::new();
+                    grade.after_operand = true;
+                } else if depth == level {
+                    grade.after_operand = true;
+                    grade.typeof_operand = false;
+                }
+            }
+            pos += 1;
+            continue;
+        }
+        if depth != level || grade.committed {
+            pos += 1;
+            continue;
+        }
+        pos = grade_body_token(bytes, pos, &mut grade)?;
+    }
+    None
+}
+
+/// The paren slot in [`delimiter_slot`]'s triple — the graded head's own.
+const PAREN_SLOT: usize = 0;
+
+/// The delimiter-depth slot a `(`/`)`, `[`/`]` or `{`/`}` counts in, or `None` for every
+/// other byte — [`matching_delimiter_close`]'s
+/// own classification, kept identical so the graded walk locates the same close.
+#[inline]
+const fn delimiter_slot(byte: u8) -> Option<usize> {
+    match byte {
+        b'(' | b')' => Some(PAREN_SLOT),
+        b'[' | b']' => Some(1),
+        b'{' | b'}' => Some(2),
+        _ => None,
+    }
+}
+
+/// What the walk has read of a parenthesized head's body so far — the facts a token's own
+/// grade may turn on.
+#[derive(Clone, Copy)]
+struct BodyGrade {
+    /// Whether the last body-level token ENDED an operand, which is what tells a binary `-`
+    /// from a literal type's sign, and an infix `as` from a type reference of the same name.
+    after_operand: bool,
+    /// Whether the body has proved itself a PARAMETER LIST, which ends its grading: tsc's
+    /// `isUnambiguouslyStartOfFunctionType` claims the whole group for a function type on a
+    /// `:` or a bare `=` behind the first parameter, and its parse then carries every token
+    /// in the group to the `>` whatever stands there. So nothing past one may refuse.
+    committed: bool,
+    /// Whether the last body-level word was `typeof`, whose operand is an entity name —
+    /// the one type position that may hold a `this.`, and so the one place that spelling
+    /// may not refuse (`f<(keyof typeof this.x)>(v)`).
+    typeof_operand: bool,
+}
+
+impl BodyGrade {
+    /// A fresh grade for one body.
+    const fn new() -> Self {
+        BodyGrade {
+            after_operand: false,
+            committed: false,
+            typeof_operand: false,
+        }
+    }
+}
+
+/// Grade one token at a parenthesized head's own level, advancing [`BodyGrade`] and returning
+/// where the token ends — or `None` where it refuses the type reading outright.
+///
+/// **A refusal says tsc reads a comparison chain here, and nothing weaker.** tsc does not
+/// guess at a `<`: `parseTypeArgumentsInExpression` really parses the list with
+/// `parseDelimitedList(TypeArguments, parseType)`, which is error-RECOVERING — a token no
+/// element can start is skipped (`abortParsingListOrMoveToNextToken`) and the parse resumes
+/// — and the region is claimed whenever that recovery still lands on the `>`, errors and
+/// all. tsc abandons the region only where the recovery cannot get there, and that is the
+/// one condition under which the `<` is a comparison operator. So this grade may refuse
+/// only on the abandoning cells; on every other body it commits, and the type parse then
+/// rejects the region exactly as tsc does.
+///
+/// | body-level token | verdict |
+/// | --- | --- |
+/// | `~` | refuse |
+/// | `++` `--`, prefix or postfix | refuse |
+/// | `?.` optional chain | refuse |
+/// | `this .` | refuse, unless it is `typeof`'s operand |
+/// | `\|\|` `&&` `??` `^` | refuse |
+/// | `==` `!=` `===` `!==` `<=` `>=` | refuse |
+/// | `+` `-` `*` `/` `%` past an operand | refuse |
+/// | a unary `+`, and a `-` on anything but a numeral | refuse |
+/// | `as` `satisfies` `in` `instanceof` past an operand | refuse |
+/// | `await` `void` `yield` `delete` ahead of an operand | refuse |
+/// | an identifier glued to `(` | refuse, unless the word opens a type |
+/// | a compound assignment | refuse |
+/// | a `-` on a numeral | commit |
+/// | `?` … `:` conditional | commit |
+/// | `...` | commit |
+/// | `:`, and a bare `=` | commit, and end the grading |
+/// | `<<` `>>` `>>>` `,` `=>` `!` `\|` `&` | commit |
+///
+/// `<<` and `>>` are the two shifts a type grammar re-reads: the type parser re-scans a `<<`
+/// into the `<` of a nested argument list, and a nested list CLOSES with `>>`, so neither
+/// ends a type at all. A `:` and a bare `=` are the converse — tsc's
+/// `isUnambiguouslyStartOfFunctionType` reads either behind the first parameter and claims
+/// the whole group for a function type, so its parse carries every token past one to the `>`
+/// ([`BodyGrade::committed`]).
+///
+/// Every cell is measured against tsc; where its recovery and the shape of the grammar
+/// disagree, the measurement is what stands here.
+fn grade_body_token(bytes: &[u8], pos: usize, grade: &mut BodyGrade) -> Option<usize> {
+    // Words first, so a word-shaped refusal is matched whole and an ordinary name can
+    // never be read one byte at a time.
+    if identifier_starts_at(bytes, pos) {
+        let word_end = skip_identifier(bytes, pos);
+        let word = &bytes[pos..word_end];
+        let next = skip_whitespace_and_comments(bytes, word_end);
+        let after_operand = grade.after_operand;
+        let typeof_operand = grade.typeof_operand;
+        grade.typeof_operand = word == b"typeof";
+        // A modifier or type operator introduces more type past itself, so it ends no
+        // operand and CLEARS the one behind it — the word after it stands at an operand
+        // position, which is what keeps `(readonly as)` a type-argument list
+        // ([`TYPE_PREFIX_WORDS`]).
+        grade.after_operand = !TYPE_PREFIX_WORDS.contains(&word);
+        // `this.` is member access; `this` heads no qualified type name, which is the same
+        // rule [`TypeKeywordKind::This`] answers at the head itself. `typeof`'s operand IS
+        // an entity name, and is the one type position that holds one.
+        if word == b"this" && bytes.get(next) == Some(&b'.') && !typeof_operand {
+            return None;
+        }
+        // A call, which no type spells — unless the word is one whose own `(` opens a
+        // construct signature's parameter list or an import type's specifier
+        // ([`TYPE_PREFIX_WORDS`]).
+        if bytes.get(next) == Some(&b'(') && !TYPE_PREFIX_WORDS.contains(&word) {
+            return None;
+        }
+        if let Some(fixity) = operator_word_fixity(word) {
+            let is_operator = match fixity {
+                WordFixity::Infix => after_operand,
+                WordFixity::Prefix => !after_operand && operand_starts_at(bytes, next),
+            };
+            if is_operator {
+                return None;
+            }
+        }
+        return Some(word_end);
+    }
+
+    let after_operand = grade.after_operand;
+    grade.after_operand = false;
+    grade.typeof_operand = false;
+    // An assignment operator is read AHEAD of every refusal below. A COMPOUND one refuses
+    // outright: no parameter default spells `+=`, so tsc reads `x < (a += b) > (t, u)` as the
+    // comparison chain acorn does. A bare `=` is a parameter default, which tsc claims the
+    // whole group for ([`BodyGrade::committed`]).
+    if let Some(end) = assignment_operator_end(bytes, pos) {
+        if bytes[pos] != b'=' {
+            return None;
+        }
+        grade.committed = true;
+        return Some(end);
+    }
+    let byte = bytes[pos];
+    match byte {
+        // A numeric literal type (`(0 | 1)`); the sign is the `-` arm's, since a `-` may
+        // equally be arithmetic.
+        b'0'..=b'9' => {
+            grade.after_operand = true;
+            Some(skip_numeric_literal(bytes, pos))
+        }
+        b'.' if matches!(bytes.get(pos + 1), Some(b'0'..=b'9')) => {
+            grade.after_operand = true;
+            Some(skip_numeric_literal(bytes, pos))
+        }
+        // A rest parameter (`(a: T, ...b: U[]) => V`).
+        b'.' if bytes[pos..].starts_with(b"...") => Some(pos + 3),
+        // A qualified name's `.` (`(Ns.T)`). An optional chain's `?.` refuses at the `?`
+        // below, so a `.` here follows a name and nothing else.
+        b'.' => Some(pos + 1),
+        // A parameter's type annotation, which proves the group a parameter list and ends
+        // the grading ([`BodyGrade::committed`]).
+        b':' => {
+            grade.committed = true;
+            Some(pos + 1)
+        }
+        // `++` / `--`: no type carries an update operator.
+        b'+' | b'-' if bytes.get(pos + 1) == Some(&byte) => None,
+        // `||` / `&&` are the logical operators, where the single `|` / `&` are a union and
+        // an intersection.
+        b'|' | b'&' if bytes.get(pos + 1) == Some(&byte) => None,
+        // `??` is the nullish coalescer and `?.` the optional chain; no type spells either.
+        // The `.` needs a digit test of its own: a conditional type's branch may be a
+        // leading-point numeric literal (`A extends B ? .5 : C`).
+        b'?' if bytes.get(pos + 1) == Some(&b'?') => None,
+        b'?' if bytes.get(pos + 1) == Some(&b'.')
+            && !matches!(bytes.get(pos + 2), Some(b'0'..=b'9')) =>
+        {
+            None
+        }
+        // Bitwise xor and complement; no type spells either.
+        b'^' | b'~' => None,
+        // `!=` / `!==` and `==` / `===` are equality operators. The assignment `=` was
+        // taken above, so an `=` reaching here carries a second one.
+        b'!' | b'=' if bytes.get(pos + 1) == Some(&b'=') => None,
+        // The relational `<=` / `>=`. Their bare twins are a nested argument list's own
+        // delimiters and stay inert.
+        b'<' | b'>' if bytes.get(pos + 1) == Some(&b'=') => None,
+        // Arithmetic past a complete operand.
+        b'+' | b'-' | b'*' | b'/' | b'%' if after_operand => None,
+        // At an operand position a `-` opens a NEGATIVE LITERAL type (`(-1 | 1)`), which is
+        // the only sign a type carries — tsc's own literal type takes a minus and nothing
+        // else, so `(+1)` is the comparison chain its unary `+` makes it. Anything else
+        // behind either sign is the unary operator, which no type spells.
+        b'-' if numeric_literal_starts_at(bytes, skip_whitespace_and_comments(bytes, pos + 1)) => {
+            Some(pos + 1)
+        }
+        b'+' | b'-' => None,
+        // Everything else continues a type or is inert to it: `,` separates parameters, a
+        // lone `?` marks an optional one or opens a conditional type's branch, `<` `>` carry
+        // a nested argument list, `!` marks a JSDoc non-nullable, `=>` an arrow's head, and a
+        // shift is what a type grammar re-reads as one of those.
+        _ => Some(pos + 1),
+    }
+}
+
+/// Whether an OPERAND begins at `pos` — an identifier or a literal. A prefix operator word
+/// is only an operator where one does: `(await)` and `(await.T)` name a type, where
+/// `(await b)` is the expression that refuses ([`OPERATOR_WORDS`]).
+#[inline]
+fn operand_starts_at(bytes: &[u8], pos: usize) -> bool {
+    matches!(bytes.get(pos), Some(b'0'..=b'9' | b'\'' | b'"' | b'`'))
+        || identifier_starts_at(bytes, pos)
+}
+
+/// The ASSIGNMENT operator spelled at `pos`, if any — a bare `=` or any compound form
+/// (`+=`, `**=`, `>>>=`, `&&=`, `??=`, …) — as the byte past it.
+///
+/// Read ahead of every refusal in [`grade_body_token`], because the two forms part there: a
+/// bare `=` is a parameter default, which tsc's `isUnambiguouslyStartOfFunctionType` claims
+/// the whole group for, while no parameter default spells `+=`, so a compound one refuses.
+/// Reading them together is also what keeps a compound operator from being taken one byte at
+/// a time — `a &&= b` must not reach the `&&` arm, and `a >>= b` not the `>=` one.
+#[inline]
+fn assignment_operator_end(bytes: &[u8], pos: usize) -> Option<usize> {
+    // Longest first, so `>>=` is not read as `>` + `>=` and `**=` not as `*` + `*=`.
+    const COMPOUND_LEADS: &[&[u8]] = &[
+        b">>>", b"**", b"<<", b">>", b"&&", b"||", b"??", b"+", b"-", b"*", b"/", b"%", b"&", b"|",
+        b"^",
+    ];
+    let lead = COMPOUND_LEADS
+        .iter()
+        .find(|lead| bytes[pos..].starts_with(lead))
+        .map_or(0, |lead| lead.len());
+    let eq = pos + lead;
+    // `==` / `===` are equality and `=>` an arrow; a relational `>=` / `<=` reaches here
+    // with no lead matched and fails the `=` test on its own first byte.
+    (bytes.get(eq) == Some(&b'=') && !matches!(bytes.get(eq + 1), Some(b'=' | b'>')))
+        .then_some(eq + 1)
 }
 
 /// Whether the type-operator keyword `op`, spelled at `kw_start`, opens type arguments.

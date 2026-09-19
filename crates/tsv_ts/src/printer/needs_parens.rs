@@ -21,6 +21,7 @@ use crate::ast::internal::{
     BinaryOperator, Expression, ExpressionKind, LiteralValue, UnaryOperator, UpdateOperator,
 };
 use crate::printer::class_expr_has_decorators;
+use crate::printer::comments::left_side_child_is_parenthesized;
 
 /// Context for parenthesization decisions
 ///
@@ -891,6 +892,124 @@ fn export_default_leftmost<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
     }
 }
 
+/// Whether the `<` region of a relational chain would open on a `(` in the PRINTED form —
+/// the second disjunct of the relational arm in [`needs_parens_binary_operand`], and the
+/// half `BinaryExpression::relexes_as_type_arguments` cannot answer.
+///
+/// That flag is a byte scan the parser ran over the SOURCE, and its `(` head arm looks
+/// THROUGH a shell, because the shell the arm was written for is one the printer STRIPS:
+/// `a < (arr[b - 1]) > c` prints as `a < arr[b - 1] > c`, so the two authorings of that one
+/// document owe one verdict (`deno task paren:audit`'s `< > operand` class enumerates
+/// exactly that pair). Where the printer KEEPS the shell the look-through grades the wrong
+/// text — the content is no type, so the scan declines the pair, while the `(` it looked
+/// through is still in the output, and a `(`-headed region IS a type-argument list to a
+/// reader that grades bracket matching and the follow token rather than the body. Both of
+/// the resulting spellings are documents the printer itself would emit:
+/// `x < (a = b) > (t, u)` is rejected flat, and `x < (a = b) > c` the moment a width puts a
+/// line terminator past the `>`.
+///
+/// The question is about the region's FIRST PRINTED BYTE, not about the operand NODE, so
+/// this walks the operand's leftmost printed spine. A `(` inherited from a descendant opens
+/// the region exactly as the operand's own would: `x < (a = b)[0] > (t, u)` prints the
+/// assignment's required pair and the member prints nothing ahead of it, so the region still
+/// opens on `(` — and a bare spelling there is a document tsv cannot reparse.
+///
+/// Two nodes carry a pair no position asks for, and both are tested at every step rather
+/// than at the root alone:
+///
+/// - a [`JsdocCast`](crate::ast::internal::JsdocCast), whose parens are semantically
+///   required — strip them and the cast stops being one — so its own doc always prints
+///   them. A `/** @type {T} */` the author glued to the shell of a `<` operand is the same
+///   document as the shell without it, and the region reads alike either way: the head scan
+///   steps over a comment;
+/// - a `SequenceExpression`, which supplies its own grouping pair in `build_sequence_doc`.
+///   (The region-keyed reading already commits on a sequence — the `,` spells the argument
+///   separator — so this is belt-and-braces, and it is here because the rule is about the
+///   printed `(`, not about which reading happens to reach it.)
+///
+/// A preserved grouping pair is neither: `ParenthesizedExpression` is layout-transparent
+/// (`Printer::build_preserved_paren_doc` renders the inner, which re-derives whatever parens
+/// it needs), so it is peeled and the question is the inner's.
+///
+/// **Where the spine STOPS, and why that is a grammar fact rather than an accident.** A `(`
+/// only opens a *type-argument* region if the type grammar can carry on past its matching
+/// `)`, and the only postfix a parenthesized type takes is `[`…`]`. So the walk descends
+/// exactly one hop kind: the OBJECT of a plain **computed** member, the one node that prints
+/// `[` and nothing else between its object and the rest of the region. Every other spine hop
+/// puts a token there that no type continues — `.` (a qualified name needs an identifier
+/// head, never a `)`), `(`, a template's backtick, an operator, a `?` — and an OPTIONAL
+/// computed member prints `?.[`, whose `?` is not a type token either. A hop that could put
+/// a type SEPARATOR there instead (`,`, `|`, `&`, a nested `<`) cannot be reached without
+/// the operand ROOT itself taking a pair first, since each of those binds looser than `<`
+/// and a sequence self-parenthesizes — so the root test above has already answered. The one
+/// other token a type operand may be followed by, `extends`, is no expression token, so no
+/// printed `)` is ever followed by it.
+///
+/// ⚠️ The one token in that list whose answer is a tsv POSITION rather than a grammar fact
+/// is the non-null `!`: it is tsc's `JSDocNonNullableType`, so a compiler reading
+/// `(a = b)! ` would carry on, while tsv's own parse follows acorn-typescript and stops —
+/// the drop-in contract. A parse that ever admitted `!` after a `)` would put the non-null
+/// hop in this walk.
+///
+/// Over-approximating within the admitted hops is free: a pair around the `>`'s left operand
+/// ends the region on a `)`, which continues no type-argument list, so a pair this adds
+/// where the bare form would have re-parsed is noise and never a hazard. The arm stays
+/// LAYOUT-BLIND with the rest of the family — whether the `>` ends a line is not knowable
+/// where parens are decided, and the follow token past the `)` is read the same way at every
+/// width — so the pair stands at every width.
+fn relational_region_opens_on_a_kept_shell(operand: &Expression<'_>, in_for_init: bool) -> bool {
+    // The root's own pair is the one its POSITION derives — the same `needs_parens` call
+    // `Printer::build_binary_operand_doc` makes for a `<`'s right operand.
+    let mut node = peel_preserved_parens(operand);
+    if prints_its_own_paren_pair(node)
+        || needs_parens(
+            node,
+            ParenContext::BinaryRight {
+                parent_op: BinaryOperator::LessThan,
+            },
+            in_for_init,
+        )
+    {
+        return true;
+    }
+    // Then the one hop that leaves the region open: a plain computed member's OBJECT, asked
+    // through the shared position table so the context cannot drift from the one the chain
+    // builder passes for that child.
+    while let ExpressionKind::MemberExpression(member) = &node.kind {
+        if !member.computed || member.optional {
+            return false;
+        }
+        let child = peel_preserved_parens(member.object);
+        if prints_its_own_paren_pair(child)
+            || left_side_child_is_parenthesized(node, child, in_for_init)
+        {
+            return true;
+        }
+        node = child;
+    }
+    false
+}
+
+/// A node whose own doc prints a paren pair whatever position it sits in, so no
+/// context-keyed question reaches it — see [`relational_region_opens_on_a_kept_shell`],
+/// which names why each one is on that list.
+fn prints_its_own_paren_pair(expr: &Expression<'_>) -> bool {
+    matches!(
+        expr.kind,
+        ExpressionKind::JsdocCast(_) | ExpressionKind::SequenceExpression(_)
+    )
+}
+
+/// Step past every preserved grouping pair, which the printer renders through rather than
+/// as a pair of its own (`Printer::build_preserved_paren_doc`).
+fn peel_preserved_parens<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
+    let mut expr = expr;
+    while let ExpressionKind::ParenthesizedExpression(paren) = &expr.kind {
+        expr = paren.expression;
+    }
+    expr
+}
+
 /// Binary operand: `<expr> op y` or `x op <expr>`. `in_for_init` is the ambient
 /// for-init flag, read only by the instantiation-tail walk below (it asks the
 /// printed shape of the operand's own children).
@@ -979,13 +1098,18 @@ fn needs_parens_binary_operand(
     // unknowable here, so the pair stands at every width, the ones that never break
     // included. And it is REGION-keyed rather than shape-keyed: an operand that is no type
     // keeps the chain bare, whatever it is parenthesized with.
+    //
+    // The recorded flag answers for every region the parser and the printer read as one
+    // text. The second disjunct is the rest of them — the region whose head the PRINTER
+    // writes, a `(` the operand keeps ([`relational_region_opens_on_a_kept_shell`]).
     if !is_right
         && parent_op == BinaryOperator::GreaterThan
         && matches!(
             &expr.kind,
             ExpressionKind::BinaryExpression(child)
                 if child.operator == BinaryOperator::LessThan
-                    && child.relexes_as_type_arguments
+                    && (child.relexes_as_type_arguments
+                        || relational_region_opens_on_a_kept_shell(child.right, in_for_init))
         )
     {
         return true;

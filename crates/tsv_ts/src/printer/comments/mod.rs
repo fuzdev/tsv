@@ -44,6 +44,7 @@ pub(crate) use declarations::{ClassMemberModifiers, ContinuationValue, HeritageK
 pub(super) use element_comma::{block_is_before_comma, next_real_element_start, run_defers_line};
 pub(crate) use lists::{BlankRule, MemberGap, StandaloneGlue};
 pub(crate) use member_body::{MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberSeam};
+pub(in crate::printer) use paren::left_side_child_is_parenthesized;
 pub(crate) use paren::{
     ParenLeadingValue, next_significant_byte, paren_pair_keeps_leading_run, paren_shell_close_after,
 };

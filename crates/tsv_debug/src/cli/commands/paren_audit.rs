@@ -74,7 +74,7 @@
 //! authoring is idempotent on its own and only a twin shows the two fixed points. Nothing
 //! re-associates here, but that does not make every twin probeable: what the splice
 //! preserves, and what it does not, is stated on
-//! [`ParenAuditCommand::twin_is_same_document`].
+//! [`ParenAuditCommand::twin_exclusion_reason`].
 //!
 //! ## Which invocation carries the relational floor
 //!
@@ -129,7 +129,7 @@
 //!   annotation, making the twin a different document. Counted in the report, not dropped
 //!   silently.
 //! - **A relational site whose twin tsv does not read as the same document is excluded**
-//!   ([`ParenAuditCommand::twin_is_same_document`], which states why a twin can fail to be
+//!   ([`ParenAuditCommand::twin_exclusion_reason`], which states why a twin can fail to be
 //!   one). Counted in the report, not dropped silently. The divergence itself is a parse
 //!   question, but no parse gate sees these twins — the audit synthesizes them, and no
 //!   fixture or corpus file holds them — so the count printed here is where they surface.
@@ -193,6 +193,11 @@ pub struct ParenAuditCommand {
     /// emit JSON
     #[argh(switch)]
     json: bool,
+
+    /// list the relational sites the run declined to probe, with the reason and the twin's
+    /// own text — the exclusion count is otherwise unauditable
+    #[argh(switch)]
+    list_excluded: bool,
 
     /// write a byte-exact repro (base / variant / ftry / ftry2) per finding into this dir
     #[argh(option)]
@@ -295,6 +300,22 @@ struct Site {
     kind: SiteKind,
 }
 
+/// A relational site the run declined to probe, kept so the exclusion can be AUDITED
+/// rather than only counted: a class that stops being the same document on both spellings
+/// is indistinguishable, from the count alone, from a fresh tsv-only over-rejection.
+#[derive(Debug, Clone)]
+struct ExcludedSite {
+    path: String,
+    line: usize,
+    column: usize,
+    kind: &'static str,
+    /// Why the twin is not the same document — which is the whole question an auditor asks
+    /// of the count.
+    reason: &'static str,
+    /// The twin's own text, so the spelling can be handed to another parser as-is.
+    twin: String,
+}
+
 /// A file's enumeration: the sites to probe, and counts of the ones excluded as unsound.
 /// Each exclusion is counted rather than dropped silently — an audit that quietly stops
 /// probing a class reads exactly like one that finds nothing in it.
@@ -303,6 +324,7 @@ struct Sites {
     probed: Vec<Site>,
     comment_bound: usize,
     parse_divergent: usize,
+    excluded: Vec<ExcludedSite>,
 }
 
 /// Collect every same-operator re-association site in a wire AST.
@@ -379,7 +401,7 @@ fn push_site(site: Site, f: &str, out: &mut Sites) {
 /// Both splices are pure paren insertions around a whole operand, with none of the logical
 /// splice's re-association argument to make (nothing moves). Whether tsv's own parser reads
 /// each twin as the same document is a separate question, answered per site by
-/// [`ParenAuditCommand::twin_is_same_document`]. The pair is what tsv's own
+/// [`ParenAuditCommand::twin_exclusion_reason`]. The pair is what tsv's own
 /// relational-chain rule synthesizes and retains
 /// (`conformance_prettier_ts.md` §Relational chain type-argument parens), and that rule
 /// reads BYTES — which head the `<` region opens with, where the region's scan stops — so
@@ -461,6 +483,24 @@ fn strip_positions(node: &mut Value) {
         }
         _ => {}
     }
+}
+
+/// The 1-based line and column of a byte offset, for naming an excluded site.
+fn line_column_at(f: &str, offset: usize) -> (usize, usize) {
+    let head = &f[..offset.min(f.len())];
+    let line = head.matches('\n').count() + 1;
+    let column = head.rfind('\n').map_or(offset, |nl| offset - nl - 1) + 1;
+    (line, column)
+}
+
+/// The excluded twin's own line, trimmed — enough to hand the spelling to another parser
+/// without reopening the file, and bounded so a corpus run's JSON stays readable.
+fn excluded_twin_text(f: &str, site: &Site) -> String {
+    let twin = splice(f, site);
+    let start = twin[..site.open].rfind('\n').map_or(0, |nl| nl + 1);
+    let end = twin[start..].find('\n').map_or(twin.len(), |nl| start + nl);
+    let line = twin[start..end].trim();
+    line.chars().take(200).collect()
 }
 
 /// Splice one site's redundant parens into the formatted base.
@@ -548,8 +588,10 @@ struct Report {
     sites: usize,
     sites_comment_bound: usize,
     /// Relational sites whose twin tsv rejects or reads as a different program — see
-    /// [`ParenAuditCommand::twin_is_same_document`].
+    /// [`ParenAuditCommand::twin_exclusion_reason`].
     sites_parse_divergent: usize,
+    /// Those sites themselves, so the count can be checked rather than trusted.
+    excluded_sites: Vec<ExcludedSite>,
     counts: BTreeMap<Verdict, usize>,
     kind_counts: BTreeMap<(SiteKind, Verdict), usize>,
     /// Sites enumerated per class, so a class that stops producing them fails its own
@@ -638,7 +680,12 @@ impl ParenAuditCommand {
         if self.json {
             print_json(&report, self.require_relational);
         } else {
-            print_human(&report, self.examples, self.require_relational);
+            print_human(
+                &report,
+                self.examples,
+                self.require_relational,
+                self.list_excluded,
+            );
         }
 
         // A base-non-idempotent file is excluded from the re-association analysis (its fixed
@@ -666,7 +713,8 @@ impl ParenAuditCommand {
         Ok(())
     }
 
-    /// Whether a site's twin is the SAME DOCUMENT to tsv's own parser — its precondition,
+    /// Why the redundantly-parenthesized twin of `site` is not the SAME DOCUMENT to tsv's own
+    /// parser, or `None` when it is and the site may be probed — the probe's precondition,
     /// since a formatter cannot be asked to reach one fixed point from two programs.
     ///
     /// The relational splice is tree-preserving **in the language**: parenthesizing a whole
@@ -675,26 +723,43 @@ impl ParenAuditCommand {
     ///
     /// Checked only for the relational classes, and only because a paren around a `<`
     /// operand genuinely can move tsv's PARSE: the type-argument lookahead's `(` head arm
-    /// grades bracket matching and the follow token alone, never the content, so a shell can
-    /// turn the comparison into a type-argument list. Where that list's body is no type, tsv
-    /// then REJECTS the twin — `x < (1 + 2) > (t, u)`, which acorn reads as the comparison
-    /// chain its paren-free twin is. Where the body happens to parse as one, the twin is a
-    /// DIFFERENT TREE — `p < (readonly.a) > (t, u)`, a call with type arguments to tsv and a
-    /// comparison chain to acorn. Either way it is a PARSER divergence against tsv's parse
-    /// oracle rather than a formatting question, so this audit excludes the site and counts
-    /// it, the way it does a comment-bound one.
+    /// grades the shell's CONTENT, so a twin whose content opens a type-argument list opens a
+    /// region its paren-free twin does not. Where that content parses as a type, the twin is
+    /// a DIFFERENT TREE — `p < (readonly.a) > (t, u)`, a call with type arguments to tsv and
+    /// a comparison chain to acorn. Where it spells a parameter list, or a body tsc's error
+    /// recovery carries to the `>`, tsv REJECTS the twin, following tsc —
+    /// `x < (a = b) > (t, u)`, `x < (a << b) > (t, u)`, both the comparison chain to acorn.
+    /// Either way it is a PARSER divergence against tsv's parse oracle rather than a
+    /// formatting question, so this audit excludes the site and counts it, the way it does a
+    /// comment-bound one.
+    ///
+    /// The two reasons are not interchangeable to an auditor: `rejected` means tsv's parser
+    /// refuses a spelling the bare one accepts, which is a parse-oracle question that may
+    /// be a deliberate divergence OR a fresh over-rejection; `different tree` means both
+    /// parse and the shell moved the reading. Naming them is what lets the excluded count
+    /// be graded against another parser instead of trusted, which `--list-excluded` and the
+    /// `--json` `excluded_sites` array are for.
     ///
     /// The logical class asks nothing of the kind: its splice re-associates a tree acorn
     /// builds the same either way, so a twin that fails to parse there stays the loud
     /// `VariantParseError` finding it always was.
-    fn twin_is_same_document(f: &str, site: &Site, base: &Value, parser: ParserType) -> bool {
+    fn twin_exclusion_reason(
+        f: &str,
+        site: &Site,
+        base: &Value,
+        parser: ParserType,
+    ) -> Option<&'static str> {
         let Some(mut twin) = tsv_parse_to_value(&splice(f, site), parser) else {
-            return false;
+            return Some("rejected");
         };
         let mut base = base.clone();
         strip_positions(&mut twin);
         strip_positions(&mut base);
-        twin == base
+        if twin == base {
+            None
+        } else {
+            Some("different tree")
+        }
     }
 
     fn scan_file(&self, path: &Path, report: &mut Report) {
@@ -735,16 +800,31 @@ impl ParenAuditCommand {
         let map = Utf16ToByte::new(&f);
         let mut sites = Sites::default();
         collect_sites(&wire, &f, &map, &mut sites);
+        let mut excluded = Vec::new();
         sites.probed.retain(|site| {
-            if site.kind.is_relational() && !Self::twin_is_same_document(&f, site, &wire, parser) {
-                sites.parse_divergent += 1;
-                return false;
+            if !site.kind.is_relational() {
+                return true;
             }
-            true
+            let Some(reason) = Self::twin_exclusion_reason(&f, site, &wire, parser) else {
+                return true;
+            };
+            sites.parse_divergent += 1;
+            let (line, column) = line_column_at(&f, site.open);
+            excluded.push(ExcludedSite {
+                path: path.display().to_string(),
+                line,
+                column,
+                kind: site.kind.label(),
+                reason,
+                twin: excluded_twin_text(&f, site),
+            });
+            false
         });
+        sites.excluded = excluded;
         report.sites += sites.probed.len();
         report.sites_comment_bound += sites.comment_bound;
         report.sites_parse_divergent += sites.parse_divergent;
+        report.excluded_sites.append(&mut sites.excluded);
         for site in &sites.probed {
             *report.kind_sites.entry(site.kind).or_default() += 1;
         }
@@ -808,7 +888,7 @@ fn describe_first_diff(base: &str, variant: &str) -> Option<(usize, String, Stri
     })
 }
 
-fn print_human(report: &Report, examples: usize, require_relational: bool) {
+fn print_human(report: &Report, examples: usize, require_relational: bool, list_excluded: bool) {
     println!("Paren-authoring independence audit (logical re-association + relational chain)");
     println!(
         "  files: {} scanned, {} parse-error, {} read-error, {} output-reparse-error, {} ignore-directive (skipped), {} base-non-idempotent",
@@ -825,6 +905,16 @@ fn print_human(report: &Report, examples: usize, require_relational: bool) {
 parse-oracle question, not this gate's)",
         report.sites, report.sites_comment_bound, report.sites_parse_divergent,
     );
+    if list_excluded && !report.excluded_sites.is_empty() {
+        println!();
+        println!("  relational sites excluded (`--list-excluded`):");
+        for e in &report.excluded_sites {
+            println!(
+                "    {}:{}:{}  [{}] {}\n        {}",
+                e.path, e.line, e.column, e.kind, e.reason, e.twin
+            );
+        }
+    }
     println!();
     println!("  verdicts:");
     println!(
@@ -973,6 +1063,20 @@ fn print_json(report: &Report, require_relational: bool) {
         "sites": report.sites,
         "sites_comment_bound": report.sites_comment_bound,
         "sites_parse_divergent": report.sites_parse_divergent,
+        "excluded_sites": report
+            .excluded_sites
+            .iter()
+            .map(|e| {
+                serde_json::json!({
+                    "path": e.path,
+                    "line": e.line,
+                    "column": e.column,
+                    "kind": e.kind,
+                    "reason": e.reason,
+                    "twin": e.twin,
+                })
+            })
+            .collect::<Vec<_>>(),
         "counts": counts,
         "kind_counts": kind_counts,
         "relational_sites": report.relational_sites(),
@@ -1160,5 +1264,35 @@ mod tests {
         assert_eq!(kinds, ["< > chain", "< > operand"]);
         assert!(sites_of("const x = a < b;").is_empty());
         assert!(sites_of("const x = a > b > c;").is_empty());
+    }
+
+    /// The exclusion reason of every relational site in `source`, in enumeration order —
+    /// `None` for a site the run probes.
+    fn exclusions_of(source: &str) -> Vec<Option<&'static str>> {
+        let wire = tsv_parse_to_value(source, ParserType::TypeScript).expect("parses");
+        sites_of(source)
+            .iter()
+            .filter(|s| s.kind.is_relational())
+            .map(|s| {
+                ParenAuditCommand::twin_exclusion_reason(source, s, &wire, ParserType::TypeScript)
+            })
+            .collect()
+    }
+
+    /// The two exclusion reasons answer different questions, so the audit has to tell them
+    /// apart: `rejected` is tsv refusing a spelling the bare one accepts, `different tree` is
+    /// both spellings parsing and the shell moving the reading.
+    #[test]
+    fn the_two_exclusion_reasons_are_named_apart() {
+        // A shell whose content opens a type-argument region the bare twin does not, and
+        // whose body then fails to parse as a type: tsv rejects the twin.
+        assert!(exclusions_of("const g1 = p < keyof.a > (t, u);").contains(&Some("rejected")));
+        // A shell whose content parses as a type moves the reading instead.
+        assert!(
+            exclusions_of("const g2 = p < readonly.a > (t, u);").contains(&Some("different tree"))
+        );
+        // A chain whose twin neither moves nor rejects is probed, so the exclusion is keyed
+        // on the twin rather than on the class.
+        assert_eq!(exclusions_of("const g3 = p < b() > (t, u);"), [None, None]);
     }
 }

@@ -629,6 +629,14 @@ pub struct BinaryExpression<'arena> {
     /// `(fn < A[T]) > (t, u)` — synthesized and retained by `needs_parens`, which is the one
     /// reader of this field.
     ///
+    /// It is not the whole of that rule's condition, and the remainder is why this field is
+    /// a claim about the SOURCE rather than about every printed region. A `(` the printer
+    /// KEEPS around the `<` operand is a region head the scan never saw — the scan looked
+    /// THROUGH the shell, since the shells it was written for are ones the printer strips —
+    /// so `needs_parens` asks that half itself
+    /// (`relational_region_opens_on_a_kept_shell`), where the printed shape is known. The
+    /// two disjuncts partition the question; neither is derivable from the other.
+    ///
     /// Set LAZILY, at the `>` that would close the region rather than at the `<`: the
     /// verdict is a fact about the join of the two tokens, and a `<` with no `>` over it —
     /// every ordinary comparison — must not pay the scan. The node is already in the arena
