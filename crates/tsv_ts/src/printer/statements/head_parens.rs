@@ -4,8 +4,9 @@
 // Three questions, one concern:
 // - lookahead restrictions (`ExpressionStatement`'s `let [`, a for-of head's `let`) —
 //   dropping the paren changes what the statement IS, or stops it parsing
-// - declaration-starter ambiguity (`(type) as T;`) — tsv's parser commits to the
-//   declaration reading, so the bare form does not reparse
+// - declaration-starter ambiguity (`(type) as T;`, `(using) as T;`) — some parser that
+//   reads the output (tsv's own, tsc, acorn at ES2026) commits to the declaration
+//   reading, so the bare form does not reparse there
 // - directive-prologue avoidance (`('use strict');`) — a bare string statement in a
 //   `Program`/`BlockStatement` would become a directive
 //
@@ -38,35 +39,56 @@ fn strip_statement_casts<'a>(expr: &'a Expression<'a>) -> Option<&'a Expression<
     stripped.then_some(cur)
 }
 
-/// Contextual-keyword identifier names whose **bare** `<kw> as T` / `<kw> satisfies T`
-/// at statement position tsv's parser *rejects* — it commits to a declaration reading
-/// (`type <name> = …` alias, `module <name> { … }` namespace) and errors when no
-/// `=`/`{` follows. Dropping the source parens on `(type) as T` would make the output
-/// unreparseable, so the parens are kept.
+/// Identifier names whose **bare** `<kw> as T` / `<kw> satisfies T` at statement position
+/// some parser that reads tsv's output takes for the head of a DECLARATION — so the pair
+/// around the word is kept (and synthesized), and the cast reaches every reader as the
+/// expression it is. Where a reader objects, it rejects the bare form rather than rereading
+/// it as another program:
 ///
-/// This is deliberately tsv's reject-set, NOT prettier's full identifier list
-/// (parentheses/identifier.js also lists `await`/`yield`/`component`/`hook`).
-/// ⚠️ **The membership test is whether the parser rejects the word BARE at statement
-/// position — a rejection is the reason to KEEP the parens, not a reason the shape never
-/// reaches the formatter.** Only `await` is out for the strong reason: it never arrives
-/// at all (tsv rejects `(await)` itself at `Goal::Module`). `using` is out on purpose —
-/// tsv **accepts** bare `using as T` (a cast, per its acorn oracle) and keeps it bare, a
-/// deliberate divergence pinned by
-/// `typescript_specific/using/cast_prettier_divergence`; wrapping it would break that.
-///
-/// TODO: `yield` / `component` / `hook` are out only because their bare cast *reparses*
-/// — which is not the same as agreeing with prettier, and tsv does not: prettier keeps
-/// those parens, tsv strips them (`(yield) as never;` → `yield as never;`). That is an
-/// uncataloged divergence in either direction. Match prettier by adding the three
-/// (nothing else changes — they are ordinary identifiers), or sanction the strip with a
-/// `_prettier_divergence` fixture and a catalog entry.
+/// - `type` / `module` / `namespace` / `interface` / `let` — a declaration keyword
+///   (`type <name> = …`, `namespace <name> { … }`), which tsv's own parser commits to as
+///   well, so bare `namespace as T;` is one tsv cannot reparse;
+/// - `using` — an ES2026 `using` declaration binding a name `as` / `satisfies`, for tsc and
+///   for acorn at `ecmaVersion: 'latest'`. The canonical parsers run acorn at ES2025, where
+///   `using` is no keyword and the bare form is the cast tsv's parse follows; the pair is
+///   the spelling both editions read alike;
+/// - `accessor` / `readonly` — a modifier tsc reads ahead of a declaration at statement
+///   start (`Declaration or statement expected.`);
+/// - `yield` / `await` — a `yield` / `await` expression to tsc. Neither is an identifier in
+///   module code, so they arrive only through the format path's Script fallback;
+/// - `component` / `hook` — declaration keywords in prettier's Flow dialect; bare they
+///   reparse everywhere, and they are here only to keep prettier's pair (its
+///   `parentheses/identifier.js` list, which this set otherwise matches or widens).
 ///
 /// `let` is in the set for the cast position only; its other three positions are
 /// lookahead restrictions on the statement grammar rather than a declaration-starter
 /// ambiguity, and live in [`Printer::let_bracket_head_target`] /
 /// [`Printer::for_in_of_let_head_target`].
 fn is_statement_ambiguous_keyword(name: &str) -> bool {
-    matches!(name, "type" | "module" | "interface" | "let")
+    matches!(
+        name,
+        "type"
+            | "module"
+            | "namespace"
+            | "interface"
+            | "let"
+            | "using"
+            | "accessor"
+            | "readonly"
+            | "yield"
+            | "await"
+            | "component"
+            | "hook"
+    )
+}
+
+/// Identifier names whose bare cast heading a `for` INIT clause reads as a declaration head
+/// — `for (using as T; ;)` is a `using` declaration to tsc and to ES2026 acorn, and
+/// `for (let as T; ;)` a `let` one to tsc, which commits a `for (let` head on the keyword.
+/// Narrower than [`is_statement_ambiguous_keyword`]: the init is no statement start, so
+/// `type` / `namespace` / the modifiers are ordinary identifiers there.
+fn is_for_init_ambiguous_keyword(name: &str) -> bool {
+    matches!(name, "using" | "let")
 }
 
 impl<'a> Printer<'a> {
@@ -151,6 +173,25 @@ impl<'a> Printer<'a> {
         };
         (is_computed_member_object && self.with_ident_name(id, |name| name == "let"))
             .then_some(id.span)
+    }
+
+    /// The identifier a C-style `for` INIT clause must keep its parens around, or `None`:
+    /// the `let [` restriction the init shares with a statement
+    /// ([`Printer::let_bracket_head_target`]), or a word heading a cast chain that would
+    /// open a declaration there ([`is_for_init_ambiguous_keyword`]).
+    pub(in crate::printer) fn for_init_head_target(
+        &self,
+        expression: &Expression<'_>,
+    ) -> Option<Span> {
+        self.let_bracket_head_target(expression).or_else(|| {
+            match strip_statement_casts(expression) {
+                Some(Expression {
+                    kind: ExpressionKind::Identifier(id),
+                    ..
+                }) if self.with_ident_name(id, is_for_init_ambiguous_keyword) => Some(id.span),
+                _ => None,
+            }
+        })
     }
 
     /// The `let` identifier a for-in / for-of LEFT must keep its parens around, or `None`.
