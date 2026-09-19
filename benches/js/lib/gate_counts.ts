@@ -515,7 +515,18 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// to prettier's output, plus `typescript/arrow/16067.ts`, which moves toward prettier and
 	// keeps its bucket. An `--all` run against a baseline `--profile corpus` FFI build reads
 	// 5179 / `unknown` 68 with every other cell of every language as at the tip.
-	typescript: 5183,
+	//
+	// 5183 → 5184: `prettier/tests/format/typescript/arrow/issue-14563.ts` arrives from
+	// `unknown` — a curried chain whose `=` carries a `//` on the operator's line
+	// (`const myFunc =⏎// eslint-disable-next-line …⏎<T extends any>(a: T) =>⏎(b: string) => {}`)
+	// stacks its later heads one level under the first, as the comment-free chain does; tsv
+	// left them at the first head's column. Byte-identical to prettier's output now. The same
+	// hunk is the last unexplained one in `typescript/arrow/16067.ts`, which leaves `partial`
+	// for `known` (see `CORPUS_FORMAT_PARTIAL_PIN`). Measured by an `--all --json` bucket
+	// set-diff between a pre-change `--profile corpus` FFI build and the tip over the whole
+	// gates view: those two files are the only movers in any bucket of any language, `safety`
+	// stays 0, and the two CLIs' outputs for them differ in that one hunk each.
+	typescript: 5184,
 	// ⚠️ A short `svelte_styles` cache understates every css count at once and reads exactly
 	// like a regression: the harvest is a CORPUS INPUT, not a measurement of tsv, and a
 	// standalone `corpus:compare:format --all` is the one entry point that does not chain it
@@ -952,7 +963,11 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	//
 	// 68 → 64: the four curried-arrow-chain files named on `CORPUS_FORMAT_MATCH_MIN` leave for
 	// `match`. Reasoning and measurement there.
-	typescript: 64,
+	//
+	// 64 → 63: `prettier/tests/format/typescript/arrow/issue-14563.ts` leaves for `match` — the
+	// curried chain under an operator-line `//`. Reasoning and the bucket set-diff on
+	// `CORPUS_FORMAT_MATCH_MIN`.
+	typescript: 63,
 	// 23 → 18: five files LEAVE for `match` (`match` 133 → 138), all of them one language
 	// question — which reader prettier hands an at-rule prelude to, and what that reader
 	// does with the text inside a feature expression.
@@ -1084,7 +1099,12 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// conditional branches' own-line `//` now keep their lines, and the cataloged
 	// `comment_position` pattern claims part of what remains beside four hunks it does not.
 	// Reasoning and the byte A/B on `CORPUS_FORMAT_UNKNOWN_PIN`.
-	typescript: 23,
+	//
+	// 23 → 22: that same file leaves for `known` — its one unexplained hunk, a curried chain
+	// under an operator-line `//`, is FIXED (the later heads stack under the first), and what
+	// is left is the cataloged conditional-branch `comment_position` hunks. Reasoning and the
+	// bucket set-diff on `CORPUS_FORMAT_MATCH_MIN`.
+	typescript: 22,
 	// 9 → 8: `prettier/tests/format/css/parens/parens.css` leaves for `unknown` — its one
 	// explained hunk, the wrapped `progid:` value, is FIXED (tsv freezes the value as
 	// prettier does), leaving the five unexplained hunks it always carried. Reasoning and the
