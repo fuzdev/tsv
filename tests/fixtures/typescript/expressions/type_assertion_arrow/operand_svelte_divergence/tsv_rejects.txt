@@ -1,1 +1,1 @@
-An arrow function cannot be the operand of a type assertion
+cannot be an operand without parentheses

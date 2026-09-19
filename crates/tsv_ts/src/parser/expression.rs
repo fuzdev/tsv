@@ -17,7 +17,7 @@ use tsv_lang::source_scan;
 use tsv_lang::{ParseError, Span, TAB_WIDTH};
 
 use super::Parser;
-use super::expression_lookahead::{ArrowHead, matching_angle_close};
+use super::expression_lookahead::{ArrowHead, matching_angle_close, type_args_follower_refuses};
 use super::expression_type_args::TypeArgScan;
 use super::scan::{
     LeadingZeroLiteral, classify_leading_zero, parse_number_literal, skip_whitespace_and_comments,
@@ -540,6 +540,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // (`yield a || b`, `yield +c`) — so this fires only for a truly complete
         // head with no argument/body to absorb it.
         let leading_bare_head = is_bare_assignment_head(left, expr_start, self.in_yield);
+
+        // The same head is no OPERAND either. Above the assignment tier this parse is a
+        // unary operator's argument or a binary operator's right side — a
+        // `UnaryExpression` at the loosest — and `ArrowFunction` / `YieldExpression` are
+        // alternatives of `AssignmentExpression` alone (ecma262 §13.15), so `x + a => b`,
+        // `!a => b` and `x < async (a) => b` are syntax errors; parenthesized, the same
+        // head is a primary any operator takes.
+        if leading_bare_head && min_bp > BP_ASSIGNMENT {
+            return Err(ParseError::invalid_syntax(
+                "An arrow function or `yield` expression cannot be an operand without parentheses"
+                    .to_string(),
+                left.span().start as usize,
+            ));
+        }
 
         // Parse infix binary operators and TypeScript `as` / `satisfies` type
         // assertions in one precedence-climbing loop. `as` / `satisfies` bind at
@@ -1474,7 +1488,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         // An instantiation expression can't be followed by a property
                         // access (`f<T>.x`); a call or tagged template, which the loop
                         // below flattens into the expression, stays valid.
-                        self.reject_instantiation_property_access()?;
+                        self.reject_instantiation_follower()?;
                     } else {
                         break;
                     }
@@ -1547,11 +1561,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // acorn parses the heritage atom with `canBeArrow = false`, so an outer
                 // arrow isn't a valid superclass. A *parenthesized* arrow
                 // (`extends (a => b) {}`) is fine — there the arrow's own span starts
-                // past the `(`, so it differs from where the atom's parse began. Same test
-                // the prefix layer uses to seal parenthesized arrows.
-                if matches!(parsed.kind, ExpressionKind::ArrowFunctionExpression(_))
-                    && start == parsed.span().start as usize
-                {
+                // past the `(`, so it differs from where the atom's parse began
+                // (`is_bare_assignment_head`, the one spelling of that test).
+                if is_bare_assignment_head(parsed, start, false) {
                     return Err(self.error_msg(
                         "Arrow functions cannot be used as a class heritage expression",
                     ));
@@ -2087,26 +2099,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let type_annotation = self.parse_type()?;
         self.expect(&TokenKind::GreaterThan)?; // consume '>'
 
-        // Parse the expression - use high binding power since type assertion is prefix
-        let operand_start = self.current_pos().0;
+        // The operand is a UnaryExpression, parsed above the assignment tier — which is what
+        // rejects an unparenthesized arrow (`<T>x => x`), as TypeScript does.
+        // acorn-typescript instead backtracks and reads `<T>` as the arrow's type
+        // parameters (a deliberate, cataloged divergence — conformance_svelte.md §Type
+        // assertion vs. generic arrow). A *parenthesized* arrow (`<T>(() => {})`) stays a
+        // valid operand.
         let parsed = self.parse_expression_bp(BP_UNARY)?;
         let end = self.prev_token_end() as u32;
         debug_assert_encloses(start as u32, end, parsed, parsed);
-
-        // Reject an unparenthesized arrow operand (`<T>x => x`): the assertion
-        // operand is a UnaryExpression, which an arrow is not — TypeScript
-        // errors here. acorn-typescript instead backtracks and reads `<T>` as
-        // the arrow's type parameters (a deliberate, cataloged divergence —
-        // conformance_svelte.md §Type assertion vs. generic arrow). A
-        // *parenthesized* arrow (`<T>(() => {})`) stays a valid operand — same
-        // span-gap test the prefix layer uses to seal parenthesized arrows.
-        if matches!(parsed.kind, ExpressionKind::ArrowFunctionExpression(_))
-            && operand_start == parsed.span().start as usize
-        {
-            return Err(
-                self.error_msg("An arrow function cannot be the operand of a type assertion")
-            );
-        }
 
         Ok(alloc_expr(
             arena,
@@ -2171,20 +2172,34 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    /// Reject a property access immediately after a TypeScript instantiation
-    /// expression. A `f<T>` (and a bare `new A<T>` — type arguments with no call)
-    /// may not be followed by `.`/`?.` property access: acorn rejects `f<T>.x` /
-    /// `f<T>?.x` / `f<T>?.[x]` ("Invalid property access after an instantiation
-    /// expression"). Errors when the *current* token starts such an access — a `.`,
-    /// or a `?.` whose next token is not `(` (an optional *call* `f<T>?.()` stays
-    /// valid). A plain call (`f<T>()`) or tagged template (`` f<T>`x` ``) never
-    /// reaches this check. Shared by the subscript-loop and `new`-expression paths.
-    fn reject_instantiation_property_access(&mut self) -> Result<(), ParseError> {
+    /// Reject a token that may not follow a TypeScript instantiation expression — a
+    /// `f<T>`, or a bare `new A<T>` (type arguments with no call). Asked where the
+    /// *current* token is the one past the list's closing `>`; a plain call (`f<T>()`) or
+    /// tagged template (`` f<T>`x` ``) passes. Shared by the subscript-loop and
+    /// `new`-expression paths. Two classes reject:
+    ///
+    /// - a **property access** — a `.`, or a `?.` whose next token is not `(` (an optional
+    ///   *call* `f<T>?.()` stays valid): acorn rejects `f<T>.x` / `f<T>?.x` / `f<T>?.[x]`
+    ///   ("Invalid property access after an instantiation expression").
+    /// - a follower that makes the list's `>` a **comparison** — a `>`-led run, or a token
+    ///   that starts an expression on the same line (`type_args_follower_refuses`). The
+    ///   lookahead has already asked this of every head but a function type's, whose
+    ///   `(…) =>` has no comparison reading to fall back to, so this is where
+    ///   `f<(a: T) => U> + 1` and `f<() => U> >> c` are the syntax errors tsc and
+    ///   acorn-typescript call them.
+    fn reject_instantiation_follower(&mut self) -> Result<(), ParseError> {
         if matches!(self.current_kind(), TokenKind::Dot)
             || (matches!(self.current_kind(), TokenKind::QuestionDot)
                 && !self.peek_is(&TokenKind::ParenOpen))
         {
             return Err(self.error_msg("Invalid property access after an instantiation expression"));
+        }
+        if type_args_follower_refuses(
+            self.source.as_bytes(),
+            self.prev_end,
+            self.current.start as usize,
+        ) {
+            return Err(self.error_msg("Type arguments cannot be followed by this token"));
         }
         Ok(())
     }
@@ -2572,6 +2587,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
         };
 
+        // A bare arrow is an `AssignmentExpression`, never the `MemberExpression` a `new`
+        // callee is: `new () => a` is a syntax error where `new (() => a)` constructs.
+        if is_bare_assignment_head(callee_parsed, callee_start as usize, false) {
+            return Err(ParseError::invalid_syntax(
+                "An arrow function cannot be a `new` callee without parentheses".to_string(),
+                callee_start as usize,
+            ));
+        }
+
         // Parse member access chains: new Foo.Bar.Baz()
         let mut callee = callee_parsed;
         // `<T>` in the callee chain belongs to a trailing tagged template
@@ -2684,7 +2708,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // `new A<T>()` took the `(` branch above, so its later `.prop` is an
                 // ordinary member access.
                 if type_arguments.is_some() {
-                    self.reject_instantiation_property_access()?;
+                    self.reject_instantiation_follower()?;
                 }
                 let end = type_arguments
                     .as_ref()

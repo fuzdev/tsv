@@ -696,39 +696,72 @@ pub(super) fn scan_for_closing_angle_bracket(bytes: &[u8], pos: usize, scan: Typ
         None => false,
         Some(close) => {
             let after = skip_whitespace_and_comments(bytes, close + 1);
-            if after >= bytes.len() {
-                return true;
+            if type_args_close_run_follows(bytes, after) {
+                return false;
             }
-            // A `>`-led follow token means the `>` we matched as the close was
-            // really the first `>` of a longer relational/shift run: acorn re-reads
-            // `a<b>>c` as `a < (b >> c)` and `a<b>>>c` as `a < (b >>> c)` (its
-            // `tsMatchRightRelational` / bitShift bail), never `(a<b>) > c`. So a
-            // `>` here disqualifies the type-argument reading — except when the run
-            // is immediately closed by `=` (`>=` / `>>=`), which acorn keeps as an
-            // instantiation follow (`f<T> >= c` is `(f<T>) >= c`).
-            if bytes[after] == b'>' {
-                let mut run = after;
-                while run < bytes.len() && bytes[run] == b'>' {
-                    run += 1;
-                }
-                return bytes.get(run) == Some(&b'=');
-            }
-            // Otherwise: a token that can start an expression (with no intervening
-            // line break) makes this `>` a comparison operator (acorn's
-            // `tokenCanStartExpression && !hasPrecedingLineBreak` bail). `(` (call),
-            // a template (tagged template), and other non-expression tokens (`;`,
-            // `,`, `)`, `.`, an operator…) continue the instantiation — and across a
-            // line break an expression-starting token leaves the `<…>` an instantiation
-            // too, whether it then begins a new statement via ASI (`x<y>⏎c`) or continues
-            // as an operand (`x<y>⏎+1`). The whole follower split, tsc's beside acorn's, is
-            // in `docs/conformance_prettier_ts.md` §Relational chain type-argument parens.
-            if !scan.reads_source_as_written() {
-                return true;
-            }
-            !starts_expression_after_type_args(bytes, after)
-                || has_line_terminator_between(bytes, close + 1, after)
+            // Past the `>`-led run, the follower is the half [`TypeArgScan::Relex`] skips.
+            !scan.reads_source_as_written()
+                || !expression_follows_type_args_close(bytes, close + 1, after)
         }
     }
+}
+
+/// Whether the token at `after` — the first past a type-argument list's closing `>` — is a
+/// `>`-led run that makes that close the first `>` of a longer relational/shift token:
+/// acorn re-reads `a<b>>c` as `a < (b >> c)` and `a<b>>>c` as `a < (b >>> c)` (its
+/// `tsMatchRightRelational` / bitShift bail), never `(a<b>) > c`. The exception is a run
+/// closed by `=` (`>=` / `>>=`), which acorn keeps as an instantiation follow
+/// (`f<T> >= c` is `(f<T>) >= c`).
+fn type_args_close_run_follows(bytes: &[u8], after: usize) -> bool {
+    if bytes.get(after) != Some(&b'>') {
+        return false;
+    }
+    let mut run = after;
+    while bytes.get(run) == Some(&b'>') {
+        run += 1;
+    }
+    bytes.get(run) != Some(&b'=')
+}
+
+/// Whether the token at `after`, the first past a type-argument list that ended at
+/// `close_end`, makes the list's `>` a comparison operator: a token that can start an
+/// expression, with no line break before it (acorn's
+/// `tokenCanStartExpression && !hasPrecedingLineBreak` bail). `(` (call), a template
+/// (tagged template), and other non-expression tokens (`;`, `,`, `)`, `.`, an operator…)
+/// continue the instantiation — and across a line break an expression-starting token
+/// leaves the `<…>` an instantiation too, whether it then begins a new statement via ASI
+/// (`x<y>⏎c`) or continues as an operand (`x<y>⏎+1`). The whole follower split, tsc's
+/// beside acorn's, is in `docs/conformance_prettier_ts.md` §Relational chain type-argument
+/// parens.
+fn expression_follows_type_args_close(bytes: &[u8], close_end: usize, after: usize) -> bool {
+    after < bytes.len()
+        && starts_expression_after_type_args(bytes, after)
+        && !has_line_terminator_between(bytes, close_end, after)
+}
+
+/// Whether the token at `after` REFUSES the type-argument list that ended at `close_end` —
+/// the follower half of [`scan_for_closing_angle_bracket`]'s [`TypeArgScan::Parse`]
+/// reading, for the parser to ask once the list is parsed and its close is known.
+///
+/// Every head but one has been asked already: its lookahead reached the close and read this
+/// follower before committing. A FUNCTION-TYPE head commits without it
+/// (`is_type_arguments_start`'s `(` and `<` arms), because `(…) =>` behind a `<` has no
+/// comparison reading to fall back to — so where the follower refuses, no reading is left
+/// at all and the parser rejects (`f<(a: T) => U> + 1`, `f<() => U> >> c`), as tsc and
+/// acorn-typescript both do.
+///
+/// `as` and `satisfies` are the one place the two oracles part on such a head, and the one
+/// word this differs from the scan on. To tsc they are binary operators, which continue an
+/// instantiation (`f<(a: T) => U> as C`); acorn-typescript lexes them as plain names, which
+/// start an expression. The scan follows acorn because a plain head has the chain acorn
+/// reads (`a < b > as`); a function-type head has none, so the compiler's reading is the
+/// only one there is.
+pub(super) fn type_args_follower_refuses(bytes: &[u8], close_end: usize, after: usize) -> bool {
+    if type_args_close_run_follows(bytes, after) {
+        return true;
+    }
+    !(is_word_at(bytes, after, b"as") || is_word_at(bytes, after, b"satisfies"))
+        && expression_follows_type_args_close(bytes, close_end, after)
 }
 
 /// Whether `pos` (the first byte after an inner `<` that directly follows a
