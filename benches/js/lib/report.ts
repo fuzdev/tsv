@@ -7,7 +7,6 @@ import { benchmark_format_number } from '@fuzdev/fuz_util/benchmark_format.ts';
 import { time_format, time_unit_detect_best, TIME_UNIT_DISPLAY } from '@fuzdev/fuz_util/time.ts';
 
 import { CANONICAL_FORMATTER_ROW, CANONICAL_PARSER_ROWS, type Language } from './types.ts';
-import type { GroupOmissions } from './perf_omit.ts';
 import { OXC_WASI_BINDING } from './versions.ts';
 
 /** Results from a benchmark group */
@@ -207,7 +206,7 @@ export function parse_payload_tier(name: string): PayloadTier | null {
  * The PARSE rows in `names` with no `PARSE_PAYLOAD_TIERS` entry — each would
  * publish `payload: null`, which a consumer can only read as "unknown".
  *
- * The fourth registry-checked list in this module, on `DISPLAY_ORDER`'s terms: asked
+ * The third registry-checked list in this module, on `DISPLAY_ORDER`'s terms: asked
  * of the rows a surface DEFINES, one direction only, and a warning at the call site.
  */
 export function rows_missing_from_payload_tiers(parse_names: Iterable<string>): string[] {
@@ -975,8 +974,11 @@ function format_ratio(r: number): string {
  * The last column is the same ratio taken over the MEDIANS (`baseline p50 / row
  * p50`). The mean is the right rate estimator and stays the headline — on a
  * stationary row the two agree to a fraction of a percent — so the second column is
- * a reading aid, not a second claim: where they part, one side's sweep times are
- * skewed (a GC tail, a row still warming), and the gap says which cells lean on it.
+ * a reading aid, not a second claim. The two differ on TWO axes, not one: the library
+ * takes `mean_ns` over the MAD-cleaned timings and the percentiles over the RAW ones,
+ * so where they part, either one side's sweep times are skewed (a row still warming)
+ * or the cleaner removed a tail or a second mode the median still sees — read the gap
+ * beside that row's `outlier_ratio` / `cv_raw`, which say which.
  */
 export function generate_group_bench_table_markdown(
 	results: BenchmarkResult[],
@@ -1033,7 +1035,8 @@ export function generate_group_bench_table_markdown(
 		const is_baseline = row_index === baseline_index;
 		const speedup = r.stats.ops_per_second / baseline_ops;
 		const vs_cell = is_baseline ? 'baseline' : format_ratio(speedup);
-		const vs_p50_cell = is_baseline ? '—' : format_ratio(baseline_p50_ns / r.stats.p50_ns);
+		// `baseline`, not `—`: in this table a dash already means "too few samples".
+		const vs_p50_cell = is_baseline ? 'baseline' : format_ratio(baseline_p50_ns / r.stats.p50_ns);
 		// p95/p99 from <10 samples is essentially `max` (R-7 interpolation
 		// collapses to the last sorted index). Render `—` so readers don't
 		// misread interpolated noise as tail-latency data.
@@ -1431,35 +1434,6 @@ export function generate_group_coverage_markdown(
 	// Section presence already signals "some impl skipped"; per-row ⚠ added
 	// no signal when every row was sub-100% (the common case).
 	return format_coverage_line(entries);
-}
-
-/**
- * Per-group line naming what the intersection LEFT OUT — the same fact the
- * `Coverage:` line implies, stated for the GROUP: a file one row fails leaves every
- * row's timed set, so this is the share of the group no published number here
- * measured. Bytes lead, because a file count understates it (one harvested
- * stylesheet is a tenth of `format/css`). `null` when nothing was omitted.
- */
-export function generate_group_omissions_markdown(
-	omissions: GroupOmissions | undefined
-): string | null {
-	if (!omissions || omissions.omitted_files === 0) return null;
-	const share = (part: number, whole: number): string =>
-		whole === 0 ? '0%' : `${((part / whole) * 100).toFixed(1)}%`;
-	const tools = omissions.by_tool
-		.map((t) => {
-			const categories = Object.entries(t.categories)
-				.map(([category, count]) => `${count} ${category}`)
-				.join(', ');
-			return `${t.name} ${t.files} (${categories})`;
-		})
-		.join('; ');
-	return (
-		`**Omitted from every row’s timed set:** ${omissions.omitted_files} of ` +
-		`${omissions.files_total} files, ${share(omissions.omitted_bytes, omissions.bytes_total)} ` +
-		`of the group’s bytes (${share(omissions.omitted_files, omissions.files_total)} of its ` +
-		`files) — by row: ${tools}. Each is a reviewed entry in \`lib/perf_omit.ts\`.`
-	);
 }
 
 /**

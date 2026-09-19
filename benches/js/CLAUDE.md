@@ -127,7 +127,7 @@ delta on the same row is the detector.
   or raw cv passed 10% or whose `drift` passed 5%, collected AHEAD of the sample
   gate — a measured 48% on five timings needs no minimum n to be believed, and the
   gate had silenced exactly that cell — marked `⚠` in the tables and on stderr.
-  The bench floors iterations at 8 and drives the rest from
+  The bench floors iterations at 8 (16 on the canonical rows) and drives the rest from
   `duration_ms`, so sample count spans two orders of magnitude inside one table and
   roughly 20 of 44 rows per runtime sit under ten; this test consumes cv in the direction
   where an UNDERestimate is expensive, since it would report a real runtime
@@ -665,7 +665,7 @@ BENCH_WARMUP_MS=2000    # this many ms (default: 5000), sized from its own pre-f
                         # count left fast rows still tiering inside the measured window (negative
                         # drift on every runtime), and JSC keeps tiering for seconds, so 1 s was not
                         # enough for bun. There is no slow-task tier any more: one protocol per row
-                        # on every runtime (floor 8, 5 s budget, warmup ≥ 5 s)
+                        # on every runtime (floor 8 — 16 on the canonical rows — 5 s budget, warmup ≥ 5 s)
 BENCH_MODE=union        # per-impl iteration (default: intersection)
 BENCH_CORPUS=conformance  # corpus/surface selector (default: perf)
 BENCH_STALE_OK=1        # run despite stale artifacts (default: off)
@@ -706,8 +706,8 @@ node-only by design** (`BENCH_COVERAGE_ONLY=1`): coverage is a pre-flight produc
 so the timed phase is skipped, and it's runtime-invariant (same parser engine — the
 site folds a tool's native/wasm variants into one per-engine row), so one node run
 is the whole surface. Entries carry null timing; no throughput/comparison sections;
-baseline save/compare are no-ops. Skipping the timed phase reclaims a fixed ≥8
-full-corpus sweeps/row (≥3 warmup + ≥5 measured) that no consumer reads. The timed
+baseline save/compare are no-ops. Skipping the timed phase reclaims a fixed floor of
+full-corpus sweeps per row (the warmup floor plus the measured one) that no consumer reads. The timed
 parse-throughput over this adversarial corpus has no consumer, so no task produces
 it; to investigate ad-hoc run `BENCH_CORPUS=conformance node benches/js/bench.ts`
 (coverage flag unset) — it overwrites `report.conformance.node.*`, so re-run
@@ -831,8 +831,10 @@ below, field for field and version note for version note, so a new top-level fie
 here is a change there too — it declares them optional and degrades on an older
 report, which is what makes the drift silent rather than loud.
 
-The committed JSON (per-runtime `version: 16` — the combined compose report carries
-its own version; coverage-only runs add `coverage_by_source`) carries, beyond
+The report JSON (per-runtime schema `version: 16`, `bench.ts` `REPORT_SCHEMA_VERSION` —
+a committed report says which version wrote it, and lags the schema until the next
+refresh; the combined compose report carries its own version; coverage-only runs add
+`coverage_by_source`) carries, beyond
 timing stats: top-level
 `runtime`; a `machine` block (`cpu_model` + `os`/`arch` + `runtime_version` — the
 numbers are machine-relative, so this travels with them; excludes hostname and
@@ -899,11 +901,12 @@ is identifiable by `files_iterated: null` — it was timed on nothing, rather th
 timed on the group's intersection. A consumer that reads `entries[]` as speeds must
 skip a row with null `ops_per_second`, not treat it as a zero. Top-level
 `suppressed_noise` records silenced third-party stderr crashes as `{pattern:
-count}`; top-level `omissions` (perf surface, from `version` 16) records, per timed
+count}`; top-level `omissions` (perf surface, intersection mode, timed runs — from
+`version` 16, absent elsewhere) records, per timed
 group, what the intersection LEFT OUT — files and BYTES against the group's totals,
 and each row's failures by `PerfOmitCategory` — because a file any timed row fails
-leaves EVERY row's timed set, and a file count understates it (one harvested
-stylesheet is about a tenth of `format/css`'s bytes); a group nothing failed is
+leaves EVERY row's timed set, and a file count understates it (a harvested
+per-collection stylesheet is ONE file); a group nothing failed is
 listed with zeroes, and the `.md` prints the same fact as an **Omitted from every
 row's timed set** line under the group. Each parse `entries[]` row also carries a
 `payload` tier (`report.ts` `PayloadTier`, a registry-checked table like
@@ -983,24 +986,26 @@ silent. One absence is exempt — an **added** row whose impl
 never initialized is this machine coming up short (already in `unavailable`), so the
 run warns and drops that line instead of failing.
 
-**Two more registry-checked claims, both warnings.** `report.ts` holds two checked
+**Three more registry-checked claims, all warnings.** `report.ts` holds three checked
 hand-maintained lists that a new impl has to reach, and each is asked the same
 availability-independent question at init (`get_defined_rows`), one direction only
 (a listed row absent from a surface is not drift — each surface registers its own
 subset): `DISPLAY_ORDER`, where an unlisted row sorts silently to the end of every
-table (`rows_missing_from_display_order`), and `COMPARISON_SECTIONS` — the
+table (`rows_missing_from_display_order`); `COMPARISON_SECTIONS` — the
 Comparisons tables' per-tier opponent lists — where an unlisted row gets no
 comparison cell at all (`rows_missing_from_comparisons`, cleared by an entry in
-`COMPARISON_EXCLUSIONS` for a row that belongs in none). Both WARN rather than
+`COMPARISON_EXCLUSIONS` for a row that belongs in none); and `PARSE_PAYLOAD_TIERS`,
+where an unlisted PARSE row publishes `payload: null`
+(`rows_missing_from_payload_tiers`). All three WARN rather than
 throw: an absent row understates a table, where a stale `SURFACE_DISCLOSURES`
 sentence asserts something false. The comparison guard exists because its drift is
-the quietest of the three — a missing cell looks like nothing — and `swc`,
+the quietest of them — a missing cell looks like nothing — and `swc`,
 `postcss`, `rsvelte-parse` and `malva-wasm` were each registered, preflighted and
 timed at full coverage while appearing in no comparison. A section's opponents each
 carry their own fairness note, rendered iff that opponent produced a cell, so the
 prose can't drift from the table either.
 
-A **third** row list in the same module is deliberately unchecked: the curated
+A **fourth** row list in the same module is deliberately unchecked: the curated
 payload-matched lines in `generate_summary_report` (`tsv-json-no-locations` vs
 `oxc-parser`, and the rest). Its membership is an ARGUMENT — this tsv wire and
 that opponent emit the same product — not a completeness claim: most rows have no
@@ -1143,9 +1148,12 @@ only and only as a diff against the snapshot (below). **SAFETY (content loss) ga
   framing is the source of truth for the public benchmark page's "What's measured"
   prose — keep them in sync.** Because it's code that ships, every in-scope tool must
   process every file: after the perf pre-flight, `bench.ts` HARD-FAILS on any
-  per-file failure not excused by `lib/perf_omit.ts` (`PERF_OMITS` — kept minimal;
-  the current entries all tolerate third-party limitations on declaration-file-only
-  syntax, e.g. acorn-typescript has no `.d.ts` mode). A silent skip would let
+  per-file failure not excused by `lib/perf_omit.ts` (`PERF_OMITS` — kept minimal,
+  each entry typed by why the tool fails: a rival's own limit on declaration-file
+  syntax (acorn-typescript has no `.d.ts` mode), syntax it does not implement (biome's
+  experimental HTML path on real Svelte), the bench's synthetic `file.ts` name, a
+  harvest artifact — and never a failure of tsv's own, which `perf_omit_test.ts` pins
+  by the rows an entry can reach as well as by its label). A silent skip would let
   coverage quietly erode; that invariant is what makes the perf/conformance split
   meaningful. The list is a **RATCHET**, graded in both directions: a full-corpus
   run also fails on an entry that excused NOTHING, the same ledger-freshness
@@ -1330,8 +1338,8 @@ benches/js/
     ├── oxc_wasm.ts        # OXC WASM wrapper (oxc-parser via wasm32-wasi; per-runtime entry)
     ├── parse_sanctions.ts # Shared parse-parity vocabulary: Sanction (keep) + KnownGap (fix)
     ├── perf_omit.ts       # PERF_OMITS — the only excused per-file failures on the perf view, each
-    │                      # typed by WHY the tool fails (`category`) and HOW the refusal arrives
-    │                      # (`failure`) — plus the per-group omissions summary the report publishes
+    │                      # typed by WHY the tool fails (`category`) — plus the per-group
+    │                      # omissions summary the report publishes
     │                      # (unit-tested by perf_omit_test.ts, which also pins that no entry
     │                      # tolerates a failure of tsv's own)
     ├── postcss.ts         # postcss wrapper (parse-only, CSS — the parser behind prettier's CSS printer)

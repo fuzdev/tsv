@@ -255,8 +255,8 @@ Things the published numbers measure that aren't quite what they look like.
   mostly already formatted, output equal to input is the expected result, so the
   last kind is invisible unless the wrapper reads the diagnostics. Every wrapper
   therefore proves at init that an invalid source is still REPORTED through the
-  call its row makes (`lib/reject_probe.ts`; the diagnostic readers keep theirs
-  beside the reader, `lib/oxc.ts` and `lib/biome.ts`), and a failed probe withdraws
+  call its row makes (`lib/reject_probe.ts`, at every language and parse goal the
+  row is handed), and a failed probe withdraws
   the impl's rows into `unavailable`. One refusal needed switching on rather than
   reading: prettier-plugin-svelte echoes an embedded `<script>` or `<style>` it
   could not format and returns normally — in the baseline, and in oxfmt's bundled
@@ -270,8 +270,10 @@ Things the published numbers measure that aren't quite what they look like.
   cost) because overhead is inherently a slowdown ratio. Every `Nx` is a ratio of
   MEANS — the right rate estimator — and each group table carries the same ratio
   over the medians beside it (`by p50`) as a reading aid: on a stationary row the
-  two agree to a fraction of a percent, and where they part one side's sweep
-  times are skewed. A ratio between two PARSE rows also integrates what each hands
+  two agree to a fraction of a percent. The means are over the MAD-cleaned timings
+  and the medians over the raw ones, so where they part either one side's sweep
+  times are skewed or the cleaner removed a tail the median still sees — read the
+  gap beside that row's `outlier_ratio` and `cv_raw`. A ratio between two PARSE rows also integrates what each hands
   JS, so every parse row carries a `payload` tier in the JSON (`drop_in`,
   `span_only`, `own_shape`, `none` — `lib/report.ts` `PayloadTier`): two rows are
   payload-matched iff their tiers are equal and not `own_shape`.
@@ -326,7 +328,7 @@ Things the published numbers measure that aren't quite what they look like.
   p90 rather than a round number (the live rows are each committed report's §Unstable
   Rows; a value restated here only goes stale). The cleaned cv is not the whole test:
   a row is also unstable on its RAW cv (a second mode the MAD cleaner deleted) or on a
-  `drift` past 5% (the second half of its timings against the first) — the 2026-09-14
+  `drift` past 5% (the second half of its timings against the first) — one
   refresh's `format/typescript/biome-wasm` under Node ran four ~4.9 s sweeps and three
   ~12.5 s ones as biome's wasm heap leaked past ~1 GB, and the cleaner's keep-closest
   fallback published a mean that was neither mode; at most other sample counts the
@@ -346,7 +348,9 @@ Things the published numbers measure that aren't quite what they look like.
   denominator of every ratio), and a cv from a handful of timings that happen to
   agree is not evidence of quiet — which is what leaves the multi-second
   alternative rows (oxfmt on svelte and typescript, at n=8) unclassified while the
-  canonical rows' floor clears the ten-timing bar.
+  canonical rows' floor of 16 is there to clear the ten-timing bar — a floor on RAW
+  timings, where the bar reads cleaned ones, so it clears it at the outlier ratios
+  these rows show rather than by construction.
 - **Per-iteration forced GC** — off by default (`BENCH_GC=1` makes the bench call
   `globalThis.gc()` between every iteration), and not a uniform bias. Measured on a BENCH_LIMIT=20 / 500ms / WARMUP=2 sample: low-
   allocation paths are penalized heavily (`tsv-internal` 1.4–1.7× slower with the
