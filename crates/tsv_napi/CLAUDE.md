@@ -141,8 +141,10 @@ addon — and execs it, forwarding argv, stdio, exit codes, and signals
 verbatim. So `npx tsv format src` on this package gets the native CLI's exact
 contract: real `--jobs` parallelism, parallel discovery, native error paths.
 The dispatch never loads the addon (it resolves the package and probes the
-file, ~1 ms on top of Node's ~20 ms startup) and never reads PATH — only this
-package's own optionalDependency. When no binary is reachable, `bin.js`
+file, ~1 ms) and never reads PATH — only this package's own
+optionalDependency. End to end the bin is the raw binary plus ~30 ms: Node's
+~20 ms startup, then ~10 ms of the dispatcher's own ES-module entry, `node:`
+imports, resolve, and spawn. When no binary is reachable, `bin.js`
 defers to `cli.js` — `tsv_wasm/npm/cli.js`, the shared JS mirror of the same
 contract, copied in at stage time; it imports its engine from `./index.js`,
 so the copy binds to the native loader with no adapter. Its `--jobs` is real
