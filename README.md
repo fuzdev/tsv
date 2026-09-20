@@ -23,8 +23,8 @@ bridging to JS or WASM plugins is an open question (leaning against).
 
 Compared to [rsvelte](https://github.com/baseballyama/rsvelte),
 tsv has its own TS/JS/CSS parsers instead of using Oxc,
-and rsvelte additionally has a compiler and linter/typechecker integration
-(tsv has some in-progress work here, scope unknown, may never ship).
+and rsvelte additionally has a Svelte compiler and linter/typechecker integration
+(the full toolchain; tsv has some in-progress work here, scope unknown and may never ship).
 
 tsv prioritizes, in order:
 
