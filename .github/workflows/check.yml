@@ -69,7 +69,7 @@ jobs:
       # whenever a new Rust release adds a nursery lint. Edition 2024 needs
       # >= 1.85. Bump deliberately.
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (no semver tags; bump manually)
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master (no semver tags; bump manually)
         with:
           toolchain: 1.94.1
           components: clippy, rustfmt
@@ -137,7 +137,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (no semver tags; bump manually)
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master (no semver tags; bump manually)
         with:
           toolchain: 1.94.1
           targets: wasm32-unknown-unknown
@@ -153,7 +153,7 @@ jobs:
       # the size gate on an unrelated binaryen release. Bump the SHA and wasm-pack
       # version manually.
       - name: Install wasm-pack
-        uses: taiki-e/install-action@c3ec0de9ae7f1019cea21aa96aa0a895b9552063 # v2.87.9
+        uses: taiki-e/install-action@26e9283f268b880168bdbd2c545dfcd60ec2c6ab # v2.87.13
         with:
           tool: wasm-pack@0.15.0
 
@@ -244,7 +244,7 @@ jobs:
 
       # Same pin as `check`; no clippy/rustfmt components — lints gate on ubuntu.
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (no semver tags; bump manually)
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master (no semver tags; bump manually)
         with:
           toolchain: 1.94.1
 
