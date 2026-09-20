@@ -37,9 +37,9 @@ Staying simple is an over-arching goal, and sometimes at odds with flexibility.
 Feedback is welcome to help navigate these tradeoffs.
 
 See the [benchmarks](https://tsv.fuz.dev/docs/benchmarks) for measurements.
-Compared to Oxc and Biome, tsv is smaller and faster
+Compared to Oxc/oxfmt and Biome, tsv is smaller and faster
 at parsing and formatting its supported languages,
-but lacks their features and broad language support.
+but lacks their features, extensibility, and broad language support.
 One reason for tsv to exist is to help find the performance bonuses
 left on the table in the Web ecosystem's increasingly-native implementations.
 
