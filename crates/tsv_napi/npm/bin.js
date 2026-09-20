@@ -10,8 +10,11 @@
  * platform that path ends at the loader's error pointing at the WASM package.
  *
  * The binary is resolved from this package's own optionalDependency, never
- * from PATH, and the probe never loads the addon — dispatch costs ~1 ms on
- * top of Node's own startup.
+ * from PATH, and the probe never loads the addon — the resolve and probe cost
+ * ~1 ms. The dispatcher as a whole costs ~10 ms over a bare `node -e ""`
+ * (the ES-module entry and the `node:` imports below, then the resolve and the
+ * spawn), so `tsv` through this bin is the raw binary plus ~30 ms: Node's own
+ * ~20 ms startup and that.
  */
 
 import { spawnSync } from 'node:child_process';
