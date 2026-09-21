@@ -552,7 +552,7 @@ prettier. Load-bearing on two axes:
   language at once. The pins are proven to land at `init`, **per language** — the
   sections are separate, so proving one proves only its own row, and the svelte
   probe is also what catches a lost `experimentalFullSupportEnabled` (biome then
-  returns empty output, which a timed row reads as success). See the pinning bullet
+  returns only the formatted `<script>`, which a timed row reads as success). See the pinning bullet
   in [Fairness caveats](#fairness-caveats). Like oxc it does not throw its verdict:
   `formatContent` formats only a file with no syntax diagnostics and otherwise hands
   the **input back unformatted**, so an accept is defined as "no FATAL diagnostic"
@@ -679,12 +679,12 @@ prettier. Load-bearing on two axes:
   over the conformance CSS corpus, postcss lands marginally *above* it — and the
   gap is two-sided: postcss **rejects** a handful of files `parseCss` accepts
   (genuinely invalid CSS — `//` comments, a missing semicolon), and **accepts**
-  more that `parseCss` rejects, most of them valid modern CSS Svelte's parser
-  simply doesn't implement (`@supports selector(…)`, `css-mixins` dashed
-  functions) rather than anything malformed. A smaller share is preprocessor
-  syntax living in prettier's `.css` fixtures (SCSS `@extend`, `@apply`, the
-  `postcss-plugins/` cases), which postcss parses structurally because it does not
-  validate at-rule preludes at all. tsv is a drop-in for `parseCss` and tracks it
+  more that `parseCss` rejects, much of it valid modern CSS Svelte's parser
+  simply doesn't implement (`css-mixins` rules and dashed functions, a quoted
+  `:lang("…")`, a `{ … }` custom-property value) rather than anything malformed.
+  A smaller share is preprocessor syntax living in prettier's `.css` fixtures
+  (SCSS `@extend`, `@apply`, the `postcss-plugins/` cases), which postcss parses
+  structurally because it does not validate at-rule preludes at all. tsv is a drop-in for `parseCss` and tracks it
   by design, so a postcss row above tsv is neither a tsv gap nor postcss laxity —
   it is two different grammars, and the per-source coverage table is what keeps
   them legible. `deno task css:over-acceptance` is the axis itself — every

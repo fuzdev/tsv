@@ -83,7 +83,8 @@ export const RESET_GROWTH_BYTES = 16 * 1024 * 1024;
  * dedicated Svelte formatter — `html.experimentalFullSupportEnabled` is what lets
  * it format `.svelte` at all, via its experimental HTML-superset pipeline; that
  * path formats the embedded `<script>`/`<style>` too (verified), so the svelte row
- * is comparable work to prettier-plugin-svelte / tsv. Without the flag biome skips it.
+ * is comparable work to prettier-plugin-svelte / tsv. Without the flag biome returns
+ * only the formatted `<script>`, dropping the markup and `<style>`.
  *
  * Applied on every fresh workspace (`reset_heap`), not just at init.
  */
@@ -245,8 +246,9 @@ export class BiomeImplementation extends BaseImplementation {
 		// `javascript` section and leaves `css` and `html` — the CSS and svelte rows —
 		// free to un-pin silently, which is the failure this check exists to catch. The
 		// svelte pass doubles as the only guard on `experimentalFullSupportEnabled`:
-		// without it biome returns an EMPTY string for `.svelte`, which the timed row
-		// would otherwise score as a successful format.
+		// without it biome returns only the formatted `<script>` for `.svelte` (an
+		// EMPTY string for the script-less probe), which the timed row would otherwise
+		// score as a successful format.
 		//
 		// ⚠️ Per-language coverage, impl-wide COST — the same shape `lib/oxc.ts` carries
 		// for its two tools: the registry's unit of absence is the impl, so a probe
