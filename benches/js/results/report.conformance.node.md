@@ -6,7 +6,7 @@
 
 **Corpus kind:** conformance — fixtures-only corpus (disjoint from perf; Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)
 
-**Date:** 2026-09-19T23:05:48.534Z — tsv 0.4.1 (8837350f)
+**Date:** 2026-09-21T18:40:22.743Z — tsv 0.4.1 (939b51f8)
 
 **Corpus:** 4621 Svelte (1.1 MB), 53955 TypeScript (70.9 MB), 22643 CSS (7.7 MB) — 81219 files, 79.7 MB total
 
@@ -84,8 +84,11 @@
 | rsvelte-fmt (binary) | 8.9 MB | 3.5 MB | 2.4x | 2.1x |
 | rsvelte compiler (napi) | 17.6 MB | 7.4 MB | 4.7x | 4.3x |
 | swc (napi) | 32.7 MB | 12.2 MB | 8.7x | 7.2x |
+| svelte + acorn-typescript parsers (js bundle) | 497.2 KB | 124.0 KB | 0.2x | 0.1x |
+| prettier + svelte plugin (js bundle) | 2.2 MB | 566.1 KB | 0.9x | 0.6x |
+| prettier + parsers (js bundle) | 2.2 MB | 566.3 KB | 0.9x | 0.6x |
 
-_`vs tsv` divides native rows by `tsv (napi)` — the binding this runtime benchmarks (FFI under Deno, N-API under Node/Bun), so the same artifact reads a different ratio in the deno and node/bun reports — and wasm rows by `tsv-wasm`. Gzipped ≈ the artifact’s wire size (`gzip -c`, system default level; the `tsv (napi)` platform package also ships the `tsv` CLI binary, so its tarball is larger than this row). `vs tsv (gz)` compares gzipped bytes; `vs tsv` compares raw on-disk bytes._
+_`vs tsv` divides native rows by `tsv (napi)` — the binding this runtime benchmarks (FFI under Deno, N-API under Node/Bun), so the same artifact reads a different ratio in the deno and node/bun reports — and wasm and js-bundle rows by `tsv-wasm`, the portable artifact a JS bundle stands beside. Gzipped ≈ the artifact’s wire size (`gzip -c`, system default level; the `tsv (napi)` platform package also ships the `tsv` CLI binary, so its tarball is larger than this row). `vs tsv (gz)` compares gzipped bytes; `vs tsv` compares raw on-disk bytes. The `js bundle` rows are SYNTHESIZED, not shipped: the canonical tools publish no single artifact, so each is a minified, tree-shaken bundle of the minimum one capability needs (`benches/js/size_bundles/`), built by `deno bundle` during this run._
 
 ## Skipped Files
 

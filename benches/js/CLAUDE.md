@@ -831,7 +831,7 @@ below, field for field and version note for version note, so a new top-level fie
 here is a change there too — it declares them optional and degrades on an older
 report, which is what makes the drift silent rather than loud.
 
-The report JSON (per-runtime schema `version: 17`, `bench.ts` `REPORT_SCHEMA_VERSION` —
+The report JSON (per-runtime schema `version: 18`, `bench.ts` `REPORT_SCHEMA_VERSION` —
 a committed report says which version wrote it, and lags the schema until the next
 refresh; the combined compose report carries its own version; coverage-only runs add
 `coverage_by_source`) carries, beyond
@@ -859,7 +859,19 @@ protocol the row ran under (`warmup_iterations` / `min_iterations` — warmup is
 by time, ≥ `BENCH_WARMUP_MS` from the row's pre-flight sweep, so a fast row no longer
 enters its window still tiering; there is no timing-keyed slow-task tier — the one
 per-row floor difference is the canonical rows' `CANONICAL_MIN_ITERATIONS` of 16,
-keyed on the row name so it is the same protocol on every runtime). **One impl is reset
+keyed on the row name so it is the same protocol on every runtime), and, from
+`version` 18, `settled_heap_bytes` — the JS heap (`heapUsed`) the row's warmup began
+from, read straight after the inter-task collection. It is a diagnostic: JSC schedules
+its next collection in proportion to the live heap, so an allocation-heavy pure-JS row
+(prettier, postcss) under bun runs up to ~15% faster from a larger settled heap; V8 rows
+do not move with it. It is a CONTROL rather than the explanation: those bun rows sit at
+one of two levels ~10–14% apart across runs, each with a quiet `cv`, while this field
+reproduces to the MB — so equal readings rule the heap out, and the two levels remain
+unexplained run-to-run variance that the per-run stability checks cannot see (read a bun
+pure-JS cell as ±15%). Compare it first when one bun row reads differently in two runs —
+across runs of ONE runtime only: JSC's `heapUsed` counts the memory its heap answers for (wasm
+linear memories, buffers) and V8's does not, so the same harness reads ~1–1.5 GB under
+bun and ~140 MB under node/deno. **One impl is reset
 between sweeps**: biome's `Workspace.openFile` retains ~4.5 B of wasm linear memory
 per source byte on every call and `closeFile` frees nothing (a genuine upstream leak,
 not a cache), and linear memory never shrinks, so `lib/biome.ts` re-instantiates the
