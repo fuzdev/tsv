@@ -78,7 +78,7 @@ import {
 import { spawn_out } from '@fuzdev/fuz_util/process.ts';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { argv, env, exit } from 'node:process';
+import { argv, env, exit, memoryUsage } from 'node:process';
 import { fileURLToPath } from 'node:url';
 import {
 	corpus_missing_entries,
@@ -333,9 +333,19 @@ const BENCH_GC = env.BENCH_GC === '1';
  * which forces a collection between every ITERATION and so reshapes the measured
  * workload's own GC profile; this one only normalizes where each task begins, and
  * is therefore always on.
+ *
+ * "Comparable" is what the collection aims at, not what it guarantees, so the heap it
+ * leaves is RECORDED per row (`settled_heap_bytes`). Under JSC the next collection is
+ * scheduled in proportion to the live heap, so an allocation-heavy pure-JS row
+ * (prettier, postcss) runs measurably faster from a larger settled heap, while V8's
+ * young generation does not care. The reading is a CONTROL: it reproduces to the MB
+ * across full bun runs, which is what rules the heap out when one of those rows reads
+ * at a different level in two runs (they sit at two levels ~10–14% apart, each with a
+ * quiet `cv`) — and what would name it if a harness change ever made the heap move.
  */
-const settle_heap = (): void => {
+const settle_heap = (tracking_key: string): void => {
 	globalThis.gc?.();
+	settled_heap_bytes.set(tracking_key, memoryUsage().heapUsed);
 };
 
 /**
@@ -865,6 +875,12 @@ const preflight_elapsed_ms: Map<string, number> = new Map();
  * every one of them (biome's css warmup, ~45, on its svelte and typescript rows).
  */
 const harness_warmups: Map<string, number> = new Map();
+/**
+ * The JS heap (`heapUsed`) each row's `settle_heap` left behind, read straight after
+ * the collection — the heap the row's warmup began from. Keyed by tracking_key for
+ * the reason `harness_warmups` is.
+ */
+const settled_heap_bytes: Map<string, number> = new Map();
 /**
  * Map result.name → tracking_key per group, so the markdown report can look up
  * coverage/throughput by display name (the bench library doesn't surface tracking_key).
@@ -2074,7 +2090,7 @@ async function run_benchmark_group(
 				warmup_iterations: 0,
 				min_iterations,
 				setup: async () => {
-					settle_heap();
+					settle_heap(task.tracking_key);
 					reset_heap();
 					for (let i = 0; i < warmup_iterations; i++) {
 						await sweep();
@@ -2089,7 +2105,7 @@ async function run_benchmark_group(
 				name: task.name,
 				warmup_iterations,
 				min_iterations,
-				setup: settle_heap,
+				setup: () => settle_heap(task.tracking_key),
 				fn: sweep,
 				async: task.is_async
 			});
@@ -2210,6 +2226,17 @@ interface BaselineEntry {
 	warmup_iterations: number | null;
 	min_iterations: number | null;
 	/**
+	 * The JS heap (`heapUsed`, bytes) the row's warmup began from, read straight after
+	 * the inter-task collection — see `settle_heap`. A diagnostic, not a measurement:
+	 * under JSC a pure-JS row's level depends on it, so it is what to compare first when
+	 * one bun row reads differently across two runs — equal here means the heap is not
+	 * why. Comparable across RUNS of one
+	 * runtime, never across runtimes: JSC's figure counts the memory its heap answers
+	 * for (wasm linear memories, buffers), V8's does not, so the same harness reads
+	 * ~1–1.5 GB under bun and ~140 MB under node/deno. `null` on a coverage-only row.
+	 */
+	settled_heap_bytes: number | null;
+	/**
 	 * sha1 (first 12 hex digits) of the newline-joined sorted paths this row was timed
 	 * on — what `compose_reports.ts` compares across runtimes, since equal
 	 * `files_iterated` COUNTS never proved equal sets. `null` when nothing was timed.
@@ -2313,8 +2340,12 @@ interface BaselineVersions extends ReportVersions {
  * 17: `binary_sizes[].kind` gains `js` — the canonical toolchain's size rows, which
  * are minified JS bundles the harness builds itself (`lib/canonical_bundles.ts`)
  * where every `wasm`/`native` row is a file a package ships.
+ *
+ * 18: per-row `settled_heap_bytes` — the JS heap each row's warmup began from. JSC
+ * paces its collections by live heap size, so a pure-JS row's level under bun depends
+ * on it; the field shows whether two runs of a row started from the same place.
  */
-const REPORT_SCHEMA_VERSION = 17;
+const REPORT_SCHEMA_VERSION = 18;
 
 interface Baseline {
 	/** See `REPORT_SCHEMA_VERSION`. */
@@ -2517,7 +2548,8 @@ const NULL_STATS = {
 	raw_sample_size: null,
 	outlier_ratio: null,
 	warmup_iterations: null,
-	min_iterations: null
+	min_iterations: null,
+	settled_heap_bytes: null
 } as const;
 
 /** `BaselineEntry.payload` for a row: parse groups only — see the field. */
@@ -2643,6 +2675,8 @@ async function build_results_data(
 						(tracking_key ? harness_warmups.get(tracking_key) : undefined) ??
 						result.budget.warmup_iterations,
 					min_iterations: result.budget.min_iterations,
+					settled_heap_bytes:
+						(tracking_key ? settled_heap_bytes.get(tracking_key) : undefined) ?? null,
 					files_processed: coverage?.processed ?? null,
 					files_total: coverage?.total ?? null,
 					files_iterated: iterated ?? null,
