@@ -41,8 +41,11 @@ import { fileURLToPath } from 'node:url';
 
 import { native_library_filename } from './runtime.ts';
 
-/** Binary kind for grouping size comparisons. */
-export type BinaryKind = 'wasm' | 'native';
+/**
+ * Binary kind for grouping size comparisons. `js` is a minified JS bundle the
+ * harness builds itself (`canonical_bundles.ts`) — the one kind no package ships.
+ */
+export type BinaryKind = 'wasm' | 'native' | 'js';
 
 /**
  * Crates whose source compiles into EVERY measured tsv artifact (the shared

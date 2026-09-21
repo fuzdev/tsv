@@ -774,7 +774,8 @@ report quantify coverage.
 
 Benchmark output includes a binary/WASM size comparison. Each row reports **raw
 on-disk size** plus **gzipped size** (≈ npm-tarball wire size), grouped by kind
-(WASM vs native) with ratios relative to `tsv` for both — the native anchor is the
+(WASM, native, and the synthesized `js bundle` rows of the canonical toolchain) with
+ratios relative to `tsv` — wasm and js-bundle rows against `tsv-wasm`; the native anchor is the
 binding the RUNTIME benchmarks (`tsv (ffi)` under Deno, `tsv (napi)` under Node/Bun),
 so the same third-party artifact reads a different `vs tsv` in the deno and node/bun
 reports; each table's footnote names its anchor. Implementation:
@@ -817,6 +818,30 @@ with nothing else wrong.
   FFI rows don't.
   Native-kind labels name the binding (`ffi`/`napi`), not just "native". `deno task
   bench` builds all of them; subset rows are omitted if those builds haven't run.
+- **prettier + the canonical parsers**: three `js bundle` rows, the one family that is
+  **synthesized rather than shipped**. The canonical tools publish no single artifact
+  — `node_modules/prettier` holds every language plugin in both ESM and CJS, and
+  `svelte` a whole compiler and runtime — so installed size answers a different
+  question. Each row is instead a minified, tree-shaken bundle of the minimum one
+  capability needs, scope-matched to tsv's three builds, from the entries in
+  `benches/js/size_bundles/`: the **parsers** (`svelte/compiler`'s `parse` +
+  `parseCss`, acorn + `@sveltejs/acorn-typescript` — prettier exposes no public parse
+  API, and its internal ASTs are not the product the parse rows compare), the
+  **formatter** (`prettier/standalone` + the estree / typescript / babel / postcss
+  plugins + `prettier-plugin-svelte`'s browser build, which pulls in Svelte's parser;
+  babel stays because the plugin parses template expressions and plain-JS scripts
+  through it), and **both**. The full bundle is barely larger than the formatter —
+  the formatter already carries the Svelte parser — which is the honest reading, not
+  an artifact. `lib/canonical_bundles.ts` builds them with `deno bundle --minify`
+  **during the run** (about a second for all three), so a row cannot be stale against
+  the installed pins and needs no build task or freshness check; a failed build is an
+  absent row. Two things to read them by: minified JS gzips far better than wasm, so
+  the raw and gzipped columns rank these rows differently against tsv's; and the
+  bundle is the *deployable minimum*, not what a Node consumer loads — a plain
+  `import 'prettier'` + `prettier-plugin-svelte` bundles to several times the formatter
+  row, since the package entry registers every built-in language. The bundler's
+  esbuild moves with the Deno version, so a row can shift by a few bytes across a Deno
+  upgrade with no pin moving.
 - **biome**: WASM from node_modules.
 - **dprint**: WASM (`@dprint/typescript`'s `plugin.wasm`). TS/JS-only scope, so it
   size-compares against the format-only tsv builds.

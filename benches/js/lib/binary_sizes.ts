@@ -9,6 +9,8 @@
  * - oxc-parser: N-API (.node) and WASM (.wasm via binding-wasm32-wasi) from node_modules
  * - oxfmt: N-API (.node) from node_modules (no WASM variant)
  * - yuku-parser: N-API (.node) and WASM (.wasm) from node_modules
+ * - prettier + the canonical parsers: minified JS bundles built at collection time
+ *   (`canonical_bundles.ts` — the one row family that is synthesized, not shipped)
  *
  * Portable across runtimes: uses `node:` builtins (Deno supports them) and the
  * shared `runtime.ts` platform normalizer instead of `Deno.*`. The alternative
@@ -20,6 +22,7 @@ import { execFile } from 'node:child_process';
 import { readdir, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { build_canonical_bundles } from './canonical_bundles.ts';
 import { OXC_WASI_BINDING } from './versions.ts';
 import type { ImplementationSet } from './implementations.ts';
 import { current_arch, current_os, current_runtime } from './runtime.ts';
@@ -259,6 +262,15 @@ export async function collect_binary_sizes(
 		await push_size(staged, artifact.label, artifact.kind, artifact.path);
 	}
 
+	// The canonical toolchain — prettier and the canonical parsers, as the minimal JS
+	// bundles `canonical_bundles.ts` builds now. Unconditional like tsv's own rows:
+	// `canonical` is a required impl, so a bundle that failed to build shows up as
+	// `absent` rather than leaving no trace.
+	for (const { bundle, path } of await build_canonical_bundles()) {
+		if (path !== null) await push_size(staged, bundle.label, 'js', path);
+		else staged.absent.push(bundle.label);
+	}
+
 	// biome WASM
 	if (impls.biome) {
 		await push_resolved(
@@ -448,7 +460,8 @@ function anchor_note(native_anchor: string | null): string {
 	return (
 		`\`vs tsv\` divides native rows by ${native} — the binding this runtime benchmarks ` +
 		'(FFI under Deno, N-API under Node/Bun), so the same artifact reads a different ratio in ' +
-		'the deno and node/bun reports — and wasm rows by `tsv-wasm`.'
+		'the deno and node/bun reports — and wasm and js-bundle rows by `tsv-wasm`, the ' +
+		'portable artifact a JS bundle stands beside.'
 	);
 }
 
@@ -463,6 +476,8 @@ interface DisplayRow {
 function build_display_entries(sizes: BinarySize[]): {
 	wasm_entries: DisplayRow[];
 	native_entries: DisplayRow[];
+	/** The synthesized canonical bundles (`canonical_bundles.ts`). */
+	js_entries: DisplayRow[];
 	/** The label the native `vs tsv` column divides by (`null` when no tsv native artifact is on disk). */
 	native_anchor: string | null;
 } {
@@ -481,6 +496,7 @@ function build_display_entries(sizes: BinarySize[]): {
 
 	const wasm_sizes = sizes.filter((s) => s.kind === 'wasm');
 	const native_sizes = sizes.filter((s) => s.kind === 'native');
+	const js_sizes = sizes.filter((s) => s.kind === 'js');
 
 	// Build combined oxc-parser+oxfmt entry if both exist. Combined gzip is
 	// the sum of the parts' gzipped sizes; that overstates wire size slightly
@@ -521,6 +537,7 @@ function build_display_entries(sizes: BinarySize[]): {
 	}
 
 	const wasm_entries = wasm_sizes.map((entry) => row(entry, tsv_wasm));
+	const js_entries = js_sizes.map((entry) => row(entry, tsv_wasm));
 
 	const native_entries: DisplayRow[] = [];
 	for (const entry of native_sizes) {
@@ -530,7 +547,7 @@ function build_display_entries(sizes: BinarySize[]): {
 		}
 	}
 
-	return { wasm_entries, native_entries, native_anchor: tsv_native?.label ?? null };
+	return { wasm_entries, native_entries, js_entries, native_anchor: tsv_native?.label ?? null };
 }
 
 /** Format a gzipped byte count or fall back to em-dash when unavailable. */
@@ -552,8 +569,8 @@ function any_gzipped(rows: DisplayRow[]): boolean {
 export function generate_binary_size_report(sizes: BinarySize[]): string | null {
 	if (sizes.length === 0) return null;
 
-	const { wasm_entries, native_entries, native_anchor } = build_display_entries(sizes);
-	const all_rows = [...wasm_entries, ...native_entries];
+	const { wasm_entries, native_entries, js_entries, native_anchor } = build_display_entries(sizes);
+	const all_rows = [...wasm_entries, ...native_entries, ...js_entries];
 	const show_gzip = any_gzipped(all_rows);
 
 	const max_label_len = Math.max(...all_rows.map((r) => r.entry.label.length));
@@ -587,6 +604,12 @@ export function generate_binary_size_report(sizes: BinarySize[]): string | null 
 		for (const r of native_entries) lines.push('  ' + format_row(r));
 	}
 
+	if (js_entries.length > 0) {
+		lines.push('');
+		lines.push('  JS bundles (synthesized — minified, tree-shaken):');
+		for (const r of js_entries) lines.push('  ' + format_row(r));
+	}
+
 	lines.push('');
 	lines.push(`  ${anchor_note(native_anchor)}`);
 	if (show_gzip) {
@@ -600,8 +623,8 @@ export function generate_binary_size_report(sizes: BinarySize[]): string | null 
 export function generate_binary_size_markdown(sizes: BinarySize[]): string | null {
 	if (sizes.length === 0) return null;
 
-	const { wasm_entries, native_entries, native_anchor } = build_display_entries(sizes);
-	const show_gzip = any_gzipped([...wasm_entries, ...native_entries]);
+	const { wasm_entries, native_entries, js_entries, native_anchor } = build_display_entries(sizes);
+	const show_gzip = any_gzipped([...wasm_entries, ...native_entries, ...js_entries]);
 
 	const lines: string[] = [];
 	lines.push('## Binary Sizes\n');
@@ -630,12 +653,17 @@ export function generate_binary_size_markdown(sizes: BinarySize[]): string | nul
 
 	add_rows(wasm_entries);
 	add_rows(native_entries);
+	add_rows(js_entries);
 
 	lines.push('');
 	lines.push(
 		`_${anchor_note(native_anchor)}${
 			show_gzip
 				? ' Gzipped ≈ the artifact’s wire size (`gzip -c`, system default level; the `tsv (napi)` platform package also ships the `tsv` CLI binary, so its tarball is larger than this row). `vs tsv (gz)` compares gzipped bytes; `vs tsv` compares raw on-disk bytes.'
+				: ''
+		}${
+			js_entries.length > 0
+				? ' The `js bundle` rows are SYNTHESIZED, not shipped: the canonical tools publish no single artifact, so each is a minified, tree-shaken bundle of the minimum one capability needs (`benches/js/size_bundles/`), built by `deno bundle` during this run.'
 				: ''
 		}_`
 	);

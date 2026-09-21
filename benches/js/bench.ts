@@ -2309,8 +2309,12 @@ interface BaselineVersions extends ReportVersions {
  * and the rows that left them, by `PerfOmitCategory` (perf surface only); and a
  * per-row `payload` tier on the parse rows, so an `Nx` built from two rows can say
  * whether their products match.
+ *
+ * 17: `binary_sizes[].kind` gains `js` — the canonical toolchain's size rows, which
+ * are minified JS bundles the harness builds itself (`lib/canonical_bundles.ts`)
+ * where every `wasm`/`native` row is a file a package ships.
  */
-const REPORT_SCHEMA_VERSION = 16;
+const REPORT_SCHEMA_VERSION = 17;
 
 interface Baseline {
 	/** See `REPORT_SCHEMA_VERSION`. */

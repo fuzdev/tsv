@@ -831,7 +831,7 @@ below, field for field and version note for version note, so a new top-level fie
 here is a change there too — it declares them optional and degrades on an older
 report, which is what makes the drift silent rather than loud.
 
-The report JSON (per-runtime schema `version: 16`, `bench.ts` `REPORT_SCHEMA_VERSION` —
+The report JSON (per-runtime schema `version: 17`, `bench.ts` `REPORT_SCHEMA_VERSION` —
 a committed report says which version wrote it, and lags the schema until the next
 refresh; the combined compose report carries its own version; coverage-only runs add
 `coverage_by_source`) carries, beyond
@@ -964,7 +964,8 @@ Top-level `binary_sizes_absent` names the artifacts the size table reached for a
 did not find — that table is the one section whose COMPOSITION varies by machine
 (a row exists only for a built artifact), so a tsv variant listed there usually
 just means its optional build task wasn't run, while a third-party label means its
-package shipped nothing where `binary_sizes.ts` looked.
+package shipped nothing where `binary_sizes.ts` looked, and a `js bundle` label
+means `deno bundle` failed or was unreachable (`lib/canonical_bundles.ts`).
 `report.<runtime>.md` renders coverage/iterated as prose; the per-entry numbers,
 `suppressed_noise`, `variant_parity`, `unavailable`, and `binary_sizes_absent` are
 JSON-only.
@@ -1305,11 +1306,16 @@ benches/js/
 ├── corpus_compare_parse.ts   # Parse/AST comparison vs canonical parsers (Deno-only entry point)
 ├── divergence_audit.ts    # Divergence audit entry point (Deno-only)
 ├── diagnostics/           # diagnostic scripts — see §Diagnostic scripts
+├── size_bundles/          # Entry modules for the canonical toolchain's size rows (parse / format /
+│                          # all) — bundled and sized, never executed (lib/canonical_bundles.ts)
 ├── results/baseline.json  # Saved baseline for regression detection (gitignored)
 └── lib/
     ├── binary_sizes.ts    # Binary/WASM size collection and reporting
     ├── biome.ts           # Biome WASM wrapper (Svelte, TypeScript, CSS)
     ├── canonical.ts       # Prettier + Svelte parser wrappers
+    ├── canonical_bundles.ts # The canonical toolchain's SIZE rows: minified JS bundles of prettier + the
+    │                      # canonical parsers, built by `deno bundle` at collection time (the one
+    │                      # synthesized row family — ../../docs/benchmarks.md §Binary size reporting)
     ├── check_artifact_freshness.ts # Native/WASM artifact staleness guard (§Artifact Freshness Guard)
     ├── check_node_modules.ts # node_modules preflight: exists + every exact pin (and every `force_installed` pin) matches installed
     ├── compare_cli.ts     # Shared scaffolding for the corpus_compare_* entry points
