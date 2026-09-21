@@ -40,9 +40,10 @@
  * - **biome** defaults to TAB indent, so no indent assertion can catch a dropped
  *   key there; width and quotes can, and do — dropping biome's whole `css` section
  *   is caught by the quote assertion (the top-level block still supplies the width).
- *   Losing `html.experimentalFullSupportEnabled` makes biome return EMPTY output for
- *   `.svelte`, which the svelte arm reads as "no probe line at all" — otherwise an
- *   empty string is a *successful* format as far as the timed row can tell.
+ *   Losing `html.experimentalFullSupportEnabled` makes biome return only the
+ *   formatted `<script>` for `.svelte` — EMPTY output for the script-less probe,
+ *   which the svelte arm reads as "no probe line at all" — otherwise a truncated
+ *   or empty string is a *successful* format as far as the timed row can tell.
  * - **oxfmt**'s own width default is already 100, so no width assertion can catch a
  *   dropped key there; tabs, quotes and the trailing comma can, and do (verified by
  *   renaming each key in turn).
@@ -220,7 +221,7 @@ export function assert_format_config_landed(
 			if (element_line === undefined) {
 				throw fail(
 					'lineWidth',
-					'the probe produced no `<div class="probe">` line at all — the formatter declined the language (biome returns EMPTY output for `.svelte` without `html.experimentalFullSupportEnabled`), or the probe no longer applies'
+					'the probe produced no `<div class="probe">` line at all — the formatter declined the language (biome returns only the `<script>` of a `.svelte` file, so nothing here, without `html.experimentalFullSupportEnabled`), or the probe no longer applies'
 				);
 			}
 			if (!element_line.includes('</div>')) {
