@@ -85,12 +85,13 @@ Future features (unknown order):
 - JS parsing diagnostics (test262 negative cases)
 - CSS error recovery (recover past invalid CSS per the spec)
 - maybe later or never:
-  - Svelte compiler (experimental partial implementation, may never ship)
   - likely TypeScript 7 integration (the Go impl), unlocking:
     - linter - type aware, initially focused on serializable data-only plugins for extensibility
     - svelte-check replacement
     - LSP
     - includes an experimental first-party typechecker `tsv_check` (which may never ship)
+  - Svelte compiler (experimental partial implementation, may never ship -
+    see [rsvelte](https://github.com/baseballyama/rsvelte))
   - bundling is out of scope 
   - [discussion](https://github.com/fuzdev/tsv/discussions) welcome
 
