@@ -19,8 +19,10 @@
  * normalizes to), skipping `lang=` blocks that aren't CSS. Svelte allows one
  * style element per component, so this misses nothing structural; the parser is
  * the downstream arbiter (a bad extraction shows up as a gates error, never
- * silently). Blocks keep their authored bytes verbatim (including the one-level
- * embedded indent), joined with blank lines under a generated-file banner.
+ * silently). Each block is dedented by the indent its lines share — the one level
+ * it carried inside `<style>` — so the concat reads like authored standalone CSS
+ * rather than a uniform one-tab re-indent job for every tool; otherwise the bytes
+ * are verbatim, joined with blank lines under a generated-file banner.
  *
  * Stamped like the suite harvests (`lib/harvest_stamp.ts`): the perf view is the
  * pinned `../corpora` snapshot, so the stamp records its `collections/` tree id, the
@@ -59,6 +61,31 @@ const collections_root = resolve(CORPORA_COLLECTIONS);
 
 /** Line-anchored component-level style blocks; group 1 = attrs, group 2 = content. */
 const STYLE_RE = /^<style([^>]*)>\n([\s\S]*?)^<\/style>/gm;
+
+/**
+ * Strip the leading whitespace every non-blank line of `block` shares. Only the
+ * common prefix goes, so a block whose lines are unevenly indented loses just the
+ * level they all carry, and one with an unindented line is returned untouched.
+ */
+const dedent = (block: string): string => {
+	const lines = block.split('\n');
+	let common: string | undefined;
+	for (const line of lines) {
+		if (line.trim() === '') continue;
+		const indent = /^[\t ]*/.exec(line)![0];
+		if (common === undefined) {
+			common = indent;
+		} else {
+			let i = 0;
+			while (i < common.length && common[i] === indent[i]) i++;
+			common = common.slice(0, i);
+		}
+		if (common === '') return block;
+	}
+	if (!common) return block; // all-blank input (the caller already skips it)
+	const prefix = common;
+	return lines.map((l) => (l.startsWith(prefix) ? l.slice(prefix.length) : l)).join('\n');
+};
 
 async function main(): Promise<void> {
 	const force = Deno.args.includes('--force');
@@ -99,7 +126,7 @@ async function main(): Promise<void> {
 			const attrs = m[1];
 			const lang = /lang\s*=\s*["']?([\w-]+)/.exec(attrs)?.[1];
 			if (lang !== undefined && lang !== 'css') continue; // scss etc. — not CSS
-			const content = m[2].replace(/^\n+/, '').trimEnd();
+			const content = dedent(m[2].replace(/^\n+/, '').trimEnd());
 			if (content === '') continue;
 			const in_snapshot = relative(collections_root, f.path);
 			if (in_snapshot.startsWith('..')) {
