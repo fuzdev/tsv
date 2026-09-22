@@ -4,7 +4,7 @@
 
 > precise language tools for TypeScript/JS, CSS, and Svelte in Rust - [tsv.fuz.dev](https://tsv.fuz.dev/)
 
-tsv is a toolchain for TypeScript/JS, CSS, and Svelte in Rust.
+tsv is a toolchain for TypeScript/JS, CSS, and Svelte in Rust (and planned HTML/JSON).
 It ships a formatter that closely follows [Prettier](https://prettier.io/) +
 [prettier-plugin-svelte](https://github.com/sveltejs/prettier-plugin-svelte),
 and a drop-in for [Svelte](https://svelte.dev/)'s parser +
@@ -17,7 +17,7 @@ Among other benefits this means tsv doesn't depend on a JS runtime,
 which it would need to resolve configs like Prettier.
 
 Compared to Oxc, Biome, and SWC, tsv is a set of focused tools, not an extensible language platform,
-so the focus is Web standards + Svelte and there's no support for JSX/SCSS/etc.
+so the focus is Web standards + TS + Svelte and there's no support for JSX/SCSS/etc.
 tsv's extensibility story is currently limited to using its Rust crates as libraries (or forking);
 bridging to JS or WASM plugins is an open question (leaning against).
 
@@ -41,7 +41,7 @@ Compared to Oxc/oxfmt and Biome, tsv is smaller and faster
 at parsing and formatting its supported languages,
 but lacks their features, extensibility, and broad language support.
 One reason for tsv to exist is to help find the performance bonuses
-left on the table in the Web ecosystem's increasingly-native implementations.
+left on the table in the Web's implementations.
 
 tsv is near production-ready, with a long tail of rare bugs
 (and numerous fixes to bugs in acorn-typescript/Prettier/prettier-plugin-svelte).
@@ -50,8 +50,8 @@ See the [issues](https://github.com/fuzdev/tsv/issues)
 and [discussions](https://github.com/fuzdev/tsv/discussions).
 
 The only first-party `unsafe` is in `tsv_ffi`, where the C boundary requires it;
-`tsv_napi` relaxes the lint only to `deny` so napi-derive's generated code compiles —
-it hand-writes none. Otherwise `unsafe_code = "forbid"`.
+`tsv_napi` relaxes the lint only to `deny` so napi-derive's generated code compiles.
+Otherwise `unsafe_code = "forbid"`.
 
 AI disclosure: this codebase is mostly LLM-generated, and the usual caveats apply.
 It's a high-effort project that prioritizes quality.
@@ -60,14 +60,14 @@ It's a high-effort project that prioritizes quality.
 
 > **status**: near production-ready - a long tail of rare bugs remains, and APIs may still change
 
-tsv derives its tools from:
+tsv implements aspects of:
 
 - HTML/CSS/JS and other Web specs
 - TypeScript
 - Svelte
 - Prettier and prettier-plugin-svelte
 
-tsv's features:
+tsv features:
 
 - [x] parsers for TypeScript/JS, CSS, and Svelte, drop-in for Svelte+acorn+acorn-typescript
 - [x] formatter following Prettier + prettier-plugin-svelte + Svelte's prettier config
@@ -140,8 +140,11 @@ and package READMEs for the full API and CLI flags:
 
 ## Design
 
+tsv's goal is to be an optimal, focused toolchain for TypeScript/JS, CSS, and Svelte.
+(with planned JSON/HTML)
+
 - focused on reducing complexity
-  - supports Svelte, TypeScript/JS, CSS and planned HTML/JSON - but no JSX/SCSS/etc
+  - supports Web+TS+Svelte - but no JSX/SCSS/etc
   - formatter is non-configurable: formatting style is hardcoded to
     Prettier's defaults with Svelte's official repo config
     (`printWidth: 100`, `useTabs: true`, `singleQuote: true`, and
@@ -158,7 +161,7 @@ and package READMEs for the full API and CLI flags:
   - pushes complexity and mess to the printer and JSON conversion,
     out of the parser and internal AST,
     keeping the model clean for the other planned tools
-- drop-in for Svelte's JS tools
+- parsers compatible with Svelte/acorn/acorn-typescript
   - tsv can generate a public JSON AST that should exactly match
     Svelte 5's modern AST with acorn and acorn-typescript
     (see [docs/conformance_svelte.md](docs/conformance_svelte.md)),
@@ -168,18 +171,22 @@ and package READMEs for the full API and CLI flags:
     (`parse --no-locations`, or the JS API's `{locations: false}` option — the published
     `@fuzdev/tsv` takes the same options; only the raw C-FFI / N-API addons keep
     flat `*_no_locations` exports)
-- compatible with Prettier, with generic rethought APIs
-  - formatting is similar Prettier and prettier-plugin-svelte for the common case,
-    but intentionally diverges in some cases and fixes numerous bugs
+- formatters following Prettier
+  - formatting is similar to Prettier and prettier-plugin-svelte for the common case,
+    and diverges more often for Svelte than TypeScript;
+    tsv closely follows Prettier's TypeScript choices
     (see [docs/conformance_prettier.md](docs/conformance_prettier.md))
   - `tsv format` discovery honors `.gitignore`, `.prettierignore`, `.formatignore`
-    (original to tsv)
-    (all 3 use [gitignore syntax](https://git-scm.com/docs/gitignore#_pattern_format))
+    (the latter is original to tsv,
+    all 3 use [gitignore syntax](https://git-scm.com/docs/gitignore#_pattern_format))
 - Rust-only
-  - implementation currently does not call or embed a JS runtime
-    (open for discussion, needs research into the tradeoffs);
-    JS reaches tsv through the WASM and native N-API bindings
+  - tsv currently has no support for JS plugins or JS/WASM runtime integration -
+    JS bridging and WASM plugins will be evaluated to see if the tradeoffs work for tsv's goals,
+    but the current lean is against, mainly for performance and simplicity;
+    JS reaches tsv through the WASM and native N-API/FFI bindings
   - no C compiler needed to build tsv
+  - crates [will be published](https://github.com/fuzdev/tsv/issues/140)
+    to crates.io for reusability
 - optimal
   - prioritizes speed then binary size and memory usage
   - ships optimal binary artifacts: runtime speed and compiled
@@ -187,23 +194,7 @@ and package READMEs for the full API and CLI flags:
     a minimal build is available (with lang-specific artifacts likely coming),
     and heavier future layers (incremental parsing, CST for LSP) will be feature-gated so they
     don't regress the focused artifacts
-- modern and Web-conformant
-  - up-to-date with web specs (roughly aiming for late-stage TC39 proposals and up)
-  - strictness follows the spec: a module is strict, a script is strict once its
-    directive prologue holds a `"use strict"`. The parse goal defaults to Module,
-    with an opt-in Script goal (`--source-type script`); formatting a path, or a
-    string with no source type named, parses as a module and retries as a script
-    only if that fails — except a `.mjs`/`.mts` path, a module by its own name,
-    which takes no retry — so a legacy sloppy script formats from a bare
-    `tsv format` while nothing a module grammar accepts is ever reinterpreted. Since Svelte and
-    TypeScript are inherently strict modules the sloppy reading only ever affects
-    standalone JS scripts. The `with` statement, the leading-zero numeric literals
-    (`010`, `08`) and the legacy string escapes (`"\7"`, `"\8"`) are the three
-    rules that move with strictness — sloppy Script code accepts them, strict code
-    rejects them; the Annex B web-compatibility grammar is out of scope at both
-    goals; and strict-mode early errors (e.g. duplicate params, reserved-word
-    bindings) still parse for now, with enforcement deferred to a future
-    diagnostics layer
+- modern and Web-conformant, roughly aiming to be up-to-date with late-stage TC39 proposals
 
 Intentional non-features:
 
@@ -223,13 +214,6 @@ the format build excludes the JSON-AST conversion layer, and a future TypeScript
 build would exclude Svelte and CSS (lang-specific builds aren't published yet) -
 see [docs/architecture.md](docs/architecture.md).
 
-tsv currently has no support for JS plugins or JS/WASM runtime integration.
-JS bridging and WASM plugins will be evaluated to see if the tradeoffs work for tsv's goals,
-but the current lean is against, mainly for performance and simplicity.
-
-tsv's goal is to be an optimal, focused toolchain for TypeScript/JS, CSS, and Svelte.
-Its crates [will be published](https://github.com/fuzdev/tsv/issues/140)
-to crates.io for reusability.
 
 ## Docs
 
@@ -321,8 +305,8 @@ Software:
 - [Prettier](https://prettier.io/) which was forked
   from [recast](https://github.com/benjamn/recast)'s printer,
   which is based on the algorithms described
-  in [A prettier printer](https://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf)
-  by Philip Wadler
+  in ["A prettier printer"](https://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf)
+  by [Philip Wadler](https://homepages.inf.ed.ac.uk/wadler/)
 - [TypeScript](https://typescriptlang.org/)
 
 Web Standards:
