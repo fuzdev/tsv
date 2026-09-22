@@ -105,7 +105,7 @@ packages for browsers, Deno, and platforms without a prebuilt binary:
 - [`@fuzdev/tsv-parse-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-parse-wasm) - parser + JSON AST only (smallest)
 
 ```bash
-npm i @fuzdev/tsv
+npm i -D @fuzdev/tsv
 npx tsv format src            # if installed locally
 npx @fuzdev/tsv format src    # or without installing first
 ```
