@@ -85,7 +85,8 @@ Future features (unknown order):
 - JS parsing diagnostics (test262 negative cases)
 - CSS error recovery (recover past invalid CSS per the spec)
 - maybe later or never:
-  - TypeScript 7 integration (the Go impl), unlocking:
+  - TypeScript 7 integration (the Go impl), unlocking
+    what [rsvelte](https://github.com/baseballyama/rsvelte) already provides:
     - linter - type aware, initially focused on serializable data-only plugins for extensibility
     - svelte-check replacement
     - LSP
