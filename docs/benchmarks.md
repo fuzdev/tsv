@@ -110,12 +110,9 @@ Things the published numbers measure that aren't quite what they look like.
   files). Those
   harvest bytes are also timed inside the svelte rows (rows are never summed, so
   this is disclosure, not distortion), and CSS per-file ratios stay the noisiest.
-  One shape note on that harvest: the blocks keep their authored bytes verbatim,
-  which includes the one level of indent they carried inside `<style>`, so the
-  concatenated file is uniformly indented by one tab. Every tool re-indents it
-  identically — same input, no per-tool advantage — but it does mean the dominant
-  CSS sample measures a full re-indent rather than the steady-state
-  already-formatted case the standalone `.css` files represent.
+  The harvest dedents each block by the one level it carried inside `<style>`, so
+  the concats read as standalone CSS and measure the same already-formatted
+  steady state the standalone `.css` files do.
 - **PGO native flagship (forthcoming — policy; no such row ships today).** The
   standalone native flagship — the `tsv` binary the `@fuzdev/tsv` platform
   packages already ship, un-PGO'd, under the one name rather than a second
