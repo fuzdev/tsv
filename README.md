@@ -53,7 +53,7 @@ The only first-party `unsafe` is in `tsv_ffi`, where the C boundary requires it;
 `tsv_napi` relaxes the lint only to `deny` so napi-derive's generated code compiles.
 Otherwise `unsafe_code = "forbid"`.
 
-AI disclosure: this codebase is mostly LLM-generated, and the usual caveats apply.
+AI disclosure: this codebase is LLM-generated, and some caveats apply.
 It's a high-effort project that prioritizes quality.
 
 ## About
@@ -143,34 +143,19 @@ and package READMEs for the full API and CLI flags:
 tsv's goal is to be an optimal, focused toolchain for TypeScript/JS, CSS, and Svelte.
 (with planned JSON/HTML)
 
-- focused on reducing complexity
+- reduce complexity within the defined scope
   - supports Web+TS+Svelte - but no JSX/SCSS/etc
   - formatter is non-configurable: formatting style is hardcoded to
     Prettier's defaults with Svelte's official repo config
     (`printWidth: 100`, `useTabs: true`, `singleQuote: true`, and
     `trailingComma: 'none'`),
     and there are no config files or CLI options for formatting style;
-    i.e. `tsv format` is opinionated like `gofmt`, `zig fmt`, and Python's Black,
-    see [CLAUDE.md § Configuration](CLAUDE.md#configuration)
-  - `<svelte:options preserveWhitespace />` is parsed (it's in the wire AST) but
-    not honored by the formatter: whitespace handling
-    is uniform (only `<pre>`/`<textarea>` content is whitespace-sensitive), any
-    reformatting under that option is already render-visible, and prettier
-    behaves the same — see
-    [docs/conformance_svelte.md § Template Whitespace](docs/conformance_svelte.md#template-whitespace-clean_nodes)
-  - pushes complexity and mess to the printer and JSON conversion,
-    out of the parser and internal AST,
-    keeping the model clean for the other planned tools
+    (opinionated like `gofmt`, `zig fmt`, and Python's Black)
 - parsers compatible with Svelte/acorn/acorn-typescript
-  - tsv can generate a public JSON AST that should exactly match
+  - can generate a public JSON AST that should exactly match
     Svelte 5's modern AST with acorn and acorn-typescript
-    (see [docs/conformance_svelte.md](docs/conformance_svelte.md)),
+    (excluding bug fixes, see [docs/conformance_svelte.md](docs/conformance_svelte.md)),
     and tsv has its own internal optimal AST
-  - the parser can also emit optimized JSON that drops the per-node `loc` and
-    Svelte `name_loc` objects, mirroring acorn's `locations: false` for improved performance
-    (`parse --no-locations`, or the JS API's `{locations: false}` option — the published
-    `@fuzdev/tsv` takes the same options; only the raw C-FFI / N-API addons keep
-    flat `*_no_locations` exports)
 - formatters following Prettier
   - formatting is similar to Prettier and prettier-plugin-svelte for the common case,
     and diverges more often for Svelte than TypeScript;
@@ -180,18 +165,19 @@ tsv's goal is to be an optimal, focused toolchain for TypeScript/JS, CSS, and Sv
     (the latter is original to tsv,
     all 3 use [gitignore syntax](https://git-scm.com/docs/gitignore#_pattern_format))
 - Rust-only
+  - minimal dependencies
+  - no C compiler needed to build tsv
+  - crates [will be published](https://github.com/fuzdev/tsv/issues/140)
+    to crates.io for reusability
   - tsv currently has no support for JS plugins or JS/WASM runtime integration -
     JS bridging and WASM plugins will be evaluated to see if the tradeoffs work for tsv's goals,
     but the current lean is against, mainly for performance and simplicity;
     JS reaches tsv through the WASM and native N-API/FFI bindings
-  - no C compiler needed to build tsv
-  - crates [will be published](https://github.com/fuzdev/tsv/issues/140)
-    to crates.io for reusability
 - optimal
-  - prioritizes speed then binary size and memory usage
-  - ships optimal binary artifacts: runtime speed and compiled
-    code size are priorities, so if all you need is a formatter or parser,
-    a minimal build is available (with lang-specific artifacts likely coming),
+  - prioritizes speed, then binary size and memory usage
+  - ships optimal binary artifacts: so if all you need is a formatter or parser,
+    a minimal build is available (currently just for WASM where it matters more,
+    and with lang-specific artifacts likely coming),
     and heavier future layers (incremental parsing, CST for LSP) will be feature-gated so they
     don't regress the focused artifacts
 - modern and Web-conformant, roughly aiming to be up-to-date with late-stage TC39 proposals
