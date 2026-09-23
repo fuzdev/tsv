@@ -181,7 +181,8 @@ export interface TsvImplementation {
 
 	/**
 	 * Parse source dropping per-node `loc` (the span-only `no-locations` wire) —
-	 * the payload-matched comparison against oxc-parser's span-only default AST.
+	 * the closest-payload comparison against oxc-parser's span-only default AST,
+	 * which still runs larger (it writes out default-valued fields this omits).
 	 * Native/wasm only; TypeScript + Svelte only (CSS emits no `loc`).
 	 */
 	parse_no_locations?(source: string, language: Language, goal?: ParseGoal): unknown;

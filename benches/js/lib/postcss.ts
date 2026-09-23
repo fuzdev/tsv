@@ -12,8 +12,9 @@
  *
  * **Why there is no native peer on this surface.** No Rust CSS parser exposes an
  * AST to JS at all: lightningcss ships `transform`/`bundle` only (its `./ast`
- * export is types for the `visitor` callback option — a napi round-trip per
- * visited node, not a parse product), biome's `js-api` exposes
+ * export is types for the `visitor` callback option, which can hand JS the whole
+ * `StyleSheet`, but normalized and only as a side channel of a transform run, not
+ * a parse product), biome's `js-api` exposes
  * `formatContent`/`lintContent`/`openProject`, malva is a formatter, and oxc's CSS
  * is `oxc_formatter_css` with no JS parse binding. So `parse/css` having a JS-only
  * alternative is an availability fact rather than an omission.

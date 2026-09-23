@@ -264,7 +264,8 @@ export function generate_summary_report(
 
 	// Parse performance comparison. The `*-json-no-locations` rows render as
 	// ordinary bars; a curated "no-locations vs oxc" line is appended per language
-	// (see below) — that's the payload-matched comparison (same span-only shape),
+	// (see below) — that's the closest-payload comparison (same span-only shape,
+	// though oxc and yuku write out default-valued fields tsv omits, ~1.3x the bytes),
 	// where plain `tsv-json` carries the richer loc-bearing drop-in AST.
 	lines.push('');
 	lines.push('Parse Performance:');
@@ -350,10 +351,10 @@ export function generate_summary_report(
 		//   (see lib/rsvelte_parse.ts), which is also why that row is named for its
 		//   option rather than for tsv's.
 		for (const [ours, opponent, note] of [
-			['tsv-json-no-locations', 'oxc-parser', 'payload-matched, span-only'],
-			['tsv-json-no-locations', 'yuku-parser', 'payload-matched, span-only'],
-			['tsv-wasm-json-no-locations', 'oxc-parser-wasm', 'payload-matched, span-only'],
-			['tsv-wasm-json-no-locations', 'yuku-parser-wasm', 'payload-matched, span-only'],
+			['tsv-json-no-locations', 'oxc-parser', 'span-only, theirs larger'],
+			['tsv-json-no-locations', 'yuku-parser', 'span-only, theirs larger'],
+			['tsv-wasm-json-no-locations', 'oxc-parser-wasm', 'span-only, theirs larger'],
+			['tsv-wasm-json-no-locations', 'yuku-parser-wasm', 'span-only, theirs larger'],
 			['tsv-json', 'rsvelte-parse', 'mechanism- and payload-matched, full AST']
 		] as const) {
 			const ours_result = results.find((r) => r.name === ours);
