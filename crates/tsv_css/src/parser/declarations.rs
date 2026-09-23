@@ -1,4 +1,5 @@
 use super::CssParser;
+use super::decl_scan::{DeclarationHead, ScannedDeclaration};
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
@@ -193,6 +194,52 @@ pub(crate) fn parse_rule<'arena>(
     })
 }
 
+/// The declaration head as a token walk: from the property identifier across the
+/// property→colon gap, the `:` and the whitespace after it, to the value's first token.
+///
+/// The reference `decl_scan`'s byte head reproduces, and the path a declaration takes when
+/// that byte head declines. Leaves the parser on the value's first token, which
+/// `parse_declaration` then re-seats past (the value is scanned, never tokenized), so
+/// nothing lexed here survives except the head's three facts.
+fn lex_declaration_head(parser: &mut CssParser<'_, '_>) -> Result<DeclarationHead, ParseError> {
+    parser.advance()?;
+
+    // The property→colon gap is an `allow_whitespace()` juncture: `read_declaration` ends
+    // the property at the first JS-`\s` code point (`read_until(/[\s:]/)`) and skips to the
+    // colon, so a boundary run standing here (`color <NBSP>: red`) is the gap's, not a name.
+    let gap_comment = parser.skip_boundary_whitespace_and_comments()?;
+
+    // The parser sits on the colon here — whitespace and comments already skipped — and
+    // `expect` below guarantees it is one.
+    let colon = parser.current_start;
+    parser.expect(TokenKind::Colon)?;
+    // Only skip whitespace, NOT comments - comments in values need to be preserved
+    parser.skip_whitespace()?;
+
+    Ok(DeclarationHead {
+        colon,
+        gap_comment,
+        value_start: parser.current_start,
+    })
+}
+
+/// The debug oracle for a head settled from the bytes: the token head must reach the same
+/// colon, gap-comment answer and value start. It moves the parser, which the terminator
+/// seat that follows every head undoes.
+#[cfg(debug_assertions)]
+fn assert_token_head_agrees(
+    parser: &mut CssParser<'_, '_>,
+    property_end: usize,
+    head: DeclarationHead,
+) {
+    let lexed = lex_declaration_head(parser);
+    assert!(
+        lexed.as_ref().is_ok_and(|lexed| *lexed == head),
+        "byte-scanned declaration head disagreed with the token head at {property_end}: \
+         scanned {head:?}, lexed {lexed:?}"
+    );
+}
+
 /// Parse a CSS declaration: `property: value;`
 pub(crate) fn parse_declaration<'arena>(
     parser: &mut CssParser<'_, 'arena>,
@@ -206,54 +253,72 @@ pub(crate) fn parse_declaration<'arena>(
     // Internal AST: use decoded value (spec-compliant)
     // Svelte quirk (raw value) will be applied in conversion layer
     let property = parser.current_identifier_in_arena();
-    parser.advance()?;
+    let property_end = parser.current_end;
 
-    // The property→colon gap is an `allow_whitespace()` juncture: `read_declaration` ends
-    // the property at the first JS-`\s` code point (`read_until(/[\s:]/)`) and skips to the
-    // colon, so a boundary run standing here (`color <NBSP>: red`) is the gap's, not a name.
-    let property_gap_comment = parser.skip_boundary_whitespace_and_comments()?;
-
-    // Record the real `property : value` colon offset (host coordinates, like the
-    // declaration span) so the writer splits property/value without a re-scan. The
-    // parser sits on the colon here — whitespace and comments already skipped — and
-    // `expect` below guarantees it is one.
-    let colon_offset = (parser.base_offset() + parser.current_start) as u32;
-    // Expect :
-    parser.expect(TokenKind::Colon)?;
-    // Only skip whitespace, NOT comments - comments in values need to be preserved
-    parser.skip_whitespace()?;
-
-    // Scan the value to its terminator (`;` / `}` at depth zero, or EOF), collecting the
-    // few facts the declaration node needs: where its span ends, whether it holds a
-    // comment, whether it is empty, and where a trailing `!important` sits. The scan walks
-    // bytes rather than tokens — a value's text is re-parsed from source below
+    // Locate the value and scan it to its terminator (`;` / `}` at depth zero, or EOF),
+    // collecting the few facts the declaration node needs: where its span ends, whether it
+    // holds a comment, whether it is empty, and where a trailing `!important` sits. The scan
+    // walks bytes rather than tokens — a value's text is re-parsed from source below
     // (`parse_value_from_source`) anyway, so tokenizing it here only to find a `;` was
     // paying the lexer twice for the same bytes. See `decl_scan`.
     //
     // For a non-custom declaration the rule/declaration disambiguation already walked this
-    // value (to decide it was a declaration, not a nested rule) and stashed these facts, so
-    // reuse them rather than walk a second time. The stash is absent for a custom property
-    // (which bypasses the disambiguation) or when the byte scan declined; then scan now.
-    let value_start_raw = parser.current_start;
-    let (facts, value_class) = match parser.take_value_facts(value_start_raw) {
-        Some(reused) => {
+    // head and value (to decide it was a declaration, not a nested rule) and stashed what it
+    // found, so take that rather than lex the head and walk the value a second time. The
+    // stash is absent for a custom property (which bypasses the disambiguation) or when the
+    // byte scan declined; then locate the head (from the bytes where they settle it) and scan
+    // now.
+    let ScannedDeclaration {
+        head,
+        facts,
+        class: value_class,
+    } = match parser.take_declaration(property_end) {
+        Some(scanned) => {
             #[cfg(debug_assertions)]
             {
-                // The reused facts must equal a fresh scan at the parser's own value start —
-                // proving the disambiguation located the value identically to the parser's
-                // positioning here. The separator class rides the same comparison, so the
-                // fused walk and the plain one are held to one answer.
-                let fresh = super::decl_scan::scan_value(parser, value_start_raw);
-                debug_assert!(
-                    fresh.as_ref().is_ok_and(|fresh| *fresh == reused),
-                    "reused value facts disagreed with a fresh scan at {value_start_raw}: \
-                     reused {reused:?}, fresh {fresh:?}"
+                // The stashed head must be the token head's, and the stashed facts a fresh
+                // scan's at that value start — proving the disambiguation located the colon
+                // and the value identically to the parser's own positioning. The separator
+                // class rides the same comparison, so the fused walk and the plain one are
+                // held to one answer.
+                assert_token_head_agrees(parser, property_end, scanned.head);
+                let value_start = scanned.head.value_start;
+                let fresh = super::decl_scan::scan_value(parser, value_start);
+                assert!(
+                    fresh.as_ref().is_ok_and(
+                        |(facts, class)| *facts == scanned.facts && *class == scanned.class
+                    ),
+                    "reused value facts disagreed with a fresh scan at {value_start}: \
+                     reused {scanned:?}, fresh {fresh:?}"
                 );
             }
-            reused
+            scanned
         }
-        None => super::decl_scan::scan_value(parser, value_start_raw)?,
+        None => {
+            let byte_head = super::decl_scan::scan_declaration_head_bytes(
+                parser.source().as_bytes(),
+                property_end,
+            );
+            let head = match byte_head {
+                Some(head) => head,
+                None => lex_declaration_head(parser)?,
+            };
+            let (facts, class) = super::decl_scan::scan_value(parser, head.value_start)?;
+            // A head located from the bytes is held to the token head once the value has
+            // scanned, not before: the token head lexes the value's first token, and a value
+            // that token fails in is the value scan's error to raise — at the same position.
+            #[cfg(debug_assertions)]
+            if byte_head.is_some() {
+                assert_token_head_agrees(parser, property_end, head);
+            }
+            ScannedDeclaration { head, facts, class }
+        }
     };
+    let value_start_raw = head.value_start;
+    let property_gap_comment = head.gap_comment;
+    // The real `property : value` colon offset (host coordinates, like the declaration
+    // span), so the writer splits property/value without a re-scan.
+    let colon_offset = parser.span_pos(head.colon);
 
     // Land on the terminator the scan found — the lexer never tokenized the value, and it
     // does not tokenize the terminator either: the scan stopped *on* it, so it knows which

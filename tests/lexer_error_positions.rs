@@ -183,10 +183,16 @@ fn template_lexer_error_after_a_skipped_island_points_at_its_own_line() {
 /// The CSS declaration-value scan lexes `source[from..]`, where `from` is inside the
 /// declaration — so this one is wrong in a plain `.css` file, with no embedding
 /// anywhere. The pair varies the property name, i.e. the slice offset itself: the caret
-/// must land on the quote in both.
+/// must land on the quote in both. The custom property is the third reader: it bypasses the
+/// declaration-vs-rule scan, so its value's first token is lexed by the declaration's own
+/// value scan rather than by that disambiguation — and must fail at the same place.
 #[test]
 fn css_declaration_value_errors_do_not_depend_on_the_scan_slice() {
-    for source in [".b { c: \"bad; }", ".b { content: \"bad; }"] {
+    for source in [
+        ".b { c: \"bad; }",
+        ".b { content: \"bad; }",
+        ".b { --c: \"bad; }",
+    ] {
         let (line, column) = token_at(source, "\"bad");
         assert_eq!(
             css_error(source),

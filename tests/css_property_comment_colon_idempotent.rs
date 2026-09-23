@@ -98,6 +98,13 @@ const CASES: &[(&str, &str, &str)] = &[
         "a{margin/* c */: 1px 2px}",
         "a {\n\tmargin /* c */ : 1px 2px;\n}\n",
     ),
+    // A custom property never reaches the declaration-vs-rule scan, so its gap comment is
+    // located by the declaration's own head rather than handed over by that scan.
+    (
+        "custom property",
+        "a{--x/* c */: 1 2}",
+        "a {\n\t--x /* c */ : 1 2;\n}\n",
+    ),
 ];
 
 /// `(label, input, prettier_expected)`. For the valid cases whose input is

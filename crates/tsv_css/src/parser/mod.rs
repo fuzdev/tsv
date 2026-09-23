@@ -14,10 +14,9 @@ use crate::ast::internal::{Comment, CssNode, CssStyleSheet};
 use crate::lexer::{Lexer, Token, TokenKind};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
-use decl_scan::{TerminatorKind, ValueFacts};
+use decl_scan::{ScannedDeclaration, TerminatorKind};
 use std::cell::Cell;
 use tsv_lang::{ParseError, Span};
-use value::lists::ValueSeparator;
 
 pub(crate) struct CssParser<'a, 'arena> {
     source: &'a str,
@@ -48,13 +47,14 @@ pub(crate) struct CssParser<'a, 'arena> {
     /// `self.bvec()` and strings via `self.alloc_str_in()` (CSS has no single-node
     /// `alloc` — every node lands in a child slice).
     pub(crate) arena: &'arena Bump,
-    /// Value facts computed speculatively by the rule/declaration disambiguation scan, for
-    /// the `parse_declaration` that immediately follows to reuse instead of re-walking the
-    /// value. Set (or cleared) at every `scan_rule_or_declaration`; keyed on the value's
-    /// start offset so a stale entry — e.g. from a custom-property declaration that bypasses
-    /// the scan — can never be mistaken for the current value's facts. `Cell` because the
-    /// scan runs behind `&CssParser` (the disambiguation is a read-only lookahead).
-    speculative_value_facts: Cell<Option<(usize, ValueFacts, Option<ValueSeparator>)>>,
+    /// A declaration located and measured speculatively by the rule/declaration
+    /// disambiguation scan — its head and its value's facts — for the `parse_declaration`
+    /// that immediately follows to take instead of lexing its head and re-walking its value.
+    /// Set (or cleared) at every `scan_rule_or_declaration` and keyed on the property's end
+    /// offset — [`take_declaration`](Self::take_declaration) states what the key guards.
+    /// `Cell` because the scan runs behind `&CssParser` (the disambiguation is a read-only
+    /// lookahead).
+    speculative_declaration: Cell<Option<(usize, ScannedDeclaration)>>,
 }
 
 impl<'a, 'arena> CssParser<'a, 'arena> {
@@ -82,29 +82,45 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             in_pseudo_args: false,
             comments: Vec::new(),
             arena,
-            speculative_value_facts: Cell::new(None),
+            speculative_declaration: Cell::new(None),
         })
     }
 
-    /// Record (or clear) the value facts the disambiguation scan produced for the
-    /// declaration it just settled — see [`take_value_facts`](Self::take_value_facts).
-    pub(in crate::parser) fn stash_value_facts(
+    /// Record (or clear) the declaration the disambiguation scan located, keyed on the end of
+    /// its property — see [`take_declaration`](Self::take_declaration).
+    pub(in crate::parser) fn stash_declaration(
         &self,
-        facts: Option<(usize, ValueFacts, Option<ValueSeparator>)>,
+        scanned: Option<(usize, ScannedDeclaration)>,
     ) {
-        self.speculative_value_facts.set(facts);
+        self.speculative_declaration.set(scanned);
     }
 
-    /// Take the stashed value facts, but only if they were computed for the value starting at
-    /// `value_start` — the guard that makes reuse safe. Offsets increase monotonically
-    /// through the parse, so a stale entry (a smaller start) never matches; a match means the
-    /// disambiguation scan and this declaration are looking at the same value.
-    pub(in crate::parser) fn take_value_facts(
+    /// Take the stashed declaration, but only if it was located from the property ending at
+    /// `property_end`.
+    ///
+    /// The key guards ORDER, not content: a stash is taken only by the `parse_declaration`
+    /// that immediately follows the disambiguation of the same property, and an entry located
+    /// from any other property is never reused. Content needs no guard — the stash is a pure
+    /// function of the source and its key (the byte scan reads nothing else), so even a stale
+    /// entry carrying this key would hold exactly this declaration's head and facts. The parse
+    /// does move backwards ([`rewind_to`](Self::rewind_to)), but never back across a stashed
+    /// key: its callers undo an at-rule prelude's trial parse (a `selector()` argument in a
+    /// condition query — `@supports`, `@import supports()`, `@container` — or a
+    /// `@custom-selector` list), which parses selectors and never a block child, so no rewound
+    /// region holds a declaration or reaches the disambiguation.
+    ///
+    /// A byte-located head — taken from here, or located by `parse_declaration` itself on a
+    /// miss — is trusted as it stands in release; only the debug oracle re-lexes it. That is
+    /// sound because the byte head (`decl_scan::scan_declaration_head_bytes`) accepts nothing
+    /// the token head could read another way: ASCII whitespace, terminated comments and the
+    /// `:`, with the value's first byte ASCII or end-of-source. Everything else declines to
+    /// the token head.
+    pub(in crate::parser) fn take_declaration(
         &self,
-        value_start: usize,
-    ) -> Option<(ValueFacts, Option<ValueSeparator>)> {
-        match self.speculative_value_facts.take() {
-            Some((start, facts, class)) if start == value_start => Some((facts, class)),
+        property_end: usize,
+    ) -> Option<ScannedDeclaration> {
+        match self.speculative_declaration.take() {
+            Some((key, scanned)) if key == property_end => Some(scanned),
             _ => None,
         }
     }

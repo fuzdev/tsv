@@ -112,8 +112,9 @@
 //!   the narrow one, and read `a { color <NBSP>: red }`'s run as the identifier that should
 //!   have been the `:`. `read_declaration` ends the property at JS `\s`
 //!   (`read_until(/[\s:]/)`) and `allow_whitespace()`s to the colon, so the gap is a
-//!   juncture: the fallback is `peek_past_boundary_whitespace` and `parse_declaration` steps
-//!   the gap with `skip_boundary_whitespace_and_comments`. Pinned by
+//!   juncture: the fallback is `peek_past_boundary_whitespace`, and a run in the gap declines
+//!   the declaration's byte head as well, so the gap is stepped by its token head
+//!   (`lex_declaration_head`) with `skip_boundary_whitespace_and_comments`. Pinned by
 //!   `a_property_gap_run_is_the_gaps_at_every_spelling`.
 //!
 //! ⚠️ **Where the two readers tokenize a run differently, the printer keeps the BYTES.** To
