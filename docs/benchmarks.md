@@ -552,8 +552,10 @@ prettier. Load-bearing on two axes:
   [Fairness caveats](#fairness-caveats)).
 - **biome (WASM)** — formatter/linter; TypeScript, JS, CSS, and Svelte (via
   biome's experimental HTML-superset support, `html.experimentalFullSupportEnabled`;
-  it formats the template **and** the embedded `<script>`/`<style>`, so it's
-  comparable work to prettier-plugin-svelte / tsv, just on an experimental path).
+  it formats the markup **and** the embedded `<script>`/`<style>`, but leaves the
+  template's expressions as written — parsed, not reprinted — where
+  prettier-plugin-svelte and tsv reformat them, so it does somewhat less work than
+  theirs, on an experimental path).
   Its per-language `formatter` sections inherit the top-level one and override it
   where they set a key (measured in both directions); each repeats the shared
   values anyway, so a rename reaching only the top-level block can't un-pin every
