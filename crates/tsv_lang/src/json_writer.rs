@@ -342,6 +342,10 @@ pub struct JsonWriter {
 /// is the test that holds this.
 const STAGE_CAP: usize = 384;
 
+/// Longest fragment [`JsonWriter::stage_short`] copies inline — two overlapping
+/// 16-byte moves reach 32 bytes. Every node type fits (the longest is 31).
+const SHORT_FRAGMENT_MAX: usize = 32;
+
 impl JsonWriter {
     /// A fresh writer over a buffer pre-sized to `cap` bytes.
     #[inline]
@@ -412,12 +416,85 @@ impl JsonWriter {
 
     /// Append a verbatim fragment to the staged run. No escaping — the same
     /// contract as [`JsonWriter::raw`].
+    ///
+    /// For a **constant** fragment: the copy is `copy_from_slice` at the
+    /// fragment's length, which is a fixed-width move only when that length is
+    /// a compile-time constant. A fragment chosen at run time (a node type
+    /// handed to a header emitter) takes [`JsonWriter::stage_short`] instead.
     #[inline]
     pub fn stage_raw(&mut self, s: &str) {
         let at = self.stage_len;
         let end = at + s.len();
         self.stage[at..end].copy_from_slice(s.as_bytes());
         self.stage_len = end;
+    }
+
+    /// Append a short static fragment chosen at run time — a node's `type`
+    /// name — to the staged run, byte-identical to [`JsonWriter::stage_raw`].
+    ///
+    /// `stage_raw`'s runtime-length copy lowers to a libc `memcpy` **call**,
+    /// and for a 5–31-byte node type the call is the cost: libc's size
+    /// dispatch, plus the scratch pointer and the run's other live values
+    /// spilled around it. This moves the same bytes as two overlapping
+    /// fixed-width copies chosen by length class — at least 16 bytes: the
+    /// first 16 and the last 16; at least 8: 8 + 8; at least 4: 4 + 4; at
+    /// least 2: 2 + 2; else the one byte — each a plain register load and
+    /// store into a fixed-size window of the scratch. A fragment longer than
+    /// [`SHORT_FRAGMENT_MAX`] takes `stage_raw`'s copy.
+    ///
+    /// ⚠️ The widths are the point. glibc's AVX `memmove` moves a 16–31-byte
+    /// copy as the same two overlapping 16-byte halves, so at those lengths
+    /// inlining removes the call and the dispatch and changes nothing else. At
+    /// exactly 32 bytes the two part ways — glibc switches to 32-byte moves,
+    /// this keeps the two 16-byte halves (which then meet) — at a length no
+    /// node type reaches. Inlining a *wide* copy is a different trade — the
+    /// build's baseline SSE2 moves against libc's 32-byte AVX ones — and an
+    /// inline 128-byte blit of a whole staged header measured slower for
+    /// exactly that reason. Grade a change here on `cycles`, like every other
+    /// staged-run change.
+    #[inline]
+    pub fn stage_short(&mut self, s: &'static str) {
+        let src = s.as_bytes();
+        let n = src.len();
+        if n > SHORT_FRAGMENT_MAX {
+            self.stage_raw_cold(s);
+            return;
+        }
+        let at = self.stage_len;
+        let Some(dst) = self.stage[at..].first_chunk_mut::<SHORT_FRAGMENT_MAX>() else {
+            // Within a window of the scratch's end: `stage_raw` copies exactly
+            // (and panics exactly where it would have).
+            self.stage_raw_cold(s);
+            return;
+        };
+        // Each arm writes the fragment's first and last `K` bytes, which
+        // overlap (or meet) because `K <= n <= 2K` — so together they are the
+        // whole fragment, and `n <= SHORT_FRAGMENT_MAX` keeps both in `dst`.
+        if let (Some(head), Some(tail)) = (src.first_chunk::<16>(), src.last_chunk::<16>()) {
+            dst[..16].copy_from_slice(head);
+            dst[n - 16..n].copy_from_slice(tail);
+        } else if let (Some(head), Some(tail)) = (src.first_chunk::<8>(), src.last_chunk::<8>()) {
+            dst[..8].copy_from_slice(head);
+            dst[n - 8..n].copy_from_slice(tail);
+        } else if let (Some(head), Some(tail)) = (src.first_chunk::<4>(), src.last_chunk::<4>()) {
+            dst[..4].copy_from_slice(head);
+            dst[n - 4..n].copy_from_slice(tail);
+        } else if let (Some(head), Some(tail)) = (src.first_chunk::<2>(), src.last_chunk::<2>()) {
+            dst[..2].copy_from_slice(head);
+            dst[n - 2..n].copy_from_slice(tail);
+        } else if let Some(&byte) = src.first() {
+            dst[0] = byte;
+        }
+        self.stage_len = at + n;
+    }
+
+    /// [`JsonWriter::stage_short`]'s fallback, out of line so its libc call
+    /// stays out of the header emitters: a fragment past the inline limit, or
+    /// a window past the scratch's end — neither of which a node header reaches.
+    #[cold]
+    #[inline(never)]
+    fn stage_raw_cold(&mut self, s: &str) {
+        self.stage_raw(s);
     }
 
     /// Append a `u32`'s decimal digits to the staged run.
@@ -589,6 +666,39 @@ impl JsonWriter {
         self.buf.push(b'"');
     }
 
+    /// The same dynamic string as two consecutive field values —
+    /// `"<s>"`, then the verbatim `between` fragment, then `"<s>"` again —
+    /// byte-identical to `string(s); raw(between); string(s)`, with `s`
+    /// escaped once.
+    ///
+    /// For the node that carries one string twice: a Svelte `Text` emits its
+    /// `raw` and its `data`, which are the same bytes whenever the text decodes
+    /// to itself — and most template text is the whitespace between tags
+    /// (`"\n\t\t"`), which needs escaping, so two [`JsonWriter::string`] calls
+    /// would run `serde_json`'s per-byte escape loop over it twice. The second
+    /// field is instead a copy of the first one's **emitted** bytes
+    /// (`extend_from_within`), which is correct by construction: the escaped
+    /// form is a pure function of `s`.
+    ///
+    /// ⚠️ `inline(always)`, because `between` is only cheap as a constant. Under
+    /// plain `inline` the release build outlined this body and tail-called it,
+    /// so `between` reached it as a runtime slice and its copy became a libc
+    /// `memcpy` call behind a reserve check of its own — a second call beside
+    /// the copy of the escaped value, which is runtime-length either way.
+    /// Inlined, the fragment is a fixed-width move at each of the two call
+    /// sites, and that is −0.39% of the Svelte wire path's `instructions:u`
+    /// over 3,048 real components (the TypeScript and CSS paths never reach
+    /// it) for +224 bytes of native `.text`.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    pub fn string_pair(&mut self, s: &str, between: &str) {
+        let start = self.buf.len();
+        self.string(s);
+        let end = self.buf.len();
+        self.buf.extend_from_slice(between.as_bytes());
+        self.buf.extend_from_within(start..end);
+    }
+
     /// A non-integral `f64` (the rare literal tail) — `serde_json`'s ryu
     /// formatting, matching `serde_json::Number` serialization.
     #[inline]
@@ -750,6 +860,48 @@ mod tests {
     /// several of these never appear in real source at all.
     #[test]
     fn string_matches_serde_json() {
+        for case in &escape_cases() {
+            let ours = emit_string(case);
+            let theirs = serde_json::to_vec(case).expect("serde_json serializes a str");
+            assert_eq!(
+                ours,
+                theirs,
+                "escape parity broke on {case:?}: ours {:?}, serde_json {:?}",
+                String::from_utf8_lossy(&ours),
+                String::from_utf8_lossy(&theirs)
+            );
+        }
+    }
+
+    /// [`JsonWriter::string_pair`] against its definition — `string`, the
+    /// fragment, `string` again — over the escape-parity cases, behind a
+    /// non-empty prefix so the copied range starts past the buffer's front.
+    #[test]
+    fn string_pair_matches_two_string_calls() {
+        for case in &escape_cases() {
+            let mut ours = JsonWriter::with_capacity(0);
+            ours.raw("{\"raw\":");
+            ours.string_pair(case, ",\"data\":");
+            let mut theirs = JsonWriter::with_capacity(0);
+            theirs.raw("{\"raw\":");
+            theirs.string(case);
+            theirs.raw(",\"data\":");
+            theirs.string(case);
+            let (ours, theirs) = (ours.into_bytes(), theirs.into_bytes());
+            assert_eq!(
+                ours,
+                theirs,
+                "string_pair broke on {case:?}: ours {:?}, two strings {:?}",
+                String::from_utf8_lossy(&ours),
+                String::from_utf8_lossy(&theirs)
+            );
+        }
+    }
+
+    /// The escape-parity case set `string_matches_serde_json` grades: every
+    /// string of length 0–3 over a boundary alphabet, plus each alphabet member
+    /// at every offset of every length up to 24.
+    fn escape_cases() -> Vec<String> {
         const ALPHABET: [&str; 12] = [
             "\u{0}", "\u{8}", "\t", "\n", "\u{c}", "\r", "\u{1f}", " ", "\"", "\\", "\u{7f}", "é",
         ];
@@ -782,17 +934,7 @@ mod tests {
                 }
             }
         }
-        for case in &cases {
-            let ours = emit_string(case);
-            let theirs = serde_json::to_vec(case).expect("serde_json serializes a str");
-            assert_eq!(
-                ours,
-                theirs,
-                "escape parity broke on {case:?}: ours {:?}, serde_json {:?}",
-                String::from_utf8_lossy(&ours),
-                String::from_utf8_lossy(&theirs)
-            );
-        }
+        cases
     }
 
     /// The prescan's own answer, against a per-byte oracle — so a
@@ -1052,6 +1194,51 @@ mod tests {
                     staged.into_bytes(),
                     direct.into_bytes(),
                     "staged run diverged from the direct emitters at ({start}, {end})"
+                );
+            }
+        }
+    }
+
+    /// [`JsonWriter::stage_short`] against [`JsonWriter::stage_raw`], at every
+    /// fragment length through the inline limit and past it (the fallback),
+    /// behind prefixes that move the window across the scratch — and right up
+    /// against the scratch's end, where the fixed window no longer fits and the
+    /// fallback copies exactly. The overlap arithmetic is what can go wrong
+    /// here, and a node-type corpus reaches only 5–31 bytes of it.
+    #[test]
+    fn stage_short_matches_stage_raw() {
+        const TEXT: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        for len in 0..=SHORT_FRAGMENT_MAX + 8 {
+            let fragment: &'static str = &TEXT[..len];
+            for prefix in [
+                0,
+                1,
+                9,
+                17,
+                STAGE_CAP - SHORT_FRAGMENT_MAX - 3,
+                STAGE_CAP - len - 1,
+            ] {
+                // The trailing `!` needs one byte past the fragment.
+                if prefix + len + 1 > STAGE_CAP {
+                    continue;
+                }
+                let lead = "x".repeat(prefix);
+                let mut ours = JsonWriter::with_capacity(0);
+                ours.stage_begin();
+                ours.stage_raw(&lead);
+                ours.stage_short(fragment);
+                ours.stage_raw("!");
+                ours.stage_flush();
+                let mut theirs = JsonWriter::with_capacity(0);
+                theirs.stage_begin();
+                theirs.stage_raw(&lead);
+                theirs.stage_raw(fragment);
+                theirs.stage_raw("!");
+                theirs.stage_flush();
+                assert_eq!(
+                    ours.into_bytes(),
+                    theirs.into_bytes(),
+                    "stage_short diverged at len {len}, prefix {prefix}"
                 );
             }
         }

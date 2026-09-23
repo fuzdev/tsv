@@ -14,7 +14,8 @@
 //! - `doc` - document builder primitives for prettier-compatible formatting
 //! - `escapes` - escape sequence utilities for printers
 //! - `printing` - shared printing utilities for printers
-//! - `sizing` - sizing heuristics for public-AST JSON / arena buffers
+//! - `sizing` - sizing heuristics for public-AST JSON / arena buffers and the
+//!   wire writer's line-start table
 //! - `json_writer` - shared wire-JSON emission substrate (`json` feature)
 //! - `hash` - dep-free multiply-xor hasher for the integer-keyed side tables
 //! - `swar` - word-at-a-time byte-search kernels shared by the line scans, the

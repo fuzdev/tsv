@@ -76,9 +76,21 @@
 //! any change here on `cycles:u`, since the run's narrow stores feed a
 //! `memmove` that reads them back.
 //!
+//! **A `Text`'s `raw` and `data` are escaped once** when `data` borrows `raw`
+//! — a text with no `&`, which is nearly all template text, and mostly the
+//! whitespace between tags, which needs escaping. `JsonWriter::string_pair`
+//! escapes it once and copies the emitted bytes for the second field. The
+//! `raw`-first shapes reach it through [`write_raw_then_data`], which escapes
+//! two strings only for a text whose `data` is owned (one holding a `&`);
+//! `write_text`'s raw-content arm (`data` first) calls it directly, since a
+//! `Raw` decoding is no decode at all and its two values are the same bytes
+//! even when the text holds a `&`.
+//!
 //! **Byte-identity**: the wire JSON is a faithful emission of the Svelte
 //! parser's JSON (its acorn `<script>` shape plus `parseCss` `<style>` shape) —
 //! the shape the canonical Svelte parser's `expected.json` records.
+
+use std::borrow::Cow;
 
 use crate::ast::internal;
 use crate::whitespace::is_svelte_ws;
@@ -823,7 +835,7 @@ fn write_element(w: &mut JsonWriter, elem: &internal::Element<'_>, ctx: &Ctx<'_>
     // Staged burst; ends at the dynamic `name` (module doc, Staged runs).
     w.stage_begin();
     w.stage_raw("{\"type\":\"");
-    w.stage_raw(node_type);
+    w.stage_short(node_type);
     w.stage_raw("\",\"start\":");
     w.stage_u32(ctx.pos(elem.span.start));
     w.stage_raw(",\"end\":");
@@ -971,11 +983,11 @@ fn write_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
         w.u32(ctx.pos(text.span.start));
         w.raw(",\"end\":");
         w.u32(ctx.pos(text.span.end));
+        // `data`, then `raw`: a `Raw` decoding is no decode at all, so the two
+        // are always the same bytes and the pair escapes them once.
+        debug_assert_eq!(text.data(ctx.source), text.raw(ctx.source));
         w.raw(",\"type\":\"Text\",\"data\":");
-        let data = text.data(ctx.source);
-        w.string(&data);
-        w.raw(",\"raw\":");
-        w.string(text.raw(ctx.source));
+        w.string_pair(text.raw(ctx.source), ",\"raw\":");
         w.raw("}");
         return;
     }
@@ -987,11 +999,30 @@ fn write_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
     w.stage_u32(ctx.pos(text.span.end));
     w.stage_raw(",\"raw\":");
     w.stage_flush();
-    w.string(text.raw(ctx.source));
-    w.raw(",\"data\":");
-    let data = text.data(ctx.source);
-    w.string(&data);
+    write_raw_then_data(w, text, ctx);
     w.raw("}");
+}
+
+/// A `Text`'s `raw` value, `,"data":`, then its `data` value — the tail every
+/// `raw`-first `Text` shape shares.
+///
+/// `data` borrows `raw` whenever the text holds no `&` (nearly every template
+/// text), and then the two values are the same bytes: [`JsonWriter::string_pair`]
+/// escapes them once and copies the escaped form. Only a text holding a `&`
+/// (`Cow::Owned`) escapes two strings.
+fn write_raw_then_data(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
+    let raw = text.raw(ctx.source);
+    match text.data(ctx.source) {
+        Cow::Borrowed(data) => {
+            debug_assert_eq!(data, raw, "a borrowed `data` is `raw` itself");
+            w.string_pair(raw, ",\"data\":");
+        }
+        Cow::Owned(data) => {
+            w.string(raw);
+            w.raw(",\"data\":");
+            w.string(&data);
+        }
+    }
 }
 
 /// A sequence-context `Text` (a `<textarea>`'s content): the canonical
@@ -1002,10 +1033,7 @@ fn write_text_sequence(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>)
     w.raw(",\"end\":");
     w.u32(ctx.pos(text.span.end));
     w.raw(",\"type\":\"Text\",\"raw\":");
-    w.string(text.raw(ctx.source));
-    w.raw(",\"data\":");
-    let data = text.data(ctx.source);
-    w.string(&data);
+    write_raw_then_data(w, text, ctx);
     w.raw("}");
 }
 
@@ -1568,10 +1596,7 @@ fn write_attribute_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>
     w.raw(",\"end\":");
     w.u32(ctx.pos(text.span.end));
     w.raw(",\"type\":\"Text\",\"raw\":");
-    w.string(text.raw(ctx.source));
-    w.raw(",\"data\":");
-    let data = text.data(ctx.source);
-    w.string(&data);
+    write_raw_then_data(w, text, ctx);
     w.raw("}");
 }
 
@@ -2169,9 +2194,7 @@ fn write_custom_element_field(
                 if let ExpressionKind::Literal(lit) = &expr.expression.kind
                     && let LiteralValue::String(cooked) = &lit.value
                 {
-                    Some(std::borrow::Cow::Borrowed(
-                        cooked.resolve(lit.span, ctx.source),
-                    ))
+                    Some(Cow::Borrowed(cooked.resolve(lit.span, ctx.source)))
                 } else {
                     None
                 }
