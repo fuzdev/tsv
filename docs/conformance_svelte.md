@@ -208,8 +208,9 @@ split — `[a=b<NBSP>]` is the value `b`, `[a=b<NBSP>i]` the value `b` and the f
 (`:nth-child(2n<NBSP>)`). And the **declaration-vs-rule byte scan**, ASCII by design (it
 declines what it does not model) but declining to a token lookahead that was the narrow one,
 so `a { color <NBSP>: red }`'s run read as the identifier that should have been the `:` and
-the declaration was rejected; the fallback is the boundary-aware lookahead and
-`parse_declaration` steps the gap with `skip_boundary_whitespace_and_comments`.
+the declaration was rejected; the fallback is the boundary-aware lookahead, and a run in the
+gap declines the declaration's byte head as well, so the gap is stepped by its token head
+(`lex_declaration_head`) with `skip_boundary_whitespace_and_comments`.
 
 ⚠️ **Where the two readers tokenize a run differently, the printer keeps the bytes.** To
 css-syntax-3 whitespace is ASCII only and the run is identifier content — a legacy tokenizer
