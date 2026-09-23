@@ -35,8 +35,40 @@
 //! separate pass that builds such a map must be configured *identically* to the emit
 //! that reads it (parser variant, schema). Here the node that closes first **is** the
 //! node that attached first, and one emission carries the configuration.
+//!
+//! **A subtree that provably takes no comment is skipped.** Most of a comment-bearing
+//! island's nodes sit nowhere near a comment, so at every non-root open the attach asks
+//! whether anything in the subtree about to open could take the queue's front comment `c`,
+//! and when nothing can it skips the whole subtree — no frame, no attach, no emission, one
+//! depth count per open and close ([`CommentAttach::skip_depth`]). A skipped subtree
+//! claims nothing, so `c` stays the front throughout and every comment behind it starts
+//! later still: the one test at the subtree's root covers all of it. The subtree rooted at
+//! the opening node `N`, under its parent `P`, is skipped when the queue is empty, or when
+//! both of these hold:
+//!
+//! - `N.end < floor(c)`, where `floor(c)` is where the run of trailing-gap bytes (`,` `)`
+//!   space tab) that ends at `c.start` begins — so `c` starts past `N`, and the gap from any
+//!   position at or before `N.end` up to `c` holds a byte outside the class;
+//! - `N` is not `P`'s last body entry, or `c.start >= P.end`.
+//!
+//! Rule by rule, for every node `M` in the subtree, `N` included: a leading claim needs
+//! `c.start < M.start`, but `M.start <= M.end <= N.end < c.start`; the single trailing claim
+//! needs `M.end..c.start` to be all trailing-gap bytes, and that gap holds `floor(c) - 1`; a
+//! last-in-body run stops at the parent's end, which inside the subtree is at most `N.end`
+//! and for `N` itself is `P.end <= c.start` by the second condition. (The `node.end ==
+//! parent.end` suppression only ever withholds a claim.) The root fallback and the
+//! preceding-HTML entry are root-only, and the root is never skipped.
+//!
+//! ⚠️ The proof leans on one fact about the writer: **a non-root node's children end no
+//! later than it does** (a child may START earlier — a decorator ahead of `export` — which
+//! the proof never needs). The one node that breaks it is a typed Svelte block binding
+//! (`{#each xs as a: T}`), whose span is the bare binding while its `typeAnnotation` child
+//! runs past it, and that node is always its island's root. A debug build asserts the fact
+//! at every open, asserts where the writer emits that node that it opens as its island's
+//! root (`CommentAttach::debug_assert_opens_island_root`), and asserts at every skipped
+//! node that the rules would have claimed nothing there.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 use super::CommentMode;
 use tsv_lang::{AcornPrefix, Comment, JsonWriter, LocationMapper, Span};
@@ -132,6 +164,32 @@ struct State {
     /// — each child truncates back to its own `lead_start`, so by the time a node closes
     /// the buffer has shrunk back to exactly that node's own leading run.
     attached: Vec<u32>,
+    /// `floor(c)` for the queue front, keyed by the `head` it was computed for — it
+    /// changes only when a claim moves the front, so one backward scan serves every
+    /// skip test until then.
+    front_floor: Option<(usize, u32)>,
+    /// Debug-only: the skipped subtree's open nodes, so a skipped close is still paired
+    /// against its open and still checked against the rules it skips.
+    #[cfg(debug_assertions)]
+    skipped: Vec<SkippedFrame>,
+    /// Debug-only: a last-body mark made inside a skipped subtree, which the attach does
+    /// not record ([`CommentAttach::mark_last_body_element`]). The next skipped open
+    /// consumes it, and a skipped close that finds it still set has caught a marked
+    /// element that emitted no node — the check `close_attached` makes of a recorded
+    /// mark.
+    #[cfg(debug_assertions)]
+    skipped_mark_pending: bool,
+}
+
+/// Debug-only: one open node of a skipped subtree (see [`State::skipped`]).
+#[cfg(debug_assertions)]
+struct SkippedFrame {
+    node_type: &'static str,
+    span: Span,
+    /// Known for the subtree's root, whose open ran the attach; `None` below it, where
+    /// the attach does not record the last-body mark (see
+    /// [`CommentAttach::mark_last_body_element`]) and the check reads both answers.
+    is_last_in_body: Option<bool>,
 }
 
 /// The online comment attach for one island (one canonical acorn parse).
@@ -143,6 +201,12 @@ pub struct CommentAttach<'a> {
     source: &'a str,
     /// What the island declared — its comment window and the root's surroundings.
     island: IslandComments<'a>,
+    /// How many nodes of a skipped subtree are open (the module doc's skip): `0` while
+    /// the attach runs, and while it is not, every open adds one and every close takes
+    /// one away with no frame and no emission. A `Cell` beside the `RefCell` rather than
+    /// a field inside it, so a skipped open or close touches this one word and nothing
+    /// else — no borrow, and none of the attach body's frame.
+    skip_depth: Cell<u32>,
     state: RefCell<State>,
 }
 
@@ -153,6 +217,7 @@ impl<'a> CommentAttach<'a> {
         Self {
             source,
             island,
+            skip_depth: Cell::new(0),
             state: RefCell::new(State::default()),
         }
     }
@@ -173,16 +238,55 @@ impl<'a> CommentAttach<'a> {
         }
     }
 
-    /// A node opens: shift every comment before the node's start onto it as leading.
+    /// A node opens: inside a skipped subtree (the module doc's skip), count it and
+    /// nothing else; otherwise run the attach ([`open_attached`](Self::open_attached)).
     ///
-    /// `#[cold]` because an ordinary (comment-free) emission never reaches this body:
-    /// keeping its register pressure out of the inlined node emitters is what makes
-    /// `CommentMode` cost one never-taken compare per node.
-    // `node_type` feeds only the open/close pairing assert, which is debug-only.
+    /// `#[cold]` because an ordinary (comment-free) emission never reaches this: keeping
+    /// it out of the node emitters' way is what makes `CommentMode` cost one never-taken
+    /// compare per node. The skipped path is split from the attach body so that it pays
+    /// for neither the `RefCell` borrow nor the body's frame; it is most of an island's
+    /// opens.
+    ///
+    /// `#[inline]` as well, unlike [`close_and_emit`](Self::close_and_emit): its handful
+    /// of callers (`node_header_impl` and the hand-written headers) take a skipped open
+    /// with no call at all, and the `#[cold]` still marks the branch to it unlikely there.
     #[cold]
-    #[cfg_attr(not(debug_assertions), allow(unused_variables))]
+    #[inline]
     pub(super) fn open(&self, node_type: &'static str, span: Span) {
+        let depth = self.skip_depth.get();
+        if depth > 0 {
+            self.skip_depth.set(depth + 1);
+            #[cfg(debug_assertions)]
+            self.debug_open_skipped(node_type, span);
+            return;
+        }
+        self.open_attached(node_type, span);
+    }
+
+    /// A node opens outside a skipped subtree: shift every comment before the node's
+    /// start onto it as leading — or, when nothing in the subtree it roots can take a
+    /// comment, start skipping that subtree.
+    // `node_type` feeds only the open/close pairing and the skip's checks, which are
+    // debug-only.
+    #[cold]
+    #[cfg_attr(not(debug_assertions), expect(unused_variables))]
+    fn open_attached(&self, node_type: &'static str, span: Span) {
         let st = &mut *self.state.borrow_mut();
+        let is_last_in_body = std::mem::take(&mut st.next_is_last_body);
+        #[cfg(debug_assertions)]
+        self.debug_check_open(st, node_type, span);
+        if let Some(parent_end) = st.frames.last().map(|f| f.span.end)
+            && self.subtree_takes_nothing(st, span, parent_end, is_last_in_body)
+        {
+            self.skip_depth.set(1);
+            #[cfg(debug_assertions)]
+            st.skipped.push(SkippedFrame {
+                node_type,
+                span,
+                is_last_in_body: Some(is_last_in_body),
+            });
+            return;
+        }
         let lead_start = st.attached.len() as u32;
         while self.front(st).is_some_and(|c| c.span.start < span.start) {
             st.attached.push(st.head as u32);
@@ -195,8 +299,42 @@ impl<'a> CommentAttach<'a> {
             span,
             lead_start,
             lead_end,
-            is_last_in_body: std::mem::take(&mut st.next_is_last_body),
+            is_last_in_body,
         });
+    }
+
+    /// Whether nothing in the subtree about to open at `span` can take a comment —
+    /// the module doc's skip test, asked of a non-root node whose parent ends at
+    /// `parent_end`.
+    fn subtree_takes_nothing(
+        &self,
+        st: &mut State,
+        span: Span,
+        parent_end: u32,
+        is_last_in_body: bool,
+    ) -> bool {
+        let Some(front) = self.front(st) else {
+            return true;
+        };
+        span.end < self.front_floor(st, front)
+            && (!is_last_in_body || front.span.start >= parent_end)
+    }
+
+    /// `floor(c)` for the queue front `front`: the start of the run of trailing-gap
+    /// bytes that ends where it starts. Cached per front ([`State::front_floor`]).
+    fn front_floor(&self, st: &mut State, front: &Comment) -> u32 {
+        if let Some((head, floor)) = st.front_floor
+            && head == st.head
+        {
+            return floor;
+        }
+        let before = &self.source.as_bytes()[..front.span.start as usize];
+        let floor = before
+            .iter()
+            .rposition(|&b| !is_trailing_gap_byte(b))
+            .map_or(0, |i| i + 1) as u32;
+        st.front_floor = Some((st.head, floor));
+        floor
     }
 
     /// The **next** node to open is its parent's last `body` / `elements` / `properties`
@@ -211,15 +349,32 @@ impl<'a> CommentAttach<'a> {
     /// span starting at the `@` and emits an `ExportNamedDeclaration` starting at
     /// `export`, so a `body.last().span().start` reading names a position no node ever
     /// opens at and the last statement silently stops being last-in-body.
+    ///
+    /// Inside a skipped subtree the mark is not recorded: the element it names opens
+    /// inside that subtree too, and a skipped open reads nothing — so no mark is ever
+    /// recorded while the attach skips, which is what lets a skipped open leave the
+    /// state untouched. A debug build still notes it (`State::skipped_mark_pending`),
+    /// so a marked element that emits no node is caught inside a skipped subtree as it
+    /// is outside one.
     #[cold]
     pub(super) fn mark_last_body_element(&self) {
-        self.state.borrow_mut().next_is_last_body = true;
+        #[cfg(debug_assertions)]
+        self.debug_mark_skipped();
+        if self.skip_depth.get() == 0 {
+            self.state.borrow_mut().next_is_last_body = true;
+        }
     }
 
-    /// A node closes: decide its trailing comments, then emit both lists.
+    /// A node closes: inside a skipped subtree, count it and nothing else; otherwise
+    /// decide its trailing comments and emit both lists
+    /// ([`close_attached`](Self::close_attached)).
     ///
-    /// `#[cold]`, as [`open`](Self::open).
+    /// `#[cold]`, and split from its body, as [`open`](Self::open) — but kept out of
+    /// line with `#[inline(never)]`: a body this small is otherwise inlined despite
+    /// `#[cold]`, and at the hundred-odd node emitters that close through it that
+    /// reshapes the comment-free path it exists to stay out of.
     #[cold]
+    #[inline(never)]
     pub(super) fn close_and_emit(
         &self,
         w: &mut JsonWriter,
@@ -227,7 +382,32 @@ impl<'a> CommentAttach<'a> {
         span: Span,
         loc: LocationMapper<'_>,
     ) {
+        let depth = self.skip_depth.get();
+        if depth > 0 {
+            self.skip_depth.set(depth - 1);
+            #[cfg(debug_assertions)]
+            self.debug_close_skipped(node_type, span);
+            return;
+        }
+        self.close_attached(w, node_type, span, loc);
+    }
+
+    /// A node closes outside a skipped subtree: decide its trailing comments, then emit
+    /// both lists.
+    #[cold]
+    fn close_attached(
+        &self,
+        w: &mut JsonWriter,
+        node_type: &'static str,
+        span: Span,
+        loc: LocationMapper<'_>,
+    ) {
         let st = &mut *self.state.borrow_mut();
+        debug_assert!(
+            !st.next_is_last_body,
+            "{node_type} closed with an unconsumed last-body mark — the marked element \
+             emitted no node, so the mark would land on an unrelated one"
+        );
         let Some(frame) = st.frames.pop() else {
             debug_assert!(false, "attach close without open: {node_type}");
             return;
@@ -248,11 +428,6 @@ impl<'a> CommentAttach<'a> {
             st.attached.len(),
             "a closing node's descendants left entries behind — its trailing run must \
              start exactly at the end of its own leading run"
-        );
-        debug_assert!(
-            !st.next_is_last_body,
-            "{node_type} closed with an unconsumed last-body mark — the marked element \
-             emitted no node, so the mark would land on an unrelated one"
         );
         let is_root = st.frames.is_empty();
         let parent_end = if is_root {
@@ -281,7 +456,8 @@ impl<'a> CommentAttach<'a> {
         (st.head < self.island.queue.len()).then(|| self.island.queue[st.head].0)
     }
 
-    /// acorn's post-recursion trailing rule for one node.
+    /// acorn's post-recursion trailing rule for one node: claim the comments
+    /// [`trailing_claim`](Self::trailing_claim) counts off the queue front.
     fn attach_trailing(
         &self,
         st: &mut State,
@@ -289,31 +465,177 @@ impl<'a> CommentAttach<'a> {
         parent_end: Option<u32>,
         is_last_in_body: bool,
     ) {
+        // A `push` per claim, never `extend` over the index range: `extend` reserves
+        // through `RawVecInner::reserve`, and a `Vec<u32>` call there is the one caller
+        // in this crate whose element size is not 1 — enough to stop LLVM specializing
+        // every byte-buffer reserve site in the codegen unit (~10 KB of `.text`).
+        for _ in 0..self.trailing_claim(st, span, parent_end, is_last_in_body) {
+            st.attached.push(st.head as u32);
+            st.head += 1;
+        }
+    }
+
+    /// How many comments, from the queue front, acorn's trailing rule assigns to a
+    /// node closing at `span` — the rule itself, apart from applying it, so the skip's
+    /// debug check reads the same rule the attach does.
+    fn trailing_claim(
+        &self,
+        st: &State,
+        span: Span,
+        parent_end: Option<u32>,
+        is_last_in_body: bool,
+    ) -> usize {
         let Some(first) = self.front(st) else {
-            return;
+            return 0;
         };
         // `if (parent === undefined || node.end !== parent.end)` — a node ending where
         // its parent ends leaves the claim to the parent.
         if parent_end == Some(span.end) {
-            return;
+            return 0;
         }
         if is_last_in_body {
             // Last in a body: several trailing comments, newlines allowed between them,
             // stopping at the parent's own end.
-            while let Some(c) = self.front(st) {
-                if parent_end.is_some_and(|pe| c.span.start >= pe) {
-                    break;
-                }
-                st.attached.push(st.head as u32);
-                st.head += 1;
+            let rest = &self.island.queue[st.head..];
+            match parent_end {
+                Some(pe) => rest.iter().take_while(|(c, _)| c.span.start < pe).count(),
+                None => rest.len(),
             }
         } else if span.end <= first.span.start {
             // Otherwise at most ONE, and only across a `/^[,) \t]*$/` gap.
-            let gap = &self.source[span.end as usize..first.span.start as usize];
-            if gap.bytes().all(|b| matches!(b, b',' | b')' | b' ' | b'\t')) {
-                st.attached.push(st.head as u32);
-                st.head += 1;
-            }
+            let gap = &self.source.as_bytes()[span.end as usize..first.span.start as usize];
+            usize::from(gap.iter().all(|&b| is_trailing_gap_byte(b)))
+        } else {
+            0
+        }
+    }
+
+    /// Debug-only, at every open: the fact the skip's proof leans on — a non-root
+    /// node's children end no later than it does — and, inside a skipped subtree, that
+    /// the leading rule would have claimed nothing here.
+    #[cfg(debug_assertions)]
+    fn debug_check_open(&self, st: &State, node_type: &'static str, span: Span) {
+        let parent = match st.skipped.last() {
+            Some(skipped) => Some((skipped.node_type, skipped.span)),
+            // The root's children are exempt: a typed block binding's annotation runs
+            // past its bare root (the writer asserts that binding is a root where it
+            // emits one), and the root is never skipped.
+            None if st.frames.len() >= 2 => st.frames.last().map(|f| (f.node_type, f.span)),
+            None => None,
+        };
+        if let Some((parent_type, parent_span)) = parent {
+            assert!(
+                span.end <= parent_span.end,
+                "{node_type} ({},{}) ends past its non-root parent {parent_type} ({},{}) — \
+                 the comment attach's subtree skip assumes it cannot",
+                span.start,
+                span.end,
+                parent_span.start,
+                parent_span.end,
+            );
+        }
+        if self.skip_depth.get() > 0 {
+            assert!(
+                self.front(st).is_none_or(|c| c.span.start >= span.start),
+                "skipped {node_type} ({},{}) would have taken a leading comment",
+                span.start,
+                span.end,
+            );
+        }
+    }
+
+    /// Debug-only, ahead of an open: the node about to open at `span` is its island's
+    /// root — no node is open, skipped or not. Asked by the writers that emit the
+    /// one node whose child may end past it (a typed Svelte block binding — the module
+    /// doc's ⚠️), so the skip's assumption is checked where that shape is made.
+    #[cfg(debug_assertions)]
+    pub(super) fn debug_assert_opens_island_root(&self, node_type: &'static str, span: Span) {
+        assert!(
+            self.skip_depth.get() == 0 && self.state.borrow().frames.is_empty(),
+            "{node_type} ({},{}) has a child ending past it but is not its island's root — \
+             the comment attach's subtree skip assumes only a root can",
+            span.start,
+            span.end,
+        );
+    }
+
+    /// Debug-only, at a last-body mark: inside a skipped subtree, note the mark the
+    /// attach does not record ([`State::skipped_mark_pending`]).
+    #[cfg(debug_assertions)]
+    fn debug_mark_skipped(&self) {
+        if self.skip_depth.get() > 0 {
+            self.state.borrow_mut().skipped_mark_pending = true;
+        }
+    }
+
+    /// Debug-only, at a skipped open: the checks every open takes, then the shadow
+    /// frame its close is paired against. The open consumes a pending skipped mark —
+    /// the marked element is the node opening here.
+    #[cfg(debug_assertions)]
+    fn debug_open_skipped(&self, node_type: &'static str, span: Span) {
+        let st = &mut *self.state.borrow_mut();
+        assert!(
+            !st.next_is_last_body,
+            "a last-body mark is recorded inside a skipped subtree"
+        );
+        st.skipped_mark_pending = false;
+        self.debug_check_open(st, node_type, span);
+        st.skipped.push(SkippedFrame {
+            node_type,
+            span,
+            is_last_in_body: None,
+        });
+    }
+
+    /// Debug-only, at a skipped close: no last-body mark is left pending, the close
+    /// pairs against its open, and the trailing rule would have claimed nothing here.
+    #[cfg(debug_assertions)]
+    fn debug_close_skipped(&self, node_type: &'static str, span: Span) {
+        let st = &mut *self.state.borrow_mut();
+        assert!(
+            !st.next_is_last_body && !st.skipped_mark_pending,
+            "{node_type} closed with an unconsumed last-body mark in a skipped subtree — \
+             the marked element emitted no node, so outside a skip the mark would land on \
+             an unrelated one"
+        );
+        let Some(frame) = st.skipped.pop() else {
+            debug_assert!(false, "a skipped close without a skipped open: {node_type}");
+            return;
+        };
+        assert!(
+            frame.node_type == node_type && frame.span == span,
+            "attach open/close mismatch in a skipped subtree: opened {} ({},{}), closed \
+             {node_type} ({},{})",
+            frame.node_type,
+            frame.span.start,
+            frame.span.end,
+            span.start,
+            span.end,
+        );
+        let Some(parent_end) = st
+            .skipped
+            .last()
+            .map(|parent| parent.span.end)
+            .or_else(|| st.frames.last().map(|f| f.span.end))
+        else {
+            debug_assert!(false, "a skipped subtree's root is never the island root");
+            return;
+        };
+        // Below the subtree's root the mark is not recorded, so both answers are read:
+        // the proof makes each claim nothing there.
+        let readings: &[bool] = match frame.is_last_in_body {
+            Some(is_last_in_body) => &[is_last_in_body][..],
+            None => &[false, true],
+        };
+        for &is_last_in_body in readings {
+            assert_eq!(
+                self.trailing_claim(st, span, Some(parent_end), is_last_in_body),
+                0,
+                "skipped {node_type} ({},{}) would have taken a trailing comment \
+                 (last in body: {is_last_in_body})",
+                span.start,
+                span.end,
+            );
         }
     }
 
@@ -413,6 +735,14 @@ impl<'a> CommentAttach<'a> {
     }
 }
 
+/// The byte class of acorn's single-trailing-comment gap, `/^[,) \t]*$/` — one
+/// definition because the skip's `floor(c)` is only sound over exactly the class the
+/// trailing rule tests.
+#[inline]
+fn is_trailing_gap_byte(b: u8) -> bool {
+    matches!(b, b',' | b')' | b' ' | b'\t')
+}
+
 /// The island's close-out: every `attach_open` owes a `close_node`, and a writer that
 /// returns without one leaves a node's comments unemitted.
 ///
@@ -431,11 +761,14 @@ impl Drop for CommentAttach<'_> {
             return;
         }
         let st = self.state.borrow();
+        let skipped = self.skip_depth.get() as usize;
         assert!(
-            st.frames.is_empty() && st.attached.is_empty(),
-            "an island finished with {} unclosed node(s) and {} unemitted comment(s)",
-            st.frames.len(),
+            st.frames.is_empty() && st.attached.is_empty() && skipped == 0,
+            "an island finished with {} unclosed node(s) ({skipped} of them skipped) and {} \
+             unemitted comment(s)",
+            st.frames.len() + skipped,
             st.attached.len(),
         );
+        debug_assert_eq!(st.skipped.len(), skipped);
     }
 }

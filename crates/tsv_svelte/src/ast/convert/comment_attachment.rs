@@ -490,4 +490,167 @@ mod tests {
             Some(" c")
         );
     }
+
+    /// The online attach's **subtree skip** at its boundaries.
+    ///
+    /// `tsv_ts`'s `CommentAttach` skips a subtree when nothing in it can take the queue's
+    /// front comment (its module doc states the test and the proof): the queue is empty,
+    /// or the front comment starts past the subtree's end *and* past the run of `,` `)`
+    /// space tab bytes in front of it, and a last-in-body subtree's parent ends before
+    /// it. Each case sits on one edge of that test, where a gate one byte too eager would
+    /// move a comment — a descendant ending inside the gap-class run, a last-in-body child
+    /// whose parent is still open, the drained queue, the preceding-HTML entry with
+    /// nothing queued.
+    ///
+    /// Every expected placement is transcribed from `canonical_parse`. The other half of
+    /// the guard runs underneath: a debug build (which `cargo test` is) asserts at every
+    /// skipped node that acorn's rules would have claimed nothing there.
+    mod subtree_skip {
+        use serde_json::Value;
+
+        const LEADING: &str = "leadingComments";
+        const TRAILING: &str = "trailingComments";
+
+        /// One attached comment: the carrying node's `type` / `start` / `end`, the list
+        /// it sits in, and the comment's `value`.
+        type Placement = (String, u64, u64, &'static str, String);
+
+        /// Every `leadingComments` / `trailingComments` entry in the wire, in document
+        /// order.
+        #[expect(clippy::expect_used)]
+        fn placements(v: &Value, out: &mut Vec<Placement>) {
+            match v {
+                Value::Object(map) => {
+                    for key in [LEADING, TRAILING] {
+                        let comments = map.get(key).and_then(Value::as_array);
+                        for comment in comments.into_iter().flatten() {
+                            out.push((
+                                map["type"].as_str().expect("node type").to_owned(),
+                                map["start"].as_u64().expect("node start"),
+                                map["end"].as_u64().expect("node end"),
+                                key,
+                                comment["value"].as_str().expect("value").to_owned(),
+                            ));
+                        }
+                    }
+                    for (key, child) in map {
+                        if key != LEADING && key != TRAILING {
+                            placements(child, out);
+                        }
+                    }
+                }
+                Value::Array(items) => items.iter().for_each(|item| placements(item, out)),
+                _ => {}
+            }
+        }
+
+        /// Assert `source`'s placements on both wires — the attach knows nothing about
+        /// line and column, so the `no-locations` variant must place every comment
+        /// identically.
+        #[expect(clippy::expect_used)]
+        fn assert_placements(source: &str, expected: &[(&str, u64, u64, &'static str, &str)]) {
+            let arena = bumpalo::Bump::new();
+            let root = crate::parse(source, &arena).expect("parse");
+            let expected: Vec<Placement> = expected
+                .iter()
+                .map(|&(node, start, end, key, value)| {
+                    (node.to_owned(), start, end, key, value.to_owned())
+                })
+                .collect();
+            for (wire_name, bytes) in [
+                ("default", crate::convert_ast_json_bytes(&root, source)),
+                (
+                    "no-locations",
+                    crate::convert_ast_json_bytes_no_locations(&root, source),
+                ),
+            ] {
+                let wire: Value = serde_json::from_slice(&bytes).expect("wire");
+                let mut found = Vec::new();
+                placements(&wire, &mut found);
+                assert_eq!(found, expected, "{wire_name} wire: {source:?}");
+            }
+        }
+
+        #[test]
+        fn a_descendant_ending_inside_the_gap_class_run_takes_the_comment() {
+            // `x` ends where the `), ` run before the comment begins, so its gap to the
+            // comment is all class bytes and it claims, two levels below the argument
+            // `g(x)`. A test that asked only whether the comment starts past the argument
+            // would skip `g(x)` and lose the claim.
+            assert_placements(
+                "{f(g(x), /* c */ y)}",
+                &[("Identifier", 5, 6, TRAILING, " c ")],
+            );
+            // The run begins exactly at the node's end.
+            assert_placements("{[a, /* c */ b]}", &[("Identifier", 2, 3, TRAILING, " c ")]);
+            // A tab is in the class too.
+            assert_placements(
+                "{f(a,\t/* c */ b)}",
+                &[("Identifier", 3, 4, TRAILING, " c ")],
+            );
+        }
+
+        #[test]
+        fn a_gap_outside_the_class_lets_the_comment_lead_the_next_node() {
+            // The `+` stops the run, so `f(a)` and everything in it is skipped and the
+            // comment leads `b`.
+            assert_placements(
+                "{f(a) + /* c */ b}",
+                &[("Identifier", 16, 17, LEADING, " c ")],
+            );
+        }
+
+        #[test]
+        fn a_last_in_body_child_takes_a_comment_before_its_parent_closes() {
+            // The comment is on its own line, so no single-trailing claim reaches it — but
+            // `a();` is its block's last statement, and that run stops only at the `}`.
+            assert_placements(
+                "<script>\n\tfunction f() {\n\t\ta();\n\t\t// c\n\t}\n</script>\n",
+                &[("ExpressionStatement", 27, 31, TRAILING, " c")],
+            );
+            // Once the block has closed, the whole function is skipped and the comment
+            // leads the next statement.
+            assert_placements(
+                "<script>\n\tfunction f() {\n\t\ta();\n\t}\n\t// c\n\tb();\n</script>\n",
+                &[("ExpressionStatement", 42, 46, LEADING, " c")],
+            );
+        }
+
+        #[test]
+        fn nested_last_in_body_children_each_see_their_own_parent() {
+            // The inner object's last property claims; the outer property holding it is
+            // itself last-in-body and contains the comment, so it is never a skip candidate.
+            assert_placements(
+                "<script>\n\tconst o = {\n\t\ta: {\n\t\t\tb: 1\n\t\t\t// c\n\t\t}\n\t};\n</script>\n",
+                &[("Property", 32, 36, TRAILING, " c")],
+            );
+            // The script's last statement claims the comment below it; every last-in-body
+            // container inside it (the object's `a`, the array's `{ b: 2 }`) is bounded by
+            // a parent that closes before the comment, so the declarator's whole subtree
+            // is skipped.
+            assert_placements(
+                "<script>\n\tconst o = { a: [1, { b: 2 }] }\n\t/* c */\n</script>\n",
+                &[("VariableDeclaration", 10, 40, TRAILING, " c ")],
+            );
+        }
+
+        #[test]
+        fn a_drained_queue_skips_everything_after_it() {
+            assert_placements(
+                "<script>\n\t// c\n\tconst a = { b: [1, 2] };\n\tfoo(a);\n</script>\n",
+                &[("VariableDeclaration", 16, 40, LEADING, " c")],
+            );
+        }
+
+        #[test]
+        fn a_preceding_html_comment_with_an_empty_queue_still_reaches_the_program() {
+            // The island is built for the HTML comment alone, so its queue is empty from
+            // the first open: every node below the root is skipped, and the root still
+            // emits the entry.
+            assert_placements(
+                "<!-- note -->\n<script>\n\tconst a = { b: 1 };\n</script>\n",
+                &[("Program", 22, 44, LEADING, " note ")],
+            );
+        }
+    }
 }
