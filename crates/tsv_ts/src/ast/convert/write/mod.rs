@@ -681,6 +681,8 @@ pub(super) fn node_header_wide_end(
     ctx: &Ctx<'_>,
 ) {
     let wire_end = wire_end.max(span.end);
+    #[cfg(debug_assertions)]
+    debug_assert_overhanging_node_is_island_root(node_type, span, wire_end, ctx);
     attach_open(node_type, span, ctx);
     w.raw("{\"type\":\"");
     w.raw(node_type);
@@ -708,6 +710,26 @@ pub(super) fn node_header_wide_end(
     w.raw(",\"column\":");
     w.usize(end.column);
     w.raw("}}");
+}
+
+/// Debug-only, ahead of a node's open: a node whose subtree ends at `subtree_end`, past
+/// its own `span` — a typed Svelte block binding, whose `typeAnnotation` hangs off the
+/// bare pattern — must be its comment-bearing island's root. It is the one shape that
+/// breaks what the online attach's subtree skip leans on (a non-root node's children end
+/// no later than it does; `comments.rs`'s module doc), and the root is the one node the
+/// skip never needs it of, so the assumption is checked here, where the shape is made.
+#[cfg(debug_assertions)]
+fn debug_assert_overhanging_node_is_island_root(
+    node_type: &'static str,
+    span: Span,
+    subtree_end: u32,
+    ctx: &Ctx<'_>,
+) {
+    if subtree_end > span.end
+        && let CommentMode::Attach(attach) = ctx.comments
+    {
+        attach.debug_assert_opens_island_root(node_type, span);
+    }
 }
 
 /// Shared body of `node_header` and the name-first identifier emission;
@@ -996,6 +1018,15 @@ pub(super) fn write_identifier_parts_with_character(
     decorators: Option<&[internal::Decorator<'_>]>,
     ctx: &Ctx<'_>,
 ) {
+    // A typed simple block binding is the bare `Identifier` the annotation hangs
+    // off, past its span.
+    #[cfg(debug_assertions)]
+    debug_assert_overhanging_node_is_island_root(
+        "Identifier",
+        span,
+        type_annotation.map_or(span.end, |ta| ta.span.end),
+        ctx,
+    );
     attach_open("Identifier", span, ctx);
     w.raw("{\"type\":\"Identifier\",\"name\":");
     write_name(w, name, span.start, ctx);
