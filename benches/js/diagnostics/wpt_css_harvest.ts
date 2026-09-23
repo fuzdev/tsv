@@ -13,6 +13,13 @@
  * Skips:
  * - `*.sub.html` — wpt server-side substitution templates (`{{…}}`
  *   placeholders are not CSS)
+ * - `<style>` tags inside a `<script>` block — markup in a JS string a test
+ *   builds at runtime (`'<style>' + slottedStyle + '</style>'`). The bytes
+ *   between the tags are JS source, not the stylesheet the browser gets: a
+ *   concatenation, or a literal whose escapes are JS's (`'\\'`, `\'`) rather
+ *   than CSS's. Blocks are still numbered by their position among every
+ *   `<style>` match in the file, so a skip here never renames the blocks after
+ *   it.
  * - `<style type="…">` blocks whose type is not `text/css` (wpt uses bogus
  *   types deliberately)
  * - whitespace-only blocks
@@ -94,6 +101,7 @@ if (
 }
 
 const STYLE_BLOCK_RE = /<style\b([^>]*)>([\s\S]*?)<\/style\s*>/gi;
+const SCRIPT_BLOCK_RE = /<script\b[^>]*>[\s\S]*?<\/script\s*>/gi;
 const TYPE_ATTR_RE = /\btype\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;
 
 const stats = {
@@ -101,6 +109,7 @@ const stats = {
 	sub_html_skipped: 0,
 	files_with_blocks: 0,
 	blocks_written: 0,
+	blocks_skipped_in_script: 0,
 	blocks_skipped_type: 0,
 	blocks_skipped_empty: 0,
 	blocks_skipped_duplicate: 0,
@@ -122,10 +131,17 @@ for (const entry of entries) {
 	stats.html_files_scanned++;
 	const path = join(entry.parentPath, entry.name);
 	const html = await readFile(path, 'utf8');
+	const script_spans = [...html.matchAll(SCRIPT_BLOCK_RE)].map(
+		(m) => [m.index, m.index + m[0].length] as const
+	);
 	let block_index = 0;
 	let wrote_any = false;
 	for (const match of html.matchAll(STYLE_BLOCK_RE)) {
 		const index = block_index++;
+		if (script_spans.some(([start, end]) => match.index > start && match.index < end)) {
+			stats.blocks_skipped_in_script++;
+			continue;
+		}
 		const type = match[1].match(TYPE_ATTR_RE);
 		if (type) {
 			const value = (type[1] ?? type[2] ?? type[3]).trim().toLowerCase();

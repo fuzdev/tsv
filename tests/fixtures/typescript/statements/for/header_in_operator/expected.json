@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 346,
+	"end": 387,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,19 +13,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 345,
+		"end": 386,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 336,
+			"end": 377,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 22,
+					"line": 23,
 					"column": 9
 				}
 			},
@@ -1473,6 +1473,217 @@
 							"end": {
 								"line": 21,
 								"column": 31
+							}
+						},
+						"body": []
+					}
+				},
+				{
+					"type": "ForStatement",
+					"start": 337,
+					"end": 376,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 40
+						}
+					},
+					"init": {
+						"type": "AssignmentExpression",
+						"start": 342,
+						"end": 366,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 6
+							},
+							"end": {
+								"line": 22,
+								"column": 30
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 342,
+							"end": 343,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 6
+								},
+								"end": {
+									"line": 22,
+									"column": 7
+								}
+							},
+							"name": "a"
+						},
+						"right": {
+							"type": "ArrowFunctionExpression",
+							"start": 346,
+							"end": 366,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 10
+								},
+								"end": {
+									"line": 22,
+									"column": 30
+								}
+							},
+							"id": null,
+							"expression": false,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "AssignmentPattern",
+									"start": 347,
+									"end": 359,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 11
+										},
+										"end": {
+											"line": 22,
+											"column": 23
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 347,
+										"end": 348,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 11
+											},
+											"end": {
+												"line": 22,
+												"column": 12
+											}
+										},
+										"name": "x"
+									},
+									"right": {
+										"type": "BinaryExpression",
+										"start": 352,
+										"end": 358,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 16
+											},
+											"end": {
+												"line": 22,
+												"column": 22
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 352,
+											"end": 353,
+											"loc": {
+												"start": {
+													"line": 22,
+													"column": 16
+												},
+												"end": {
+													"line": 22,
+													"column": 17
+												}
+											},
+											"name": "b"
+										},
+										"operator": "in",
+										"right": {
+											"type": "Identifier",
+											"start": 357,
+											"end": 358,
+											"loc": {
+												"start": {
+													"line": 22,
+													"column": 21
+												},
+												"end": {
+													"line": 22,
+													"column": 22
+												}
+											},
+											"name": "c"
+										}
+									}
+								}
+							],
+							"body": {
+								"type": "BlockStatement",
+								"start": 364,
+								"end": 366,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 28
+									},
+									"end": {
+										"line": 22,
+										"column": 30
+									}
+								},
+								"body": []
+							}
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 368,
+						"end": 369,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 32
+							},
+							"end": {
+								"line": 22,
+								"column": 33
+							}
+						},
+						"name": "d"
+					},
+					"update": {
+						"type": "Identifier",
+						"start": 371,
+						"end": 372,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 35
+							},
+							"end": {
+								"line": 22,
+								"column": 36
+							}
+						},
+						"name": "e"
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 374,
+						"end": 376,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 38
+							},
+							"end": {
+								"line": 22,
+								"column": 40
 							}
 						},
 						"body": []

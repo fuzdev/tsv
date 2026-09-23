@@ -454,17 +454,6 @@ const BEYOND_ACORN_KNOWN_GAPS: BeyondAcornKnownGap[] = [
 		category: 'beyond_acorn_gap',
 		reason:
 			'`import { type "<A>" as typeA }` — a string-named specifier behind the `type` modifier (the unmodified `{ "<X>" as x }` in the same file parses)'
-	},
-	{
-		pattern: 'usingDeclarationsInFor.ts',
-		category: 'beyond_acorn_gap',
-		reason:
-			'`for (using x = …;;)` — explicit resource management admits a `using` LexicalDeclaration in a C-style for head (only for-in is excluded); tsc, babel and prettier accept'
-	},
-	{
-		pattern: 'awaitUsingDeclarationsInFor.ts',
-		category: 'beyond_acorn_gap',
-		reason: '`for (await using x = …;;)` — the same for-head production as `using`'
 	}
 ];
 

@@ -115,7 +115,7 @@ fn comment_from_token(
 ///
 /// - the closer of the delimiter the `<` was written in ([`Parser::exit_grouping`], read
 ///   against [`LtRegion::floor`] as `no_in_depth` reads its baseline) — call arguments,
-///   `[…]`, `{…}`, `${…}`. **A grouping paren is not one**: the printer may strip it, so
+///   a parameter list, `[…]`, `{…}`, `${…}`. **A grouping paren is not one**: the printer may strip it, so
 ///   `f((x < q), a > b)` prints as one comma list, and the region re-anchors one level out
 ///   instead ([`Parser::exit_stripped_grouping`]);
 /// - a statement or class-member boundary ([`Parser::lt_region_statement_base`]).
@@ -216,7 +216,9 @@ pub struct Parser<'a, 'arena> {
     /// Whether a top-level `as` is TypeScript's assertion operator. Set per partial
     /// parse from a [`TopLevelAs`] policy — false only where the host grammar spells its
     /// own separator `as` (`{#each items as pattern}`), never as a blanket
-    /// "Svelte template" rule (`{#await p as T then v}` keeps it).
+    /// "Svelte template" rule (`{#await p as T then v}` keeps it) — and only at the
+    /// head's own level: a grouping delimiter (`grouping_depth`) or a body
+    /// ([`Parser::with_body_frame`]) is where the separator cannot sit.
     ///
     /// `satisfies` is deliberately NOT gated by this: no host separator collides with it,
     /// so it is an assertion in every context.
@@ -263,10 +265,11 @@ pub struct Parser<'a, 'arena> {
     allow_in: bool,
     /// The [`Parser::grouping_depth`] at which the current `[~In]` region began —
     /// the baseline the `in`-is-a-binary-operator gate compares against, so the
-    /// question it asks is "has a grouping opened **since this for-header
-    /// started**?" rather than "is any grouping open anywhere?". Only meaningful
-    /// while `allow_in` is false; set (save/restore) by
-    /// [`Parser::parse_expression_no_in`]. A plain `== 0` test would read the
+    /// question it asks is "has a grouping opened **since this region
+    /// began**?" rather than "is any grouping open anywhere?". Only meaningful
+    /// while `allow_in` is false; set (save/restore) by [`Parser::with_no_in`],
+    /// which opens a region at a for header's expression head and at each of its
+    /// declaration's initializers. A plain `== 0` test would read the
     /// enclosing expression's delimiters — `fn(function () { for (k in o) {} })`
     /// parses its header at depth 1 — and take the for-in separator for a
     /// relational `in`.
@@ -1105,12 +1108,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// The two calls are what maintain [`Parser::grouping_depth`], and every
     /// consumer of that counter is documented on the field: a *baseline* decides
     /// what a reading means, and the two questions it answers use different ones
-    /// ([`Parser::no_in_depth`] vs the parse root's literal 0). Nine pairs across
-    /// `expression.rs` / `expression_literals.rs` / `expression_template.rs` are
-    /// hand-balanced across early returns and are deliberately NOT unwound on the
-    /// error path — a rejected parse propagates straight out, and the one place
-    /// that abandons a parse and continues, [`Parser::rewind`], restores the depth
-    /// itself. Wrapping them in a combinator (so the pair is balanced by
+    /// ([`Parser::no_in_depth`] vs the parse root's literal 0). The pairs across
+    /// `expression.rs` / `expression_literals.rs` / `expression_template.rs` /
+    /// `parameters.rs` are hand-balanced across early returns and are deliberately
+    /// NOT unwound on the error path — a rejected parse propagates straight out, and
+    /// the one place that abandons a parse and continues, [`Parser::rewind`],
+    /// restores the depth itself. Wrapping them in a combinator (so the pair is balanced by
     /// construction) wants body extraction at several sites and is its own change.
     #[inline]
     pub(super) fn enter_grouping(&mut self) {
@@ -1950,32 +1953,64 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
+    /// The byte scan the one-past-peek predicates share: where the next token
+    /// begins past the peeked one (skipping whitespace and comments), and whether
+    /// that gap holds no line terminator — the answer a `[no LineTerminator here]`
+    /// predicate needs. A comment spanning a line counts as one (per ASI rules).
+    fn scan_past_peek(&mut self) -> (usize, bool) {
+        self.peek_kind(); // populate the cache
+        let after_peek = self.peek.as_ref().map_or(0, |t| t.end as usize);
+        let pos = scan::skip_whitespace_and_comments(self.source.as_bytes(), after_peek);
+        (
+            pos,
+            !self.source[after_peek..pos].contains(is_es_line_terminator),
+        )
+    }
+
     /// Whether the peeked token is followed on the same line by an identifier.
     ///
     /// Used for `await using [no LineTerminator here] BindingIdentifier`, where
     /// the binding sits one token past the peek horizon.
     pub(super) fn peek_followed_by_same_line_binding_word(&mut self) -> bool {
-        self.peek_kind(); // populate the cache
-        let after_peek = self.peek.as_ref().map_or(0, |t| t.end as usize);
+        let (pos, same_line) = self.scan_past_peek();
         let bytes = self.source.as_bytes();
-        let pos = scan::skip_whitespace_and_comments(bytes, after_peek);
-        scan::identifier_starts_at(bytes, pos)
-            && !self.source[after_peek..pos].contains(is_es_line_terminator)
-            && {
-                // A word continuing the *expression* reading instead of binding:
-                // `await using in b` / `await using instanceof C` are await
-                // expressions (`in`/`instanceof` are the word-shaped binary
-                // operators), and `await using as T` / `await using satisfies T`
-                // are casts of `await using` (acorn's reading at the canonical
-                // ES2025; tsc would commit to a declaration binding
-                // `as`/`satisfies`, but the drop-in oracle wins). Every other word
-                // is a binding attempt — including
-                // contextual keywords that are valid binding names (`async`,
-                // `undefined`, `of`). Mirrors `peek_is_same_line_binding_word`.
-                let end = scan::skip_identifier(bytes, pos);
-                let word = &bytes[pos..end];
-                word != b"in" && word != b"instanceof" && word != b"as" && word != b"satisfies"
-            }
+        same_line && scan::identifier_starts_at(bytes, pos) && {
+            // A word continuing the *expression* reading instead of binding:
+            // `await using in b` / `await using instanceof C` are await
+            // expressions (`in`/`instanceof` are the word-shaped binary
+            // operators), and `await using as T` / `await using satisfies T`
+            // are casts of `await using` (acorn's reading at the canonical
+            // ES2025; tsc would commit to a declaration binding
+            // `as`/`satisfies`, but the drop-in oracle wins). Every other word
+            // is a binding attempt — including
+            // contextual keywords that are valid binding names (`async`,
+            // `undefined`, `of`). Mirrors `peek_is_same_line_binding_word`.
+            let end = scan::skip_identifier(bytes, pos);
+            let word = &bytes[pos..end];
+            word != b"in" && word != b"instanceof" && word != b"as" && word != b"satisfies"
+        }
+    }
+
+    /// Whether the peeked token is followed by `=`, `;` or `:` — the tokens that
+    /// continue a declarator whose binding is the peek (an initializer, the end
+    /// of a C-style head's init, a type annotation).
+    ///
+    /// Used where `using of` reads two ways in a `for` head: a declaration of
+    /// `of` (`for (using of = a; ;)`), or — the proposal's `[lookahead ≠ using
+    /// of]`, which restricts the for-of `ForDeclaration` alone — a for-of over
+    /// the identifier `using` (`for (using of items)`). tsc's
+    /// `nextTokenIsEqualsOrSemicolonOrColonToken` draws the line at the same
+    /// three tokens; an `=` opening `==` / `===` / `=>` is no initializer. A
+    /// break before the token is fine: nothing past the binding carries `[no
+    /// LineTerminator here]`.
+    pub(super) fn peek_followed_by_declarator_continuation(&mut self) -> bool {
+        let (pos, _) = self.scan_past_peek();
+        let bytes = self.source.as_bytes();
+        match bytes.get(pos) {
+            Some(b';' | b':') => true,
+            Some(b'=') => !matches!(bytes.get(pos + 1), Some(b'=' | b'>')),
+            _ => false,
+        }
     }
 
     /// Whether the peeked token is followed on the same line by the `function`
@@ -1992,12 +2027,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// question, which this predicate does not touch: tsc recovers into three
     /// statements, tsv rejects — as it did before `declare async` was accepted at all.
     pub(super) fn peek_followed_by_same_line_function_keyword(&mut self) -> bool {
-        self.peek_kind(); // populate the cache
-        let after_peek = self.peek.as_ref().map_or(0, |t| t.end as usize);
+        let (pos, same_line) = self.scan_past_peek();
         let bytes = self.source.as_bytes();
-        let pos = scan::skip_whitespace_and_comments(bytes, after_peek);
-        pos < bytes.len()
-            && !self.source[after_peek..pos].contains(is_es_line_terminator)
+        same_line
+            && pos < bytes.len()
             && &bytes[pos..scan::skip_identifier(bytes, pos)] == b"function"
     }
 
@@ -2008,7 +2041,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `peek_is_same_line_binding_word` spells both).
     ///
     /// One question, one predicate: every dispatch site asks exactly this, and a
-    /// for head then adds only its own `[lookahead ≠ of]`.
+    /// for head then adds only the for-of form's `[lookahead ≠ using of]`, which
+    /// a C-style init's declaration of `of` escapes.
     pub(super) fn at_using_declaration(&mut self) -> bool {
         *self.current_kind() == TokenKind::Identifier
             && self.current_value() == "using"

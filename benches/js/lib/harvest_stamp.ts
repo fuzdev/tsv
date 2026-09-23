@@ -14,15 +14,20 @@
  *
  * `--force` re-harvests regardless — needed when the harvest's own LOGIC
  * changes without moving any keyed input (e.g. a grading/extraction change in
- * the script or, for test262, in the Rust runner). Stamps live in
- * `benches/js/.cache` (gitignored); `deno task bench:clean` wipes them with
- * the caches.
+ * the script or, for test262, in the Rust runner). The one piece of logic a
+ * harvest does NOT own but reads through — the corpus loader's per-file filters
+ * (`corpus_filter_fingerprint`) — is stamped by every grade that loads a corpus
+ * view, so a filter change re-harvests without anyone remembering `--force`.
+ * Stamps live in `benches/js/.cache` (gitignored); `deno task bench:clean` wipes
+ * them with the caches.
  *
  * Deno-only (like the harvests themselves — `git` runs via `Deno.Command`,
  * needing `--allow-run=git`).
  */
 
-import { readFile, stat, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 
 import { CORPORA_ROOT, CORPORA_TREE } from './corpora.ts';
 
@@ -47,7 +52,7 @@ export interface HarvestStamp {
 }
 
 /**
- * Every stamp, by grade name: the four suite harvests, the CSS reject pin — which
+ * Every stamp, by grade name: the five suite harvests, the CSS reject pin — which
  * harvests nothing but is graded and stamped the same way
  * (`diagnostics/css_over_acceptance.ts --pin-only`) — and the svelte-styles harvest
  * over the real-code snapshot. Each script reads its own
@@ -57,7 +62,7 @@ export interface HarvestStamp {
  * the doctor reading a file nothing writes. The `checkouts` keys are the stamp's OWN key names; a doctor probe that
  * finds a listed key absent from the stamp reports that rather than guessing.
  *
- * `as const satisfies` rather than a bare `Record` annotation: the six scripts read
+ * `as const satisfies` rather than a bare `Record` annotation: the seven scripts read
  * their own entry by key, and under a `Record<string, …>` a renamed key still
  * typechecks and fails at runtime — which is the drift this table exists to prevent.
  */
@@ -94,6 +99,15 @@ export const HARVEST_STAMPS = {
 			prettier_plugin_svelte_commit: '../prettier-plugin-svelte'
 		}
 	},
+	// The Prettier `.js` fixtures Prettier's own babel parser reads as JSX — one
+	// checkout, since only `../prettier/tests/format/js` holds JS-language
+	// fixtures the conformance view keeps (the other suites' `.js` were their spec
+	// files, dropped by the validity filter).
+	'prettier-jsx': {
+		path: 'benches/js/.cache/prettier_jsx_files.stamp.json',
+		task: 'bench:harvest:prettier-jsx',
+		checkouts: { prettier_commit: '../prettier' }
+	},
 	'css-rejects': {
 		path: 'benches/js/.cache/css_rejects.stamp.json',
 		task: 'css:over-acceptance:pin',
@@ -112,6 +126,38 @@ export const HARVEST_STAMPS = {
 		checkouts: { corpora_tree: { path: CORPORA_ROOT, tree: CORPORA_TREE } }
 	}
 } as const satisfies Record<string, HarvestStamp>;
+
+/**
+ * The modules whose per-file filters decide what a stamped corpus view yields: the
+ * loader (every entry-level skip, extension set and exclusion) for both, and for
+ * the `conformance` view the validity filter it applies to the Prettier suites. A
+ * stamp keyed on checkouts and the entry list alone reads fresh across a filter
+ * change — the Prettier filter moved `CSS_REJECTS_PIN` 229 → 207 with no stamped
+ * input moving, and only the coverage run's own grade of that count caught it.
+ * Listed by hand, so filter logic that moves to a new module must join its view's
+ * list.
+ */
+const CORPUS_FILTER_MODULES: Record<'conformance' | 'perf', string[]> = {
+	conformance: ['benches/js/lib/prettier_fixtures.ts', 'benches/js/lib/corpus.ts'],
+	perf: ['benches/js/lib/corpus.ts']
+};
+
+/**
+ * A digest of `view`'s {@link CORPUS_FILTER_MODULES} by source text, for a
+ * view-loading grade's stamp (`filters`). A comment edit re-harvests too — the
+ * price of not modelling which lines are filter logic, paid in seconds per harvest.
+ */
+export async function corpus_filter_fingerprint(view: 'conformance' | 'perf'): Promise<string> {
+	const hash = createHash('sha1');
+	for (const path of CORPUS_FILTER_MODULES[view]) {
+		hash
+			.update(path)
+			.update('\0')
+			.update(await readFile(path, 'utf8'))
+			.update('\0');
+	}
+	return hash.digest('hex').slice(0, 16);
+}
 
 /** `HEAD` commit of a checkout, or null when it isn't a git repo / git fails. */
 export function git_head(repo: string): string | null {
@@ -188,4 +234,34 @@ async function stamp_fresh(path: string, inputs: StampInputs): Promise<boolean> 
 /** Record `inputs` at `path` — call only after the harvest + its pin check succeed. */
 export async function write_stamp(path: string, inputs: StampInputs): Promise<void> {
 	await writeFile(path, JSON.stringify(inputs, null, '\t') + '\n');
+}
+
+/**
+ * Write a harvest's path-list cache, then its stamp — only once the list's exact
+ * pin holds, so a wrong cache never replaces a good one. A mismatch exits 1 however
+ * the harvest was invoked: `--if-present` tolerates a MISSING input, never a moved
+ * count. `stamp` is null when a checkout has no commit to record. Returns the
+ * cache's resolved path.
+ */
+export async function write_pinned_path_cache(options: {
+	cache: string;
+	paths: string[];
+	pin: number;
+	/** What the paths are, for the mismatch message (`143 rejects ≠ pinned 142`). */
+	what: string;
+	stamp: { path: string; inputs: StampInputs } | null;
+}): Promise<string> {
+	const { cache, paths, pin, what, stamp } = options;
+	if (paths.length !== pin) {
+		console.error(
+			`FAIL: pinned count mismatch — ${paths.length} ${what} ≠ pinned ${pin}; cache not ` +
+				'written. If the move is deliberate (suite refresh), re-pin in lib/gate_counts.ts.'
+		);
+		Deno.exit(1);
+	}
+	const out = resolve(cache);
+	await mkdir(dirname(out), { recursive: true });
+	await writeFile(out, JSON.stringify(paths, null, '\t') + '\n');
+	if (stamp) await write_stamp(stamp.path, stamp.inputs);
+	return out;
 }

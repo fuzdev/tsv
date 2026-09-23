@@ -1511,6 +1511,13 @@ export function generate_coverage_only_markdown(
 export interface SourceCoverageCell {
 	processed: number;
 	total: number;
+	/**
+	 * Of `processed`, the files accepted only on the Script-goal retry a
+	 * `goal_fallback` source allows (`SourceFile.goal_fallback`) — absent when the
+	 * source allows no retry or the impl needed none, so an ordinary cell keeps its
+	 * two-field shape. Since report `version` 19.
+	 */
+	script_only?: number;
 }
 
 /** Per-group, per-source, per-impl coverage: `group → source → impl name → cell`. */
@@ -1564,7 +1571,8 @@ export function generate_coverage_by_source_markdown(
 				const columns = impl_names.map((name) => {
 					const cell = cells.get(name);
 					if (!cell) return '—';
-					return `${cell.processed} (${coverage_pct(cell.processed, cell.total)}%)`;
+					const pct = `${cell.processed} (${coverage_pct(cell.processed, cell.total)}%)`;
+					return cell.script_only ? `${pct}, ${cell.script_only} at script` : pct;
 				});
 				lines.push(`| \`${source}\` | ${total} | ${columns.join(' | ')} |`);
 			}

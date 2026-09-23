@@ -277,7 +277,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // Management); a break at either gap, or a word-shaped binary
                     // operator (`await using in b`), leaves an expression statement
                     if self.at_await_using_declaration() {
-                        return self.parse_await_using_declaration();
+                        return self
+                            .parse_declaration_statement(VariableDeclarationKind::AwaitUsing);
                     }
                     // Regular await expression (rejected by the expression parser
                     // when Module `[~Await]` — reserved with no `[+Await]`).
@@ -356,7 +357,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // statement, and an expression-continuation word (`in`/`instanceof`/
                 // `as`/`satisfies`) keeps the expression reading
                 if self.at_using_declaration() {
-                    return self.parse_using_declaration();
+                    return self.parse_declaration_statement(VariableDeclarationKind::Using);
                 }
                 // Contextual keyword `type` starts a type alias only when the name is
                 // on the SAME line (tsc `nextTokenIsIdentifierOnSameLine`). A line

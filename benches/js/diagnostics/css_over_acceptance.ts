@@ -31,7 +31,7 @@
  *
  * **Two modes.** The default run is the profile above. `--pin-only` grades the
  * pin and nothing else: it loads only the oracle (no FFI / WASM build, though the
- * CORPUS load is still the whole conformance view — 79.5k files to reach 22.6k CSS,
+ * CORPUS load is still the whole conformance view — 80.4k files to reach 22.4k CSS,
  * since the loader has no language axis, ~10 s warm) and is
  * FRESHNESS-STAMPED like the suite harvests (`lib/harvest_stamp.ts` — the
  * ../svelte + ../prettier + ../wpt commits, the svelte oracle version, and the two
@@ -65,6 +65,7 @@ import {
 } from '../lib/corpus.ts';
 import { CSS_REJECTS_PIN, WPT_CSS_HARVEST_PIN } from '../lib/gate_counts.ts';
 import {
+	corpus_filter_fingerprint,
 	git_head,
 	HARVEST_STAMPS,
 	harvest_up_to_date,
@@ -73,7 +74,7 @@ import {
 	write_stamp
 } from '../lib/harvest_stamp.ts';
 import type { InitializedImplementations } from '../lib/implementations.ts';
-import { CANONICAL_PARSER_ROWS, type SourceFile, type TsvImplementation } from '../lib/types.ts';
+import { CANONICAL_PARSER_ROWS, type TsvImplementation } from '../lib/types.ts';
 import { load_all_versions } from '../lib/versions.ts';
 
 /** Sample paths kept per tool for `--verbose` — enough to see the shape, not a dump. */
@@ -96,8 +97,8 @@ const STAMP_PATH = HARVEST_STAMPS['css-rejects'].path;
 // the stamp. Only `--pin-only` skips: the profile is the point of a default run.
 //
 // Each source checkout is stamped by COMMIT, `../wpt` included. Its harvest count
-// pin is stamped too but cannot stand in for the commit: wpt supplies 22310 of the
-// 22643 CSS files, and an edit to an existing test moves content without moving the
+// pin is stamped too but cannot stand in for the commit: wpt supplies 22127 of the
+// 22449 CSS files, and an edit to an existing test moves content without moving the
 // count — so a wpt pull would re-run `bench:harvest:wpt`, rewrite the cache, and
 // leave this grade stamped fresh over a corpus that changed under it. The
 // conformance view's ENTRY LIST is stamped too (the whole view's, not only the
@@ -114,7 +115,8 @@ const stamp_inputs: StampInputs = {
 	svelte_oracle: versions.canonical.svelte,
 	wpt_pin: WPT_CSS_HARVEST_PIN,
 	rejects_pin: CSS_REJECTS_PIN,
-	conformance_entries: (await corpus_view_paths('conformance')).join(' ')
+	conformance_entries: (await corpus_view_paths('conformance')).join(' '),
+	filters: await corpus_filter_fingerprint('conformance')
 };
 
 /**
@@ -220,15 +222,8 @@ const accepts = (impl: TsvImplementation, source: string): boolean => {
 // below then reports an unharvested cache as `the oracle rejects 22 of 332 …
 // re-pin CSS_REJECTS_PIN`. Every mode of this tool grades that pin, so no mode may
 // load a partial CSS corpus.
-let files: SourceFile[];
-try {
-	files = await load_pinned_language_corpus('conformance', 'css', { logger: log });
-} catch (e) {
-	skip_or_fail(
-		`css-rejects: could not load a complete conformance CSS corpus ` +
-			`(${e instanceof Error ? e.message : e})`
-	);
-}
+const files = await load_pinned_language_corpus('conformance', 'css', { if_present, logger: log });
+if (files === null) Deno.exit(0);
 if (files.length === 0) {
 	// Unreachable via an absent entry (the loader refuses those above); this catches
 	// the other way to get an empty set — every CSS entry present but empty.

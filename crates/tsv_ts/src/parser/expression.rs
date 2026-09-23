@@ -372,17 +372,28 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Used in for-loop headers to distinguish `for (x in y)` from expressions.
     /// The `in` keyword is recognized as the for-in separator, not as a binary operator.
+    pub(super) fn parse_expression_no_in(&mut self) -> Result<Expression<'arena>, ParseError> {
+        self.with_no_in(Self::parse_expression)
+    }
+
+    /// Run `f` as a `[~In]` region — a for header's expression head or a
+    /// declaration's initializer there — restoring the prior state afterward.
     ///
-    /// Opening the `[~In]` region also pins `no_in_depth` to the CURRENT grouping
+    /// Opening the region also pins `no_in_depth` to the CURRENT grouping
     /// depth, which is the baseline the gate in `parse_expression_bp` measures
     /// against. The depth a header starts at is not zero in general — the loop may
     /// sit anywhere inside an enclosing expression's delimiters
     /// (`fn(function () { for (k in o) {} })`, an object-literal method, an array
     /// element, a template hole) — and only a grouping opened *inside* the header
-    /// restores `[+In]`.
-    pub(super) fn parse_expression_no_in(&mut self) -> Result<Expression<'arena>, ParseError> {
+    /// restores `[+In]`. Setting `allow_in` alone, without the pin, leaves that
+    /// gate measuring against an outer region's baseline: inside any enclosing
+    /// delimiter the `in` then reads as the binary operator again.
+    pub(super) fn with_no_in<T>(
+        &mut self,
+        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
         let saved_depth = std::mem::replace(&mut self.no_in_depth, self.grouping_depth);
-        let result = self.with_context_flag(|p| &mut p.allow_in, false, Self::parse_expression);
+        let result = self.with_context_flag(|p| &mut p.allow_in, false, f);
         // Every delimiter the header opened is closed again by the time it ends, so
         // the gate's `==` can never be reached from below. The `enter_grouping` /
         // `exit_grouping` pairs are hand-balanced across several early returns, and
@@ -399,11 +410,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Run `f` with the `[In]` grammar parameter forced to `[+In]` (`allow_in =
     /// true`), restoring the prior value afterward (even on error). Used at the
-    /// grammar productions that reset `[+In]` within a for-header init — the
-    /// ternary consequent, function/class bodies, param defaults — where a bare
-    /// `in` is the binary operator, not the for-in separator. A no-op outside a
-    /// for-header init (where `allow_in` is already `true`); a nested for-header
-    /// re-disables it via `parse_expression_no_in`'s own save/restore.
+    /// grammar productions that reset `[+In]` within a for-header init without
+    /// opening a delimiter — the ternary consequent and function/class bodies —
+    /// where a bare `in` is the binary operator, not the for-in separator (a
+    /// delimiter, a parameter list's included, restores it through `no_in_depth`).
+    /// A no-op outside a for-header init (where `allow_in` is already `true`); a
+    /// nested for-header re-disables it via [`Parser::with_no_in`]'s own
+    /// save/restore.
     ///
     /// The `[In]` parameter ALONE — a body also lifts the conditional consequent's
     /// return-type bar, and takes [`Parser::with_body_frame`] for both.
@@ -417,12 +430,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Run `f` as a **body** — an arrow's block body, a function's params + body,
     /// or a class body: `[+In]` ([`Parser::with_allow_in`]), a conditional
     /// consequent's return-type bar lifted
-    /// ([`Parser::with_arrow_return_type_allowed`]), and the open `<` region handed down
-    /// to the body's statements ([`Parser::with_lt_region_inherited`]), all restored
-    /// afterward (even on error). The first two share this boundary — a body is where
-    /// tsc's `allowReturnTypeInArrowFunction` goes back to `true` without a delimiter
-    /// opening, and it is `[+In]` for the same reason — so the three sites take one call
-    /// rather than nesting three.
+    /// ([`Parser::with_arrow_return_type_allowed`]), a top-level `as` read as the
+    /// assertion, and the open `<` region handed down to the body's statements
+    /// ([`Parser::with_lt_region_inherited`]), all restored afterward (even on error).
+    /// The first three share this boundary — a body is where tsc's
+    /// `allowReturnTypeInArrowFunction` goes back to `true` without a delimiter
+    /// opening, it is `[+In]` for the same reason, and a host's `as` separator
+    /// (`{#each xs as item}`) cannot sit inside one — so the three sites take one call
+    /// rather than nesting four.
     ///
     /// The ternary consequent is the one `[+In]` production that instead BARS the
     /// return type, so it takes `with_allow_in` and
@@ -432,7 +447,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
     ) -> Result<T, ParseError> {
-        self.with_allow_in(|p| p.with_arrow_return_type_allowed(|p| p.with_lt_region_inherited(f)))
+        self.with_allow_in(|p| {
+            p.with_context_flag(
+                |p| &mut p.top_level_as_is_assertion,
+                true,
+                |p| p.with_arrow_return_type_allowed(|p| p.with_lt_region_inherited(f)),
+            )
+        })
     }
 
     /// Fold a trailing TypeScript `as` / `satisfies` type assertion at the current

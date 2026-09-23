@@ -103,90 +103,63 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return self.parse_for_standard(start, None);
         }
 
-        // Check if it starts with a variable declaration. `const` and `var` are
-        // declaration keywords outright; `let` is one only when a binding follows it
-        // (`Parser::at_let_declaration`) — `for (let in o)`, `for (let; ;)`,
-        // `for (let = 3; ;)` and `for (let.x in o)` are expression heads whose leftmost
-        // token happens to be the `IdentifierReference` `let`.
+        // Read ahead of the head's parse: the for-of `[lookahead ∉ { let, … }]` below
+        // is a rule about the head's leftmost token, whatever the head turns out to be.
         let starts_with_let = matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Let));
-        let is_var_decl = matches!(
-            self.current_kind(),
-            TokenKind::Keyword(KeywordKind::Const | KeywordKind::Var)
-        ) || (starts_with_let && self.at_let_declaration());
 
-        // Check for a `using` / `await using` head (Explicit Resource Management),
-        // `for (using resource of resources)` / `for await (await using resource of
-        // resources)`. The shared dispatch predicates own the `[no LineTerminator
-        // here]` restrictions; a head adds one rule of its own — `[lookahead ≠ of]`,
-        // since a using ForBinding cannot be named `of`, so `for (using of items)`
-        // is a for-of whose LHS is the plain identifier `using`.
-        let is_using = self.at_using_declaration() && self.peek_value() != "of";
-        let is_await_using = self.at_await_using_declaration();
+        if let Some(kind) = self.for_head_declaration_kind(starts_with_let) {
+            let var_decl = self.parse_for_head_declaration(kind)?;
 
-        // Neither form has a for-in or C-style spelling, so both parse the same way
-        // and differ only in which keyword the rejection names.
-        if is_using || is_await_using {
-            let var_decl = if is_await_using {
-                self.parse_for_await_using_declaration()?
-            } else {
-                self.parse_for_using_declaration()?
-            };
-
-            if self.current_value() == "of" {
-                self.advance()?;
-                return self.parse_for_of(
-                    start,
-                    self.arena.alloc(ForInOfLeft::VariableDeclaration(var_decl)),
-                    is_await,
-                );
-            }
-
-            return Err(self.error_msg(if is_await_using {
-                "'await using' can only be used in for-of loops"
-            } else {
-                "'using' can only be used in for-of loops"
-            }));
-        }
-
-        if is_var_decl {
-            // Parse variable declaration (without semicolon)
-            let var_decl = self.parse_for_variable_declaration()?;
-
-            // Check for 'in' or 'of'
-            let is_for_in = matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::In));
-            let is_for_of = self.current_value() == "of";
-
-            // A for-in/for-of head binds exactly one declarator: the grammar is
-            // `for ( ForDeclaration in/of … )` where `ForDeclaration` is a single
-            // `ForBinding`. Multiple declarators (`for (let a, b of …)`) is a syntax
-            // error — acorn reports an unexpected token at the `in`/`of`.
-            if (is_for_in || is_for_of) && var_decl.declarations.len() != 1 {
-                return Err(self.error_expected_found("a single binding in a for-in/of header"));
-            }
-
-            if is_for_in {
-                self.advance()?;
-                return self.parse_for_in(
+            let Some(form) = self.for_in_of_separator() else {
+                // Standard for loop with a declaration as init.
+                return self.parse_c_style_for(
                     start,
                     await_at,
-                    self.arena.alloc(ForInOfLeft::VariableDeclaration(var_decl)),
+                    Some(self.arena.alloc(ForInit::VariableDeclaration(var_decl))),
                 );
+            };
+
+            // The rules a declaration owes a for-in/of head, stated once here — the
+            // one place a declaration reaches `parse_for_in` / `parse_for_of` from.
+            //
+            // `ForDeclaration` is a single `ForBinding`, so a head binds exactly one
+            // declarator; `for (let a, b of …)` is a syntax error (acorn reports an
+            // unexpected token at the `in`/`of`).
+            if var_decl.declarations.len() != 1 {
+                return Err(self.error_expected_found("a single binding in a for-in/of header"));
             }
-            if is_for_of {
-                self.advance()?;
-                return self.parse_for_of(
-                    start,
-                    self.arena.alloc(ForInOfLeft::VariableDeclaration(var_decl)),
-                    is_await,
-                );
+            if form == ForInOf::In
+                && matches!(
+                    kind,
+                    VariableDeclarationKind::Using | VariableDeclarationKind::AwaitUsing
+                )
+            {
+                return Err(self.error_msg(&format!(
+                    "'{}' declarations are not allowed in for-in loops",
+                    kind.as_str()
+                )));
+            }
+            // A `ForBinding` carries no `Initializer` either. A default *inside* a
+            // binding pattern (`for (const {x = 1} of [])`) is a pattern default, not
+            // a declarator initializer, and stays valid. The one extension is Annex
+            // B's for-in `var` head (`for (var x = 1 in o)`, sloppy, a plain
+            // identifier), out of scope at both goals — so every keyword and both
+            // forms reject, as acorn and prettier do. The initializer's own `[~In]`
+            // (`DeclaratorSite::ForHead`) is what brings a for-in head here at all
+            // rather than letting the initializer swallow the `in`.
+            if var_decl.declarations[0].init.is_some() {
+                return Err(self.error_msg(&format!(
+                    "{} loop variable declaration may not have an initializer",
+                    form.loop_name()
+                )));
             }
 
-            // Standard for loop with var decl init.
-            return self.parse_c_style_for(
-                start,
-                await_at,
-                Some(self.arena.alloc(ForInit::VariableDeclaration(var_decl))),
-            );
+            self.advance()?;
+            let left = self.arena.alloc(ForInOfLeft::VariableDeclaration(var_decl));
+            return match form {
+                ForInOf::In => self.parse_for_in(start, await_at, left),
+                ForInOf::Of => self.parse_for_of(start, left, is_await),
+            };
         }
 
         // `for await (async of …)` — here `async` is a plain IdentifierReference
@@ -220,53 +193,98 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Use parse_expression_no_in to prevent `in` from being parsed as binary operator
         let expr = self.parse_expression_no_in()?;
 
-        // Check for 'in' or 'of'. A no-declaration for-in/of LHS is refined
-        // through `to_assignable` (the cover-grammar conversion): per the spec
-        // an `ObjectLiteral`/`ArrayLiteral` LHS must cover an `AssignmentPattern`
-        // (enforcing the rest constraints + producing the deep internal pattern,
-        // `ArrayExpression` → `ArrayPattern`), and any other LHS must have a
-        // valid (non-`invalid`) assignment-target type — and, as the WHOLE head, never
-        // an `AssignmentPattern` (`for ((a = b) of xs)`).
-        if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::In)) {
-            self.advance()?;
-            let left = self.to_whole_assignable(expr, AssignableContext::ForHead)?;
-            return self.parse_for_in(
+        // A no-declaration for-in/of LHS is refined through `to_assignable` (the
+        // cover-grammar conversion): per the spec an `ObjectLiteral`/`ArrayLiteral` LHS
+        // must cover an `AssignmentPattern` (enforcing the rest constraints + producing
+        // the deep internal pattern, `ArrayExpression` → `ArrayPattern`), and any other
+        // LHS must have a valid (non-`invalid`) assignment-target type — and, as the
+        // WHOLE head, never an `AssignmentPattern` (`for ((a = b) of xs)`).
+        let Some(form) = self.for_in_of_separator() else {
+            // Standard for loop with expression init.
+            return self.parse_c_style_for(
                 start,
                 await_at,
-                self.arena.alloc(ForInOfLeft::Pattern(left)),
+                Some(self.arena.alloc(ForInit::Expression(expr))),
+            );
+        };
+        // `ForInOfStatement`'s of-forms carry `[lookahead ∉ { let, async of }]` (and
+        // `[lookahead ≠ let]` for the for-await form), a restriction on the head's
+        // leftmost TOKEN whatever shape follows it: `for (let of x)`, `for (let.x of y)`
+        // and `for (let[0] of a)` are all syntax errors, and only `for ((let) … of x)`
+        // says what they mean. The in-form restricts only `let [` (`[lookahead ≠ let
+        // []`), so `for (let in o)` and `for (let.x in o)` are legal there while
+        // `for (let[0] in o)` is not. acorn spells this the same way, off the token it
+        // recorded before parsing the head. Of the three of-heads only `let.x` reaches
+        // this check — `let of` reads as a declaration of `of` and dies at the missing
+        // `;`, `let[0]` as an invalid binding pattern.
+        if form == ForInOf::Of && starts_with_let {
+            return Err(
+                self.error_msg("The left-hand side of a for-of loop may not start with 'let'")
             );
         }
-        if self.current_value() == "of" {
-            // `ForInOfStatement`'s of-forms carry `[lookahead ∉ { let, async of }]` (and
-            // `[lookahead ≠ let]` for the for-await form), a restriction on the head's
-            // leftmost TOKEN whatever shape follows it: `for (let of x)`,
-            // `for (let.x of y)` and `for (let[0] of a)` are all syntax errors, and only
-            // `for ((let) … of x)` says what they mean. The in-form restricts only
-            // `let [` (`[lookahead ≠ let []`), so `for (let in o)` and `for (let.x in o)`
-            // are legal there while `for (let[0] in o)` is not. acorn spells this the
-            // same way, off the token it recorded before parsing the head. Of the three
-            // of-heads only `let.x` reaches this check — `let of` reads as a declaration
-            // of `of` and dies at the missing `;`, `let[0]` as an invalid binding pattern.
-            if starts_with_let {
-                return Err(
-                    self.error_msg("The left-hand side of a for-of loop may not start with 'let'")
-                );
-            }
-            self.advance()?;
-            let left = self.to_whole_assignable(expr, AssignableContext::ForHead)?;
-            return self.parse_for_of(
-                start,
-                self.arena.alloc(ForInOfLeft::Pattern(left)),
-                is_await,
-            );
+        self.advance()?;
+        let left = self.to_whole_assignable(expr, AssignableContext::ForHead)?;
+        let left = self.arena.alloc(ForInOfLeft::Pattern(left));
+        match form {
+            ForInOf::In => self.parse_for_in(start, await_at, left),
+            ForInOf::Of => self.parse_for_of(start, left, is_await),
         }
+    }
 
-        // Standard for loop with expression init.
-        self.parse_c_style_for(
-            start,
-            await_at,
-            Some(self.arena.alloc(ForInit::Expression(expr))),
-        )
+    /// The declaration keyword a `for` head opens with, if it opens with one —
+    /// `starts_with_let` is whether its first token is `let`.
+    ///
+    /// Every declaration keyword takes the same three heads, and one dispatch states
+    /// them: the for-of `ForDeclaration` and the C-style init for all of them, the
+    /// for-in `ForDeclaration` for `var`/`let`/`const` alone. A using declaration is a
+    /// `LexicalDeclaration`, so it is the `let` case minus for-in, which the proposal's
+    /// `ForInOfStatement` reserves for `let`/`const`; tsc parses both of its heads, and
+    /// acorn does from ES2026, one edition past the oracle's pin (a cataloged
+    /// divergence).
+    ///
+    /// `const` and `var` are declaration keywords outright; `let` is one only when a
+    /// binding follows it ([`Parser::at_let_declaration`]) — `for (let in o)`,
+    /// `for (let; ;)`, `for (let = 3; ;)` and `for (let.x in o)` are expression heads
+    /// whose leftmost token happens to be the `IdentifierReference` `let`.
+    ///
+    /// The shared dispatch predicates own the using heads' `[no LineTerminator here]`
+    /// restrictions; a head adds one rule of its own — the for-of form's `[lookahead ≠
+    /// using of]`, which makes `for (using of items)` a for-of whose LHS is the plain
+    /// identifier `using`. It restricts the for-of `ForDeclaration` alone, so a
+    /// C-style init may still bind `of` (`for (using of = a; ; )`): one token past
+    /// `of` decides, as tsc reads it
+    /// ([`Parser::peek_followed_by_declarator_continuation`]).
+    fn for_head_declaration_kind(
+        &mut self,
+        starts_with_let: bool,
+    ) -> Option<VariableDeclarationKind> {
+        if matches!(
+            self.current_kind(),
+            TokenKind::Keyword(KeywordKind::Const | KeywordKind::Var)
+        ) || (starts_with_let && self.at_let_declaration())
+        {
+            Some(self.current_variable_kind())
+        } else if self.at_await_using_declaration() {
+            Some(VariableDeclarationKind::AwaitUsing)
+        } else if self.at_using_declaration()
+            && (self.peek_value() != "of" || self.peek_followed_by_declarator_continuation())
+        {
+            Some(VariableDeclarationKind::Using)
+        } else {
+            None
+        }
+    }
+
+    /// The for-in/of separator the head's left side stopped at, if any — `None` is
+    /// a C-style head.
+    fn for_in_of_separator(&self) -> Option<ForInOf> {
+        if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::In)) {
+            Some(ForInOf::In)
+        } else if self.current_value() == "of" {
+            Some(ForInOf::Of)
+        } else {
+            None
+        }
     }
 
     /// `for await` heads exactly one production: `ForInOfStatement`'s
@@ -381,21 +399,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         left: &'arena ForInOfLeft<'arena>,
         r#await: bool,
     ) -> Result<Statement<'arena>, ParseError> {
-        // A for-of variable declaration may not have an initializer: ecma262's
-        // `ForBinding` carries no `Initializer`, and (unlike for-in's `var` head)
-        // there is no Annex-B extension, so `for (var/let/const x = 1 of [])` is
-        // invalid in every mode — acorn and prettier both reject. This covers the
-        // `using` / `await using` heads too (all arrive here as a VariableDeclaration
-        // left). A default *inside* a binding pattern (`for (const {x = 1} of [])`) is
-        // a pattern default, not a declarator initializer, so it stays valid.
-        if matches!(left, ForInOfLeft::VariableDeclaration(decl)
-            if decl.declarations.iter().any(|d| d.init.is_some()))
-        {
-            return Err(
-                self.error_msg("for-of loop variable declaration may not have an initializer")
-            );
-        }
-
         let right = self.parse_expression_ref()?;
         self.expect(&TokenKind::ParenClose)?;
 
@@ -876,5 +879,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             span: Span::new(start as u32, end),
             kind: StatementKind::LabeledStatement(LabeledStatement { label, body }),
         })
+    }
+}
+
+/// The two for-in/of heads a `for` head's left side can end at
+/// ([`Parser::for_in_of_separator`]).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ForInOf {
+    In,
+    Of,
+}
+
+impl ForInOf {
+    /// The loop's name, for a diagnostic.
+    const fn loop_name(self) -> &'static str {
+        match self {
+            Self::In => "for-in",
+            Self::Of => "for-of",
+        }
     }
 }

@@ -56,6 +56,12 @@ import {
 	load_corpora_manifest
 } from './corpora.ts';
 import { clone_hint } from './corpus_repos.ts';
+import { PRETTIER_JSX_PIN, SVELTE_REJECTS_PIN } from './gate_counts.ts';
+import {
+	create_prettier_fixture_skip,
+	prettier_fixture_content_skip,
+	prettier_fixture_has_markers
+} from './prettier_fixtures.ts';
 import type { Language, Logger, ParseGoal, SourceFile } from './types.ts';
 
 const exec_file = promisify(execFile);
@@ -72,11 +78,11 @@ function detect_language(path: string): Language | null {
 		// are `.html` files holding Svelte components — the extension is that suite's
 		// convention, not a claim about HTML. It reaches one other entry,
 		// `../prettier/tests/format/html`, where the files really are HTML documents:
-		// svelte/compiler rejects 40 of the 124 (harvested into the reject cache) and
-		// parses the rest, so 84 plain HTML files sit in the Svelte parse denominator
-		// at ~1.8% of it. Tolerated, not intended — Svelte's grammar is an HTML
-		// superset, so an accept there is a weaker claim than the rest of the set
-		// makes. The per-source coverage table keeps it separable.
+		// svelte/compiler rejects 40 of the 122 the conformance view keeps (harvested
+		// into the reject cache) and parses the rest, so 82 plain HTML files sit in the
+		// Svelte parse denominator at ~1.8% of it. Tolerated, not intended — Svelte's
+		// grammar is an HTML superset, so an accept there is a weaker claim than the
+		// rest of the set makes. The per-source coverage table keeps it separable.
 		case '.svelte':
 		case '.html':
 			return 'svelte';
@@ -115,7 +121,11 @@ const DEFAULT_EXCLUSIONS = [
 	// files contain `<|>` markers for prettier's formatWithCursor() API tests
 	// (syntactically invalid for every parser; also triggers stderr noise from
 	// prettier-plugin-svelte's parser-fallback path). The `multiparser*` family
-	// is excluded separately in `should_exclude` (segment-prefix match).
+	// is excluded separately in `should_exclude` (segment-prefix match). These
+	// are the DIRECTORIES named for a feature; the conformance view also drops
+	// the same shapes by CONTENT wherever they sit (`range/`'s markers,
+	// `css/yaml/`'s front matter) plus what Prettier's own specs call rejected —
+	// `prettier_fixtures.ts`, wired per entry as its `conformance` reading.
 	'/_errors_/',
 	'/front-matter/',
 	'/cursor/'
@@ -201,6 +211,38 @@ async function has_companion_options(file_path: string): Promise<boolean> {
 
 /** Per-file skip filter — return true to skip. `relative` is the path below the walk root. */
 type SkipFn = (path: string, relative: string) => boolean | Promise<boolean>;
+
+/**
+ * Per-file skip filter over the file's CONTENT, for what a path can't tell —
+ * runs after the read, so it costs the read either way; return true to skip.
+ */
+type ContentSkipFn = (content: string, path: string) => boolean;
+
+/** Every given skip in order, skipping when any does; `undefined` when none is given. */
+const compose_skips = (...skips: Array<SkipFn | undefined>): SkipFn | undefined => {
+	const present = skips.filter((skip): skip is SkipFn => skip !== undefined);
+	if (present.length <= 1) return present[0];
+	return async (path, relative) => {
+		for (const skip of present) if (await skip(path, relative)) return true;
+		return false;
+	};
+};
+
+/**
+ * A skip over a loaded exclusion cache's path set, tallying each exclusion into
+ * the cache so `stream()` can grade it against what it actually excluded (a
+ * cached path the walk never reached is drift). `undefined` when the cache is
+ * absent.
+ */
+const path_set_skip = (cache: LoadedExclusionCache): SkipFn | undefined => {
+	const { paths } = cache;
+	if (!paths) return undefined;
+	return (path) => {
+		const hit = paths.has(path);
+		if (hit) cache.excluded++;
+		return hit;
+	};
+};
 
 interface WalkOptions {
 	extensions?: string[];
@@ -388,6 +430,14 @@ interface CorpusEntryBase {
 	extensions?: string[];
 	skip?: SkipFn;
 	/**
+	 * How the `conformance` view reads the entry, beyond `skip` — every other view
+	 * ignores it. For an entry whose other views want its breadth: the `gates` view
+	 * keeps every fixture (its sanction lists were reviewed against the raw suites),
+	 * while the coverage surface keeps only what the suite itself calls valid, read
+	 * at the goal its own runner reads it.
+	 */
+	conformance?: ConformanceReading;
+	/**
 	 * Tolerate absence with a warning instead of failing the run. Only for the
 	 * derived harvest caches — wpt/test262 because their source checkouts are
 	 * legitimately machine-dependent (their harvest tasks warn-and-skip the same
@@ -400,6 +450,16 @@ interface CorpusEntryBase {
 	optional?: boolean;
 	/** Remedy appended to the missing-entry warning/error (e.g. the harvest task to run). */
 	hint?: string;
+}
+
+/** The `conformance` view's reading of an entry (`CorpusEntryBase.conformance`). */
+interface ConformanceReading {
+	/** A per-file skip by path, on top of the entry's own `skip`. */
+	skip?: SkipFn;
+	/** A per-file skip by content — for what a path can't tell. */
+	skip_content?: ContentSkipFn;
+	/** Read the entry's TypeScript files as its suite's runner does (`read_at_runner_goal`). */
+	runner_goal?: boolean;
 }
 
 /**
@@ -687,11 +747,33 @@ function assemble_entries(
 			extensions: ['html'],
 			skip: has_companion_options
 		},
-		// Prettier test cases (formatting edge cases and regression tests)
-		{ path: '../prettier/tests/format/typescript', tier: 'prettier_fixture' },
-		{ path: '../prettier/tests/format/js', tier: 'prettier_fixture' },
-		{ path: '../prettier/tests/format/css', tier: 'prettier_fixture' },
-		{ path: '../prettier/tests/format/html', tier: 'prettier_fixture', extensions: ['html'] },
+		// Prettier test cases (formatting edge cases and regression tests). The
+		// conformance view reads each suite as Prettier's own harness does
+		// (`lib/prettier_fixtures.ts`): what it calls valid, at the goal its parsers
+		// read — plus, for the JS suite, less the JSX exclusion cache
+		// (`PRETTIER_JSX_CACHE`). The gates keep the raw suites.
+		...(['typescript', 'js', 'css'] as const).map((suite): CorpusEntry => ({
+			path: `../prettier/tests/format/${suite}`,
+			tier: 'prettier_fixture',
+			conformance: {
+				skip: create_prettier_fixture_skip(suite),
+				// only CSS lifts front matter; JS and TypeScript read a fence as source
+				skip_content:
+					suite === 'css' ? prettier_fixture_content_skip : prettier_fixture_has_markers,
+				runner_goal: suite !== 'css'
+			}
+		})),
+		{
+			path: '../prettier/tests/format/html',
+			tier: 'prettier_fixture',
+			extensions: ['html'],
+			// the content filter alone (no spec-grammar verdicts for HTML). Svelte reads
+			// front matter and the markers as plain text, so here the skip follows
+			// Prettier's harness, which strips them before its parser runs, rather than
+			// dropping input invalid for the parser graded — two `html/yaml/`
+			// documents, neither a svelte/compiler reject
+			conformance: { skip_content: prettier_fixture_content_skip }
+		},
 		// '../prettier/tests/format/jsx' is deliberately absent: tsv rejects JSX by design
 		// (drop-in for Svelte's parser; acorn without the JSX plugin rejects it too), so the
 		// suite's 91 files would grade as always-reject noise, not conformance signal.
@@ -781,24 +863,118 @@ const TIERS_BY_VIEW: Record<CorpusView, CorpusTier[]> = {
  * strict drop-in for, so its verdict defines validity; acorn-ts (trails modern
  * TS) and parseCss (lenient) are not validity oracles, so TS/CSS get no cache.
  */
-const SVELTE_REJECT_CACHE = 'benches/js/.cache/svelte_parse_rejects.json';
+export const SVELTE_REJECT_CACHE = 'benches/js/.cache/svelte_parse_rejects.json';
 
 /**
- * Load the canonical-reject cache as an absolute-path set, or `null` if absent.
- * Absent is fail-open: the conformance corpus stays un-filtered (the pre-harvest
- * numbers), matching the wpt/test262 optional-cache posture — disclosed in the
- * loader's log rather than silently assumed.
+ * The conformance view's second exclusion cache: the Prettier `.js` fixtures
+ * Prettier's own babel parser reads as JSX (`diagnostics/prettier_jsx_harvest.ts`,
+ * absolute paths, gitignored) — out of scope rather than invalid, as
+ * `lib/prettier_fixtures.ts` explains. Paths under the JS suite only, by
+ * construction (the harvest walks that entry alone).
  */
-async function load_svelte_reject_set(): Promise<Set<string> | null> {
-	const cache_path = resolve(SVELTE_REJECT_CACHE);
+export const PRETTIER_JSX_CACHE = 'benches/js/.cache/prettier_jsx_files.json';
+
+/**
+ * The conformance view's exclusion caches, each with what its load log says —
+ * applied alike: loaded up front (the loader fails open when one is absent, and
+ * reports what it applied — `CorpusLoader.exclusion_caches`), skipped by path in
+ * every entry's walk, and graded afterward against what they actually excluded.
+ */
+interface ExclusionCache {
+	path: string;
+	/** The harvest that writes it, named by the absent and drift hints. */
+	task: string;
+	label: string;
+	/**
+	 * The exact count its harvest writes it against (`lib/gate_counts.ts`) — a
+	 * present cache of any other size predates a re-pin.
+	 */
+	pin: number;
+	/** What its paths are, for the load log's `excluding <count> <excludes>` line. */
+	excludes: string;
+	/** What the coverage counts when the cache is absent. */
+	absent: string;
+}
+
+const EXCLUSION_CACHES: readonly ExclusionCache[] = [
+	{
+		path: SVELTE_REJECT_CACHE,
+		task: 'bench:harvest:svelte-rejects',
+		label: 'canonical-reject',
+		pin: SVELTE_REJECTS_PIN,
+		excludes: 'Svelte files rejected by svelte/compiler',
+		absent: "Svelte coverage counts svelte/compiler's rejects"
+	},
+	{
+		path: PRETTIER_JSX_CACHE,
+		task: 'bench:harvest:prettier-jsx',
+		label: 'prettier-jsx',
+		pin: PRETTIER_JSX_PIN,
+		excludes: 'Prettier .js fixtures babel reads as JSX',
+		absent: "TypeScript coverage counts Prettier's JSX-in-.js fixtures"
+	}
+];
+
+/**
+ * What one `stream()` applied of an exclusion cache, for the consumer that decides
+ * whether the result may be published (`CorpusLoader.exclusion_caches`) — `size`
+ * null when the cache was absent.
+ */
+export interface ExclusionCacheState {
+	label: string;
+	task: string;
+	pin: number;
+	size: number | null;
+}
+
+/** An exclusion cache as one `stream()` loaded it — `paths` null when absent. */
+interface LoadedExclusionCache {
+	cache: ExclusionCache;
+	paths: Set<string> | null;
+	/** How many walked paths the cache excluded, graded against its size afterward. */
+	excluded: number;
+}
+
+/**
+ * Load an exclusion cache as an absolute-path set, or `null` if absent. The loader
+ * fails open on an absent one — the conformance corpus stays un-filtered (the
+ * pre-harvest numbers), disclosed in its log — because most graders it serves are
+ * untouched by the caches (neither holds a CSS path). The run that PUBLISHES the
+ * coverage refuses instead (`bench.ts`'s `enforce_exclusion_caches`).
+ */
+async function load_path_set(cache: string): Promise<Set<string> | null> {
+	const cache_path = resolve(cache);
 	if (!(await fs_exists(cache_path))) return null;
 	const paths = JSON.parse(await readFile(cache_path, 'utf8')) as string[];
 	return new Set(paths);
 }
 
+/**
+ * Set a TypeScript file's goal as Prettier's runner reads it
+ * (`ConformanceReading.runner_goal`): its parsers take the goal from the
+ * extension when it names one (`getSourceType`: `.mjs` / `.mts` module, `.cjs` /
+ * `.cts` commonjs, set as an explicit `SourceFile.goal`) and otherwise try module,
+ * then commonjs (`SourceFile.goal_fallback`).
+ */
+function read_at_runner_goal(file: SourceFile): void {
+	if (file.language !== 'typescript') return;
+	const ext = extname(file.path).toLowerCase();
+	if (ext === '.mjs' || ext === '.mts') file.goal = 'module';
+	else if (ext === '.cjs' || ext === '.cts') file.goal = 'script';
+	else file.goal_fallback = true;
+}
+
 //
 // Corpus Loader
 //
+
+/**
+ * The loader's refusal of an ABSENT entry — the one load failure
+ * `load_pinned_language_corpus` lets an `--if-present` grade skip.
+ */
+class CorpusEntryMissingError extends Error {
+	override name = 'CorpusEntryMissingError';
+}
 
 /**
  * A corpus source's GitHub origin — detected at report-build time
@@ -1163,12 +1339,25 @@ export class CorpusLoader {
 	readonly missing: MissingEntryPolicy;
 	/**
 	 * Whether the `conformance` view applies the Svelte canonical-reject cache
-	 * (`SVELTE_REJECT_CACHE`). Default true. The reject **harvest** itself must set
+	 * (`SVELTE_REJECT_CACHE`) and the Prettier JSX cache (`PRETTIER_JSX_CACHE`).
+	 * Default true. Either **harvest** itself must set
 	 * this false — it loads the conformance corpus to *produce* that cache, so
 	 * applying it would exclude the very files it needs to grade (and, on a second
 	 * run, overwrite the cache with an empty set).
 	 */
-	readonly apply_reject_cache: boolean;
+	readonly apply_exclusion_caches: boolean;
+	/**
+	 * Which of the view's entries to walk, by declared path — `undefined` walks them
+	 * all. For a grade whose pin is a claim about SOME of the view's entries (every
+	 * `load_pinned_language_corpus` grade: the entries that can hold its language,
+	 * and for the prettier-jsx harvest the Prettier JS suite alone), so it neither
+	 * reads the entries its count ignores (the conformance view is ~80k files, over
+	 * half of them test262's) nor refuses over one of them being absent: the
+	 * missing-entry policy is applied to the selected entries only. The stamp still
+	 * records the whole view's entry list, so a selection that grows with the view
+	 * re-harvests.
+	 */
+	readonly only: ((entry_path: string) => boolean) | undefined;
 
 	/**
 	 * Per-entry file counts from the most recent `stream()`/`load()` — the
@@ -1178,13 +1367,25 @@ export class CorpusLoader {
 	 */
 	sources: CorpusSource[] = [];
 
+	/**
+	 * The exclusion caches the most recent `stream()` applied — empty outside the
+	 * `conformance` view or with `apply_exclusion_caches` off. The loader decides
+	 * nothing from it; a publishing run holds each to its harvest and pin.
+	 */
+	exclusion_caches: ExclusionCacheState[] = [];
+
 	constructor(
 		view: CorpusView,
-		options?: { missing?: MissingEntryPolicy; apply_reject_cache?: boolean }
+		options?: {
+			missing?: MissingEntryPolicy;
+			apply_exclusion_caches?: boolean;
+			only?: (entry_path: string) => boolean;
+		}
 	) {
 		this.view = view;
 		this.missing = options?.missing ?? 'fail';
-		this.apply_reject_cache = options?.apply_reject_cache ?? true;
+		this.apply_exclusion_caches = options?.apply_exclusion_caches ?? true;
+		this.only = options?.only;
 	}
 
 	async *stream(logger: Logger = console.log): AsyncGenerator<SourceFile> {
@@ -1198,7 +1399,9 @@ export class CorpusLoader {
 					'the snapshot (`corpus_robustness_seeds`), never loaded whole'
 			);
 		}
-		const entries = (await corpus_entries()).filter((e) => tiers.includes(e.tier));
+		const entries = (await corpus_entries()).filter(
+			(e) => tiers.includes(e.tier) && (this.only === undefined || this.only(entry_source(e)))
+		);
 
 		// Fail fast on missing entries — all existence checks up front, before
 		// any file is yielded, so a partial corpus can't be half-processed. Which
@@ -1243,7 +1446,7 @@ export class CorpusLoader {
 			missing.push(entry_path + suffix(remedy_for(entry)));
 		}
 		if (missing.length > 0) {
-			throw new Error(
+			throw new CorpusEntryMissingError(
 				`Missing corpus entr${missing.length === 1 ? 'y' : 'ies'} (${this.view} view): ` +
 					`${missing.join(', ')} — clone the missing repo(s) or run the named harvest` +
 					// The remedy a PIN grader must never be offered: tolerating the gap is
@@ -1261,55 +1464,62 @@ export class CorpusLoader {
 
 		// Conformance view: exclude the Svelte files svelte/compiler rejects (the
 		// canonical-reject cache) so parse coverage measures fidelity on valid
-		// Svelte, not permissiveness over the suite's error fixtures. Fail-open
-		// when the cache is absent (pre-harvest), disclosed here.
-		const apply_rejects = this.view === 'conformance' && this.apply_reject_cache;
-		const reject_set = apply_rejects ? await load_svelte_reject_set() : null;
-		if (apply_rejects) {
+		// Svelte, not permissiveness over the suite's error fixtures, and the
+		// Prettier `.js` fixtures Prettier's babel parser reads as JSX, out of
+		// scope for every parser on the surface. Fail-open when a cache is absent
+		// (pre-harvest), disclosed here and in `exclusion_caches`.
+		const conformance = this.view === 'conformance';
+		const caches: LoadedExclusionCache[] =
+			conformance && this.apply_exclusion_caches
+				? await Promise.all(
+						EXCLUSION_CACHES.map(async (cache) => ({
+							cache,
+							paths: await load_path_set(cache.path),
+							excluded: 0
+						}))
+					)
+				: [];
+		this.exclusion_caches = caches.map(({ cache, paths }) => ({
+			label: cache.label,
+			task: cache.task,
+			pin: cache.pin,
+			size: paths?.size ?? null
+		}));
+		for (const { cache, paths } of caches) {
 			logger(
-				reject_set
-					? `  canonical-reject cache: excluding ${reject_set.size} Svelte files rejected by svelte/compiler`
-					: `  ⚠ canonical-reject cache absent — Svelte coverage counts svelte/compiler's rejects ` +
-							`(run \`deno task bench:harvest:svelte-rejects\`)`
+				paths
+					? `  ${cache.label} cache: excluding ${paths.size} ${cache.excludes}`
+					: `  ⚠ ${cache.label} cache absent — ${cache.absent} (run \`deno task ${cache.task}\`)`
 			);
 		}
-		let reject_excluded = 0;
 
 		for (const entry of present) {
 			const entry_path = entry_source(entry);
 			const resolved_path = resolve(entry_path);
+			const reading = conformance ? entry.conformance : undefined;
+			// A harvest's file list is already curated, so no skip applies to it. Each
+			// cache holds one language's paths (harvested Svelte-only / JS-only), so a
+			// bare membership test is inherently language-scoped. The caches skip LAST,
+			// so each tallies only paths the view's path filters keep: a cached path one
+			// now drops goes uncounted and reads as drift, rather than as a hit. (A
+			// content filter runs after the read, so it cannot be ordered ahead.)
+			const files =
+				entry.files_from !== undefined
+					? load_file_list(resolved_path, entry.extensions)
+					: walk_corpus(resolved_path, {
+							extensions: entry.extensions,
+							skip: compose_skips(entry.skip, reading?.skip, ...caches.map(path_set_skip)),
+							prune_build_output: false
+						});
 			let count = 0;
 			const by_language: Record<Language, number> = { svelte: 0, typescript: 0, css: 0 };
-			if (entry.files_from !== undefined) {
-				for await (const file of load_file_list(resolved_path, entry.extensions)) {
-					count++;
-					by_language[file.language]++;
-					file.source = entry_path;
-					yield file;
-				}
-			} else {
-				const base_skip = entry.skip;
-				// `reject_set` holds only Svelte paths (harvested Svelte-only), so a
-				// bare membership test is inherently language-scoped.
-				const skip: SkipFn | undefined = reject_set
-					? async (path, relative) => {
-							if (reject_set.has(path)) {
-								reject_excluded++;
-								return true;
-							}
-							return (await base_skip?.(path, relative)) ?? false;
-						}
-					: base_skip;
-				for await (const file of walk_corpus(resolved_path, {
-					extensions: entry.extensions,
-					skip,
-					prune_build_output: false
-				})) {
-					count++;
-					by_language[file.language]++;
-					file.source = entry_path;
-					yield file;
-				}
+			for await (const file of files) {
+				if (reading?.skip_content?.(file.content, file.path)) continue;
+				count++;
+				by_language[file.language]++;
+				file.source = entry_path;
+				if (reading?.runner_goal) read_at_runner_goal(file);
+				yield file;
 			}
 
 			if (count > 0) {
@@ -1318,17 +1528,20 @@ export class CorpusLoader {
 			}
 		}
 
-		if (reject_set && reject_excluded !== reject_set.size) {
-			// Stale cache: it names more paths than this corpus still yields (fewer
-			// hit than cached). Only detects cache-names-a-gone-path; a NEW reject the
-			// corpus grew but the cache doesn't name isn't counted here (it's simply
-			// not excluded) — a re-harvest, chained ahead of `bench:conformance`,
-			// picks those up. Not fatal — disclose the drift so a re-harvest is
-			// prompted for the `:run` (skip-harvest) path.
-			logger(
-				`  ⚠ canonical-reject cache drift: excluded ${reject_excluded} of ${reject_set.size} ` +
-					`cached paths — re-run \`deno task bench:harvest:svelte-rejects\``
-			);
+		// Stale cache: it names more paths than this corpus still yields (fewer hit
+		// than cached). Only detects cache-names-a-gone-path; a NEW entry the corpus
+		// grew but the cache doesn't name isn't counted here (it's simply not
+		// excluded) — a re-harvest, chained ahead of `bench:conformance`, picks those
+		// up. Not fatal — disclose the drift so a re-harvest is prompted for the
+		// `:run` (skip-harvest) path. A cache is a claim about the whole view, so a
+		// walk narrowed by `only` has nothing to grade it against.
+		for (const { cache, paths, excluded } of caches) {
+			if (this.only === undefined && paths && excluded !== paths.size) {
+				logger(
+					`  ⚠ ${cache.label} cache drift: excluded ${excluded} of ${paths.size} ` +
+						`cached paths — re-run \`deno task ${cache.task}\``
+				);
+			}
 		}
 	}
 
@@ -1345,16 +1558,23 @@ export class CorpusLoader {
 /**
  * One view's files for ONE language, loaded under the posture an exact count pin
  * requires: `{ complete_for: language }`, so any absent entry that could hold that
- * language THROWS — `optional` ones included, since a pin is a claim about the
- * whole corpus and `optional` only says a normal run may proceed without it.
+ * language refuses — `optional` ones included, since a pin is a claim about the
+ * whole corpus and `optional` only says a normal run may proceed without it. Only
+ * the entries that can hold the language are walked (`entry_holds_language`), so
+ * a Svelte or CSS pin never reads the TypeScript-only suites.
  *
  * This exists so the posture is not a thing each grader has to remember. Every
  * pinned-count grader does the same two steps — load the view, keep one language —
  * and the two that spelled them out separately BOTH got the tolerance wrong in the
  * same direction, tolerating an absent contributor and then reporting the shortfall
  * as a moved pin. Reach for this rather than `new CorpusLoader` whenever the
- * number that comes out is compared against a constant; the throw is the caller's
- * to translate (a `--if-present` warn-skip, usually).
+ * number that comes out is compared against a constant.
+ *
+ * For the same reason it owns what a grader's `--if-present` tolerates: an ABSENT
+ * entry, and nothing else, is logged and answered with `null` so the grader skips.
+ * A present input the loader cannot read (a Prettier spec the validity filter
+ * cannot evaluate, an unreadable snapshot manifest) throws either way — skipped, it
+ * would leave the grade's stamp stale under a green run.
  *
  * NOT a substitute for `corpus_missing_entries` in a STAMPED grade: a stamp is
  * consulted before anything loads, so "may I trust the stamp?" has to be asked
@@ -1363,12 +1583,31 @@ export class CorpusLoader {
 export async function load_pinned_language_corpus(
 	view: CorpusView,
 	language: Language,
-	options?: { logger?: Logger; apply_reject_cache?: boolean }
-): Promise<SourceFile[]> {
-	const files = await new CorpusLoader(view, {
-		missing: { complete_for: language },
-		apply_reject_cache: options?.apply_reject_cache
-	}).load(options?.logger ?? console.log);
+	options: {
+		/** Whether the grader was invoked `--if-present`: an absent entry answers `null`. */
+		if_present: boolean;
+		logger?: Logger;
+		apply_exclusion_caches?: boolean;
+		/** Walk only these entries — see `CorpusLoader.only`; the pin's claim narrows with it. */
+		only?: (entry_path: string) => boolean;
+	}
+): Promise<SourceFile[] | null> {
+	const logger = options.logger ?? console.log;
+	const holding = new Set(
+		(await corpus_entries()).filter((e) => entry_holds_language(e, language)).map(entry_source)
+	);
+	let files: SourceFile[];
+	try {
+		files = await new CorpusLoader(view, {
+			missing: { complete_for: language },
+			apply_exclusion_caches: options.apply_exclusion_caches,
+			only: (entry_path) => holding.has(entry_path) && (options.only?.(entry_path) ?? true)
+		}).load(logger);
+	} catch (e) {
+		if (!(options.if_present && e instanceof CorpusEntryMissingError)) throw e;
+		logger(`  ⚠ ${e.message} — skipping (--if-present)`);
+		return null;
+	}
 	return files.filter((f) => f.language === language);
 }
 

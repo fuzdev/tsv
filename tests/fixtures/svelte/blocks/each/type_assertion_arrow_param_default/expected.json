@@ -1,0 +1,891 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 469,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 45,
+				"end": 47,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 47,
+				"end": 135,
+				"data": " an `as` in an arrow's parameter default is an assertion, not the each separator "
+			},
+			{
+				"type": "Text",
+				"start": 135,
+				"end": 136,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 136,
+				"end": 197,
+				"expression": {
+					"type": "ArrowFunctionExpression",
+					"start": 143,
+					"end": 161,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 7
+						},
+						"end": {
+							"line": 6,
+							"column": 25
+						}
+					},
+					"id": null,
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "AssignmentPattern",
+							"start": 144,
+							"end": 154,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 8
+								},
+								"end": {
+									"line": 6,
+									"column": 18
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 144,
+								"end": 145,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 8
+									},
+									"end": {
+										"line": 6,
+										"column": 9
+									}
+								},
+								"name": "x"
+							},
+							"right": {
+								"type": "TSAsExpression",
+								"start": 148,
+								"end": 154,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 12
+									},
+									"end": {
+										"line": 6,
+										"column": 18
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 148,
+									"end": 149,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 12
+										},
+										"end": {
+											"line": 6,
+											"column": 13
+										}
+									},
+									"name": "y"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 153,
+									"end": 154,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 17
+										},
+										"end": {
+											"line": 6,
+											"column": 18
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 153,
+										"end": 154,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 17
+											},
+											"end": {
+												"line": 6,
+												"column": 18
+											}
+										},
+										"name": "A"
+									}
+								}
+							}
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 159,
+						"end": 161,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 23
+							},
+							"end": {
+								"line": 6,
+								"column": 25
+							}
+						},
+						"body": []
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 170,
+							"end": 172,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 172,
+							"end": 189,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 7,
+									"column": 2,
+									"character": 173
+								},
+								"end": {
+									"line": 7,
+									"column": 5,
+									"character": 176
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 177,
+										"end": 183,
+										"expression": {
+											"type": "Identifier",
+											"start": 178,
+											"end": 182,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 7
+												},
+												"end": {
+													"line": 7,
+													"column": 11
+												}
+											},
+											"name": "item"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 189,
+							"end": 190,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 165,
+					"end": 169,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 29,
+							"character": 165
+						},
+						"end": {
+							"line": 6,
+							"column": 33,
+							"character": 169
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 197,
+				"end": 199,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 199,
+				"end": 280,
+				"data": " in an async arrow's list beside another parameter, with an index and key "
+			},
+			{
+				"type": "Text",
+				"start": 280,
+				"end": 281,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 281,
+				"end": 358,
+				"expression": {
+					"type": "ArrowFunctionExpression",
+					"start": 288,
+					"end": 315,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 7
+						},
+						"end": {
+							"line": 11,
+							"column": 34
+						}
+					},
+					"id": null,
+					"expression": false,
+					"generator": false,
+					"async": true,
+					"params": [
+						{
+							"type": "AssignmentPattern",
+							"start": 295,
+							"end": 305,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 14
+								},
+								"end": {
+									"line": 11,
+									"column": 24
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 295,
+								"end": 296,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 14
+									},
+									"end": {
+										"line": 11,
+										"column": 15
+									}
+								},
+								"name": "x"
+							},
+							"right": {
+								"type": "TSAsExpression",
+								"start": 299,
+								"end": 305,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 18
+									},
+									"end": {
+										"line": 11,
+										"column": 24
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 299,
+									"end": 300,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 18
+										},
+										"end": {
+											"line": 11,
+											"column": 19
+										}
+									},
+									"name": "y"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 304,
+									"end": 305,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 23
+										},
+										"end": {
+											"line": 11,
+											"column": 24
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 304,
+										"end": 305,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 23
+											},
+											"end": {
+												"line": 11,
+												"column": 24
+											}
+										},
+										"name": "A"
+									}
+								}
+							}
+						},
+						{
+							"type": "Identifier",
+							"start": 307,
+							"end": 308,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 26
+								},
+								"end": {
+									"line": 11,
+									"column": 27
+								}
+							},
+							"name": "w"
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 313,
+						"end": 315,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 32
+							},
+							"end": {
+								"line": 11,
+								"column": 34
+							}
+						},
+						"body": []
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 331,
+							"end": 333,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 333,
+							"end": 350,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 12,
+									"column": 2,
+									"character": 334
+								},
+								"end": {
+									"line": 12,
+									"column": 5,
+									"character": 337
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 338,
+										"end": 344,
+										"expression": {
+											"type": "Identifier",
+											"start": 339,
+											"end": 343,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 7
+												},
+												"end": {
+													"line": 12,
+													"column": 11
+												}
+											},
+											"name": "item"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 350,
+							"end": 351,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 319,
+					"end": 323,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 38,
+							"character": 319
+						},
+						"end": {
+							"line": 11,
+							"column": 42,
+							"character": 323
+						}
+					}
+				},
+				"index": "i",
+				"key": {
+					"type": "Identifier",
+					"start": 328,
+					"end": 329,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 47
+						},
+						"end": {
+							"line": 11,
+							"column": 48
+						}
+					},
+					"name": "i"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 358,
+				"end": 360,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 360,
+				"end": 400,
+				"data": " in a function expression's list "
+			},
+			{
+				"type": "Text",
+				"start": 400,
+				"end": 401,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 401,
+				"end": 468,
+				"expression": {
+					"type": "FunctionExpression",
+					"start": 408,
+					"end": 432,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 7
+						},
+						"end": {
+							"line": 16,
+							"column": 31
+						}
+					},
+					"id": null,
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "AssignmentPattern",
+							"start": 418,
+							"end": 428,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 17
+								},
+								"end": {
+									"line": 16,
+									"column": 27
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 418,
+								"end": 419,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 17
+									},
+									"end": {
+										"line": 16,
+										"column": 18
+									}
+								},
+								"name": "x"
+							},
+							"right": {
+								"type": "TSAsExpression",
+								"start": 422,
+								"end": 428,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 21
+									},
+									"end": {
+										"line": 16,
+										"column": 27
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 422,
+									"end": 423,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 21
+										},
+										"end": {
+											"line": 16,
+											"column": 22
+										}
+									},
+									"name": "y"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 427,
+									"end": 428,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 26
+										},
+										"end": {
+											"line": 16,
+											"column": 27
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 427,
+										"end": 428,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 26
+											},
+											"end": {
+												"line": 16,
+												"column": 27
+											}
+										},
+										"name": "A"
+									}
+								}
+							}
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 430,
+						"end": 432,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 29
+							},
+							"end": {
+								"line": 16,
+								"column": 31
+							}
+						},
+						"body": []
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 441,
+							"end": 443,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 443,
+							"end": 460,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 17,
+									"column": 2,
+									"character": 444
+								},
+								"end": {
+									"line": 17,
+									"column": 5,
+									"character": 447
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 448,
+										"end": 454,
+										"expression": {
+											"type": "Identifier",
+											"start": 449,
+											"end": 453,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 7
+												},
+												"end": {
+													"line": 17,
+													"column": 11
+												}
+											},
+											"name": "item"
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 460,
+							"end": 461,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 436,
+					"end": 440,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 35,
+							"character": 436
+						},
+						"end": {
+							"line": 16,
+							"column": 39,
+							"character": 440
+						}
+					}
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 45,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 36,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 20,
+					"end": 35,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 16
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 24,
+							"end": 34,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 5
+								},
+								"end": {
+									"line": 2,
+									"column": 15
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 24,
+								"end": 34,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 5
+									},
+									"end": {
+										"line": 2,
+										"column": 15
+									}
+								},
+								"name": "y",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 25,
+									"end": 34,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 6
+										},
+										"end": {
+											"line": 2,
+											"column": 15
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSUnknownKeyword",
+										"start": 27,
+										"end": 34,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 8
+											},
+											"end": {
+												"line": 2,
+												"column": 15
+											}
+										}
+									}
+								}
+							},
+							"init": null
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
