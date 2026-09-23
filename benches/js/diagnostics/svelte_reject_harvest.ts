@@ -73,7 +73,7 @@ async function main(): Promise<void> {
 	// BOTH prettier suites' `.html` (the loader reads that extension as Svelte),
 	// and the oracle is the pinned npm svelte — skip the grade when all of those
 	// plus the rejects pin match the stamp. All three checkouts are stamped
-	// because all three produce rejects (98 / 40 / 7 of the pinned count): a
+	// because all three produce rejects (95 / 40 / 7 of the pinned count): a
 	// contributor left out is one whose pull leaves this stamp reading fresh over
 	// a corpus that moved under it. The conformance view's ENTRY LIST is stamped
 	// too: a suite entry added to or dropped from the corpus entries changes what is
@@ -122,7 +122,7 @@ async function main(): Promise<void> {
 	// and saying it any other way has been the bug: a machine without the
 	// wpt/test262 suite caches (css/js — no Svelte) still harvests the full Svelte
 	// set, while a missing ../svelte / ../prettier / ../prettier-plugin-svelte —
-	// each a real contributor to the pinned count (98 / 40 / 7) — refuses HERE,
+	// each a real contributor to the pinned count (95 / 40 / 7) — refuses HERE,
 	// where --if-present can warn-and-skip it. A blanket tolerance instead let those
 	// three through to the exact-count check below, which then reported a missing
 	// checkout as `pinned count mismatch … re-pin in lib/gate_counts.ts` — the one
