@@ -1,9 +1,9 @@
 {
-	"version": 18,
+	"version": 19,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-09-21T18:40:22.743Z",
-	"git_commit": "939b51f8",
+	"timestamp": "2026-09-23T01:44:33.674Z",
+	"git_commit": "23392a6e",
 	"machine": {
 		"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 		"os": "linux",
@@ -11,9 +11,9 @@
 		"runtime_version": "24.14.1"
 	},
 	"corpus": {
-		"svelte": 4621,
-		"typescript": 53955,
-		"css": 22643
+		"svelte": 4619,
+		"typescript": 53323,
+		"css": 22449
 	},
 	"corpus_sources": [
 		{
@@ -33,10 +33,10 @@
 		},
 		{
 			"path": "../prettier/tests/format/typescript",
-			"files": 795,
+			"files": 591,
 			"by_language": {
 				"svelte": 0,
-				"typescript": 795,
+				"typescript": 591,
 				"css": 0
 			},
 			"repo": {
@@ -48,10 +48,10 @@
 		},
 		{
 			"path": "../prettier/tests/format/js",
-			"files": 1106,
+			"files": 756,
 			"by_language": {
 				"svelte": 0,
-				"typescript": 1106,
+				"typescript": 756,
 				"css": 0
 			},
 			"repo": {
@@ -63,11 +63,11 @@
 		},
 		{
 			"path": "../prettier/tests/format/css",
-			"files": 228,
+			"files": 139,
 			"by_language": {
 				"svelte": 0,
-				"typescript": 78,
-				"css": 150
+				"typescript": 0,
+				"css": 139
 			},
 			"repo": {
 				"url": "https://github.com/prettier/prettier",
@@ -78,9 +78,9 @@
 		},
 		{
 			"path": "../prettier/tests/format/html",
-			"files": 84,
+			"files": 82,
 			"by_language": {
-				"svelte": 84,
+				"svelte": 82,
 				"typescript": 0,
 				"css": 0
 			},
@@ -108,11 +108,11 @@
 		},
 		{
 			"path": "benches/js/.cache/wpt_css",
-			"files": 22310,
+			"files": 22127,
 			"by_language": {
 				"svelte": 0,
 				"typescript": 0,
-				"css": 22310
+				"css": 22127
 			},
 			"repo": {
 				"url": "https://github.com/web-platform-tests/wpt",
@@ -152,6 +152,10 @@
 			}
 		}
 	],
+	"exclusion_caches": {
+		"canonical-reject": 142,
+		"prettier-jsx": 39
+	},
 	"coverage_by_source": {
 		"parse/svelte": {
 			"../prettier-plugin-svelte/test": {
@@ -194,40 +198,40 @@
 			},
 			"../prettier/tests/format/html": {
 				"svelte/compiler": {
-					"processed": 84,
-					"total": 84
+					"processed": 82,
+					"total": 82
 				},
 				"tsv-json": {
-					"processed": 84,
-					"total": 84
+					"processed": 82,
+					"total": 82
 				},
 				"tsv-wasm-json": {
-					"processed": 84,
-					"total": 84
+					"processed": 82,
+					"total": 82
 				},
 				"tsv-json-no-locations": {
-					"processed": 84,
-					"total": 84
+					"processed": 82,
+					"total": 82
 				},
 				"tsv-wasm-json-no-locations": {
-					"processed": 84,
-					"total": 84
+					"processed": 82,
+					"total": 82
 				},
 				"tsv-internal": {
-					"processed": 84,
-					"total": 84
+					"processed": 82,
+					"total": 82
 				},
 				"tsv-wasm-internal": {
-					"processed": 84,
-					"total": 84
+					"processed": 82,
+					"total": 82
 				},
 				"rsvelte-parse": {
-					"processed": 84,
-					"total": 84
+					"processed": 82,
+					"total": 82
 				},
 				"rsvelte-parse-skip-expr-loc": {
-					"processed": 84,
-					"total": 84
+					"processed": 82,
+					"total": 82
 				}
 			},
 			"../svelte/packages/svelte/tests": {
@@ -272,152 +276,118 @@
 		"parse/typescript": {
 			"../prettier/tests/format/typescript": {
 				"acorn-typescript": {
-					"processed": 716,
-					"total": 795
+					"processed": 515,
+					"total": 591
 				},
 				"tsv-json": {
-					"processed": 781,
-					"total": 795
+					"processed": 581,
+					"total": 591,
+					"script_only": 1
 				},
 				"tsv-wasm-json": {
-					"processed": 781,
-					"total": 795
+					"processed": 581,
+					"total": 591,
+					"script_only": 1
 				},
 				"tsv-json-no-locations": {
-					"processed": 781,
-					"total": 795
+					"processed": 581,
+					"total": 591,
+					"script_only": 1
 				},
 				"tsv-wasm-json-no-locations": {
-					"processed": 781,
-					"total": 795
+					"processed": 581,
+					"total": 591,
+					"script_only": 1
 				},
 				"tsv-internal": {
-					"processed": 781,
-					"total": 795
+					"processed": 581,
+					"total": 591,
+					"script_only": 1
 				},
 				"tsv-wasm-internal": {
-					"processed": 781,
-					"total": 795
+					"processed": 581,
+					"total": 591,
+					"script_only": 1
 				},
 				"oxc-parser": {
-					"processed": 768,
-					"total": 795
+					"processed": 569,
+					"total": 591
 				},
 				"oxc-parser-wasm": {
-					"processed": 769,
-					"total": 795
+					"processed": 570,
+					"total": 591
 				},
 				"tsc": {
-					"processed": 791,
-					"total": 795
+					"processed": 590,
+					"total": 591
 				},
 				"yuku-parser-wasm": {
-					"processed": 779,
-					"total": 795
+					"processed": 582,
+					"total": 591,
+					"script_only": 2
 				},
 				"swc": {
-					"processed": 758,
-					"total": 795
+					"processed": 557,
+					"total": 591
 				}
 			},
 			"../prettier/tests/format/js": {
 				"acorn-typescript": {
-					"processed": 862,
-					"total": 1106
+					"processed": 709,
+					"total": 756,
+					"script_only": 34
 				},
 				"tsv-json": {
-					"processed": 920,
-					"total": 1106
+					"processed": 740,
+					"total": 756,
+					"script_only": 11
 				},
 				"tsv-wasm-json": {
-					"processed": 920,
-					"total": 1106
+					"processed": 740,
+					"total": 756,
+					"script_only": 11
 				},
 				"tsv-json-no-locations": {
-					"processed": 920,
-					"total": 1106
+					"processed": 740,
+					"total": 756,
+					"script_only": 11
 				},
 				"tsv-wasm-json-no-locations": {
-					"processed": 920,
-					"total": 1106
+					"processed": 740,
+					"total": 756,
+					"script_only": 11
 				},
 				"tsv-internal": {
-					"processed": 920,
-					"total": 1106
+					"processed": 740,
+					"total": 756,
+					"script_only": 11
 				},
 				"tsv-wasm-internal": {
-					"processed": 920,
-					"total": 1106
+					"processed": 740,
+					"total": 756,
+					"script_only": 11
 				},
 				"oxc-parser": {
-					"processed": 935,
-					"total": 1106
+					"processed": 748,
+					"total": 756
 				},
 				"oxc-parser-wasm": {
-					"processed": 935,
-					"total": 1106
+					"processed": 748,
+					"total": 756
 				},
 				"tsc": {
-					"processed": 950,
-					"total": 1106
+					"processed": 743,
+					"total": 756
 				},
 				"yuku-parser-wasm": {
-					"processed": 937,
-					"total": 1106
+					"processed": 751,
+					"total": 756,
+					"script_only": 1
 				},
 				"swc": {
-					"processed": 908,
-					"total": 1106
-				}
-			},
-			"../prettier/tests/format/css": {
-				"acorn-typescript": {
-					"processed": 78,
-					"total": 78
-				},
-				"tsv-json": {
-					"processed": 78,
-					"total": 78
-				},
-				"tsv-wasm-json": {
-					"processed": 78,
-					"total": 78
-				},
-				"tsv-json-no-locations": {
-					"processed": 78,
-					"total": 78
-				},
-				"tsv-wasm-json-no-locations": {
-					"processed": 78,
-					"total": 78
-				},
-				"tsv-internal": {
-					"processed": 78,
-					"total": 78
-				},
-				"tsv-wasm-internal": {
-					"processed": 78,
-					"total": 78
-				},
-				"oxc-parser": {
-					"processed": 78,
-					"total": 78
-				},
-				"oxc-parser-wasm": {
-					"processed": 78,
-					"total": 78
-				},
-				"tsc": {
-					"processed": 78,
-					"total": 78
-				},
-				"yuku-parser-wasm": {
-					"processed": 78,
-					"total": 78
-				},
-				"swc": {
-					"processed": 78,
-					"total": 78
+					"processed": 734,
+					"total": 756,
+					"script_only": 14
 				}
 			},
 			"../svelte/packages/svelte/tests": {
@@ -526,27 +496,27 @@
 					"total": 8097
 				},
 				"tsv-json": {
-					"processed": 8015,
+					"processed": 8017,
 					"total": 8097
 				},
 				"tsv-wasm-json": {
-					"processed": 8015,
+					"processed": 8017,
 					"total": 8097
 				},
 				"tsv-json-no-locations": {
-					"processed": 8015,
+					"processed": 8017,
 					"total": 8097
 				},
 				"tsv-wasm-json-no-locations": {
-					"processed": 8015,
+					"processed": 8017,
 					"total": 8097
 				},
 				"tsv-internal": {
-					"processed": 8015,
+					"processed": 8017,
 					"total": 8097
 				},
 				"tsv-wasm-internal": {
-					"processed": 8015,
+					"processed": 8017,
 					"total": 8097
 				},
 				"oxc-parser": {
@@ -574,28 +544,28 @@
 		"parse/css": {
 			"../prettier/tests/format/css": {
 				"svelte/compiler": {
-					"processed": 120,
-					"total": 150
+					"processed": 118,
+					"total": 139
 				},
 				"tsv-json": {
-					"processed": 124,
-					"total": 150
+					"processed": 122,
+					"total": 139
 				},
 				"tsv-wasm-json": {
-					"processed": 124,
-					"total": 150
+					"processed": 122,
+					"total": 139
 				},
 				"tsv-internal": {
-					"processed": 124,
-					"total": 150
+					"processed": 122,
+					"total": 139
 				},
 				"tsv-wasm-internal": {
-					"processed": 124,
-					"total": 150
+					"processed": 122,
+					"total": 139
 				},
 				"postcss": {
-					"processed": 142,
-					"total": 150
+					"processed": 139,
+					"total": 139
 				}
 			},
 			"../svelte/packages/svelte/tests": {
@@ -626,28 +596,28 @@
 			},
 			"benches/js/.cache/wpt_css": {
 				"svelte/compiler": {
-					"processed": 22111,
-					"total": 22310
+					"processed": 21941,
+					"total": 22127
 				},
 				"tsv-json": {
-					"processed": 22160,
-					"total": 22310
+					"processed": 21990,
+					"total": 22127
 				},
 				"tsv-wasm-json": {
-					"processed": 22160,
-					"total": 22310
+					"processed": 21990,
+					"total": 22127
 				},
 				"tsv-internal": {
-					"processed": 22160,
-					"total": 22310
+					"processed": 21990,
+					"total": 22127
 				},
 				"tsv-wasm-internal": {
-					"processed": 22160,
-					"total": 22310
+					"processed": 21990,
+					"total": 22127
 				},
 				"postcss": {
-					"processed": 22210,
-					"total": 22310
+					"processed": 22039,
+					"total": 22127
 				}
 			}
 		}
@@ -677,45 +647,45 @@
 	"binary_sizes": [
 		{
 			"label": "tsv (ffi)",
-			"bytes": 3370512,
+			"bytes": 3367824,
 			"kind": "native",
-			"gzip_bytes": 1551289
+			"gzip_bytes": 1550678
 		},
 		{
 			"label": "tsv format (ffi)",
-			"bytes": 3064480,
+			"bytes": 3061808,
 			"kind": "native",
-			"gzip_bytes": 1411723
+			"gzip_bytes": 1410750
 		},
 		{
 			"label": "tsv parse (ffi)",
-			"bytes": 1531792,
+			"bytes": 1529104,
 			"kind": "native",
-			"gzip_bytes": 675399
+			"gzip_bytes": 674282
 		},
 		{
 			"label": "tsv (napi)",
-			"bytes": 3753072,
+			"bytes": 3751072,
 			"kind": "native",
-			"gzip_bytes": 1708600
+			"gzip_bytes": 1707953
 		},
 		{
 			"label": "tsv-format-wasm",
-			"bytes": 2252473,
+			"bytes": 2250575,
 			"kind": "wasm",
-			"gzip_bytes": 867174
+			"gzip_bytes": 866596
 		},
 		{
 			"label": "tsv-parse-wasm",
-			"bytes": 968862,
+			"bytes": 966971,
 			"kind": "wasm",
-			"gzip_bytes": 376969
+			"gzip_bytes": 376149
 		},
 		{
 			"label": "tsv-wasm",
-			"bytes": 2529715,
+			"bytes": 2527817,
 			"kind": "wasm",
-			"gzip_bytes": 966361
+			"gzip_bytes": 965297
 		},
 		{
 			"label": "svelte + acorn-typescript parsers (js bundle)",
@@ -826,8 +796,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4621,
-			"files_total": 4621,
+			"files_processed": 4619,
+			"files_total": 4619,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "drop_in",
@@ -855,8 +825,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4621,
-			"files_total": 4621,
+			"files_processed": 4619,
+			"files_total": 4619,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "drop_in",
@@ -884,8 +854,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4621,
-			"files_total": 4621,
+			"files_processed": 4619,
+			"files_total": 4619,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "drop_in",
@@ -913,8 +883,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4621,
-			"files_total": 4621,
+			"files_processed": 4619,
+			"files_total": 4619,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "span_only",
@@ -942,8 +912,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4621,
-			"files_total": 4621,
+			"files_processed": 4619,
+			"files_total": 4619,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "span_only",
@@ -971,8 +941,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4621,
-			"files_total": 4621,
+			"files_processed": 4619,
+			"files_total": 4619,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "none",
@@ -1000,8 +970,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4621,
-			"files_total": 4621,
+			"files_processed": 4619,
+			"files_total": 4619,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "none",
@@ -1029,8 +999,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4621,
-			"files_total": 4621,
+			"files_processed": 4619,
+			"files_total": 4619,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "drop_in",
@@ -1058,8 +1028,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 4621,
-			"files_total": 4621,
+			"files_processed": 4619,
+			"files_total": 4619,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "own_shape",
@@ -1087,8 +1057,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 53046,
-			"files_total": 53955,
+			"files_processed": 52614,
+			"files_total": 53323,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "drop_in",
@@ -1116,8 +1086,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 53673,
-			"files_total": 53955,
+			"files_processed": 53217,
+			"files_total": 53323,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "drop_in",
@@ -1145,8 +1115,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 53673,
-			"files_total": 53955,
+			"files_processed": 53217,
+			"files_total": 53323,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "drop_in",
@@ -1174,8 +1144,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 53673,
-			"files_total": 53955,
+			"files_processed": 53217,
+			"files_total": 53323,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "span_only",
@@ -1203,8 +1173,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 53673,
-			"files_total": 53955,
+			"files_processed": 53217,
+			"files_total": 53323,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "span_only",
@@ -1232,8 +1202,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 53673,
-			"files_total": 53955,
+			"files_processed": 53217,
+			"files_total": 53323,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "none",
@@ -1261,8 +1231,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 53673,
-			"files_total": 53955,
+			"files_processed": 53217,
+			"files_total": 53323,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "none",
@@ -1290,8 +1260,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 53645,
-			"files_total": 53955,
+			"files_processed": 53181,
+			"files_total": 53323,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "span_only",
@@ -1319,8 +1289,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 53647,
-			"files_total": 53955,
+			"files_processed": 53183,
+			"files_total": 53323,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "span_only",
@@ -1348,8 +1318,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 53733,
-			"files_total": 53955,
+			"files_processed": 53247,
+			"files_total": 53323,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "own_shape",
@@ -1377,8 +1347,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 53623,
-			"files_total": 53955,
+			"files_processed": 53162,
+			"files_total": 53323,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "span_only",
@@ -1406,8 +1376,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 53077,
-			"files_total": 53955,
+			"files_processed": 52624,
+			"files_total": 53323,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "own_shape",
@@ -1435,8 +1405,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 22414,
-			"files_total": 22643,
+			"files_processed": 22242,
+			"files_total": 22449,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "drop_in",
@@ -1464,8 +1434,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 22467,
-			"files_total": 22643,
+			"files_processed": 22295,
+			"files_total": 22449,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "drop_in",
@@ -1493,8 +1463,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 22467,
-			"files_total": 22643,
+			"files_processed": 22295,
+			"files_total": 22449,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "drop_in",
@@ -1522,8 +1492,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 22467,
-			"files_total": 22643,
+			"files_processed": 22295,
+			"files_total": 22449,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "none",
@@ -1551,8 +1521,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 22467,
-			"files_total": 22643,
+			"files_processed": 22295,
+			"files_total": 22449,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "none",
@@ -1580,8 +1550,8 @@
 			"warmup_iterations": null,
 			"min_iterations": null,
 			"settled_heap_bytes": null,
-			"files_processed": 22535,
-			"files_total": 22643,
+			"files_processed": 22361,
+			"files_total": 22449,
 			"files_iterated": null,
 			"files_iterated_digest": null,
 			"payload": "own_shape",
