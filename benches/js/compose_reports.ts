@@ -811,7 +811,7 @@ function fmt_file_counts(fi: Row['files_iterated']): string {
  * Whether a row's per-runtime timed SETS differ: by path-set digest where every
  * present runtime carries one (report 15+), by count otherwise (nulls ignored). Two
  * equal counts never proved two equal sets — a runtime whose group intersection
- * lost one impl (biome does not load under Bun) can time the same NUMBER of files
+ * lost one impl (one that runtime can't load) can time the same NUMBER of files
  * from a different set.
  */
 function files_unequal(row: Pick<Row, 'files_iterated' | 'digest'>): boolean {

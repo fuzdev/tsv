@@ -44,10 +44,12 @@
  *
  * ⚠ **The reduced row is NOT payload-matched to tsv's `no-locations` wire**, which
  * is why it is named for the option it passes rather than for tsv's. tsv drops
- * per-node `loc` throughout; `skipExpressionLoc` drops only the nested `loc`
- * blocks on embedded JS expressions and keeps top-level `start`/`end`, so
- * it reduces strictly less. Two different reductions — read the pair as "each
- * tool's own lighter wire", never as one payload measured twice.
+ * per-node `loc` throughout; `skipExpressionLoc` drops `loc` from every JS node —
+ * the `<script>` Program and its statements included, not only template
+ * expressions — but keeps `name_loc` on elements, attributes, and directives and
+ * `loc` on the root's comments, so it reduces strictly less. Two different
+ * reductions — read the pair as "each tool's own lighter wire", never as one
+ * payload measured twice.
  *
  * ⚠ `ParseOptions.skipCssAst` gets no row: `parse()` **rejects** it outright
  * (`skipCssAst is only supported by parseEnvelope`), and the one path that does

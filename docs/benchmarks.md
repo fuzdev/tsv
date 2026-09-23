@@ -627,8 +627,8 @@ prettier. Load-bearing on two axes:
   addon on that corpus is exactly where yuku's N-API binding segfaults.
   ⚠ `rsvelte-parse-skip-expr-loc` is named for the **option it passes**, not for
   tsv's `no-locations` wire, because the reductions differ: tsv drops per-node
-  `loc` throughout, `skipExpressionLoc` drops only nested `loc` on embedded JS
-  expressions and keeps top-level `start`/`end`. Read the pair as "each
+  `loc` throughout, `skipExpressionLoc` drops `loc` from every JS node but keeps
+  `name_loc` on elements, attributes, and directives. Read the pair as "each
   tool's own lighter wire", never as one payload measured twice — which is why it
   is absent from the payload-matched lines. Package choice is deliberate and
   documented in `lib/rsvelte_parse.ts`: `@rsvelte/compiler` also exists but is a
