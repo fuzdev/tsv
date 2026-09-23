@@ -207,6 +207,19 @@ pub(in crate::printer) fn is_freeze_target(child: &TSType<'_>) -> bool {
     )
 }
 
+/// Whether a source byte can end no TRIVIA — an ASCII graphic character other than `/`.
+///
+/// It is not the last byte of any whitespace character (ECMAScript's `WhiteSpace` and
+/// `LineTerminator` are ASCII controls, space, or multi-byte characters, whose bytes are all
+/// non-ASCII), and not the `/` every block comment closes on. The one trivia it CAN end is a
+/// line comment, whose last byte is anything; each reader rules that out on its own terms.
+/// The class is deliberately narrower than "not trivia": a byte outside it only sends the
+/// reader to its exact walk.
+#[inline]
+pub(in crate::printer) const fn ends_no_trivia(byte: u8) -> bool {
+    matches!(byte, b'!'..=b'~') && byte != b'/'
+}
+
 impl<'a> Printer<'a> {
     //
     // Directive recognition and routing — is there a freeze, and what does it target
@@ -1258,32 +1271,6 @@ impl<'a> Printer<'a> {
         span.start + content.len() as u32
     }
 
-    /// Where a statement's own COMMENT CLAIM ends — prettier's `__contentEnd`
-    /// (`setContentEnd`, `src/language-js/parse/postprocess/index.js`), the third reader of
-    /// the [`Self::statement_content_end`] table and the only one that measures the
-    /// comment-STRIPPED text prettier itself measures.
-    ///
-    /// The whole point of the difference: the region between a statement's content and the
-    /// `;` that terminates it is trivia, so a comment the author left there is **not inside
-    /// the statement** for attachment purposes — it falls in the gap BETWEEN two statements,
-    /// where the ordinary own-line / same-line split decides whether it trails the statement
-    /// before it or leads the one after (`docs/comments.md` §The statement-gap seam). That is
-    /// what makes `a()⏎/* c */;⏎b();` print as `a();⏎/* c */ b();`: the comment leads `b()`
-    /// and, being glued to a pure separator, shares its line
-    /// ([`Printer::comment_hugs_next`]).
-    ///
-    /// ⚠️ **Not a replacement for its sibling — a third reading, and the two must not be
-    /// swapped.** [`Self::statement_content_end`] counts a comment as CONTENT, which is what
-    /// keeps a freeze slice verbatim and what keeps
-    /// [`Printer::statement_content_tail_blank`]'s scan from crossing a comment's own
-    /// interior newlines (`docs/comments.md` §The five hazards, hazard 5). This reading is
-    /// for the comment CURSOR alone; the blank cursor and the freeze slice keep theirs.
-    ///
-    /// The walk is backwards and alternating — whitespace, then a comment ending where that
-    /// trim stopped, then whitespace again — because the gap may hold a run
-    /// (`a()⏎/* c1 */ /* c2 */;`) and prettier's `stripComments` blanks every one of them
-    /// before its single `trimEnd`. Bounded below by the content end its sibling reports, so
-    /// a comment INSIDE the statement's content (`fn(/* c */)`) is never reached.
     /// Whether a statement's terminator gap belongs to the enclosing statement LIST rather
     /// than to the statement itself — the kind half of prettier's `nodeTypesWithContentEnd`.
     ///
@@ -1353,6 +1340,33 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Where a statement's own COMMENT CLAIM ends — prettier's `__contentEnd`
+    /// (`setContentEnd`, `src/language-js/parse/postprocess/index.js`), the third reader of
+    /// the [`Self::statement_content_end`] table and the only one that measures the
+    /// comment-STRIPPED text prettier itself measures.
+    ///
+    /// The whole point of the difference: the region between a statement's content and the
+    /// `;` that terminates it is trivia, so a comment the author left there is **not inside
+    /// the statement** for attachment purposes — it falls in the gap BETWEEN two statements,
+    /// where the ordinary own-line / same-line split decides whether it trails the statement
+    /// before it or leads the one after (`docs/comments.md` §The statement-gap seam). That is
+    /// what makes `a()⏎/* c */;⏎b();` print as `a();⏎/* c */ b();`: the comment leads `b()`
+    /// and, being glued to a pure separator, shares its line
+    /// ([`Printer::comment_hugs_next`]).
+    ///
+    /// ⚠️ **Not a replacement for its sibling — a third reading, and the two must not be
+    /// swapped.** [`Self::statement_content_end`] counts a comment as CONTENT, which is what
+    /// keeps a freeze slice verbatim and what keeps
+    /// [`Printer::statement_content_tail_blank`]'s scan from crossing a comment's own
+    /// interior newlines (`docs/comments.md` §The five hazards, hazard 5). This reading is
+    /// for the comment CURSOR alone; the blank cursor and the freeze slice keep theirs.
+    ///
+    /// The measure is [`Self::trivia_run_start`] back from the `;`, whose alternating walk is
+    /// what takes a whole run (`a()⏎/* c1 */ /* c2 */;`) out, as prettier's `stripComments`
+    /// blanks every one of them before its single `trimEnd`. Its floor is the span's start,
+    /// but what stops it is the first byte, walking back, that is neither whitespace nor the
+    /// last byte of a comment, so a comment INSIDE the statement's content (`fn(/* c */)`) is
+    /// never reached — the `)` ends the walk first.
     pub(in crate::printer) fn statement_comment_claim_end(
         &self,
         stmt: &internal::Statement<'_>,
@@ -1378,7 +1392,64 @@ impl<'a> Printer<'a> {
     /// The stopping byte is what makes this the right question at a terminator gap: a `)`
     /// the printer keeps is neither, so a comment the author wrote inside a retained shell
     /// (`return (x /* c */);`) is never ejected — the shell closes *after* it.
+    ///
+    /// Nearly every gap asked about holds no trivia at all, and two bytes say so without
+    /// the trim or the comment search ([`Self::trivia_run_is_empty`]); the walk
+    /// ([`Self::trivia_run_start_walk`]) runs only when one could be there.
+    #[inline]
     pub(in crate::printer) fn trivia_run_start(&self, floor: u32, end: u32) -> u32 {
+        if self.trivia_run_is_empty(floor, end) {
+            debug_assert_eq!(
+                self.trivia_run_start_walk(floor, end),
+                end,
+                "a gap the byte gate calls trivia-free must walk to its own end"
+            );
+            return end;
+        }
+        self.trivia_run_start_walk(floor, end)
+    }
+
+    /// Whether no trivia can END at `end`, so the run [`Self::trivia_run_start`] walks is
+    /// empty and its answer is `end` itself.
+    ///
+    /// Two shapes, between them almost every terminator gap a statement has:
+    ///
+    /// - **`end == floor`** — nothing to walk (`a();` as [`Self::node_terminator_claim_end`]
+    ///   asks it: the gap from `a()` to its `;` is empty).
+    /// - **`end` holds a `;` glued to a byte that ends no trivia** ([`ends_no_trivia`]: an
+    ///   ASCII graphic character other than `/`). That byte is not the last byte of a
+    ///   whitespace character, and not the `/` every block comment closes on. A line comment
+    ///   cannot end there either, which is what the `;` is for: a line comment runs to a line
+    ///   terminator or to the end of the text its lexer read, so one reaching `end` would have
+    ///   swallowed the `;` behind it. Every `end` that holds a `;` holds one a caller located
+    ///   as a token of the same text: [`Self::statement_comment_claim_end`]'s, a span that ends
+    ///   in its `;` at [`Self::node_terminator_claim_end`], and the `;` position a caller
+    ///   passes there as the span end itself (the parenthesized `return` / `throw` binary,
+    ///   whose `;` a comment-skipping scan found). The one other `end` is a statement's own
+    ///   end under ASI — or, at that binary's ASI fallback, its argument's end, which is the
+    ///   floor itself — and it never holds a `;` (one right there is a terminator the parser
+    ///   would have taken), so the gate answers it only through `end == floor`.
+    ///
+    /// Anything else — whitespace, a `/`, a non-ASCII byte, a gap with no `;` behind it —
+    /// takes the walk, which is exact for every input; this gate only ever answers where the
+    /// walk provably returns `end` (asserted in debug builds).
+    #[inline]
+    fn trivia_run_is_empty(&self, floor: u32, end: u32) -> bool {
+        if end == floor {
+            return true;
+        }
+        let bytes = self.source.as_bytes();
+        let end = end as usize;
+        end > floor as usize && bytes.get(end) == Some(&b';') && ends_no_trivia(bytes[end - 1])
+    }
+
+    /// The walk behind [`Self::trivia_run_start`], exact for every gap — kept out of line,
+    /// since only a gap that may hold trivia reaches it: **228 of 367,392 calls** (0.06%) in
+    /// a format pass over a 2,877-file TypeScript corpus, every other one answered by the
+    /// byte gate ([`Self::trivia_run_is_empty`]).
+    #[cold]
+    #[inline(never)]
+    fn trivia_run_start_walk(&self, floor: u32, end: u32) -> u32 {
         let mut pos = end;
         loop {
             let before = Span::new(floor, pos).extract(self.source);

@@ -540,8 +540,10 @@ impl<'a> Printer<'a> {
     /// caller's own scan bound stands unchanged.
     ///
     /// The one spelling for every statement-list walk (program, block/namespace body,
-    /// switch consequent — both its printing and orphan arms) so the trailing claim,
-    /// the cursor clamp, and the orphan scan bound cannot drift apart.
+    /// switch consequent) so the trailing claim, the cursor clamp, and the orphan scan bound
+    /// cannot drift apart. The walks' ORPHAN arm calls it as is
+    /// ([`Self::orphan_semi_slot`]); a PRINTING arm, which already holds the statement's
+    /// emitted end, reaches the same spelling through [`Self::statement_claim_end_with`].
     pub(crate) fn statement_claim_end(
         &self,
         body: &[internal::Statement<'_>],
@@ -549,13 +551,31 @@ impl<'a> Printer<'a> {
         tail_target: Option<u32>,
         frozen: bool,
     ) -> u32 {
+        self.statement_claim_end_with(body, index, tail_target, || {
+            self.statement_emitted_end(&body[index], frozen)
+        })
+    }
+
+    /// [`Self::statement_claim_end`] for a walk that already HOLDS `body[index]`'s
+    /// [`Self::statement_emitted_end`] — `emitted_end` hands it over, asked only when the
+    /// gap's scan opens there. Both statement walks' printing arms compute that end for their
+    /// own cursor first, and re-deriving it (the kind walk, the terminator gap's claim) for
+    /// the same statement a second time is the cost this saves.
+    pub(crate) fn statement_claim_end_with(
+        &self,
+        body: &[internal::Statement<'_>],
+        index: usize,
+        tail_target: Option<u32>,
+        emitted_end: impl FnOnce() -> u32,
+    ) -> u32 {
         match next_printed_stmt(body, index)
             .map(|s| s.span().start)
             .or(tail_target)
         {
-            Some(target) => {
-                self.trailing_claim_end(self.statement_gap_scan_start(body, index, frozen), target)
-            }
+            Some(target) => self.trailing_claim_end(
+                self.statement_gap_scan_start(body, index, emitted_end),
+                target,
+            ),
             None => u32::MAX,
         }
     }
@@ -577,15 +597,18 @@ impl<'a> Printer<'a> {
     ///
     /// A kind prettier does not eject reports its own span end and nothing moves, so the
     /// table is read here and nowhere else in the seam.
+    ///
+    /// `emitted_end` is `body[index]`'s [`Self::statement_emitted_end`], supplied lazily — it
+    /// is read only when nothing was raised.
     fn statement_gap_scan_start(
         &self,
         body: &[internal::Statement<'_>],
         index: usize,
-        frozen: bool,
+        emitted_end: impl FnOnce() -> u32,
     ) -> u32 {
         let floor = statement_gap_floor(body, index);
         if floor == body[index].span().end {
-            self.statement_emitted_end(&body[index], frozen)
+            emitted_end()
         } else {
             floor
         }
@@ -723,7 +746,7 @@ impl<'a> Printer<'a> {
             parts,
             stmt_end,
             bound,
-            self.statement_claim_end(body, index, None, frozen),
+            self.statement_claim_end_with(body, index, None, || stmt_end),
             self.printed_tail(stmt_end, statement_gap_floor(body, index)),
         )
     }
