@@ -3334,8 +3334,8 @@ if (write_report) {
 	log(`  ${RESULTS_DIR}/report.${REPORT_TAG}.json`);
 	log(`  ${RESULTS_DIR}/report.${REPORT_TAG}.md`);
 	// A limited corpus withholds this file (above); a machine missing an impl does
-	// NOT — and shouldn't, since `unavailable` is non-empty by design on some
-	// runtimes (Bun does not load biome). But the two are the
+	// NOT — and shouldn't, since `unavailable` is non-empty by design on a runtime
+	// that can't load an impl. But the two are the
 	// same KIND of diminished measurement, and this one leaves no trace in the
 	// table it thins: the row is simply gone, and the ⚠ init lines are far up the
 	// scroll. So name the shortfall at the moment the file is published.

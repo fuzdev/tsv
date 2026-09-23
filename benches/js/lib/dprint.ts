@@ -8,8 +8,7 @@
  * - **Runtime neutrality.** A `deno fmt` subprocess row would exist only under
  *   Deno, against a harness whose whole design is one body across three runtimes
  *   (see benches/js/CLAUDE.md §Cross-Runtime). The Wasm plugin loads under Deno,
- *   Node, AND Bun — verified — so this is a full three-runtime row, unlike
- *   `biome-wasm` (which does not load under Bun).
+ *   Node, AND Bun — verified — so this is a full three-runtime row.
  * - **It would measure the wrong thing.** The harness times one file at a time in
  *   a warm in-process loop; a fresh `deno` process per file would be dominated by
  *   spawn + IPC, not format work, and would be cold on every call against warm
