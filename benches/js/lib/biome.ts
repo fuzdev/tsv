@@ -29,45 +29,28 @@ const GLUE_IMPORT_MODULE = './biome_wasm_bg.js';
 
 /**
  * Linear-memory GROWTH since the instance was made past which `reset_heap` swaps in a
- * fresh one — i.e. the leak an instance is allowed to accumulate before the row pays a
- * swap for it. A fresh, configured instance sits at ~74 MB; a svelte sweep retains
- * ~30 MB, a TypeScript sweep ~117 MB, a css sweep ~4 MB (`closeFile` frees nothing —
- * see the class doc), so the svelte and TypeScript rows swap before EVERY sweep, the
- * css row every ~4, and a millisecond-sweep row (a `BENCH_LIMIT` probe, kilobytes a
- * sweep) once in thousands — that last one matters, because a 70 MB instantiation per
- * millisecond sweep out-churns the collector and read as a 40x slowdown when the swap
- * was unconditional. Keyed on growth rather than on a size so the rule needs no
- * runtime fact to be true and retires itself: a biome whose `closeFile` frees stops
- * growing after its first sweep and never swaps again. Growth since the SWAP, not since
- * the previous call: a slow leak (css) must still reach the swap, and measured per call
- * it never did (80 css sweeps, 0 swaps, 387 MB).
+ * fresh one — the leak an instance may accumulate before the row pays a swap for it.
+ * `closeFile` frees nothing (see the class doc): a svelte sweep retains ~30 MB, a
+ * TypeScript sweep ~117 MB, a css sweep ~4 MB, so the svelte and TypeScript rows swap
+ * before EVERY sweep, the css row every few, and a millisecond-sweep row (a
+ * `BENCH_LIMIT` probe) rarely — a fresh instance per millisecond sweep out-churns the
+ * collector, which swamped the timing when the swap was unconditional. Keyed on growth
+ * rather than on a size so the rule needs no runtime fact to be true and retires itself:
+ * a biome whose `closeFile` frees stops growing after its first sweep and never swaps
+ * again. Growth since the SWAP, not since the previous call, so a slow leak (css) still
+ * reaches it.
  *
- * Why every sweep, on a full-corpus row — measured with `diagnostics/biome_heap_probe.ts`
- * (the svelte row: 951 files, 30 consecutive sweeps). What a growing heap costs is
- * RUNTIME-dependent. On V8 (node, deno) the sweep time is FLAT as the heap grows —
- * measured to 974 MB in a bare process and inside the bench's own process context
- * (node: 1034 ms never resetting, cv ≤ 2%) — until Node's external memory passes ~1 GB,
- * where a TypeScript sweep nearly triples. On JSC (bun) a bare process is flat too
- * (857 ms never resetting, to 974 MB, cv 1.0%), but inside the bench process — after
- * the prettier-class tasks of the same group have run and left a large live JS heap —
- * the sweep time CLIMBS with the buffer's size and falls back at each swap: ~0.4 ms
- * per MB after prettier alone (1249 → 1617 ms over 74 → 974 MB, drift +12%), ~1.2 ms/MB
- * after the whole format/svelte group. The earlier rule, a 320 MB size budget, let a
- * swap land inside the timed window (svelte crossed it once per ~9 sweeps, TypeScript
- * every 2–3) and published a sawtooth: 1217 ms at cv 8.6% where a swap before every
- * sweep reads 1046 ms at cv 1.4% in the same context — the row §Unstable Rows flagged
- * under bun, with the TypeScript row's cv 3–4% the same shape below the threshold. The
- * mechanism is not pinned down; the shape fits JSC re-accounting the whole buffer on
- * each of a sweep's ~165 `memory.grow`s and collecting a heap whose cost scales with
- * what prettier left live. The per-sweep swap's own price on a full-corpus row is a
- * fresh instance's first sweep — ~+1% on bun, ~+3% on node (1062 vs 1018 ms, bare
- * process), paid on every sweep of every runtime alike — beyond the ~10 ms swap itself,
- * which runs in the untimed slots. The css row is where that price shows, because it
- * has no slope to buy off: 22-odd grows a sweep, and in the bench context bun reads
- * 88.7 ms with or without swaps (cv 4.3% → 1.9%) while node pays the every-fourth-sweep
- * fresh instance as +4% and a doubled cv (101.2 ms cv 2.4% → 105.3 ms cv 5.2%). The
- * threshold cannot rise to spare it: a svelte sweep's 30 MB is its ceiling, and 64 MiB
- * would put bun's svelte sawtooth back (a swap every third sweep).
+ * Why every sweep on a full-corpus row (measured with `diagnostics/biome_heap_probe.ts`):
+ * what a growing heap costs is RUNTIME-dependent. On V8 (node, deno) the sweep time stays
+ * flat as the heap grows, until Node's external memory passes ~1 GB. On JSC (bun) it is
+ * flat in a bare process, but inside the bench process — after the prettier-class tasks
+ * of the same group leave a large live JS heap — it CLIMBS with the buffer's size and
+ * falls back at each swap, so a size budget that let a swap land inside the timed window
+ * published a sawtooth the §Unstable Rows check flagged. The mechanism is not pinned
+ * down. The swap's own price is a fresh instance's slower first sweep, a few percent on
+ * a full-corpus row and most visible on the css row, which has no slope to buy off; the
+ * swap itself runs in the untimed slots. The threshold can't rise to spare css: a svelte
+ * sweep's ~30 MB is its ceiling, and a higher one brings bun's svelte sawtooth back.
  */
 export const RESET_GROWTH_BYTES = 16 * 1024 * 1024;
 

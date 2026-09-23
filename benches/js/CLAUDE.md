@@ -908,9 +908,9 @@ sawtooth inside the window (1217 ms at cv 8.6%, drift past ±5% either way depen
 where the resets landed — the `format/svelte/biome-wasm` row §Unstable Rows flagged
 under bun, with the TypeScript row's cv 3–4% the same shape under the threshold) where a
 reset before every sweep reads 1046 ms at cv 1.4% in the same context, for a fresh
-instance's first-sweep price of ~+1% on bun and ~+3% on node, paid on every runtime
-alike. `diagnostics/biome_heap_probe.ts` holds the measurement; `lib/biome.ts`'s
-`RESET_GROWTH_BYTES` the numbers. Such a row also WARMS in its
+instance's first-sweep price of a few percent, paid on every runtime alike.
+`diagnostics/biome_heap_probe.ts` holds the measurement; `lib/biome.ts`'s
+`RESET_GROWTH_BYTES` the rule. Such a row also WARMS in its
 `setup` (the library warming 0 times and the row carrying the harness's count),
 because the library's warmup loop has no between-sweeps hook to offer the reset in.
 That is the honest footing: every in-process impl starts each sweep from a settled

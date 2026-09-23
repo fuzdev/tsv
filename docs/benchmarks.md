@@ -61,8 +61,9 @@ Things the published numbers measure that aren't quite what they look like.
   (`javascript`/`css`/`html`), each feeding a different row, so a TypeScript-only
   probe would prove one section and leave the CSS and svelte rows free to un-pin
   silently. The svelte probe doubles as the only guard on biome's
-  `html.experimentalFullSupportEnabled` — without it biome returns an EMPTY string
-  for `.svelte`, which the timed row would otherwise score as a successful format.
+  `html.experimentalFullSupportEnabled` — without it biome returns only the formatted
+  `<script>` for `.svelte` (an EMPTY string for a script-less file), which the timed
+  row would otherwise score as a successful format.
   A tool whose pins stop landing goes ABSENT, with the option and the language named
   in the report's `unavailable`, rather than staying present and publishing a number
   produced at some other tool's defaults. `prettier`'s failure STOPS THE RUN instead,
@@ -311,9 +312,9 @@ Things the published numbers measure that aren't quite what they look like.
   tasks have run in the same process (~0.4–1.2 ms per MB) and falls back at each
   reset, so a size budget put a sawtooth inside the timed window and the row
   published flagged (cv 8.6% under a 320 MB budget against cv 1.4% with a reset
-  before every sweep, same context — `benches/js/diagnostics/biome_heap_probe.ts`,
-  numbers in `lib/biome.ts`). A fresh instance's first sweep costs ~+1% on bun and
-  ~+3% on node, paid on every sweep of every runtime alike. Same footing as the GC —
+  before every sweep, same context — `benches/js/diagnostics/biome_heap_probe.ts`).
+  A fresh instance's slower first sweep costs a few percent, paid on every sweep of
+  every runtime alike. Same footing as the GC —
   a settled heap per sweep — for the one heap a GC cannot settle; the leak itself is
   disclosed rather than measured.
   This is deliberately NOT the same knob as the per-iteration hook below: it
