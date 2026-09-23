@@ -609,7 +609,9 @@ impl<'a> Printer<'a> {
             // instead (`b1(); /* c */ let d1 = 1;`, `b1(); /* c */ case 2:`), emitted
             // by that statement's leading run / the switch's between-case run.
             let claim_end = if body_has_comments {
-                self.statement_claim_end(case.consequent, i, next_case_start, frozen.is_some())
+                self.statement_claim_end_with(case.consequent, i, next_case_start, || {
+                    stmt_gap_start
+                })
             } else {
                 u32::MAX
             };

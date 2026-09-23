@@ -11,6 +11,7 @@
 // expressions/ and statements/ modules.
 
 use crate::ast::internal;
+use crate::printer::ignore::ends_no_trivia;
 use crate::printer::statements::StatementContext;
 use crate::printer::{CommentVec, Printer, is_effectively_empty_body};
 use tsv_lang::Span;
@@ -353,7 +354,63 @@ impl<'a> Printer<'a> {
     /// `<LS>` / `<PS>`, so the table is the closer reading, and it is the form
     /// [`Self::set_canonical`] erases — a canonical reprint must not resurrect an author
     /// blank from raw source.
+    ///
+    /// Almost every statement's tail is bare, and its last two bytes say so
+    /// ([`Self::statement_tail_is_bare`]); the walk
+    /// ([`Self::statement_content_tail_blank_walk`]) runs only for a tail that may hold
+    /// something.
+    #[inline]
     pub(in crate::printer) fn statement_content_tail_blank(
+        &self,
+        stmt: &internal::Statement<'_>,
+        frozen: bool,
+    ) -> bool {
+        if self.statement_tail_is_bare(stmt) {
+            debug_assert!(
+                !self.statement_content_tail_blank_walk(stmt, frozen),
+                "a bare statement tail holds no line, so it holds no blank"
+            );
+            return false;
+        }
+        self.statement_content_tail_blank_walk(stmt, frozen)
+    }
+
+    /// Whether `stmt`'s tail — the stretch between its content end
+    /// ([`Self::statement_content_end`]) and its full end — provably holds no trivia, read
+    /// from the span's last two bytes. Two shapes:
+    ///
+    /// - **No `;` ends the span.** The content end IS the full end (an ASI terminator, or a
+    ///   kind that owns none), so there is no tail at all.
+    /// - **A `;` glued to a byte that [`ends_no_trivia`].** The content ends right at the
+    ///   `;` (the whitespace trim finds nothing to take) — or, for a kind that owns no
+    ///   terminator (`FrozenTerminator::Never`), at the full end, which leaves no tail at
+    ///   all — and no comment ends there to lower the comment claim
+    ///   ([`Self::statement_comment_claim_end`]) below it: not a block comment, which closes
+    ///   on `/`, and not a line comment, which would have swallowed the `;` — the
+    ///   statement's own last token.
+    ///
+    /// Either way every range [`Self::statement_content_tail_blank_walk`] scans is at most
+    /// the `;` itself, which holds no line, so its answer is `false` — whether the statement
+    /// is frozen, keeps its terminator gap, or hands it to the list. A lone `;` (nothing
+    /// before it in the span) is left to the walk rather than argued separately.
+    #[inline]
+    fn statement_tail_is_bare(&self, stmt: &internal::Statement<'_>) -> bool {
+        let span = stmt.span();
+        let (start, end) = (span.start as usize, span.end as usize);
+        let bytes = self.source.as_bytes();
+        end == start
+            || bytes[end - 1] != b';'
+            || (end - start >= 2 && ends_no_trivia(bytes[end - 2]))
+    }
+
+    /// The walk behind [`Self::statement_content_tail_blank`], exact for every statement —
+    /// kept out of line, since only a tail that may hold trivia reaches it. A format pass over
+    /// a 2,877-file TypeScript corpus asks about 175,683 list statements: 90.6% end in a `;`
+    /// directly after a byte that [`ends_no_trivia`], 9.4% carry no `;` at all, and the
+    /// remaining **78 (0.04%)** reach this walk.
+    #[cold]
+    #[inline(never)]
+    fn statement_content_tail_blank_walk(
         &self,
         stmt: &internal::Statement<'_>,
         frozen: bool,
