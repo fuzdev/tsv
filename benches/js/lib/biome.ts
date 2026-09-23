@@ -82,9 +82,13 @@ export const RESET_GROWTH_BYTES = 16 * 1024 * 1024;
  * top-level block can't silently un-pin every language at once. Biome has no
  * dedicated Svelte formatter — `html.experimentalFullSupportEnabled` is what lets
  * it format `.svelte` at all, via its experimental HTML-superset pipeline; that
- * path formats the embedded `<script>`/`<style>` too (verified), so the svelte row
- * is comparable work to prettier-plugin-svelte / tsv. Without the flag biome returns
- * only the formatted `<script>`, dropping the markup and `<style>`.
+ * path formats the markup and the embedded `<script>`/`<style>` (verified), but
+ * leaves the template's expressions as written — parsed (a syntax error in one is
+ * reported) yet not reprinted, where prettier-plugin-svelte and tsv reformat them —
+ * so the svelte row does somewhat less work than theirs. `formatContent` ignores
+ * `html.formatter.enabled`, which biome's CLI also needs before it formats a
+ * `.svelte` (verified: even `false` formats in full here). Without the flag biome
+ * returns only the formatted `<script>`, dropping the markup and `<style>`.
  *
  * Applied on every fresh workspace (`reset_heap`), not just at init.
  */
