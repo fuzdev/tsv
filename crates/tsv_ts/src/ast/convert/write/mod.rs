@@ -755,7 +755,7 @@ fn node_header_impl<const CHARACTER: bool>(
     attach_open(node_type, span, ctx);
     w.stage_begin();
     w.stage_raw("{\"type\":\"");
-    w.stage_raw(node_type);
+    w.stage_short(node_type);
     w.stage_raw("\"");
     position_fields::<CHARACTER>(w, span, ctx);
     w.stage_flush();

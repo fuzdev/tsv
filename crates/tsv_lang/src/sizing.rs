@@ -1,5 +1,5 @@
-// Sizing heuristics for allocation pre-sizing — the wire-JSON output buffer
-// and the parse-time bump arena.
+// Sizing heuristics for allocation pre-sizing — the wire-JSON output buffer,
+// the parse-time bump arena, and the wire writer's line-start table.
 
 /// Estimated compact-JSON bytes per source byte for the wire-JSON output.
 ///
@@ -48,4 +48,27 @@ pub fn estimated_ast_arena_capacity(source_len: usize) -> usize {
     source_len
         .saturating_mul(AST_ARENA_BYTES_PER_SOURCE_BYTE)
         .max(512)
+}
+
+/// Source bytes per line assumed when pre-sizing a line-start table — a
+/// deliberate *under*-estimate of the line length, so the table rarely grows.
+///
+/// Real source runs ~30–35 bytes per line (TypeScript ~35, Svelte ~31 across
+/// the benchmark corpora), so at 16 only a file of unusually short lines
+/// outgrows the reservation and pays one doubling. Growing from the seeded
+/// single entry instead cost ~5 reallocations a file, each a copy of the
+/// table so far. The reservation is one 4-byte entry per 16 source bytes — a
+/// quarter of the source length in bytes, of which a typical file fills about
+/// half — short-lived (the table lives for one wire emission), and small
+/// beside the ~20x wire buffer it sits next to.
+const SOURCE_BYTES_PER_LINE: usize = 16;
+
+/// Pre-size estimate (in entries) for a document's line-start table, given
+/// the source length. The `+ 1` is line 1's start, which every table holds.
+///
+/// Used by `location`'s line-start builders — every constructor that scans
+/// a source for its lines seeds its table at this capacity rather than at
+/// the single entry it begins with.
+pub(crate) fn estimated_line_starts_capacity(source_len: usize) -> usize {
+    source_len / SOURCE_BYTES_PER_LINE + 1
 }

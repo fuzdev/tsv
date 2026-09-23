@@ -1,5 +1,6 @@
 use std::cell::Cell;
 
+use crate::sizing::estimated_line_starts_capacity;
 use crate::swar::{high_bit_lanes, splat, zero_lanes};
 
 /// A position in source code (line and column)
@@ -165,10 +166,11 @@ struct LineScan {
 }
 
 impl LineScan {
-    /// A scan that collects line starts, seeded with line 1's — byte 0.
-    fn lines() -> Self {
+    /// A scan that collects line starts over a source of `source_len` bytes,
+    /// seeded with line 1's — byte 0 — at the table's estimated capacity.
+    fn lines(source_len: usize) -> Self {
         Self {
-            starts: vec![0],
+            starts: seeded_line_starts(source_len),
             ecmascript_differs: false,
         }
     }
@@ -193,6 +195,16 @@ impl LineScan {
     fn bare() -> Self {
         Self::map_only()
     }
+}
+
+/// A line-start table holding line 1's start (byte 0), reserved at
+/// `estimated_line_starts_capacity` for a `source_len`-byte source — every
+/// scanning constructor's seed, so no table grows from a single entry by
+/// doubling.
+fn seeded_line_starts(source_len: usize) -> Vec<u32> {
+    let mut starts = Vec::with_capacity(estimated_line_starts_capacity(source_len));
+    starts.push(0);
+    starts
 }
 
 /// One delta-table element width. `u8` is what a sparse-multibyte source needs;
@@ -588,7 +600,7 @@ impl LocationTracker {
     /// differential test oracle (the "byte-identical to `new` +
     /// `ByteToCharMap::new`" contract).
     pub fn new(source: &str) -> Self {
-        let mut line_starts = vec![0];
+        let mut line_starts = seeded_line_starts(source.len());
         for (i, ch) in source.char_indices() {
             if ch == '\n' {
                 line_starts.push((i + 1) as u32);
@@ -610,7 +622,7 @@ impl LocationTracker {
         if source.is_ascii() {
             return Self::with_line_starts(ascii_ecmascript_line_starts(source.as_bytes()));
         }
-        let mut line_starts = vec![0];
+        let mut line_starts = seeded_line_starts(source.len());
         let mut chars = source.char_indices().peekable();
         while let Some((i, ch)) = chars.next() {
             match ch {
@@ -646,7 +658,7 @@ impl LocationTracker {
             );
         }
 
-        let mut lines = LineScan::lines();
+        let mut lines = LineScan::lines(source.len());
         let map = build_map(source, &mut lines, LineRule::Ecmascript, bom);
         (Self::with_line_starts(lines.starts), map)
     }
@@ -671,7 +683,7 @@ impl LocationTracker {
     /// author wrote and acorn never saw). A caller gating the whole re-seeding
     /// route on this alone has drawn the boundary too tight.
     pub fn new_with_map(source: &str, bom: LeadingBom) -> (Self, ByteToCharMap, bool) {
-        let mut lines = LineScan::lines();
+        let mut lines = LineScan::lines(source.len());
         let map = if source.is_ascii() {
             ascii_lf_line_starts_into(source.as_bytes(), 0, &mut lines);
             ByteToCharMap::identity()
@@ -865,7 +877,7 @@ impl LocationTracker {
 /// ECMAScript-rule line starts for ASCII-only source: no U+2028/U+2029
 /// possible, so line terminators are single bytes with CRLF fusing.
 fn ascii_ecmascript_line_starts(bytes: &[u8]) -> Vec<u32> {
-    let mut lines = LineScan::lines();
+    let mut lines = LineScan::lines(bytes.len());
     ascii_ecmascript_line_starts_into(bytes, 0, &mut lines);
     lines.starts
 }
