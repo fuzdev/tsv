@@ -1,5 +1,5 @@
 <script lang="ts">
-	for (using x = a; ; ) {
+	for (using x in obj) {
 		expr;
 	}
 </script>

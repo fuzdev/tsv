@@ -144,9 +144,20 @@ Things the published numbers measure that aren't quite what they look like.
   better, not "more permissive." The **tsc corpus** is filtered the same way and by
   the same argument, with tsc as the oracle that decides validity (its parser AND
   its `.errors.txt` baselines must agree) — and `tsc` is a row on this surface, so
-  on that corpus it reads 100% by construction. The **prettier suites and the
-  remaining CSS** keep the full set (acorn-ts trails modern TS, parseCss is lenient
-  — neither is a validity oracle).
+  on that corpus it reads 100% by construction. The **prettier suites** are what
+  Prettier's own harness calls valid — its marker files, front matter, spec files
+  and the fixtures each directory's `format.test.js` declares rejected by every
+  spec-grammar parser are out (`benches/js/lib/prettier_fixtures.ts`), as are the
+  `.js` fixtures Prettier's babel parser reads as JSX, out of scope for every parser
+  on this surface (`bench:harvest:prettier-jsx`) — and the JS and TypeScript suites
+  are parsed module, then script on a rejection (approximating the module-then-CommonJS
+  retry of Prettier's own parsers; a `.mjs` / `.cts`-style extension fixes the goal
+  instead, as it does for them), each per-source cell disclosing how many files only
+  the retry accepted (`script_only`). The verdicts are Prettier's, not the spec's: its
+  parsers run with lenient options (a top-level `return` passes), so a few kept JS
+  fixtures are no strict ECMAScript — the known ones are named in
+  `prettier_fixtures.ts`. The **remaining CSS** (the wpt harvest and Svelte's test
+  stylesheets) keeps the full set — parseCss is lenient, so it is no validity oracle.
 
   Because those corpora answer different questions, the report splits each group's
   coverage **per corpus source** under the aggregate line. Read the source rows: a

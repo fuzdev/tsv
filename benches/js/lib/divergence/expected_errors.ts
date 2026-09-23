@@ -26,6 +26,7 @@
  * merely contains a marker in a string/comment never reaches these patterns.
  */
 
+import { PRETTIER_RANGE_MARKERS } from '../prettier_fixtures.ts';
 import type { Language } from '../types.ts';
 
 /** A pattern that matches expected parse errors */
@@ -141,7 +142,7 @@ const EXPECTED_ERROR_PATTERNS: ExpectedErrorPattern[] = [
 	{
 		name: 'range_marker',
 		reason: 'Prettier range-format marker (`<<<PRETTIER_RANGE_*>>>`) — a test harness artifact',
-		matches: (content) => /<<<PRETTIER_RANGE_(?:START|END)>>>/.test(content)
+		matches: (content) => PRETTIER_RANGE_MARKERS.some((marker) => content.includes(marker))
 	},
 
 	// --- Non-standard JS/TS proposals. tsv targets standard

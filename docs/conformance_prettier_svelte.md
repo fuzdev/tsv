@@ -698,6 +698,20 @@ whole run in authored order, as both formatters already do above a `<script>` or
 
 - chained-`as` head, all four positions — [type_assertion_comment](../tests/fixtures/svelte/blocks/each/type_assertion_comment_svelte_prettier_divergence/)
 
+## Svelte: each-head parenthesized tail under `lang="ts"`
+
+**◆prettier_bug.** An `{#each}` head whose expression ends on a parenthesized operand
+(`a || (b as A)`, `cond ? a : (b as A)`) loses that operand's `)` in prettier-plugin-svelte
+under `lang="ts"`: `{#each a || (b as A) as item}` becomes `{#each a || (b as A as item}`,
+which no parser accepts, so prettier's own next pass throws. The cause is canonical's parse:
+its type-assertion unwind ends the head expression one character early, before the `)` (the
+parser half — [conformance_svelte.md §Svelte Template Corrections](./conformance_svelte.md#svelte-template-corrections-corpus-enforced)),
+and the plugin prints the head from the source slice those offsets bound — a slice that does
+not parse, which its fallback then prints verbatim. tsv ends the head at the `)` and keeps
+the pair.
+
+- logical and conditional tails — [ts_head_paren_tail](../tests/fixtures/svelte/blocks/each/ts_head_paren_tail_svelte_prettier_divergence/)
+
 ## Svelte: empty destructuring brace spacing
 
 **◆design_choice.** Non-empty object-destructure patterns in `{#each … as}`, `{#await … then}`, `{:then}`, and `{:catch}` binding positions space their braces in both formatters (`{a}` → `{ a }`), matching prettier-plugin-svelte under `bracketSpacing`. The lone remaining divergence is the **empty** pattern: tsv keeps tight braces (`{}`), prettier-plugin-svelte inserts a space (`{ }`). tsv's empty object braces stay tight everywhere — `bracketSpacing` only spaces braces around content, and an empty pattern has none — so this binding position follows the same universal empty-braces rule as an empty object literal (`{}`) and a TypeScript empty destructure (`const {} = x`, where both formatters already agree on `{}`).

@@ -6,9 +6,41 @@ use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
 
+/// Where a variable declarator sits — the two grammar parameters a variable
+/// statement and a `for` head disagree on follow from it.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DeclaratorSite {
+    /// A variable statement: the definite assignment `!` is part of the
+    /// production (tsc's `allowExclamation`), and the initializer is `[+In]`.
+    Statement,
+    /// A `for` head's declaration — the C-style init and the `in`/`of` left
+    /// alike, in every keyword spelling: no definite `!`, and the initializer is
+    /// `[~In]`.
+    ///
+    /// tsc reads the marker under three conjuncts (`parseVariableDeclaration`:
+    /// `allowExclamation && name.kind === Identifier &&
+    /// !scanner.hasPrecedingLineBreak()`), and
+    /// `parseVariableDeclarationList(/*inForStatementInitializer*/ true)` selects
+    /// the `allowExclamation: false` spelling for the whole head — a grammar
+    /// parameter barring a production, so the rejection is the parser's rather
+    /// than a deferred early error. acorn-typescript has no such parameter and
+    /// accepts, but it is the AST-*shape* oracle, not the validity one. Every
+    /// keyword spelling reaches this site through one caller,
+    /// `Parser::parse_for_head_declaration`, so the spellings cannot drift apart.
+    ///
+    /// The `[~In]`: ecma262 parses `ForStatement`'s `LexicalDeclaration[~In]` /
+    /// `VariableDeclarationList[~In]`, so a bare `in` ends the initializer
+    /// (`for (let a = b in c; ;)` is a syntax error, and `for (var a = 0 in b)`
+    /// reaches the for-in branch to be refused there). The restriction reaches
+    /// only the initializer's own `AssignmentExpression`: a default inside the
+    /// binding pattern is an `Initializer[+In]`, and every bracketing position
+    /// under the initializer restores `[+In]` on its own.
+    ForHead,
+}
+
 impl<'a, 'arena> Parser<'a, 'arena> {
     /// Variable kind from the current `const`/`let`/`var` keyword token.
-    fn current_variable_kind(&self) -> VariableDeclarationKind {
+    pub(super) fn current_variable_kind(&self) -> VariableDeclarationKind {
         match self.current_kind() {
             TokenKind::Keyword(KeywordKind::Const) => VariableDeclarationKind::Const,
             TokenKind::Keyword(KeywordKind::Let) => VariableDeclarationKind::Let,
@@ -19,68 +51,64 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    /// Parse the comma-separated declarator list and trailing semicolon shared
-    /// by all variable-declaration statements (`const`/`let`/`var`/`using`/
-    /// `await using`), after the keyword(s) have been consumed.
-    fn finish_variable_declaration(
+    /// Parse a `const`/`let`/`var` declaration statement.
+    pub(super) fn parse_variable_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
+        self.parse_declaration_statement(self.current_variable_kind())
+    }
+
+    /// Parse a declaration statement of `kind` — `const`/`let`/`var`, `using`, or
+    /// `await using` (Explicit Resource Management: `using resource =
+    /// getResource();`) — from its keyword(s) through the trailing semicolon.
+    pub(super) fn parse_declaration_statement(
         &mut self,
         kind: VariableDeclarationKind,
-        start: usize,
     ) -> Result<Statement<'arena>, ParseError> {
-        let mut declarations = self.bvec();
-        declarations.push(self.parse_variable_declarator()?);
-        while self.eat(TokenKind::Comma) {
-            declarations.push(self.parse_variable_declarator()?);
-        }
-
+        let (start, _) = self.current_pos();
+        self.eat_declaration_keyword(kind)?;
+        let (declarations, _) = self.parse_declarator_list(DeclaratorSite::Statement)?;
         let end = self.semicolon_end()?;
 
         Ok(Statement::from_variable_declaration(VariableDeclaration {
             kind,
-            declarations: declarations.into_bump_slice(),
+            declarations,
             declare: false,
             span: Span::new(start as u32, end),
         }))
     }
 
-    pub(super) fn parse_variable_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
-        let (start, _) = self.current_pos();
-        let kind = self.current_variable_kind();
-        self.advance()?;
-        self.finish_variable_declaration(kind, start)
+    /// Consume `kind`'s keyword token(s) — `await using` is two
+    /// ([`VariableDeclarationKind::words`]); the caller has already recognized them.
+    fn eat_declaration_keyword(&mut self, kind: VariableDeclarationKind) -> Result<(), ParseError> {
+        for word in kind.words() {
+            debug_assert!(self.current_value() == *word);
+            self.advance()?;
+        }
+        Ok(())
     }
 
-    /// Parse one declarator of a variable **statement**, where the definite
-    /// assignment `!` is part of the declarator production.
-    fn parse_variable_declarator(&mut self) -> Result<VariableDeclarator<'arena>, ParseError> {
-        self.parse_declarator(true)
+    /// Parse a comma-separated declarator list, returning it with its end — the
+    /// last declarator's, since the list is never empty.
+    fn parse_declarator_list(
+        &mut self,
+        site: DeclaratorSite,
+    ) -> Result<(&'arena [VariableDeclarator<'arena>], u32), ParseError> {
+        let first = self.parse_declarator(site)?;
+        let mut end = first.span.end;
+        let mut declarations = self.bvec();
+        declarations.push(first);
+        while self.eat(TokenKind::Comma) {
+            let declarator = self.parse_declarator(site)?;
+            end = declarator.span.end;
+            declarations.push(declarator);
+        }
+        Ok((declarations.into_bump_slice(), end))
     }
 
-    /// Parse one declarator of a `for` **head** — the C-style init and the
-    /// `in`/`of` left alike, in every keyword spelling — where the definite
-    /// assignment `!` is *not* part of the production.
-    ///
-    /// tsc reads the marker under three conjuncts (`parseVariableDeclaration`:
-    /// `allowExclamation && name.kind === Identifier &&
-    /// !scanner.hasPrecedingLineBreak()`), and
-    /// `parseVariableDeclarationList(/*inForStatementInitializer*/ true)` selects
-    /// the `allowExclamation: false` spelling for the whole head — a grammar
-    /// parameter barring a production, so the rejection is the parser's rather
-    /// than a deferred early error. acorn-typescript has no such parameter and
-    /// accepts, but it is the AST-*shape* oracle, not the validity one.
-    ///
-    /// The rule is stated here rather than at each caller so the keyword
-    /// spellings cannot drift apart: `let`/`const`/`var` reach it through
-    /// [`Self::parse_for_variable_declaration`], `using` and `await using`
-    /// through [`Self::parse_for_using_declaration`].
-    fn parse_for_header_declarator(&mut self) -> Result<VariableDeclarator<'arena>, ParseError> {
-        self.parse_declarator(false)
-    }
-
-    /// Shared declarator body. `allow_definite` is tsc's `allowExclamation`.
+    /// Parse one variable declarator; `site` settles the two grammar parameters
+    /// that differ between a statement and a `for` head.
     fn parse_declarator(
         &mut self,
-        allow_definite: bool,
+        site: DeclaratorSite,
     ) -> Result<VariableDeclarator<'arena>, ParseError> {
         let id_start = self.current_pos().0;
 
@@ -88,7 +116,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Note: Some keywords can be used as identifiers in variable declarations (e.g., `async`)
         // For simple identifiers, also handles definite assignment assertion (`!`)
         let (id, definite) = if let Some(name) = self.try_binding_name() {
-            self.parse_simple_binding(name, allow_definite)?
+            self.parse_simple_binding(name, site)?
         } else if matches!(
             self.current_kind(),
             TokenKind::BracketOpen | TokenKind::BraceOpen
@@ -108,10 +136,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Check for initializer
         // Use assignment_expression because comma separates declarators
-        let init: Option<&'arena Expression<'arena>> = if self.eat(TokenKind::Equals) {
-            Some(self.parse_assignment_expression_ref()?)
-        } else {
+        let init: Option<&'arena Expression<'arena>> = if !self.eat(TokenKind::Equals) {
             None
+        } else if site == DeclaratorSite::ForHead {
+            Some(self.with_no_in(Self::parse_assignment_expression_ref)?)
+        } else {
+            Some(self.parse_assignment_expression_ref()?)
         };
 
         // Use the later of expression span end and prev_token_end() to include any
@@ -134,106 +164,25 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         })
     }
 
-    /// Parse variable declaration for for-loop init (without trailing semicolon)
-    pub(super) fn parse_for_variable_declaration(
+    /// Parse a `for` head's declaration (no trailing semicolon) — the C-style
+    /// init or the for-in/of left, for every keyword: `var` / `let` / `const`,
+    /// `using` (`for (using a = x, b = y; ; )`, `for (using r of rs)`), and
+    /// `await using`, whose keyword is two tokens. One grammar serves them all —
+    /// a declarator list — and the for-in/of dispatch holds it to one binding.
+    pub(super) fn parse_for_head_declaration(
         &mut self,
+        kind: VariableDeclarationKind,
     ) -> Result<VariableDeclaration<'arena>, ParseError> {
         let (decl_start, _) = self.current_pos();
-
-        let kind = self.current_variable_kind();
-        self.advance()?;
-
-        // Parse first declarator
-        let first = self.parse_for_header_declarator()?;
-        let mut decl_end = first.span.end;
-
-        // Parse additional declarators (comma-separated)
-        let mut declarations = self.bvec();
-        declarations.push(first);
-        while self.eat(TokenKind::Comma) {
-            let decl = self.parse_for_header_declarator()?;
-            decl_end = decl.span.end;
-            declarations.push(decl);
-        }
+        self.eat_declaration_keyword(kind)?;
+        let (declarations, decl_end) = self.parse_declarator_list(DeclaratorSite::ForHead)?;
 
         Ok(VariableDeclaration {
             kind,
-            declarations: declarations.into_bump_slice(),
+            declarations,
             declare: false,
             span: Span::new(decl_start as u32, decl_end),
         })
-    }
-
-    /// Parse `using` declaration (Explicit Resource Management)
-    /// `using resource = getResource();`
-    pub(super) fn parse_using_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
-        let (start, _) = self.current_pos();
-
-        // Consume 'using' contextual keyword
-        debug_assert!(self.current_value() == "using");
-        self.advance()?;
-
-        self.finish_variable_declaration(VariableDeclarationKind::Using, start)
-    }
-
-    /// Parse `await using` declaration (Explicit Resource Management)
-    /// `await using resource = getAsyncResource();`
-    pub(super) fn parse_await_using_declaration(
-        &mut self,
-    ) -> Result<Statement<'arena>, ParseError> {
-        let (start, _) = self.current_pos();
-
-        // Consume 'await' keyword
-        debug_assert!(*self.current_kind() == TokenKind::Keyword(KeywordKind::Await));
-        self.advance()?;
-
-        // Consume 'using' contextual keyword
-        debug_assert!(self.current_value() == "using");
-        self.advance()?;
-
-        self.finish_variable_declaration(VariableDeclarationKind::AwaitUsing, start)
-    }
-
-    /// Parse `using` declaration for for-of loop init (without trailing semicolon)
-    /// `for (using resource of resources) { ... }`
-    pub(super) fn parse_for_using_declaration(
-        &mut self,
-    ) -> Result<VariableDeclaration<'arena>, ParseError> {
-        let (decl_start, _) = self.current_pos();
-
-        // Consume 'using' contextual keyword
-        debug_assert!(self.current_value() == "using");
-        self.advance()?;
-
-        // Parse single declarator (for-of only allows one)
-        let declarator = self.parse_for_header_declarator()?;
-        let decl_end = declarator.span.end;
-
-        let mut declarations = self.bvec();
-        declarations.push(declarator);
-        Ok(VariableDeclaration {
-            kind: VariableDeclarationKind::Using,
-            declarations: declarations.into_bump_slice(),
-            declare: false,
-            span: Span::new(decl_start as u32, decl_end),
-        })
-    }
-
-    /// Parse `await using` declaration for for-await-of loop init (without trailing semicolon)
-    /// `for await (await using resource of resources) { ... }`
-    pub(super) fn parse_for_await_using_declaration(
-        &mut self,
-    ) -> Result<VariableDeclaration<'arena>, ParseError> {
-        let (decl_start, _) = self.current_pos();
-
-        // Consume 'await' keyword, then delegate to the `using` form
-        debug_assert!(*self.current_kind() == TokenKind::Keyword(KeywordKind::Await));
-        self.advance()?;
-
-        let mut decl = self.parse_for_using_declaration()?;
-        decl.kind = VariableDeclarationKind::AwaitUsing;
-        decl.span = Span::new(decl_start as u32, decl.span.end);
-        Ok(decl)
     }
 
     /// Parse an identifier or contextual keyword as a binding pattern (with optional type annotation)
@@ -243,12 +192,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Returns `(expression, definite)` where `definite` is true if `!` was present.
     ///
-    /// `allow_definite` is tsc's `allowExclamation` — false in a `for` head, where
-    /// the marker is barred by position (see [`Self::parse_for_header_declarator`]).
+    /// `site` is tsc's `allowExclamation`: a `for` head bars the marker by position
+    /// (see [`DeclaratorSite::ForHead`]).
     fn parse_simple_binding(
         &mut self,
         name: IdentName<'arena>,
-        allow_definite: bool,
+        site: DeclaratorSite,
     ) -> Result<(Expression<'arena>, bool), ParseError> {
         let (start, end) = self.current_pos();
         self.advance()?;
@@ -265,7 +214,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // token: the printer prints a binding through the plain expression path, which
         // cannot see `definite`, so accepting here deleted authored source and emitted
         // a program that re-parsed differently.
-        if definite && !allow_definite {
+        if definite && site == DeclaratorSite::ForHead {
             return Err(self.error_msg_at(
                 "a definite assignment assertion is not permitted in a for header",
                 marker_start,

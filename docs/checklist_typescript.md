@@ -263,7 +263,7 @@ written in the flags position) is not a flags production at all and is rejected,
 - Default parameters (`(x = 1) => x`)
 - Destructured parameters
 - Async arrows (`async () => {}`)
-- Return-type annotation in a conditional's consequent — kept only when a second `:` follows the arrow (`a ? (b): c => d : e`); otherwise the `:` is the conditional's and the head is a parenthesized expression (`a ? (b) : c => d`), tsc's rule (acorn rejects the latter). A head tsc reads as a signature without asking (`()`, `(...a)`, `(a: T)`, `(a?: T)`, `(public a)`, and each behind `async`) is committed instead, which lifts the rule inside its body — see `tests/fixtures/typescript/expressions/arrow/return_type_ternary_consequent/`
+- Return-type annotation in a conditional's consequent — kept only when a second `:` follows the arrow (`a ? (b): c => d : e`); otherwise the `:` is the conditional's and the head is a parenthesized expression (`a ? (b) : c => d`), tsc's rule (acorn rejects the latter). A head tsc reads as a signature without asking (`()`, `(...a)`, `(a: T)`, `(a?: T)`, `(public a)`, and each behind `async`) is committed instead, which lifts the rule inside its body — see `tests/fixtures/typescript/expressions/arrow/return_type_ternary_consequent/`. A parameter list is a fresh frame, so a default there may be an annotated arrow with no second `:` (`a ? (x = (y): T => z) => w : v`, tsc's `parseInitializer`) — see `tests/fixtures/typescript/expressions/arrow/return_type_ternary_consequent_param_default/`
 
 ### Function Expressions
 
@@ -310,8 +310,8 @@ written in the flags position) is not a flags production at all and is rejected,
 
 - `while` loop
 - `do...while` loop
-- `for` loop
-- `for...in` loop
+- `for` loop — its head is `[~In]` (`LexicalDeclaration[~In]` / `VariableDeclarationList[~In]` / `Expression[~In]`), so a bare `in` ends a declaration's initializer or the expression head rather than extending it (`for (let a = b in c; ;)`, `for (let a = () => b in c; ;)` reject, as for acorn). Any bracketing position under the head restores `[+In]` — including every parameter list, since a parameter default is an `Initializer[+In]` and `ArrowParameters` takes no `[In]` (`for (let a = (x = b in c) => {}; ;)` parses)
+- `for...in` loop — its declaration takes no initializer (`for (var a = 0 in b)` is Annex B, below)
 - `for...of` loop - ES2015
 - `for await...of` loop - ES2018 — `await` heads the of-form alone (`ForInOfStatement`'s `for await ( … of … )`), so `for await (x in o)` and `for await (x; ;)` are syntax errors, as they are for acorn; at `Goal::Script` a top-level `for await` is refused as a goal gate (only a module takes the loop there), while one in a non-async function body is the deferred early error at both goals
 
@@ -773,6 +773,7 @@ rejects it; tsv is native — see
 
 - `using` declarations
 - `await using` declarations
+- either as a `for` head: the for-of `ForDeclaration` and the C-style init (a declarator list, like `let`'s); never the for-in head
 - `Symbol.dispose` (computed method syntax)
 - `Symbol.asyncDispose` (computed method syntax)
 

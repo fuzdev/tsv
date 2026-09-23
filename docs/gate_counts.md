@@ -26,9 +26,10 @@ real move in a number is a deliberate, visible edit.
   --all` (minimum per-language `match` + EXACT per-language `unknown`/`partial`
   counts — the un-triaged divergence backlog is pinned, so a new unexplained
   divergence fails until fixed/cataloged and a shrink is re-pinned to record the
-  win), and the five harvests (wpt block count, test262 positive count, the
-  ts-repo corpus + rejects counts, svelte-rejects count, svelte-styles block count
-  — all exact; the last one over the `../corpora` snapshot's perf view), plus
+  win), and the six harvests (wpt block count, test262 positive count, the
+  ts-repo corpus + rejects counts, svelte-rejects count, prettier-jsx count,
+  svelte-styles block count — all exact; the last one over the `../corpora`
+  snapshot's perf view), plus
   the CSS reject count `diagnostics/css_over_acceptance.ts` grades over — derived
   live from pinned inputs rather than harvested, and the one pin whose list filters
   nothing (see `CSS_REJECTS_PIN`), but stamped and graded on the harvests' cadence
@@ -38,7 +39,7 @@ real move in a number is a deliberate, visible edit.
   with the corpus unchanged.
 
   **The suite-derived pins have exactly one cadence.** Every count above that is
-  measured over a sibling checkout (the four suite harvests' plus the CSS reject
+  measured over a sibling checkout (the five suite harvests' plus the CSS reject
   count) is re-derived by `deno task bench:pins:suites` and by nothing in `deno task
   check`, whose two sibling-checkout legs (`roundtrip:audit:prettier`, `discovery:audit`) re-derive no pin — so a checkout that moves leaves the pin
   describing the previous corpus with every committed-tree gate green until that
@@ -57,10 +58,16 @@ real move in a number is a deliberate, visible edit.
   still re-grades. A contributor left out of a stamp is the whole failure: its pull
   leaves the stamp reading fresh over a corpus that moved under it. A count pin is
   never a substitute for a commit in a stamp either: an
-  edit to an existing suite file moves the corpus without moving the count. Two of
-  the pins are also re-DERIVED a second time on their own surface (a third,
-  `TS_REPO_REJECTS_PIN`, gets a weaker cache-staleness check from
-  `ts_repo_over_acceptance.ts`):
+  edit to an existing suite file moves the corpus without moving the count. Nor is
+  a checkout a substitute for the loader's own filters: the grades over the
+  conformance view stamp a fingerprint of the filter modules too
+  (`corpus_filter_fingerprint`), since a validity filter that drops or re-admits a
+  file moves the count with nothing else moving. Two of
+  the pins are also re-DERIVED a second time on their own surface (three more get
+  a weaker cache-staleness check: `TS_REPO_REJECTS_PIN` from
+  `ts_repo_over_acceptance.ts`, and `SVELTE_REJECTS_PIN` / `PRETTIER_JSX_PIN` from
+  the conformance coverage run, which refuses to publish over an exclusion cache
+  whose size is not its pin — `bench.ts` `enforce_exclusion_caches`):
   `TEST262_POSITIVES_PIN` by `conformance:test262` (its Rust twin) and
   `CSS_REJECTS_PIN` by the conformance coverage run (`bench:conformance`), whose
   oracle row's `parse/css` skips are the reject set. `deno task doctor` reports a

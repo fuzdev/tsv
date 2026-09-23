@@ -54,8 +54,10 @@ export const CANONICAL_FORMATTER_ROW = 'prettier';
  * are errors, and `with` / legacy octal literals / legacy string escapes parse
  * (strict only via the file's own `"use strict"` prologue). Every other corpus is
  * module (Svelte `<script>` and real TS), so `SourceFile.goal` is left undefined
- * there and treated as `module`. Threaded ONLY through the conformance-coverage preflight so that
- * corpus scores each tool on the goal test262 declares — see
+ * there and treated as `module` — except in Prettier's JS and TypeScript
+ * suites, read at their runner's goal (`SourceFile.goal_fallback`). Threaded ONLY
+ * through the conformance-coverage preflight so that corpus scores each tool on
+ * the goal test262 declares — see
  * `docs/benchmarks.md` §Fairness caveats (Conformance-surface semantics).
  */
 export type ParseGoal = 'script' | 'module';
@@ -109,11 +111,32 @@ export interface SourceFile {
 	 */
 	source?: string;
 	/**
-	 * The declared parse goal (test262 only; undefined = `module`). The
+	 * The declared parse goal (undefined = `module`): test262's per-test goal, or
+	 * the goal a Prettier fixture's extension names (`.mjs`, `.cts`, …). The
 	 * conformance preflight parses each tool at this goal so a script-goal
 	 * `await`-identifier test isn't scored as a failure against a module parse.
 	 */
 	goal?: ParseGoal;
+	/**
+	 * The file's suite declares no goal and its own runner tries both: parse at
+	 * `module`, and on a rejection retry at `script`, counting the file accepted if
+	 * either parse is. Set on the TypeScript files of Prettier's JS and TypeScript
+	 * suites that no extension settles (`ConformanceReading.runner_goal`):
+	 * Prettier's acorn/espree/meriyah/oxc and typescript/oxc-ts parsers try
+	 * `sourceType: "module"` then `"commonjs"` (babel reads module-only, under
+	 * lenient options), so the verdicts its specs record presume a fallback. Script,
+	 * the goal every goal-taking parser here offers, approximates CommonJS (which
+	 * also admits a top-level `return`) — and without it a sloppy-only fixture
+	 * (`with`, a legacy octal, `let` as a name) would count against every
+	 * goal-taking parser while `tsc`, which has no goal input, accepts it.
+	 *
+	 * Read by the conformance preflight alone. A tool the goal does not reach
+	 * re-runs the same parse and rejects again, so the retry can only add files a
+	 * goal-taking parser accepts at Script; each per-source cell reports how many
+	 * (`SourceCoverageCell.script_only`), so a module-goal-only shortfall the
+	 * fallback covers stays visible rather than absorbed.
+	 */
+	goal_fallback?: boolean;
 }
 
 /** Common interface for parser/formatter implementations */

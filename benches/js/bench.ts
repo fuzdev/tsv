@@ -44,8 +44,8 @@
  *                         tool must fully process it — unlisted pre-flight failures hard-fail;
  *                         see lib/perf_omit.ts);
  *                       conformance = fixtures-only view (the prettier + parse-conformance
- *                         suites, excluding the perf/real corpus; Svelte minus canonical-rejects),
- *                         parse groups only
+ *                         suites, excluding the perf/real corpus, each less its exclusion
+ *                         caches and filters — lib/corpus.ts), parse groups only
  *                       (see benches/js/CLAUDE.md §Corpus)
  *   BENCH_COVERAGE_ONLY Set to 1 to emit coverage from pre-flight and SKIP the
  *                       timed phase (requires BENCH_CORPUS=conformance). Default off
@@ -85,6 +85,7 @@ import {
 	type CorpusRepoRef,
 	type CorpusSource,
 	CorpusLoader,
+	type ExclusionCacheState,
 	format_mb,
 	group_by_language
 } from './lib/corpus.ts';
@@ -384,8 +385,9 @@ type CorpusKind = 'perf' | 'conformance';
  * Corpus + surface selector. Default `perf`: the real-world corpus view, parse
  * + format groups, writing `report.<runtime>.*` — the throughput headline.
  * `BENCH_CORPUS=conformance`: the fixtures-only corpus view (prettier suites +
- * the parse-conformance suites, disjoint from the perf/real corpus, minus the
- * Svelte files svelte/compiler rejects — see `lib/corpus.ts` `SVELTE_REJECT_CACHE`),
+ * the parse-conformance suites, disjoint from the perf/real corpus; a suite with
+ * a validity oracle or harness is filtered to what it calls valid — see
+ * `lib/corpus.ts` `EXCLUSION_CACHES` and `lib/prettier_fixtures.ts`),
  * parse groups ONLY, writing `report.conformance.<runtime>.*` — the per-tool
  * parse coverage/throughput surface. Format impls are deliberately excluded there:
  * grading formatter behavior on the fixture suites is the correctness gates'
@@ -504,6 +506,7 @@ for await (const file of corpus_loader.stream(log)) {
 // Reify each loaded source's GitHub origin (URL + commit + subpath) so the
 // report links straight to the measured code — a few cheap `git` calls.
 await enrich_source_repos(corpus_loader.sources);
+enforce_exclusion_caches(corpus_loader.exclusion_caches);
 const by_language = group_by_language(files);
 
 // Preserve total counts before limiting
@@ -842,6 +845,25 @@ if (untiered_rows.length > 0) {
 const successful_files: Map<string, Set<string>> = new Map();
 /** Files an impl failed on during pre-flight, with the error message. */
 const skipped_files: Map<string, Map<string, string>> = new Map();
+/**
+ * Of `successful_files`, the ones accepted only on the Script-goal retry a
+ * `goal_fallback` file allows (`SourceFile.goal_fallback`), keyed by tracking_key —
+ * surfaced per source as `SourceCoverageCell.script_only`.
+ */
+const script_only_files: Map<string, Set<string>> = new Map();
+
+/**
+ * `files` with each goal the timed sweep must replay: `script` for a file only the
+ * `goal_fallback` retry accepted, the file's own goal otherwise. Replayed at its
+ * own (module) goal, a script-only file throws inside the timed loop, where a throw
+ * is a harness failure rather than a skip. Rewritten once, ahead of the sweep, so
+ * the timed loop pays no per-file lookup.
+ */
+function with_accepted_goals(tracking_key: string, files: SourceFile[]): SourceFile[] {
+	const script_only = script_only_files.get(tracking_key);
+	if (!script_only) return files;
+	return files.map((f): SourceFile => (script_only.has(f.path) ? { ...f, goal: 'script' } : f));
+}
 /** Effective corpus size per benchmark (processed / total files). */
 const effective_corpus_size: Map<string, { processed: number; total: number }> = new Map();
 /** Effective corpus bytes per benchmark — used for honest throughput math. */
@@ -1017,6 +1039,50 @@ function enforce_perf_coverage(full_corpus: boolean): void {
 			`excused no pre-flight failure in this full-corpus run, though the task each names ran:\n` +
 			stale.map((o) => `  ${o.task ?? '<any task>'}  ${o.path}: ${o.reason}`).join('\n') +
 			`\n  Delete the entry if the tool was fixed; update it if the corpus path was renamed.`
+	);
+	exit(1);
+}
+
+/**
+ * The conformance run's exclusion caches, held to what the published coverage
+ * presumes — refused before any impl loads, so a bad state costs seconds. The
+ * loader applies them fail-open (most of its graders are untouched by them), but
+ * the numbers this run writes are the committed report, and a cache that is absent
+ * or predates its pin changes the Svelte or TypeScript denominator for every row.
+ * The normal flow cannot reach either state — `bench:conformance` chains the
+ * harvests first — so each means something broke:
+ *
+ * - absent: refused, naming the harvest, unless `BENCH_ALLOW_MISSING=1` — the same
+ *   opt-in that tolerates a missing corpus entry and already marks the run as not
+ *   comparable. The report records the absence either way (`exclusion_caches`);
+ * - present at a size other than its exact pin: refused with no override. The
+ *   harvest writes a cache only once its pin holds, so this is a cache from before
+ *   a re-pin, and the fix is to re-harvest, never to tolerate it.
+ *
+ * Graded whatever `BENCH_FILTER` / `BENCH_LIMIT` say: the loader applies each cache
+ * whole, so its size is a fact about the cache, not about the files this run kept.
+ */
+function enforce_exclusion_caches(caches: ExclusionCacheState[]): void {
+	const refusals: string[] = [];
+	for (const { label, task, pin, size } of caches) {
+		if (size === null) {
+			if (env.BENCH_ALLOW_MISSING === '1') {
+				log(`  ⚠ ${label} cache absent — tolerated (BENCH_ALLOW_MISSING=1); not comparable`);
+			} else {
+				refusals.push(`the ${label} cache is absent — run \`deno task ${task}\``);
+			}
+		} else if (size !== pin) {
+			refusals.push(
+				`the ${label} cache holds ${size} paths ≠ its pin ${pin} — it predates a re-pin; ` +
+					`re-run \`deno task ${task} --force\``
+			);
+		}
+	}
+	if (refusals.length === 0) return;
+	console.error(
+		`Conformance corpus: ${refusals.join('; ')}. The coverage this run publishes presumes ` +
+			'every exclusion cache at its pin' +
+			(env.BENCH_ALLOW_MISSING === '1' ? '.' : ' (BENCH_ALLOW_MISSING=1 tolerates an ABSENT one).')
 	);
 	exit(1);
 }
@@ -1460,6 +1526,7 @@ function compute_coverage_by_source(): CoverageBySource {
 		for (const [name, tracking_key] of task_tracking) {
 			const success = successful_files.get(tracking_key);
 			if (!success) continue;
+			const script_only = script_only_files.get(tracking_key);
 			for (const file of files) {
 				if (file.source === undefined) continue;
 				let cells = by_source.get(file.source);
@@ -1474,6 +1541,7 @@ function compute_coverage_by_source(): CoverageBySource {
 				}
 				cell.total++;
 				if (success.has(file.path)) cell.processed++;
+				if (script_only?.has(file.path)) cell.script_only = (cell.script_only ?? 0) + 1;
 			}
 		}
 		if (by_source.size > 0) by_group.set(group_name, by_source);
@@ -1670,8 +1738,9 @@ function serialize_ungraded_digests(): Record<string, number> {
 }
 
 /**
- * `compute_coverage_by_source` as plain JSON — `group → source → impl → {processed,
- * total}` — for the committed report. Maps don't survive `JSON.stringify`, and the
+ * `compute_coverage_by_source` as plain JSON — `group → source → impl →
+ * SourceCoverageCell` (`{processed, total}`, plus `script_only` where a goal
+ * fallback added files) — for the committed report. Maps don't survive `JSON.stringify`, and the
  * markdown tables alone would leave a consumer (tsv.fuz.dev, a diff at review time)
  * reading percentages out of prose.
  */
@@ -1752,6 +1821,7 @@ async function run_preflight(
 	for (let i = 0; i < tasks.length; i++) {
 		const task = tasks[i];
 		const success = new Set<string>();
+		const script_only = new Set<string>();
 		// Digests are the byte half of `check_variant_parity`, and cost nothing on a
 		// row it doesn't grade: `null` here means no hashing happens at all.
 		const digests = byte_graded_names.has(task.name) ? new Map<string, string>() : null;
@@ -1763,15 +1833,32 @@ async function run_preflight(
 			// in it — the digest below was — turns a HARNESS-side failure on a file the
 			// tool handled into a recorded skip against the tool. See `output_digest`.
 			let result: unknown;
+			let at_script = false;
 			try {
-				// `file.goal` is set only for test262 (conformance surface); every
-				// other corpus leaves it undefined → the default module parse.
+				// `file.goal` is set only on the conformance surface — test262's declared
+				// goal, or a Prettier fixture's extension goal (`.mjs`, `.cts`, …); every
+				// other file leaves it undefined → the default module parse.
 				result = task.is_async
 					? await task.run_async!(file.content, language, file.goal)
 					: task.run(file.content, language, file.goal);
 			} catch (e) {
-				record_skip(task.tracking_key, file.path, e);
-				continue;
+				// A `goal_fallback` file (a TypeScript file with no goal of its own) is
+				// retried at script (`SourceFile.goal_fallback`). The retry's own failure is
+				// not the verdict — the module error is recorded, the primary reading — and
+				// a tool the goal does not reach simply rejects twice.
+				if (!file.goal_fallback) {
+					record_skip(task.tracking_key, file.path, e);
+					continue;
+				}
+				try {
+					result = task.is_async
+						? await task.run_async!(file.content, language, 'script')
+						: task.run(file.content, language, 'script');
+				} catch {
+					record_skip(task.tracking_key, file.path, e);
+					continue;
+				}
+				at_script = true;
 			}
 			// A tool-side verdict, not a harness failure: an empty output on a non-empty
 			// input is the impl declining the file without saying so, recorded as a
@@ -1782,6 +1869,7 @@ async function run_preflight(
 				continue;
 			}
 			success.add(file.path);
+			if (at_script) script_only.add(file.path);
 			bytes += file.bytes;
 			if (digests !== null) {
 				// Digesting is HARNESS work — JSON.stringify + sha1 over the wire, ~+50% of
@@ -1805,6 +1893,7 @@ async function run_preflight(
 		}
 		const elapsed_ms = performance.now() - start_ms - digest_ms;
 		successful_files.set(task.tracking_key, success);
+		if (script_only.size > 0) script_only_files.set(task.tracking_key, script_only);
 		if (digests !== null) output_digests.set(task.tracking_key, digests);
 		effective_corpus_size.set(task.tracking_key, { processed: success.size, total: files.length });
 		effective_corpus_bytes.set(task.tracking_key, bytes);
@@ -2044,7 +2133,10 @@ async function run_benchmark_group(
 	const canonical_min_iterations = Math.max(CANONICAL_MIN_ITERATIONS, baselining ? 10 : 8);
 
 	for (const task of tasks) {
-		const task_files = filtered_files_by_task.get(task.tracking_key)!;
+		const task_files = with_accepted_goals(
+			task.tracking_key,
+			filtered_files_by_task.get(task.tracking_key)!
+		);
 		// ONE protocol per row on every runtime: the suite floor (8; 10 when
 		// baselining; 16 on the canonical rows), the duration budget, and a warmup
 		// sized by TIME from the row's own pre-flight sweep. There used to be a slow-task tier here (a cold
@@ -2344,8 +2436,14 @@ interface BaselineVersions extends ReportVersions {
  * 18: per-row `settled_heap_bytes` — the JS heap each row's warmup began from. JSC
  * paces its collections by live heap size, so a pure-JS row's level under bun depends
  * on it; the field shows whether two runs of a row started from the same place.
+ *
+ * 19: `coverage_by_source` cells gain `script_only` — of `processed`, the files a
+ * goal-fallback source accepted only on its Script retry (`SourceFile.goal_fallback`;
+ * conformance surface only, absent when the retry added none), and conformance
+ * reports gain `exclusion_caches` — each exclusion cache the view applied, by label,
+ * its size or `null` when absent.
  */
-const REPORT_SCHEMA_VERSION = 18;
+const REPORT_SCHEMA_VERSION = 19;
 
 interface Baseline {
 	/** See `REPORT_SCHEMA_VERSION`. */
@@ -2356,8 +2454,9 @@ interface Baseline {
 	/**
 	 * Which corpus/surface produced this report: `perf` (real-world corpus,
 	 * parse + format groups — `report.<runtime>.*`) or `conformance`
-	 * (fixtures-only corpus, disjoint from perf, Svelte set minus canonical-rejects,
-	 * parse groups only — `report.conformance.<runtime>.*`). See `BENCH_CORPUS`.
+	 * (fixtures-only corpus, disjoint from perf, a suite with a validity oracle or
+	 * harness filtered to what it calls valid, parse groups only —
+	 * `report.conformance.<runtime>.*`). See `BENCH_CORPUS`.
 	 *
 	 * Since `version` 6.
 	 */
@@ -2385,6 +2484,13 @@ interface Baseline {
 	 * produced on a partial machine would be indistinguishable from a full one.
 	 */
 	corpus_sources: CorpusSource[];
+	/**
+	 * The exclusion caches the conformance view applied, by label, each its size
+	 * (held to its exact pin) — `null` for an absent one, which only a
+	 * `BENCH_ALLOW_MISSING=1` run can publish (`enforce_exclusion_caches`), so a
+	 * consumer can refuse it. Conformance reports only; since `version` 19.
+	 */
+	exclusion_caches?: Record<string, number | null>;
 	/**
 	 * The real-code snapshot the `real`/`framework` sources were read from — the
 	 * `fuzdev/corpora` checkout at its commit (`subpath` empty). One roll-up commit
@@ -2703,6 +2809,9 @@ async function build_results_data(
 		machine: current_machine(),
 		corpus,
 		corpus_sources: corpus_loader.sources,
+		exclusion_caches: IS_CONFORMANCE
+			? Object.fromEntries(corpus_loader.exclusion_caches.map((c) => [c.label, c.size]))
+			: undefined,
 		corpus_snapshot: (await detect_corpus_snapshot(corpus_loader.sources)) ?? undefined,
 		// Per-source coverage, the JSON half of the markdown tables. Coverage-only
 		// runs only: on the perf surface every cell would read 100% by construction
@@ -2749,8 +2858,8 @@ function generate_markdown_report(data: Baseline, groups: GroupResults[]): strin
 			`${RUNTIME} ${machine.runtime_version}\n`
 	);
 	const conformance_note = COVERAGE_ONLY
-		? 'conformance — fixtures-only corpus (disjoint from perf; Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)'
-		: 'conformance — fixtures-only corpus (disjoint from perf; Svelte set minus svelte/compiler-rejected files), parse groups only; the headline is the per-tool Coverage lines (parse success over the valid set), with throughput measured on the all-tools-pass intersection';
+		? 'conformance — fixtures-only corpus (disjoint from perf; a suite with a validity oracle or harness filtered to what it calls valid), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)'
+		: 'conformance — fixtures-only corpus (disjoint from perf; a suite with a validity oracle or harness filtered to what it calls valid), parse groups only; the headline is the per-tool Coverage lines (parse success over the valid set), with throughput measured on the all-tools-pass intersection';
 	lines.push(
 		`**Corpus kind:** ${
 			IS_CONFORMANCE ? conformance_note : 'perf — real-world code only (fixture suites excluded)'
@@ -2778,6 +2887,13 @@ function generate_markdown_report(data: Baseline, groups: GroupResults[]): strin
 	if (corpus_loader.sources.length > 0) {
 		lines.push(
 			`**Sources:** ${corpus_loader.sources.map((s) => `${s.path} (${s.files})`).join(', ')}\n`
+		);
+	}
+	if (corpus_loader.exclusion_caches.length > 0) {
+		lines.push(
+			`**Excluded by cache:** ${corpus_loader.exclusion_caches
+				.map((c) => `${c.label} (${c.size ?? 'ABSENT — not comparable'})`)
+				.join(', ')}\n`
 		);
 	}
 

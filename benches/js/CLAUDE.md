@@ -35,7 +35,7 @@ grades); the reference halves live in `docs/`:
 | --- | --- | --- | --- |
 | **`deno task check`** | `cargo fmt --check` · `format:audit` · `pins:audit` · `docs:audit` · `typecheck` · `typecheck:features` · `typecheck:scripts` · `typecheck:bench-core` · `conformance:audit` · `conformance:audit:compiler` · `variants:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `roundtrip:audit:prettier` · `discovery:audit` · `canonicalize:audit` · `binding:audit` · `authoring:audit` · `paren:audit` · `razor:audit` · `fuzz:audit` · `test:deno` · `cargo test` (incl. fixtures) · `test:audits` · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `fabrication:audit` · `census:audit` · `width:audit` · `ignore:audit` · `check:ast-types` · `clippy` | **committed tree only** — `tests/fixtures` + pure-Rust/Deno audits, no external oracle — save two opportunistic sibling-checkout legs: `roundtrip:audit:prettier` gates the pinned `../prettier` format suites, and `discovery:audit` checks `tsv format --list` over the `../corpora` snapshot against its committed file list (each a loud skip when its checkout is absent; ~0.1 s) | every commit; the CI `check` job |
 | **`deno task conformance:all`** | `pins:audit:checkouts` + `bench:pins:suites` + `fixtures:validate` + `compile:fixtures:validate` preflights (then `bench:harvest:svelte-styles`, late, beside the corpus legs that read its cache), then `conformance` (one process, five FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:format --all`, plus `render:audit` as its one subprocess leg) **+** `conformance:test262` (pure Rust) | `../corpora` (the real-code snapshot), `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../prettier-plugin-svelte`, `../test262`; the **`gates`** corpus view (~9,300) | release; `scripts/publish.ts` **Step 3b** |
-| **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (~3,650; 100%-coverage invariant) / **`conformance`** view (fixtures + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
+| **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (~3,650; 100%-coverage invariant) / **`conformance`** view (fixtures filtered to what their own suite calls valid + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
 | **`deno task idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored** | **`robustness`** view (the WHOLE `../corpora` snapshot — every collection it vendors, placed in a tier or not — + the `svelte_styles` cache + the live working trees' DIFF against the snapshot; absent dirs skipped with a warning) | after a printer change; conformance cadence |
 | **`deno task audit:corpus`** | the pure-Rust content-loss / robustness suite over **real code**: `roundtrip_audit --gate` · `comment_audit` · `swallow_audit` · `binding_audit --gate` (real code gating; prettier suites report-only) · `authoring_audit` · `paren_audit` (both real-code-only) · `census_audit` · `fabrication_audit` (both strict-zero off their default corpus) · `fuzz --iterations 0`. `width_audit` is NOT a leg — it has no zero to grade (../../docs/audits.md §The Corpus Bundle) | **`robustness`** view (the whole snapshot + the `svelte_styles` cache + the live diff) + the pinned `../prettier` format suites (absent working trees skipped; floor = the whole `../corpora` snapshot) | release; `scripts/publish.ts` **Step 3c**; conformance cadence |
 | **`deno task render:audit <paths>`** | `render_audit --gate` — per `.svelte` file, does `tsv format` change what it RENDERS? Compares the browser-visible render key of the source vs of `format(source)`. The corpus-scale arm of the fixture **R** rules. **Needs the Deno sidecar** (`svelte compile`), so it is deliberately not a leg of the pure-Rust `audit:corpus` — it rides `conformance` instead | standalone: any `.svelte` corpus, given explicitly. As a `conformance` leg: the WHOLE `../corpora` snapshot (every collection, placed in a tier or not — this leg pins no count, so it reads the root rather than the tiers' entries) + the `suite` checkout, both version-pinned, so a live working tree can't move a release verdict | release (in `conformance`); standalone after a printer change |
@@ -717,13 +717,15 @@ it; to investigate ad-hoc run `BENCH_CORPUS=conformance node benches/js/bench.ts
 
 ```bash
 deno task bench:harvest            # everything = :suites + :svelte-styles
-deno task bench:pins:suites        # the conformance-view group: the four SUITE caches + the CSS reject
+deno task bench:pins:suites        # the conformance-view group: the five SUITE caches + the CSS reject
                                    # pin; the pin-freshness preflight
-deno task bench:harvest:wpt        # ../wpt/css <style> blocks → .cache/wpt_css
+deno task bench:harvest:wpt        # ../wpt/css <style> blocks (outside <script>) → .cache/wpt_css
 deno task bench:harvest:test262    # graded positives → .cache/test262_files.json (runs cargo)
 deno task bench:harvest:ts-repo    # tsc-corpus valid + rejects lists → .cache/ts_repo_{files,rejects}.json
 deno task bench:harvest:svelte-rejects  # svelte/compiler-rejected Svelte files
                                         # → .cache/svelte_parse_rejects.json
+deno task bench:harvest:prettier-jsx    # Prettier .js fixtures its babel parser reads as JSX
+                                        # → .cache/prettier_jsx_files.json
 deno task css:over-acceptance:pin  # CSS_REJECTS_PIN alone (oracle only, no build) — no cache, just the stamp
 deno task bench:harvest:svelte-styles   # perf-view .svelte <style> blocks, concatenated per
                                         # snapshot collection → .cache/svelte_styles/<collection>.css
@@ -745,8 +747,8 @@ blocks): an unchanged triple skips the walk, and a moved count fails before writ
 every other harvest.
 
 **Two groups, because the corpus VIEWS decide who needs which cache.**
-`bench:pins:suites` is the conformance-view group: the four suite caches
-(`suite`-tier, so they appear in the CONFORMANCE view and nowhere else) plus
+`bench:pins:suites` is the conformance-view group: the five suite caches
+(`suite`-tier, or an exclusion list over one — so they act in the CONFORMANCE view and nowhere else) plus
 `css:over-acceptance:pin`, which harvests nothing — nothing consumes the CSS reject
 list, so it is rebuilt live — but grades `CSS_REJECTS_PIN` over the same view and
 stamps the same way. `WPT_CSS_HARVEST_PIN` is stamped beside them but cannot
@@ -766,19 +768,23 @@ the perf view, where every snapshot collection is REQUIRED, and fails outright �
 it is not in front of the repo-local fixture gates.
 
 **What "an input it cannot see" means is the loader's to decide, not each leg's.**
-A pinned count is a claim about the WHOLE corpus, so the two reject pins load
-through `load_pinned_language_corpus` (`lib/corpus.ts`), which takes the
-`{ complete_for: <language> }` missing-entry policy: an absent entry that could hold
-that language throws — **`optional` ones included**, since `optional` says only that
-an ordinary run may proceed without it — while one that cannot hold it warns and is
-skipped. That is what lets the svelte-rejects leg harvest its full 142 on a machine
+A pinned count is a claim about the WHOLE corpus, so the two reject pins and the
+prettier-jsx harvest load through `load_pinned_language_corpus` (`lib/corpus.ts`),
+which takes the `{ complete_for: <language> }` missing-entry policy: an absent entry
+that could hold that language refuses the load — **`optional` ones included**, since
+`optional` says only that an ordinary run may proceed without it — while one that
+cannot hold it warns and is skipped. The helper owns the `--if-present` answer too:
+an absent entry, and nothing else, comes back `null` for the leg to warn-skip. That is what lets the svelte-rejects leg harvest its full 142 on a machine
 with no wpt/test262 caches (css/js — no Svelte) and still refuse, warn-skippably, when
 `../prettier-plugin-svelte` is gone. Spelling the tolerance as a plain "allow
 missing" instead is the bug this shape exists to prevent: the leg then grades a
 short corpus and reports it as `pinned count mismatch … re-pin in gate_counts.ts`,
 which is the one diagnosis that is never right for an absent input. Reach for that
 helper, not a bare `CorpusLoader`, whenever the number coming out is compared to a
-constant.
+constant. A pin that is a claim about SOME of the view's entries names them (`only`,
+the prettier-jsx harvest: the Prettier JS suite alone) — the loader then walks and
+refuses over those entries and no others, so the grade neither reads the ~80k files
+its count ignores nor fails on a harvest cache it never consults.
 
 **A stamp records every checkout its grade READS, not the one it is named after.**
 Both reject pins are measured over THREE, and neither list is guessable from the
@@ -793,11 +799,17 @@ structurally cannot see a missing second — so the stamp's `checkouts` table
 (`lib/harvest_stamp.ts`) and that `pins` list are kept in agreement by hand. And a
 checkout is not the only kind of input: every stamped grade that loads a corpus VIEW also
 stamps that view's ENTRY LIST (`corpus_view_paths`) — the styles harvest the perf view's,
-the svelte-rejects harvest and the CSS reject pin the conformance view's — because an
+the svelte-rejects and prettier-jsx harvests and the CSS reject pin the conformance view's — because an
 entry joining or leaving the corpus entries changes what the grade reads while every
 checkout stays put; a stamp keyed on checkouts alone would skip that re-harvest and leave
 the cache short under a green stamp (it did once: two collections joining the `real` tier
-moved the styles count 278 → 401 with no checkout moving). The entry list's ORDER is part
+moved the styles count 278 → 401 with no checkout moving). Each of those grades stamps
+one more input no checkout records: a fingerprint of the loader's per-file FILTERS
+(`corpus_filter_fingerprint` — `lib/prettier_fixtures.ts` + `lib/corpus.ts` by source
+text), because a filter change moves what the view yields with every checkout and the
+entry list unmoved (the Prettier validity filter moved `CSS_REJECTS_PIN` 229 → 207 that
+way, and only the coverage run's own grade of the count saw it; an exclusion or
+extension edit in `lib/corpus.ts` would move the perf view the same way). The entry list's ORDER is part
 of the stamp, so `corpus_entries()` keeps it stable — table order, then manifest order —
 and a tier that lands in no perf view (`third_party`) leaves the perf stamp untouched.
 
@@ -811,7 +823,10 @@ they once went stale unnoticed (the two suite-only checkouts, `../wpt` and
 cost under a second when nothing has moved. Two of the pins have a second grader:
 `TEST262_POSITIVES_PIN` (its Rust twin, in `conformance:test262`) and
 `CSS_REJECTS_PIN` (the conformance coverage run, `bench.ts` `enforce_css_reject_pin`
-— the oracle row's `parse/css` skips ARE the reject set). Run the group standalone
+— the oracle row's `parse/css` skips ARE the reject set). The two exclusion-cache
+pins, `SVELTE_REJECTS_PIN` and `PRETTIER_JSX_PIN`, get a weaker check from the same
+run: it refuses to publish over a cache whose size is not its pin, or an absent one
+without `BENCH_ALLOW_MISSING=1` (`enforce_exclusion_caches`). Run the group standalone
 after a `../wpt` / `../test262` / `../svelte` / `../prettier` update — and EXPECT a
 pinned count to trip after a source pull
 ([../../docs/gate_counts.md](../../docs/gate_counts.md)): re-pin in
@@ -1203,7 +1218,8 @@ only and only as a diff against the snapshot (below). **SAFETY (content loss) ga
   reviewed against it. The `CorpusLoader` view is required at every construction
   site — the view decides what a number or gate verdict means, so there's no implicit
   default to inherit by accident.
-- **`conformance`** — the hard parse cases only: the `prettier_fixture` suites + the
+- **`conformance`** — the hard parse cases only: the `prettier_fixture` suites (less
+  what Prettier's own harness marks invalid — see the validity filter below) + the
   parse-conformance `suite` entries — Svelte's compiler tests (with the gate-aligned
   skips: `_`-prefixed segments, `migrate/`, `output.svelte` snapshots), the wpt-css
   harvest cache, the test262 graded-positive path list (a `files_from` entry), and
@@ -1227,6 +1243,56 @@ only and only as a diff against the snapshot (below). **SAFETY (content loss) ga
   tsv 640 files it and tsc both accept to win back 25. Full rules, the measurement,
   and why the two validity readings must AGREE: `harvest_ts_repo.ts`.
 
+  **Prettier-suite validity filter (conformance view only).** Prettier's
+  `tests/format/{typescript,js,css,html}` are formatter fixtures, and the raw walk
+  carries three kinds of file no parser can accept: the runner's own markers
+  (`<<<PRETTIER_RANGE_START>>>` in every `range/` fixture, `<|>` in the cursor
+  ones — stripped by Prettier before formatting, so the bytes on disk are valid for
+  nothing), front matter (`css/yaml/`, a Prettier feature over the host language),
+  and the fixtures Prettier itself records as rejected by every standards parser
+  it verifies against — Babel-only proposals (`do/`, `pipeline-operator/`,
+  `discard-binding/`, …) and deliberate error cases, declared per file in each
+  directory's `format.test.js` `errors` option. Counted raw, the JS suite read as
+  77–85% across the whole field, with the real gaps buried in the deltas. So the
+  conformance view drops all three, reading Prettier's own verdicts rather than
+  any parser's (`lib/prettier_fixtures.ts`: the markers by content, front matter
+  by Prettier's own `getFrontMatter` rule — an opening AND a closing fence, and
+  only in the CSS and HTML suites, the languages whose parsers lift it — and
+  the verdicts by evaluating the spec files: Prettier's `get-parsers.js` implicit
+  verify parsers, `shouldThrowOnFormat` and `isErrorTest` mirrored, a declared
+  error counted even for a parser the directory never runs, and a spec the reader
+  can't bind fails the load rather than grading as "no verdict"). It also drops
+  the spec files themselves, which Prettier's own `getFiles` never treats as
+  fixtures — harness JS, one file in five of the raw walk, and in the CSS and
+  TypeScript suites the only JS-language files there were, lifting every
+  parser's rate alike. A fixture that some spec-grammar parser (typescript, acorn,
+  espree, meriyah, oxc, oxc-ts, css) is expected to accept stays — Prettier's
+  line, not ecma262's, since oxc and meriyah take some stage-3 syntax — and
+  Prettier verifies with lenient parser options (acorn's `allowReturnOutsideFunction`,
+  babel's `allowNewTargetOutsideFunction`, …), so a few kept JS fixtures are no strict
+  ECMAScript (the known three are named in `prettier_fixtures.ts`). Two more
+  readings are Prettier's own rather than any parser's. **JSX in a
+  `.js` fixture is out of SCOPE**, not invalid: Prettier's parsers all take it, but
+  every parser on the coverage surface runs in TypeScript mode, where all of them
+  reject it alike, so the 39 files Prettier's babel parser reads as JSX carried no
+  signal and leave the way the `jsx/` suite and the compiler's `.tsx` cases do
+  (`bench:harvest:prettier-jsx` → `.cache/prettier_jsx_files.json`, an exclusion
+  cache consumed like the svelte-rejects one, pinned by `PRETTIER_JSX_PIN`). And
+  the JS and TypeScript suites are read at the GOAL their runner reads them,
+  approximately: Prettier's acorn / espree / meriyah / oxc parsers, and its
+  typescript / oxc-ts ones, try `sourceType: "module"` then `"commonjs"` (babel
+  reads module-only, leniently), so both entries' `conformance` reading sets
+  `runner_goal`: the preflight retries a module-goal reject at Script, the nearest
+  goal every parser here takes (`SourceFile.goal_fallback`), and a file whose
+  extension names its goal (`.mjs` / `.mts` module, `.cjs` / `.cts` commonjs) is
+  read at that goal alone, as Prettier's parsers read it (`read_at_runner_goal`).
+  A sloppy-only fixture (`with`, a legacy octal, `let` as a name) then counts for every goal-taking parser as it already did for `tsc`,
+  which has no goal input. The retry can only add files (a tool the goal does not
+  reach rejects twice), and each per-source cell reports how many it added
+  (`script_only`, "N at script" in the markdown), so a module-goal-only shortfall
+  stays visible. The `gates` view keeps the raw suites — its sanction lists were
+  reviewed against them.
+
   **Canonical-reject exclusion (Svelte only, conformance view only).** The suite
   bundles deliberately-invalid fixtures (svelte's own `compiler-errors/`, `loose-*`
   error-tolerant fixtures, preprocess inputs) plus non-Svelte HTML (prettier's
@@ -1242,8 +1308,12 @@ only and only as a diff against the snapshot (below). **SAFETY (content loss) ga
   drop-in *for*; `acorn-typescript` **trails** modern TS/JS (its rejects include
   valid code tsv correctly parses) and `parseCss` is lenient, so neither is a
   validity oracle and TS/CSS get no reject cache. The cache is machine-local +
-  regenerable (gitignored); absent = fail-open to the un-filtered corpus (disclosed
-  in the load log). The **`gates` view is untouched**, so `corpus:compare:*` /
+  regenerable (gitignored). The LOADER fails open on an absent cache (the
+  un-filtered corpus, disclosed in the load log) — most of its graders are untouched
+  by it — but the coverage run that publishes refuses: an absent cache unless
+  `BENCH_ALLOW_MISSING=1`, and a cache whose size is not its exact pin always
+  (`enforce_exclusion_caches`, both caches alike). The report records each applied
+  cache's size, `null` when absent (`exclusion_caches`). The **`gates` view is untouched**, so `corpus:compare:*` /
   `skip_triage` still see the error fixtures they need.
 - **`robustness`** — the WHOLE snapshot + the `svelte_styles` cache + the **live diff**,
   for the real-code robustness sweeps (`audit:corpus`, `idempotency:sweep`). The snapshot
@@ -1361,6 +1431,9 @@ benches/js/
     │                      # (unit-tested by perf_omit_test.ts, which also pins that no entry
     │                      # tolerates a failure of tsv's own)
     ├── postcss.ts         # postcss wrapper (parse-only, CSS — the parser behind prettier's CSS printer)
+    ├── prettier_fixtures.ts # What Prettier's own suites call valid — harness markers, front matter,
+    │                      # and each directory's `format.test.js` verdicts, the conformance view's
+    │                      # filter over the Prettier suites (unit-tested by prettier_fixtures_test.ts)
     ├── prettier_cache.ts  # Content-addressed prettier-output cache for the format comparison
     ├── reject_probe.ts    # Behavioral "is a rejection still REPORTED" check, asked at every
     │                      # wrapper's init: tsv's three front-ends (FFI decides by the `out_status`
@@ -1604,11 +1677,11 @@ build:wasm:all:deno` first (these three read the `release` FFI, not `corpus`). T
 two with `deno task` entries — `css:over-acceptance` and `ts-repo:over-acceptance`
 — build what they need themselves.
 
-Six live here but are documented above: the parse-conformance gates
+Seven live here but are documented above: the parse-conformance gates
 (`svelte_fixtures_compare.ts`, `ts_fixtures_compare.ts`, `ts_repo_compare.ts` →
 [§Parse-Conformance Gates](#parse-conformance-gates)) and the harvests
-(`wpt_css_harvest.ts`, `svelte_reject_harvest.ts`, `svelte_styles_harvest.ts` →
-[§Harvests](#harvests)).
+(`wpt_css_harvest.ts`, `svelte_reject_harvest.ts`, `prettier_jsx_harvest.ts`,
+`svelte_styles_harvest.ts` → [§Harvests](#harvests)).
 
 | Script | What it does | Task |
 | --- | --- | --- |

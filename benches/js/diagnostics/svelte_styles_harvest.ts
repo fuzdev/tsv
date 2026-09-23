@@ -26,9 +26,10 @@
  *
  * Stamped like the suite harvests (`lib/harvest_stamp.ts`): the perf view is the
  * pinned `../corpora` snapshot, so the stamp records its `collections/` tree id, the
- * pinned block count, and the perf view's entry list (a collection joining a perf
- * tier changes the input with no checkout moving), and an unchanged triple
- * skips the walk. The count is an EXACT pin (`SVELTE_STYLES_BLOCKS_PIN`): a move is a
+ * pinned block count, the perf view's entry list (a collection joining a perf
+ * tier changes the input with no checkout moving), and the loader's filter
+ * fingerprint (an exclusion or extension edit in `lib/corpus.ts` changes what the
+ * view yields with nothing else moving), and unchanged inputs skip the walk. The count is an EXACT pin (`SVELTE_STYLES_BLOCKS_PIN`): a move is a
  * snapshot refresh or a view change (re-pin) or a broken extraction, and either fails
  * BEFORE writing so a wrong cache never replaces a good one. `--force` re-harvests
  * despite a fresh stamp (after a change to the extraction itself, which the stamp
@@ -50,6 +51,7 @@ import {
 	HARVEST_STAMPS,
 	checkout_hash,
 	checkout_label,
+	corpus_filter_fingerprint,
 	harvest_up_to_date,
 	short_commit,
 	write_stamp
@@ -102,7 +104,8 @@ async function main(): Promise<void> {
 	const inputs = {
 		corpora_tree,
 		blocks_pin: SVELTE_STYLES_BLOCKS_PIN,
-		perf_entries: (await corpus_view_paths('perf')).join(' ')
+		perf_entries: (await corpus_view_paths('perf')).join(' '),
+		filters: await corpus_filter_fingerprint('perf')
 	};
 	if (!force && (await harvest_up_to_date(stamp.path, inputs, [CACHE_DIR]))) {
 		console.error(

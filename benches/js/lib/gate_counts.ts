@@ -119,7 +119,13 @@ export const GATE_CHECKOUT_IDS: Record<
 	// each pin names at least one, which cannot see a missing second.
 	'../prettier': {
 		hash: '1dcd0b05d',
-		pins: ['SVELTE_REJECTS_PIN', 'CSS_REJECTS_PIN', 'CORPUS_FORMAT_*', 'CORPUS_PARSE_*']
+		pins: [
+			'SVELTE_REJECTS_PIN',
+			'CSS_REJECTS_PIN',
+			'PRETTIER_JSX_PIN',
+			'CORPUS_FORMAT_*',
+			'CORPUS_PARSE_*'
+		]
 	},
 	'../prettier-plugin-svelte': {
 		hash: '7809486',
@@ -231,12 +237,25 @@ export const TS_FIXTURES_PINS: GatePins = { scanned: 226, both_accept: 202, over
  * for reject parity — it got better — when a bare `yield` or arrow function stopped being
  * accepted as an operand (an `AssignmentExpression` is no `UnaryExpression`); the full-corpus
  * A/B moved no other TypeScript file, and every other bucket is unmoved.
+ *
+ * 12282 → 12284 `accept_parity`: `usingDeclarationsInFor.ts` and
+ * `awaitUsingDeclarationsInFor.ts` joined it from the beyond-acorn known gaps when a
+ * `using` / `await using` declaration became a C-style for-head init — the
+ * `LexicalDeclaration` production `let` already took there (conformance_svelte.md
+ * §TypeScript Corrections, the for_head_c_style entry); every other bucket unmoved.
+ *
+ * 467 → 468 `over_acceptance_checker`: `usingDeclarationsInForOf.4.ts` left reject
+ * parity when a C-style head's using declaration could bind `of` (`for (using of =
+ * null;;)`) — tsc's parser takes all three of its heads, and the baseline's one error
+ * is the checker's TS1155 on `for (using of;;)`, the missing initializer tsv defers
+ * like `const x;`'s (conformance_svelte.md §TypeScript Corrections, the
+ * for_head_c_style_of_binding entry); every other bucket unmoved.
  */
 export const TS_REPO_PINS = {
 	scanned: 13708,
-	accept_parity: 12282,
+	accept_parity: 12284,
 	over_acceptance_parser: 19,
-	over_acceptance_checker: 467,
+	over_acceptance_checker: 468,
 	units_scanned: 7874,
 	units_accept_parity: 7858
 };
@@ -1129,8 +1148,14 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
  */
 export const SVELTE_STYLES_BLOCKS_PIN = 401;
 
-/** bench:harvest:wpt — exact `<style>` blocks from the default `../wpt/css`. Measured 2026-07-06: ../wpt at 7437c7bc. */
-export const WPT_CSS_HARVEST_PIN = 22_310;
+/**
+ * bench:harvest:wpt — exact `<style>` blocks from the default `../wpt/css`. Measured
+ * 2026-09-22: ../wpt at 7437c7bc, the same checkout as the previous 22,310 — the move is
+ * the harvest's own: it now skips `<style>` tags inside `<script>` blocks — 202 of them,
+ * JS string literals rather than stylesheets, 183 of which the cache had been writing
+ * (the rest were duplicates or empty, skipped either way).
+ */
+export const WPT_CSS_HARVEST_PIN = 22_127;
 
 /**
  * bench:harvest:test262 — exact expected-positive files in the cache list. Measured 2026-09-08: ../test262 at 7153986f (48,274 graded).
@@ -1161,9 +1186,22 @@ export const TS_REPO_CORPUS_PIN = 8_097;
 export const TS_REPO_REJECTS_PIN = 519;
 
 /**
+ * bench:harvest:prettier-jsx — exact count of the conformance view's Prettier `.js`
+ * fixtures that Prettier's own babel parser reads as JSX (`ast_has_jsx`), the
+ * out-of-scope set the view drops. Measured 2026-09-22: ../prettier at 1dcd0b05d,
+ * oracle prettier@3.9.6, 39 of the 795 JS-suite files the validity filter keeps.
+ * Fewer = the oracle stopped seeing JSX (a broken import, or babel's JSX plugin off);
+ * more = it started reading plain JS as JSX — either way the cache would move a
+ * number every parser shares. Re-derived by `bench:pins:suites` (see there).
+ */
+export const PRETTIER_JSX_PIN = 39;
+
+/**
  * bench:harvest:svelte-rejects — exact reject count. Measured 2026-09-16: ../svelte
  * at 7bc0a70fe, ../prettier at 1dcd0b05d, ../prettier-plugin-svelte at 7809486,
- * oracle svelte@5.57.0, 142 of 4763 conformance-view Svelte files.
+ * oracle svelte@5.57.0, 142 of 4761 conformance-view Svelte files (4763 before the
+ * conformance view's Prettier filter dropped `html/yaml/`'s two front-matter documents,
+ * neither a reject).
  * Fewer = the svelte/compiler oracle stopped rejecting (broken import/config);
  * more = it started rejecting wholesale — either way the cache would corrupt the
  * published coverage number. Re-derived by `bench:pins:suites` (see there).
@@ -1206,8 +1244,18 @@ export const SVELTE_REJECTS_PIN = 142;
  * consumes the list), but graded and STAMPED like the harvests: `deno task
  * css:over-acceptance:pin` is a `bench:pins:suites` leg, so it is re-derived on
  * the same cadence as its siblings; the full `css:over-acceptance` profile grades it
- * too, and stamps the same three checkout commits. Measured 2026-09-16: ../prettier at 1dcd0b05d, ../svelte at 7bc0a70fe,
- * ../wpt at 7437c7bc7, oracle svelte@5.57.0, 229 of 22643 conformance-view CSS files.
+ * too, and stamps the same three checkout commits. Measured 2026-09-22: ../prettier at 1dcd0b05d, ../svelte at 7bc0a70fe,
+ * ../wpt at 7437c7bc7, oracle svelte@5.57.0, 207 of 22449 conformance-view CSS files.
+ *
+ * 229 → 207 with no checkout or oracle moving: the conformance view's own filters
+ * tightened. The Prettier CSS suite lost its front-matter (`css/yaml/`, all but the
+ * one file whose fence never closes — no front matter by Prettier's rule, and
+ * parseCss accepts it) and range-marker fixtures (`lib/prettier_fixtures.ts`), nine
+ * of them rejects, and the
+ * wpt harvest stopped lifting `<style>` tags out of `<script>` strings
+ * ({@link WPT_CSS_HARVEST_PIN}), thirteen of those rejects. Every file that left was
+ * invalid for every parser by construction, so the remaining rejects are the
+ * oracle's verdicts on stylesheets.
  *
  * 240 → 229: the oracle moved to svelte@5.57.0, the same CSS-parser fixes that moved
  * {@link SVELTE_REJECTS_PIN} (a single upstream fix lands in both counts, so a change that
@@ -1218,4 +1266,4 @@ export const SVELTE_REJECTS_PIN = 142;
  * `selectors/not-default-ns-*`, `selectors/nth-child-of-universal-selector`, …). The
  * checkout's one new CSS file parses.
  */
-export const CSS_REJECTS_PIN = 229;
+export const CSS_REJECTS_PIN = 207;

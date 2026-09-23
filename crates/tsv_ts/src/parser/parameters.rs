@@ -280,11 +280,27 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Shared parameter-list body. `allow_decorators` gates whether a leading `@` on
     /// a parameter is parsed as a decorator (`true`) or rejected (`false`).
+    ///
+    /// The list is a grouping delimiter ([`Parser::enter_grouping`]), so each
+    /// parameter default parses as a fresh expression frame, whatever encloses the
+    /// list. An arrow's list is where that shows, since no body frame encloses it:
+    /// - `in` is the operator even in a for header's `[~In]` region
+    ///   (`(x = b in c) => {}`) — every default is an `Initializer[+In]` (ecma262
+    ///   `SingleNameBinding` / `BindingElement`), and `ArrowParameters` takes no
+    ///   `[In]` of its own;
+    /// - a conditional consequent's return-type bar stops at the `(`, so a default
+    ///   may be an annotated arrow (`a ? (x = (y): T => z) => w : v`) — tsc's
+    ///   `parseInitializer` passes `allowReturnTypeInArrowFunction` as `true`;
+    /// - `as` is an assertion even in a `{#each}` head (`{#each (x = y as A) => z as
+    ///   item}`) — the host's separator cannot sit inside the list;
+    /// - a `<` region opened in a default ends at the `)`, which the printer always
+    ///   prints ([`super::LtRegion`]).
     fn parse_parameter_list_inner(
         &mut self,
         allow_decorators: bool,
     ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, ParseError> {
         self.expect(&TokenKind::ParenOpen)?;
+        self.enter_grouping();
 
         let mut params = self.bvec();
         if !self.check(&TokenKind::ParenClose) {
@@ -498,6 +514,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         self.expect(&TokenKind::ParenClose)?;
+        self.exit_grouping();
         Ok(params)
     }
 
