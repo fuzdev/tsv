@@ -219,9 +219,11 @@ export class OxcImplementation extends BaseImplementation {
 				await this.format_async(FORMAT_CONFIG_PROBES[language], language)
 			);
 			// And the FORMAT half's rejection surface, per language, since it is two
-			// engines behind one call: the native formatter reports through `errors`
-			// (TS/JS), the bundled-prettier fallback by throwing (css, svelte). Neither
-			// is covered by the parser probe above — see `lib/reject_probe.ts`.
+			// engines behind one call: the native formatter (ts, css) and the
+			// bundled-prettier svelte fallback, whose throws oxfmt catches into the same
+			// `errors` — an embedded block's only because `surface_embedded_format_errors`
+			// stops the plugin echoing it back. Neither is covered by the parser probe
+			// above — see `lib/reject_probe.ts`.
 			await assert_tool_rejects_invalid_async('oxfmt', 'format_async', language, (source) =>
 				this.format_async(source, language)
 			);

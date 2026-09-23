@@ -846,7 +846,7 @@ below, field for field and version note for version note, so a new top-level fie
 here is a change there too — it declares them optional and degrades on an older
 report, which is what makes the drift silent rather than loud.
 
-The report JSON (per-runtime schema `version: 18`, `bench.ts` `REPORT_SCHEMA_VERSION` —
+The report JSON (per-runtime schema `version: 19`, `bench.ts` `REPORT_SCHEMA_VERSION` —
 a committed report says which version wrote it, and lags the schema until the next
 refresh; the combined compose report carries its own version; coverage-only runs add
 `coverage_by_source`) carries, beyond
