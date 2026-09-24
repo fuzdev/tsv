@@ -9,15 +9,20 @@
 //! a pattern. Svelte enforces this with `eat('}', true)`; a token left over after the
 //! expression/pattern is a hard error ("Expected token }").
 //!
-//! tsv routes the expression callers through `tsv_ts::parse_expression_with_comments` and
-//! the pattern callers through `tsv_ts::parse_pattern_with_comments`; both previously
-//! returned without checking they had reached the end of their slice — so a trailing
-//! token was silently DROPPED (`{@html a b}` → `{@html a}`, `<p>{a b}</p>` → `<p>{a}</p>`,
-//! `{@const x y = a}` → `{@const x = a}`). That is content loss, not a divergence, and it
-//! is fuzzer-invisible: the truncated output is itself idempotent and reparseable. The
-//! fix is a shared end-of-slice check (`Parser::expect_end_of_input`) in both functions;
-//! trailing **trivia** (comments, whitespace) is consumed by the lexer and so stays valid
-//! (`{@html a /* c */}`).
+//! tsv routes the expression callers through `tsv_ts::parse_expression_with_comments`,
+//! which once returned without checking it had reached the end of its slice — so a
+//! trailing token was silently DROPPED (`{@html a b}` → `{@html a}`, `<p>{a b}</p>` →
+//! `<p>{a}</p>`). That is content loss, not a divergence, and it is fuzzer-invisible: the
+//! truncated output is itself idempotent and reparseable. The fix is an end-of-slice check
+//! (`Parser::expect_end_of_input`); trailing **trivia** (comments, whitespace) is consumed
+//! by the lexer and so stays valid (`{@html a /* c */}`).
+//!
+//! The pattern callers read the binding the way Svelte's `read_pattern` does
+//! (`SvelteParser::parse_block_pattern`): its extent is bounded to a name or a matched
+//! bracket plus an optional `: T`, and the host then requires what Svelte's next `eat`
+//! does — the declarator's `=` for `{@const}` (`{@const x y = a}` is missing it), only
+//! whitespace before the tag's `}` for `{:then}` / `{:catch}` (`{:then x y}`). The paren and
+//! member spellings of the same class are pinned in `tests/svelte_block_pattern_head.rs`.
 //!
 //! The type-annotation over-acceptances (`{@const x: T = a}`, `{:then x: T}` in a non-TS
 //! component) are a *separate* concern — TS-only syntax tsv always accepts in templates,
@@ -53,7 +58,7 @@ fn accepts_expression_that_fills_its_slice() {
         "<a {@attach a}>x</a>",        // attach tag
         "<a {...a}>x</a>",             // spread attribute
         "{#snippet s(p)}x{/snippet}",  // snippet name
-        // Pattern path (`parse_pattern_with_comments`):
+        // Pattern path (`parse_block_pattern` + the host's `=` / `}`):
         "{@const {a} = x}",               // destructuring binding id
         "{#each xs as {a}}b{/each}",      // each destructuring context
         "{#await p}a{:then x}b{/await}",  // then value pattern
@@ -82,7 +87,7 @@ fn rejects_trailing_token_after_expression() {
         "{#each xs as x (a b)}y{/each}", // each key
         "<a {@attach a b}>x</a>",        // attach tag
         "<a {...a b}>x</a>",             // spread attribute
-        // Pattern path (`parse_pattern_with_comments`):
+        // Pattern path (`parse_block_pattern` + the host's `=` / `}`):
         "{@const x y = a}",                 // binding id
         "{@const {a} b = x}",               // destructuring binding id
         "{#await p}a{:then x y}b{/await}",  // then value pattern

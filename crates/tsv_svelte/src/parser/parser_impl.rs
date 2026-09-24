@@ -609,9 +609,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<TSTypeAnnotation<'arena>, ParseError> {
-        // The COLON's offset: this reader splits the head itself and parses the annotation
-        // from there, where the `{:then}`/`{:catch}`/`{@const}` arm hands the annotation's
-        // own start. Both reach the same `lex_start` — see `record_annotation_acorn_region`.
+        // The COLON's offset: `parse_block_pattern` splits every block and tag pattern head
+        // itself and parses the annotation from there. The wire writer looks the region up
+        // from the annotation's own start; both reach the same `lex_start` — see
+        // `record_annotation_acorn_region`.
         self.record_annotation_acorn_region(base_offset as u32, base_offset + source.len());
         let (ta, comments) =
             tsv_ts::parse_type_annotation_partial(source, base_offset, self.arena)?;
@@ -620,7 +621,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Parse a TypeScript pattern (destructuring) and collect any comments.
-    /// Also handles optional type annotations (`: Type`) after the pattern.
+    ///
+    /// `source` is the BARE pattern — a name or a matched bracket, as
+    /// `SvelteParser::parse_block_pattern` bounds it. A trailing `: T` is a second acorn parse
+    /// for canonical (`read_pattern` calls `read_type_annotation` after it), so the caller
+    /// reads it through [`Self::parse_ts_type_annotation`], which records its own region.
     ///
     /// The pattern is arena-allocated here and handed back `&mut`, so the `{#each}` head can
     /// still attach its separately-parsed annotation in place before storing the reference.
@@ -643,15 +648,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         self.record_acorn_region(base_offset, source, prefix);
         let (pattern, comments) =
             tsv_ts::parse_pattern_with_comments(source, base_offset, self.arena)?;
-        // A trailing `: T` this sub-parse swallowed is a SECOND acorn parse for
-        // canonical (`read_pattern` calls `read_type_annotation` after it), so it
-        // gets its own region. `{#each}` splits the two reads itself and hands
-        // the annotation to `parse_ts_type_annotation`, which records it there —
-        // this arm is the one-sub-parse readers, `{:then}` / `{:catch}` /
-        // `{@const}`.
-        if let Some(annotation) = tsv_ts::pattern_type_annotation(&pattern) {
-            self.record_annotation_acorn_region(annotation.span.start, base_offset + source.len());
-        }
+        debug_assert!(
+            tsv_ts::pattern_type_annotation(&pattern).is_none(),
+            "a block pattern's `: T` is its own sub-parse (`parse_block_pattern`)"
+        );
         // Canonical reads a destructure via a synthetic `(pattern = 1)` acorn
         // parse whose inserted `(` shifts the pattern's start line one column
         // right when that line is `> 1` — the same quirk the pattern nodes get
@@ -708,8 +708,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     /// Record the acorn parse of a block pattern's trailing `: T`, given any position
     /// `at` that reaches the `:` over whitespace alone — the annotation's own span start
-    /// (which is anchored at the *binding's* end) or the colon itself. Its two callers
-    /// hand it each of those, and `annotation_lex_start` steps the run either way.
+    /// (which is anchored at the *binding's* end) or the colon itself. The parser records
+    /// it from the colon and the wire writer looks it up from the span start, and
+    /// `annotation_lex_start` steps the run either way.
     ///
     /// Svelte reads it with a second parse over `blanked_prefix + "_ as " +
     /// rest`, entered at `a = parser.index - "_ as ".len()` with `parser.index`

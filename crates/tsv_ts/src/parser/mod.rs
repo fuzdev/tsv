@@ -2604,8 +2604,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse a single expression, WITHOUT requiring it to fill the input slice — the raw
     /// parse the pattern path builds on: `parse_pattern_with_comments` parses here, converts
-    /// the result to a binding pattern, reads an optional `: Type`, then enforces
-    /// end-of-input itself. (Expression tags use `parse_expression_with_comments`, which
+    /// the result to a binding pattern, then enforces end-of-input itself. (Expression tags use `parse_expression_with_comments`, which
     /// requires full consumption via `expect_end_of_input`.)
     pub fn parse_expression_unbounded(&mut self) -> Result<Expression<'arena>, ParseError> {
         self.parse_expression()
@@ -2673,11 +2672,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Return the start of the current (unconsumed) token
         let next_pos = self.current.start as usize + self.base_offset;
         Ok((expr, next_pos))
-    }
-
-    /// Check if the current token is a colon.
-    pub fn at_colon(&self) -> bool {
-        matches!(self.current.kind, TokenKind::Colon)
     }
 
     /// Convert an expression to a Svelte block or tag pattern — an `{#each}` context, a

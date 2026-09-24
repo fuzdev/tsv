@@ -1,0 +1,1 @@
+{#await p then a[0]}x{/await}

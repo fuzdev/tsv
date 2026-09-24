@@ -606,8 +606,8 @@ pub fn parse_expression_with_comments<'arena>(
     })
 }
 
-/// Parse a binding pattern — an expression converted to a pattern, plus an optional
-/// `: T` annotation — and return it with the comments it collected.
+/// Parse a binding pattern — an expression converted to a pattern — and return it with
+/// the comments it collected.
 ///
 /// The expression-to-pattern conversion:
 /// - ObjectExpression → ObjectPattern
@@ -616,10 +616,11 @@ pub fn parse_expression_with_comments<'arena>(
 /// - AssignmentExpression → AssignmentPattern
 /// - Identifier → Identifier (unchanged)
 ///
-/// Used for the Svelte block positions that take a destructuring or typed binding:
-/// `{@const {a, b} = expr}`, `{:then num: number}`, `{:catch error: Error}`. The
-/// annotation attaches through [`attach_pattern_type_annotation`], and the pattern
-/// (plus annotation) must fill the whole slice.
+/// Used for the Svelte block and tag patterns — `{#each xs as {a, b}}`,
+/// `{@const {a, b} = expr}`, `{:then [a]}` — whose caller bounds the slice to the bare
+/// pattern (a name or a matched bracket, as Svelte's `read_pattern` does) and reads any
+/// `: T` itself with [`parse_type_annotation_partial`], attaching it through
+/// [`attach_pattern_type_annotation`]. The pattern must fill the whole slice.
 ///
 /// # Arguments
 ///
@@ -639,17 +640,9 @@ pub fn parse_pattern_with_comments<'arena>(
 ) -> Result<(Expression<'arena>, &'arena [ast::Comment])> {
     with_embedding_parser(source, base_offset, arena, |parser| {
         let expr = parser.parse_expression_unbounded()?;
-        let mut pattern = parser.expression_to_pattern(expr)?;
-        // Check for type annotation (`: Type`) — used in Svelte block contexts
-        // like `{:then num: number}` and `{:catch error: Error}`
-        if parser.at_colon() {
-            let ta = parser.parse_type_annotation()?;
-            attach_pattern_type_annotation(&mut pattern, ta, arena)?;
-        }
-        // The pattern (plus any type annotation) must fill the whole slice — the Svelte
-        // callers (`{@const id = …}`, `{:then pattern}`, `{:catch pattern}`) hand us a slice
-        // bounded by `=`/`}`. Without this a trailing token is silently dropped
-        // (`{@const x y = a}` → `{@const x = a}`), losing content.
+        let pattern = parser.expression_to_pattern(expr)?;
+        // The pattern must fill the whole slice the caller bounded. Without this a trailing
+        // token is silently dropped, losing content.
         parser.expect_end_of_input()?;
         Ok((pattern, parser.take_comments()))
     })

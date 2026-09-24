@@ -56,12 +56,12 @@ pub struct Root<'arena> {
 /// Regions are recorded in strict source order, so "the region a position belongs
 /// to" is the last one starting at or before it.
 ///
-/// ⚠️ They **can nest**: a block pattern with a trailing `: T` is two parses, and
-/// the annotation's runs inside the pattern's (both were handed the same slice —
-/// `{:then v: T}` reads the whole thing in one `parse_pattern_with_comments` and
-/// the annotation region is recorded within it). The "last start at or before"
-/// rule is still the right answer there: the later start is the inner, more
-/// specific parse, which is the one that lexed the position.
+/// ⚠️ They **can nest**: a block pattern's trailing `: T` is its own parse, handed
+/// the whole rest of the head (the type parser finds its own end), so its region
+/// runs over whatever the head holds after it — `{#each}`'s `(key)`, `{@const}`'s
+/// init — and those later parses' regions sit inside it. The "last start at or
+/// before" rule is still the right answer there: the later start is the inner,
+/// more specific parse, which is the one that lexed the position.
 #[derive(Debug, Clone, Copy)]
 pub struct AcornRegion {
     /// First byte of the component acorn lexes for real.

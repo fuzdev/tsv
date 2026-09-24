@@ -3,7 +3,7 @@
 //! `tsv_svelte` has exactly **two** standing whitespace questions, one class each, and which
 //! one a site wants follows from the question it is answering — never from the language the
 //! code is written in. A read that answers neither is an exception and has to argue for itself;
-//! the four that do are enumerated at the bottom of this doc.
+//! the three that do are enumerated at the bottom of this doc.
 //!
 //! | question | class | where |
 //! | --- | --- | --- |
@@ -37,20 +37,15 @@
 //!   ended early, so `{expr<NBSP>/* c */}` lost the comment's `trailingComments` attachment
 //!   AND its root `comments` entry.
 //!
-//! Four whitespace reads here are deliberately NOT [`is_svelte_ws`], and each carries its own
-//! argument. None of them is "Rust's class, and safe" — two are *narrower* than either class
-//! above, and naming them Rust's is what would send the next sweep at a site that is already
+//! Three whitespace reads here are deliberately NOT [`is_svelte_ws`], and each carries its own
+//! argument. None of them is "Rust's class, and safe" — one is *narrower* than either class
+//! above, and naming it Rust's is what would send the next sweep at a site that is already
 //! right:
 //!
 //! - `is_horizontal_ws` (printer/text.rs) is a BYTE match, `[ \t\r]` — narrower than
 //!   everything above, and answering to Svelte's own `regex_not_whitespace` (`/[^ \t\r\n]/`).
 //!   It asks whether a byte lets a NEWLINE RUN continue; a form feed is rendered content
 //!   there, so it must END the run, which every wider class would get wrong.
-//! - `reject_binding_comments`'s significance flag (parser/tag.rs) is `u8::is_ascii_whitespace`
-//!   — also narrower, and also not Rust's `char::is_whitespace` (it omits the VT, which JS
-//!   `\s` has). Safe by DIRECTION rather than by agreement: the flag only ever moves one way,
-//!   and setting it can only *suppress* an over-rejection, over a slice already trimmed with
-//!   [`is_svelte_ws`].
 //! - `is_separator_like_text` (printer/nodes/fragment_doc.rs) is the one read that really is
 //!   Rust's `char::is_whitespace`, and deliberately **wider** than either class above: it asks
 //!   "is this text node a separator rather than a word for the fill to pack", where an NBSP is
