@@ -1580,6 +1580,11 @@ impl<'a> Printer<'a> {
         let body_start = span_start + 1; // After opening delimiter
         let body_end = span_end.saturating_sub(1); // Before closing delimiter
 
+        // The common body holds no comment: answered before the run is collected, so the
+        // empty run is never built.
+        if self.gap_known_comment_free(body_start, body_end) {
+            return d.concat(&[opening, closing]);
+        }
         let comments: CommentVec<'_> = self
             .comments_to_emit_between(body_start, body_end)
             .collect();

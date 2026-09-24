@@ -243,12 +243,58 @@ fn call_paren_split(
 /// list under, `[gap_start, paren)`, or `None` when the gap does not split: no arguments (the
 /// whole gap is pre-paren and `build_empty_args_parens_doc` owns it), no `(` found, no `//`
 /// in the half, or a directive the split would strand outside the freeze window.
+///
+/// Asked of every call, `new` and `import()` with arguments, and nearly every one has no
+/// comment anywhere in its callee→first-argument gap — most are the bare `(`, one byte. So
+/// the comment question comes FIRST, inline, over `[gap_start, first_arg_start)`: the half
+/// the split needs a `//` in, `[gap_start, paren)`, lies inside it (the `(` is found before
+/// the first argument), so a gap known to hold no comment at all
+/// ([`Printer::gap_known_comment_free`]) answers `None` exactly — without locating the paren
+/// the answer would then have discarded, and without a call.
+#[inline]
 pub(super) fn paren_split_for(
     printer: &Printer<'_>,
     gap_start: u32,
     arguments: &[&internal::Expression<'_>],
 ) -> Option<(u32, u32)> {
     let first_arg_start = arguments.first()?.span().start;
+    if printer.gap_known_comment_free(gap_start, first_arg_start) {
+        debug_assert!(
+            split_paren_wide(printer, gap_start, first_arg_start, arguments).is_none(),
+            "a comment-free callee gap split at its `(`"
+        );
+        return None;
+    }
+    split_paren_wide(printer, gap_start, first_arg_start, arguments).map(|paren| (gap_start, paren))
+}
+
+/// [`paren_split_for`] outlined, behind a function call, for `import()`: its builder inlines
+/// into the recursive expression dispatch, whose frame every nested expression pays, and a
+/// construct that rare has no use for the inline gate there.
+#[inline(never)]
+pub(super) fn paren_split_for_outlined(
+    printer: &Printer<'_>,
+    gap_start: u32,
+    arguments: &[&internal::Expression<'_>],
+) -> Option<(u32, u32)> {
+    paren_split_for(printer, gap_start, arguments)
+}
+
+/// The search half of [`paren_split_for`] — one outlined copy, for a callee→first-argument
+/// gap the inline gate could not clear: locate the `(`, then ask the pre-paren half for a
+/// `//`. Returns the `(` the gap splits at; the half's start is the caller's own `gap_start`.
+///
+/// Returns the paren alone rather than the pair so the answer comes back in a register: a
+/// twelve-byte `Option<(u32, u32)>` is returned through a stack slot, and the common `None`
+/// written there as a four-byte tag would be copied into [`CalleeGap`] with an eight-byte
+/// load — a store that cannot forward to it.
+#[inline(never)]
+fn split_paren_wide(
+    printer: &Printer<'_>,
+    gap_start: u32,
+    first_arg_start: u32,
+    arguments: &[&internal::Expression<'_>],
+) -> Option<u32> {
     let paren = printer.find_char_outside_comments(gap_start, first_arg_start, b'(')?;
     if !printer.has_line_comments_between(gap_start, paren) {
         return None;
@@ -256,7 +302,7 @@ pub(super) fn paren_split_for(
     if split_strands_directive(printer, gap_start, paren, arguments) {
         return None;
     }
-    Some((gap_start, paren))
+    Some(paren)
 }
 
 /// Join a construct's HEAD to an argument list hung under the callee→`(` gap's pre-paren

@@ -3002,7 +3002,26 @@ impl<'a> Printer<'a> {
     /// span still starts past the `(`
     /// (`docs/comments.md`, and the standing rule that a bound derived from a node span
     /// is not the printed edge).
+    ///
+    /// Nearly every value gap holds no comment — no run, so no break after one — and that is
+    /// answered inline at the caller ([`Self::gap_known_comment_free`]); only a gap a search
+    /// must answer reaches the outlined collect.
+    #[inline]
     pub(crate) fn broke_after_value_leading_run(
+        &self,
+        gap_start: u32,
+        value_start: u32,
+    ) -> Option<CommentVec<'a>> {
+        if self.gap_known_comment_free(gap_start, value_start) {
+            return None;
+        }
+        self.broke_after_value_leading_run_wide(gap_start, value_start)
+    }
+
+    /// The search half of [`Self::broke_after_value_leading_run`] — one outlined copy: the
+    /// collect and its classification.
+    #[inline(never)]
+    fn broke_after_value_leading_run_wide(
         &self,
         gap_start: u32,
         value_start: u32,

@@ -1011,7 +1011,37 @@ impl<'a> Printer<'a> {
     /// statement's line ([`Printer::comment_leads_next_item`], the trailing claim's
     /// other half) — and `None` for an orphaned run (a dropped `;`'s comments), where
     /// nothing follows to lead.
+    ///
+    /// Most statements lead with no comment at all, so the gate is inline at the caller: a
+    /// gap known to hold none ([`Printer::gap_known_comment_free`]) is the empty run, written
+    /// in place, with no call and no walk; only a gap a search must answer reaches the
+    /// outlined collect.
+    #[inline]
     pub(in crate::printer) fn collect_leading_comments(
+        &self,
+        prev_end: u32,
+        stmt_start: u32,
+        prev_stmt_end: Option<u32>,
+        claims_trailing: bool,
+        leads_target: Option<u32>,
+    ) -> CommentVec<'_> {
+        if self.gap_known_comment_free(prev_end, stmt_start) {
+            #[cfg(feature = "buffer_stats")]
+            crate::printer::buffer_stats::record_leading_comments(0);
+            return CommentVec::new();
+        }
+        self.collect_leading_comments_wide(
+            prev_end,
+            stmt_start,
+            prev_stmt_end,
+            claims_trailing,
+            leads_target,
+        )
+    }
+
+    /// The search half of [`Self::collect_leading_comments`] — one outlined copy.
+    #[inline(never)]
+    fn collect_leading_comments_wide(
         &self,
         prev_end: u32,
         stmt_start: u32,
