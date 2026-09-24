@@ -71,6 +71,40 @@ const WORD_DIGITS: usize = 8;
 /// Decimal digits in `u32::MAX` — the ceiling of [`decimal_width_u32`].
 const MAX_U32_DIGITS: usize = 10;
 
+/// The key between the two values [`JsonWriter::start_end`] writes.
+const END_KEY: &str = ",\"end\":";
+
+/// [`END_KEY`] padded to one word, so it is stored as a single fixed-width
+/// move; the pad byte lands where the `end` digits begin and is overwritten.
+const END_KEY_WORD: &[u8; 8] = b",\"end\":\0";
+
+/// The fixed window [`JsonWriter::start_end`] appends before trimming: both
+/// values at their full [`WORD_DIGITS`] width and the key between them.
+const START_END_WINDOW: usize = 2 * WORD_DIGITS + END_KEY.len();
+
+/// The `"start":` key [`JsonWriter::start_end_field`] and
+/// [`JsonWriter::start_end_object`] lead with, after their one-byte `,` / `{`.
+const START_KEY: &str = "\"start\":";
+
+/// [`JsonWriter::start_end_led`]'s window: the lead byte and [`START_KEY`],
+/// then [`START_END_WINDOW`].
+const LED_WINDOW: usize = 1 + START_KEY.len() + START_END_WINDOW;
+
+/// What [`JsonWriter::start_end_led`] appends before filling its window: the
+/// key already in place behind a placeholder lead byte, zeros after it — so
+/// the key rides the window's own fixed-width copy instead of a store of its
+/// own.
+const LED_TEMPLATE: [u8; LED_WINDOW] = {
+    let mut t = [0; LED_WINDOW];
+    let key = START_KEY.as_bytes();
+    let mut i = 0;
+    while i < key.len() {
+        t[1 + i] = key[i];
+        i += 1;
+    }
+    t
+};
+
 /// Decimal digit count of a `u32` (`0` is one digit) — the [`decimal_width`]
 /// sibling for the `u32` path.
 ///
@@ -80,8 +114,8 @@ const MAX_U32_DIGITS: usize = 10;
 /// single widening `imul`. Taking a `u64` here would sink the argument back
 /// into 64-bit arithmetic and undo it.
 ///
-/// Reached only from [`digit_word`]'s five-digits-and-up arm, which has
-/// already established `n >= 10_000` — so the first four compares fold away
+/// Reached only from [`digit_word`]'s six-digits-and-up arm, which has
+/// already established `n >= 100_000` — so the first five compares fold away
 /// there, and the ladder answers only the widths that arm actually sees. The
 /// widths below it are named by the arm that generated them.
 #[inline]
@@ -209,13 +243,25 @@ const fn decimal_width(n: u64) -> usize {
 /// significant digit at byte 0 (little-endian byte order) so the caller's write
 /// is a plain prefix; the bytes past the width are therefore zero.
 ///
-/// ⚠️ `inline`, and that is a **performance** constraint that costs binary
-/// size. Out-of-lining it is +5.5% instructions on the parse→JSON path
+/// Five digits has an arm of its own — one leading digit ahead of the
+/// four-digit word — because it is not rare: a stylesheet or component a few
+/// tens of KB long spends most of its offsets there (48% of the `start`/`end`
+/// values over a corpus of real stylesheets), and the general arm pays a width
+/// ladder, a second four-digit word and two variable shifts for them.
+///
+/// ⚠️ `inline(always)`, and that is a **performance** constraint that costs
+/// binary size. Out-of-lining it is +5.5% instructions on the parse→JSON path
 /// (measured): the staged emitter's whole advantage is that `stage_len` and
 /// the scratch base stay in registers across the header, and an opaque call
-/// per integer forces them back to the stack. The size it buys — the parse
-/// WASM bundle carries ~12 inlined copies — is the deliberate trade.
-#[inline]
+/// per integer forces them back to the stack. Plain `inline` held that decision
+/// only while the body was small — adding the five-digit arm under it outlined
+/// the function at the staged sites, +2.3% on the TypeScript and Svelte wire
+/// paths — so the attribute is a pin, as on [`JsonWriter::stage_u32`]. The size
+/// it buys — one inlined copy per staged integer site, one in
+/// [`JsonWriter::u32`], and two each in [`JsonWriter::start_end`] and its led
+/// sibling — is the deliberate trade.
+#[expect(clippy::inline_always)]
+#[inline(always)]
 fn digit_word(n: u32) -> (u64, usize) {
     if n < 100 {
         let pair = dec_pair(n) as u64;
@@ -225,8 +271,13 @@ fn digit_word(n: u32) -> (u64, usize) {
         let word = four_digit_word(n);
         return if n < 1_000 { (word >> 8, 3) } else { (word, 4) };
     }
-    // Five digits and up: rare enough that one variable shift is cheaper than
-    // four more arms, and the wide values fall out of the same width.
+    if n < 100_000 {
+        // One leading digit ahead of the four-digit word.
+        let lead = u64::from(b'0' + (n / 10_000) as u8);
+        return (lead | four_digit_word(n % 10_000) << 8, 5);
+    }
+    // Six digits and up: rare enough that one variable shift is cheaper than
+    // three more arms, and the wide values fall out of the same width.
     let digits = decimal_width_u32(n);
     if digits > WORD_DIGITS {
         return (0, digits);
@@ -250,6 +301,24 @@ fn digit_word(n: u32) -> (u64, usize) {
 const fn four_digit_word(n: u32) -> u64 {
     debug_assert!(n < 10_000);
     dec_pair(n / 100) as u64 | (dec_pair(n % 100) as u64) << 16
+}
+
+/// Write a `start` / `end` pair's digit words and the `,"end":` key between
+/// them into the front of `window`, returning how many of its bytes the pair
+/// occupies — the fill [`JsonWriter::start_end`] and its led siblings share.
+/// Each word is a [`digit_word`] result no wider than [`WORD_DIGITS`], so every
+/// store is a fixed-width move at an offset bounded by the window's length.
+#[expect(clippy::inline_always)]
+#[inline(always)]
+fn fill_start_end(window: &mut [u8], start: (u64, usize), end: (u64, usize)) -> usize {
+    let (start_word, start_digits) = start;
+    let (end_word, end_digits) = end;
+    let window = &mut window[..START_END_WINDOW];
+    window[..WORD_DIGITS].copy_from_slice(&start_word.to_le_bytes());
+    window[start_digits..start_digits + END_KEY_WORD.len()].copy_from_slice(END_KEY_WORD);
+    let end_at = start_digits + END_KEY.len();
+    window[end_at..end_at + WORD_DIGITS].copy_from_slice(&end_word.to_le_bytes());
+    end_at + end_digits
 }
 
 /// Does `bytes` contain a byte JSON must escape?
@@ -374,7 +443,7 @@ impl JsonWriter {
     /// survives staging: the scratch's base never moves, its bound is a
     /// compile-time constant, `stage_len` stays in a register across the whole
     /// header, and the integer emission inlines into the one staging site
-    /// instead of ~200 writer call sites.
+    /// instead of reaching an out-of-line emitter per integer.
     ///
     /// The cost it trades for is a single runtime-length `extend_from_slice`
     /// per run — a `memmove` call over ~90 bytes, whose loads read bytes the
@@ -396,7 +465,8 @@ impl JsonWriter {
     /// out-of-line [`JsonWriter::u32`] instead, which cost it ~1.6% of the
     /// wire path. Today `tsv_ts`'s `node_header_impl`, `tsv_svelte`'s
     /// `name_loc` field + `Attribute`/element/`Text` headers, and `tsv_css`'s
-    /// three trailing `start`/`end` bursts all stage.
+    /// three trailing `start`/`end` bursts all stage. A `start`/`end` pair
+    /// outside a run is [`JsonWriter::start_end`]'s one call, not two `u32`s.
     ///
     /// ⚠️ **The bar is not frequency alone — a run's STATIC fragments are
     /// copied twice**, once into the scratch and once through the flush, so the
@@ -510,10 +580,11 @@ impl JsonWriter {
     /// inliner's cost model reads it. The whole point of a staged run is that
     /// `stage_len` and the scratch base stay in registers across the header;
     /// an opaque call per integer spills them, and that is worth ~5% of the
-    /// parse→JSON path. Ten call sites, all in one writer, so the size this
-    /// costs is small — and it is a *pin*, not a change of policy: plain
-    /// `inline` bought the same decision until the body shrank enough for the
-    /// cost model to start declining it.
+    /// parse→JSON path. The sites are the three writers' staged runs (with
+    /// [`JsonWriter::stage_usize`], which narrows onto this), so the size this
+    /// costs is bounded by how many runs stage — and it is a *pin*, not a
+    /// change of policy: plain `inline` bought the same decision until the
+    /// body shrank enough for the cost model to start declining it.
     #[expect(clippy::inline_always)]
     #[inline(always)]
     pub fn stage_u32(&mut self, n: u32) {
@@ -708,8 +779,9 @@ impl JsonWriter {
     }
 
     // ⚠️ `inline(never)`, and that is a **size** constraint. The body below is
-    // small enough that LLVM will happily inline it at all ~200 writer call
-    // sites, and each copy carries the fixed-width blit — which grew the
+    // small enough that LLVM will happily inline it at every writer call site,
+    // and each copy carries the fixed-width blit — which, measured when every
+    // `start`/`end` pair still came through here, grew the
     // `@fuzdev/tsv-parse-wasm` bundle 6% and blew its publish size bound.
     // Out-of-line the win is unaffected: it comes from removing the libc
     // `memmove` **call** inside the body, not from removing the call *to* the
@@ -730,6 +802,97 @@ impl JsonWriter {
         let len = self.buf.len();
         self.buf.extend_from_slice(&word.to_le_bytes());
         self.buf.truncate(len + digits);
+    }
+
+    /// A node's `start` value, the `,"end":` key, and its `end` value —
+    /// byte-identical to `u32(start); raw(",\"end\":"); u32(end)`, the pair
+    /// nearly every node carries, as one call.
+    ///
+    /// For a caller whose own literal ends in `"start":` (a node head
+    /// `{"type":"Block","start":`); a pair that opens with the key alone takes
+    /// [`JsonWriter::start_end_field`] or [`JsonWriter::start_end_object`].
+    /// Three appends become one: the buffer takes a fixed-width window once,
+    /// both [`digit_word`] registers and the key land in it at offsets known
+    /// once each width is, and a `truncate` trims the zero padding the widths
+    /// leave. The key is stored as a whole word — its eighth byte is
+    /// overwritten by the `end` digits, which follow it at `+7`.
+    ///
+    /// `inline(never)` for [`JsonWriter::u32`]'s reason, and more so: the
+    /// body holds two inlined `digit_word` copies, which is the size the two
+    /// out-of-line calls it replaces used to share with every other integer.
+    #[inline(never)]
+    pub fn start_end(&mut self, start: u32, end: u32) {
+        let (start_word, start_digits) = digit_word(start);
+        let (end_word, end_digits) = digit_word(end);
+        if start_digits > WORD_DIGITS || end_digits > WORD_DIGITS {
+            self.start_end_wide(start, end);
+            return;
+        }
+        let len = self.buf.len();
+        self.buf.extend_from_slice(&[0; START_END_WINDOW]);
+        let window = &mut self.buf[len..len + START_END_WINDOW];
+        let used = fill_start_end(window, (start_word, start_digits), (end_word, end_digits));
+        self.buf.truncate(len + used);
+    }
+
+    /// `,"start":` N `,"end":` M — [`JsonWriter::start_end`] with its key,
+    /// for a pair that trails other fields.
+    #[inline]
+    pub fn start_end_field(&mut self, start: u32, end: u32) {
+        self.start_end_led(b',', start, end);
+    }
+
+    /// `{"start":` N `,"end":` M — [`JsonWriter::start_end`] with its key,
+    /// for a node whose fields open with its positions.
+    #[inline]
+    pub fn start_end_object(&mut self, start: u32, end: u32) {
+        self.start_end_led(b'{', start, end);
+    }
+
+    /// The one body behind [`JsonWriter::start_end_field`] and
+    /// [`JsonWriter::start_end_object`]: [`JsonWriter::start_end`]'s window
+    /// with the lead byte and `"start":` ahead of it. The key is part of the
+    /// constant the window is filled from, so writing it costs the lead byte's
+    /// store alone. `inline(never)` for `start_end`'s reason.
+    #[inline(never)]
+    fn start_end_led(&mut self, lead: u8, start: u32, end: u32) {
+        let (start_word, start_digits) = digit_word(start);
+        let (end_word, end_digits) = digit_word(end);
+        if start_digits > WORD_DIGITS || end_digits > WORD_DIGITS {
+            self.start_end_led_wide(lead, start, end);
+            return;
+        }
+        let len = self.buf.len();
+        self.buf.extend_from_slice(&LED_TEMPLATE);
+        let window = &mut self.buf[len..len + LED_WINDOW];
+        window[0] = lead;
+        let at = 1 + START_KEY.len();
+        let used = fill_start_end(
+            &mut window[at..],
+            (start_word, start_digits),
+            (end_word, end_digits),
+        );
+        self.buf.truncate(len + at + used);
+    }
+
+    /// [`JsonWriter::start_end`] with either value past `99_999_999`, which no
+    /// offset in a real document reaches — the three separate appends, each
+    /// integer through [`JsonWriter::u32`].
+    #[cold]
+    #[inline(never)]
+    fn start_end_wide(&mut self, start: u32, end: u32) {
+        self.u32(start);
+        self.raw(END_KEY);
+        self.u32(end);
+    }
+
+    /// [`JsonWriter::start_end_led`]'s wide arm, for `start_end_wide`'s reason.
+    #[cold]
+    #[inline(never)]
+    fn start_end_led_wide(&mut self, lead: u8, start: u32, end: u32) {
+        self.buf.push(lead);
+        self.raw(START_KEY);
+        self.start_end_wide(start, end);
     }
 
     /// A `u64` value. **Every integer the writers actually emit — offsets,
@@ -1049,9 +1212,54 @@ mod tests {
     }
 
     #[test]
+    fn start_end_family_matches_format() {
+        // Every width pair — both values at each power-of-ten edge, so each
+        // value's width moves the key and the second value independently,
+        // including the 8→9-digit hand-off to the wide arm on either side.
+        fn emit(start: u32, end: u32) -> String {
+            let mut w = JsonWriter::with_capacity(0);
+            w.raw("{");
+            w.start_end(start, end);
+            w.raw("}");
+            String::from_utf8(w.into_bytes()).expect("digits are ASCII")
+        }
+        fn emit_led(start: u32, end: u32) -> String {
+            let mut w = JsonWriter::with_capacity(0);
+            w.start_end_object(start, end);
+            w.start_end_field(end, start);
+            w.raw("}");
+            String::from_utf8(w.into_bytes()).expect("digits are ASCII")
+        }
+        let mut edges = vec![0, 1, u32::MAX, u32::MAX - 1];
+        let mut pow = 10u32;
+        loop {
+            edges.extend([pow - 1, pow, pow + 1]);
+            match pow.checked_mul(10) {
+                Some(next) => pow = next,
+                None => break,
+            }
+        }
+        for &start in &edges {
+            for &end in &edges {
+                assert_eq!(
+                    emit(start, end),
+                    format!("{{{start},\"end\":{end}}}"),
+                    "start_end({start}, {end})"
+                );
+                assert_eq!(
+                    emit_led(start, end),
+                    format!("{{\"start\":{start},\"end\":{end},\"start\":{end},\"end\":{start}}}"),
+                    "start_end_object({start}, {end}) + start_end_field({end}, {start})"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn u64_matches_std_exhaustively_over_small_values() {
-        // Every value through five digits — covers the whole distribution the
-        // writer actually emits (offsets, lines, columns) and both arms of the
+        // Every value through five digits — the bulk of what the writers emit
+        // (offsets, lines, columns), across `digit_word`'s one- through
+        // five-digit arms and the six-digit boundary, and both arms of the
         // final odd/even-digit branch at every length.
         for n in 0..=100_000u64 {
             assert_eq!(emit(n), n.to_string(), "u64({n})");
