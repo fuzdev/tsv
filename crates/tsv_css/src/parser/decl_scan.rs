@@ -638,8 +638,8 @@ fn scan_value_core<const WANT_VERDICT: bool>(
             }
             // A `url(…)` is ONE opaque token (css-syntax §4.3.6), so its parens are content,
             // not nesting — an interior `;` or `)` must not be seen. Any other `(` nests.
-            b'(' => match url_token_end(source, bytes, value_start, i) {
-                Some(end) => {
+            b'(' => match paren_open_kind(source, bytes, value_start, i) {
+                ParenOpen::UrlToken { end } => {
                     // Opaque here, walked there: a url-token's interior can hold a `(`, a
                     // quote or a `/*`, each of which moves `fast_scan`'s state and none of
                     // which this scan sees. Rare enough (0.3% of real declaration values)
@@ -647,10 +647,11 @@ fn scan_value_core<const WANT_VERDICT: bool>(
                     class_unstated = true;
                     i = end;
                 }
-                None => {
+                ParenOpen::Nesting => {
                     paren += 1;
                     i += 1;
                 }
+                ParenOpen::UnterminatedUrl => return None,
             },
             // A string the lexer would reject (unterminated / trailing `\`) declines.
             b'"' | b'\'' => i = string_end(bytes, i).ok()?,
@@ -729,8 +730,21 @@ fn scan_value_core<const WANT_VERDICT: bool>(
     ))
 }
 
-/// If the `(` at `open` closes a `url` **identifier token**, the end of the opaque
-/// url-token it opens; `None` for an ordinary nesting paren.
+/// What a content-position `(` opens, as the value byte scan must treat it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ParenOpen {
+    /// An ordinary nesting paren: a function-token's `(`, or a bare one.
+    Nesting,
+    /// An opaque url-token (css-syntax-3 §4.3.6) that closes; `end` is one past its
+    /// matching unescaped `)`.
+    UrlToken { end: usize },
+    /// A url-token that nothing closes. The scan declines on it — see
+    /// [`paren_open_kind`].
+    UnterminatedUrl,
+}
+
+/// What the `(` at `open` opens: a url-token when it closes a `url` **identifier token**
+/// with an unquoted argument, and an ordinary nesting paren otherwise.
 ///
 /// The subtlety is that `url` only opens a url-token when it is a *token start*. `5url(`
 /// lexes as one `Dimension` (`url` is the unit) followed by a plain `(`, so its interior
@@ -742,39 +756,44 @@ fn scan_value_core<const WANT_VERDICT: bool>(
 /// The three bytes before a content-position `(` can never be the tail of a region this
 /// scan skipped — a string ends in a quote, a comment in `*/`, a url-token in `)`, and none
 /// of those spell `url` — so reading them raw is sound.
-fn url_token_end(source: &str, bytes: &[u8], value_start: usize, open: usize) -> Option<usize> {
+///
+/// A url-token with no matching unescaped `)` is [`ParenOpen::UnterminatedUrl`], and the
+/// caller must decline on it rather than read it as either of the other two. The lexer
+/// models no `<bad-url-token>`: whatever css-syntax-3 would make of the interior, the lexer
+/// takes the token to end-of-source, so it can *end in whitespace* — and `value_end`'s
+/// trailing-whitespace trim assumes the value's last token does not, which is why the trim
+/// is exact everywhere else. Read as a nesting paren instead, the url's interior is
+/// scanned as content and the trim stops short of the token's real end (`url( ⏎` at
+/// end-of-source: the scan's `value_end` sits after the `(`, the walk's after the
+/// newline). A plain `url(` at end-of-source reaches it, and so does any unclosed `url(`
+/// in a Svelte `<style>` whose `</style>` sits on its own line, since the island then ends
+/// in that newline. The parse fails regardless (the url swallows the block's `}`), so
+/// declining costs nothing and leaves the error to the reference walk.
+fn paren_open_kind(source: &str, bytes: &[u8], value_start: usize, open: usize) -> ParenOpen {
     if open < 3 || open - 3 < value_start {
-        return None;
+        return ParenOpen::Nesting;
     }
     if !bytes[open - 3..open].eq_ignore_ascii_case(b"url") {
-        return None;
+        return ParenOpen::Nesting;
     }
     // `open - 3 == value_start` needs no check: the byte before the value's first token is
     // the `:` or the whitespace after it, neither of which continues an identifier.
     if open - 3 > value_start {
         let prev = bytes[open - 4];
         if IDENT_CONTINUE_LUT[prev as usize] || prev == b'$' {
-            return None;
+            return ParenOpen::Nesting;
         }
     }
     // A quoted argument makes it a function-token (`url("…")` lexes as ident + `(` +
     // string), not a url-token — the lexer's own fork, shared.
     if url_arg_is_quoted(source, open + 1) {
-        return None;
+        return ParenOpen::Nesting;
     }
     // Opaque to the matching unescaped `)`, via the lexer's own scan.
-    //
-    // An **unterminated** url-token (`None`) declines to the reference walk. The lexer
-    // takes it as-is (it models no bad-url recovery), so the token runs to end-of-source
-    // and can therefore *end in whitespace* — and `value_end`'s trailing-whitespace trim
-    // assumes the value's last token does not, which is why the trim is exact everywhere
-    // else. Reachable only on malformed CSS (`url(x\)` — the `\)` escapes the closing
-    // paren, so nothing ever closes the url), where the parse fails regardless; declining
-    // costs nothing and keeps the byte scan and the walk agreeing fact-for-fact. The
-    // other way a last token can end in whitespace — an escape's payload or a hex
-    // escape's terminator — is already declined by the main loop's `\` arm, which this
-    // helper is what hides.
-    url_token_close(bytes, open + 1)
+    match url_token_close(bytes, open + 1) {
+        Some(end) => ParenOpen::UrlToken { end },
+        None => ParenOpen::UnterminatedUrl,
+    }
 }
 
 /// `to`, walked back over trailing whitespace (never below `from`).
@@ -1097,5 +1116,156 @@ mod tests {
         assert_eq!(head_of("a{color red}", "color"), None);
         // conservative: the token head starts this value on the `é` too
         assert_eq!(head_of("a{content: \u{e9}}", "content"), None);
+    }
+
+    /// Both byte scans over the declaration `source` holds, graded exactly as the debug
+    /// oracles in [`scan_value`] and [`scan_rule_or_declaration`] grade them: a scan that
+    /// answers must agree with the token walk fact for fact (an `Err` walk fails too — the
+    /// scan accepted what the lexer rejects). Returns whether each scan declined, as
+    /// `(plain, fused)`, for the caller to pin.
+    fn value_scans_agree_with_the_token_walk(source: &str) -> (bool, bool) {
+        let bytes = source.as_bytes();
+        let colon = source.find(':').expect("test source needs a `:`");
+        let mut value_start = colon + 1;
+        while value_start < bytes.len() && is_ascii_css_whitespace(bytes[value_start]) {
+            value_start += 1;
+        }
+        let walked = scan_value_tokens(source, 0, value_start).ok();
+
+        let plain = scan_value_bytes(source, value_start).map(|(facts, _)| facts);
+        if let Some(facts) = plain {
+            assert_eq!(
+                Some(facts),
+                walked,
+                "plain value scan disagreed: {source:?}"
+            );
+        }
+
+        // The fused walk starts where the disambiguation does, just past the property; the
+        // head scan steps to the `:` itself, so the colon's own offset serves.
+        let fused = scan_rule_or_declaration_and_value_bytes(source, colon);
+        match &fused {
+            Some(Disambiguation::Declaration(scanned)) => {
+                assert_eq!(
+                    scan_rule_or_declaration_tokens(source, 0, colon).ok(),
+                    Some(false),
+                    "fused verdict disagreed: {source:?}"
+                );
+                assert_eq!(
+                    Some(scanned.facts),
+                    walked,
+                    "fused value scan disagreed: {source:?}"
+                );
+            }
+            Some(Disambiguation::Rule) => panic!("a declaration read as a rule: {source:?}"),
+            None => {}
+        }
+        (plain.is_none(), fused.is_none())
+    }
+
+    /// A `url(` with no matching unescaped `)` declines both scans, whatever follows it.
+    ///
+    /// tsv's lexer models no `<bad-url-token>` (css-syntax-3 §4.3.6's recovery): it takes an
+    /// unclosed url-token to end-of-source, so "runs to end-of-source" here is the LEXER's
+    /// model, not a claim that each spelling is a spec url-token — `url(x;` is a
+    /// `<bad-url-token>` to the spec, with the same extent. Running to end-of-source, the
+    /// token can end in whitespace, which the byte scan's `value_end` trim cannot model.
+    /// The decline is the tri-state [`ParenOpen::UnterminatedUrl`], not a whitespace test:
+    /// `url(x` and `url(x;` end in no whitespace and must decline too, as must a url after
+    /// another member (`x url( `), a url inside a function, and both the fused (property)
+    /// and plain (custom property) paths.
+    ///
+    /// The three escaped-close spellings (`url(x\)`, whose `\)` leaves nothing to close
+    /// the url) are regression guards, not reproducers: were their `(` misread as nesting,
+    /// the scan would still decline at the `\` the loop reaches next.
+    #[test]
+    fn an_unterminated_url_token_declines_both_scans() {
+        for source in [
+            "a{color: url( \n",
+            "a{color: url( ",
+            "a{color: URL( \n",
+            "a{color: url(x \n",
+            "a{color: url(x",
+            "a{color: url(x;",
+            "a{color: x url( \n",
+            "a{--x: url( \n",
+            "a{b: f(url( \n",
+            "a{b: f(url(x \n",
+            // regression guards: the `\` arm declines these even without the tri-state
+            "a{color: url(x\\)",
+            "a{color: url(x\\) ",
+            "a{color: url(x\\)\n",
+        ] {
+            assert_eq!(
+                value_scans_agree_with_the_token_walk(source),
+                (true, true),
+                "{source:?}"
+            );
+        }
+    }
+
+    /// The tri-state itself, at the `(` of each spelling.
+    #[test]
+    fn paren_open_kind_tells_the_three_apart() {
+        let kind = |source: &str| {
+            let value_start = source.find(':').expect("test source needs a `:`") + 2;
+            let open = source.rfind('(').expect("test source needs a `(`");
+            paren_open_kind(source, source.as_bytes(), value_start, open)
+        };
+        assert_eq!(kind("a{b: url(x)}"), ParenOpen::UrlToken { end: 11 });
+        assert_eq!(kind("a{b: url(x\\))}"), ParenOpen::UrlToken { end: 13 });
+        assert_eq!(kind("a{b: url(x"), ParenOpen::UnterminatedUrl);
+        assert_eq!(kind("a{b: url(x\\)"), ParenOpen::UnterminatedUrl);
+        assert_eq!(kind("a{b: f(x"), ParenOpen::Nesting);
+        assert_eq!(kind("a{b: url('x"), ParenOpen::Nesting);
+        assert_eq!(kind("a{b: 5url(x"), ParenOpen::Nesting);
+        assert_eq!(kind("a{b: blurl(x"), ParenOpen::Nesting);
+    }
+
+    /// The controls: a terminated url-token is stepped over whole and answered by the
+    /// byte scan, and an unterminated ordinary `(` is plain nesting that the scan answers
+    /// too (its last token, the `(`, ends on a non-whitespace byte, so the trim is exact).
+    #[test]
+    fn a_terminated_url_and_an_unterminated_plain_paren_are_answered() {
+        for source in [
+            "a{color: url(x)}",
+            "a{color: url(x) }",
+            "a{color: url( x )\n",
+            "a{b: f( \n",
+            "a{b: f(x \n",
+        ] {
+            assert_eq!(
+                value_scans_agree_with_the_token_walk(source),
+                (false, false),
+                "{source:?}"
+            );
+        }
+    }
+
+    /// End to end, through the parser that runs the debug oracles: an unterminated
+    /// url-token is the parse error the token walk reports (the url swallows the rest of
+    /// the block, so its `}` never arrives), never an oracle panic.
+    #[test]
+    fn an_unterminated_url_token_is_the_token_walks_parse_error() {
+        for source in [
+            "a{color: url( \n",
+            "a{color: url(x \n",
+            "a{--x: url( \n",
+            "a{color: url(x\\) \n",
+            "a{color: url(x;",
+            "a{color: x url( \n",
+            "a{b: f(url( \n",
+            "@media x{a{color: url( \n",
+            "\n\ta {\n\t\tcolor: url(x;\n\t}\n",
+        ] {
+            let arena = bumpalo::Bump::new();
+            let err = crate::parse(source, &arena).expect_err(source);
+            assert!(
+                err.to_string().contains("Expected '}'"),
+                "{source:?}: {err}"
+            );
+        }
+        let arena = bumpalo::Bump::new();
+        assert!(crate::parse("a{color: url(x)}", &arena).is_ok());
     }
 }
