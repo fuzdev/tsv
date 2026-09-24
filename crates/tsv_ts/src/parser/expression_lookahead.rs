@@ -977,9 +977,11 @@ pub(super) fn matching_delimiter_close(bytes: &[u8], open: usize) -> Option<usiz
 /// turns a would-be type-argument `<…>` into a relational chain (acorn's
 /// `tokenCanStartExpression` bail): identifier (covers keyword operands like
 /// `typeof`), numeric literal (including `.5`), string, `[`, `{`, or a prefix
-/// operator. `(` (call) and `` ` `` (tagged template) continue the
-/// instantiation instead and are deliberately excluded; regex is excluded
-/// because acorn also rejects `x < y > /a/`.
+/// operator. The question is about the TOKEN, not its first byte: `!=`, `+=` and
+/// `-=` share a byte with a prefix operator but start nothing. `(` (call) and
+/// `` ` `` (tagged template) continue the instantiation instead and are
+/// deliberately excluded; regex is excluded because acorn also rejects
+/// `x < y > /a/`.
 fn starts_expression_after_type_args(bytes: &[u8], pos: usize) -> bool {
     if identifier_starts_at(bytes, pos) {
         // `in` and `instanceof` are binary keyword operators — acorn's `tt._in` /
@@ -1000,8 +1002,15 @@ fn starts_expression_after_type_args(bytes: &[u8], pos: usize) -> bool {
     if b == b'!' {
         return bytes.get(pos + 1) != Some(&b'=');
     }
+    // `+` / `-` start an expression as a unary sign (`+x`) or a prefix update (`++x`,
+    // acorn's `tt.plusMin` / `tt.incDec`, both `startsExpr`); `+=` / `-=` are
+    // assignment operators (acorn's `tt.assign` isn't), so a would-be close followed
+    // by one continues the instantiation (`f<T> += c` assigns to `f<T>`).
+    if matches!(b, b'+' | b'-') {
+        return bytes.get(pos + 1) != Some(&b'=');
+    }
     b.is_ascii_digit()
-        || matches!(b, b'\'' | b'"' | b'[' | b'{' | b'~' | b'+' | b'-')
+        || matches!(b, b'\'' | b'"' | b'[' | b'{' | b'~')
         || (b == b'.' && pos + 1 < bytes.len() && bytes[pos + 1].is_ascii_digit())
 }
 

@@ -3,7 +3,7 @@
 	foo() += 1;
 	1 >>= 2;
 	this = x;
-	f<T> += c;
+	(f<T>) += c;
 	a.b<T> -= c;
 	f<(a: T) => U> += c;
 </script>
