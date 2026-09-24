@@ -489,7 +489,7 @@ pub(crate) const fn is_ascii_css_whitespace(b: u8) -> bool {
 /// argument — `url("…")` lexes as a function-token (ident + `(` + string), not a
 /// url-token (css-syntax §4.3.6's fork). Skips Unicode whitespace (`char::is_whitespace`,
 /// matching `parseCss`) before classifying the first content char. The single statement
-/// of the fork, shared by `Lexer::consume_url_token` and `decl_scan::url_token_end`
+/// of the fork, shared by `Lexer::consume_url_token` and `decl_scan::paren_open_kind`
 /// (the second reader of this grammar).
 pub(crate) fn url_arg_is_quoted(source: &str, after_paren: usize) -> bool {
     let mut i = after_paren;
