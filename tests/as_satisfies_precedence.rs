@@ -12,10 +12,10 @@
 //!
 //! So `x === y as Foo` is `x === (y as Foo)` (the cast binds tighter than
 //! equality), while `a + b as T` stays `(a + b) as T` (additive binds tighter
-//! than the cast). tsv previously parsed `as` / `satisfies` *below every* binary
-//! operator (a two-phase infix loop that finished the whole binary expression
-//! first), so it grouped `(x === y) as Foo` — diverging from the AST-shape oracle
-//! (acorn) itself.
+//! than the cast). A parser that reads `as` / `satisfies` *below every* binary
+//! operator (a two-phase infix loop that finishes the whole binary expression
+//! first) groups `(x === y) as Foo` — diverging from the AST-shape oracle (acorn)
+//! itself.
 //!
 //! These bare forms escape `corpus:compare:parse` because real code always
 //! parenthesizes the cast (`x === (y as Foo)`), so the corpus is no safety net —
@@ -102,7 +102,8 @@ fn expr_sig(source: &str) -> String {
 /// `as` / `satisfies` bind tighter than every operator below the relational tier
 /// (equality, bitwise, logical, `??`), so the cast attaches to the right operand:
 /// `x === y as Foo` is `x === (y as Foo)`, not `(x === y) as Foo`. This is the
-/// core divergence — tsv previously grouped the whole binary first.
+/// core divergence a below-every-binary reading gets wrong, grouping the whole
+/// binary first.
 #[test]
 fn binds_tighter_than_sub_relational_operators() {
     for (src, expected) in [

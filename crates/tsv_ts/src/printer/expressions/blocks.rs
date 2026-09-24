@@ -11,7 +11,7 @@
 // expressions/ and statements/ modules.
 
 use crate::ast::internal;
-use crate::printer::ignore::ends_no_trivia;
+use crate::printer::comments::ends_no_trivia;
 use crate::printer::statements::StatementContext;
 use crate::printer::{CommentVec, Printer, is_effectively_empty_body};
 use tsv_lang::Span;
@@ -383,7 +383,7 @@ impl<'a> Printer<'a> {
     ///   kind that owns none), so there is no tail at all.
     /// - **A `;` glued to a byte that [`ends_no_trivia`].** The content ends right at the
     ///   `;` (the whitespace trim finds nothing to take) — or, for a kind that owns no
-    ///   terminator (`FrozenTerminator::Never`), at the full end, which leaves no tail at
+    ///   terminator (`StatementTerminator::Never`), at the full end, which leaves no tail at
     ///   all — and no comment ends there to lower the comment claim
     ///   ([`Self::statement_comment_claim_end`]) below it: not a block comment, which closes
     ///   on `/`, and not a line comment, which would have swallowed the `;` — the
@@ -536,7 +536,7 @@ impl<'a> Printer<'a> {
         // (`a(); ; /* c */ b();`) — or, past the last one, the construct at `tail_target` (a
         // consequent's next `case` label). The orphan run must stop at the claim split so
         // that leading run still finds it.
-        let claim_end = self.statement_claim_end(body, index, tail_target, false);
+        let claim_end = self.statement_claim_end(body, index, tail_target);
         // A dropped `;` owns no terminator gap, so its own run reads one line.
         let search_end = self
             .find_end_with_trailing_comments(stmt_end, u32::MAX)

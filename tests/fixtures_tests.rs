@@ -1,7 +1,7 @@
 //! Unified fixture validation tests
 //!
-//! This single test runs ALL fixture validations that were previously split
-//! across multiple test files and the fixtures_validate CLI command.
+//! This single test runs ALL fixture validations — the same checks the
+//! `fixtures_validate` CLI command runs.
 //!
 //! Requires Deno to be installed for full validation.
 //! Run with: cargo test --workspace --test fixtures_tests

@@ -314,7 +314,7 @@ fn build_call_args_doc_for_chain_impl(
     // A spread's stripped parens can hide a comment *before* the argument's own end,
     // where no scan above reaches it and the collapsing paths below drop it.
     let has_spread_paren_comments =
-        call_has_comments && printer.any_spread_paren_comment_forces_expansion(call.arguments);
+        call_has_comments && printer.any_paren_interior_forces_expansion(call.arguments);
     let has_any_comments = has_leading_comments
         || has_inter_arg_comments
         || has_trailing_comments

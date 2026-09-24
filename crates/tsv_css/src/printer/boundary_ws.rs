@@ -205,7 +205,7 @@ impl<'a> Printer<'a> {
             // member, and tsv strips BOMs by policy. Anchored at offset 0 of a whole
             // document, which is what makes one a BOM — anywhere else, a fragment's offset 0
             // included, it is an ordinary character and is kept.
-            let is_bom = i == 0 && c == '\u{feff}' && self.source_role == SourceRole::Document;
+            let is_bom = i == 0 && c == tsv_lang::BOM && self.source_role == SourceRole::Document;
             if !is_bom && crate::whitespace::is_boundary_only_whitespace(c) {
                 out.push(c);
             }
@@ -394,11 +394,8 @@ impl<'a> Printer<'a> {
         // ([`SourceRole::Fragment`]) — is an ordinary character and is preserved with the
         // rest, including a second one later in this same run, which the forward scan in
         // `preserved_boundary_ws` still reaches.
-        if run_start == 0
-            && self.source_role == SourceRole::Document
-            && self.source.starts_with('\u{feff}')
-        {
-            run_start = '\u{feff}'.len_utf8();
+        if run_start == 0 && self.source_role == SourceRole::Document {
+            run_start = tsv_lang::leading_bom_len(self.source);
         }
         (run_start as u32, holds_member)
     }

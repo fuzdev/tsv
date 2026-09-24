@@ -957,16 +957,14 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Whether `[start, end)` is known to hold no comment of any kind **without a search**:
-    /// too narrow to hold one, or lying inside the comment-free window
-    /// ([`Self::comment_free_gap`]) — the `tsv_ts` printer's gate of the same name. The
-    /// inline head of [`Self::first_index_between`], and the gate a builder puts ahead of
-    /// work whose only product on a comment-free gap is "nothing"; `false` says only that a
-    /// search would have to answer.
+    /// Whether `[start, end)` is known to hold no comment of any kind **without a search**
+    /// (`CommentFreeWindow::known_comment_free` over [`Self::comment_free_gap`]) — the
+    /// `tsv_ts` printer's gate of the same name. The inline head of
+    /// [`Self::first_index_between`], and the gate a builder puts ahead of work whose only
+    /// product on a comment-free gap is "nothing".
     #[inline]
     pub(in crate::printer) fn gap_known_comment_free(&self, start: u32, end: u32) -> bool {
-        tsv_lang::range_too_narrow_for_a_comment(start, end)
-            || self.comment_free_gap.contains(start, end)
+        self.comment_free_gap.known_comment_free(start, end)
     }
 
     /// The index a comment walk over `[start, end)` starts at: `len` (an empty walk) for a

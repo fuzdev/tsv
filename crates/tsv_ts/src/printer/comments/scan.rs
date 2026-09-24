@@ -334,3 +334,16 @@ impl<'a> Printer<'a> {
         .expect("comma must exist between list elements") as u32
     }
 }
+
+/// Whether a source byte can end no TRIVIA — an ASCII graphic character other than `/`.
+///
+/// It is not the last byte of any whitespace character (ECMAScript's `WhiteSpace` and
+/// `LineTerminator` are ASCII controls, space, or multi-byte characters, whose bytes are all
+/// non-ASCII), and not the `/` every block comment closes on. The one trivia it CAN end is a
+/// line comment, whose last byte is anything; each reader rules that out on its own terms.
+/// The class is deliberately narrower than "not trivia": a byte outside it only sends the
+/// reader to its exact walk.
+#[inline]
+pub(in crate::printer) const fn ends_no_trivia(byte: u8) -> bool {
+    byte.is_ascii_graphic() && byte != b'/'
+}

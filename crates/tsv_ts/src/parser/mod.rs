@@ -115,9 +115,9 @@ fn comment_from_token(
 ///
 /// - the closer of the delimiter the `<` was written in ([`Parser::exit_grouping`], read
 ///   against [`LtRegion::floor`] as `no_in_depth` reads its baseline) — call arguments,
-///   a parameter list, `[…]`, `{…}`, `${…}`. **A grouping paren is not one**: the printer may strip it, so
-///   `f((x < q), a > b)` prints as one comma list, and the region re-anchors one level out
-///   instead ([`Parser::exit_stripped_grouping`]);
+///   a parameter list, `[…]`, `{…}`, `${…}`. **A grouping paren is not one**: the printer
+///   may strip it, so `f((x < q), a > b)` prints as one comma list, and the region
+///   re-anchors one level out instead ([`Parser::exit_stripped_grouping`]);
 /// - a statement or class-member boundary ([`Parser::lt_region_statement_base`]).
 ///
 /// Ending it EARLY is the unsound direction (a `>` the printer may then end a line on);
@@ -262,9 +262,11 @@ pub struct Parser<'a, 'arena> {
     /// [`Parser::grouping_parens`]. Set only while [`Parser::parse_binding_pattern`] reads
     /// its pattern as an array/object literal, the one place a paren the internal AST
     /// drops still decides the verdict: a binding pattern admits no parenthesized target.
-    /// The flag stays set through everything nested in the pattern — a default's
-    /// function or arrow body included — so those parens are recorded too; an entry matches
-    /// only a target whose own span it wraps, so the extra entries never decide a verdict.
+    /// A function, class or arrow block body inside the pattern clears it
+    /// ([`Parser::with_body_frame`]), since no paren there can wrap one of the pattern's
+    /// targets; the rest of the pattern's nesting records too — an arrow's concise body,
+    /// a default's own grouping — harmlessly, as an entry matches only a target whose own
+    /// span it wraps.
     record_grouping_parens: bool,
     /// The grouping parens discarded while [`Parser::record_grouping_parens`] was set,
     /// in parse order — acorn's `parenthesizedBind`, kept as a list because tsv refines
@@ -1141,8 +1143,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `parameters.rs` are hand-balanced across early returns and are deliberately
     /// NOT unwound on the error path — a rejected parse propagates straight out, and
     /// the one place that abandons a parse and continues, [`Parser::rewind`],
-    /// restores the depth itself. Wrapping them in a combinator (so the pair is balanced by
-    /// construction) wants body extraction at several sites and is its own change.
+    /// restores the depth itself. Wrapping them in a combinator (so the pair is balanced
+    /// by construction) wants body extraction at several sites and is its own change.
     #[inline]
     pub(super) fn enter_grouping(&mut self) {
         self.grouping_depth += 1;
@@ -2604,8 +2606,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse a single expression, WITHOUT requiring it to fill the input slice — the raw
     /// parse the pattern path builds on: `parse_pattern_with_comments` parses here, converts
-    /// the result to a binding pattern, then enforces end-of-input itself. (Expression tags use `parse_expression_with_comments`, which
-    /// requires full consumption via `expect_end_of_input`.)
+    /// the result to a Svelte pattern, then enforces end-of-input itself. (Expression tags
+    /// use `parse_expression_with_comments`, which requires full consumption via
+    /// `expect_end_of_input`.)
     pub fn parse_expression_unbounded(&mut self) -> Result<Expression<'arena>, ParseError> {
         self.parse_expression()
     }
@@ -2690,7 +2693,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// * `Ok(Expression)` - The converted pattern (ObjectPattern, ArrayPattern, etc.)
     /// * `Err(ParseError)` - If the expression cannot be converted to a valid pattern
-    pub fn expression_to_pattern(
+    pub fn expression_to_svelte_pattern(
         &self,
         expr: Expression<'arena>,
     ) -> Result<Expression<'arena>, ParseError> {

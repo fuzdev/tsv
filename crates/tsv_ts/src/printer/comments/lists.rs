@@ -549,10 +549,10 @@ impl<'a> Printer<'a> {
         body: &[internal::Statement<'_>],
         index: usize,
         tail_target: Option<u32>,
-        frozen: bool,
     ) -> u32 {
+        // Only the orphan arm asks here, and an orphan `;` is never frozen.
         self.statement_claim_end_with(body, index, tail_target, || {
-            self.statement_emitted_end(&body[index], frozen)
+            self.statement_emitted_end(&body[index], false)
         })
     }
 

@@ -436,8 +436,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// The first three share this boundary — a body is where tsc's
     /// `allowReturnTypeInArrowFunction` goes back to `true` without a delimiter
     /// opening, it is `[+In]` for the same reason, and a host's `as` separator
-    /// (`{#each xs as item}`) cannot sit inside one — so the three sites take one call
-    /// rather than nesting four.
+    /// (`{#each xs as item}`) cannot sit inside one — so each of the three body sites
+    /// makes this one call rather than nesting all four combinators. A body also ends an
+    /// enclosing binding pattern's paren record ([`Parser::record_grouping_parens`]): no
+    /// paren inside one can wrap a target of the pattern around it.
     ///
     /// The ternary consequent is the one `[+In]` production that instead BARS the
     /// return type, so it takes `with_allow_in` and
@@ -451,7 +453,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             p.with_context_flag(
                 |p| &mut p.top_level_as_is_assertion,
                 true,
-                |p| p.with_arrow_return_type_allowed(|p| p.with_lt_region_inherited(f)),
+                |p| {
+                    p.with_context_flag(
+                        |p| &mut p.record_grouping_parens,
+                        false,
+                        |p| p.with_arrow_return_type_allowed(|p| p.with_lt_region_inherited(f)),
+                    )
+                },
             )
         })
     }

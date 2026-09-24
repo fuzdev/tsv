@@ -38,12 +38,12 @@
 //! `}` or a constant `metadata` payload — and the three emitters that carry ~37%
 //! of the corpus's nodes (`write_rule`, `write_relative_selector`,
 //! `write_named_selector`) assemble it through [`JsonWriter::stage_begin`]
-//! instead of five separate appends. Two of those five are calls to
-//! `JsonWriter::u32`, which is deliberately `inline(never)` for WASM size, so
-//! each one forces the output buffer's pointer/length/capacity out of registers
-//! at every surrounding append; the staged form keeps the scratch base fixed,
-//! its bound a compile-time constant, and `stage_len` in a register, and reaches
-//! the buffer once.
+//! instead of the unstaged pair of appends, [`JsonWriter::start_end_field`] and
+//! the closing literal. The pair's body is deliberately `inline(never)` for WASM
+//! size, so the call forces the output buffer's pointer/length/capacity out of
+//! registers around it; the staged form keeps the scratch base fixed, its bound a
+//! compile-time constant, and `stage_len` in a register, and reaches the buffer
+//! once.
 //!
 //! ⚠️ **Only the trailing burst stages, and that is a measured boundary, not an
 //! unfinished migration.** The *head* bursts have the same shape

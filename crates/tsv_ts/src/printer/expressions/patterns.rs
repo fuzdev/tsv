@@ -11,7 +11,6 @@ use super::assignment::{AssignmentLeft, RhsCommentInfo};
 use crate::ast::internal::{
     self, ArrowFunctionBody, Expression, ExpressionKind, ObjectPatternProperty,
 };
-use crate::printer::comments::ShellRunOrder;
 use crate::printer::comments::ValueGap;
 use crate::printer::comments::next_real_element_start;
 use crate::printer::layout::hang_after_operator;
@@ -630,11 +629,11 @@ impl<'a> Printer<'a> {
             // A rest's stripped-paren interior lies inside its printed span, out of every
             // gap scan above — see the array pattern's twin.
             let rest_interior_expands = has_comments
-                && obj
-                    .properties
-                    .last()
-                    .and_then(ObjectPatternProperty::as_rest)
-                    .is_some_and(|r| self.paren_interior_forces_expansion(r.paren_interior()));
+                && self.paren_interior_forces_expansion(
+                    obj.properties
+                        .last()
+                        .and_then(ObjectPatternProperty::paren_interior),
+                );
 
             if should_expand
                 || has_line_comments
@@ -1024,30 +1023,17 @@ impl<'a> Printer<'a> {
                 .get(i + 1)
                 .map_or(boundary, |next| next.span().start);
             let mut trailing = self.collect_trailing_comments(prop_end, upper_bound, is_last);
-            // A rest's stripped-paren interior, the object literal's spread partition: the
-            // rest's doc prints the same-line share (a `//` there already ends the line, so
-            // a second may not weld onto it), and the own-line share is this loop's. A
-            // frozen property printed its interior verbatim.
-            let rest_interior = frozen
-                .is_none()
-                .then(|| prop.as_rest().map(internal::RestElement::paren_interior))
-                .flatten();
-            trailing.demote_line_after_deferred(
-                rest_interior.is_some_and(|i| self.paren_interior_defers_line_comment(i)),
-            );
 
             // Separator comma between properties; no trailing comma on the last
             // property under `trailingComma: 'none'` (a rest element never takes one
             // either — it is a syntax error there).
             let comma = (!is_last).then(|| d.text(","));
-            // A rest is always the LAST property, so its share and the run past its `)`
-            // take the last-element order (`Printer::push_last_element_share_and_run`).
-            self.push_last_element_share_and_run(
+            let rest_interior = prop.paren_interior().filter(|_| frozen.is_none());
+            self.push_pattern_element_comma_trailing(
                 &mut prop_parts,
+                &mut trailing,
                 rest_interior,
-                ShellRunOrder::HoistBlocks,
-                |parts| self.push_element_comma_trailing_blocks(parts, &trailing, comma),
-                |parts| self.push_element_trailing_line(parts, &trailing),
+                comma,
             );
 
             if !is_last {
@@ -1278,13 +1264,13 @@ impl<'a> Printer<'a> {
         };
         // A rest element's stripped-paren interior lies inside its printed span, so no gap
         // scan above sees it — the argument list's entry-gate problem
-        // (`Printer::any_spread_paren_comment_forces_expansion`), in pattern form.
+        // (`Printer::any_paren_interior_forces_expansion`), in pattern form.
         let rest_interior_expands = has_comments
-            && arr
-                .elements
-                .last()
-                .and_then(|e| e.as_ref()?.as_rest())
-                .is_some_and(|r| self.paren_interior_forces_expansion(r.paren_interior()));
+            && self.paren_interior_forces_expansion(
+                arr.elements
+                    .last()
+                    .and_then(|e| e.as_ref()?.paren_interior()),
+            );
 
         if has_line_comments || has_multiline_block || has_own_line_block || rest_interior_expands {
             self.build_expanded_array_pattern_doc(arr, arr_span, tail)
@@ -1458,26 +1444,17 @@ impl<'a> Printer<'a> {
                 // last) the body's end — `array_pattern_gap_end` carries both halves.
                 let upper_bound = array_pattern_gap_end(arr, i, boundary);
                 let mut trailing = self.collect_trailing_comments(elem_end, upper_bound, is_last);
-                // A rest's stripped-paren interior — the object pattern's twin above.
-                let rest_interior = frozen_span
-                    .is_none()
-                    .then(|| e.as_rest().map(internal::RestElement::paren_interior))
-                    .flatten();
-                trailing.demote_line_after_deferred(
-                    rest_interior.is_some_and(|i| self.paren_interior_defers_line_comment(i)),
-                );
 
                 // Separator comma between elements; no trailing comma on the last
                 // element under `trailingComma: 'none'` (a rest element never takes one
                 // either — it is a syntax error there).
                 let comma = (!is_last).then(|| d.text(","));
-                // A rest is always the LAST element — see the object pattern's twin.
-                self.push_last_element_share_and_run(
+                let rest_interior = e.paren_interior().filter(|_| frozen_span.is_none());
+                self.push_pattern_element_comma_trailing(
                     &mut parts,
+                    &mut trailing,
                     rest_interior,
-                    ShellRunOrder::HoistBlocks,
-                    |parts| self.push_element_comma_trailing_blocks(parts, &trailing, comma),
-                    |parts| self.push_element_trailing_line(parts, &trailing),
+                    comma,
                 );
 
                 if !is_last {

@@ -5,12 +5,12 @@
 //! (after a leading `|`, before a MULTI-LINE first member) freezes that member and is
 //! re-emitted own-line BEFORE the `|` — never relocated to trail it.
 //!
-//! Regression this guards (the FIX 3 non-idempotency): the printer used to emit a frozen
-//! first member's leading run AFTER the `| ` prefix, relocating the directive to trail the
-//! pipe (`| // prettier-ignore`). On the next pass that trailing directive is no longer
-//! own-line, so the freeze is lost and the member reformats — an F1 fixed-point violation.
-//! The fix emits the run before the `| ` in both the line-comment path (own-line line
-//! directive) and the main loop (own-line block directive).
+//! The hazard this guards: emitting a frozen first member's leading run AFTER the `| `
+//! prefix relocates the directive to trail the pipe (`| // prettier-ignore`). On the next
+//! pass that trailing directive is no longer own-line, so the freeze is lost and the member
+//! reformats — an F1 fixed-point violation. The printer emits the run before the `| ` in
+//! both the line-comment path (own-line line directive) and the main loop (own-line block
+//! directive).
 //!
 //! Not a fixture: the in-span form is not tsv-stable (tsv normalizes the directive to the
 //! leading-run position, which the `union_prettier_ignore_multiline_member` fixture already

@@ -574,6 +574,7 @@ impl<'a> Printer<'a> {
         // Each arm spells its literals, so the pair is a constant at the arm rather than a
         // runtime `text()` at every attribute. A value with no `"` takes the double quotes
         // whatever else it holds, so the `'` question is asked only of a value that has one.
+        // The `"` test walks a CLONE, so the `'` test below scans the parts from the start.
         if !texts.clone().any(|raw| raw.contains('"')) {
             (d.text("=\""), d.text("\""))
         } else if texts.any(|raw| raw.contains('\'')) {

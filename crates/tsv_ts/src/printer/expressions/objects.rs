@@ -197,15 +197,12 @@ impl<'a> Printer<'a> {
                     .map_or(obj_span.end, |next| next.span().start);
 
                 let is_last = i == obj.properties.len() - 1;
-                let spread = prop.as_spread();
+                let interior = prop.paren_interior();
                 let mut trailing = self.collect_trailing_comments(prop_end, upper_bound, is_last);
                 // A spread whose stripped parens held a `//` already ends its line in one;
                 // a second may not weld onto it.
-                trailing.demote_line_after_deferred(
-                    spread.is_some_and(|s| {
-                        self.paren_interior_defers_line_comment(s.paren_interior())
-                    }),
-                );
+                trailing
+                    .demote_line_after_deferred(self.paren_interior_defers_line_comment(interior));
                 let comma = (!is_last).then(|| d.text(","));
                 // The object's share of a spread's stripped-paren interior: the own-line
                 // comments the spread's own doc leaves behind, each a sibling line the
@@ -213,7 +210,6 @@ impl<'a> Printer<'a> {
                 // (`...b, // c⏎/* i */`), like the array element loop and the argument-list
                 // gaps; on the LAST property there is no comma, and the two take the
                 // last-element order (`Printer::push_last_element_share_and_run`).
-                let interior = spread.map(internal::SpreadElement::paren_interior);
                 if is_last {
                     self.push_last_element_share_and_run(
                         &mut parts,
@@ -224,9 +220,7 @@ impl<'a> Printer<'a> {
                     );
                 } else {
                     self.push_element_comma_trailing(&mut parts, &trailing, comma);
-                    if let Some(interior) = interior {
-                        self.push_paren_interior_own_line_comments(&mut parts, interior);
-                    }
+                    self.push_paren_interior_own_line_comments(&mut parts, interior);
                 }
 
                 prev_end = trailing.end_pos;

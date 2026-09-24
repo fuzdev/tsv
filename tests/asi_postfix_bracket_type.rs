@@ -6,9 +6,10 @@
 //! && eat('['))`): a newline before `[` ends the type via ASI, so `T⏎[K]` parses
 //! as `T` then a fresh `[K]` statement, never an indexed-access type `T[K]`. In a
 //! class body this surfaces as Gap B (the `[e2]` starts a new member); at
-//! statement level it was a silent AST divergence — tsv used to emit
-//! `TSIndexedAccessType` where acorn splits. These pin the split (and the
-//! same-line control that stays an indexed access) directly on the wire AST.
+//! statement level a parser that ignores the line break is a silent AST
+//! divergence — it emits `TSIndexedAccessType` where acorn splits. These pin the
+//! split (and the same-line control that stays an indexed access) directly on the
+//! wire AST.
 //!
 //! The `asi_after_type_annotation` fixture guards the same split via formatter
 //! normalization; this asserts the AST shape itself, independent of the printer.
@@ -82,7 +83,7 @@ fn same_line_bracket_is_indexed_access() {
 
 /// Per-bracket check: `A[]⏎[K]` stops after the FIRST `[]` (the second `[` has a
 /// line break), so the type is the array `A[]` and `[K]` splits into its own
-/// statement. This is what makes the fix a loop-condition check (every bracket),
+/// statement. The line-break check is therefore a loop condition (every bracket),
 /// not a first-bracket-only one.
 #[test]
 fn chained_bracket_newline_stops_per_bracket() {

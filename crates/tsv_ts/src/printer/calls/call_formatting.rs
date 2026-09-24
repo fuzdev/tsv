@@ -1040,8 +1040,7 @@ fn build_call_with_arg_comments(
     // These need per-element handling to emit after the trailing comma.
     // A spread's stripped parens can leave one *before* the argument's own end, where no
     // scan here can reach it — that share is asked for by name, of every argument.
-    let has_spread_paren_comments =
-        printer.any_spread_paren_comment_forces_expansion(call.arguments);
+    let has_spread_paren_comments = printer.any_paren_interior_forces_expansion(call.arguments);
     let has_own_line_trailing_block = call.arguments.last().is_some_and(|last_arg| {
         let search_start = last_arg.span().end;
         printer
@@ -1181,11 +1180,11 @@ fn build_call_with_arg_comments(
             // A same-line `//` the spread's own doc defers must flush INSIDE the call:
             // on a collapsed list the buffer drains past the `)` and the `;`,
             // re-binding the comment to the statement. Also feeds the demotion below.
-            let arg_defers_line = printer.defers_trailing_line_comment(arg);
+            let interior = arg.paren_interior();
+            let arg_defers_line = printer.paren_interior_defers_line_comment(interior);
             if arg_defers_line {
                 force_expansion = true;
             }
-            let interior = arg.as_spread().map(internal::SpreadElement::paren_interior);
             let mut run_forces_expansion = false;
             let share_pushed = printer.push_last_element_share_and_run(
                 &mut arg_parts,

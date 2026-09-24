@@ -346,16 +346,12 @@ impl<'a> Lexer<'a> {
     /// unrelated line.
     pub fn at_offset(source: &'a str, base_offset: usize) -> Self {
         let bytes = source.as_bytes();
-        // Skip UTF-8 BOM (EF BB BF / U+FEFF) at start of file if present.
+        // Skip UTF-8 BOM (U+FEFF) at start of file if present.
         // BOM is a legacy artifact; we strip it (like deno fmt, VS Code).
         // Position starts after BOM so token spans reflect actual file bytes, and the
         // WIRE keeps them (`LeadingBom::Counted` in the writer): acorn reads the BOM as
         // whitespace, so its offsets index the author's string, BOM included.
-        let position = if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
-            3
-        } else {
-            0
-        };
+        let position = tsv_lang::leading_bom_len(source);
 
         Self {
             source,

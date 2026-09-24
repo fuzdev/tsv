@@ -232,9 +232,9 @@ fn test_format_jobs_one() {
 
 /// `--jobs 0` is a width, not an opt-out — it means the same as `--jobs 1`.
 /// Both discovery paths must agree on that: a **directory** streams into the
-/// pool and an **explicit file argument** collects first, and only the collected
-/// one used to clamp. Unclamped, the streamed path left every file unclaimed and
-/// reported a "worker thread panicked" error for a worker it never spawned.
+/// pool and an **explicit file argument** collects first, and both clamp.
+/// Unclamped, the streamed path leaves every file unclaimed and reports a "worker
+/// thread panicked" error for a worker it never spawned.
 #[test]
 fn test_format_jobs_zero_means_one() {
     let dir = temp_dir("jobs_zero");
@@ -264,12 +264,12 @@ fn test_format_jobs_zero_means_one() {
 
 /// A `--jobs` count the OS refuses must **narrow the pool**, not fail the run.
 ///
-/// `--jobs` is a user-supplied number, and the pool's spawn used to `expect`, so this
-/// was the one `format` argument that answered with a panic where every other bad one
-/// exits 2 with a message. On the streamed path the panic was worse than a crash: it
-/// unwound past the queue's `finish`, leaving every already-spawned worker parked on
-/// the condvar while `thread::scope` waited to join them — the process hung holding
-/// the whole pool's stacks. Both discovery paths are covered here: one directory root
+/// `--jobs` is a user-supplied number, so a pool spawn that `expect`s would make it the
+/// one `format` argument that answers with a panic where every other bad one exits 2
+/// with a message. On the streamed path such a panic is worse than a crash: it unwinds
+/// past the queue's `finish`, leaving every already-spawned worker parked on the
+/// condvar while `thread::scope` waits to join them — the process hangs holding the
+/// whole pool's stacks. Both discovery paths are covered here: one directory root
 /// streams, two spellings of it collect (the dedup is set-wide).
 ///
 /// The refusal is provoked through **address space** (`ulimit -v`), which is the one

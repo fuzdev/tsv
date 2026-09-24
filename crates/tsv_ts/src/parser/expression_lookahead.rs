@@ -996,17 +996,13 @@ fn starts_expression_after_type_args(bytes: &[u8], pos: usize) -> bool {
         );
     }
     let b = bytes[pos];
-    // `!` starts an expression only as prefix negation (`!x`); `!=` / `!==` are
-    // equality operators (acorn's tokens aren't `startsExpr`), so a would-be close
-    // followed by one continues the instantiation (`f<T> != c` is `(f<T>) != c`).
-    if b == b'!' {
-        return bytes.get(pos + 1) != Some(&b'=');
-    }
-    // `+` / `-` start an expression as a unary sign (`+x`) or a prefix update (`++x`,
-    // acorn's `tt.plusMin` / `tt.incDec`, both `startsExpr`); `+=` / `-=` are
-    // assignment operators (acorn's `tt.assign` isn't), so a would-be close followed
-    // by one continues the instantiation (`f<T> += c` assigns to `f<T>`).
-    if matches!(b, b'+' | b'-') {
+    // `!`, `+` and `-` start an expression only as a prefix operator — negation (`!x`),
+    // a unary sign (`+x`) or a prefix update (`++x`; acorn's `tt.prefix` / `tt.plusMin` /
+    // `tt.incDec`, all `startsExpr`). Followed by `=` each is instead an operator that
+    // starts nothing — `!=` / `!==` equality, `+=` / `-=` assignment — so a would-be close
+    // followed by one continues the instantiation (`f<T> != c` is `(f<T>) != c`,
+    // `f<T> += c` assigns to `f<T>`).
+    if matches!(b, b'!' | b'+' | b'-') {
         return bytes.get(pos + 1) != Some(&b'=');
     }
     b.is_ascii_digit()

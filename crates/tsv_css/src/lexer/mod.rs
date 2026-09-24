@@ -104,11 +104,7 @@ impl<'a> Lexer<'a> {
         // Position starts after BOM so token spans reflect actual file bytes; the WIRE
         // elides it at emission (`LeadingBom::Elided` in the writer), since `parseCss`
         // strips it before parsing and its offsets index the BOM-less string.
-        let pos = if source.starts_with('\u{feff}') {
-            '\u{feff}'.len_utf8()
-        } else {
-            0
-        };
+        let pos = tsv_lang::leading_bom_len(source);
         Self {
             source,
             bytes: source.as_bytes(),

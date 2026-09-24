@@ -83,11 +83,10 @@ fn module_script_indented() {
 /// JS `\s` character. The end column counts it as the one UTF-16 unit it is, so
 /// `</script\u{a0}>` reports column 10 like a plain `</script >` would.
 ///
-/// The regression this guards: the column math used to be anchored at the
-/// `Program`'s content offset rather than at the tag position, which left every
-/// multibyte character *between* the content end and the tag end uncounted — this
-/// input reported the byte column 11. Unreachable before a Unicode space was
-/// accepted there, so the bug and its trigger arrived together.
+/// The hazard this guards: column math anchored at the `Program`'s content offset
+/// rather than at the tag position leaves every multibyte character *between* the
+/// content end and the tag end uncounted — this input then reports the byte column
+/// 11.
 #[test]
 fn multibyte_in_closing_tag_counts_utf16_units() {
     for close in ["</script\u{a0}>", "</script\u{feff}>", "</script\u{3000}>"] {

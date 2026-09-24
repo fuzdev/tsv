@@ -79,8 +79,22 @@ pub enum LeadingBom {
     Elided,
 }
 
-/// The UTF-8 encoding of U+FEFF, the byte-order mark.
-const BOM_BYTES: [u8; 3] = [0xEF, 0xBB, 0xBF];
+/// U+FEFF: a byte-order mark at a file's byte 0, and the character ZERO WIDTH NO-BREAK
+/// SPACE anywhere else.
+pub const BOM: char = '\u{FEFF}';
+
+/// The byte length of the byte-order mark `source` begins with — [`BOM`]'s three UTF-8
+/// bytes, or 0 when there is none. Every lexer starts past it: the parsers skip a leading
+/// BOM, and how the wire then counts it is [`LeadingBom`]'s question.
+#[inline]
+#[must_use]
+pub fn leading_bom_len(source: &str) -> usize {
+    if source.starts_with(BOM) {
+        BOM.len_utf8()
+    } else {
+        0
+    }
+}
 
 impl ByteToCharMap {
     /// Build a byte-to-UTF-16-code-unit offset map from source text
@@ -392,12 +406,15 @@ fn build_map(
     bom: LeadingBom,
 ) -> ByteToCharMap {
     let mut narrow: Vec<u8> = Vec::with_capacity(source.len() + 1);
-    let (from, delta) = if bom == LeadingBom::Elided && source.as_bytes().starts_with(&BOM_BYTES) {
-        narrow.extend_from_slice(&[0, 1, 2]);
-        (BOM_BYTES.len(), BOM_BYTES.len() as u32)
-    } else {
-        (0, 0)
+    let bom_len = match bom {
+        LeadingBom::Elided => leading_bom_len(source),
+        LeadingBom::Counted => 0,
     };
+    if bom_len > 0 {
+        narrow.extend_from_slice(&[0, 1, 2]);
+    }
+    // An elided BOM's three bytes resolve to position 0: a running delta of its length.
+    let (from, delta) = (bom_len, bom_len as u32);
     let Err(outgrown) = build_deltas::<u8>(source, &mut narrow, lines, from, delta, line_rule)
     else {
         return ByteToCharMap {

@@ -420,9 +420,6 @@ impl<'a> FoldedSource<'a> {
     }
 }
 
-/// The byte-order mark, which is also the character U+FEFF ZERO WIDTH NO-BREAK SPACE.
-const BOM: char = '\u{FEFF}';
-
 /// Write a byte-order mark ahead of a formatted HTML/Svelte or CSS document whose first
 /// character is a **content** U+FEFF, and return every other output unchanged.
 ///
@@ -453,8 +450,8 @@ const BOM: char = '\u{FEFF}';
 /// text, so it is not something the formatter can recover.
 #[must_use]
 pub fn encode_leading_zwnbsp(mut formatted: String) -> String {
-    if formatted.starts_with(BOM) {
-        formatted.insert(0, BOM);
+    if formatted.starts_with(crate::BOM) {
+        formatted.insert(0, crate::BOM);
     }
     formatted
 }

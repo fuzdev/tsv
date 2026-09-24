@@ -4,9 +4,9 @@
 //! expression (`read_expression`), then rejects it unless the expression is a
 //! `CallExpression`, **or** a `ChainExpression` whose inner `.expression` is a
 //! `CallExpression` (`e.render_tag_invalid_expression`, "`{@render ...}` tags can
-//! only contain call expressions"). tsv previously parsed the content as an
-//! arbitrary TS expression and never checked, so it over-accepted `{@render foo}`,
-//! `{@render a.b}`, and other non-call forms.
+//! only contain call expressions"). Parsing the content as an arbitrary TS
+//! expression without that check over-accepts `{@render foo}`, `{@render a.b}`, and
+//! other non-call forms.
 //!
 //! tsv has no distinct `ChainExpression` node — an optional chain folds into the
 //! member/call node it wraps (`Expression::has_optional_in_chain` drives the wire

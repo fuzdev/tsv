@@ -7,17 +7,15 @@
 //! as one expression (`read_expression`), flattens a top-level comma sequence
 //! into the identifier list, then rejects it unless **every** element is an
 //! `Identifier` (`e.debug_tag_invalid_arguments`, "`{@debug ...}` arguments must
-//! be identifiers, not arbitrary expressions"). tsv previously parsed each
-//! comma-separated argument as an arbitrary TS expression via a hand-rolled
-//! comment-blanking scan plus `str::split(',')`, and never checked, so it
-//! over-accepted regexes, member/call/binary expressions, and `this`.
+//! be identifiers, not arbitrary expressions"). Parsing each comma-separated
+//! argument as an arbitrary TS expression without that check over-accepts regexes,
+//! member/call/binary expressions, and `this`.
 //!
-//! The regex case additionally produced **unreparseable output**: the fuzzer
+//! The regex case additionally produces **unreparseable output**: the fuzzer
 //! mutant `{@debug , /ug* c */ b}` parses `/ug* c */` as a regex literal (dropping
 //! the trailing `b`), and the printer re-emits the regex source immediately before
 //! `}` (`{@debug /ug* c */}`), which the parser then rejects (`Unclosed block
-//! tag`). The fuzzer surfaced this as a seed-42 `unreparseable` finding; rejecting
-//! the input at parse time (as Svelte does) removes it.
+//! tag`). Rejecting the input at parse time (as Svelte does) removes it.
 //!
 //! Parsing the content as one expression (mirroring `read_expression`) also fixes
 //! the split-based scan's blind spots: a comma inside parens is not a top-level
@@ -122,10 +120,10 @@ fn parenthesized_sequence_formats_like_bare_sequence() {
     assert_eq!(format("{@debug (a, b)}"), format("{@debug a, b}"));
 }
 
-/// The exact seed-42 fuzzer finding: a stray `/` makes the argument a regex
-/// literal that swallows trailing content. Formerly accepted and formatted to
-/// `{@debug /ug* c */}`, which no longer reparses (`Unclosed block tag`). Must be
-/// rejected at parse time, not formatted into unreparseable output.
+/// A stray `/` makes the argument a regex literal that swallows trailing content.
+/// Accepted, it formats to `{@debug /ug* c */}`, which does not reparse (`Unclosed
+/// block tag`), so it must be rejected at parse time, not formatted into
+/// unreparseable output.
 #[test]
 fn rejects_regex_argument_that_would_format_unreparseable() {
     assert!(

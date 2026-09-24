@@ -8,9 +8,9 @@
 //! sibling, `<td>`/`<th>`/`<tr>`/`<dt>`/`<dd>`/`<option>`/… at their structural
 //! boundaries — matching the WHATWG optional-end-tag table (the
 //! `autoclosing_children` map + `closing_tag_omitted` in
-//! `../svelte/packages/svelte/src/html-tree-validation.js`). tsv previously
-//! rejected all of it (`Mismatched tags`), an over-rejection of ordinary Svelte
-//! markup.
+//! `../svelte/packages/svelte/src/html-tree-validation.js`). A parser without the
+//! optional-end-tag rules rejects all of it (`Mismatched tags`), an over-rejection
+//! of ordinary Svelte markup.
 //!
 //! Coverage is split by what each vehicle can see. The *formatter* side — that the
 //! implicit form normalizes to the explicit-close form under both tsv and prettier

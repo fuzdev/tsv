@@ -670,13 +670,16 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // and only falls to acorn when that reads nothing — and then only on a `{`/`[`
         // (`expected_pattern` otherwise). So the identifier arm goes through the same
         // reader (reserved-word rule included) and the bracket arm keeps the deferral.
-        let end = if trimmed.starts_with('{') || trimmed.starts_with('[') {
-            self.find_matching_bracket(trimmed)?
-        } else {
-            let Some(name) = self.read_identifier(trimmed, adjusted)? else {
-                return Err(self.error_expected_at("identifier or destructure pattern", adjusted));
-            };
-            name.len()
+        let end = match trimmed.as_bytes().first() {
+            Some(&open @ (b'{' | b'[')) => self.matching_bracket_end(trimmed, open, adjusted)?,
+            _ => {
+                let Some(name) = self.read_identifier(trimmed, adjusted)? else {
+                    return Err(
+                        self.error_expected_at("identifier or destructure pattern", adjusted)
+                    );
+                };
+                name.len()
+            }
         };
         // `parse_ts_pattern` yields ObjectPattern/ArrayPattern (not the Object/Array
         // *Expression* the plain expression parser would).
@@ -706,22 +709,21 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         Ok((expr, annotation_end))
     }
 
-    /// Find the matching closing bracket for a string starting with `{` or `[`,
-    /// returning the byte offset just past the close (so `&input[..end]` is the whole
-    /// bracketed run). Comment- and string-aware via the shared cursor.
-    fn find_matching_bracket(&self, input: &str) -> Result<usize, ParseError> {
+    /// The byte offset just past the bracket that closes the `open` (`{` or `[`) at
+    /// `input[0]`, so `&input[..end]` is the whole bracketed run. Comment- and string-aware
+    /// via the shared cursor. `offset` is `input[0]`'s source offset, where an unmatched
+    /// bracket is reported.
+    fn matching_bracket_end(
+        &self,
+        input: &str,
+        open: u8,
+        offset: usize,
+    ) -> Result<usize, ParseError> {
+        let close = if open == b'{' { b'}' } else { b']' };
         let bytes = input.as_bytes();
-        let (open, close) = match bytes.first() {
-            Some(b'{') => (b'{', b'}'),
-            Some(b'[') => (b'[', b']'),
-            _ => {
-                return Err(ParseError::invalid_syntax("Expected { or [".to_string(), 0));
-            }
-        };
-
         match_bracket(bytes, 0, bytes.len(), open, close, TriviaProfile::JS)
             .map(|close_pos| close_pos + 1) // include the closing bracket
-            .ok_or_else(|| ParseError::invalid_syntax("Unmatched bracket".to_string(), 0))
+            .ok_or_else(|| self.error_msg_at("Unmatched bracket", offset))
     }
 
     /// Parse ", index" and/or "(key)" after the context pattern

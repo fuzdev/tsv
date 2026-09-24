@@ -70,7 +70,7 @@
 //! **Four, because a run is earned by frequency.** Those bursts emit 4.6–14.1
 //! times per KB of source, and each staged emitter is *inlined at its site* —
 //! so a rare burst buys nothing and still costs `@fuzdev/tsv-parse-wasm` bytes.
-//! `ExpressionTag`, `write_text`'s raw-content arm, `write_text_sequence` and
+//! `ExpressionTag`, `write_text`'s raw-content arm, `write_sequence_text` and
 //! the directive heads are deliberately left unstaged: their `start`/`end`
 //! pairs are one out-of-line call each (`JsonWriter::start_end`, or its
 //! `start_end_field` / `start_end_object` forms, which also write the
@@ -852,7 +852,7 @@ fn write_element(w: &mut JsonWriter, elem: &internal::Element<'_>, ctx: &Ctx<'_>
     if elem.name(ctx.source) == "textarea" {
         w.raw("{\"type\":\"Fragment\",\"nodes\":");
         write_array(w, elem.fragment.nodes, |w, n| match n {
-            internal::FragmentNode::Text(text) => write_text_sequence(w, text, ctx),
+            internal::FragmentNode::Text(text) => write_sequence_text(w, text, ctx),
             _ => write_fragment_node(w, n, ctx),
         });
         w.raw("}");
@@ -1010,9 +1010,10 @@ fn write_raw_then_data(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>)
     }
 }
 
-/// A sequence-context `Text` (a `<textarea>`'s content): the canonical
-/// attribute-value sequence literal, `{start, end, type, raw, data}`.
-fn write_text_sequence(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
+/// A `Text` as Svelte's attribute-value sequence literal, `{start, end, type, raw, data}`
+/// — an attribute value's text part, and a `<textarea>`'s content, which Svelte reads as
+/// the same sequence.
+fn write_sequence_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
     w.start_end_object(ctx.pos(text.span.start), ctx.pos(text.span.end));
     w.raw(",\"type\":\"Text\",\"raw\":");
     write_raw_then_data(w, text, ctx);
@@ -1536,17 +1537,9 @@ fn write_attribute_value_field(
 /// One attribute-value part (array element or bare-object body).
 fn write_attribute_value(w: &mut JsonWriter, value: &internal::AttributeValue<'_>, ctx: &Ctx<'_>) {
     match value {
-        internal::AttributeValue::Text(text) => write_attribute_text(w, text, ctx),
+        internal::AttributeValue::Text(text) => write_sequence_text(w, text, ctx),
         internal::AttributeValue::ExpressionTag(tag) => write_expression_tag(w, tag, ctx),
     }
-}
-
-/// Emits a `Text` node in attribute context (`start, end, type, raw, data`).
-fn write_attribute_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
-    w.start_end_object(ctx.pos(text.span.start), ctx.pos(text.span.end));
-    w.raw(",\"type\":\"Text\",\"raw\":");
-    write_raw_then_data(w, text, ctx);
-    w.raw("}");
 }
 
 /// Emits a `SpreadAttribute` node (`{...expr}`).

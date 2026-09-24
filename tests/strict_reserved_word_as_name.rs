@@ -105,11 +105,10 @@ fn format(source: &str) -> String {
 /// bullet bars all of them, so one verdict covers all of them: tsv parses each
 /// as a name and defers.
 ///
-/// Three of these have a *competing syntactic role* that used to block them in
-/// specific positions — `implements` reads as the start of a heritage clause
-/// after `class`, and `private`/`protected`/`public` read as parameter
-/// accessibility modifiers. Both now resolve by lookahead, exactly as tsc does,
-/// so the whole list behaves uniformly.
+/// Three of these have a *competing syntactic role* in specific positions —
+/// `implements` reads as the start of a heritage clause after `class`, and
+/// `private`/`protected`/`public` read as parameter accessibility modifiers. Both
+/// resolve by lookahead, exactly as tsc does, so the whole list behaves uniformly.
 const STRICT_RESERVED: &[&str] = &[
     "let",
     "yield",

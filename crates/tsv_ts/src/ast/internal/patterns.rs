@@ -66,12 +66,12 @@ impl<'arena> ObjectPatternProperty<'arena> {
         }
     }
 
-    /// The rest element behind this property, if it is one — the pattern counterpart of
-    /// [`super::ObjectProperty::as_spread`], for the printer's stripped-paren interior
-    /// helpers.
-    pub fn as_rest(&self) -> Option<&RestElement<'arena>> {
+    /// The rest element's stripped-paren interior ([`RestElement::paren_interior`]), if this
+    /// property is the rest — the pattern counterpart of
+    /// [`super::ObjectProperty::paren_interior`].
+    pub fn paren_interior(&self) -> Option<Span> {
         match self {
-            ObjectPatternProperty::RestElement(r) => Some(r),
+            ObjectPatternProperty::RestElement(r) => Some(r.paren_interior()),
             ObjectPatternProperty::Property(_) => None,
         }
     }

@@ -6,8 +6,8 @@
 //!
 //! The wrapped branch of `print_decl_function_with_comments` re-emits the arguments
 //! from source (CSS value comments aren't in the AST, so there is nothing else to
-//! print from). It used to locate them by searching the declaration for the
-//! function's name and then taking the first `(` after it. A property routinely
+//! print from). Locating them by searching the declaration for the function's name
+//! and then taking the first `(` after it is not sound. A property routinely
 //! contains the function's name — `--linear-gradient: linear-gradient(…)` — and the
 //! search then measures from the *property's* occurrence; that still lands on the
 //! right paren, but only because nothing between the two can be a `(`.
@@ -17,7 +17,7 @@
 //! `css/tokens/comments/in_property_value_before_colon_prettier_divergence`). Then
 //! the offset is wrong, the paren-depth scan never balances, extraction returns
 //! `None`, and the whole value falls to the semantic fallback — which prints from
-//! the AST and so drops the **closing comma** (and would drop an argument comment
+//! the AST and so would drop the **closing comma** (and would drop an argument comment
 //! that wasn't glued into an argument's span).
 //!
 //! Slicing the arguments out of the function's span instead is exact:
