@@ -9,6 +9,7 @@ use smallvec::SmallVec;
 
 use super::super::{LeadingGlue, Printer};
 use crate::ast::internal;
+use crate::printer::comments::ShellRunOrder;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -733,24 +734,31 @@ pub(super) fn emit_last_arg_trailing_comments(
     last_arg: &internal::Expression<'_>,
     paren_close: u32,
 ) {
-    // The share/gap emit order — see the predicate's doc for the rule it encodes.
-    let share_ends_in_line = printer.spread_share_ends_in_line_comment(last_arg);
-    if !share_ends_in_line {
-        printer.push_spread_own_line_comments(parts, last_arg);
-    }
-    let arg_end = last_arg.span().end;
-    // Every argument list reaching these builders pays this call, comments or not, so
-    // skip the partition on the common empty gap (same guard as
-    // `emit_first_arg_leading_comments`). Both emits `PartitionedComments` would run
-    // walk only its own buckets, so an empty range is already a no-op.
-    if printer.has_comments_to_emit_between(arg_end, paren_close) {
-        let mut pc = PartitionedComments::for_closer_gap(printer, arg_end, paren_close);
-        pc.demote_trailing_line_after_deferred(printer.defers_trailing_line_comment(last_arg));
-        pc.emit_last_arg_comments(parts, printer);
-    }
-    if share_ends_in_line {
-        printer.push_spread_own_line_comments(parts, last_arg);
-    }
+    // The share/gap emit order — see the emitter's doc for the rule it encodes.
+    let interior = last_arg
+        .as_spread()
+        .map(internal::SpreadElement::paren_interior);
+    // `SourceOrder`: the argument lists' cataloged order — the run never separates.
+    printer.push_last_element_share_and_run(
+        parts,
+        interior,
+        ShellRunOrder::SourceOrder,
+        |parts| {
+            let arg_end = last_arg.span().end;
+            // Every argument list reaching these builders pays this call, comments or not, so
+            // skip the partition on the common empty gap (same guard as
+            // `emit_first_arg_leading_comments`). Both emits `PartitionedComments` would run
+            // walk only its own buckets, so an empty range is already a no-op.
+            if printer.has_comments_to_emit_between(arg_end, paren_close) {
+                let mut pc = PartitionedComments::for_closer_gap(printer, arg_end, paren_close);
+                pc.demote_trailing_line_after_deferred(
+                    printer.defers_trailing_line_comment(last_arg),
+                );
+                pc.emit_last_arg_comments(parts, printer);
+            }
+        },
+        |_| {},
+    );
 }
 
 /// Check if there are trailing comments (line OR block) on any arguments

@@ -13,3 +13,13 @@
 <!-- a run that does not end in a line comment leaves no break for the `}` to reuse, so a
 	directive value takes the block form instead of hugging -->
 <button on:click={fn}> text </button>
+
+<!-- a line comment inside parens the parser stripped, then another after the `)`: one run,
+	so the second starts the line the first one broke -->
+{a}
+
+{#if a}
+	text
+{/if}
+
+<div title={a}></div>

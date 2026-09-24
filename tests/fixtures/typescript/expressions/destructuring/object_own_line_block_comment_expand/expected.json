@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 435,
+	"end": 609,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -137,24 +137,72 @@
 					"column": 20
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " an own-line MULTI-LINE block comment after the last property keeps its own line too",
+			"start": 427,
+			"end": 513,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1\nc2 ",
+			"start": 536,
+			"end": 547,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 2
+				},
+				"end": {
+					"line": 31,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1\nc2 ",
+			"start": 576,
+			"end": 587,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 2
+				},
+				"end": {
+					"line": 38,
+					"column": 5
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 434,
+		"end": 608,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 425,
+			"end": 599,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 25,
+					"line": 40,
 					"column": 9
 				}
 			},
@@ -894,6 +942,364 @@
 							"end": 391
 						}
 					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 515,
+					"end": 557,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 521,
+							"end": 556,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 7
+								},
+								"end": {
+									"line": 32,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 521,
+								"end": 550,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 7
+									},
+									"end": {
+										"line": 32,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 525,
+										"end": 527,
+										"loc": {
+											"start": {
+												"line": 28,
+												"column": 2
+											},
+											"end": {
+												"line": 28,
+												"column": 4
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 525,
+											"end": 527,
+											"loc": {
+												"start": {
+													"line": 28,
+													"column": 2
+												},
+												"end": {
+													"line": 28,
+													"column": 4
+												}
+											},
+											"name": "a4"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 525,
+											"end": 527,
+											"loc": {
+												"start": {
+													"line": 28,
+													"column": 2
+												},
+												"end": {
+													"line": 28,
+													"column": 4
+												}
+											},
+											"name": "a4"
+										},
+										"kind": "init"
+									},
+									{
+										"type": "Property",
+										"start": 531,
+										"end": 533,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 2
+											},
+											"end": {
+												"line": 29,
+												"column": 4
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 531,
+											"end": 533,
+											"loc": {
+												"start": {
+													"line": 29,
+													"column": 2
+												},
+												"end": {
+													"line": 29,
+													"column": 4
+												}
+											},
+											"name": "b4"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 531,
+											"end": 533,
+											"loc": {
+												"start": {
+													"line": 29,
+													"column": 2
+												},
+												"end": {
+													"line": 29,
+													"column": 4
+												}
+											},
+											"name": "b4"
+										},
+										"kind": "init"
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 553,
+								"end": 556,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 5
+									},
+									"end": {
+										"line": 32,
+										"column": 8
+									}
+								},
+								"name": "obj",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c1\nc2 ",
+										"start": 536,
+										"end": 547
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line MULTI-LINE block comment after the last property keeps its own line too",
+							"start": 427,
+							"end": 513
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 560,
+					"end": 598,
+					"loc": {
+						"start": {
+							"line": 34,
+							"column": 1
+						},
+						"end": {
+							"line": 39,
+							"column": 10
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 561,
+						"end": 596,
+						"loc": {
+							"start": {
+								"line": 34,
+								"column": 2
+							},
+							"end": {
+								"line": 39,
+								"column": 8
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "ObjectPattern",
+							"start": 561,
+							"end": 590,
+							"loc": {
+								"start": {
+									"line": 34,
+									"column": 2
+								},
+								"end": {
+									"line": 39,
+									"column": 2
+								}
+							},
+							"properties": [
+								{
+									"type": "Property",
+									"start": 565,
+									"end": 567,
+									"loc": {
+										"start": {
+											"line": 35,
+											"column": 2
+										},
+										"end": {
+											"line": 35,
+											"column": 4
+										}
+									},
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 565,
+										"end": 567,
+										"loc": {
+											"start": {
+												"line": 35,
+												"column": 2
+											},
+											"end": {
+												"line": 35,
+												"column": 4
+											}
+										},
+										"name": "a5"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 565,
+										"end": 567,
+										"loc": {
+											"start": {
+												"line": 35,
+												"column": 2
+											},
+											"end": {
+												"line": 35,
+												"column": 4
+											}
+										},
+										"name": "a5"
+									},
+									"kind": "init"
+								},
+								{
+									"type": "Property",
+									"start": 571,
+									"end": 573,
+									"loc": {
+										"start": {
+											"line": 36,
+											"column": 2
+										},
+										"end": {
+											"line": 36,
+											"column": 4
+										}
+									},
+									"method": false,
+									"shorthand": true,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 571,
+										"end": 573,
+										"loc": {
+											"start": {
+												"line": 36,
+												"column": 2
+											},
+											"end": {
+												"line": 36,
+												"column": 4
+											}
+										},
+										"name": "b5"
+									},
+									"value": {
+										"type": "Identifier",
+										"start": 571,
+										"end": 573,
+										"loc": {
+											"start": {
+												"line": 36,
+												"column": 2
+											},
+											"end": {
+												"line": 36,
+												"column": 4
+											}
+										},
+										"name": "b5"
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 593,
+							"end": 596,
+							"loc": {
+								"start": {
+									"line": 39,
+									"column": 5
+								},
+								"end": {
+									"line": 39,
+									"column": 8
+								}
+							},
+							"name": "obj",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c1\nc2 ",
+									"start": 576,
+									"end": 587
+								}
+							]
+						}
+					}
 				}
 			],
 			"sourceType": "module"

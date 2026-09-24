@@ -6,7 +6,7 @@
 // re-added with the parens when stripping would relocate them, or prepended at a
 // chain base.
 
-use super::{CommentSpacing, CommentVec, LeadingGlue, Printer, RunLeadingBlank};
+use super::{CommentSpacing, CommentVec, LeadingGlue, Printer, RunLeadingBlank, ShellRunOrder};
 use crate::ast::internal;
 use crate::printer::ParenContext;
 use crate::printer::chain::chain_paren_leading_gap;
@@ -711,28 +711,30 @@ impl<'a> Printer<'a> {
             .is_some()
     }
 
-    /// Append trailing comments from stripped grouping parens in spread elements,
-    /// excluding own-line comments (which are handled by the parent array/call/object).
+    /// Append the NODE's share of a stripped-paren interior — a spread's
+    /// ([`internal::SpreadElement::paren_interior`]) or a destructuring-assignment rest's
+    /// ([`internal::RestElement::paren_interior`]) — excluding own-line comments, which
+    /// are the parent list's share (array/call/object literal, array/object pattern).
     ///
-    /// The spread's doc prints only what shares the argument's line: same-line blocks
+    /// The node's doc prints only what shares the argument's line: same-line blocks
     /// inline, and the same-line `//` deferred via `line_suffix` so text the parent
     /// appends inline (a comma, an after-comma block) still lands ahead of it. Every
     /// own-line comment — block or line — needs a line of its own that only the parent
     /// can give (a `line_suffix` raised here would escape past the enclosing `]`/`)`),
-    /// so the parent picks them up via [`Self::spread_own_line_comments`], in source
-    /// order.
+    /// so the parent picks them up via [`Self::paren_interior_own_line_comments`], in
+    /// source order.
     ///
     /// At most ONE comment can defer: a `//` ends its line, so everything after it in
     /// the interior is own-line by construction — which is also what makes the deferred
     /// run structurally weld-free here.
-    pub(crate) fn append_spread_trailing_paren_comments(
+    pub(crate) fn append_paren_interior_trailing_comments(
         &self,
         parts: &mut DocBuf,
-        argument_end: u32,
-        span_end: u32,
+        interior: Span,
     ) {
         let d = self.d();
-        for comment in self.comments_to_emit_between(argument_end, span_end) {
+        let argument_end = interior.start;
+        for comment in self.comments_to_emit_between(argument_end, interior.end) {
             if self.has_newline_between(argument_end, comment.span.start) {
                 // Own-line comments (line or block): skip — the parent's share.
                 continue;
@@ -749,72 +751,115 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// The PARENT's share of a spread's stripped-paren interior.
+    /// The PARENT's share of a stripped-paren interior.
     ///
-    /// When the parser strips grouping parens (`...(x⏎/* c */)`) the comments land in
-    /// `[spread.argument.end, spread.span.end)`, and that region has **two** emitters
-    /// which must partition it exactly once (the seam in `docs/comments.md` §The
-    /// element-comma seam, applied to a node's own interior rather than to a list gap).
-    /// The split is the source's own-line question — the same question every other
-    /// trailing seam asks:
+    /// When the parser strips grouping parens from a spread's or a destructuring rest's
+    /// argument (`...(x⏎/* c */)`) the comments land in `[argument end, node end)` — the
+    /// node's `paren_interior` — and that region has **two** emitters which must
+    /// partition it exactly once (the seam in `docs/comments.md` §The element-comma seam,
+    /// applied to a node's own interior rather than to a list gap). The split is the
+    /// source's own-line question — the same question every other trailing seam asks:
     ///
-    /// - [`Self::append_spread_trailing_paren_comments`] — the spread's own doc — prints
+    /// - [`Self::append_paren_interior_trailing_comments`] — the node's own doc — prints
     ///   what shares the argument's line: the same-line blocks inline, and the same-line
     ///   `//` deferred through `line_suffix`.
     /// - the parent (array element loop, call/`new`/member-chain last-argument emitter,
-    ///   object property loop) prints the **own-line comments** — block or line — which
-    ///   need a line of their own that only the parent can give (a `line_suffix` raised
-    ///   from inside the spread would escape past the enclosing `]`/`)`), each on its own
-    ///   line in source order.
+    ///   object property loop, array/object pattern loop) prints the **own-line
+    ///   comments** — block or line — which need a line of their own that only the parent
+    ///   can give (a `line_suffix` raised from inside the node would escape past the
+    ///   enclosing `]`/`)`), each on its own line in source order.
     ///
     /// This function is the ONLY spelling of that share — the emitting form,
-    /// [`Self::push_spread_own_line_comments`], reads it from here rather than
+    /// [`Self::push_paren_interior_own_line_comments`], reads it from here rather than
     /// re-deriving the predicate. Expressing it as an *anchor shift* instead — scanning
-    /// the parent's trailing gap from `spread.argument.end` rather than from the spread's
-    /// own end — reads as equivalent and is not: it hands the parent the spread's share
-    /// too, so every same-line block and same-line `//` prints twice.
+    /// the parent's trailing gap from the argument's end rather than from the node's own
+    /// end — reads as equivalent and is not: it hands the parent the node's share too, so
+    /// every same-line block and same-line `//` prints twice.
+    pub(crate) fn paren_interior_own_line_comments(&self, interior: Span) -> CommentVec<'_> {
+        let arg_end = interior.start;
+        self.comments_to_emit_between(arg_end, interior.end)
+            .filter(|c| self.has_newline_between(arg_end, c.span.start))
+            .collect()
+    }
+
+    /// [`Self::paren_interior_own_line_comments`] for a list element that may be a
+    /// spread — empty for anything else. The argument-list and array-literal spelling.
     pub(crate) fn spread_own_line_comments(
         &self,
         expr: &internal::Expression<'_>,
     ) -> CommentVec<'_> {
         expr.as_spread()
-            .map(|spread| self.spread_element_own_line_comments(spread))
+            .map(|spread| self.paren_interior_own_line_comments(spread.paren_interior()))
             .unwrap_or_default()
     }
 
-    /// [`Self::spread_own_line_comments`] on the node itself, for the parents whose
-    /// element type is a [`internal::SpreadElement`] rather than an
-    /// [`internal::Expression`] — the object literal's property list.
-    pub(crate) fn spread_element_own_line_comments(
-        &self,
-        spread: &internal::SpreadElement<'_>,
-    ) -> CommentVec<'_> {
-        let arg_end = spread.argument.span().end;
-        self.comments_to_emit_between(arg_end, spread.span.end)
-            .filter(|c| self.has_newline_between(arg_end, c.span.start))
-            .collect()
-    }
-
-    /// Whether the parent's share ([`Self::spread_own_line_comments`]) ends in a `//` —
-    /// the END-of-list ordering question, stated once for both last-argument emitters
-    /// (`emit_last_arg_trailing_comments` and the `call_formatting` loop that mirrors
-    /// it): a share whose last comment is a `//` can have nothing glued after it, so
-    /// the ordinary `[spread.end, closer)` gap must emit FIRST, its inline blocks
-    /// landing on the argument's line ahead of any deferred suffix; a block-ending
-    /// share keeps source order, the gap gluing onto the share's own line
-    /// (`...b⏎/* i */ /* t */` — the order divergence pin).
-    pub(crate) fn spread_share_ends_in_line_comment(
-        &self,
-        expr: &internal::Expression<'_>,
-    ) -> bool {
-        let Some(spread) = expr.as_spread() else {
-            return false;
-        };
-        let arg_end = spread.argument.span().end;
-        self.comments_to_emit_between(arg_end, spread.span.end)
-            .filter(|c| self.has_newline_between(arg_end, c.span.start))
+    /// Whether the parent's share of a stripped-paren interior
+    /// ([`Self::paren_interior_own_line_comments`]) ends in a `//` — the END-of-list
+    /// ordering question: a share whose last comment is a `//` can have nothing glued after
+    /// it, so the ordinary `[node end, closer)` gap run must emit FIRST, its inline blocks
+    /// landing on the argument's line ahead of any deferred suffix. Where a block-ending
+    /// share goes relative to that run is the list family's [`ShellRunOrder`].
+    ///
+    /// Asked of the LAST element only. Between two elements the comma gives the gap's run a
+    /// home on the element's own line and the share follows it past the comma, whatever the
+    /// share ends in (`...b, // c⏎/* i */`). [`Self::push_last_element_share_and_run`] is
+    /// the one emitter of the ordering, for every list with a last element — the argument
+    /// lists, the array and object literals, and the array and object patterns.
+    pub(crate) fn paren_interior_share_ends_in_line_comment(&self, interior: Span) -> bool {
+        self.paren_interior_own_line_comments(interior)
             .last()
             .is_some_and(|c| !c.is_block)
+    }
+
+    /// Emit a LAST element's stripped-paren share and its closer-gap run, in the order
+    /// the list family names.
+    ///
+    /// A share ending in a `//` goes last under every family
+    /// ([`Self::paren_interior_share_ends_in_line_comment`]): nothing can be glued behind
+    /// it. A share ending in a block splits the families, and only over the run's BLOCKS
+    /// ([`ShellRunOrder`]): the argument lists keep source order, a cataloged prettier
+    /// divergence ("Spread stripped-paren comment then an outside block, as the LAST
+    /// argument" in conformance_prettier_ts_comments.md §Comment relocation), while the
+    /// array and object literals and patterns match prettier, which hoists a block written
+    /// after the `)` onto the element's line. The run's `//` follows the share under both
+    /// (`...b⏎/* i */ // t`), where prettier agrees with the call family.
+    ///
+    /// `interior` is `None` for an element with no interior (anything but a spread or a
+    /// rest), which leaves the run alone. The run comes in two halves, `push_blocks` and
+    /// `push_line`, whose shapes each list family keeps as its own; a family under
+    /// [`ShellRunOrder::SourceOrder`] never separates them, so it may pass its whole run as
+    /// `push_blocks`.
+    ///
+    /// Returns whether the share printed anything — an own-line comment, which a list that
+    /// may still collapse must force open (the call-argument loop's `force_expansion`).
+    pub(crate) fn push_last_element_share_and_run(
+        &self,
+        parts: &mut DocBuf,
+        interior: Option<Span>,
+        order: ShellRunOrder,
+        push_blocks: impl FnOnce(&mut DocBuf),
+        push_line: impl FnOnce(&mut DocBuf),
+    ) -> bool {
+        let mut pushed = false;
+        let share_ends_in_line =
+            interior.is_some_and(|i| self.paren_interior_share_ends_in_line_comment(i));
+        let block_share = interior.filter(|_| !share_ends_in_line);
+        if order == ShellRunOrder::SourceOrder
+            && let Some(interior) = block_share
+        {
+            pushed |= self.push_paren_interior_own_line_comments(parts, interior);
+        }
+        push_blocks(parts);
+        if order == ShellRunOrder::HoistBlocks
+            && let Some(interior) = block_share
+        {
+            pushed |= self.push_paren_interior_own_line_comments(parts, interior);
+        }
+        push_line(parts);
+        if let Some(interior) = interior.filter(|_| share_ends_in_line) {
+            pushed |= self.push_paren_interior_own_line_comments(parts, interior);
+        }
+        pushed
     }
 
     /// Whether a spread's stripped-paren interior holds a comment the enclosing argument
@@ -836,11 +881,17 @@ impl<'a> Printer<'a> {
         &self,
         expr: &internal::Expression<'_>,
     ) -> bool {
-        let Some(spread) = expr.as_spread() else {
-            return false;
-        };
-        let arg_end = spread.argument.span().end;
-        self.comments_to_emit_between(arg_end, spread.span.end)
+        expr.as_spread()
+            .is_some_and(|spread| self.paren_interior_forces_expansion(spread.paren_interior()))
+    }
+
+    /// [`Self::spread_paren_comment_forces_expansion`] on the interior itself — also the
+    /// array and object PATTERN's question about a rest element's interior, where both
+    /// kinds need a broken pattern for the same two reasons: the own-line share's line,
+    /// and a deferred `//` that must not drain past the closer.
+    pub(crate) fn paren_interior_forces_expansion(&self, interior: Span) -> bool {
+        let arg_end = interior.start;
+        self.comments_to_emit_between(arg_end, interior.end)
             .any(|c| !c.is_block || self.has_newline_between(arg_end, c.span.start))
     }
 
@@ -864,7 +915,7 @@ impl<'a> Printer<'a> {
 
     /// Whether this expression's own doc ends in a DEFERRED line comment — today only a
     /// spread whose stripped grouping parens held a **same-line** `//` (`...(b // c⏎)`),
-    /// which [`Self::append_spread_trailing_paren_comments`] emits through `line_suffix`
+    /// which [`Self::append_paren_interior_trailing_comments`] emits through `line_suffix`
     /// (an own-line `//` is the parent's share and defers nothing).
     ///
     /// The caller that owns the gap *after* such a node must not let its own same-line
@@ -874,22 +925,20 @@ impl<'a> Printer<'a> {
     /// `docs/comments.md` §Trailing and dangling runs.
     pub(crate) fn defers_trailing_line_comment(&self, expr: &internal::Expression<'_>) -> bool {
         expr.as_spread()
-            .is_some_and(|spread| self.spread_element_defers_trailing_line_comment(spread))
+            .is_some_and(|spread| self.paren_interior_defers_line_comment(spread.paren_interior()))
     }
 
-    /// [`Self::defers_trailing_line_comment`] on the node itself — see
-    /// [`Self::spread_element_own_line_comments`] for why both spellings exist.
-    pub(crate) fn spread_element_defers_trailing_line_comment(
-        &self,
-        spread: &internal::SpreadElement<'_>,
-    ) -> bool {
-        let arg_end = spread.argument.span().end;
-        self.comments_to_emit_between(arg_end, spread.span.end)
+    /// [`Self::defers_trailing_line_comment`] on the interior itself, for the parents
+    /// whose element is not an argument-list [`internal::Expression`] — the object
+    /// literal's spread property, and a destructuring pattern's rest element.
+    pub(crate) fn paren_interior_defers_line_comment(&self, interior: Span) -> bool {
+        let arg_end = interior.start;
+        self.comments_to_emit_between(arg_end, interior.end)
             .any(|c| !c.is_block && !self.has_newline_between(arg_end, c.span.start))
     }
 
     /// Emit the parent's share of a spread's stripped-paren interior
-    /// ([`Self::spread_own_line_comments`]) into `parts`, each on its own line with
+    /// ([`Self::paren_interior_own_line_comments`]) into `parts`, each on its own line with
     /// author blank lines preserved. Returns whether anything was emitted — which is also
     /// the caller's signal to force its argument list open, since an own-line comment is
     /// a sibling of the argument rather than a trailer on its line.
@@ -938,30 +987,35 @@ impl<'a> Printer<'a> {
         preserve_blanks: bool,
     ) -> bool {
         expr.as_spread().is_some_and(|spread| {
-            self.push_spread_element_own_line_comments_with_blanks(parts, spread, preserve_blanks)
+            self.push_paren_interior_own_line_comments_with_blanks(
+                parts,
+                spread.paren_interior(),
+                preserve_blanks,
+            )
         })
     }
 
-    /// [`Self::push_spread_own_line_comments`] on the node itself — see
-    /// [`Self::spread_element_own_line_comments`] for why both spellings exist.
-    pub(crate) fn push_spread_element_own_line_comments(
+    /// [`Self::push_spread_own_line_comments`] on the interior itself, for the parents
+    /// whose element is not an argument-list [`internal::Expression`] — the object
+    /// literal's spread property, and a destructuring pattern's rest element.
+    pub(crate) fn push_paren_interior_own_line_comments(
         &self,
         parts: &mut DocBuf,
-        spread: &internal::SpreadElement<'_>,
+        interior: Span,
     ) -> bool {
-        self.push_spread_element_own_line_comments_with_blanks(parts, spread, true)
+        self.push_paren_interior_own_line_comments_with_blanks(parts, interior, true)
     }
 
-    /// [`Self::push_spread_element_own_line_comments`] with the author-blank policy
+    /// [`Self::push_paren_interior_own_line_comments`] with the author-blank policy
     /// named — see [`Self::push_spread_own_line_comments_with_blanks`].
-    pub(crate) fn push_spread_element_own_line_comments_with_blanks(
+    pub(crate) fn push_paren_interior_own_line_comments_with_blanks(
         &self,
         parts: &mut DocBuf,
-        spread: &internal::SpreadElement<'_>,
+        interior: Span,
         preserve_blanks: bool,
     ) -> bool {
-        let comments = self.spread_element_own_line_comments(spread);
-        let mut prev_end = spread.argument.span().end;
+        let comments = self.paren_interior_own_line_comments(interior);
+        let mut prev_end = interior.start;
         let mut prev_comment: Option<&internal::Comment> = None;
         for comment in &comments {
             // A pair the author GLUED onto one line keeps that line, whichever blank policy

@@ -298,10 +298,23 @@ impl<'a> Printer<'a> {
         let mut comments = comments.peekable();
         let mut ends_with_line_comment = false;
         let mut docs = DocBuf::new();
+        let mut prev: Option<&Comment> = None;
         while let Some(c) = comments.next() {
             ends_with_line_comment = !c.is_block;
             let last = comments.peek().is_none();
-            docs.push(self.build_trailing_js_comment_doc(c, last && closer_owns_break));
+            // A `//` this run emitted ended its line, so the next comment starts one — the
+            // run's own anchor, never a source peek, which a stripped `)` between the two
+            // (`...(a // c1⏎) // c2`) reads as content and spaces the comment off the margin.
+            let starts_line = match prev {
+                Some(p) => !p.is_block,
+                None => self.trailing_comment_starts_line(c),
+            };
+            docs.push(self.build_trailing_js_comment_doc_at(
+                c,
+                last && closer_owns_break,
+                starts_line,
+            ));
+            prev = Some(c);
         }
         (docs, ends_with_line_comment)
     }
@@ -354,7 +367,14 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a `...rest` binding, threading any comment in the `...`→binding gap
-    /// (`.../* c */ rest`). Shared by the array-pattern and object-pattern rest arms.
+    /// (`.../* c */ rest`). Shared by the array-pattern and object-pattern rest arms and the
+    /// default value's spread.
+    ///
+    /// The node's stripped-paren interior (`...(rest /* c */)`) is NOT this doc's: the
+    /// enclosing brackets anchor their next gap at the binding's printed end
+    /// ([`binding_printed_end`]), so the interior and the gap past the `)` are one trailing
+    /// run — a binding pattern stays inline, so there is no own-line share to split off,
+    /// and one run is what lets each comment take its separator from the one before it.
     fn build_rest_pattern_doc(&self, rest_span_start: u32, argument: &Expression<'_>) -> DocId {
         let d = self.d();
         let dots_end = rest_span_start + 3; // past "..."
@@ -539,7 +559,9 @@ impl<'a> Printer<'a> {
             }
             if let Some(e) = elem {
                 parts.push(self.build_pattern_doc(e));
-                prev_end = e.span().end;
+                // The element's PRINTED end: a rest's or a default value's stripped parens
+                // (`[b, ...(a /* c */)]`, `[a = (1 /* c */), b]`) are this gap's.
+                prev_end = binding_printed_end(e);
             }
         }
         parts.push(self.build_pattern_trailing_comments(prev_end, span_end - 1));
@@ -615,7 +637,15 @@ impl<'a> Printer<'a> {
                     .iter()
                     .map(|p| {
                         let s = p.span();
-                        (s.start, s.end, self.build_object_pattern_property_doc(p))
+                        // The property's PRINTED end: a value's or a rest's stripped parens
+                        // (`{ b: (a /* c */) }`, `{ ...(a /* c */) }`) are the next gap's.
+                        let end = match p {
+                            tsv_ts::ObjectPatternProperty::RestElement(r) => {
+                                r.paren_interior().start
+                            }
+                            tsv_ts::ObjectPatternProperty::Property(_) => p.value_end(),
+                        };
+                        (s.start, end, self.build_object_pattern_property_doc(p))
                     })
                     .collect();
                 let braces = self.build_object_braces(expr.span.start, expr.span.end, &entries);
@@ -627,7 +657,11 @@ impl<'a> Printer<'a> {
                     .iter()
                     .map(|p| {
                         let s = p.span();
-                        (s.start, s.end, self.build_object_expr_property_doc(p))
+                        let end = match p {
+                            tsv_ts::ObjectProperty::SpreadElement(sp) => sp.paren_interior().start,
+                            tsv_ts::ObjectProperty::Property(_) => p.value_end(),
+                        };
+                        (s.start, end, self.build_object_expr_property_doc(p))
                     })
                     .collect();
                 self.build_object_braces(expr.span.start, expr.span.end, &entries)
@@ -862,6 +896,20 @@ impl<'a> Printer<'a> {
             parts.extend(trailing_docs);
             self.d().concat(&parts)
         }
+    }
+}
+
+/// Where a binding-pattern element's doc stops printing — the anchor its trailing gap takes.
+///
+/// A rest or spread stops at its argument: the stripped-paren interior (`...(a /* c */)`)
+/// is the gap's, one run with the comments past the `)` ([`Printer::build_rest_pattern_doc`]).
+/// Anything else stops at its [`Expression::printed_end`], so a default's `(1 /* c */)`
+/// shell is the gap's too.
+fn binding_printed_end(expr: &Expression<'_>) -> u32 {
+    match &expr.kind {
+        ExpressionKind::RestElement(r) => r.paren_interior().start,
+        ExpressionKind::SpreadElement(s) => s.paren_interior().start,
+        _ => expr.printed_end(),
     }
 }
 

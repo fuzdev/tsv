@@ -30,18 +30,18 @@
 
 <!-- a line comment inside parens the parser stripped, then another after the `)`: one run,
 	so the second starts the line the first one broke -->
-{a // c1
-// c2
+{(a // c1
+) // c2
 }
 
-{#if a // c1
-// c2
+{#if (a // c1
+) // c2
 }
 	text
 {/if}
 
 <div
-	title={a // c1
-	// c2
+	title={(a // c1
+	) // c2
 	}
 ></div>

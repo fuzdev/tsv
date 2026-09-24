@@ -28,6 +28,13 @@ avoid doubling a break that is already there, and here there is none to double. 
 expression tag hugs its braces either way: it is inline content wherever it appears, so it
 never had the choice.
 
+A run is one run however the author spelled its span: a `//` inside grouping parens the
+parser stripped, then another after the `)` (`{(a // c1⏎) // c2⏎}`, at an expression tag,
+an `{#if}` head and an attribute value), prints exactly as the
+unparenthesized pair does (`unformatted_ours_parens.svelte`). The second comment starts the
+line the first one broke; reading the source between them instead, where the erased `)`
+still stands, spaced it off the margin for one pass.
+
 ## Reason
 
 User comments are valuable and shouldn't be silently removed, and a preserved comment must

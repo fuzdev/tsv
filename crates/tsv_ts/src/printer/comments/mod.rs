@@ -377,6 +377,23 @@ pub(in crate::printer) enum TrailingBlank {
     Drop,
 }
 
+/// Where the BLOCKS of a last element's closer-gap run land against its stripped-paren
+/// share when that share ends in a block — the one question on which the list families
+/// differ ([`Printer::push_last_element_share_and_run`]). A `//` in the run lands behind
+/// the share under both; a share ending in a `//` goes last under both.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ShellRunOrder {
+    /// Source order: the share, then the whole run (`...b⏎/* i */ /* t */`). The argument
+    /// lists' order, a cataloged prettier divergence (conformance_prettier_ts_comments.md
+    /// §Comment relocation, "Spread stripped-paren comment then an outside block, as the
+    /// LAST argument").
+    SourceOrder,
+    /// The run's blocks hoist onto the element's line ahead of the share, and its `//`
+    /// follows the share (`...b /* t */⏎/* i */`, `...b⏎/* i */ // t`) — prettier's order,
+    /// which the array and object literals and the array and object patterns match.
+    HoistBlocks,
+}
+
 /// Where a **block** comment the author gave its own line lands in a trailing gap's run
 /// ([`Printer::push_trailing_comments_in_range_with`]) when no `//` ahead of it has
 /// already deferred the run — the one question the gap's DESTINATION decides, so the

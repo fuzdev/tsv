@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 791,
+	"end": 991,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -249,24 +249,88 @@
 					"column": 12
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " on the LAST element, a line comment written after the `)` trails the own-line",
+			"start": 783,
+			"end": 863,
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 1
+				},
+				"end": {
+					"line": 41,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment the parens held, keeping the order the author wrote them in",
+			"start": 865,
+			"end": 935,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 1
+				},
+				"end": {
+					"line": 42,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " i ",
+			"start": 964,
+			"end": 971,
+			"loc": {
+				"start": {
+					"line": 46,
+					"column": 2
+				},
+				"end": {
+					"line": 46,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " t",
+			"start": 972,
+			"end": 976,
+			"loc": {
+				"start": {
+					"line": 46,
+					"column": 10
+				},
+				"end": {
+					"line": 46,
+					"column": 14
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 790,
+		"end": 990,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 781,
+			"end": 981,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 40,
+					"line": 48,
 					"column": 9
 				}
 			},
@@ -1076,6 +1140,147 @@
 							"value": " an author blank line after the spread survives",
 							"start": 695,
 							"end": 744
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 937,
+					"end": 980,
+					"loc": {
+						"start": {
+							"line": 43,
+							"column": 1
+						},
+						"end": {
+							"line": 47,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 943,
+							"end": 979,
+							"loc": {
+								"start": {
+									"line": 43,
+									"column": 7
+								},
+								"end": {
+									"line": 47,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 943,
+								"end": 945,
+								"loc": {
+									"start": {
+										"line": 43,
+										"column": 7
+									},
+									"end": {
+										"line": 43,
+										"column": 9
+									}
+								},
+								"name": "a7"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 948,
+								"end": 979,
+								"loc": {
+									"start": {
+										"line": 43,
+										"column": 12
+									},
+									"end": {
+										"line": 47,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 952,
+										"end": 953,
+										"loc": {
+											"start": {
+												"line": 44,
+												"column": 2
+											},
+											"end": {
+												"line": 44,
+												"column": 3
+											}
+										},
+										"name": "c"
+									},
+									{
+										"type": "SpreadElement",
+										"start": 957,
+										"end": 961,
+										"loc": {
+											"start": {
+												"line": 45,
+												"column": 2
+											},
+											"end": {
+												"line": 45,
+												"column": 6
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 960,
+											"end": 961,
+											"loc": {
+												"start": {
+													"line": 45,
+													"column": 5
+												},
+												"end": {
+													"line": 45,
+													"column": 6
+												}
+											},
+											"name": "b"
+										},
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " i ",
+												"start": 964,
+												"end": 971
+											},
+											{
+												"type": "Line",
+												"value": " t",
+												"start": 972,
+												"end": 976
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " on the LAST element, a line comment written after the `)` trails the own-line",
+							"start": 783,
+							"end": 863
+						},
+						{
+							"type": "Line",
+							"value": " comment the parens held, keeping the order the author wrote them in",
+							"start": 865,
+							"end": 935
 						}
 					]
 				}

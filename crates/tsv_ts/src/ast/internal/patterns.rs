@@ -65,6 +65,16 @@ impl<'arena> ObjectPatternProperty<'arena> {
             ObjectPatternProperty::RestElement(r) => r.span.end,
         }
     }
+
+    /// The rest element behind this property, if it is one — the pattern counterpart of
+    /// [`super::ObjectProperty::as_spread`], for the printer's stripped-paren interior
+    /// helpers.
+    pub fn as_rest(&self) -> Option<&RestElement<'arena>> {
+        match self {
+            ObjectPatternProperty::RestElement(r) => Some(r),
+            ObjectPatternProperty::Property(_) => None,
+        }
+    }
 }
 
 /// Array pattern for destructuring: `[a, b]`, `[a, , b]`, `[...rest]`
@@ -132,4 +142,23 @@ pub struct RestElement<'arena> {
     // inline (`Option<TSTypeAnnotation>`) everywhere else.
     pub type_annotation: Option<TSTypeAnnotation<'arena>>,
     pub span: Span,
+}
+
+impl RestElement<'_> {
+    /// The source the grouping parens the parser stripped from the argument leave behind
+    /// — `[argument end, span end)`, the region between the argument and the shell's last
+    /// `)` (`[...(a /* c */)] = x`). A destructuring-assignment rest is the only one that
+    /// can hold a shell (`AssignmentRestElement` takes a `DestructuringAssignmentTarget`);
+    /// the spread twin is [`super::SpreadElement::paren_interior`].
+    ///
+    /// Empty for a rest carrying a `?` marker or a `: T` annotation: that tail is what
+    /// extends its span there, and its gaps are the tail emitter's, never an interior.
+    pub fn paren_interior(&self) -> Span {
+        let arg_end = self.argument.span().end;
+        if self.optional || self.type_annotation.is_some() {
+            Span::new(arg_end, arg_end)
+        } else {
+            Span::new(arg_end, self.span.end)
+        }
+    }
 }

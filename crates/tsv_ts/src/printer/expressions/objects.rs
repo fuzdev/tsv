@@ -8,6 +8,7 @@
 // - Blank line preservation between properties
 
 use crate::ast::internal::{self, Expression, ExpressionKind, Literal, LiteralValue};
+use crate::printer::comments::ShellRunOrder;
 use crate::printer::comments::ValueGap;
 use crate::printer::expressions::assignment::{AssignmentLeft, RhsCommentInfo};
 use crate::printer::expressions::literals::is_valid_js_identifier;
@@ -201,17 +202,31 @@ impl<'a> Printer<'a> {
                 // A spread whose stripped parens held a `//` already ends its line in one;
                 // a second may not weld onto it.
                 trailing.demote_line_after_deferred(
-                    spread.is_some_and(|s| self.spread_element_defers_trailing_line_comment(s)),
+                    spread.is_some_and(|s| {
+                        self.paren_interior_defers_line_comment(s.paren_interior())
+                    }),
                 );
                 let comma = (!is_last).then(|| d.text(","));
-                self.push_element_comma_trailing(&mut parts, &trailing, comma);
-
                 // The object's share of a spread's stripped-paren interior: the own-line
                 // comments the spread's own doc leaves behind, each a sibling line the
-                // object cannot stay collapsed around. Emitted past the comma, like the
-                // array element loop and the argument-list gaps.
-                if let Some(s) = spread {
-                    self.push_spread_element_own_line_comments(&mut parts, s);
+                // object cannot stay collapsed around. Past a comma it follows the run
+                // (`...b, // c⏎/* i */`), like the array element loop and the argument-list
+                // gaps; on the LAST property there is no comma, and the two take the
+                // last-element order (`Printer::push_last_element_share_and_run`).
+                let interior = spread.map(internal::SpreadElement::paren_interior);
+                if is_last {
+                    self.push_last_element_share_and_run(
+                        &mut parts,
+                        interior,
+                        ShellRunOrder::HoistBlocks,
+                        |parts| self.push_element_comma_trailing_blocks(parts, &trailing, comma),
+                        |parts| self.push_element_trailing_line(parts, &trailing),
+                    );
+                } else {
+                    self.push_element_comma_trailing(&mut parts, &trailing, comma);
+                    if let Some(interior) = interior {
+                        self.push_paren_interior_own_line_comments(&mut parts, interior);
+                    }
                 }
 
                 prev_end = trailing.end_pos;
