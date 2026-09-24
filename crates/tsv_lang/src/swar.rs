@@ -59,6 +59,57 @@ pub(crate) const fn zero_lanes(v: u64) -> u64 {
     v.wrapping_sub(LOW_BITS) & !v & HIGH_BITS
 }
 
+/// Lane mask of the zero bytes in `v`, **exact per lane**, for a `v` whose every
+/// byte is ASCII (`< 0x80`).
+///
+/// [`zero_lanes`] finds a zero by borrowing *out* of it, and that borrow is what
+/// lets a flag spill into the next lane. This kernel flags the NONZERO lanes
+/// instead, by carrying *into* each lane's high bit — `x + 0x7f` reaches `0x80`
+/// exactly when `x >= 1` — and inverts. An ASCII lane plus `0x7f` is at most
+/// `0xfe`, so nothing ever carries out of a lane: every flag is independently
+/// genuine, and the mask may be iterated (clear the lowest set lane and
+/// continue) or popcounted — the readings [`zero_lanes`] forbids. The cost is
+/// the same: an add and an and-not.
+///
+/// ⚠️ **The ASCII precondition is the whole exactness argument**, and a
+/// non-ASCII word breaks it in BOTH directions. A lane at or above `0x81` (or
+/// `0x80` with a carry in) wraps past `0xff`: its own sum lands in `0..0x80`, so
+/// that lane reads as a zero it is not — a FALSE match — and it carries into the
+/// lane above, where a genuine zero lane is pushed to `0x80` and loses its flag
+/// — a MISSED match, the one failure no caller can detect. XOR with an ASCII
+/// needle keeps an ASCII word ASCII, so `ascii_zero_lanes(w ^ splat(needle))` is
+/// exact over any ASCII `w`; a caller that can see other words clears the high
+/// bits first and masks the lanes that held them back out (`location`'s
+/// `terminator_lanes_any`).
+#[inline]
+pub(crate) const fn ascii_zero_lanes(v: u64) -> u64 {
+    !v.wrapping_add(splat(0x7f)) & HIGH_BITS
+}
+
+/// Does the ASCII word `v` hold a byte below `n` (`n <= 0x80`)? The boolean
+/// [`lanes_less_than`] with its `& !v` term dropped — the term that keeps a lane
+/// at or above `0x80` from flagging, which an ASCII word has none of.
+///
+/// A lane below `n` underflows and sets its high bit; a lane at or above `n`
+/// that receives no borrow lands in `0..0x80` and does not; and a borrow only
+/// originates at a lane that genuinely underflows. So the mask is nonzero
+/// exactly when some lane is below `n` — one subtract and one test, the
+/// cheapest loose class a word loop can ask before an exact kernel confirms it.
+///
+/// Off ASCII it errs in ONE direction only, toward `true`, and that is what lets
+/// a loose hop use it over any bytes. A byte below `n` is never missed: no
+/// borrow reaches the lowest such lane from below it (a borrow only originates
+/// at a lane that underflows), so that lane underflows and flags. And a word
+/// with no byte below `n` draws no borrow at all, so each lane reads `x - n`,
+/// which sets its high bit exactly when `x >= 0x80 + n` — a lane in
+/// `[0x80, 0x80 + n)` lands back in `0x00..0x80` and does not flag. So over any
+/// word the answer is "some byte is below `n`, or some byte is at or above
+/// `0x80 + n`".
+#[inline]
+pub(crate) const fn ascii_has_byte_below(v: u64, n: u8) -> bool {
+    v.wrapping_sub(splat(n)) & HIGH_BITS != 0
+}
+
 /// Lane mask of the bytes in `v` that are zero **or** have their high bit set —
 /// [`zero_lanes`] with its `& !v` term dropped.
 ///
@@ -472,6 +523,68 @@ mod tests {
                 |v| lanes_less_than(v, n),
                 |b| b < n,
             );
+        }
+    }
+
+    /// [`ascii_zero_lanes`] is exact per LANE, a stronger claim than the lowest-lane
+    /// one: every ordered pair of ASCII byte values at every pair of adjacent lanes,
+    /// over a background of each ASCII value, with the whole mask compared against
+    /// the per-lane oracle — so a carry that set or cleared any lane's flag, not just
+    /// the lowest, is caught.
+    #[test]
+    fn ascii_zero_lanes_is_exact_per_lane() {
+        for fill in [0x00u8, 0x01, 0x0a, 0x7e, 0x7f] {
+            for k in 0..7 {
+                for a in 0..0x80u8 {
+                    for b in 0..0x80u8 {
+                        let mut lanes = [fill; 8];
+                        lanes[k] = a;
+                        lanes[k + 1] = b;
+                        let mut expected = 0u64;
+                        for (lane, &x) in lanes.iter().enumerate() {
+                            if x == 0 {
+                                expected |= 0x80 << (8 * lane);
+                            }
+                        }
+                        assert_eq!(
+                            ascii_zero_lanes(u64::from_le_bytes(lanes)),
+                            expected,
+                            "{lanes:?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// [`ascii_has_byte_below`] against the scalar predicate: every byte value in
+    /// every lane over a background of each boundary value, for every `n` either side
+    /// of the line scan's `0x0e` and at both ends of the claimed range. Over an ASCII
+    /// word the answer is exactly "some byte is below `n`"; over any word it is that
+    /// OR "some byte is at or above `0x80 + n`" — never a miss, which is what the
+    /// line scan's loose hop relies on over a word it cannot prove ASCII.
+    #[test]
+    fn ascii_has_byte_below_matches_the_scalar_predicate() {
+        for n in [0x00u8, 0x01, 0x0d, 0x0e, 0x0f, 0x7f, 0x80] {
+            for fill in [0x00u8, 0x0d, 0x0e, 0x0f, 0x7f, 0x80, 0x8d, 0x8e, 0xff] {
+                for k in 0..8 {
+                    for x in 0..=0xffu8 {
+                        let mut lanes = [fill; 8];
+                        lanes[k] = x;
+                        let below = lanes.iter().any(|&b| b < n);
+                        let expected = if lanes.is_ascii() {
+                            below
+                        } else {
+                            below || lanes.iter().any(|&b| u16::from(b) >= 0x80 + u16::from(n))
+                        };
+                        assert_eq!(
+                            ascii_has_byte_below(u64::from_le_bytes(lanes), n),
+                            expected,
+                            "n={n:#04x} {lanes:?}"
+                        );
+                    }
+                }
+            }
         }
     }
 

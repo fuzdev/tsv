@@ -1125,10 +1125,21 @@ which a corpus samples arbitrarily. So grade a scan over every input length and
 **every alignment across the word stride** — the line-start scans are checked
 against the byte-at-a-time shapes they replaced over every string of length 0–4
 on an alphabet covering each arm (`\n`, `\r`, `\0`, ordinary, `0x7f`) × every
-alignment 0–16. Note what no corpus could have covered: real source contains no
-`\r` at all, so the entire CRLF arm is corpus-dead. Both corruptions tried
-(dropping the scalar tail; reading the highest set lane of the SWAR mask instead
-of the lowest) were caught only there. See the same rule applied to CSS keyword sets in
+alignment 0–16, and over every whole word on `\n`, `\r`, `0x0b`, `0x0c` × every
+alignment 0–7 × an LF, an ordinary byte or the run's end behind it. The second
+set exists because the scans take *every* terminator a word holds, so they rest on
+a lane kernel exact per lane, not merely at its lowest lane: swapping in the
+borrowing has-zero kernel (whose spurious lane after a genuine `\n` is exactly a
+`0x0b`) fails there, and on the `0x0b` / `0x0c` pieces of the third set below. A
+third set feeds the scans non-ASCII bytes — every high byte at every lane beside each
+terminator, and real UTF-8 characters against every terminator spelling at every
+offset — since they are exact over any bytes, not only over the ASCII runs their
+callers hand them: deleting the high-bit gate that routes such a word to the any-byte
+arm, dropping that arm's non-ASCII lane mask, or building it on the borrowing kernel
+fails only there. Note what no corpus could have covered: real source contains no
+`\r` at all, so the entire CRLF arm is corpus-dead — dropping the lane-7 "next byte
+is LF" correction, or the shift that pairs a CR with the LF in the lane above it, is
+caught only by these tests. See the same rule applied to CSS keyword sets in
 [`crates/tsv_css/CLAUDE.md`](../crates/tsv_css/CLAUDE.md), and to text width in
 [`crates/tsv_lang/CLAUDE.md`](../crates/tsv_lang/CLAUDE.md).
 

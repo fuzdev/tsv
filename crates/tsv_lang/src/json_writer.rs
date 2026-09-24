@@ -355,7 +355,7 @@ fn fill_start_end(window: &mut [u8], start: (u64, usize), end: (u64, usize)) -> 
 /// the two `zero_lanes` tests are only the `"` and `\` needles.
 ///
 /// One word is loaded once and tested three ways rather than scanned three
-/// times — the same trade `next_ecmascript_terminator` makes for its two
+/// times — the same trade `location`'s `terminator_lanes` makes for its two
 /// needles.
 ///
 /// The remainder is finished with an **overlapping final word** rather than a
