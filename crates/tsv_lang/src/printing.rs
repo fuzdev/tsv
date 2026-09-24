@@ -1561,8 +1561,8 @@ fn build_line_breaks_bytes(bytes: &[u8], breaks: &mut Vec<u32>) -> bool {
 /// Index of the first byte at or after `from` that could BEGIN a line terminator
 /// sequence — `\n`, `\r`, or the `0xE2` lead of `<LS>` / `<PS>` — or `bytes.len()`.
 ///
-/// The same word-at-a-time shape, and the same reason, as `location`'s
-/// `next_ecmascript_terminator`: terminators are sparse (~1 per 30–40 source bytes), so a
+/// The same word-at-a-time shape, and the same reason, as `location`'s line-start
+/// scans: terminators are sparse (~1 per 30–40 source bytes), so a
 /// per-byte compare spends nearly all of its work confirming misses, and this table is
 /// built once over the whole source in every `format_in`. The `0xE2` lead is what
 /// `location`'s does not look for — that one runs inside a run already proven ASCII, where

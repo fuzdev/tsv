@@ -1,7 +1,7 @@
 use std::cell::Cell;
 
 use crate::sizing::estimated_line_starts_capacity;
-use crate::swar::{high_bit_lanes, splat, zero_lanes};
+use crate::swar::{ascii_has_byte_below, ascii_zero_lanes, high_bit_lanes, splat};
 
 /// A position in source code (line and column)
 ///
@@ -165,7 +165,7 @@ enum LineRule {
 ///
 /// The two travel as **one** out-param because the flag is a fact the starts
 /// scan discovers, not an independent output: it costs no extra pass precisely
-/// because `next_ecmascript_terminator` already loads the `\r` positions the LF
+/// because [`terminator_lanes`] already loads the `\r` positions the LF
 /// rule discards, and a caller holding the starts without it has silently
 /// dropped half of what the scan found. The `None` and `Ecmascript` rules leave
 /// it `false`.
@@ -899,37 +899,122 @@ fn ascii_ecmascript_line_starts(bytes: &[u8]) -> Vec<u32> {
     lines.starts
 }
 
-/// Index of the first `\n` **or** `\r` at or after `from`, or `bytes.len()`.
+/// The line-terminator lanes of one word: `(lf, cr)`, the `\n` lanes and the
+/// `\r` lanes, each **exact per lane** over any bytes at all.
 ///
-/// The line-scan sibling of [`next_non_ascii`], and the same word-at-a-time
-/// shape for the same reason: line terminators are sparse (~1 per 30–40 source
-/// bytes), so a per-byte compare spends nearly all of its work confirming
-/// misses. `from_le_bytes` puts byte 0 in the low lane, so the lowest set bit is
-/// the earliest match.
+/// Exact is what lets the scans below take every terminator a word holds from
+/// the one load — clear the lowest set lane and continue — rather than
+/// re-searching from the byte after each one: lines run ~30–40 bytes, so a
+/// search per line re-enters its loop, reloads the word it just read, and pays
+/// its entry and exit once a line, where a stride over the source pays them
+/// once a run. Both needles ride the same loaded word, so the source is read
+/// **once**, which is also why the LF-only scan asks for `\r` at all: it wants
+/// the positions, to report whether the ECMAScript rule would draw different
+/// lines.
 ///
-/// Both needles are tested against the same loaded word, so the source is read
-/// **once** — two independent single-needle passes would double the memory
-/// traffic to save one `xor`/`sub`/`andn` triple per word, the wrong trade on a
-/// multi-megabyte source. That is also why the LF-only scan shares it rather
-/// than searching `\n` alone: it wants the `\r` positions anyway, to report
-/// whether the ECMAScript rule would draw different lines.
+/// The kernel beneath, [`ascii_zero_lanes`], is exact only over an ASCII word —
+/// a non-ASCII lane (post-XOR at or above `0x81`, every high byte but the
+/// needle's own `0x8a` / `0x8d`) carries into the lane above it — so a word
+/// holding a non-ASCII byte takes [`terminator_lanes_any`] instead. The scans'
+/// callers hand them ASCII runs, so that arm is cold, but the exactness is this
+/// function's, not its callers': one high-bit test per flagged word (the hop
+/// tests only the words its loose class has flagged) buys a scan that is exact
+/// over any byte string rather than one whose release build silently draws
+/// phantom and missing lines from a slice that is not the run it expected.
+///
+/// `from_le_bytes` puts byte 0 in the low lane, so lane `k` is byte `k`.
 #[inline]
-fn next_ecmascript_terminator(bytes: &[u8], from: usize) -> usize {
-    let mut i = from;
-    while let Some(chunk) = bytes[i..].first_chunk::<8>() {
-        let w = u64::from_le_bytes(*chunk);
-        // OR-ing two masks preserves the lowest-lane guarantee: a spurious lane
-        // in either mask is preceded by a genuine one in that same mask.
-        let hits = zero_lanes(w ^ splat(b'\n')) | zero_lanes(w ^ splat(b'\r'));
-        if hits != 0 {
-            return i + (hits.trailing_zeros() / 8) as usize;
-        }
-        i += 8;
+fn terminator_lanes(word: u64) -> (u64, u64) {
+    if high_bit_lanes(word) != 0 {
+        return terminator_lanes_any(word);
     }
-    while i < bytes.len() && bytes[i] != b'\n' && bytes[i] != b'\r' {
+    (
+        ascii_zero_lanes(word ^ splat(b'\n')),
+        ascii_zero_lanes(word ^ splat(b'\r')),
+    )
+}
+
+/// [`terminator_lanes`] for a word holding a non-ASCII byte: clear every lane's
+/// high bit so the word is ASCII and [`ascii_zero_lanes`] exact again, then drop
+/// the lanes that were non-ASCII — a `0x8a` masked to `0x0a` would otherwise
+/// read as a `\n`.
+#[cold]
+#[inline(never)]
+fn terminator_lanes_any(word: u64) -> (u64, u64) {
+    let high = high_bit_lanes(word);
+    let ascii = word ^ high;
+    (
+        ascii_zero_lanes(ascii ^ splat(b'\n')) & !high,
+        ascii_zero_lanes(ascii ^ splat(b'\r')) & !high,
+    )
+}
+
+/// The lanes of `cr` holding a **lone** CR — one whose next byte is not `\n` —
+/// given the same word's exact `lf` lanes and `next`, the byte after the word.
+///
+/// Lane `k + 1`'s flag shifted down one lane is lane `k`'s "followed by LF", so
+/// `cr & !(lf >> 8)` answers every lane but the last from the word alone. Lane
+/// 7's next byte lies outside the word — the next word's first, or nothing at
+/// the end of the run (a run only ends at a non-ASCII byte or the source's end,
+/// and neither is `\n`) — so the shift reads it as "not LF" and `next` corrects
+/// it.
+#[inline]
+fn lone_cr_lanes(lf: u64, cr: u64, next: Option<&u8>) -> u64 {
+    let lone = cr & !(lf >> 8);
+    if next == Some(&b'\n') {
+        lone & !(0x80 << 56)
+    } else {
+        lone
+    }
+}
+
+/// The next of `words` at or after index `*k` holding a line terminator, as
+/// `(byte offset, lf, cr)` ([`terminator_lanes`]), leaving `*k` one past it; or
+/// `None` once the words run out.
+///
+/// The hop between terminators — four or five words a line — asks the LOOSE
+/// class first: a byte below `0x0e` ([`ascii_has_byte_below`], one subtract and
+/// one test a word) holds both terminators and, of what real source carries,
+/// only the tab besides — which sits beside a line break in the indentation that
+/// follows it, so it rarely costs a word of its own. Only a word the loose test
+/// flags pays for the two exact masks.
+///
+/// The loose test can never skip a terminator word, whatever bytes it holds: off
+/// ASCII it errs only toward a spurious hit (a lane at or above `0x8e` flags),
+/// never a miss, because the lowest lane below the bound always flags — see
+/// [`ascii_has_byte_below`]. A spurious hit costs the exact masks, which find
+/// nothing, and the hop moves on.
+///
+/// Its own loop rather than a branch inside the caller's: spelled as one loop
+/// over every word with the push inside it, the push's state stays live beside
+/// the word test's constants and LLVM rematerializes the constants once a
+/// word; as a loop of its own, the hop holds them in registers.
+#[inline]
+fn next_terminator_word(words: &[[u8; 8]], k: &mut usize) -> Option<(usize, u64, u64)> {
+    let mut i = *k;
+    while i < words.len() {
+        let word = u64::from_le_bytes(words[i]);
         i += 1;
+        if ascii_has_byte_below(word, b'\r' + 1) {
+            let (lf, cr) = terminator_lanes(word);
+            if lf | cr != 0 {
+                *k = i;
+                return Some((8 * (i - 1), lf, cr));
+            }
+        }
     }
-    i
+    *k = i;
+    None
+}
+
+/// Push the line start after each flagged lane of `lanes`, in ascending order;
+/// `after` is the start after lane 0 — the word's source position plus one.
+#[inline]
+fn push_lane_starts(starts: &mut Vec<u32>, mut lanes: u64, after: usize) {
+    while lanes != 0 {
+        starts.push((after + (lanes.trailing_zeros() / 8) as usize) as u32);
+        lanes &= lanes - 1;
+    }
 }
 
 /// Append the LF-only line starts of an ASCII run to `lines`, offset by the
@@ -945,21 +1030,46 @@ fn next_ecmascript_terminator(bytes: &[u8], from: usize) -> usize {
 /// CR, exactly as this reads it.
 ///
 /// The scan looks for `\r` alongside `\n` — both needles ride one loaded word
-/// (see [`next_ecmascript_terminator`]), so the probe costs no extra pass and no
-/// extra memory traffic. It is what lets `tsv_svelte` skip building acorn's
-/// second line table on every document that does not need one; see
+/// (see [`terminator_lanes`]), so the probe costs no extra pass and no extra
+/// memory traffic. It is what lets `tsv_svelte` skip building acorn's second
+/// line table on every document that does not need one; see
 /// `tsv_ts::AcornSeed`.
+///
+/// Its starts are exact over any bytes ([`terminator_lanes`]), though its
+/// callers hand it ASCII runs; the slice is read as a whole source, so a `\r` as
+/// its last byte is a lone CR. Its `ecmascript_differs` is NOT exact over a
+/// non-ASCII slice: it sees a lone CR but not `<LS>` / `<PS>` (U+2028 / U+2029),
+/// three-byte characters the multibyte builder checks between the runs.
 fn ascii_lf_line_starts_into(bytes: &[u8], base: usize, lines: &mut LineScan) {
-    let mut i = next_ecmascript_terminator(bytes, 0);
-    while i < bytes.len() {
-        if bytes[i] == b'\r' {
-            // CRLF is one ECMAScript break holding one LF, so it leaves the two
-            // classes agreeing; a *lone* CR is the divergence this reports.
-            lines.ecmascript_differs |= bytes.get(i + 1) != Some(&b'\n');
-        } else {
-            lines.starts.push((base + i + 1) as u32);
+    let (words, tail) = bytes.as_chunks::<8>();
+    let mut k = 0;
+    while let Some((at, lf, cr)) = next_terminator_word(words, &mut k) {
+        if cr != 0 {
+            // CRLF is one ECMAScript break holding one LF, so it leaves the
+            // two classes agreeing; a *lone* CR is the divergence this reports.
+            lines.ecmascript_differs |= lone_cr_lanes(lf, cr, bytes.get(at + 8)) != 0;
         }
-        i = next_ecmascript_terminator(bytes, i + 1);
+        push_lane_starts(&mut lines.starts, lf, base + at + 1);
+    }
+    if tail.is_empty() {
+        return;
+    }
+    if let Some(last) = bytes.last_chunk::<8>() {
+        // The tail is the high lanes of the run's LAST word, whose low lanes the
+        // loop has already read: take that word and keep only the fresh lanes.
+        let (lf, cr) = terminator_lanes(u64::from_le_bytes(*last));
+        let fresh = !0u64 << (8 * (8 - tail.len()));
+        lines.ecmascript_differs |= lone_cr_lanes(lf, cr, None) & fresh != 0;
+        push_lane_starts(&mut lines.starts, lf & fresh, base + bytes.len() - 7);
+    } else {
+        // A run shorter than one word.
+        for (k, &b) in tail.iter().enumerate() {
+            match b {
+                b'\n' => lines.starts.push((base + k + 1) as u32),
+                b'\r' => lines.ecmascript_differs |= tail.get(k + 1) != Some(&b'\n'),
+                _ => {}
+            }
+        }
     }
 }
 
@@ -972,19 +1082,48 @@ fn ascii_lf_line_starts_into(bytes: &[u8], base: usize, lines: &mut LineScan) {
 /// non-ASCII byte, which `\n` is not — so a `\r` at the end of a run is a lone
 /// CR, exactly as this scan reads it.
 ///
-/// The rule collapses to one shape once the scan lands *on* a terminator: `\n`
-/// and a lone `\r` both start the next line at `i + 1`, and CRLF is the same
-/// after stepping `i` onto its `\n`. So the only per-byte work left is the CRLF
-/// test, run once per line instead of once per byte.
+/// A line starts after every `\n` and after every lone `\r`; a CR followed by
+/// its LF starts nothing of its own, since the LF's start is the pair's. So a
+/// word's starts are its LF lanes plus its lone-CR lanes, and the CR arm runs
+/// only in a word that holds a `\r` at all.
+///
+/// Exact over any bytes ([`terminator_lanes`]) for the two terminators it reads,
+/// `\n` and `\r`, but it does NOT see `<LS>` / `<PS>` (U+2028 / U+2029): those
+/// are three-byte characters, so its callers hand it ASCII runs and the
+/// multibyte builder handles the two between them.
 fn ascii_ecmascript_line_starts_into(bytes: &[u8], base: usize, lines: &mut LineScan) {
-    let mut i = next_ecmascript_terminator(bytes, 0);
-    while i < bytes.len() {
-        // CRLF counts as a single line terminator.
-        if bytes[i] == b'\r' && bytes.get(i + 1) == Some(&b'\n') {
-            i += 1;
+    let (words, tail) = bytes.as_chunks::<8>();
+    let mut k = 0;
+    while let Some((at, lf, cr)) = next_terminator_word(words, &mut k) {
+        let starts = if cr == 0 {
+            lf
+        } else {
+            lf | lone_cr_lanes(lf, cr, bytes.get(at + 8))
+        };
+        push_lane_starts(&mut lines.starts, starts, base + at + 1);
+    }
+    if tail.is_empty() {
+        return;
+    }
+    if let Some(last) = bytes.last_chunk::<8>() {
+        // The tail is the high lanes of the run's LAST word, whose low lanes the
+        // loop has already read: take that word and keep only the fresh lanes.
+        let (lf, cr) = terminator_lanes(u64::from_le_bytes(*last));
+        let fresh = !0u64 << (8 * (8 - tail.len()));
+        let starts = (lf | lone_cr_lanes(lf, cr, None)) & fresh;
+        push_lane_starts(&mut lines.starts, starts, base + bytes.len() - 7);
+    } else {
+        // A run shorter than one word.
+        for (k, &b) in tail.iter().enumerate() {
+            let starts_line = match b {
+                b'\n' => true,
+                b'\r' => tail.get(k + 1) != Some(&b'\n'),
+                _ => false,
+            };
+            if starts_line {
+                lines.starts.push((base + k + 1) as u32);
+            }
         }
-        lines.starts.push((base + i + 1) as u32);
-        i = next_ecmascript_terminator(bytes, i + 1);
     }
 }
 
@@ -1268,8 +1407,11 @@ mod tests {
     /// diff over thousands of files unless some file happens to exercise the
     /// exact word alignment that breaks. The SWAR scans are therefore graded
     /// against these shapes *exhaustively over every alignment*
-    /// (`test_swar_line_scans_match_scalar_reference_exhaustive`), and by
-    /// nothing else.
+    /// (`test_swar_line_scans_match_scalar_reference_exhaustive`), over every
+    /// terminator arrangement within a word
+    /// (`test_swar_line_scans_match_scalar_reference_on_dense_words`), and over
+    /// bytes that are not ASCII
+    /// (`test_swar_line_scans_match_scalar_reference_on_non_ascii_bytes`).
     fn reference_lf_line_starts(bytes: &[u8], base: usize) -> Vec<u32> {
         let mut out = Vec::new();
         for (i, &b) in bytes.iter().enumerate() {
@@ -1317,7 +1459,9 @@ mod tests {
                     rest /= ALPHABET.len();
                 }
                 // Every alignment across the 8-byte stride, so a pattern is
-                // tested inside a word, straddling two, and in the scalar tail.
+                // tested inside a word, straddling two, and in the run's last
+                // word — read overlapped with the one before and masked to its
+                // fresh lanes — or, in a run under eight bytes, the byte loop.
                 for prefix in 0..17usize {
                     let mut bytes = vec![b'x'; prefix];
                     bytes.extend_from_slice(&word);
@@ -1344,6 +1488,145 @@ mod tests {
                         es.starts != lf.starts,
                         "ecmascript-differs probe {label}"
                     );
+                }
+            }
+        }
+    }
+
+    /// Every whole word over the terminators and their borrow partners, at every
+    /// alignment, against both references.
+    ///
+    /// The scans take EVERY flagged lane of a word, so they rest on the lane
+    /// kernel being exact per lane, not merely at its lowest lane — which the
+    /// four-byte patterns above cannot fully grade: a word can hold eight
+    /// terminators. The alphabet is the two terminators plus `0x0b` and `0x0c` —
+    /// each needle with its low bit flipped, exactly the byte a borrowing has-zero
+    /// kernel flags spuriously in the lane after a genuine match, so a scan built
+    /// on one fails here (and on the non-ASCII test's `0x0b` / `0x0c` pieces), and
+    /// both below the hop's loose `0x0e` bound, so they also drive the loose test's
+    /// false hits. The suffixes put an LF, an ordinary byte, or the end of the run
+    /// behind the word's last lane, which is where a CRLF pair straddles two words
+    /// and a CR's LF lies outside the word that holds it; the prefixes place the
+    /// word at every offset, splitting it across two words and across the word
+    /// loop and the overlapped, masked read of the run's last word.
+    #[test]
+    fn test_swar_line_scans_match_scalar_reference_on_dense_words() {
+        const ALPHABET: [u8; 4] = [b'\n', b'\r', 0x0b, 0x0c];
+        let mut word = [0u8; 8];
+        for n in 0..ALPHABET.len().pow(8) {
+            let mut rest = n;
+            for slot in &mut word {
+                *slot = ALPHABET[rest % ALPHABET.len()];
+                rest /= ALPHABET.len();
+            }
+            for prefix in 0..8usize {
+                for suffix in [&b""[..], b"\n", b"y"] {
+                    let mut bytes = vec![b'x'; prefix];
+                    bytes.extend_from_slice(&word);
+                    bytes.extend_from_slice(suffix);
+
+                    let mut lf = LineScan::bare();
+                    ascii_lf_line_starts_into(&bytes, 7, &mut lf);
+                    let lf_reference = reference_lf_line_starts(&bytes, 7);
+                    assert_eq!(lf.starts, lf_reference, "lf {bytes:?}");
+
+                    let mut es = LineScan::bare();
+                    ascii_ecmascript_line_starts_into(&bytes, 7, &mut es);
+                    let es_reference = reference_ecmascript_line_starts(&bytes, 7);
+                    assert_eq!(es.starts, es_reference, "ecmascript {bytes:?}");
+                    assert_eq!(
+                        lf.ecmascript_differs,
+                        es_reference != lf_reference,
+                        "ecmascript-differs probe {bytes:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Both scans against the references over bytes that are NOT ASCII: the scans
+    /// are exact over any bytes (`terminator_lanes`), not only over the ASCII runs
+    /// their callers hand them.
+    ///
+    /// Two families. Every high byte `0x80..=0xff` at every lane of a 24-byte run
+    /// (whole words) and a 21-byte one (ending in the overlapped last word), over
+    /// an LF, a CR and an ordinary background, and again with a `\n` or `\r`
+    /// directly on either side of it — the placements where the raw ASCII kernel
+    /// fails both ways. XORed with the needle, every high byte but one lands at
+    /// or above `0x81`, wraps to read as that needle (a phantom line) and carries
+    /// into the lane above, clearing a genuine terminator there (a missed line).
+    /// The one that does not is `0x8a` for `\n` and `0x8d` for `\r`, which XOR
+    /// to exactly `0x80` and, absent a carry in, stay unflagged; they are instead
+    /// the lanes `terminator_lanes_any`'s high-bit clear turns into `\n` / `\r`,
+    /// which its `& !high` removes. And every ordered pair of real UTF-8
+    /// characters and terminator spellings at every offset, each followed by the
+    /// end of the run, an LF, an ordinary byte or a multibyte character — a
+    /// multibyte sequence against a terminator at every lane, including the
+    /// U+2028 / U+2029 the scans do not count and the references do not either.
+    /// The pieces also hold `\x0b` and `\x0c`, the bytes that XOR with `\n` and
+    /// `\r` to `0x01`: directly above a terminator in a word that also holds a
+    /// high byte, they are the lanes a borrowing kernel (`swar::zero_lanes`) in
+    /// the non-ASCII arm would flag spuriously.
+    ///
+    /// Deleting the high-bit gate in `terminator_lanes` fails this test and no
+    /// other in the module, as do dropping the `& !high` that takes the
+    /// non-ASCII lanes back out of `terminator_lanes_any`'s masks and swapping
+    /// the borrowing `zero_lanes` in for `ascii_zero_lanes` there.
+    #[test]
+    fn test_swar_line_scans_match_scalar_reference_on_non_ascii_bytes() {
+        fn assert_scans_match(bytes: &[u8]) {
+            let mut lf = LineScan::bare();
+            ascii_lf_line_starts_into(bytes, 3, &mut lf);
+            let lf_reference = reference_lf_line_starts(bytes, 3);
+            assert_eq!(lf.starts, lf_reference, "lf {bytes:x?}");
+
+            let mut es = LineScan::bare();
+            ascii_ecmascript_line_starts_into(bytes, 3, &mut es);
+            let es_reference = reference_ecmascript_line_starts(bytes, 3);
+            assert_eq!(es.starts, es_reference, "ecmascript {bytes:x?}");
+            assert_eq!(
+                lf.ecmascript_differs,
+                es_reference != lf_reference,
+                "ecmascript-differs probe {bytes:x?}"
+            );
+        }
+
+        for high in 0x80..=0xffu8 {
+            for len in [24usize, 21] {
+                for pos in 0..len {
+                    for fill in [b'x', b'\n', b'\r'] {
+                        let mut bytes = vec![fill; len];
+                        bytes[pos] = high;
+                        assert_scans_match(&bytes);
+                    }
+                    for terminator in [b'\n', b'\r'] {
+                        for neighbour in [pos.wrapping_sub(1), pos + 1] {
+                            if neighbour < len {
+                                let mut bytes = vec![b'x'; len];
+                                bytes[pos] = high;
+                                bytes[neighbour] = terminator;
+                                assert_scans_match(&bytes);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        const PIECES: [&str; 13] = [
+            "\n", "\r", "\r\n", "\n\r", "\x0b", "\x0c", "\u{85}", "é", "\u{7ff}", "中", "\u{2028}",
+            "\u{2029}", "😀",
+        ];
+        for first in PIECES {
+            for second in PIECES {
+                for prefix in 0..16usize {
+                    for suffix in ["", "\n", "y", "é"] {
+                        let mut bytes = vec![b'x'; prefix];
+                        bytes.extend_from_slice(first.as_bytes());
+                        bytes.extend_from_slice(second.as_bytes());
+                        bytes.extend_from_slice(suffix.as_bytes());
+                        assert_scans_match(&bytes);
+                    }
                 }
             }
         }
