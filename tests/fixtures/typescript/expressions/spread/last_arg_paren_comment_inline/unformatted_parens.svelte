@@ -17,17 +17,4 @@ fn(a, ...(b // i
 
 new A(...(b // i
 ));
-
-// same, with a block written after the `)`: it trails the argument ahead of the
-// deferred line comment
-obj.method(a, ...(b // i
-) /* t */
-);
-// two line comments inside the stripped parens: only the first can trail the
-// argument's line, the second takes its own — and a block written after the `)`
-// still lands ahead of both
-fn(a, ...(b // i1
-// i2
-) /* t */
-);
 </script>

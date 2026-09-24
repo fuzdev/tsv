@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 2214,
+	"end": 1738,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -428,9 +428,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " a comment after the `)` follows the interior's share; a line comment in the shell",
+			"value": " a comment after the `)` follows the interior's share",
 			"start": 876,
-			"end": 960,
+			"end": 931,
 			"loc": {
 				"start": {
 					"line": 53,
@@ -438,38 +438,22 @@
 				},
 				"end": {
 					"line": 53,
-					"column": 85
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " still ends the line, so the block after the `)` lands ahead of it",
-			"start": 962,
-			"end": 1030,
-			"loc": {
-				"start": {
-					"line": 54,
-					"column": 1
-				},
-				"end": {
-					"line": 54,
-					"column": 69
+					"column": 56
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 1038,
-			"end": 1046,
+			"start": 939,
+			"end": 947,
 			"loc": {
 				"start": {
-					"line": 55,
+					"line": 54,
 					"column": 7
 				},
 				"end": {
-					"line": 55,
+					"line": 54,
 					"column": 15
 				}
 			}
@@ -477,15 +461,15 @@
 		{
 			"type": "Block",
 			"value": " c2 ",
-			"start": 1047,
-			"end": 1055,
+			"start": 948,
+			"end": 956,
 			"loc": {
 				"start": {
-					"line": 55,
+					"line": 54,
 					"column": 16
 				},
 				"end": {
-					"line": 55,
+					"line": 54,
 					"column": 24
 				}
 			}
@@ -493,15 +477,15 @@
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 1071,
-			"end": 1079,
+			"start": 972,
+			"end": 980,
 			"loc": {
 				"start": {
-					"line": 56,
+					"line": 55,
 					"column": 9
 				},
 				"end": {
-					"line": 56,
+					"line": 55,
 					"column": 17
 				}
 			}
@@ -509,95 +493,31 @@
 		{
 			"type": "Block",
 			"value": " c2 ",
-			"start": 1080,
-			"end": 1088,
+			"start": 981,
+			"end": 989,
 			"loc": {
 				"start": {
-					"line": 56,
+					"line": 55,
 					"column": 18
 				},
 				"end": {
-					"line": 56,
+					"line": 55,
 					"column": 26
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": " c2 ",
-			"start": 1107,
-			"end": 1115,
-			"loc": {
-				"start": {
-					"line": 58,
-					"column": 7
-				},
-				"end": {
-					"line": 58,
-					"column": 15
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " c1",
-			"start": 1116,
-			"end": 1121,
-			"loc": {
-				"start": {
-					"line": 58,
-					"column": 16
-				},
-				"end": {
-					"line": 58,
-					"column": 21
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": " c2 ",
-			"start": 1141,
-			"end": 1149,
-			"loc": {
-				"start": {
-					"line": 61,
-					"column": 7
-				},
-				"end": {
-					"line": 61,
-					"column": 15
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " c1",
-			"start": 1150,
-			"end": 1155,
-			"loc": {
-				"start": {
-					"line": 61,
-					"column": 16
-				},
-				"end": {
-					"line": 61,
-					"column": 21
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " an own-line comment in the shell, then a line comment after the `)`: the pair keeps",
-			"start": 1167,
-			"end": 1253,
+			"start": 1000,
+			"end": 1086,
 			"loc": {
 				"start": {
-					"line": 64,
+					"line": 57,
 					"column": 1
 				},
 				"end": {
-					"line": 64,
+					"line": 57,
 					"column": 87
 				}
 			}
@@ -605,15 +525,15 @@
 		{
 			"type": "Line",
 			"value": " the order the author wrote it in, the line comment trailing the one before it",
-			"start": 1255,
-			"end": 1335,
+			"start": 1088,
+			"end": 1168,
 			"loc": {
 				"start": {
-					"line": 65,
+					"line": 58,
 					"column": 1
 				},
 				"end": {
-					"line": 65,
+					"line": 58,
 					"column": 81
 				}
 			}
@@ -621,15 +541,15 @@
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 1348,
-			"end": 1356,
+			"start": 1181,
+			"end": 1189,
 			"loc": {
 				"start": {
-					"line": 68,
+					"line": 61,
 					"column": 2
 				},
 				"end": {
-					"line": 68,
+					"line": 61,
 					"column": 10
 				}
 			}
@@ -637,15 +557,15 @@
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 1357,
-			"end": 1362,
+			"start": 1190,
+			"end": 1195,
 			"loc": {
 				"start": {
-					"line": 68,
+					"line": 61,
 					"column": 11
 				},
 				"end": {
-					"line": 68,
+					"line": 61,
 					"column": 16
 				}
 			}
@@ -653,15 +573,15 @@
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 1384,
-			"end": 1392,
+			"start": 1217,
+			"end": 1225,
 			"loc": {
 				"start": {
-					"line": 72,
+					"line": 65,
 					"column": 2
 				},
 				"end": {
-					"line": 72,
+					"line": 65,
 					"column": 10
 				}
 			}
@@ -669,127 +589,31 @@
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 1393,
-			"end": 1398,
+			"start": 1226,
+			"end": 1231,
 			"loc": {
 				"start": {
-					"line": 72,
+					"line": 65,
 					"column": 11
 				},
 				"end": {
-					"line": 72,
+					"line": 65,
 					"column": 16
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " an own-line comment in the shell, then a block after the `)`: the block hoists onto",
-			"start": 1410,
-			"end": 1496,
-			"loc": {
-				"start": {
-					"line": 75,
-					"column": 1
-				},
-				"end": {
-					"line": 75,
-					"column": 87
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " the target's line, ahead of the one the shell held",
-			"start": 1498,
-			"end": 1551,
-			"loc": {
-				"start": {
-					"line": 76,
-					"column": 1
-				},
-				"end": {
-					"line": 76,
-					"column": 54
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": " c2 ",
-			"start": 1562,
-			"end": 1570,
-			"loc": {
-				"start": {
-					"line": 78,
-					"column": 7
-				},
-				"end": {
-					"line": 78,
-					"column": 15
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": " c1 ",
-			"start": 1573,
-			"end": 1581,
-			"loc": {
-				"start": {
-					"line": 79,
-					"column": 2
-				},
-				"end": {
-					"line": 79,
-					"column": 10
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": " c2 ",
-			"start": 1601,
-			"end": 1609,
-			"loc": {
-				"start": {
-					"line": 82,
-					"column": 7
-				},
-				"end": {
-					"line": 82,
-					"column": 15
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": " c1 ",
-			"start": 1612,
-			"end": 1620,
-			"loc": {
-				"start": {
-					"line": 83,
-					"column": 2
-				},
-				"end": {
-					"line": 83,
-					"column": 10
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " a multi-line block comment keeps its lines and breaks the pattern",
-			"start": 1632,
-			"end": 1700,
+			"start": 1243,
+			"end": 1311,
 			"loc": {
 				"start": {
-					"line": 86,
+					"line": 68,
 					"column": 1
 				},
 				"end": {
-					"line": 86,
+					"line": 68,
 					"column": 69
 				}
 			}
@@ -797,15 +621,15 @@
 		{
 			"type": "Block",
 			"value": " c1\n\tc2 ",
-			"start": 1711,
-			"end": 1723,
+			"start": 1322,
+			"end": 1334,
 			"loc": {
 				"start": {
-					"line": 88,
+					"line": 70,
 					"column": 7
 				},
 				"end": {
-					"line": 89,
+					"line": 71,
 					"column": 6
 				}
 			}
@@ -813,47 +637,47 @@
 		{
 			"type": "Line",
 			"value": " an own-line multi-line block in the shell keeps its own line, in the object pattern",
-			"start": 1734,
-			"end": 1820,
+			"start": 1345,
+			"end": 1431,
 			"loc": {
 				"start": {
-					"line": 92,
+					"line": 74,
 					"column": 1
 				},
 				"end": {
-					"line": 92,
+					"line": 74,
 					"column": 87
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " as in the array pattern, a block after the `)` hoisting ahead of it",
-			"start": 1822,
-			"end": 1892,
+			"value": " as in the array pattern",
+			"start": 1433,
+			"end": 1459,
 			"loc": {
 				"start": {
-					"line": 93,
+					"line": 75,
 					"column": 1
 				},
 				"end": {
-					"line": 93,
-					"column": 71
+					"line": 75,
+					"column": 27
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c1\n\tc2 ",
-			"start": 1905,
-			"end": 1917,
+			"start": 1472,
+			"end": 1484,
 			"loc": {
 				"start": {
-					"line": 96,
+					"line": 78,
 					"column": 2
 				},
 				"end": {
-					"line": 97,
+					"line": 79,
 					"column": 6
 				}
 			}
@@ -861,15 +685,15 @@
 		{
 			"type": "Block",
 			"value": " c1\n\tc2 ",
-			"start": 1939,
-			"end": 1951,
+			"start": 1506,
+			"end": 1518,
 			"loc": {
 				"start": {
-					"line": 101,
+					"line": 83,
 					"column": 2
 				},
 				"end": {
-					"line": 102,
+					"line": 84,
 					"column": 6
 				}
 			}
@@ -877,47 +701,15 @@
 		{
 			"type": "Block",
 			"value": " c1\n\tc2 ",
-			"start": 1979,
-			"end": 1991,
+			"start": 1546,
+			"end": 1558,
 			"loc": {
 				"start": {
-					"line": 107,
+					"line": 89,
 					"column": 2
 				},
 				"end": {
-					"line": 108,
-					"column": 6
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": " t ",
-			"start": 2012,
-			"end": 2019,
-			"loc": {
-				"start": {
-					"line": 111,
-					"column": 7
-				},
-				"end": {
-					"line": 111,
-					"column": 14
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": " c1\n\tc2 ",
-			"start": 2022,
-			"end": 2034,
-			"loc": {
-				"start": {
-					"line": 112,
-					"column": 2
-				},
-				"end": {
-					"line": 113,
+					"line": 90,
 					"column": 6
 				}
 			}
@@ -925,15 +717,15 @@
 		{
 			"type": "Line",
 			"value": " a nested pattern, and a for-of head",
-			"start": 2046,
-			"end": 2084,
+			"start": 1570,
+			"end": 1608,
 			"loc": {
 				"start": {
-					"line": 116,
+					"line": 93,
 					"column": 1
 				},
 				"end": {
-					"line": 116,
+					"line": 93,
 					"column": 39
 				}
 			}
@@ -941,15 +733,15 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 2096,
-			"end": 2103,
+			"start": 1620,
+			"end": 1627,
 			"loc": {
 				"start": {
-					"line": 117,
+					"line": 94,
 					"column": 11
 				},
 				"end": {
-					"line": 117,
+					"line": 94,
 					"column": 18
 				}
 			}
@@ -957,15 +749,15 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 2126,
-			"end": 2133,
+			"start": 1650,
+			"end": 1657,
 			"loc": {
 				"start": {
-					"line": 119,
+					"line": 96,
 					"column": 11
 				},
 				"end": {
-					"line": 119,
+					"line": 96,
 					"column": 18
 				}
 			}
@@ -973,15 +765,15 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 2156,
-			"end": 2163,
+			"start": 1680,
+			"end": 1687,
 			"loc": {
 				"start": {
-					"line": 121,
+					"line": 98,
 					"column": 12
 				},
 				"end": {
-					"line": 121,
+					"line": 98,
 					"column": 19
 				}
 			}
@@ -989,15 +781,15 @@
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 2188,
-			"end": 2192,
+			"start": 1712,
+			"end": 1716,
 			"loc": {
 				"start": {
-					"line": 123,
+					"line": 100,
 					"column": 7
 				},
 				"end": {
-					"line": 123,
+					"line": 100,
 					"column": 11
 				}
 			}
@@ -1006,19 +798,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 2213,
+		"end": 1737,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 2204,
+			"end": 1728,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 125,
+					"line": 102,
 					"column": 9
 				}
 			},
@@ -2978,73 +2770,73 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 1032,
-					"end": 1061,
+					"start": 933,
+					"end": 962,
 					"loc": {
 						"start": {
-							"line": 55,
+							"line": 54,
 							"column": 1
 						},
 						"end": {
-							"line": 55,
+							"line": 54,
 							"column": 30
 						}
 					},
 					"expression": {
 						"type": "AssignmentExpression",
-						"start": 1032,
-						"end": 1060,
+						"start": 933,
+						"end": 961,
 						"loc": {
 							"start": {
-								"line": 55,
+								"line": 54,
 								"column": 1
 							},
 							"end": {
-								"line": 55,
+								"line": 54,
 								"column": 29
 							}
 						},
 						"operator": "=",
 						"left": {
 							"type": "ArrayPattern",
-							"start": 1032,
-							"end": 1056,
+							"start": 933,
+							"end": 957,
 							"loc": {
 								"start": {
-									"line": 55,
+									"line": 54,
 									"column": 1
 								},
 								"end": {
-									"line": 55,
+									"line": 54,
 									"column": 25
 								}
 							},
 							"elements": [
 								{
 									"type": "RestElement",
-									"start": 1033,
-									"end": 1037,
+									"start": 934,
+									"end": 938,
 									"loc": {
 										"start": {
-											"line": 55,
+											"line": 54,
 											"column": 2
 										},
 										"end": {
-											"line": 55,
+											"line": 54,
 											"column": 6
 										}
 									},
 									"argument": {
 										"type": "Identifier",
-										"start": 1036,
-										"end": 1037,
+										"start": 937,
+										"end": 938,
 										"loc": {
 											"start": {
-												"line": 55,
+												"line": 54,
 												"column": 5
 											},
 											"end": {
-												"line": 55,
+												"line": 54,
 												"column": 6
 											}
 										},
@@ -3054,8 +2846,8 @@
 										{
 											"type": "Block",
 											"value": " c1 ",
-											"start": 1038,
-											"end": 1046
+											"start": 939,
+											"end": 947
 										}
 									]
 								}
@@ -3063,15 +2855,15 @@
 						},
 						"right": {
 							"type": "Identifier",
-							"start": 1059,
-							"end": 1060,
+							"start": 960,
+							"end": 961,
 							"loc": {
 								"start": {
-									"line": 55,
+									"line": 54,
 									"column": 28
 								},
 								"end": {
-									"line": 55,
+									"line": 54,
 									"column": 29
 								}
 							},
@@ -3080,8 +2872,8 @@
 								{
 									"type": "Block",
 									"value": " c2 ",
-									"start": 1047,
-									"end": 1055
+									"start": 948,
+									"end": 956
 								}
 							]
 						}
@@ -3089,87 +2881,81 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " a comment after the `)` follows the interior's share; a line comment in the shell",
+							"value": " a comment after the `)` follows the interior's share",
 							"start": 876,
-							"end": 960
-						},
-						{
-							"type": "Line",
-							"value": " still ends the line, so the block after the `)` lands ahead of it",
-							"start": 962,
-							"end": 1030
+							"end": 931
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 1063,
-					"end": 1096,
+					"start": 964,
+					"end": 997,
 					"loc": {
 						"start": {
-							"line": 56,
+							"line": 55,
 							"column": 1
 						},
 						"end": {
-							"line": 56,
+							"line": 55,
 							"column": 34
 						}
 					},
 					"expression": {
 						"type": "AssignmentExpression",
-						"start": 1064,
-						"end": 1094,
+						"start": 965,
+						"end": 995,
 						"loc": {
 							"start": {
-								"line": 56,
+								"line": 55,
 								"column": 2
 							},
 							"end": {
-								"line": 56,
+								"line": 55,
 								"column": 32
 							}
 						},
 						"operator": "=",
 						"left": {
 							"type": "ObjectPattern",
-							"start": 1064,
-							"end": 1090,
+							"start": 965,
+							"end": 991,
 							"loc": {
 								"start": {
-									"line": 56,
+									"line": 55,
 									"column": 2
 								},
 								"end": {
-									"line": 56,
+									"line": 55,
 									"column": 28
 								}
 							},
 							"properties": [
 								{
 									"type": "RestElement",
-									"start": 1066,
-									"end": 1070,
+									"start": 967,
+									"end": 971,
 									"loc": {
 										"start": {
-											"line": 56,
+											"line": 55,
 											"column": 4
 										},
 										"end": {
-											"line": 56,
+											"line": 55,
 											"column": 8
 										}
 									},
 									"argument": {
 										"type": "Identifier",
-										"start": 1069,
-										"end": 1070,
+										"start": 970,
+										"end": 971,
 										"loc": {
 											"start": {
-												"line": 56,
+												"line": 55,
 												"column": 7
 											},
 											"end": {
-												"line": 56,
+												"line": 55,
 												"column": 8
 											}
 										},
@@ -3179,8 +2965,8 @@
 										{
 											"type": "Block",
 											"value": " c1 ",
-											"start": 1071,
-											"end": 1079
+											"start": 972,
+											"end": 980
 										}
 									]
 								}
@@ -3188,15 +2974,15 @@
 						},
 						"right": {
 							"type": "Identifier",
-							"start": 1093,
-							"end": 1094,
+							"start": 994,
+							"end": 995,
 							"loc": {
 								"start": {
-									"line": 56,
+									"line": 55,
 									"column": 31
 								},
 								"end": {
-									"line": 56,
+									"line": 55,
 									"column": 32
 								}
 							},
@@ -3205,8 +2991,8 @@
 								{
 									"type": "Block",
 									"value": " c2 ",
-									"start": 1080,
-									"end": 1088
+									"start": 981,
+									"end": 989
 								}
 							]
 						}
@@ -3214,137 +3000,26 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 1098,
-					"end": 1129,
+					"start": 1170,
+					"end": 1203,
 					"loc": {
 						"start": {
-							"line": 57,
+							"line": 59,
 							"column": 1
 						},
 						"end": {
-							"line": 59,
+							"line": 62,
 							"column": 7
 						}
 					},
 					"expression": {
 						"type": "AssignmentExpression",
-						"start": 1098,
-						"end": 1128,
+						"start": 1170,
+						"end": 1202,
 						"loc": {
 							"start": {
-								"line": 57,
-								"column": 1
-							},
-							"end": {
 								"line": 59,
-								"column": 6
-							}
-						},
-						"operator": "=",
-						"left": {
-							"type": "ArrayPattern",
-							"start": 1098,
-							"end": 1124,
-							"loc": {
-								"start": {
-									"line": 57,
-									"column": 1
-								},
-								"end": {
-									"line": 59,
-									"column": 2
-								}
-							},
-							"elements": [
-								{
-									"type": "RestElement",
-									"start": 1102,
-									"end": 1106,
-									"loc": {
-										"start": {
-											"line": 58,
-											"column": 2
-										},
-										"end": {
-											"line": 58,
-											"column": 6
-										}
-									},
-									"argument": {
-										"type": "Identifier",
-										"start": 1105,
-										"end": 1106,
-										"loc": {
-											"start": {
-												"line": 58,
-												"column": 5
-											},
-											"end": {
-												"line": 58,
-												"column": 6
-											}
-										},
-										"name": "a"
-									},
-									"trailingComments": [
-										{
-											"type": "Block",
-											"value": " c2 ",
-											"start": 1107,
-											"end": 1115
-										}
-									]
-								}
-							]
-						},
-						"right": {
-							"type": "Identifier",
-							"start": 1127,
-							"end": 1128,
-							"loc": {
-								"start": {
-									"line": 59,
-									"column": 5
-								},
-								"end": {
-									"line": 59,
-									"column": 6
-								}
-							},
-							"name": "x",
-							"leadingComments": [
-								{
-									"type": "Line",
-									"value": " c1",
-									"start": 1116,
-									"end": 1121
-								}
-							]
-						}
-					}
-				},
-				{
-					"type": "ExpressionStatement",
-					"start": 1131,
-					"end": 1164,
-					"loc": {
-						"start": {
-							"line": 60,
-							"column": 1
-						},
-						"end": {
-							"line": 62,
-							"column": 8
-						}
-					},
-					"expression": {
-						"type": "AssignmentExpression",
-						"start": 1132,
-						"end": 1162,
-						"loc": {
-							"start": {
-								"line": 60,
-								"column": 2
+								"column": 1
 							},
 							"end": {
 								"line": 62,
@@ -3353,156 +3028,45 @@
 						},
 						"operator": "=",
 						"left": {
-							"type": "ObjectPattern",
-							"start": 1132,
-							"end": 1158,
-							"loc": {
-								"start": {
-									"line": 60,
-									"column": 2
-								},
-								"end": {
-									"line": 62,
-									"column": 2
-								}
-							},
-							"properties": [
-								{
-									"type": "RestElement",
-									"start": 1136,
-									"end": 1140,
-									"loc": {
-										"start": {
-											"line": 61,
-											"column": 2
-										},
-										"end": {
-											"line": 61,
-											"column": 6
-										}
-									},
-									"argument": {
-										"type": "Identifier",
-										"start": 1139,
-										"end": 1140,
-										"loc": {
-											"start": {
-												"line": 61,
-												"column": 5
-											},
-											"end": {
-												"line": 61,
-												"column": 6
-											}
-										},
-										"name": "a"
-									},
-									"trailingComments": [
-										{
-											"type": "Block",
-											"value": " c2 ",
-											"start": 1141,
-											"end": 1149
-										}
-									]
-								}
-							]
-						},
-						"right": {
-							"type": "Identifier",
-							"start": 1161,
-							"end": 1162,
-							"loc": {
-								"start": {
-									"line": 62,
-									"column": 5
-								},
-								"end": {
-									"line": 62,
-									"column": 6
-								}
-							},
-							"name": "x",
-							"leadingComments": [
-								{
-									"type": "Line",
-									"value": " c1",
-									"start": 1150,
-									"end": 1155
-								}
-							]
-						}
-					}
-				},
-				{
-					"type": "ExpressionStatement",
-					"start": 1337,
-					"end": 1370,
-					"loc": {
-						"start": {
-							"line": 66,
-							"column": 1
-						},
-						"end": {
-							"line": 69,
-							"column": 7
-						}
-					},
-					"expression": {
-						"type": "AssignmentExpression",
-						"start": 1337,
-						"end": 1369,
-						"loc": {
-							"start": {
-								"line": 66,
-								"column": 1
-							},
-							"end": {
-								"line": 69,
-								"column": 6
-							}
-						},
-						"operator": "=",
-						"left": {
 							"type": "ArrayPattern",
-							"start": 1337,
-							"end": 1365,
+							"start": 1170,
+							"end": 1198,
 							"loc": {
 								"start": {
-									"line": 66,
+									"line": 59,
 									"column": 1
 								},
 								"end": {
-									"line": 69,
+									"line": 62,
 									"column": 2
 								}
 							},
 							"elements": [
 								{
 									"type": "RestElement",
-									"start": 1341,
-									"end": 1345,
+									"start": 1174,
+									"end": 1178,
 									"loc": {
 										"start": {
-											"line": 67,
+											"line": 60,
 											"column": 2
 										},
 										"end": {
-											"line": 67,
+											"line": 60,
 											"column": 6
 										}
 									},
 									"argument": {
 										"type": "Identifier",
-										"start": 1344,
-										"end": 1345,
+										"start": 1177,
+										"end": 1178,
 										"loc": {
 											"start": {
-												"line": 67,
+												"line": 60,
 												"column": 5
 											},
 											"end": {
-												"line": 67,
+												"line": 60,
 												"column": 6
 											}
 										},
@@ -3513,15 +3077,15 @@
 						},
 						"right": {
 							"type": "Identifier",
-							"start": 1368,
-							"end": 1369,
+							"start": 1201,
+							"end": 1202,
 							"loc": {
 								"start": {
-									"line": 69,
+									"line": 62,
 									"column": 5
 								},
 								"end": {
-									"line": 69,
+									"line": 62,
 									"column": 6
 								}
 							},
@@ -3530,14 +3094,14 @@
 								{
 									"type": "Block",
 									"value": " c1 ",
-									"start": 1348,
-									"end": 1356
+									"start": 1181,
+									"end": 1189
 								},
 								{
 									"type": "Line",
 									"value": " c2",
-									"start": 1357,
-									"end": 1362
+									"start": 1190,
+									"end": 1195
 								}
 							]
 						}
@@ -3546,86 +3110,86 @@
 						{
 							"type": "Line",
 							"value": " an own-line comment in the shell, then a line comment after the `)`: the pair keeps",
-							"start": 1167,
-							"end": 1253
+							"start": 1000,
+							"end": 1086
 						},
 						{
 							"type": "Line",
 							"value": " the order the author wrote it in, the line comment trailing the one before it",
-							"start": 1255,
-							"end": 1335
+							"start": 1088,
+							"end": 1168
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 1372,
-					"end": 1407,
+					"start": 1205,
+					"end": 1240,
 					"loc": {
 						"start": {
-							"line": 70,
+							"line": 63,
 							"column": 1
 						},
 						"end": {
-							"line": 73,
+							"line": 66,
 							"column": 8
 						}
 					},
 					"expression": {
 						"type": "AssignmentExpression",
-						"start": 1373,
-						"end": 1405,
+						"start": 1206,
+						"end": 1238,
 						"loc": {
 							"start": {
-								"line": 70,
+								"line": 63,
 								"column": 2
 							},
 							"end": {
-								"line": 73,
+								"line": 66,
 								"column": 6
 							}
 						},
 						"operator": "=",
 						"left": {
 							"type": "ObjectPattern",
-							"start": 1373,
-							"end": 1401,
+							"start": 1206,
+							"end": 1234,
 							"loc": {
 								"start": {
-									"line": 70,
+									"line": 63,
 									"column": 2
 								},
 								"end": {
-									"line": 73,
+									"line": 66,
 									"column": 2
 								}
 							},
 							"properties": [
 								{
 									"type": "RestElement",
-									"start": 1377,
-									"end": 1381,
+									"start": 1210,
+									"end": 1214,
 									"loc": {
 										"start": {
-											"line": 71,
+											"line": 64,
 											"column": 2
 										},
 										"end": {
-											"line": 71,
+											"line": 64,
 											"column": 6
 										}
 									},
 									"argument": {
 										"type": "Identifier",
-										"start": 1380,
-										"end": 1381,
+										"start": 1213,
+										"end": 1214,
 										"loc": {
 											"start": {
-												"line": 71,
+												"line": 64,
 												"column": 5
 											},
 											"end": {
-												"line": 71,
+												"line": 64,
 												"column": 6
 											}
 										},
@@ -3636,15 +3200,15 @@
 						},
 						"right": {
 							"type": "Identifier",
-							"start": 1404,
-							"end": 1405,
+							"start": 1237,
+							"end": 1238,
 							"loc": {
 								"start": {
-									"line": 73,
+									"line": 66,
 									"column": 5
 								},
 								"end": {
-									"line": 73,
+									"line": 66,
 									"column": 6
 								}
 							},
@@ -3653,14 +3217,14 @@
 								{
 									"type": "Block",
 									"value": " c1 ",
-									"start": 1384,
-									"end": 1392
+									"start": 1217,
+									"end": 1225
 								},
 								{
 									"type": "Line",
 									"value": " c2",
-									"start": 1393,
-									"end": 1398
+									"start": 1226,
+									"end": 1231
 								}
 							]
 						}
@@ -3668,309 +3232,73 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 1553,
-					"end": 1589,
+					"start": 1313,
+					"end": 1342,
 					"loc": {
 						"start": {
-							"line": 77,
+							"line": 69,
 							"column": 1
 						},
 						"end": {
-							"line": 80,
+							"line": 72,
 							"column": 7
 						}
 					},
 					"expression": {
 						"type": "AssignmentExpression",
-						"start": 1553,
-						"end": 1588,
+						"start": 1313,
+						"end": 1341,
 						"loc": {
 							"start": {
-								"line": 77,
+								"line": 69,
 								"column": 1
 							},
 							"end": {
-								"line": 80,
+								"line": 72,
 								"column": 6
 							}
 						},
 						"operator": "=",
 						"left": {
 							"type": "ArrayPattern",
-							"start": 1553,
-							"end": 1584,
+							"start": 1313,
+							"end": 1337,
 							"loc": {
 								"start": {
-									"line": 77,
+									"line": 69,
 									"column": 1
 								},
 								"end": {
-									"line": 80,
+									"line": 72,
 									"column": 2
 								}
 							},
 							"elements": [
 								{
 									"type": "RestElement",
-									"start": 1557,
-									"end": 1561,
+									"start": 1317,
+									"end": 1321,
 									"loc": {
 										"start": {
-											"line": 78,
+											"line": 70,
 											"column": 2
 										},
 										"end": {
-											"line": 78,
+											"line": 70,
 											"column": 6
 										}
 									},
 									"argument": {
 										"type": "Identifier",
-										"start": 1560,
-										"end": 1561,
+										"start": 1320,
+										"end": 1321,
 										"loc": {
 											"start": {
-												"line": 78,
+												"line": 70,
 												"column": 5
 											},
 											"end": {
-												"line": 78,
-												"column": 6
-											}
-										},
-										"name": "a"
-									},
-									"trailingComments": [
-										{
-											"type": "Block",
-											"value": " c2 ",
-											"start": 1562,
-											"end": 1570
-										}
-									]
-								}
-							]
-						},
-						"right": {
-							"type": "Identifier",
-							"start": 1587,
-							"end": 1588,
-							"loc": {
-								"start": {
-									"line": 80,
-									"column": 5
-								},
-								"end": {
-									"line": 80,
-									"column": 6
-								}
-							},
-							"name": "x",
-							"leadingComments": [
-								{
-									"type": "Block",
-									"value": " c1 ",
-									"start": 1573,
-									"end": 1581
-								}
-							]
-						}
-					},
-					"leadingComments": [
-						{
-							"type": "Line",
-							"value": " an own-line comment in the shell, then a block after the `)`: the block hoists onto",
-							"start": 1410,
-							"end": 1496
-						},
-						{
-							"type": "Line",
-							"value": " the target's line, ahead of the one the shell held",
-							"start": 1498,
-							"end": 1551
-						}
-					]
-				},
-				{
-					"type": "ExpressionStatement",
-					"start": 1591,
-					"end": 1629,
-					"loc": {
-						"start": {
-							"line": 81,
-							"column": 1
-						},
-						"end": {
-							"line": 84,
-							"column": 8
-						}
-					},
-					"expression": {
-						"type": "AssignmentExpression",
-						"start": 1592,
-						"end": 1627,
-						"loc": {
-							"start": {
-								"line": 81,
-								"column": 2
-							},
-							"end": {
-								"line": 84,
-								"column": 6
-							}
-						},
-						"operator": "=",
-						"left": {
-							"type": "ObjectPattern",
-							"start": 1592,
-							"end": 1623,
-							"loc": {
-								"start": {
-									"line": 81,
-									"column": 2
-								},
-								"end": {
-									"line": 84,
-									"column": 2
-								}
-							},
-							"properties": [
-								{
-									"type": "RestElement",
-									"start": 1596,
-									"end": 1600,
-									"loc": {
-										"start": {
-											"line": 82,
-											"column": 2
-										},
-										"end": {
-											"line": 82,
-											"column": 6
-										}
-									},
-									"argument": {
-										"type": "Identifier",
-										"start": 1599,
-										"end": 1600,
-										"loc": {
-											"start": {
-												"line": 82,
-												"column": 5
-											},
-											"end": {
-												"line": 82,
-												"column": 6
-											}
-										},
-										"name": "a"
-									},
-									"trailingComments": [
-										{
-											"type": "Block",
-											"value": " c2 ",
-											"start": 1601,
-											"end": 1609
-										}
-									]
-								}
-							]
-						},
-						"right": {
-							"type": "Identifier",
-							"start": 1626,
-							"end": 1627,
-							"loc": {
-								"start": {
-									"line": 84,
-									"column": 5
-								},
-								"end": {
-									"line": 84,
-									"column": 6
-								}
-							},
-							"name": "x",
-							"leadingComments": [
-								{
-									"type": "Block",
-									"value": " c1 ",
-									"start": 1612,
-									"end": 1620
-								}
-							]
-						}
-					}
-				},
-				{
-					"type": "ExpressionStatement",
-					"start": 1702,
-					"end": 1731,
-					"loc": {
-						"start": {
-							"line": 87,
-							"column": 1
-						},
-						"end": {
-							"line": 90,
-							"column": 7
-						}
-					},
-					"expression": {
-						"type": "AssignmentExpression",
-						"start": 1702,
-						"end": 1730,
-						"loc": {
-							"start": {
-								"line": 87,
-								"column": 1
-							},
-							"end": {
-								"line": 90,
-								"column": 6
-							}
-						},
-						"operator": "=",
-						"left": {
-							"type": "ArrayPattern",
-							"start": 1702,
-							"end": 1726,
-							"loc": {
-								"start": {
-									"line": 87,
-									"column": 1
-								},
-								"end": {
-									"line": 90,
-									"column": 2
-								}
-							},
-							"elements": [
-								{
-									"type": "RestElement",
-									"start": 1706,
-									"end": 1710,
-									"loc": {
-										"start": {
-											"line": 88,
-											"column": 2
-										},
-										"end": {
-											"line": 88,
-											"column": 6
-										}
-									},
-									"argument": {
-										"type": "Identifier",
-										"start": 1709,
-										"end": 1710,
-										"loc": {
-											"start": {
-												"line": 88,
-												"column": 5
-											},
-											"end": {
-												"line": 88,
+												"line": 70,
 												"column": 6
 											}
 										},
@@ -3980,8 +3308,8 @@
 										{
 											"type": "Block",
 											"value": " c1\n\tc2 ",
-											"start": 1711,
-											"end": 1723
+											"start": 1322,
+											"end": 1334
 										}
 									]
 								}
@@ -3989,15 +3317,15 @@
 						},
 						"right": {
 							"type": "Identifier",
-							"start": 1729,
-							"end": 1730,
+							"start": 1340,
+							"end": 1341,
 							"loc": {
 								"start": {
-									"line": 90,
+									"line": 72,
 									"column": 5
 								},
 								"end": {
-									"line": 90,
+									"line": 72,
 									"column": 6
 								}
 							},
@@ -4008,80 +3336,80 @@
 						{
 							"type": "Line",
 							"value": " a multi-line block comment keeps its lines and breaks the pattern",
-							"start": 1632,
-							"end": 1700
+							"start": 1243,
+							"end": 1311
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 1894,
-					"end": 1925,
+					"start": 1461,
+					"end": 1492,
 					"loc": {
 						"start": {
-							"line": 94,
+							"line": 76,
 							"column": 1
 						},
 						"end": {
-							"line": 98,
+							"line": 80,
 							"column": 7
 						}
 					},
 					"expression": {
 						"type": "AssignmentExpression",
-						"start": 1894,
-						"end": 1924,
+						"start": 1461,
+						"end": 1491,
 						"loc": {
 							"start": {
-								"line": 94,
+								"line": 76,
 								"column": 1
 							},
 							"end": {
-								"line": 98,
+								"line": 80,
 								"column": 6
 							}
 						},
 						"operator": "=",
 						"left": {
 							"type": "ArrayPattern",
-							"start": 1894,
-							"end": 1920,
+							"start": 1461,
+							"end": 1487,
 							"loc": {
 								"start": {
-									"line": 94,
+									"line": 76,
 									"column": 1
 								},
 								"end": {
-									"line": 98,
+									"line": 80,
 									"column": 2
 								}
 							},
 							"elements": [
 								{
 									"type": "RestElement",
-									"start": 1898,
-									"end": 1902,
+									"start": 1465,
+									"end": 1469,
 									"loc": {
 										"start": {
-											"line": 95,
+											"line": 77,
 											"column": 2
 										},
 										"end": {
-											"line": 95,
+											"line": 77,
 											"column": 6
 										}
 									},
 									"argument": {
 										"type": "Identifier",
-										"start": 1901,
-										"end": 1902,
+										"start": 1468,
+										"end": 1469,
 										"loc": {
 											"start": {
-												"line": 95,
+												"line": 77,
 												"column": 5
 											},
 											"end": {
-												"line": 95,
+												"line": 77,
 												"column": 6
 											}
 										},
@@ -4092,15 +3420,15 @@
 						},
 						"right": {
 							"type": "Identifier",
-							"start": 1923,
-							"end": 1924,
+							"start": 1490,
+							"end": 1491,
 							"loc": {
 								"start": {
-									"line": 98,
+									"line": 80,
 									"column": 5
 								},
 								"end": {
-									"line": 98,
+									"line": 80,
 									"column": 6
 								}
 							},
@@ -4109,8 +3437,8 @@
 								{
 									"type": "Block",
 									"value": " c1\n\tc2 ",
-									"start": 1905,
-									"end": 1917
+									"start": 1472,
+									"end": 1484
 								}
 							]
 						}
@@ -4119,86 +3447,86 @@
 						{
 							"type": "Line",
 							"value": " an own-line multi-line block in the shell keeps its own line, in the object pattern",
-							"start": 1734,
-							"end": 1820
+							"start": 1345,
+							"end": 1431
 						},
 						{
 							"type": "Line",
-							"value": " as in the array pattern, a block after the `)` hoisting ahead of it",
-							"start": 1822,
-							"end": 1892
+							"value": " as in the array pattern",
+							"start": 1433,
+							"end": 1459
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 1927,
-					"end": 1960,
+					"start": 1494,
+					"end": 1527,
 					"loc": {
 						"start": {
-							"line": 99,
+							"line": 81,
 							"column": 1
 						},
 						"end": {
-							"line": 103,
+							"line": 85,
 							"column": 8
 						}
 					},
 					"expression": {
 						"type": "AssignmentExpression",
-						"start": 1928,
-						"end": 1958,
+						"start": 1495,
+						"end": 1525,
 						"loc": {
 							"start": {
-								"line": 99,
+								"line": 81,
 								"column": 2
 							},
 							"end": {
-								"line": 103,
+								"line": 85,
 								"column": 6
 							}
 						},
 						"operator": "=",
 						"left": {
 							"type": "ObjectPattern",
-							"start": 1928,
-							"end": 1954,
+							"start": 1495,
+							"end": 1521,
 							"loc": {
 								"start": {
-									"line": 99,
+									"line": 81,
 									"column": 2
 								},
 								"end": {
-									"line": 103,
+									"line": 85,
 									"column": 2
 								}
 							},
 							"properties": [
 								{
 									"type": "RestElement",
-									"start": 1932,
-									"end": 1936,
+									"start": 1499,
+									"end": 1503,
 									"loc": {
 										"start": {
-											"line": 100,
+											"line": 82,
 											"column": 2
 										},
 										"end": {
-											"line": 100,
+											"line": 82,
 											"column": 6
 										}
 									},
 									"argument": {
 										"type": "Identifier",
-										"start": 1935,
-										"end": 1936,
+										"start": 1502,
+										"end": 1503,
 										"loc": {
 											"start": {
-												"line": 100,
+												"line": 82,
 												"column": 5
 											},
 											"end": {
-												"line": 100,
+												"line": 82,
 												"column": 6
 											}
 										},
@@ -4209,15 +3537,15 @@
 						},
 						"right": {
 							"type": "Identifier",
-							"start": 1957,
-							"end": 1958,
+							"start": 1524,
+							"end": 1525,
 							"loc": {
 								"start": {
-									"line": 103,
+									"line": 85,
 									"column": 5
 								},
 								"end": {
-									"line": 103,
+									"line": 85,
 									"column": 6
 								}
 							},
@@ -4226,8 +3554,8 @@
 								{
 									"type": "Block",
 									"value": " c1\n\tc2 ",
-									"start": 1939,
-									"end": 1951
+									"start": 1506,
+									"end": 1518
 								}
 							]
 						}
@@ -4235,59 +3563,59 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 1962,
-					"end": 2000,
+					"start": 1529,
+					"end": 1567,
 					"loc": {
 						"start": {
-							"line": 104,
+							"line": 86,
 							"column": 1
 						},
 						"end": {
-							"line": 109,
+							"line": 91,
 							"column": 8
 						}
 					},
 					"expression": {
 						"type": "AssignmentExpression",
-						"start": 1963,
-						"end": 1998,
+						"start": 1530,
+						"end": 1565,
 						"loc": {
 							"start": {
-								"line": 104,
+								"line": 86,
 								"column": 2
 							},
 							"end": {
-								"line": 109,
+								"line": 91,
 								"column": 6
 							}
 						},
 						"operator": "=",
 						"left": {
 							"type": "ObjectPattern",
-							"start": 1963,
-							"end": 1994,
+							"start": 1530,
+							"end": 1561,
 							"loc": {
 								"start": {
-									"line": 104,
+									"line": 86,
 									"column": 2
 								},
 								"end": {
-									"line": 109,
+									"line": 91,
 									"column": 2
 								}
 							},
 							"properties": [
 								{
 									"type": "Property",
-									"start": 1967,
-									"end": 1968,
+									"start": 1534,
+									"end": 1535,
 									"loc": {
 										"start": {
-											"line": 105,
+											"line": 87,
 											"column": 2
 										},
 										"end": {
-											"line": 105,
+											"line": 87,
 											"column": 3
 										}
 									},
@@ -4296,15 +3624,15 @@
 									"computed": false,
 									"key": {
 										"type": "Identifier",
-										"start": 1967,
-										"end": 1968,
+										"start": 1534,
+										"end": 1535,
 										"loc": {
 											"start": {
-												"line": 105,
+												"line": 87,
 												"column": 2
 											},
 											"end": {
-												"line": 105,
+												"line": 87,
 												"column": 3
 											}
 										},
@@ -4312,15 +3640,15 @@
 									},
 									"value": {
 										"type": "Identifier",
-										"start": 1967,
-										"end": 1968,
+										"start": 1534,
+										"end": 1535,
 										"loc": {
 											"start": {
-												"line": 105,
+												"line": 87,
 												"column": 2
 											},
 											"end": {
-												"line": 105,
+												"line": 87,
 												"column": 3
 											}
 										},
@@ -4330,29 +3658,29 @@
 								},
 								{
 									"type": "RestElement",
-									"start": 1972,
-									"end": 1976,
+									"start": 1539,
+									"end": 1543,
 									"loc": {
 										"start": {
-											"line": 106,
+											"line": 88,
 											"column": 2
 										},
 										"end": {
-											"line": 106,
+											"line": 88,
 											"column": 6
 										}
 									},
 									"argument": {
 										"type": "Identifier",
-										"start": 1975,
-										"end": 1976,
+										"start": 1542,
+										"end": 1543,
 										"loc": {
 											"start": {
-												"line": 106,
+												"line": 88,
 												"column": 5
 											},
 											"end": {
-												"line": 106,
+												"line": 88,
 												"column": 6
 											}
 										},
@@ -4363,15 +3691,15 @@
 						},
 						"right": {
 							"type": "Identifier",
-							"start": 1997,
-							"end": 1998,
+							"start": 1564,
+							"end": 1565,
 							"loc": {
 								"start": {
-									"line": 109,
+									"line": 91,
 									"column": 5
 								},
 								"end": {
-									"line": 109,
+									"line": 91,
 									"column": 6
 								}
 							},
@@ -4380,8 +3708,8 @@
 								{
 									"type": "Block",
 									"value": " c1\n\tc2 ",
-									"start": 1979,
-									"end": 1991
+									"start": 1546,
+									"end": 1558
 								}
 							]
 						}
@@ -4389,170 +3717,59 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 2002,
-					"end": 2043,
+					"start": 1610,
+					"end": 1634,
 					"loc": {
 						"start": {
-							"line": 110,
+							"line": 94,
 							"column": 1
 						},
 						"end": {
-							"line": 114,
-							"column": 8
-						}
-					},
-					"expression": {
-						"type": "AssignmentExpression",
-						"start": 2003,
-						"end": 2041,
-						"loc": {
-							"start": {
-								"line": 110,
-								"column": 2
-							},
-							"end": {
-								"line": 114,
-								"column": 6
-							}
-						},
-						"operator": "=",
-						"left": {
-							"type": "ObjectPattern",
-							"start": 2003,
-							"end": 2037,
-							"loc": {
-								"start": {
-									"line": 110,
-									"column": 2
-								},
-								"end": {
-									"line": 114,
-									"column": 2
-								}
-							},
-							"properties": [
-								{
-									"type": "RestElement",
-									"start": 2007,
-									"end": 2011,
-									"loc": {
-										"start": {
-											"line": 111,
-											"column": 2
-										},
-										"end": {
-											"line": 111,
-											"column": 6
-										}
-									},
-									"argument": {
-										"type": "Identifier",
-										"start": 2010,
-										"end": 2011,
-										"loc": {
-											"start": {
-												"line": 111,
-												"column": 5
-											},
-											"end": {
-												"line": 111,
-												"column": 6
-											}
-										},
-										"name": "a"
-									},
-									"trailingComments": [
-										{
-											"type": "Block",
-											"value": " t ",
-											"start": 2012,
-											"end": 2019
-										}
-									]
-								}
-							]
-						},
-						"right": {
-							"type": "Identifier",
-							"start": 2040,
-							"end": 2041,
-							"loc": {
-								"start": {
-									"line": 114,
-									"column": 5
-								},
-								"end": {
-									"line": 114,
-									"column": 6
-								}
-							},
-							"name": "x",
-							"leadingComments": [
-								{
-									"type": "Block",
-									"value": " c1\n\tc2 ",
-									"start": 2022,
-									"end": 2034
-								}
-							]
-						}
-					}
-				},
-				{
-					"type": "ExpressionStatement",
-					"start": 2086,
-					"end": 2110,
-					"loc": {
-						"start": {
-							"line": 117,
-							"column": 1
-						},
-						"end": {
-							"line": 117,
+							"line": 94,
 							"column": 25
 						}
 					},
 					"expression": {
 						"type": "AssignmentExpression",
-						"start": 2086,
-						"end": 2109,
+						"start": 1610,
+						"end": 1633,
 						"loc": {
 							"start": {
-								"line": 117,
+								"line": 94,
 								"column": 1
 							},
 							"end": {
-								"line": 117,
+								"line": 94,
 								"column": 24
 							}
 						},
 						"operator": "=",
 						"left": {
 							"type": "ArrayPattern",
-							"start": 2086,
-							"end": 2105,
+							"start": 1610,
+							"end": 1629,
 							"loc": {
 								"start": {
-									"line": 117,
+									"line": 94,
 									"column": 1
 								},
 								"end": {
-									"line": 117,
+									"line": 94,
 									"column": 20
 								}
 							},
 							"elements": [
 								{
 									"type": "Identifier",
-									"start": 2087,
-									"end": 2088,
+									"start": 1611,
+									"end": 1612,
 									"loc": {
 										"start": {
-											"line": 117,
+											"line": 94,
 											"column": 2
 										},
 										"end": {
-											"line": 117,
+											"line": 94,
 											"column": 3
 										}
 									},
@@ -4560,44 +3777,44 @@
 								},
 								{
 									"type": "ArrayPattern",
-									"start": 2090,
-									"end": 2104,
+									"start": 1614,
+									"end": 1628,
 									"loc": {
 										"start": {
-											"line": 117,
+											"line": 94,
 											"column": 5
 										},
 										"end": {
-											"line": 117,
+											"line": 94,
 											"column": 19
 										}
 									},
 									"elements": [
 										{
 											"type": "RestElement",
-											"start": 2091,
-											"end": 2095,
+											"start": 1615,
+											"end": 1619,
 											"loc": {
 												"start": {
-													"line": 117,
+													"line": 94,
 													"column": 6
 												},
 												"end": {
-													"line": 117,
+													"line": 94,
 													"column": 10
 												}
 											},
 											"argument": {
 												"type": "Identifier",
-												"start": 2094,
-												"end": 2095,
+												"start": 1618,
+												"end": 1619,
 												"loc": {
 													"start": {
-														"line": 117,
+														"line": 94,
 														"column": 9
 													},
 													"end": {
-														"line": 117,
+														"line": 94,
 														"column": 10
 													}
 												},
@@ -4607,8 +3824,8 @@
 												{
 													"type": "Block",
 													"value": " c ",
-													"start": 2096,
-													"end": 2103
+													"start": 1620,
+													"end": 1627
 												}
 											]
 										}
@@ -4618,15 +3835,15 @@
 						},
 						"right": {
 							"type": "Identifier",
-							"start": 2108,
-							"end": 2109,
+							"start": 1632,
+							"end": 1633,
 							"loc": {
 								"start": {
-									"line": 117,
+									"line": 94,
 									"column": 23
 								},
 								"end": {
-									"line": 117,
+									"line": 94,
 									"column": 24
 								}
 							},
@@ -4637,66 +3854,66 @@
 						{
 							"type": "Line",
 							"value": " a nested pattern, and a for-of head",
-							"start": 2046,
-							"end": 2084
+							"start": 1570,
+							"end": 1608
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 2112,
-					"end": 2143,
+					"start": 1636,
+					"end": 1667,
 					"loc": {
 						"start": {
-							"line": 118,
+							"line": 95,
 							"column": 1
 						},
 						"end": {
-							"line": 120,
+							"line": 97,
 							"column": 8
 						}
 					},
 					"expression": {
 						"type": "AssignmentExpression",
-						"start": 2113,
-						"end": 2141,
+						"start": 1637,
+						"end": 1665,
 						"loc": {
 							"start": {
-								"line": 118,
+								"line": 95,
 								"column": 2
 							},
 							"end": {
-								"line": 120,
+								"line": 97,
 								"column": 6
 							}
 						},
 						"operator": "=",
 						"left": {
 							"type": "ObjectPattern",
-							"start": 2113,
-							"end": 2137,
+							"start": 1637,
+							"end": 1661,
 							"loc": {
 								"start": {
-									"line": 118,
+									"line": 95,
 									"column": 2
 								},
 								"end": {
-									"line": 120,
+									"line": 97,
 									"column": 2
 								}
 							},
 							"properties": [
 								{
 									"type": "Property",
-									"start": 2117,
-									"end": 2134,
+									"start": 1641,
+									"end": 1658,
 									"loc": {
 										"start": {
-											"line": 119,
+											"line": 96,
 											"column": 2
 										},
 										"end": {
-											"line": 119,
+											"line": 96,
 											"column": 19
 										}
 									},
@@ -4705,15 +3922,15 @@
 									"computed": false,
 									"key": {
 										"type": "Identifier",
-										"start": 2117,
-										"end": 2118,
+										"start": 1641,
+										"end": 1642,
 										"loc": {
 											"start": {
-												"line": 119,
+												"line": 96,
 												"column": 2
 											},
 											"end": {
-												"line": 119,
+												"line": 96,
 												"column": 3
 											}
 										},
@@ -4721,44 +3938,44 @@
 									},
 									"value": {
 										"type": "ArrayPattern",
-										"start": 2120,
-										"end": 2134,
+										"start": 1644,
+										"end": 1658,
 										"loc": {
 											"start": {
-												"line": 119,
+												"line": 96,
 												"column": 5
 											},
 											"end": {
-												"line": 119,
+												"line": 96,
 												"column": 19
 											}
 										},
 										"elements": [
 											{
 												"type": "RestElement",
-												"start": 2121,
-												"end": 2125,
+												"start": 1645,
+												"end": 1649,
 												"loc": {
 													"start": {
-														"line": 119,
+														"line": 96,
 														"column": 6
 													},
 													"end": {
-														"line": 119,
+														"line": 96,
 														"column": 10
 													}
 												},
 												"argument": {
 													"type": "Identifier",
-													"start": 2124,
-													"end": 2125,
+													"start": 1648,
+													"end": 1649,
 													"loc": {
 														"start": {
-															"line": 119,
+															"line": 96,
 															"column": 9
 														},
 														"end": {
-															"line": 119,
+															"line": 96,
 															"column": 10
 														}
 													},
@@ -4768,8 +3985,8 @@
 													{
 														"type": "Block",
 														"value": " c ",
-														"start": 2126,
-														"end": 2133
+														"start": 1650,
+														"end": 1657
 													}
 												]
 											}
@@ -4781,15 +3998,15 @@
 						},
 						"right": {
 							"type": "Identifier",
-							"start": 2140,
-							"end": 2141,
+							"start": 1664,
+							"end": 1665,
 							"loc": {
 								"start": {
-									"line": 120,
+									"line": 97,
 									"column": 5
 								},
 								"end": {
-									"line": 120,
+									"line": 97,
 									"column": 6
 								}
 							},
@@ -4799,59 +4016,59 @@
 				},
 				{
 					"type": "ForOfStatement",
-					"start": 2145,
-					"end": 2172,
+					"start": 1669,
+					"end": 1696,
 					"loc": {
 						"start": {
-							"line": 121,
+							"line": 98,
 							"column": 1
 						},
 						"end": {
-							"line": 121,
+							"line": 98,
 							"column": 28
 						}
 					},
 					"await": false,
 					"left": {
 						"type": "ArrayPattern",
-						"start": 2150,
-						"end": 2164,
+						"start": 1674,
+						"end": 1688,
 						"loc": {
 							"start": {
-								"line": 121,
+								"line": 98,
 								"column": 6
 							},
 							"end": {
-								"line": 121,
+								"line": 98,
 								"column": 20
 							}
 						},
 						"elements": [
 							{
 								"type": "RestElement",
-								"start": 2151,
-								"end": 2155,
+								"start": 1675,
+								"end": 1679,
 								"loc": {
 									"start": {
-										"line": 121,
+										"line": 98,
 										"column": 7
 									},
 									"end": {
-										"line": 121,
+										"line": 98,
 										"column": 11
 									}
 								},
 								"argument": {
 									"type": "Identifier",
-									"start": 2154,
-									"end": 2155,
+									"start": 1678,
+									"end": 1679,
 									"loc": {
 										"start": {
-											"line": 121,
+											"line": 98,
 											"column": 10
 										},
 										"end": {
-											"line": 121,
+											"line": 98,
 											"column": 11
 										}
 									},
@@ -4861,8 +4078,8 @@
 									{
 										"type": "Block",
 										"value": " c ",
-										"start": 2156,
-										"end": 2163
+										"start": 1680,
+										"end": 1687
 									}
 								]
 							}
@@ -4870,15 +4087,15 @@
 					},
 					"right": {
 						"type": "Identifier",
-						"start": 2168,
-						"end": 2170,
+						"start": 1692,
+						"end": 1694,
 						"loc": {
 							"start": {
-								"line": 121,
+								"line": 98,
 								"column": 24
 							},
 							"end": {
-								"line": 121,
+								"line": 98,
 								"column": 26
 							}
 						},
@@ -4886,15 +4103,15 @@
 					},
 					"body": {
 						"type": "EmptyStatement",
-						"start": 2171,
-						"end": 2172,
+						"start": 1695,
+						"end": 1696,
 						"loc": {
 							"start": {
-								"line": 121,
+								"line": 98,
 								"column": 27
 							},
 							"end": {
-								"line": 121,
+								"line": 98,
 								"column": 28
 							}
 						}
@@ -4902,59 +4119,59 @@
 				},
 				{
 					"type": "ForOfStatement",
-					"start": 2174,
-					"end": 2203,
+					"start": 1698,
+					"end": 1727,
 					"loc": {
 						"start": {
-							"line": 122,
+							"line": 99,
 							"column": 1
 						},
 						"end": {
-							"line": 124,
+							"line": 101,
 							"column": 10
 						}
 					},
 					"await": false,
 					"left": {
 						"type": "ObjectPattern",
-						"start": 2179,
-						"end": 2195,
+						"start": 1703,
+						"end": 1719,
 						"loc": {
 							"start": {
-								"line": 122,
+								"line": 99,
 								"column": 6
 							},
 							"end": {
-								"line": 124,
+								"line": 101,
 								"column": 2
 							}
 						},
 						"properties": [
 							{
 								"type": "RestElement",
-								"start": 2183,
-								"end": 2187,
+								"start": 1707,
+								"end": 1711,
 								"loc": {
 									"start": {
-										"line": 123,
+										"line": 100,
 										"column": 2
 									},
 									"end": {
-										"line": 123,
+										"line": 100,
 										"column": 6
 									}
 								},
 								"argument": {
 									"type": "Identifier",
-									"start": 2186,
-									"end": 2187,
+									"start": 1710,
+									"end": 1711,
 									"loc": {
 										"start": {
-											"line": 123,
+											"line": 100,
 											"column": 5
 										},
 										"end": {
-											"line": 123,
+											"line": 100,
 											"column": 6
 										}
 									},
@@ -4964,8 +4181,8 @@
 									{
 										"type": "Line",
 										"value": " c",
-										"start": 2188,
-										"end": 2192
+										"start": 1712,
+										"end": 1716
 									}
 								]
 							}
@@ -4973,15 +4190,15 @@
 					},
 					"right": {
 						"type": "Identifier",
-						"start": 2199,
-						"end": 2201,
+						"start": 1723,
+						"end": 1725,
 						"loc": {
 							"start": {
-								"line": 124,
+								"line": 101,
 								"column": 6
 							},
 							"end": {
-								"line": 124,
+								"line": 101,
 								"column": 8
 							}
 						},
@@ -4989,15 +4206,15 @@
 					},
 					"body": {
 						"type": "EmptyStatement",
-						"start": 2202,
-						"end": 2203,
+						"start": 1726,
+						"end": 1727,
 						"loc": {
 							"start": {
-								"line": 124,
+								"line": 101,
 								"column": 9
 							},
 							"end": {
-								"line": 124,
+								"line": 101,
 								"column": 10
 							}
 						}

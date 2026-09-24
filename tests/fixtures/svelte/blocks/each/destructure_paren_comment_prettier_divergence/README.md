@@ -18,7 +18,11 @@ drops (`{ b: (a // c⏎), d }` → `{ b: a // c⏎, d }`) — and an array eleme
 value (`[a = (1 /* c */), b]`), and a line comment in the parens followed by another
 after the `)`, at an array rest, an object rest and a property value
 (`[b, ...(a // c1⏎) // c2⏎]` → `[b, ...a // c1⏎// c2⏎]`), where the pair is one trailing run
-and the second comment starts the line the first one broke. Each lands where the same comment
+and the second comment starts the line the first one broke — and an own-line comment in a
+rest's parens followed by one after the `)` (`[b, ...(a⏎/* i */⏎) /* t */]` →
+`[b, ...a /* i */ /* t */]`, `{ b, ...(a⏎// i⏎) /* t */ }` → `{ b, ...a // i⏎/* t */ }`), one run
+in the order the author wrote it, since a binding pattern that stays inline gives the parens'
+comment no line of its own to take. Each lands where the same comment
 lands without the parens — the fixed points of
 [destructure_comment](../destructure_comment_prettier_divergence/)'s positions — so the
 parenthesized authorings are `unformatted_ours_parens.svelte`.

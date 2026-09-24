@@ -188,7 +188,8 @@ fn(
 ```
 
 A spread or rest `...` is part of what the directive precedes, so it rides inside
-the frozen slice (`...  a  .  b` is kept verbatim). An argument that needs
+the frozen slice (`...  a  .  b` is kept verbatim), grouping parens and the comments inside
+them included; a comment written after the `)` stays on the `)`'s line. An argument that needs
 clarity parens keeps them around the frozen slice (`(a = b  +  c)`). An
 argument or element that would normally hug (`fn({ a, b })`, `new A([a, b])`)
 expands instead, so the directive keeps its own line. An array hole contributes

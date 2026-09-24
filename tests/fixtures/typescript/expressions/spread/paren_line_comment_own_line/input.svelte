@@ -2,14 +2,6 @@
 	// an own-line line comment left behind by a spread's stripped parens keeps its own
 	// line, a sibling in the parent list — like an own-line block, and in source order
 
-	// array: with an interior own-line block and an after-comma block glued to the spread
-	const a1 = [
-		1,
-		...x1 /* t */
-		// c
-		/* i */
-	];
-
 	// array: alone, on an element the list continues past
 	const a2 = [
 		1,
@@ -41,13 +33,4 @@
 		/* i */
 		b5: 1
 	};
-
-	// call: an outside block written after the `)` — a share ending in a line comment can
-	// have nothing glued behind it, so the block lands on the argument's line ahead of it
-	fn(
-		a,
-		...x6 /* t */
-		/* i */
-		// c
-	);
 </script>

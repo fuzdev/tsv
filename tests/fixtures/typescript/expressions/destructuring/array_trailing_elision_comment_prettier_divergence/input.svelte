@@ -11,4 +11,7 @@
 		,
 		/* c */
 	] = arr;
+
+	// Two comments there keep a space between them
+	const [c, ,/* c1 */ /* c2 */] = arr;
 </script>

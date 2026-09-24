@@ -23,16 +23,8 @@
 		c
 	];
 
-	// a block written after the stripped `)` sits before the comma, so it trails the
-	// element; the own-line comment keeps the line below
-	const a5 = [
-		...b /* t */,
-		/* i */
-		c
-	];
-
 	// an author blank line after the spread survives
-	const a6 = [
+	const a5 = [
 		...b, // i
 
 		c
@@ -40,7 +32,7 @@
 
 	// on the LAST element, a line comment written after the `)` trails the own-line
 	// comment the parens held, keeping the order the author wrote them in
-	const a7 = [
+	const a6 = [
 		c,
 		...b
 		/* i */ // t

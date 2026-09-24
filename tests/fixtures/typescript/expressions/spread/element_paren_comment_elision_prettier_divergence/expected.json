@@ -1,0 +1,833 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 670,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a spread's stripped parens leave an own-line comment behind, and elisions follow the",
+			"start": 10,
+			"end": 97,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " spread: the comment and the one written after the `)` travel past the elision commas",
+			"start": 99,
+			"end": 186,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " together, in the order the author wrote them",
+			"start": 188,
+			"end": 235,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " i ",
+			"start": 264,
+			"end": 271,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 2
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 274,
+			"end": 281,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 2
+				},
+				"end": {
+					"line": 9,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " with only holes after the spread they reach the array's trailing position, ahead of a",
+			"start": 290,
+			"end": 378,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment written there",
+			"start": 380,
+			"end": 409,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " i ",
+			"start": 438,
+			"end": 445,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 2
+				},
+				"end": {
+					"line": 17,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 446,
+			"end": 453,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 10
+				},
+				"end": {
+					"line": 17,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " h",
+			"start": 454,
+			"end": 458,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 18
+				},
+				"end": {
+					"line": 17,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " i ",
+			"start": 492,
+			"end": 499,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 2
+				},
+				"end": {
+					"line": 23,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 500,
+			"end": 507,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 10
+				},
+				"end": {
+					"line": 23,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " h",
+			"start": 508,
+			"end": 512,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 18
+				},
+				"end": {
+					"line": 23,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a block written after the holes travels with them, each block its own space apart",
+			"start": 519,
+			"end": 603,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " i ",
+			"start": 632,
+			"end": 639,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 2
+				},
+				"end": {
+					"line": 30,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 640,
+			"end": 647,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 10
+				},
+				"end": {
+					"line": 30,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " h ",
+			"start": 648,
+			"end": 655,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 18
+				},
+				"end": {
+					"line": 30,
+					"column": 25
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 669,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 660,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 32,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 237,
+					"end": 287,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 243,
+							"end": 286,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 10,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 243,
+								"end": 245,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 9
+									}
+								},
+								"name": "a1"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 248,
+								"end": 286,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 12
+									},
+									"end": {
+										"line": 10,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "SpreadElement",
+										"start": 252,
+										"end": 256,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 2
+											},
+											"end": {
+												"line": 6,
+												"column": 6
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 255,
+											"end": 256,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 5
+												},
+												"end": {
+													"line": 6,
+													"column": 6
+												}
+											},
+											"name": "b"
+										}
+									},
+									null,
+									{
+										"type": "Identifier",
+										"start": 282,
+										"end": 283,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 10
+											},
+											"end": {
+												"line": 9,
+												"column": 11
+											}
+										},
+										"name": "c",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " i ",
+												"start": 264,
+												"end": 271
+											},
+											{
+												"type": "Block",
+												"value": " t ",
+												"start": 274,
+												"end": 281
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a spread's stripped parens leave an own-line comment behind, and elisions follow the",
+							"start": 10,
+							"end": 97
+						},
+						{
+							"type": "Line",
+							"value": " spread: the comment and the one written after the `)` travel past the elision commas",
+							"start": 99,
+							"end": 186
+						},
+						{
+							"type": "Line",
+							"value": " together, in the order the author wrote them",
+							"start": 188,
+							"end": 235
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 411,
+					"end": 462,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 417,
+							"end": 461,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 7
+								},
+								"end": {
+									"line": 18,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 417,
+								"end": 419,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 7
+									},
+									"end": {
+										"line": 14,
+										"column": 9
+									}
+								},
+								"name": "a2"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 422,
+								"end": 461,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 12
+									},
+									"end": {
+										"line": 18,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "SpreadElement",
+										"start": 426,
+										"end": 430,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 2
+											},
+											"end": {
+												"line": 15,
+												"column": 6
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 429,
+											"end": 430,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 5
+												},
+												"end": {
+													"line": 15,
+													"column": 6
+												}
+											},
+											"name": "b"
+										}
+									},
+									null
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " with only holes after the spread they reach the array's trailing position, ahead of a",
+							"start": 290,
+							"end": 378
+						},
+						{
+							"type": "Line",
+							"value": " line comment written there",
+							"start": 380,
+							"end": 409
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 465,
+					"end": 516,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 471,
+							"end": 515,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 7
+								},
+								"end": {
+									"line": 24,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 471,
+								"end": 473,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 7
+									},
+									"end": {
+										"line": 20,
+										"column": 9
+									}
+								},
+								"name": "a3"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 476,
+								"end": 515,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 12
+									},
+									"end": {
+										"line": 24,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "SpreadElement",
+										"start": 480,
+										"end": 484,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 2
+											},
+											"end": {
+												"line": 21,
+												"column": 6
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 483,
+											"end": 484,
+											"loc": {
+												"start": {
+													"line": 21,
+													"column": 5
+												},
+												"end": {
+													"line": 21,
+													"column": 6
+												}
+											},
+											"name": "b"
+										}
+									},
+									null
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " i ",
+							"start": 438,
+							"end": 445
+						},
+						{
+							"type": "Block",
+							"value": " t ",
+							"start": 446,
+							"end": 453
+						},
+						{
+							"type": "Line",
+							"value": " h",
+							"start": 454,
+							"end": 458
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 605,
+					"end": 659,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 31,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 611,
+							"end": 658,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 7
+								},
+								"end": {
+									"line": 31,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 611,
+								"end": 613,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 7
+									},
+									"end": {
+										"line": 27,
+										"column": 9
+									}
+								},
+								"name": "a4"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 616,
+								"end": 658,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 12
+									},
+									"end": {
+										"line": 31,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "SpreadElement",
+										"start": 620,
+										"end": 624,
+										"loc": {
+											"start": {
+												"line": 28,
+												"column": 2
+											},
+											"end": {
+												"line": 28,
+												"column": 6
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 623,
+											"end": 624,
+											"loc": {
+												"start": {
+													"line": 28,
+													"column": 5
+												},
+												"end": {
+													"line": 28,
+													"column": 6
+												}
+											},
+											"name": "b"
+										}
+									},
+									null
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " i ",
+							"start": 492,
+							"end": 499
+						},
+						{
+							"type": "Block",
+							"value": " t ",
+							"start": 500,
+							"end": 507
+						},
+						{
+							"type": "Line",
+							"value": " h",
+							"start": 508,
+							"end": 512
+						},
+						{
+							"type": "Line",
+							"value": " a block written after the holes travels with them, each block its own space apart",
+							"start": 519,
+							"end": 603
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " i ",
+							"start": 632,
+							"end": 639
+						},
+						{
+							"type": "Block",
+							"value": " t ",
+							"start": 640,
+							"end": 647
+						},
+						{
+							"type": "Block",
+							"value": " h ",
+							"start": 648,
+							"end": 655
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

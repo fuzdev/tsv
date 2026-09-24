@@ -68,4 +68,39 @@
 		),
 		c: 1
 	};
+
+	// a frozen spread's stripped parens print inside its verbatim slice, own-line comment
+	// included, and a comment written after the `)` stays on the `)`'s line
+	const obj12 = {
+		a,
+		// prettier-ignore
+		...(b
+		/* i */) /* t */,
+		c
+	};
+
+	const obj13 = {
+		a,
+		// prettier-ignore
+		...(b
+		/* i */) /* t */
+	};
+
+	const obj14 = {
+		a,
+		// prettier-ignore
+		...(b // i
+		) /* t */,
+		c
+	};
+
+	// the `)` on a line of its own below the comment rides in the slice too
+	const obj15 = {
+		a,
+		// prettier-ignore
+		...(b
+		/* i */
+		) /* t */,
+		c
+	};
 </script>

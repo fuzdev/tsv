@@ -32,3 +32,9 @@ below it -->
 {#each items as { ...a }}<div>{a}</div>{/each}
 
 {#each items as { b: a, d }}<div>{a} {d}</div>{/each}
+
+<!-- an own-line comment in the rest's parens, then a comment after the `)`: one run, in the
+order the author wrote it -->
+{#each items as [b, ...a]}<div>{a}</div>{/each}
+
+{#each items as { b, ...a }}<div>{a}</div>{/each}

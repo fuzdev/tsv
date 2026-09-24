@@ -1022,19 +1022,21 @@ impl<'a> Printer<'a> {
                 .properties
                 .get(i + 1)
                 .map_or(boundary, |next| next.span().start);
-            let mut trailing = self.collect_trailing_comments(prop_end, upper_bound, is_last);
+            // A rest's stripped-paren interior (a frozen one printed it verbatim): the run
+            // past its `)` follows the pattern's share of it.
+            let rest_interior = prop.paren_interior().filter(|_| frozen.is_none());
+            let trailing = self.collect_element_trailing_comments(
+                prop_end,
+                upper_bound,
+                is_last,
+                rest_interior,
+            );
 
             // Separator comma between properties; no trailing comma on the last
             // property under `trailingComma: 'none'` (a rest element never takes one
             // either — it is a syntax error there).
             let comma = (!is_last).then(|| d.text(","));
-            let rest_interior = prop.paren_interior().filter(|_| frozen.is_none());
-            self.push_pattern_element_comma_trailing(
-                &mut prop_parts,
-                &mut trailing,
-                rest_interior,
-                comma,
-            );
+            self.push_element_comma_trailing(&mut prop_parts, &trailing, comma);
 
             if !is_last {
                 // Blank line before the next property, on prettier's `isNextLineEmpty` —
@@ -1362,11 +1364,10 @@ impl<'a> Printer<'a> {
         // sides partition the gap. A line comment routes to the expanded path, so only
         // blocks reach here.
         if has_comments && arr.elements.last().is_some_and(Option::is_none) {
-            for comment in self.comments_to_emit_between(prev_end, boundary) {
-                if comment.is_block {
-                    parts.push(self.build_comment_doc(comment));
-                }
-            }
+            self.push_trailing_elision_blocks(
+                &mut parts,
+                self.comments_to_emit_between(prev_end, boundary),
+            );
         }
 
         // Build group for the array pattern brackets only
@@ -1443,19 +1444,21 @@ impl<'a> Printer<'a> {
                 // Collect trailing comments, bounded by the next REAL element or (past the
                 // last) the body's end — `array_pattern_gap_end` carries both halves.
                 let upper_bound = array_pattern_gap_end(arr, i, boundary);
-                let mut trailing = self.collect_trailing_comments(elem_end, upper_bound, is_last);
+                // A rest's stripped-paren interior (a frozen one printed it verbatim): the
+                // run past its `)` follows the pattern's share of it.
+                let rest_interior = e.paren_interior().filter(|_| frozen_span.is_none());
+                let trailing = self.collect_element_trailing_comments(
+                    elem_end,
+                    upper_bound,
+                    is_last,
+                    rest_interior,
+                );
 
                 // Separator comma between elements; no trailing comma on the last
                 // element under `trailingComma: 'none'` (a rest element never takes one
                 // either — it is a syntax error there).
                 let comma = (!is_last).then(|| d.text(","));
-                let rest_interior = e.paren_interior().filter(|_| frozen_span.is_none());
-                self.push_pattern_element_comma_trailing(
-                    &mut parts,
-                    &mut trailing,
-                    rest_interior,
-                    comma,
-                );
+                self.push_element_comma_trailing(&mut parts, &trailing, comma);
 
                 if !is_last {
                     // Check for a blank line before the next REAL binding (or its leading
@@ -1722,7 +1725,7 @@ impl<'a> Printer<'a> {
         parts.push(self.build_expression_doc(rest.argument));
         // The rest's share of its stripped-paren interior (`[...(a /* c */)] = x`): what
         // shares the argument's line. The own-line rest is the enclosing pattern's
-        // (`Printer::push_paren_interior_own_line_comments`), which anchors its own
+        // (`Printer::push_element_share_and_run`), which anchors its own
         // trailing scan past the `)` — the spread's partition, one emitter per share.
         self.append_paren_interior_trailing_comments(&mut parts, rest.paren_interior());
         // The optional `?` marker and the `: type` annotation, with the comment landings

@@ -15,6 +15,9 @@ An own-line comment there takes its own line and the array expands (`b`), which 
 own-line block rule; prettier expands too and differs only in ordering the comment against the
 elision comma.
 
+Two comments in that region keep a space between them, inline (`c`) and on their own line
+(`e`): the separator goes before each comment, so the pair never welds into `/* c1 *//* c2 */`.
+
 Both authorings in `unformatted_ours_authored` reach our form: written before `x`'s comma
 (`[x⏎/* c */, , ]`) or between the two commas (`[x, /* c */ , ]`), the comment slides *forward*
 past the anonymous elision comma, never backward across `x`'s. Prettier normalizes each to

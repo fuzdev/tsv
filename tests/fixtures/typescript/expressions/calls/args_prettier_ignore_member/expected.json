@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1952,
+	"end": 2456,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -489,24 +489,264 @@
 					"column": 20
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " a frozen spread's stripped parens print inside its verbatim slice, own-line comment",
+			"start": 1944,
+			"end": 2030,
+			"loc": {
+				"start": {
+					"line": 102,
+					"column": 1
+				},
+				"end": {
+					"line": 102,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " included, and a comment written after the `)` stays on the `)`'s line",
+			"start": 2032,
+			"end": 2104,
+			"loc": {
+				"start": {
+					"line": 103,
+					"column": 1
+				},
+				"end": {
+					"line": 103,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 2117,
+			"end": 2135,
+			"loc": {
+				"start": {
+					"line": 106,
+					"column": 2
+				},
+				"end": {
+					"line": 106,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " i ",
+			"start": 2146,
+			"end": 2153,
+			"loc": {
+				"start": {
+					"line": 108,
+					"column": 2
+				},
+				"end": {
+					"line": 108,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 2155,
+			"end": 2162,
+			"loc": {
+				"start": {
+					"line": 108,
+					"column": 11
+				},
+				"end": {
+					"line": 108,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 2185,
+			"end": 2203,
+			"loc": {
+				"start": {
+					"line": 114,
+					"column": 2
+				},
+				"end": {
+					"line": 114,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " i ",
+			"start": 2214,
+			"end": 2221,
+			"loc": {
+				"start": {
+					"line": 116,
+					"column": 2
+				},
+				"end": {
+					"line": 116,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 2223,
+			"end": 2230,
+			"loc": {
+				"start": {
+					"line": 116,
+					"column": 11
+				},
+				"end": {
+					"line": 116,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 2248,
+			"end": 2266,
+			"loc": {
+				"start": {
+					"line": 121,
+					"column": 2
+				},
+				"end": {
+					"line": 121,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " i",
+			"start": 2275,
+			"end": 2279,
+			"loc": {
+				"start": {
+					"line": 122,
+					"column": 8
+				},
+				"end": {
+					"line": 122,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 2284,
+			"end": 2291,
+			"loc": {
+				"start": {
+					"line": 123,
+					"column": 4
+				},
+				"end": {
+					"line": 123,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the `)` on a line of its own below the comment rides in the slice too",
+			"start": 2303,
+			"end": 2375,
+			"loc": {
+				"start": {
+					"line": 127,
+					"column": 1
+				},
+				"end": {
+					"line": 127,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 2388,
+			"end": 2406,
+			"loc": {
+				"start": {
+					"line": 130,
+					"column": 2
+				},
+				"end": {
+					"line": 130,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " i ",
+			"start": 2417,
+			"end": 2424,
+			"loc": {
+				"start": {
+					"line": 132,
+					"column": 2
+				},
+				"end": {
+					"line": 132,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 2429,
+			"end": 2436,
+			"loc": {
+				"start": {
+					"line": 133,
+					"column": 4
+				},
+				"end": {
+					"line": 133,
+					"column": 11
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 1951,
+		"end": 2455,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 1942,
+			"end": 2446,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 101,
+					"line": 136,
 					"column": 9
 				}
 			},
@@ -2854,6 +3094,550 @@
 							"value": " node span — the frozen slice re-synthesizes them or the call changes arity",
 							"start": 1818,
 							"end": 1895
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2106,
+					"end": 2171,
+					"loc": {
+						"start": {
+							"line": 104,
+							"column": 1
+						},
+						"end": {
+							"line": 110,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 2106,
+						"end": 2170,
+						"loc": {
+							"start": {
+								"line": 104,
+								"column": 1
+							},
+							"end": {
+								"line": 110,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 2106,
+							"end": 2108,
+							"loc": {
+								"start": {
+									"line": 104,
+									"column": 1
+								},
+								"end": {
+									"line": 104,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 2112,
+								"end": 2113,
+								"loc": {
+									"start": {
+										"line": 105,
+										"column": 2
+									},
+									"end": {
+										"line": 105,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "SpreadElement",
+								"start": 2138,
+								"end": 2154,
+								"loc": {
+									"start": {
+										"line": 107,
+										"column": 2
+									},
+									"end": {
+										"line": 108,
+										"column": 10
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 2142,
+									"end": 2143,
+									"loc": {
+										"start": {
+											"line": 107,
+											"column": 6
+										},
+										"end": {
+											"line": 107,
+											"column": 7
+										}
+									},
+									"name": "b"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 2117,
+										"end": 2135
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 2166,
+								"end": 2167,
+								"loc": {
+									"start": {
+										"line": 109,
+										"column": 2
+									},
+									"end": {
+										"line": 109,
+										"column": 3
+									}
+								},
+								"name": "c",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " i ",
+										"start": 2146,
+										"end": 2153
+									},
+									{
+										"type": "Block",
+										"value": " t ",
+										"start": 2155,
+										"end": 2162
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a frozen spread's stripped parens print inside its verbatim slice, own-line comment",
+							"start": 1944,
+							"end": 2030
+						},
+						{
+							"type": "Line",
+							"value": " included, and a comment written after the `)` stays on the `)`'s line",
+							"start": 2032,
+							"end": 2104
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2174,
+					"end": 2234,
+					"loc": {
+						"start": {
+							"line": 112,
+							"column": 1
+						},
+						"end": {
+							"line": 117,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 2174,
+						"end": 2233,
+						"loc": {
+							"start": {
+								"line": 112,
+								"column": 1
+							},
+							"end": {
+								"line": 117,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 2174,
+							"end": 2176,
+							"loc": {
+								"start": {
+									"line": 112,
+									"column": 1
+								},
+								"end": {
+									"line": 112,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 2180,
+								"end": 2181,
+								"loc": {
+									"start": {
+										"line": 113,
+										"column": 2
+									},
+									"end": {
+										"line": 113,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "SpreadElement",
+								"start": 2206,
+								"end": 2222,
+								"loc": {
+									"start": {
+										"line": 115,
+										"column": 2
+									},
+									"end": {
+										"line": 116,
+										"column": 10
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 2210,
+									"end": 2211,
+									"loc": {
+										"start": {
+											"line": 115,
+											"column": 6
+										},
+										"end": {
+											"line": 115,
+											"column": 7
+										}
+									},
+									"name": "b"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 2185,
+										"end": 2203
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2237,
+					"end": 2300,
+					"loc": {
+						"start": {
+							"line": 119,
+							"column": 1
+						},
+						"end": {
+							"line": 125,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 2237,
+						"end": 2299,
+						"loc": {
+							"start": {
+								"line": 119,
+								"column": 1
+							},
+							"end": {
+								"line": 125,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 2237,
+							"end": 2239,
+							"loc": {
+								"start": {
+									"line": 119,
+									"column": 1
+								},
+								"end": {
+									"line": 119,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 2243,
+								"end": 2244,
+								"loc": {
+									"start": {
+										"line": 120,
+										"column": 2
+									},
+									"end": {
+										"line": 120,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "SpreadElement",
+								"start": 2269,
+								"end": 2283,
+								"loc": {
+									"start": {
+										"line": 122,
+										"column": 2
+									},
+									"end": {
+										"line": 123,
+										"column": 3
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 2273,
+									"end": 2274,
+									"loc": {
+										"start": {
+											"line": 122,
+											"column": 6
+										},
+										"end": {
+											"line": 122,
+											"column": 7
+										}
+									},
+									"name": "b",
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " i",
+											"start": 2275,
+											"end": 2279
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 2248,
+										"end": 2266
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " t ",
+										"start": 2284,
+										"end": 2291
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 2295,
+								"end": 2296,
+								"loc": {
+									"start": {
+										"line": 124,
+										"column": 2
+									},
+									"end": {
+										"line": 124,
+										"column": 3
+									}
+								},
+								"name": "c"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " i ",
+							"start": 2214,
+							"end": 2221
+						},
+						{
+							"type": "Block",
+							"value": " t ",
+							"start": 2223,
+							"end": 2230
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 2377,
+					"end": 2445,
+					"loc": {
+						"start": {
+							"line": 128,
+							"column": 1
+						},
+						"end": {
+							"line": 135,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 2377,
+						"end": 2444,
+						"loc": {
+							"start": {
+								"line": 128,
+								"column": 1
+							},
+							"end": {
+								"line": 135,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 2377,
+							"end": 2379,
+							"loc": {
+								"start": {
+									"line": 128,
+									"column": 1
+								},
+								"end": {
+									"line": 128,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 2383,
+								"end": 2384,
+								"loc": {
+									"start": {
+										"line": 129,
+										"column": 2
+									},
+									"end": {
+										"line": 129,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "SpreadElement",
+								"start": 2409,
+								"end": 2428,
+								"loc": {
+									"start": {
+										"line": 131,
+										"column": 2
+									},
+									"end": {
+										"line": 133,
+										"column": 3
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 2413,
+									"end": 2414,
+									"loc": {
+										"start": {
+											"line": 131,
+											"column": 6
+										},
+										"end": {
+											"line": 131,
+											"column": 7
+										}
+									},
+									"name": "b"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 2388,
+										"end": 2406
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 2440,
+								"end": 2441,
+								"loc": {
+									"start": {
+										"line": 134,
+										"column": 2
+									},
+									"end": {
+										"line": 134,
+										"column": 3
+									}
+								},
+								"name": "c",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " i ",
+										"start": 2417,
+										"end": 2424
+									},
+									{
+										"type": "Block",
+										"value": " t ",
+										"start": 2429,
+										"end": 2436
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the `)` on a line of its own below the comment rides in the slice too",
+							"start": 2303,
+							"end": 2375
 						}
 					]
 				}

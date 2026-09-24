@@ -11,11 +11,9 @@
 // ordering can't drift between them. (The array literal answers the same rule
 // through its own paired trailing/leading predicate — holes and the fill path don't
 // fit this collector's shape. Its comma arm is [`block_is_before_comma`], shared with
-// this collector's classifier, and a demoted line comment's RENDERING is
-// [`Printer::push_trailing_line_comment_demotion_aware`], shared likewise; the block's
-// ORDER past the comma and the demotion trigger
-// ([`TrailingComments::demote_line_after_deferred`]'s question, which the array asks
-// itself) are still its own, so a change to THOSE has to be mirrored there.)
+// this collector's classifier, and a run behind a stripped-paren interior renders
+// through the same [`Printer::push_element_share_and_run`]; the block's ORDER past the
+// comma is still its own, so a change to THAT has to be mirrored there.)
 //
 // This side is half of a partition: what it does NOT claim leads the next element,
 // and every caller resumes its own leading scan at `end_pos`. See
@@ -26,7 +24,7 @@
 // (`a /* , */ /* x */, b`) is never mistaken for the separator and the following
 // comment is not relocated across it.
 
-use super::{CommentVec, Printer, ShellRunOrder};
+use super::{CommentVec, Printer, ShareSite};
 use crate::ast::internal::Expression;
 use smallvec::SmallVec;
 use std::borrow::Borrow;
@@ -115,33 +113,31 @@ pub(in crate::printer) struct TrailingComments<'a> {
     /// the run's last member ([`Printer::trailing_comment_run`]) — and a second deferred
     /// one would weld onto the first's output line rather than render.
     line: Option<&'a Comment>,
-    /// Whether `line` renders DEMOTED — on a fresh line of its own instead of through
-    /// `line_suffix` — because the element's own doc already ends in a deferred `//`.
-    /// Set by [`TrailingComments::demote_line_after_deferred`].
-    line_demoted: bool,
+    /// The element's stripped-paren interior when it stands between the element's text and
+    /// this run ([`Printer::paren_interior_separates_run`]) — a spread's or rest's own-line
+    /// share, or a same-line `//` its own doc defers. The run then follows the interior
+    /// ([`Printer::push_element_share_and_run`]) and the comma moves up against the
+    /// element, so every block of the run is past the comma: `before_comma` stays empty on
+    /// an element the list continues past. A run that leads the next element
+    /// ([`Printer::run_leads_next_item`]) is handed to it instead
+    /// ([`TrailingComments::leads_next`]). `None` for every other element.
+    behind_interior: Option<Span>,
+    /// The run displaced past the comma that LEADS the next element
+    /// ([`Printer::run_leads_next_item`]): claimed here (`end_pos` covers it) and handed to
+    /// the caller, which prints it ahead of the next element's own leading run
+    /// ([`Printer::push_run_leading_next_item`]). Empty for every other element.
+    pub(in crate::printer) leads_next: SmallVec<[&'a Comment; 2]>,
     /// Position after all trailing comments (for updating prev_end)
     pub(in crate::printer) end_pos: u32,
 }
 
 impl TrailingComments<'_> {
-    /// Give this run's LINE comment a line of its own when the element's own doc
-    /// already ends in a DEFERRED `//` — a spread or rest whose stripped grouping parens
-    /// held one ([`Printer::paren_interior_defers_line_comment`]).
-    ///
-    /// Its output line already terminates in a `//`, so nothing more may join it:
-    /// deferring a second line comment onto the same line welds the two into ONE comment,
-    /// the second `//` becoming text inside the first. The argument-list twin is
-    /// [`super::super::calls::PartitionedComments::demote_trailing_line_after_deferred`];
-    /// it moves the comments to the *next* element's leading run, which this collector
-    /// cannot do — the run stays claimed here (`end_pos` already covers it) and
-    /// [`Printer::push_element_comma_trailing`] gives it a line of its own instead. Both
-    /// land on the same output, and both are fixed points: a comment printed onto a fresh
-    /// line is own-line when it is reparsed.
-    ///
-    /// `element_defers_line` is the question already answered by the caller, which is the
-    /// only place that knows the element's node type.
-    pub(in crate::printer) fn demote_line_after_deferred(&mut self, element_defers_line: bool) {
-        self.line_demoted = element_defers_line;
+    /// Whether this run was collected behind the element's stripped-paren interior
+    /// ([`TrailingComments::behind_interior`]) — the comma then sits against the element,
+    /// so the separator to the next element measures an author blank from the run's end,
+    /// not across the comma's own line ([`Printer::blank_before_next_item`]).
+    pub(in crate::printer) fn is_behind_interior(&self) -> bool {
+        self.behind_interior.is_some()
     }
 }
 
@@ -405,6 +401,23 @@ impl<'a> Printer<'a> {
         upper_bound: u32,
         is_last: bool,
     ) -> TrailingComments<'_> {
+        self.collect_element_trailing_comments(elem_end, upper_bound, is_last, None)
+    }
+
+    /// [`Self::collect_trailing_comments`] for an element that may carry a stripped-paren
+    /// interior — a spread in an object literal, a rest in an array or object pattern
+    /// (`interior`, `None` for anything else or a frozen element, which printed its interior
+    /// verbatim). Where the interior stands between the element's text and its run
+    /// ([`Printer::paren_interior_separates_run`]), the run is collected to follow it
+    /// ([`TrailingComments::behind_interior`]).
+    pub(in crate::printer) fn collect_element_trailing_comments(
+        &self,
+        elem_end: u32,
+        upper_bound: u32,
+        is_last: bool,
+        interior: Option<Span>,
+    ) -> TrailingComments<'_> {
+        let behind_interior = interior.filter(|_| self.paren_interior_separates_run(interior));
         // Zero-comment fast gate: the comma position only classifies comments, so
         // with no comment in the window there is nothing to collect — skip the
         // comma scan entirely.
@@ -413,7 +426,8 @@ impl<'a> Printer<'a> {
                 before_comma: SmallVec::new(),
                 after_comma: SmallVec::new(),
                 line: None,
-                line_demoted: false,
+                behind_interior,
+                leads_next: SmallVec::new(),
                 end_pos: elem_end,
             };
         }
@@ -440,7 +454,18 @@ impl<'a> Printer<'a> {
         // block trails the element in the same run as its before-comma blocks, so all
         // the run's blocks collect into one source-ordered `before_comma` (the comma
         // between them is `None`).
-        let is_before_comma = |c: &Comment| block_is_before_comma(is_last, comma_pos, c.span.start);
+        //
+        // Behind an interior the comma is emitted against the element itself, ahead of the
+        // interior and the run, so on an element the list continues past no block of the
+        // run is before it.
+        let is_before_comma = |c: &Comment| {
+            block_is_before_comma(is_last, comma_pos, c.span.start)
+                && (is_last || behind_interior.is_none())
+        };
+        // …and every displaced block is claimed here, whichever side of the comma the
+        // author wrote it on: it either follows the interior or leads the next element,
+        // which is decided below, once the run is known.
+        let displaced = behind_interior.is_some() && !is_last;
 
         let mut before_comma = SmallVec::new();
         let mut after_comma = SmallVec::new();
@@ -451,7 +476,9 @@ impl<'a> Printer<'a> {
                 line = Some(c);
             } else if is_before_comma(c) {
                 before_comma.push(c);
-            } else if defers_line {
+            } else if defers_line
+                || (displaced && !self.comment_hugs_next_item(c.span.end, upper_bound))
+            {
                 after_comma.push(c);
             } else {
                 // Leads the next element — not this element's to print, and nothing
@@ -461,11 +488,21 @@ impl<'a> Printer<'a> {
             end_pos = c.span.end;
         }
 
+        let leads_next = if displaced
+            && line.is_none()
+            && self.run_leads_next_item(&after_comma, comma_pos, upper_bound)
+        {
+            std::mem::take(&mut after_comma)
+        } else {
+            SmallVec::new()
+        };
+
         TrailingComments {
             before_comma,
             after_comma,
             line,
-            line_demoted: false,
+            behind_interior,
+            leads_next,
             end_pos,
         }
     }
@@ -481,41 +518,42 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Push one trailing LINE comment, demotion-aware — the single rendering of the
-    /// deferred-`//` weld rule, shared by [`Self::push_element_comma_trailing`] and the
-    /// array literal's element loop so the two can't drift. Not demoted, the comment
-    /// defers past the element through `line_suffix`; demoted (the element's own doc
-    /// already ends in a deferred `//` —
-    /// [`TrailingComments::demote_line_after_deferred`]), it takes a fresh line of its
-    /// own, where a reparse keeps it.
-    pub(in crate::printer) fn push_trailing_line_comment_demotion_aware(
-        &self,
-        parts: &mut DocBuf,
-        comment: &Comment,
-        demoted: bool,
-    ) {
-        if demoted {
-            parts.push(self.d().hardline());
-            parts.push(self.build_comment_doc(comment));
-        } else {
-            parts.push(self.build_trailing_line_comment_doc(comment));
-        }
-    }
-
     /// Push one element's trailing comments around its `comma` doc, in the order
     /// that preserves comment position: the run's before-comma blocks (source-ordered,
     /// including a last element's after-comma block since its comma is `None`),
     /// the comma, the after-comma blocks the author wrote there, then the run's line
     /// comment as a suffix. That is source order for every arrangement of the run, which
     /// is the point: the pieces land on the same side of the comma and in the same
-    /// sequence the author gave them. Shared by the object/array pattern element loops and the object-literal
-    /// loop so this ordering — the comment-position contract — can't drift between them.
+    /// sequence the author gave them. Shared by the object/array pattern element loops and
+    /// the object-literal loop so this ordering — the comment-position contract — can't
+    /// drift between them.
+    ///
+    /// Behind a stripped-paren interior ([`TrailingComments::behind_interior`]) the order
+    /// is the comma, then the interior's share, then the run
+    /// ([`Printer::push_element_share_and_run`]) — the order the same element prints in
+    /// without its parens.
     pub(in crate::printer) fn push_element_comma_trailing(
         &self,
         parts: &mut DocBuf,
         trailing: &TrailingComments<'_>,
         comma: Option<DocId>,
     ) {
+        if let Some(interior) = trailing.behind_interior {
+            let site = if let Some(comma) = comma {
+                parts.push(comma);
+                ShareSite::NextElement
+            } else {
+                ShareSite::Closer
+            };
+            let run = trailing
+                .before_comma
+                .iter()
+                .chain(&trailing.after_comma)
+                .chain(&trailing.line)
+                .copied();
+            self.push_element_share_and_run(parts, Some(interior), site, run);
+            return;
+        }
         // The comment runs are empty on the common (comment-free) path — collected as
         // empty vecs by the zero-comment gate in `collect_trailing_comments`. Skip
         // pushing their `empty()` docs so a comment-free element leaves no wasted child
@@ -524,48 +562,6 @@ impl<'a> Printer<'a> {
         // it vs not is the same rendered output.
         // The last element's comma is `None` (trailingComma: 'none'): nothing is pushed,
         // for the same reason the empty runs are not.
-        self.push_element_comma_trailing_blocks(parts, trailing, comma);
-        self.push_element_trailing_line(parts, trailing);
-    }
-
-    /// [`Self::push_element_comma_trailing`] for a destructuring PATTERN's element, ordered
-    /// against a rest element's stripped-paren interior — the object literal's spread
-    /// partition in pattern form. The rest's own doc prints the interior's same-line share
-    /// (a `//` there already ends the line, so the run's own `//` is demoted rather than
-    /// welded onto it), and the own-line share is the pattern's. A rest is always the LAST
-    /// element, so the share and the run past its `)` take the last-element order
-    /// ([`Printer::push_last_element_share_and_run`]).
-    ///
-    /// `rest_interior` is `None` for every other element, and for a frozen one, which
-    /// printed its interior verbatim. Shared by the array and object pattern element loops.
-    pub(in crate::printer) fn push_pattern_element_comma_trailing(
-        &self,
-        parts: &mut DocBuf,
-        trailing: &mut TrailingComments<'_>,
-        rest_interior: Option<Span>,
-        comma: Option<DocId>,
-    ) {
-        trailing.demote_line_after_deferred(self.paren_interior_defers_line_comment(rest_interior));
-        self.push_last_element_share_and_run(
-            parts,
-            rest_interior,
-            ShellRunOrder::HoistBlocks,
-            |parts| self.push_element_comma_trailing_blocks(parts, trailing, comma),
-            |parts| self.push_element_trailing_line(parts, trailing),
-        );
-    }
-
-    /// [`Self::push_element_comma_trailing`] up to its line comment — the blocks and the
-    /// comma. The last-element emitter ([`Printer::push_last_element_share_and_run`])
-    /// takes the run in these two halves, since under
-    /// [`ShellRunOrder::HoistBlocks`] a stripped-paren share lands
-    /// between them.
-    pub(in crate::printer) fn push_element_comma_trailing_blocks(
-        &self,
-        parts: &mut DocBuf,
-        trailing: &TrailingComments<'_>,
-        comma: Option<DocId>,
-    ) {
         if !trailing.before_comma.is_empty() {
             parts.push(self.build_block_comments_doc(&trailing.before_comma));
         }
@@ -575,17 +571,8 @@ impl<'a> Printer<'a> {
         if !trailing.after_comma.is_empty() {
             parts.push(self.build_block_comments_doc(&trailing.after_comma));
         }
-    }
-
-    /// The run's line comment — the other half of
-    /// [`Self::push_element_comma_trailing_blocks`].
-    pub(in crate::printer) fn push_element_trailing_line(
-        &self,
-        parts: &mut DocBuf,
-        trailing: &TrailingComments<'_>,
-    ) {
         if let Some(comment) = trailing.line {
-            self.push_trailing_line_comment_demotion_aware(parts, comment, trailing.line_demoted);
+            parts.push(self.build_trailing_line_comment_doc(comment));
         }
     }
 }

@@ -729,8 +729,9 @@ fn build_chain_args_force_expand(
             // own-line share; the separator + leading comments below finish the gap.
             // This layout is hardline-joined throughout, so the gap's `forces_expansion`
             // obligation is already met and nothing reads it.
+            let interior = printer.arg_paren_interior(paren_open, call.arguments, i);
             let pc = printer
-                .open_inter_arg_gap(&mut arg_parts, arg, next_arg_start)
+                .open_inter_arg_gap(&mut arg_parts, arg, interior, next_arg_start)
                 .comments;
 
             // Skip hardline if next arg has blank line
@@ -765,7 +766,8 @@ fn build_chain_args_force_expand(
             // the source comma just trails past where the comma was; a line comment
             // follows via `line_suffix`), then own-line dangling comments. No trailing
             // comma (trailingComma: 'none').
-            emit_last_arg_trailing_comments(printer, &mut arg_parts, arg, next_boundary);
+            let interior = printer.arg_paren_interior(paren_open, call.arguments, i);
+            emit_last_arg_trailing_comments(printer, &mut arg_parts, arg, interior, next_boundary);
         }
     }
 

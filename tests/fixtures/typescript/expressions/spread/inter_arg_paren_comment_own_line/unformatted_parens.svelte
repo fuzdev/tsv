@@ -18,12 +18,6 @@
 	/* i */
 	), c);
 
-	// a block written after the stripped `)` sits before the comma, so it trails the
-	// argument; the own-line comment keeps the line below
-	fn(...(b
-	/* i */
-	) /* t */, c);
-
 	// a line comment written on its own line after the `)` keeps its own line too
 	fn(...(b
 	/* i */

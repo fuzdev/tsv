@@ -8,4 +8,7 @@
 	// An own-line comment takes its own line there, still past the elision comma
 	const [b
 /* c */, , ] = arr;
+
+	// Two comments there keep a space between them
+	const [c, /* c1 */ /* c2 */ , ] = arr;
 </script>
