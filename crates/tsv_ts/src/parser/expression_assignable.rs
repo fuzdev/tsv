@@ -70,19 +70,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         context: AssignableContext,
     ) -> Result<Expression<'arena>, ParseError> {
         match &expr.kind {
-            // A target on an optional chain (`a?.b`, `a?.b!`, `a?.[i].c`) is no target
-            // at all in a for-head: ecma262 gives an `OptionalExpression` the invalid
-            // `AssignmentTargetType`, and there is no wire shape for it — acorn wraps
-            // the chain in a `ChainExpression`, which is not a `Pattern`, and rejects
-            // ("Optional chaining cannot appear in left-hand side"); tsc's checker
-            // rejects it too (TS2780 / TS2781, the `OptionalChain` flag on the
-            // reference it skipped to), and so does prettier. Read through the assertions and the
-            // JSDoc cast first, since `a?.b!` is the same chain one node up. Sits
-            // ahead of the accepting arms so no simple-target arm admits the chain. An
-            // assignment (`a?.b = 1`) keeps deferring it with the rest of the
-            // non-simple targets below (TS2779 is checker-raised, and an
-            // `AssignmentExpression.left` carries any expression). A parenthesized
-            // chain is sealed: `(a?.b).c` is an ordinary member target.
+            // A target on an optional chain (`a?.b`, `a?.b!`, `a?.[i].c`) rejects in a
+            // for-head. ecma262 gives an `OptionalExpression` the invalid
+            // `AssignmentTargetType`, a static-semantic early error that tsc's parser
+            // does not raise (its checker does, TS2780 / TS2781). tsv rejects it here
+            // for the reason every non-simple for-head target rejects: a no-declaration
+            // for-in/of head is a `LeftHandSideExpression` position but not an
+            // assignment context, so the assignment deferral does not reach it (see
+            // docs/conformance_svelte.md §TypeScript Corrections, the non-simple
+            // assignment target entry). acorn rejects it too ("Optional chaining
+            // cannot appear in left-hand side"), and so does prettier. Read through
+            // the assertions and the JSDoc cast first, since `a?.b!` is the same chain
+            // one node up. Sits ahead of the accepting arms so no simple-target arm
+            // admits the chain. An assignment (`a?.b = 1`, and a destructuring element,
+            // `[a?.b] = xs`) keeps deferring it with the rest of the non-simple targets
+            // below (TS2779 is checker-raised, and an `AssignmentExpression.left`
+            // carries any expression). A parenthesized chain is sealed: `(a?.b).c` is
+            // an ordinary member target.
             _ if matches!(context, AssignableContext::ForHead)
                 && expr.skip_type_assertions().has_optional_in_chain() =>
             {
