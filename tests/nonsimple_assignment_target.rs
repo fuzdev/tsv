@@ -12,7 +12,7 @@
 //! layer so the formatter keeps formatting well-formed input — prettier formats all
 //! of these, so tsv must parse them.
 //!
-//! The four prettier-canonical shapes ARE a fixture —
+//! The prettier-canonical shapes ARE a fixture —
 //! `typescript/expressions/assignment/nonsimple_target_svelte_divergence`. An
 //! acorn *rejection* is representable (`expected_ours.json` plus an
 //! `expected_svelte.json` holding `{"error": "failed to parse"}`), and it is the
@@ -389,5 +389,113 @@ fn whole_target_default_pattern_rejected() {
             .and_then(Value::as_str),
         Some("AssignmentExpression"),
         "the unparenthesized chain nests on the RIGHT",
+    );
+}
+
+/// An instantiation expression is a non-simple target like any other, and `+=` / `-=`
+/// must reach it exactly as `*=` does. They are the two compound operators that share a
+/// first byte with an EXPRESSION start (`+c`, `-c`), so a follower test that reads the
+/// byte instead of the token takes the `+` of `+=` for a unary operand and reads the
+/// would-be `<…>` as a comparison chain — which then has no right operand. tsc's
+/// `canFollowTypeArgumentsInExpression` refuses the list ahead of `+` / `-` but not ahead
+/// of `+=` / `-=`, which are different tokens; acorn-typescript's `tt.assign` is not
+/// `startsExpr` either, so both read the instantiation (acorn then rejects the target,
+/// the early error tsv defers). Each spelling must build the `*=` tree with only the
+/// operator changed, glued (`f<T>+= c`), behind a comment, or past a `>>` close
+/// (`f<A<B>>`) alike. The function-type head (`f<(a: T) => U>`) is the one that commits
+/// without the lookahead and asks the follower afterwards; `new f<T>` is the one no
+/// fixture can hold bare, since prettier and tsv both re-spell it `new f<T>()`, whose `(`
+/// commits the list ahead of any follower; and `x = f<T>` puts the target on the right.
+#[test]
+fn instantiation_target_takes_plus_minus_assign_like_star_assign() {
+    let expr = "/body/0/expression";
+    let nested = "/body/0/expression/right";
+    // (template with `OP` for the operator, the assignment's pointer, its `left` type)
+    for (template, at, left) in [
+        ("f<T> OP c;", expr, "TSInstantiationExpression"),
+        ("f<T>OP c;", expr, "TSInstantiationExpression"),
+        ("f<T> /* x */ OP c;", expr, "TSInstantiationExpression"),
+        ("f<A<B>> OP c;", expr, "TSInstantiationExpression"),
+        ("a.b<T> OP c;", expr, "TSInstantiationExpression"),
+        ("new f<T> OP c;", expr, "NewExpression"),
+        ("f<(a: T) => U> OP c;", expr, "TSInstantiationExpression"),
+        ("x = f<T> OP c;", nested, "TSInstantiationExpression"),
+    ] {
+        let baseline = template.replace("OP", "*=");
+        let sibling = parse_json(&baseline);
+        assert_eq!(
+            sibling
+                .pointer(&format!("{at}/type"))
+                .and_then(Value::as_str),
+            Some("AssignmentExpression"),
+            "the `*=` baseline is an assignment: {baseline:?} {sibling}"
+        );
+        assert_eq!(
+            sibling
+                .pointer(&format!("{at}/left/type"))
+                .and_then(Value::as_str),
+            Some(left),
+            "the `*=` baseline's target: {baseline:?} {sibling}"
+        );
+        let sibling = sibling.to_string();
+        for op in ["+=", "-="] {
+            let source = template.replace("OP", op);
+            assert!(!rejects(&source), "must parse: {source:?}");
+            let json = parse_json(&source);
+            assert_eq!(
+                json.pointer(&format!("{at}/operator"))
+                    .and_then(Value::as_str),
+                Some(op),
+                "the operator: {source:?} {json}"
+            );
+            assert_eq!(
+                json.to_string(),
+                sibling.replace("\"*=\"", &format!("\"{op}\"")),
+                "`{op}` must build the `*=` tree: {source:?}"
+            );
+        }
+    }
+}
+
+/// The CONTRAST that bounds the fix: a bare `+` / `-` and a prefix `++` / `--` DO start an
+/// expression, so ahead of them the `<…>` stays a comparison chain on both oracles
+/// (`x = f<T> + c` is `x = (f < T) > +c`), and a line break before the `+=` changes
+/// nothing, the instantiation already holding there.
+#[test]
+fn a_unary_follower_still_reads_as_a_comparison_chain() {
+    for (source, operand) in [
+        ("x = f<T> + c;", "UnaryExpression"),
+        ("x = f<T> - c;", "UnaryExpression"),
+        ("x = f<T> ++c;", "UpdateExpression"),
+        ("x = f<T> --c;", "UpdateExpression"),
+    ] {
+        let json = parse_json(source);
+        let right = "/body/0/expression/right";
+        assert_eq!(
+            json.pointer(&format!("{right}/operator"))
+                .and_then(Value::as_str),
+            Some(">"),
+            "the chain's outer operator: {source:?} {json}"
+        );
+        assert_eq!(
+            json.pointer(&format!("{right}/left/operator"))
+                .and_then(Value::as_str),
+            Some("<"),
+            "the chain's inner operator: {source:?} {json}"
+        );
+        assert_eq!(
+            json.pointer(&format!("{right}/right/type"))
+                .and_then(Value::as_str),
+            Some(operand),
+            "the follower is the chain's operand: {source:?} {json}"
+        );
+    }
+    let broken = parse_json("f<T>\n-= c;");
+    assert_eq!(
+        broken
+            .pointer("/body/0/expression/left/type")
+            .and_then(Value::as_str),
+        Some("TSInstantiationExpression"),
+        "across a line break the instantiation already holds: {broken}"
     );
 }

@@ -282,10 +282,13 @@ Side by side, the two readers of a follower past the `>`:
 - **tsc** — a `(` or a template commits the list **unconditionally**; a `<`, `>`, `+` or `-`
   refuses it **unconditionally**; every other follower reaches the last line, which commits
   on a preceding line break, a binary operator, or a token that cannot start an expression.
+  The refusal is keyed on the token, so `+=` / `-=` (and `++` / `--`) are not in it: an
+  assignment operator commits the list at the last line (`f<T> += c` assigns to `f<T>`),
+  where a prefix `++` / `--` starts an expression and refuses it on the `>`'s own line.
 - **acorn-typescript** — a template or a `(` commits **unconditionally**, as in tsc; a `>`,
   `<<`, `>>` or `>>>` bails **unconditionally**; any other token that can start an expression bails
   **only on the `>`'s own line**, and after a line break commits; a token that cannot start
-  an expression commits.
+  an expression commits — an assignment operator among them, `+=` / `-=` included.
 
 tsv's own parse follows acorn-typescript (`scan_for_closing_angle_bracket`), acorn being
 tsv's AST contract. The one difference that matters here is `+` / `-`: tsc refuses the list

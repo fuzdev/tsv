@@ -1,19 +1,23 @@
 # non-simple assignment target - Svelte divergence
 
 This fixture pins that a *non-simple* assignment target parses: a call (`foo() = bar`),
-a compound assignment to one (`foo() += 1`), a literal (`1 >>= 2`), and `this`
-(`this = x`).
+a compound assignment to one (`foo() += 1`), a literal (`1 >>= 2`), `this`
+(`this = x`), and an instantiation expression (`f<T> += c`, `a.b<T> -= c`,
+`f<(a: T) => U> += c`). A `+=` / `-=` after the type arguments is its own token, not the
+`+` / `-` ahead of which tsc and acorn read `<…>` as a comparison chain, so both parsers
+read the instantiation as the target. The `unformatted_paren_instantiation` variant
+parenthesizes that target, `(f<T>) += c`, and both formatters strip the parens.
 
 ## Why tsv Differs
 
 "The left-hand side is not a valid assignment target" is a **static-semantic early
 error**, not a syntax error. The grammar production is
 `LeftHandSideExpression = AssignmentExpression`
-([ecma262 §13.15](https://tc39.es/ecma262/#prod-AssignmentExpression)), which parses all
-four fine; the "is it assignable?" refinement (`AssignmentTargetType`) is layered on top
+([ecma262 §13.15](https://tc39.es/ecma262/#prod-AssignmentExpression)), which parses every
+shape fine; the "is it assignable?" refinement (`AssignmentTargetType`) is layered on top
 as an early error. Per tsv's permissive-parser stance the parser defers it to the
 diagnostics layer, so the formatter keeps formatting everything well-formed — and
-prettier formats all four, which is the practical accept test.
+prettier formats every one, which is the practical accept test.
 
 **Acorn-typescript** (used by Svelte's parser) enforces the early error and rejects:
 
@@ -27,9 +31,9 @@ validity the oracle is tsc. See
 
 ## Expected behavior
 
-- **tsv parser**: parses all four (see `expected_ours.json`)
+- **tsv parser**: parses every line (see `expected_ours.json`)
 - **Svelte/acorn**: fails to parse (see `expected_svelte.json` with `{"error": "failed to parse"}`)
-- **prettier**: formats all four, and to exactly this input — so the fixture also pins
+- **prettier**: formats every line, and to exactly this input — so the fixture also pins
   formatting agreement, which is the claim a Rust test cannot make against a live oracle
 
 **Two shapes the deferral stops at — the `input_invalid_*` siblings.** A compound
