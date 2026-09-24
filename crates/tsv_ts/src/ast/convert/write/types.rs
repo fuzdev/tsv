@@ -26,9 +26,7 @@ pub(super) fn write_type_annotation(
         let span = type_annotation.span;
         super::attach_open("TSTypeAnnotation", span, ctx);
         w.raw("{\"type\":\"TSTypeAnnotation\",\"start\":");
-        w.u32(ctx.loc.pos(span.start));
-        w.raw(",\"end\":");
-        w.u32(ctx.loc.pos(span.end));
+        w.start_end(ctx.loc.pos(span.start), ctx.loc.pos(span.end));
     } else {
         node_header(w, "TSTypeAnnotation", type_annotation.span, ctx);
     }

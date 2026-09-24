@@ -59,10 +59,15 @@
 //! instructions**: staging all seven bursts removes 2.6× more instructions than
 //! staging the three and is ~1.05 points slower.
 //!
-//! The remaining unstaged tails (combinator, the pseudo selectors, `Nth`,
-//! `Percentage`, `CSSComment`, the synthesized selector lists) are ~8% of nodes
-//! across ten sites — below the floor at which a ratio can be measured, and each
-//! staged emitter inlines at its site and costs `@fuzdev/tsv-parse-wasm` bytes.
+//! Every other pair — the head bursts, and the remaining tails (combinator, the
+//! pseudo selectors, `Nth`, `Percentage`, `CSSComment`, the synthesized selector
+//! lists) — is one call: [`JsonWriter::start_end`] after a head literal ending in
+//! `"start":`, [`JsonWriter::start_end_field`] for a tail, each writing both
+//! integers and the key between them into one fixed-width window of the output
+//! buffer instead of two out-of-line `u32` calls around an append. It is not a
+//! substitute for the three staged tails: moving those onto `start_end_field`
+//! as well gives back a third of what the pairs remove (a staged run inlines its
+//! integer emission, the call does not), for ~4 KB less native `.text`.
 
 use super::super::internal;
 use super::{
@@ -164,9 +169,7 @@ fn write_stylesheet_file(
     ctx: &Ctx<'_>,
 ) {
     w.raw("{\"type\":\"StyleSheetFile\",\"start\":");
-    w.u32(ctx.pos(0));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(ctx.source.len() as u32));
+    w.start_end(ctx.pos(0), ctx.pos(ctx.source.len() as u32));
     w.raw(",\"children\":");
     let comments = write_children(w, stylesheet, ctx);
     w.raw(",\"comments\":");
@@ -228,10 +231,7 @@ fn write_comments(w: &mut JsonWriter, comments: &CssComments, ctx: &Ctx<'_>) {
         let interior = Span::new(c.span.start + 2, c.span.end - 2);
         w.raw("{\"type\":\"CSSComment\",\"value\":");
         w.string(interior.extract(ctx.source));
-        w.raw(",\"start\":");
-        w.u32(ctx.pos(c.span.start));
-        w.raw(",\"end\":");
-        w.u32(ctx.pos(c.span.end));
+        w.start_end_field(ctx.pos(c.span.start), ctx.pos(c.span.end));
         if let Some(position) = c.position {
             w.raw(",\"position\":");
             w.u32(position);
@@ -291,9 +291,7 @@ fn write_atrule(
     comments: &mut Vec<WireComment>,
 ) {
     w.raw("{\"type\":\"Atrule\",\"start\":");
-    w.u32(ctx.pos(atrule.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(atrule.span.end));
+    w.start_end(ctx.pos(atrule.span.start), ctx.pos(atrule.span.end));
     w.raw(",\"name\":");
     // Half-decoded from source, like a selector name: parseCss reads both with
     // `read_identifier`, so an identity escape keeps its backslash (`@a\?b` → `a\?b`)
@@ -361,9 +359,7 @@ fn write_block(
         _ => None,
     }));
     w.raw("{\"type\":\"Block\",\"start\":");
-    w.u32(ctx.pos(block_span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(block_span.end));
+    w.start_end(ctx.pos(block_span.start), ctx.pos(block_span.end));
     w.raw(",\"children\":");
     write_array(
         w,
@@ -464,9 +460,7 @@ fn write_declaration(
     };
 
     w.raw("{\"type\":\"Declaration\",\"start\":");
-    w.u32(ctx.pos(decl.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(split.end));
+    w.start_end(ctx.pos(decl.span.start), ctx.pos(split.end));
     w.raw(",\"property\":");
     w.string(trim_wire_end(split.property));
     w.raw(",\"value\":");
@@ -497,9 +491,7 @@ fn write_selector_list_inner(
     filter_invalid: bool,
 ) {
     w.raw("{\"type\":\"SelectorList\",\"start\":");
-    w.u32(ctx.pos(sl.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(sl.span.end));
+    w.start_end(ctx.pos(sl.span.start), ctx.pos(sl.span.end));
     w.raw(",\"children\":");
     write_array(
         w,
@@ -514,9 +506,7 @@ fn write_selector_list_inner(
 /// Emits a `ComplexSelector` node.
 fn write_complex_selector(w: &mut JsonWriter, c: &internal::ComplexSelector<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"ComplexSelector\",\"start\":");
-    w.u32(ctx.pos(c.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(c.span.end));
+    w.start_end(ctx.pos(c.span.start), ctx.pos(c.span.end));
     w.raw(",\"children\":");
     write_array(w, c.children, |w, r| write_relative_selector(w, r, ctx));
     if ctx.has_metadata {
@@ -553,10 +543,7 @@ fn write_relative_selector(w: &mut JsonWriter, r: &internal::RelativeSelector<'_
 fn write_combinator(w: &mut JsonWriter, name: &'static str, span: Span, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"Combinator\",\"name\":");
     w.token(name); // ` ` / `>` / `+` / `~` / `||` — escape-free
-    w.raw(",\"start\":");
-    w.u32(ctx.pos(span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(span.end));
+    w.start_end_field(ctx.pos(span.start), ctx.pos(span.end));
     w.raw("}");
 }
 
@@ -619,9 +606,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             // `*` and the empty prefix fall out of the same slice.
             let namespace = namespace_span.map(|ns| raw_selector_name(ctx.source, ns, 0));
             w.raw("{\"type\":\"AttributeSelector\",\"start\":");
-            w.u32(ctx.pos(span.start));
-            w.raw(",\"end\":");
-            w.u32(ctx.pos(span.end));
+            w.start_end(ctx.pos(span.start), ctx.pos(span.end));
             w.raw(",\"name\":");
             w.string(&name);
             w.raw(",\"matcher\":");
@@ -652,10 +637,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             w.string(&name);
             w.raw(",\"args\":");
             write_or_null(w, args.as_ref(), |w, a| write_pseudo_args(w, a, ctx));
-            w.raw(",\"start\":");
-            w.u32(ctx.pos(span.start));
-            w.raw(",\"end\":");
-            w.u32(ctx.pos(span.end));
+            w.start_end_field(ctx.pos(span.start), ctx.pos(span.end));
             w.raw("}");
         }
         internal::SimpleSelector::PseudoElement {
@@ -676,10 +658,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             );
             w.raw("{\"type\":\"PseudoElementSelector\",\"name\":");
             w.string(&name);
-            w.raw(",\"start\":");
-            w.u32(ctx.pos(span.start));
-            w.raw(",\"end\":");
-            w.u32(ctx.pos(span.end));
+            w.start_end_field(ctx.pos(span.start), ctx.pos(span.end));
             // `args` is emitted only when present — Svelte spreads the key in
             // conditionally (`...(args && { args })`), so an argument-less
             // `::before` carries no `args` at all, unlike a pseudo-CLASS (which
@@ -698,10 +677,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             };
             w.raw("{\"type\":\"Percentage\",\"value\":");
             w.string(&value_str);
-            w.raw(",\"start\":");
-            w.u32(ctx.pos(span.start));
-            w.raw(",\"end\":");
-            w.u32(ctx.pos(span.end));
+            w.start_end_field(ctx.pos(span.start), ctx.pos(span.end));
             w.raw("}");
         }
         internal::SimpleSelector::Nth { span } => {
@@ -714,10 +690,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             // `Nth.selector`).
             w.raw("{\"type\":\"Nth\",\"value\":");
             w.string(span.extract(ctx.source));
-            w.raw(",\"start\":");
-            w.u32(ctx.pos(span.start));
-            w.raw(",\"end\":");
-            w.u32(ctx.pos(span.end));
+            w.start_end_field(ctx.pos(span.start), ctx.pos(span.end));
             w.raw("}");
         }
         // Forgiving-list `Invalid`s are filtered before convert (see
@@ -828,10 +801,7 @@ fn write_pseudo_args(w: &mut JsonWriter, args: &internal::PseudoClassArgs<'_>, c
             write_wrap_single_selector(w, public_span, ctx, |w, ctx| {
                 w.raw("{\"type\":\"Nth\",\"value\":");
                 w.string(value);
-                w.raw(",\"start\":");
-                w.u32(ctx.pos(public_span.start));
-                w.raw(",\"end\":");
-                w.u32(ctx.pos(public_span.end));
+                w.start_end_field(ctx.pos(public_span.start), ctx.pos(public_span.end));
                 if let Some(sel) = of_selector {
                     w.raw(",\"selector\":");
                     write_selector_list_filtered(w, sel, ctx);
@@ -926,13 +896,9 @@ fn write_synth_selector_list(
     let s = ctx.pos(span.start);
     let e = ctx.pos(span.end);
     w.raw("{\"type\":\"SelectorList\",\"start\":");
-    w.u32(s);
-    w.raw(",\"end\":");
-    w.u32(e);
+    w.start_end(s, e);
     w.raw(",\"children\":[{\"type\":\"ComplexSelector\",\"start\":");
-    w.u32(s);
-    w.raw(",\"end\":");
-    w.u32(e);
+    w.start_end(s, e);
     w.raw(",\"children\":");
     emit_relatives(w, ctx);
     if ctx.has_metadata {
@@ -962,9 +928,7 @@ fn write_synth_relative_selector(
     w.raw(",\"selectors\":[");
     emit_simple(w, ctx);
     w.raw("],\"start\":");
-    w.u32(ctx.pos(span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(span.end));
+    w.start_end(ctx.pos(span.start), ctx.pos(span.end));
     if ctx.has_metadata {
         w.raw(RELATIVE_META);
     }

@@ -726,10 +726,7 @@ impl<'a> CommentAttach<'a> {
             w.raw(if comment.is_block { "Block" } else { "Line" });
             w.raw("\",\"value\":");
             w.string(&comment.wire_value(self.source, prefix));
-            w.raw(",\"start\":");
-            w.u32(loc.pos(comment.span.start));
-            w.raw(",\"end\":");
-            w.u32(loc.pos(comment.span.end));
+            w.start_end_field(loc.pos(comment.span.start), loc.pos(comment.span.end));
             w.raw("}");
         }
     }

@@ -273,9 +273,7 @@ pub fn write_program_embedded(
     );
     attach_open("Program", program.span, &ctx);
     w.raw("{\"type\":\"Program\",\"start\":");
-    w.u32(loc.pos(program.span.start));
-    w.raw(",\"end\":");
-    w.u32(loc.pos(program.span.end));
+    w.start_end(loc.pos(program.span.start), loc.pos(program.span.end));
     if let ProgramLoc::Emit(start_pos, end_pos) = program_loc {
         w.raw(",\"loc\":{\"start\":{\"line\":");
         w.usize(start_pos.line);
@@ -688,19 +686,13 @@ pub(super) fn node_header_wide_end(
     w.raw(node_type);
     w.raw("\"");
     if !ctx.emit_loc {
-        w.raw(",\"start\":");
-        w.u32(ctx.loc.pos(span.start));
-        w.raw(",\"end\":");
-        w.u32(ctx.loc.pos(wire_end));
+        w.start_end_field(ctx.loc.pos(span.start), ctx.loc.pos(wire_end));
         return;
     }
     let ((start_pos, start), (_, end)) = ctx.loc.span_positions(span.start, span.end);
     let start = emitted_position(ctx, span.start, start);
     let end = emitted_position(ctx, span.end, end);
-    w.raw(",\"start\":");
-    w.u32(start_pos);
-    w.raw(",\"end\":");
-    w.u32(ctx.loc.pos(wire_end));
+    w.start_end_field(start_pos, ctx.loc.pos(wire_end));
     w.raw(",\"loc\":{\"start\":{\"line\":");
     w.usize(start.line);
     w.raw(",\"column\":");

@@ -71,7 +71,11 @@
 //! times per KB of source, and each staged emitter is *inlined at its site* —
 //! so a rare burst buys nothing and still costs `@fuzdev/tsv-parse-wasm` bytes.
 //! `ExpressionTag`, `write_text`'s raw-content arm, `write_text_sequence` and
-//! the directive heads are deliberately left on the plain appends.
+//! the directive heads are deliberately left unstaged: their `start`/`end`
+//! pairs are one out-of-line call each (`JsonWriter::start_end`, or its
+//! `start_end_field` / `start_end_object` forms, which also write the
+//! `,"start":` / `{"start":` key), the pair written into one fixed-width window
+//! of the buffer rather than as two `u32` calls around an append.
 //! ⚠️ It is the *staged emitters* that pay, not the `stage_flush` copy — grade
 //! any change here on `cycles:u`, since the run's narrow stores feed a
 //! `memmove` that reads them back.
@@ -606,9 +610,7 @@ fn write_root(w: &mut JsonWriter, root: &internal::Root<'_>, ctx: &Ctx<'_>) {
         write_style_sheet(w, style, style_comment, ctx);
     });
     w.raw(",\"js\":[],\"start\":");
-    w.u32(ctx.pos(0));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(source.len() as u32));
+    w.start_end(ctx.pos(0), ctx.pos(source.len() as u32));
     w.raw(",\"type\":\"Root\",\"fragment\":");
     write_fragment(w, &root.fragment, ctx);
     w.raw(",\"options\":");
@@ -651,18 +653,13 @@ fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
     w.raw(if comment.is_block { "Block" } else { "Line" });
     if comment.emit_character_field {
         w.raw("\",\"start\":");
-        w.u32(start_char);
-        w.raw(",\"end\":");
-        w.u32(end_char);
+        w.start_end(start_char, end_char);
         w.raw(",\"value\":");
         w.string(&comment.wire_value(ctx.source, prefix));
     } else {
         w.raw("\",\"value\":");
         w.string(&comment.wire_value(ctx.source, prefix));
-        w.raw(",\"start\":");
-        w.u32(start_char);
-        w.raw(",\"end\":");
-        w.u32(end_char);
+        w.start_end_field(start_char, end_char);
     }
     if !ctx.emit_loc {
         // `no-locations`: no `loc` on the comment; close the object directly.
@@ -871,9 +868,7 @@ fn write_special_element(w: &mut JsonWriter, elem: &internal::SpecialElement<'_>
     w.raw("{\"type\":\"");
     w.raw(elem.kind.node_type());
     w.raw("\",\"start\":");
-    w.u32(ctx.pos(elem.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(elem.span.end));
+    w.start_end(ctx.pos(elem.span.start), ctx.pos(elem.span.end));
     w.raw(",\"name\":");
     // Escape-free `&'static str` (`svelte:head`, `slot`, `title`, …) → skip the
     // serde string-escape scan.
@@ -925,10 +920,7 @@ fn write_special_tag(w: &mut JsonWriter, this: &internal::SpecialThis<'_>, ctx: 
             w.raw(",\"raw\":");
             // Svelte reports the raw as a single-quoted string regardless of source.
             w.string(&format!("'{content}'"));
-            w.raw(",\"start\":");
-            w.u32(ctx.pos(span.start));
-            w.raw(",\"end\":");
-            w.u32(ctx.pos(span.end));
+            w.start_end_field(ctx.pos(span.start), ctx.pos(span.end));
             w.raw("}");
         }
         internal::SpecialThis::Braced(tag) => {
@@ -940,9 +932,7 @@ fn write_special_tag(w: &mut JsonWriter, this: &internal::SpecialThis<'_>, ctx: 
 /// Emits an `ExpressionTag` node (fragment `{expr}`).
 fn write_expression_tag(w: &mut JsonWriter, tag: &internal::ExpressionTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"ExpressionTag\",\"start\":");
-    w.u32(ctx.pos(tag.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(tag.span.end));
+    w.start_end(ctx.pos(tag.span.start), ctx.pos(tag.span.end));
     w.raw(",\"expression\":");
     write_braced_island(w, tag.expression, tag.span, ctx);
     w.raw("}");
@@ -958,9 +948,7 @@ fn write_shorthand_expression_tag(
     ctx: &Ctx<'_>,
 ) {
     w.raw("{\"type\":\"ExpressionTag\",\"start\":");
-    w.u32(ctx.pos(tag.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(tag.span.end));
+    w.start_end(ctx.pos(tag.span.start), ctx.pos(tag.span.end));
     w.raw(",\"expression\":");
     write_identifier_expression_with_character(
         w,
@@ -979,10 +967,7 @@ fn write_shorthand_expression_tag(
 /// to earn a staged run's inlined emitters (module doc, Staged runs).
 fn write_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
     if matches!(text.decoding, internal::TextDecoding::Raw) {
-        w.raw("{\"start\":");
-        w.u32(ctx.pos(text.span.start));
-        w.raw(",\"end\":");
-        w.u32(ctx.pos(text.span.end));
+        w.start_end_object(ctx.pos(text.span.start), ctx.pos(text.span.end));
         // `data`, then `raw`: a `Raw` decoding is no decode at all, so the two
         // are always the same bytes and the pair escapes them once.
         debug_assert_eq!(text.data(ctx.source), text.raw(ctx.source));
@@ -1028,10 +1013,7 @@ fn write_raw_then_data(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>)
 /// A sequence-context `Text` (a `<textarea>`'s content): the canonical
 /// attribute-value sequence literal, `{start, end, type, raw, data}`.
 fn write_text_sequence(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
-    w.raw("{\"start\":");
-    w.u32(ctx.pos(text.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(text.span.end));
+    w.start_end_object(ctx.pos(text.span.start), ctx.pos(text.span.end));
     w.raw(",\"type\":\"Text\",\"raw\":");
     write_raw_then_data(w, text, ctx);
     w.raw("}");
@@ -1040,9 +1022,7 @@ fn write_text_sequence(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>)
 /// Emits a `Comment` node (HTML `<!-- … -->`).
 fn write_html_comment(w: &mut JsonWriter, comment: &internal::HtmlComment, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"Comment\",\"start\":");
-    w.u32(ctx.pos(comment.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(comment.span.end));
+    w.start_end(ctx.pos(comment.span.start), ctx.pos(comment.span.end));
     w.raw(",\"data\":");
     w.string(comment.content(ctx.source));
     w.raw("}");
@@ -1058,16 +1038,11 @@ fn write_html_comment(w: &mut JsonWriter, comment: &internal::HtmlComment, ctx: 
 /// literal orders, keyed exactly by `elseif`.
 fn write_if_block(w: &mut JsonWriter, block: &internal::IfBlock<'_>, ctx: &Ctx<'_>) {
     if block.elseif {
-        w.raw("{\"start\":");
-        w.u32(ctx.pos(block.span.start));
-        w.raw(",\"end\":");
-        w.u32(ctx.pos(block.span.end));
+        w.start_end_object(ctx.pos(block.span.start), ctx.pos(block.span.end));
         w.raw(",\"type\":\"IfBlock\",\"elseif\":true");
     } else {
         w.raw("{\"type\":\"IfBlock\",\"elseif\":false,\"start\":");
-        w.u32(ctx.pos(block.span.start));
-        w.raw(",\"end\":");
-        w.u32(ctx.pos(block.span.end));
+        w.start_end(ctx.pos(block.span.start), ctx.pos(block.span.end));
     }
     let range_end = fragment_first_start(&block.consequent).unwrap_or(block.span.end);
     w.raw(",\"test\":");
@@ -1084,9 +1059,7 @@ fn write_if_block(w: &mut JsonWriter, block: &internal::IfBlock<'_>, ctx: &Ctx<'
 /// `index`/`key`/`fallback` are skip-if-none.
 fn write_each_block(w: &mut JsonWriter, block: &internal::EachBlock<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"EachBlock\",\"start\":");
-    w.u32(ctx.pos(block.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(block.span.end));
+    w.start_end(ctx.pos(block.span.start), ctx.pos(block.span.end));
     let range_end = fragment_first_start(&block.body).unwrap_or(block.span.end);
     w.raw(",\"expression\":");
     write_generic_island(w, block.expression, block.span.start, range_end, ctx);
@@ -1120,9 +1093,7 @@ fn write_each_block(w: &mut JsonWriter, block: &internal::EachBlock<'_>, ctx: &C
 /// `Option` → `null` when absent (no skip).
 fn write_await_block(w: &mut JsonWriter, block: &internal::AwaitBlock<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"AwaitBlock\",\"start\":");
-    w.u32(ctx.pos(block.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(block.span.end));
+    w.start_end(ctx.pos(block.span.start), ctx.pos(block.span.end));
     let range_end = [
         block.pending.as_ref(),
         block.then.as_ref(),
@@ -1163,9 +1134,7 @@ fn write_await_block(w: &mut JsonWriter, block: &internal::AwaitBlock<'_>, ctx: 
 /// Emits a `KeyBlock` node.
 fn write_key_block(w: &mut JsonWriter, block: &internal::KeyBlock<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"KeyBlock\",\"start\":");
-    w.u32(ctx.pos(block.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(block.span.end));
+    w.start_end(ctx.pos(block.span.start), ctx.pos(block.span.end));
     let range_end = fragment_first_start(&block.fragment).unwrap_or(block.span.end);
     w.raw(",\"expression\":");
     write_generic_island(w, block.expression, block.span.start, range_end, ctx);
@@ -1179,9 +1148,7 @@ fn write_key_block(w: &mut JsonWriter, block: &internal::KeyBlock<'_>, ctx: &Ctx
 /// `expression` (Svelte assigns it before reading the parameters).
 fn write_snippet_block(w: &mut JsonWriter, block: &internal::SnippetBlock<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"SnippetBlock\",\"start\":");
-    w.u32(ctx.pos(block.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(block.span.end));
+    w.start_end(ctx.pos(block.span.start), ctx.pos(block.span.end));
     let range_end = fragment_first_start(&block.body).unwrap_or(block.span.end);
     w.raw(",\"expression\":");
     write_snippet_name(w, block.expression, block.span.start, range_end, ctx);
@@ -1251,9 +1218,7 @@ fn write_snippet_parameters(
 /// Emits an `HtmlTag` node (`{@html expr}`).
 fn write_html_tag(w: &mut JsonWriter, tag: &internal::HtmlTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"HtmlTag\",\"start\":");
-    w.u32(ctx.pos(tag.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(tag.span.end));
+    w.start_end(ctx.pos(tag.span.start), ctx.pos(tag.span.end));
     w.raw(",\"expression\":");
     write_braced_island(w, tag.expression, tag.span, ctx);
     w.raw("}");
@@ -1262,9 +1227,7 @@ fn write_html_tag(w: &mut JsonWriter, tag: &internal::HtmlTag<'_>, ctx: &Ctx<'_>
 /// Emits a `RenderTag` node (`{@render expr}`).
 fn write_render_tag(w: &mut JsonWriter, tag: &internal::RenderTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"RenderTag\",\"start\":");
-    w.u32(ctx.pos(tag.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(tag.span.end));
+    w.start_end(ctx.pos(tag.span.start), ctx.pos(tag.span.end));
     w.raw(",\"expression\":");
     write_braced_island(w, tag.expression, tag.span, ctx);
     w.raw("}");
@@ -1279,9 +1242,7 @@ fn write_render_tag(w: &mut JsonWriter, tag: &internal::RenderTag<'_>, ctx: &Ctx
 /// (root-fallback trailing).
 fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"DebugTag\",\"start\":");
-    w.u32(ctx.pos(tag.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(tag.span.end));
+    w.start_end(ctx.pos(tag.span.start), ctx.pos(tag.span.end));
     w.raw(",\"identifiers\":");
     // The internal entries keep what the author wrote — a JSDoc cast around the
     // whole comma list (`{@debug /** @type {B} */ (b, c)}`) is ONE entry so the
@@ -1348,9 +1309,7 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
 /// never reach the other's tree.
 fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"ConstTag\",\"start\":");
-    w.u32(ctx.pos(tag.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(tag.span.end));
+    w.start_end(ctx.pos(tag.span.start), ctx.pos(tag.span.end));
     w.raw(",\"declaration\":");
     // The declaration `end` is always `tag.span.end - 1` — canonical Svelte
     // hard-codes `parser.index - 1` (the byte before the closing `}`).
@@ -1452,14 +1411,9 @@ fn write_const_declaration(
     write_pattern_embedded(w, tag.id, ctx.embed_pattern(id_mode, tag.id));
     w.raw(",\"init\":");
     write_expression_embedded(w, tag.init, ctx.embed_expr(init_mode, tag.init));
-    w.raw(",\"start\":");
-    w.u32(ctx.pos(tag.id.span().start));
-    w.raw(",\"end\":");
-    w.u32(declarator_end);
+    w.start_end_field(ctx.pos(tag.id.span().start), declarator_end);
     w.raw("}],\"start\":");
-    w.u32(ctx.pos(tag.span.start + 2));
-    w.raw(",\"end\":");
-    w.u32(decl_end);
+    w.start_end(ctx.pos(tag.span.start + 2), decl_end);
     w.raw("}");
 }
 
@@ -1475,9 +1429,7 @@ fn write_const_declaration(
 /// a later declarator (`{let a = 1, /* c */ b}`) unattached.
 fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"DeclarationTag\",\"start\":");
-    w.u32(ctx.pos(tag.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(tag.span.end));
+    w.start_end(ctx.pos(tag.span.start), ctx.pos(tag.span.end));
     w.raw(",\"declaration\":");
     // Scoped comment pre-check (see `write_const_tag`): no comment inside this
     // tag's span means the attach queue is empty, so fuse directly.
@@ -1591,10 +1543,7 @@ fn write_attribute_value(w: &mut JsonWriter, value: &internal::AttributeValue<'_
 
 /// Emits a `Text` node in attribute context (`start, end, type, raw, data`).
 fn write_attribute_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
-    w.raw("{\"start\":");
-    w.u32(ctx.pos(text.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(text.span.end));
+    w.start_end_object(ctx.pos(text.span.start), ctx.pos(text.span.end));
     w.raw(",\"type\":\"Text\",\"raw\":");
     write_raw_then_data(w, text, ctx);
     w.raw("}");
@@ -1607,9 +1556,7 @@ fn write_spread_attribute(
     ctx: &Ctx<'_>,
 ) {
     w.raw("{\"type\":\"SpreadAttribute\",\"start\":");
-    w.u32(ctx.pos(spread.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(spread.span.end));
+    w.start_end(ctx.pos(spread.span.start), ctx.pos(spread.span.end));
     w.raw(",\"expression\":");
     write_braced_island(w, spread.expression, spread.span, ctx);
     w.raw("}");
@@ -1618,9 +1565,7 @@ fn write_spread_attribute(
 /// Emits an `AttachTag` node (`{@attach expr}`).
 fn write_attach_tag(w: &mut JsonWriter, tag: &internal::AttachTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"AttachTag\",\"start\":");
-    w.u32(ctx.pos(tag.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(tag.span.end));
+    w.start_end(ctx.pos(tag.span.start), ctx.pos(tag.span.end));
     w.raw(",\"expression\":");
     write_braced_island(w, tag.expression, tag.span, ctx);
     w.raw("}");
@@ -1639,10 +1584,7 @@ fn write_directive_head(
     head_span: Span,
     ctx: &Ctx<'_>,
 ) {
-    w.raw("{\"start\":");
-    w.u32(ctx.pos(span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(span.end));
+    w.start_end_object(ctx.pos(span.start), ctx.pos(span.end));
     w.raw(",\"type\":\"");
     w.raw(node_type);
     w.raw("\",\"name\":");
@@ -1735,10 +1677,7 @@ fn write_directive_value_expression(
         let tsv_ts::ast::internal::ExpressionKind::Identifier(id) = &expr.kind else {
             unreachable!("shorthand directive expression is always an Identifier");
         };
-        w.raw("{\"start\":");
-        w.u32(ctx.pos(id.span.start));
-        w.raw(",\"end\":");
-        w.u32(ctx.pos(id.span.end));
+        w.start_end_object(ctx.pos(id.span.start), ctx.pos(id.span.end));
         w.raw(",\"type\":\"Identifier\",\"name\":");
         w.string(id.name(ctx.source));
         w.raw("}");
@@ -1816,9 +1755,7 @@ fn write_style_sheet(
     ctx: &Ctx<'_>,
 ) {
     w.raw("{\"type\":\"StyleSheet\",\"start\":");
-    w.u32(ctx.pos(style.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(style.span.end));
+    w.start_end(ctx.pos(style.span.start), ctx.pos(style.span.end));
     w.raw(",\"attributes\":");
     write_value_attributes(w, style.attributes, ctx);
     w.raw(",\"children\":");
@@ -1826,9 +1763,10 @@ fn write_style_sheet(
     w.raw(",\"comments\":");
     write_css_comments(w, &css_comments, ctx.source, ctx.loc.map);
     w.raw(",\"content\":{\"start\":");
-    w.u32(ctx.pos(style.content_span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(style.content_span.end));
+    w.start_end(
+        ctx.pos(style.content_span.start),
+        ctx.pos(style.content_span.end),
+    );
     w.raw(",\"styles\":");
     w.string(style.content_span.extract(ctx.source));
     w.raw(",\"comment\":");
@@ -1859,9 +1797,7 @@ fn write_script(
     ctx: &Ctx<'_>,
 ) {
     w.raw("{\"type\":\"Script\",\"start\":");
-    w.u32(ctx.pos(script.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(script.span.end));
+    w.start_end(ctx.pos(script.span.start), ctx.pos(script.span.end));
     w.raw(",\"context\":");
     // Escape-free `&'static str` (`default` / `module`) → skip the serde scan.
     w.token(script.context.as_str());
@@ -1959,10 +1895,7 @@ fn write_script_program_fused(
 /// preserveWhitespace, namespace, customElement` (no `type`).
 fn write_svelte_options(w: &mut JsonWriter, options: &internal::SvelteOptions<'_>, ctx: &Ctx<'_>) {
     let attrs = options.attributes;
-    w.raw("{\"start\":");
-    w.u32(ctx.pos(options.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(options.span.end));
+    w.start_end_object(ctx.pos(options.span.start), ctx.pos(options.span.end));
     w.raw(",\"attributes\":");
     write_value_attributes(w, attrs, ctx);
     if let Some(runes) = bool_option(attrs, "runes", ctx.source) {

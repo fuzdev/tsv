@@ -862,11 +862,12 @@ Two rules follow, and it is easy to spend one while believing you have spent bot
   standalone-`.css` corpus may have to be *built* before its surface is visible.
 
 **A cell is not a blend of its neighbours.** The wire writer's out-of-line
-integer emitter (`JsonWriter::u32`) is a 3.3%-self symbol on the Svelte wire
-board and appears on no other board in the project — on a TypeScript wire board
-~86% of the wire's integers take the *staged* emitter instead, so the
-out-of-line one never rises. The same code, a different call-site mix, a
-different verdict.
+integer emitter (`JsonWriter::u32`) was once a 3.3%-self symbol on the Svelte
+wire board while appearing on no TypeScript board — there ~86% of the wire's
+integers took the *staged* emitter instead, so the out-of-line one never rose.
+The same code, a different call-site mix, a different verdict. (Most of its
+callers have since moved to the `start`/`end` pair emitter,
+`JsonWriter::start_end`; the lesson is the cell, not the symbol.)
 
 So: when a board reads dry, ask which cell you took before concluding the
 surface is mined out. Taking another is one `board.sh` invocation with
@@ -961,6 +962,7 @@ The census is one line per consumer:
 ```bash
 # who uses the optimized spelling, and who uses the plain one
 grep -rc '\.stage_u32(\|\.stage_usize(' crates/tsv_*/src/ast/convert/
+grep -rc '\.start_end'                   crates/tsv_*/src/ast/convert/
 grep -rc '\.u32(\|\.usize(\|\.u64('    crates/tsv_*/src/ast/convert/
 ```
 
