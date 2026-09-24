@@ -1433,7 +1433,7 @@ Understanding CSS escapes requires understanding 5 layers:
 1. **CSS Syntax**: `\\` = one literal backslash
 2. **Lexer Tokens**: Escapes preserved as-is
 3. **Parser AST**: Semantic representation (no compat behaviors)
-4. **JSON Serialization**: serde_json escapes backslashes
+4. **JSON Serialization**: the wire writer's JSON string escaping (`JsonWriter::string`, byte-identical to `serde_json`) escapes backslashes
 5. **Shell/Testing**: Additional escaping
 
 The same backslash: source `\\` (2 bytes) → Svelte value `\\\\` (4 bytes) → JSON `\\\\\\\\` (8 bytes)

@@ -160,7 +160,8 @@ pub fn convert_ast_json_bytes_no_locations(root: &Root<'_>, source: &str) -> Vec
 #[cfg(feature = "convert")]
 #[expect(clippy::expect_used)]
 pub fn convert_ast_json_string(root: &Root<'_>, source: &str) -> String {
-    String::from_utf8(convert_ast_json_bytes(root, source)).expect("serde_json emits valid UTF-8")
+    String::from_utf8(convert_ast_json_bytes(root, source))
+        .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
 }
 
 /// The `String` form of `convert_ast_json_bytes_no_locations` for `&str`
@@ -169,7 +170,7 @@ pub fn convert_ast_json_string(root: &Root<'_>, source: &str) -> String {
 #[expect(clippy::expect_used)]
 pub fn convert_ast_json_string_no_locations(root: &Root<'_>, source: &str) -> String {
     String::from_utf8(convert_ast_json_bytes_no_locations(root, source))
-        .expect("serde_json emits valid UTF-8")
+        .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
 }
 
 /// Byte spans of the instance/module `<script>` element contents.

@@ -191,7 +191,7 @@ pub fn convert_ast_json_bytes_no_locations(
 #[expect(clippy::expect_used)]
 pub fn convert_ast_json_string(stylesheet: &CssStyleSheet<'_>, source: &str) -> String {
     String::from_utf8(convert_ast_json_bytes(stylesheet, source))
-        .expect("serde_json emits valid UTF-8")
+        .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
 }
 
 /// The `String` form of `convert_ast_json_bytes_no_locations` (an alias — CSS

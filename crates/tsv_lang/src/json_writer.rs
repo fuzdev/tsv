@@ -14,11 +14,13 @@
 //! turns `convert` off — never links `serde_json`.
 //!
 //! **Escape / format parity contract**: static structure and tokens are written
-//! verbatim (debug-asserted escape-free); dynamic strings and non-integral `f64`
-//! delegate to `serde_json::to_writer`, so escaping and ryu formatting are
-//! exactly `serde_json`'s (the canonical parsers' `JSON.stringify` parity the
-//! fixtures pin); integers have a unique decimal form and are hand-formatted
-//! (two-digit-pair, the hot path emitting several ints per node).
+//! verbatim (debug-asserted escape-free); dynamic strings are escaped by hand,
+//! **byte-identical** to `serde_json`'s string serialization (graded against
+//! `serde_json` itself by `string_matches_serde_json`); non-integral `f64`
+//! delegates to `serde_json::to_writer`, so ryu formatting is exactly its — the
+//! canonical parsers' `JSON.stringify` parity the fixtures pin; integers have a
+//! unique decimal form and are hand-formatted (two-digit-pair, the hot path
+//! emitting several ints per node).
 
 use crate::swar::{lanes_less_than, splat, zero_lanes};
 
@@ -348,6 +350,12 @@ fn fill_start_end(window: &mut [u8], start: (u64, usize), end: (u64, usize)) -> 
 /// strings arriving here are short — an identifier name straddles one or two
 /// words — so the tail is a large fraction of the whole scan, and a byte loop
 /// there gives back much of what the word loop won.
+///
+/// The same union argument covers a slice **shorter** than a word, which is
+/// over half of all calls (property names, short literals, the whitespace
+/// between two tags): it is gathered into one word — two overlapping
+/// four-byte loads, or the first, middle and last byte — and tested once,
+/// where a byte loop cost about seven instructions a byte.
 #[inline]
 fn needs_escape(bytes: &[u8]) -> bool {
     let mut i = 0;
@@ -365,23 +373,179 @@ fn needs_escape(bytes: &[u8]) -> bool {
         // already-cleared bytes, harmlessly — see above).
         return word_needs_escape(*chunk);
     }
-    // Shorter than one word, so the loop above never ran and there is nothing
-    // to overlap with.
-    bytes.iter().any(|&b| b < 0x20 || b == b'"' || b == b'\\')
+    // Shorter than one word, so the loop above never ran — but the same union
+    // argument still gathers the slice into one word. Four to seven bytes are
+    // two overlapping four-byte loads; one to three are the first, middle and
+    // last byte (which between them name every byte of a slice that short),
+    // with the lanes past them filled by a byte no kernel flags.
+    let word = if let (Some(lo), Some(hi)) = (bytes.first_chunk::<4>(), bytes.last_chunk::<4>()) {
+        u64::from(u32::from_le_bytes(*lo)) | u64::from(u32::from_le_bytes(*hi)) << 32
+    } else if let (Some(&first), Some(&last)) = (bytes.first(), bytes.last()) {
+        let middle = bytes[bytes.len() / 2];
+        u64::from(first) | u64::from(middle) << 8 | u64::from(last) << 16 | splat(b' ') << 24
+    } else {
+        return false;
+    };
+    escape_lanes(word) != 0
 }
 
 /// [`needs_escape`]'s per-word kernel: does any of these eight bytes need a
 /// JSON escape?
 #[inline]
 const fn word_needs_escape(chunk: [u8; 8]) -> bool {
-    let w = u64::from_le_bytes(chunk);
-    lanes_less_than(w, 0x20) | zero_lanes(w ^ splat(b'"')) | zero_lanes(w ^ splat(b'\\')) != 0
+    escape_lanes(u64::from_le_bytes(chunk)) != 0
+}
+
+/// Lane mask of the bytes in `w` JSON must escape — `0x00..=0x1F`, `"` and `\`.
+///
+/// ⚠️ Only the **lowest** set lane is guaranteed genuine (the OR keeps
+/// [`zero_lanes`] / [`lanes_less_than`]'s guarantee: the OR's lowest set lane
+/// is its own mask's lowest). Read it with `trailing_zeros` or as a boolean.
+#[inline]
+const fn escape_lanes(w: u64) -> u64 {
+    lanes_less_than(w, 0x20) | zero_lanes(w ^ splat(b'"')) | zero_lanes(w ^ splat(b'\\'))
+}
+
+/// What each byte becomes inside a JSON string, as `serde_json` writes it: `0` for a
+/// byte written as itself, the letter after the backslash for the seven two-byte
+/// short forms (`\"`, `\\`, `\b`, `\t`, `\n`, `\f`, `\r`), and `u` for every other
+/// control byte, written `\u00XX` with [`HEX_DIGITS`]'s lowercase digits.
+const ESCAPE: [u8; 256] = {
+    let mut t = [0u8; 256];
+    let mut i = 0;
+    while i < 0x20 {
+        t[i] = b'u';
+        i += 1;
+    }
+    t[0x08] = b'b';
+    t[0x09] = b't';
+    t[0x0A] = b'n';
+    t[0x0C] = b'f';
+    t[0x0D] = b'r';
+    t[b'"' as usize] = b'"';
+    t[b'\\' as usize] = b'\\';
+    t
+};
+
+/// The hex digits of a `\u00XX` escape — lowercase, as `serde_json` writes them.
+const HEX_DIGITS: [u8; 16] = *b"0123456789abcdef";
+
+/// How far into an escape window [`escape_into`] may start a step; past it,
+/// [`JsonWriter::string_escaped`] cuts the window and opens a fresh one.
+const ESCAPE_LIMIT: usize = 85;
+
+/// An escape window: the widest a step can reach from [`ESCAPE_LIMIT`] is the
+/// sub-word tail, up to seven bytes of six each, plus the closing quote.
+///
+/// ⚠️ The bound is **exact and reachable**, not slack: a step that starts at
+/// exactly [`ESCAPE_LIMIT`] with seven `\u00XX` bytes left writes the last index,
+/// the closing quote. `escape_windows_hold_their_widest_step` constructs that
+/// string (and its neighbours), so a window one byte short fails a test rather
+/// than panicking on the first real input to reach it. Don't trim it.
+///
+/// A window this wide restarts every ~90 output bytes on a long string; a
+/// 256-byte one restarted less often and measured no better (−0.006% to
+/// −0.03% instructions), since what it saves is a handful of stores per
+/// restart.
+const ESCAPE_WINDOW: usize = ESCAPE_LIMIT + 7 * 6 + 1;
+
+/// The window a string shorter than a word is escaped into: seven bytes of
+/// six each and both quotes. ⚠️ Exact and reachable, like [`ESCAPE_WINDOW`] —
+/// seven `\u00XX` bytes fill it to the last index.
+const SHORT_ESCAPE_WINDOW: usize = 7 * 6 + 2;
+
+/// Write `byte`'s escape at `window[at]` and return the position after it.
+/// `form` is `ESCAPE[byte]`, which the caller has already found non-zero.
+#[inline]
+fn write_escape<const N: usize>(window: &mut [u8; N], at: usize, byte: u8, form: u8) -> usize {
+    if form == b'u' {
+        return write_control_escape(window, at, byte);
+    }
+    window[at] = b'\\';
+    window[at + 1] = form;
+    at + 2
+}
+
+/// [`write_escape`]'s `\u00XX` arm — a control byte with no short form, which
+/// real source almost never carries. A slice rather than a window of either
+/// width, so the cold path is one copy, not one per window.
+#[cold]
+#[inline(never)]
+fn write_control_escape(window: &mut [u8], at: usize, byte: u8) -> usize {
+    window[at..at + 6].copy_from_slice(&[
+        b'\\',
+        b'u',
+        b'0',
+        b'0',
+        HEX_DIGITS[usize::from(byte >> 4)],
+        HEX_DIGITS[usize::from(byte & 0xF)],
+    ]);
+    at + 6
+}
+
+/// Escape `bytes[from..]` into `window` from `at`, until the input ends or `at`
+/// passes [`ESCAPE_LIMIT`]; returns the new `(at, from)`.
+///
+/// Clean bytes move a **word** at a time: each eight-byte step is copied to the
+/// window whole and tested with [`escape_lanes`], and a clean word is done. A
+/// word that flags stops at its lowest flagged lane — the one lane the kernel
+/// guarantees genuine, and every byte before it is clean and already copied —
+/// and the escapes from there go a **byte** at a time until a clean byte hands
+/// back to the word step, because escapes cluster: a newline and the
+/// indentation after it is the commonest string that reaches this arm. Fewer
+/// than eight bytes from the end, the rest is a byte at a time.
+#[inline]
+fn escape_into(
+    window: &mut [u8; ESCAPE_WINDOW],
+    bytes: &[u8],
+    mut at: usize,
+    mut from: usize,
+) -> (usize, usize) {
+    while at <= ESCAPE_LIMIT {
+        let Some(word) = bytes.get(from..).and_then(<[u8]>::first_chunk::<8>) else {
+            for &byte in &bytes[from.min(bytes.len())..] {
+                let form = ESCAPE[usize::from(byte)];
+                if form == 0 {
+                    window[at] = byte;
+                    at += 1;
+                } else {
+                    at = write_escape(window, at, byte, form);
+                }
+            }
+            return (at, bytes.len());
+        };
+        window[at..at + 8].copy_from_slice(word);
+        let lanes = escape_lanes(u64::from_le_bytes(*word));
+        if lanes == 0 {
+            from += 8;
+            at += 8;
+            continue;
+        }
+        let clean = (lanes.trailing_zeros() / 8) as usize;
+        from += clean;
+        at += clean;
+        let byte = bytes[from];
+        at = write_escape(window, at, byte, ESCAPE[usize::from(byte)]);
+        from += 1;
+        while at <= ESCAPE_LIMIT
+            && let Some(&byte) = bytes.get(from)
+        {
+            let form = ESCAPE[usize::from(byte)];
+            if form == 0 {
+                break;
+            }
+            at = write_escape(window, at, byte, form);
+            from += 1;
+        }
+    }
+    (at, from)
 }
 
 /// Compact-JSON output buffer.
 ///
 /// All writes are infallible (`Vec<u8>` backing). The escape-sensitive entry
-/// points are [`JsonWriter::string`] (full JSON escaping via `serde_json`) and
+/// points are [`JsonWriter::string`] (full JSON escaping, `serde_json`'s byte
+/// for byte) and
 /// [`JsonWriter::token`] (quoted verbatim — static ASCII tokens only,
 /// debug-asserted).
 pub struct JsonWriter {
@@ -703,38 +867,103 @@ impl JsonWriter {
 
     /// A dynamic string value, JSON-escaped and quoted.
     ///
-    /// The escape set is exactly `serde_json`'s, because anything that needs
-    /// escaping still goes through `serde_json::to_writer`. What the prescan
-    /// buys is the *common* case: identifier names, string-literal bodies and
-    /// comment text are overwhelmingly escape-free, and `serde_json`'s
-    /// escaping loop pays a 256-entry table lookup plus `split_at` /
-    /// `split_first` bookkeeping **per byte** to establish that. [`needs_escape`]
-    /// answers the same question eight bytes at a time, and a clean answer
-    /// turns the emission into [`JsonWriter::token`]'s quote-blit-quote.
+    /// Two arms. The prescan [`needs_escape`] asks whether anything here needs
+    /// escaping a word at a time, and a clean answer turns the emission into
+    /// [`JsonWriter::token`]'s quote-blit-quote — the common case, since
+    /// identifier names, string-literal bodies and comment text are
+    /// overwhelmingly escape-free. Anything else goes to
+    /// [`JsonWriter::string_escaped`], a hand escaper byte-identical to
+    /// `serde_json`'s string serialization.
     ///
-    /// ⚠️ The predicate must stay a *superset* of `serde_json`'s `ESCAPE`
-    /// table's non-zero set, or a byte that needs escaping would be blitted
-    /// raw. That set is `0x00..=0x1F` plus `"` and `\` — nothing else, in
-    /// particular not `DEL` and no non-ASCII byte. The equivalence is graded
-    /// against `serde_json` itself by `string_matches_serde_json`, exhaustively
-    /// over a boundary alphabet and across the 8-byte stride; a corpus cannot
-    /// see this (a mis-scan would only surface on the rare input that actually
+    /// ⚠️ The prescan's predicate must stay a *superset* of the escaper's set,
+    /// or a byte that needs escaping would be blitted raw. That set is
+    /// `serde_json`'s: `0x00..=0x1F` plus `"` and `\` — nothing else, in
+    /// particular not `DEL` and no non-ASCII byte. Both arms are graded against
+    /// `serde_json` itself by `string_matches_serde_json`, exhaustively over a
+    /// boundary alphabet and across the 8-byte stride; a corpus cannot see
+    /// this (a mis-scan would only surface on the rare input that actually
     /// carries the byte).
     ///
-    /// The escaping arm is left where LLVM puts it: `#[cold]`-splitting it into
-    /// its own out-of-line function so the hot arm inlines at the ~58 writer
-    /// call sites was measured and is a **wash** (fuz_app −0.02%, zzz +0.03%
-    /// instructions), so it is not worth the code size. Don't re-mint it.
+    /// The escaping arm is `inline(never)`. Left to LLVM under plain `inline`
+    /// it was inlined here and measured +0.11% / +0.22% / +0.25% instructions
+    /// on the Svelte / CSS / TypeScript wire paths.
     #[inline]
-    #[expect(clippy::expect_used)]
     pub fn string(&mut self, s: &str) {
         if needs_escape(s.as_bytes()) {
-            serde_json::to_writer(&mut self.buf, s).expect("Vec<u8> write is infallible");
+            self.string_escaped(s.as_bytes());
             return;
         }
         self.buf.push(b'"');
         self.buf.extend_from_slice(s.as_bytes());
         self.buf.push(b'"');
+    }
+
+    /// [`JsonWriter::string`]'s escaping arm: `bytes` quoted, with every byte
+    /// `serde_json` escapes written the way `serde_json` writes it — the seven
+    /// two-byte short forms, `\u00XX` with lowercase hex for every other
+    /// control byte, and everything else as itself.
+    ///
+    /// ⚠️ It is not the rare arm the prescan was designed around. Over real
+    /// Svelte components 16% of the strings reaching `string` need escaping,
+    /// holding 30% of the bytes — template text is mostly the whitespace
+    /// between tags (`"\n\t\t"`) — and over real stylesheets it is 6% of the
+    /// strings and 24% of the bytes. `serde_json`'s loop, which this
+    /// replaces, paid a table lookup and slice bookkeeping per byte and a libc
+    /// `memcpy` call per clean run between escapes.
+    ///
+    /// The output goes into a **window** of the buffer — extended by a fixed
+    /// width, written through a slice held in registers, then truncated to
+    /// what was written — the shape [`JsonWriter::start_end`] uses, so no
+    /// store pays `Vec`'s append protocol. [`escape_into`] fills it, clean
+    /// bytes a word at a time. A string shorter than a word, most escaping
+    /// template text, skips the word step for a byte loop into a narrower
+    /// window.
+    #[inline(never)]
+    #[expect(clippy::expect_used)]
+    fn string_escaped(&mut self, bytes: &[u8]) {
+        if bytes.len() < 8 {
+            let base = self.buf.len();
+            self.buf.extend_from_slice(&[0; SHORT_ESCAPE_WINDOW]);
+            let window = self
+                .buf
+                .get_mut(base..)
+                .and_then(<[u8]>::first_chunk_mut::<SHORT_ESCAPE_WINDOW>)
+                .expect("the window was just appended");
+            window[0] = b'"';
+            let mut at = 1;
+            for &byte in bytes {
+                let form = ESCAPE[usize::from(byte)];
+                if form == 0 {
+                    window[at] = byte;
+                    at += 1;
+                } else {
+                    at = write_escape(window, at, byte, form);
+                }
+            }
+            window[at] = b'"';
+            self.buf.truncate(base + at + 1);
+            return;
+        }
+        let (mut at, mut from) = (1, 0);
+        loop {
+            let base = self.buf.len();
+            self.buf.extend_from_slice(&[0; ESCAPE_WINDOW]);
+            let window = self
+                .buf
+                .get_mut(base..)
+                .and_then(<[u8]>::first_chunk_mut::<ESCAPE_WINDOW>)
+                .expect("the window was just appended");
+            // The opening quote; past the first window the escape overwrites it.
+            window[0] = b'"';
+            (at, from) = escape_into(window, bytes, at, from);
+            if from == bytes.len() {
+                window[at] = b'"';
+                self.buf.truncate(base + at + 1);
+                return;
+            }
+            self.buf.truncate(base + at);
+            at = 0;
+        }
     }
 
     /// The same dynamic string as two consecutive field values —
@@ -746,10 +975,9 @@ impl JsonWriter {
     /// `raw` and its `data`, which are the same bytes whenever the text decodes
     /// to itself — and most template text is the whitespace between tags
     /// (`"\n\t\t"`), which needs escaping, so two [`JsonWriter::string`] calls
-    /// would run `serde_json`'s per-byte escape loop over it twice. The second
-    /// field is instead a copy of the first one's **emitted** bytes
-    /// (`extend_from_within`), which is correct by construction: the escaped
-    /// form is a pure function of `s`.
+    /// would run the escaper over it twice. The second field is instead a copy
+    /// of the first one's **emitted** bytes (`extend_from_within`), which is
+    /// correct by construction: the escaped form is a pure function of `s`.
     ///
     /// ⚠️ `inline(always)`, because `between` is only cheap as a constant. Under
     /// plain `inline` the release build outlined this body and tail-called it,
@@ -1009,18 +1237,19 @@ mod tests {
         w.into_bytes()
     }
 
-    /// [`JsonWriter::string`]'s escape-free fast path must be byte-identical to
-    /// the `serde_json` delegation it replaces — the parity contract this
-    /// module's whole doc comment rests on.
+    /// [`JsonWriter::string`] must be byte-identical to `serde_json`'s own
+    /// string serialization — the parity contract this module's whole doc
+    /// comment rests on — on both of its arms: the escape-free fast path and
+    /// the hand escaper.
     ///
-    /// Graded exhaustively over an alphabet that carries one member of every
-    /// arm of `serde_json`'s `ESCAPE` table plus the bytes adjacent to each
-    /// boundary: the named escapes, an unnamed control (`\u00XX`), both
-    /// literal escapes, `0x1f`/`0x20` either side of the control cutoff, `DEL`
-    /// (which `serde_json` does **not** escape), and a multibyte character
-    /// whose UTF-8 bytes are all `>= 0x80`. A corpus cannot grade this: a
-    /// mis-scan only surfaces on an input that actually carries the byte, and
-    /// several of these never appear in real source at all.
+    /// Graded exhaustively over [`escape_cases`], whose alphabet carries every
+    /// byte `serde_json` escapes and the bytes adjacent to each boundary: the
+    /// named escapes, every unnamed control (`\u00XX`, whose hex case is part
+    /// of the contract), both literal escapes, `0x20` and `DEL` (which
+    /// `serde_json` does **not** escape), and multibyte characters whose UTF-8
+    /// bytes are all `>= 0x80`. A corpus cannot grade this: a mis-scan only
+    /// surfaces on an input that actually carries the byte, and several of
+    /// these never appear in real source at all.
     #[test]
     fn string_matches_serde_json() {
         for case in &escape_cases() {
@@ -1033,6 +1262,32 @@ mod tests {
                 String::from_utf8_lossy(&ours),
                 String::from_utf8_lossy(&theirs)
             );
+        }
+    }
+
+    /// The escape windows' widths are exact, so the strings that reach their
+    /// last byte are graded here, against `serde_json`: a lead of escapes (none,
+    /// one to three short forms, one or two `\u00XX`) shifting the output by
+    /// every amount, a clean run of every length to twice the window — so a
+    /// step starts at every odd offset of the first window up to
+    /// [`ESCAPE_LIMIT`], the largest start there is — and a tail of up to
+    /// fifteen `\u00XX` bytes, the widest thing a step can write. A window one
+    /// byte short panics on these (checked by shrinking each window by one);
+    /// the general case set reaches the short window's bound but not
+    /// [`ESCAPE_WINDOW`]'s, so this is the one test that guards it.
+    #[test]
+    fn escape_windows_hold_their_widest_step() {
+        for lead in ["", "\"", "\"\"", "\"\"\"", "\u{1}", "\u{1}\u{1}"] {
+            for clean in 0..=2 * ESCAPE_WINDOW {
+                for tail in 0..=15 {
+                    let case = format!("{lead}{}{}", "a".repeat(clean), "\u{1}".repeat(tail));
+                    assert_eq!(
+                        emit_string(&case),
+                        serde_json::to_vec(&case).expect("serde_json serializes a str"),
+                        "escape parity broke on {case:?}"
+                    );
+                }
+            }
         }
     }
 
@@ -1061,24 +1316,42 @@ mod tests {
         }
     }
 
-    /// The escape-parity case set `string_matches_serde_json` grades: every
-    /// string of length 0–3 over a boundary alphabet, plus each alphabet member
-    /// at every offset of every length up to 24.
+    /// The escape-parity case set `string_matches_serde_json` grades.
+    ///
+    /// Its alphabet is every byte `serde_json` escapes (all of `0x00..=0x1F`,
+    /// `"`, `\`), the bytes either side of each cutoff that it does **not**
+    /// (`0x20`, `DEL`), a plain letter, and a character of each multi-byte
+    /// UTF-8 width. Over it: every string of length 0–2, and 0–3 over a
+    /// boundary subset; each member at every offset of every length to 40; a
+    /// run of escapes of every length at every offset; each member repeated
+    /// to 40 (the all-`\u00XX` case is the widest expansion); every pair of
+    /// members at every pair of offsets to 20; a needle at every offset of a
+    /// 300-byte string; and a seeded mix of long strings. The long cases are
+    /// there for the hand escaper's window, which restarts every ~90 output
+    /// bytes, so an escape has to land on each side of every restart.
     fn escape_cases() -> Vec<String> {
-        const ALPHABET: [&str; 12] = [
+        let mut alphabet: Vec<String> = (0u8..0x20).map(|b| char::from(b).to_string()).collect();
+        alphabet.extend(
+            [" ", "\"", "\\", "\u{7f}", "a", "é", "€", "😀"]
+                .into_iter()
+                .map(String::from),
+        );
+        const BOUNDARY: [&str; 12] = [
             "\u{0}", "\u{8}", "\t", "\n", "\u{c}", "\r", "\u{1f}", " ", "\"", "\\", "\u{7f}", "é",
         ];
-        // Every string of length 0–3 over the alphabet — enough for two
-        // escapes to meet, and to sit at each end of a partial word.
         let mut cases: Vec<String> = vec![String::new()];
-        for _ in 0..3 {
-            let mut next = Vec::new();
-            for base in &cases {
-                for piece in ALPHABET {
-                    next.push(format!("{base}{piece}"));
+        for x in &alphabet {
+            cases.push(x.clone());
+            for y in &alphabet {
+                cases.push(format!("{x}{y}"));
+            }
+        }
+        for x in BOUNDARY {
+            for y in BOUNDARY {
+                for z in BOUNDARY {
+                    cases.push(format!("{x}{y}{z}"));
                 }
             }
-            cases.extend(next);
         }
         // ⚠️ The axis a word-at-a-time scan fails on: the same needle at every
         // offset across the 8-byte stride. A corpus samples alignment
@@ -1087,15 +1360,77 @@ mod tests {
         // multiple of 8 never exercises the remainder, and an offset that never
         // reaches the last word never puts the needle *in* the remainder. Each
         // of those holes has hidden a corruption probe that the other caught.
-        for piece in ALPHABET {
-            for len in 0..24usize {
+        for piece in &alphabet {
+            for len in 0..=40usize {
                 for offset in 0..=len {
                     let mut s = "a".repeat(offset);
                     s.push_str(piece);
                     s.push_str(&"b".repeat(len - offset));
                     cases.push(s);
                 }
+                cases.push(piece.repeat(len));
             }
+        }
+        // A run of escapes of every length, starting at every offset: the
+        // escaper leaves its word hop for a byte loop at the first escape and
+        // returns at the first clean byte, and both hand-offs move with these.
+        const RUN: [&str; 6] = ["\n", "\t", "\"", "\\", "\u{1}", "\r"];
+        for run in 1..=16usize {
+            for offset in 0..=24usize {
+                let mut s = "a".repeat(offset);
+                for j in 0..run {
+                    s.push_str(RUN[(j + offset) % RUN.len()]);
+                }
+                s.push_str("bc");
+                cases.push(s.clone());
+                s.push_str(&"d".repeat(17));
+                cases.push(s);
+            }
+        }
+        const PAIR: [&str; 7] = ["\n", "\u{1}", "\"", "\\", "é", "😀", "\u{7f}"];
+        for x in PAIR {
+            for y in PAIR {
+                for i in 0..20usize {
+                    for j in i..20usize {
+                        let mut s = "a".repeat(i);
+                        s.push_str(x);
+                        s.push_str(&"b".repeat(j - i));
+                        s.push_str(y);
+                        s.push_str(&"c".repeat(20 - j));
+                        cases.push(s);
+                    }
+                }
+            }
+        }
+        for piece in &alphabet {
+            for offset in 0..300usize {
+                let mut s = "a".repeat(offset);
+                s.push_str(piece);
+                s.push_str(&"b".repeat(300 - offset));
+                cases.push(s);
+            }
+        }
+        // Seeded long mixes, weighted toward escapes so windows fill with
+        // every kind of step (a clean word, a hop, a run, the byte tail).
+        let mut seed = 0x2545_f491_4f6c_dd1du64;
+        for _ in 0..3_000 {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            let len = (seed % 257) as usize;
+            let mut s = String::new();
+            for _ in 0..len {
+                seed ^= seed << 13;
+                seed ^= seed >> 7;
+                seed ^= seed << 17;
+                let pick = (seed % 64) as usize;
+                s.push_str(if pick < alphabet.len() {
+                    &alphabet[pick]
+                } else {
+                    "x"
+                });
+            }
+            cases.push(s);
         }
         cases
     }

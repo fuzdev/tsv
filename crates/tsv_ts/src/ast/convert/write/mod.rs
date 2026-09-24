@@ -11,11 +11,11 @@
 //! for non-skipped `Option`s, and scalar formatting match acorn-typescript's
 //! JSON exactly (the shape each fixture's `expected.json` records).
 //!
-//! Scalar formatting delegates to `serde_json` wherever its output is not
-//! trivially reproducible: dynamic strings (`to_writer` runs `serde_json`'s
-//! exact string-escape logic) and non-integral `f64` (ryu). Static tokens
-//! (node types, operators, kinds) are known escape-free and written verbatim;
-//! integers have a unique decimal form and are hand-formatted.
+//! Dynamic strings are escaped by `JsonWriter::string`, byte-identical to
+//! `serde_json`'s string serialization; only non-integral `f64` delegates to
+//! `serde_json` (ryu). Static tokens (node types, operators, kinds) are known
+//! escape-free and written verbatim; integers have a unique decimal form and
+//! are hand-formatted.
 //!
 //! Three conversion-time mutations of already-converted children become
 //! pre-computed decisions threaded down as flags (see `ExprFlags` in

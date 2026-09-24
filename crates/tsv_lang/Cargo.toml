@@ -37,9 +37,9 @@ smallvec.workspace = true
 thiserror.workspace = true
 unicode-segmentation.workspace = true
 unicode-width.workspace = true
-# Only for the `json` feature's wire-JSON writer, whose `string`/`f64` emitters
-# delegate to `serde_json::to_writer` for exact escape/ryu parity with the typed
-# serialization. Optional so format-only builds stay serde-free.
+# Only for the `json` feature's wire-JSON writer, whose `f64` emitter delegates
+# to `serde_json::to_writer` for exact ryu parity (and whose hand string escaper
+# is graded against it in tests). Optional so format-only builds stay serde-free.
 serde_json = { workspace = true, optional = true }
 
 [lints]
