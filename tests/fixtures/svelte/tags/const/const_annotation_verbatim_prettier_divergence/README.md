@@ -11,8 +11,9 @@ normalizes it like any other declarator, so every authoring reaches one form.
 
 The canonical form is the same on both sides, so `input.svelte` is a fixed point
 for both formatters and the divergence is visible only from a non-canonical
-authoring — the two `prettier_variant_*` files, each of which prettier keeps
-stable and tsv normalizes to `input`.
+authoring — the three `prettier_variant_*` files (compacted, spaced, and a
+binding whose `:` opens its own line), each of which prettier keeps stable and
+tsv normalizes to `input`.
 
 ## Reason
 
@@ -34,7 +35,7 @@ freeze is the fallback, not a decision about annotations.
 That makes the agreement on the canonical form accidental: the frozen text and
 the normalized text simply coincide there. `a4` is the null control — the same
 tag one annotation short, which prettier really does reprint, and which is why
-neither variant can compact it.
+no variant respells it.
 
 tsv routes the head through its TypeScript printer in every case, the same
 uniform normalization it already applies to the `{#each … as}` and

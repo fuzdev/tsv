@@ -402,8 +402,10 @@ impl<'a> Printer<'a> {
 
     /// The byte offset of the `{@const}` declarator's `=`: the first byte past the binding
     /// that is not whitespace. Svelte crosses the binding→`=` gap with `allow_whitespace`
-    /// alone and the parser rejects a comment there (`reject_binding_comments`), so nothing
-    /// else can stand between them.
+    /// alone, and the parser reads the declarator the same way (`parse_declarator`): the
+    /// binding is bounded to a name or a matched bracket plus its annotation, and the `=` must
+    /// be the next non-whitespace byte, so a successful parse leaves nothing else — no
+    /// comment, no paren shell, no member tail — between them.
     fn assignment_operator_pos(&self, binding_end: u32) -> u32 {
         let rest = &self.source[binding_end as usize..];
         let pos =

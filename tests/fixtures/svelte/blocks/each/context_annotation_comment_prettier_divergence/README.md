@@ -10,13 +10,11 @@ Covered positions: an identifier binding's annotation, a destructuring binding's
 annotation, and an indexed each (`as b: /* c */ C, i`), where the annotation is
 followed by the `, index` tail.
 
-The annotation region is the one part of the block-binding grammar the `{#each}`
-reader parses on its own (`tsv_ts::parse_type_annotation_partial`) rather than
-inside the pattern parse — it has to be, because the pattern's extent is bounded
-before the annotation so `{#each xs as { a } (a.id)}` cannot read `{ a } (a.id)`
-as a call. `{:then}` / `{:catch}` take their annotation inside
-`parse_pattern_with_comments` instead. Both routes reach the same comment window,
-which runs to the end of the **binding**, annotation included — anchoring it on
+The annotation region is parsed on its own (`tsv_ts::parse_type_annotation_partial`)
+rather than inside the pattern parse — it has to be, because the pattern's extent is
+bounded before the annotation so `{#each xs as { a } (a.id)}` cannot read
+`{ a } (a.id)` as a call. `{:then}` / `{:catch}` and `{@const}` share that reader.
+The comment window runs to the end of the **binding**, annotation included — anchoring it on
 the bare pattern collapses it to the name and leaves an annotation comment
 attached nowhere.
 

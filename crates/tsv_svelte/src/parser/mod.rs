@@ -412,8 +412,8 @@ fn find_tag_close(
 /// returning its byte offset or `None`.
 ///
 /// The trivia-aware replacement for the hand-rolled top-level scans over Svelte
-/// binding/declaration strings — the `{@const}` declarator's `=` and its init's
-/// separator `,`, the `{@debug}` printer's identifier gap: a `target` glyph inside a
+/// binding/declaration strings — the `{@const}` init's separator `,`, the `{@debug}`
+/// printer's identifier gap: a `target` glyph inside a
 /// comment or string can't mis-anchor the scan. `target` must not itself be a bracket
 /// or a trivia-introducing byte (`/`, `'`, `"`, `` ` ``).
 ///
@@ -423,8 +423,9 @@ fn find_tag_close(
 /// of a top-level anything — a type argument list's `,` (`Map<A, B>`) and a function
 /// type's `=>` both land here at depth 0. Every such caller has to narrow the question
 /// until the scan is sound on it, and each states its own narrowing:
-/// `SvelteParser::reject_multi_declarator` gates the scan on the parsed node,
-/// `SvelteParser::find_top_level_equals` steps over `=>`.
+/// `SvelteParser::reject_multi_declarator` gates the scan on the parsed node. A boundary
+/// the grammar defines — the `{@const}` declarator's `=`, a binding's annotation end — is
+/// the parser's to find, never this scan's (`SvelteParser::parse_block_pattern`).
 pub(crate) fn find_top_level_delim(
     bytes: &[u8],
     start: usize,

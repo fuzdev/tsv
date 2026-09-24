@@ -5,7 +5,7 @@
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use crate::whitespace::is_svelte_ws;
-use tsv_lang::source_scan::{TriviaProfile, skip_comment, skip_trivia};
+use tsv_lang::source_scan::TriviaProfile;
 use tsv_lang::{ParseError, Span};
 use tsv_ts::{Expression, ExpressionKind};
 
@@ -83,15 +83,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             .trim_start_matches(is_svelte_ws);
 
         let decl_offset = tag_content_start + subslice_offset(tag_content, decl_str);
-
-        // Find the top-level `=` (not the nested `=` of a destructuring default)
-        // separating id from init, then parse both sides. The single-declarator rule
-        // (`{@const a = 1, b = 2}`) is enforced on the parsed init inside
-        // `parse_declarator`, where the *node* answers whether a bare comma is there at
-        // all — a byte scan cannot, because it reads a type argument's `,` as a
-        // separator (`{@const a: Map<A, B> = expr}`).
-        let eq_pos = self.find_top_level_equals(decl_str, decl_offset)?;
-        let (id, init) = self.parse_declarator(decl_str, decl_offset, eq_pos)?;
+        let (id, init) = self.parse_declarator(decl_str, decl_offset)?;
 
         Ok(FragmentNode::ConstTag(ConstTag {
             id,
@@ -189,39 +181,40 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         }))
     }
 
-    /// Split a declarator string on the top-level `=` at `eq_pos` into a parsed
-    /// (id pattern, init expression). `decl_offset` is the byte offset of
-    /// `decl_str` in the source, used to recover each side's span.
+    /// Read a `{@const}` declarator — `decl_str`, whose first byte is at source offset
+    /// `decl_offset` — into its (id pattern, init expression), the way Svelte's `tag()` does:
+    /// `read_pattern`, then `allow_whitespace` + `eat('=', true)`, then `read_expression` over
+    /// the rest of the tag.
+    ///
+    /// The binding is [`Self::parse_block_pattern`]'s, the reader every `read_pattern`
+    /// position shares, so its head gate and bounded extent hold here too: `(a)`, `(a): T`
+    /// and `([a])` fail at the head (`expected_pattern`), and a binding that would continue
+    /// as an expression (`a.b`, `a?.b`, `[a][0]`, `{ a }.b`, `[a] [b]`, `a, b`) stops at its
+    /// own end, where the `=` is then missing. The declarator's `=` is therefore the first
+    /// non-whitespace byte past the binding — never found by a scan, which cannot see TS
+    /// type syntax (a function type's `=>`, a type argument list's `>`). A comment on either
+    /// side of the binding is rejected by the same two reads, as canonical's `allow_whitespace`
+    /// rejects it; one inside a destructure or inside the annotation is acorn's and stays.
     ///
     /// `{@const}`-only. The `{const}`/`{let}` declaration tags hand their whole content to
-    /// `parse_ts_statement` instead, which is why the binding rule below is enforced here
-    /// rather than at the tag: acorn takes a comment at either binding gap and Svelte's
+    /// `parse_ts_statement` instead: acorn takes a comment at either binding gap and Svelte's
     /// `read_pattern` does not, so the two tags genuinely disagree.
     fn parse_declarator(
         &mut self,
         decl_str: &'a str,
         decl_offset: usize,
-        eq_pos: usize,
     ) -> Result<(&'arena Expression<'arena>, &'arena Expression<'arena>), ParseError> {
-        // The id side ends at the `=`, so its trailing run is the head's; the init side ends
-        // at the tag's `}` and its may be a line comment's own text
-        // (`Parser::parse_ts_expression`).
-        let id_str = decl_str[..eq_pos].trim_matches(is_svelte_ws);
-        let after_eq = &decl_str[eq_pos + 1..];
+        let (id, binding_end) = self.parse_block_pattern(decl_str, decl_offset)?;
+        let after_binding = &decl_str[binding_end - decl_offset..];
+        let at_eq = after_binding.trim_start_matches(is_svelte_ws);
+        let eq_offset = binding_end + (after_binding.len() - at_eq.len());
+        let Some(after_eq) = at_eq.strip_prefix('=') else {
+            return Err(self.error_msg_at("Expected token =", eq_offset));
+        };
+        // The init ends at the tag's `}`, and its trailing run may be a line comment's own
+        // text, so only the LEADING run is trimmed (`Parser::parse_ts_expression`).
         let init_str = after_eq.trim_start_matches(is_svelte_ws);
-
-        let id_offset = decl_offset + subslice_offset(decl_str, id_str);
-        // The length the init's LEADING run costs, which the start-keyed trim above is what
-        // makes this subtraction: a both-ends trim would fold the trailing run in here too.
-        let init_offset = decl_offset + eq_pos + 1 + (after_eq.len() - init_str.len());
-
-        // Taken off the id side derived just above, so the rule and the parse cannot
-        // disagree about where the binding is.
-        self.reject_binding_comments(id_str, id_offset)?;
-
-        // id is a pattern (identifier or destructuring — `parse_ts_pattern`
-        // converts ObjectExpression/ArrayExpression to patterns), init an expression.
-        let id = self.parse_ts_pattern(id_str, id_offset)?;
+        let init_offset = eq_offset + 1 + (after_eq.len() - init_str.len());
         let init = self.parse_ts_expression(init_str, init_offset)?;
         self.reject_multi_declarator(init, init_str, init_offset)?;
         Ok((id, init))
@@ -271,118 +264,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             )),
             None => Ok(()),
         }
-    }
-
-    /// Reject a comment in the `{@const}` **binding** — the gaps Svelte's reader cannot
-    /// cross. `read_pattern` starts at the first non-whitespace byte, so a comment before
-    /// the pattern is `expected_pattern`; it then reads an optional `: T` (TS only) and the
-    /// caller does `allow_whitespace()` + `eat('=')`, so a comment anywhere else outside the
-    /// annotation is `expected_token`. Only the annotation's **interior** is comment-bearing,
-    /// because acorn parses it: `y: A /* c */ | B` is legal, `y /* c */: T` and `y: T /* c */`
-    /// are not.
-    ///
-    /// ⚠️ Reached only from [`Self::parse_declarator`], the `{@const}`-only splitter — the
-    /// unprefixed `{const}`/`{let}` tags take a comment at either gap and must keep doing so.
-    ///
-    /// Without this the head over-accepts and the printer has no emitter for the gap: a line
-    /// comment is DROPPED, and one before the `=` is RELOCATED across it onto the init.
-    ///
-    /// `id_str` is the binding side of the declarator, whitespace-trimmed; `id_offset` its
-    /// byte offset in the source, for error positions.
-    fn reject_binding_comments(&self, id_str: &str, id_offset: usize) -> Result<(), ParseError> {
-        let bytes = id_str.as_bytes();
-        let end = bytes.len();
-
-        // Depth keeps a pattern's interior out of it — a comment inside `{ a }` or `[ a ]` is
-        // acorn's, not Svelte's. `<`/`>` is untracked for `find_top_level_delim`'s reason, and
-        // costs nothing here: a type argument's interior is already covered by the annotation
-        // rule below. `annot_colon` is the annotation opener (an object pattern's `:` is
-        // nested, so a top-level one can only be that), and `pending_annotation_comment`
-        // holds a comment that is legal *so far* and becomes a violation only if nothing
-        // significant follows it.
-        let mut depth = 0usize;
-        let mut annot_colon: Option<usize> = None;
-        let mut seen_significant = false;
-        let mut pending_annotation_comment: Option<usize> = None;
-        let mut i = 0;
-
-        while i < end {
-            if let Some(next) = skip_comment(bytes, i, end) {
-                if depth == 0 {
-                    if !seen_significant {
-                        return Err(self.error_msg_at(
-                            "Expected identifier or destructure pattern",
-                            id_offset + i,
-                        ));
-                    }
-                    match annot_colon {
-                        // Before the annotation opener (or with no annotation at all) the
-                        // comment sits in a gap Svelte crosses with `allow_whitespace`.
-                        None => return Err(self.error_msg_at("Expected token =", id_offset + i)),
-                        Some(_) => pending_annotation_comment = Some(i),
-                    }
-                }
-                i = next;
-                continue;
-            }
-            // Strings only — comments are handled above.
-            if let Some(next) = skip_trivia(bytes, i, end, TriviaProfile::JS) {
-                seen_significant = true;
-                pending_annotation_comment = None;
-                i = next;
-                continue;
-            }
-
-            let b = bytes[i];
-            match b {
-                b'(' | b'[' | b'{' => depth += 1,
-                b')' | b']' | b'}' => depth = depth.saturating_sub(1),
-                b':' if depth == 0 && annot_colon.is_none() => annot_colon = Some(i),
-                _ => {}
-            }
-            if !b.is_ascii_whitespace() {
-                seen_significant = true;
-                pending_annotation_comment = None;
-            }
-            i += 1;
-        }
-
-        // A comment the annotation opened for but never closed over — it trails the type,
-        // where Svelte is already looking for the `=`.
-        if let Some(pos) = pending_annotation_comment {
-            return Err(self.error_msg_at("Expected token =", id_offset + pos));
-        }
-        Ok(())
-    }
-
-    /// Find the top-level `=` in a declaration string (not inside brackets/braces,
-    /// strings, or comments) — the one separating the binding from its initializer.
-    /// `offset` is `s`'s byte offset in the source, for the error position.
-    ///
-    /// This is one of the two callers [`super::find_top_level_delim`] warns about. An `=`
-    /// followed by `>` is the arrow of a function-type annotation
-    /// (`{@const f: (a: A) => B = expr}`), not the declarator's own `=`, so the search
-    /// steps over it and resumes — depth-correctly, since every offset that scan returns
-    /// is already at depth 0. Only `=>` is reachable: the split takes the **first**
-    /// top-level `=`, and everything ahead of it is a binding and its annotation, where
-    /// no other compound `=` operator is legal. The preceding byte is deliberately NOT
-    /// tested — a type argument list closes on `>`, so `{@const a: Map<A>= expr}` would
-    /// lose its assignment.
-    fn find_top_level_equals(&self, s: &str, offset: usize) -> Result<usize, ParseError> {
-        let bytes = s.as_bytes();
-        let mut from = 0;
-        while let Some(pos) =
-            super::find_top_level_delim(bytes, from, bytes.len(), b'=', TriviaProfile::JS)
-        {
-            if bytes.get(pos + 1) != Some(&b'>') {
-                return Ok(pos);
-            }
-            from = pos + 1;
-        }
-        // Svelte's own `eat('=', true)`, reached once `read_pattern` has consumed the
-        // binding — the same diagnostic `reject_binding_comments` raises for the gaps
-        // around it, pointing at the end of what was read rather than at byte 0.
-        Err(self.error_msg_at("Expected token =", offset + s.len()))
     }
 
     /// Parse a debug tag: {@debug} or {@debug x, y, z}

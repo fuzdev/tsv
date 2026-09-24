@@ -614,7 +614,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Patterns are: identifiers OR destructuring {..}/[..]
         // This naturally stops at whitespace/comma/paren, avoiding the
         // `item (key)` being parsed as a function call
-        let (context, pattern_end) = self.parse_context_pattern(trimmed, adjusted_offset)?;
+        let (context, pattern_end) = self.parse_block_pattern(trimmed, adjusted_offset)?;
 
         // Parse remaining: ", index" and/or "(key)"
         let consumed = pattern_end - adjusted_offset;
@@ -625,26 +625,37 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         Ok((context, index, key, consumed_end))
     }
 
-    /// Parse a context pattern: identifier or destructuring pattern, each with an
-    /// optional `: Type` annotation (`{#each xs as x: T}`,
-    /// `{#each xs as { a }: T}`).
+    /// Parse a block or tag pattern — Svelte's `read_pattern` (`1-parse/read/context.js`):
+    /// an identifier or a destructuring pattern, each with an optional `: Type` annotation
+    /// (`{#each xs as x: T}`, `{:then { a }: T}`, `{@const [a]: T = expr}`). The one reader
+    /// for every `read_pattern` position — `{#each}`'s context, the `{:then}`/`{:catch}`
+    /// value, the `{@const}` id — returning the pattern and the absolute offset just past
+    /// the binding (the annotation's end when there is one). What follows is the caller's
+    /// grammar: `, index` / `(key)`, the tag's `}`, or the declarator's `=`.
     ///
-    /// Like Svelte's `read_pattern`, this stops at whitespace/comma/paren for
-    /// identifiers and at the matching bracket for a destructuring pattern — the
-    /// bound slice is what keeps `{#each xs as { a } (a.id)}` from parsing
-    /// `{ a } (a.id)` as a *call*. The annotation therefore has to be consumed
-    /// here, after the pattern, rather than by handing the whole remainder to the
-    /// expression parser.
+    /// Both halves of canonical's reading are enforced here, and the caller must not re-find
+    /// either with a byte scan:
     ///
-    /// `tsv_ts::attach_pattern_type_annotation` owns the span convention — one
-    /// definition, so the two Svelte block readers can't drift. It leaves the span
-    /// on the **bare** binding for every kind (only a destructuring pattern's wire
-    /// `end` widens at emit time — the one kind whose byte range and `loc` genuinely
-    /// disagree; an annotated identifier stays bare on the wire too, per Svelte's
-    /// `read_pattern`), so `pattern.span().end` is the bare end and
-    /// `tsv_ts::pattern_binding_end` the end past any annotation. A reader that
-    /// needs the gap between them — the trailing-comment gates — must ask for both.
-    fn parse_context_pattern(
+    /// - **The head gate.** The binding STARTS as a name (the shared `read_identifier`,
+    ///   reserved-word rule included) or as a `{`/`[` opening a matched bracket; anything
+    ///   else — a paren shell `(a)`, a comment — is `expected_pattern`. A member or paren
+    ///   target stays legal INSIDE a destructure, which acorn reads as an assignment target.
+    /// - **The bounded extent.** The pattern ends at the name's last byte or the bracket's
+    ///   close, so a tail that would continue an expression (`a.b`, `[a][0]`, `{ a }.b`,
+    ///   `a = 1`, `{ a } (a.id)` read as a *call*) is left for the caller to reject or
+    ///   consume. The annotation's end is the TS type parse's own, never a scan — a
+    ///   function type's `=>` and a type argument list's `,`/`>` sit at depth 0.
+    ///
+    /// The annotation attaches through `tsv_ts::attach_pattern_type_annotation`, which owns
+    /// the span convention: the span stays on the **bare** binding for every kind (only a
+    /// destructuring pattern's wire `end` widens at emit time — the one kind whose byte
+    /// range and `loc` genuinely disagree; an annotated identifier stays bare on the wire
+    /// too, per Svelte's `read_pattern`). So `pattern.span().end` is the bare end, and the
+    /// returned offset — `tsv_ts::pattern_binding_end` — the end past any annotation. A
+    /// comment in the gap on either side of the annotation is rejected by the reads that
+    /// bound it: the annotation parse starts only at a `:`, and the caller's own check of
+    /// what follows the returned offset (`, index`, `}`, `=`) finds anything else there.
+    pub(super) fn parse_block_pattern(
         &mut self,
         input: &str,
         offset: usize,
@@ -653,17 +664,17 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let ws_len = input.len() - trimmed.len();
         let adjusted = offset + ws_len;
 
-        // The pattern's extent, bounded so the annotation (and any `, index` /
-        // `(key)` tail) stays out of the expression parse.
-        // This split IS canonical's: `read_pattern` (`1-parse/read/context.js`) opens with
-        // `parser.read_identifier()` and only falls to acorn when that reads nothing — i.e.
-        // on the `{`/`[` destructuring branch. So the identifier arm goes through the same
+        // The pattern's extent, bounded so the annotation (and whatever the caller's
+        // grammar puts after the binding) stays out of the expression parse.
+        // This split IS canonical's: `read_pattern` opens with `parser.read_identifier()`
+        // and only falls to acorn when that reads nothing — and then only on a `{`/`[`
+        // (`expected_pattern` otherwise). So the identifier arm goes through the same
         // reader (reserved-word rule included) and the bracket arm keeps the deferral.
         let end = if trimmed.starts_with('{') || trimmed.starts_with('[') {
             self.find_matching_bracket(trimmed)?
         } else {
             let Some(name) = self.read_identifier(trimmed, adjusted)? else {
-                return Err(self.error_expected_at("identifier or pattern", offset));
+                return Err(self.error_expected_at("identifier or destructure pattern", adjusted));
             };
             name.len()
         };
@@ -1102,72 +1113,24 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         Ok(())
     }
 
-    /// Parse a `{#await}` `then`/`catch` binding pattern (the value/error), rejecting a
-    /// comment immediately BEFORE the pattern or BETWEEN the binding and its `}`.
-    /// Svelte reads these with `read_pattern` — acorn at the current index, having skipped
-    /// only whitespace — so a comment before the pattern fails ("Expected identifier or
-    /// destructure pattern") and the following `eat()` rejects one between the binding and
-    /// the next token. A comment INSIDE a destructure (`{ a /* c */ }`) or INSIDE the type
-    /// annotation (`value: /* c */ number`) stays valid — it's acorn trivia within the
-    /// pattern/type. tsv's `parse_ts_pattern` is comment-tolerant (it would relocate or drop
-    /// a surrounding comment), so this gate restores Svelte's strictness. `region_offset` is
-    /// the absolute source offset of `region[0]`.
-    ///
-    /// ⚠️ An annotation gives the region **two** edges and the gate needs both. A bare-span
-    /// reading alone sees the `:` first, calls the whole tail an annotation, and lets
-    /// `{:then a: A /* c */}` through — accepted where canonical rejects, with the comment
-    /// silently eaten by the sub-parse's lookahead. A `pattern_binding_end` reading alone
-    /// steps past the `:` and re-opens `{:then a /* c */: A}`, which the bare reading had
-    /// covered. Both, for every kind. The `{#each}` and `{@const}` readers gate the same
-    /// two edges, `{#each}` by bounding the pattern before it parses the annotation.
+    /// Parse a `{#await}` `then`/`catch` binding pattern (the value/error). Svelte reads it
+    /// with `read_pattern` and then `eat('}')` over `allow_whitespace`, so the binding is
+    /// [`Self::parse_block_pattern`]'s — the head gate and the bounded extent — and
+    /// everything after it up to the head's `}` must be whitespace. That one rule rejects
+    /// every tail canonical does: a comment BETWEEN the binding and its `}` on either side of
+    /// the annotation (`{:then a /* c */: A}`, `{:then a: A /* c */}`), and an expression
+    /// continuing past the pattern (`{:then a.b}`, `{:then [a][0]}`, `{:then a = 1}`). A
+    /// comment INSIDE a destructure (`{ a /* c */ }`) or INSIDE the type annotation
+    /// (`value: /* c */ number`) stays valid — it's acorn trivia within the pattern/type.
+    /// `region` runs to the head's `}`; `region_offset` is the absolute source offset of
+    /// `region[0]`.
     fn parse_await_value_pattern(
         &mut self,
         region: &str,
         region_offset: usize,
     ) -> Result<&'arena Expression<'arena>, ParseError> {
-        let lead = region.len() - region.trim_start_matches(is_svelte_ws).len();
-        let value_start = region_offset + lead;
-        // The trailing trim is safe here for the reason the doc below gives: a comment at
-        // either edge of this region is REJECTED, so none can be standing at the end for the
-        // trim to clip (contrast a head's, `Parser::parse_ts_expression`).
-        let trimmed = region.trim_matches(is_svelte_ws);
-        // `{:then p}` / `{:catch p}` are `read_pattern` positions like `{#each … as p}`, so
-        // a PLAIN-IDENTIFIER binding takes the reserved-word rule here too — canonical's
-        // `read_pattern` reads it with `parser.read_identifier()` before any acorn call.
-        // Asked BEFORE `parse_ts_pattern` rather than of the parsed node because a reserved
-        // word must not reach the TypeScript parser at all: it defers exactly this as a
-        // strict-mode early error, so the shape would come back as a valid binding. The
-        // reader's own answer is discarded — the annotation (`{:then v: T}`) means the
-        // pattern's extent is the TS parser's to find, not this reader's.
-        if !trimmed.starts_with(['{', '[']) {
-            self.read_identifier(trimmed, value_start)?;
-        }
-        let pattern = self.parse_ts_pattern(trimmed, value_start)?;
-        let span = pattern.span();
-        // Leading comment: the pattern would start past `value_start`.
-        if span.start as usize != value_start {
-            return Err(self.error_expected_at("identifier or destructure pattern", value_start));
-        }
-        // TWO gaps in this region can hold a comment canonical rejects, one on each side of
-        // the annotation, and neither reading covers the other: after the BARE pattern,
-        // before its `:`/`}` (`then a /* c */: A`), and after the whole BINDING, before its
-        // `}` (`then a: A /* c */`). Each is a legitimate leftover otherwise — a `: type`
-        // annotation, or nothing — so the reject is only on a tail that *starts* with a
-        // comment; one INSIDE the type (`value: /* c */ number`) leaves `:` first and is
-        // allowed. The two ends coincide for an unannotated binding.
-        //
-        // The bare end is the pattern node's own span for EVERY kind — `attach_pattern_type_
-        // annotation` leaves the span on the bare binding; only a destructuring pattern's
-        // wire `end` widens, at emit time — so only the far end needs `pattern_binding_end`.
-        for edge in [
-            span.end as usize,
-            tsv_ts::pattern_binding_end(pattern) as usize,
-        ] {
-            let tail = trimmed[edge - value_start..].trim_start_matches(is_svelte_ws);
-            if tail.starts_with("/*") || tail.starts_with("//") {
-                return Err(self.error_expected_at("identifier or destructure pattern", edge));
-            }
-        }
+        let (pattern, binding_end) = self.parse_block_pattern(region, region_offset)?;
+        self.reject_trailing_tag_content(&region[binding_end - region_offset..], binding_end)?;
         Ok(pattern)
     }
 
