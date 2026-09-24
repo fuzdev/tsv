@@ -27,4 +27,11 @@
 	),
 
 	c];
+
+	// on the LAST element, a line comment written after the `)` trails the own-line
+	// comment the parens held, keeping the order the author wrote them in
+	const a7 = [c, ...(b
+	/* i */
+	) // t
+	];
 </script>

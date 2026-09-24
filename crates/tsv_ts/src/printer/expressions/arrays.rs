@@ -6,7 +6,9 @@
 // - Comment preservation
 
 use crate::ast::internal::{self, Expression, ExpressionKind, LiteralValue};
-use crate::printer::comments::{block_is_before_comma, next_real_element_start, run_defers_line};
+use crate::printer::comments::{
+    ShellRunOrder, block_is_before_comma, next_real_element_start, run_defers_line,
+};
 use crate::printer::{CommentVec, Printer};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
@@ -457,10 +459,9 @@ impl<'a> Printer<'a> {
     ///   exclusion exact by construction, including its prefix rule, which no per-comment
     ///   test can reproduce.
     /// - **The anchor's own line** — a comment glued there belongs to whoever owns that
-    ///   line: `Printer::append_spread_trailing_paren_comments` **INSIDE a spread's
-    ///   stripped parens** (`scan_start` is the argument's end, below the element's), and
-    ///   the hole seams past a **trailing elision**, where the last real element's claim
-    ///   stops at its comma and the region beyond is not this scan's to re-parent.
+    ///   line: the element's own trailing claim, and the hole seams past a **trailing
+    ///   elision**, where the last real element's claim stops at its comma and the region
+    ///   beyond is not this scan's to re-parent.
     ///
     /// `last_real` is `None` only when the array holds no real element at all.
     fn end_scan_emits_comment(
@@ -478,27 +479,33 @@ impl<'a> Printer<'a> {
         !self.is_same_line(scan_start, comment.span.start)
     }
 
-    /// Where an end-of-array scan starts: the last REAL element's end — or, when that
-    /// element is a spread whose stripped parens hold own-line comments, the spread
-    /// ARGUMENT's end, so the scan reaches into that interior to re-parent them.
+    /// Where an end-of-array scan starts: the last REAL element's end.
     ///
-    /// The one spelling of that reach, shared by [`Self::build_array_group_doc`]'s
-    /// end-of-array scan and [`Self::build_array_doc_with_expanding_comments`]'s final
-    /// scan. Asking it two ways — "any to-emit comment in the interior"
-    /// vs "own-line BLOCKS in it" — agrees only because
-    /// [`Self::end_scan_emits_comment`]'s same-line arm discards the difference
-    /// downstream: the drift-risk shape the anchor rule beside it guards against, so
-    /// the two are stated once.
+    /// Never inside a last spread's stripped parens: that interior's own-line share is
+    /// emitted by the expanding printer's loop, beside the run past the `)`, in the
+    /// last-element order (`Printer::push_last_element_share_and_run`) — and
+    /// [`Self::last_slot_spread_has_share`] is what routes every such array there. A scan
+    /// that reached in as well would print the share twice.
     ///
     /// `None` when the array holds no real element: there is nothing to scan past.
     fn end_scan_start(&self, arr: &internal::ArrayExpression<'_>) -> Option<u32> {
         let (_, elem) = self.prev_real_slot(arr, arr.elements.len())?;
-        Some(match elem.as_spread() {
-            Some(spread) if !self.spread_element_own_line_comments(spread).is_empty() => {
-                spread.argument.span().end
-            }
-            _ => elem.span().end,
-        })
+        Some(elem.span().end)
+    }
+
+    /// Whether the LAST slot is a spread whose stripped parens hold an own-line share —
+    /// an expansion trigger, so the one printer that orders that share against the run
+    /// past the `)` is the only one to reach it. Its comments lie inside the spread's own
+    /// span, out of every gap scan the other triggers make.
+    fn last_slot_spread_has_share(&self, arr: &internal::ArrayExpression<'_>) -> bool {
+        arr.elements
+            .last()
+            .and_then(|e| e.as_ref()?.as_spread())
+            .is_some_and(|s| {
+                !self
+                    .paren_interior_own_line_comments(s.paren_interior())
+                    .is_empty()
+            })
     }
 
     /// The last REAL element's end paired with its gap SPLIT — the
@@ -554,7 +561,8 @@ impl<'a> Printer<'a> {
         let has_expanding_comments = has_comments
             && (self.has_line_comments_between(arr_span.start, arr_span.end)
                 || self.has_multiline_block_comments_on_page_between(arr_span.start, arr_span.end)
-                || self.has_own_line_block_comments_in_array(arr, arr_span));
+                || self.has_own_line_block_comments_in_array(arr, arr_span)
+                || self.last_slot_spread_has_share(arr));
 
         if has_expanding_comments {
             return self.build_array_doc_with_expanding_comments(arr, arr_span);
@@ -849,12 +857,12 @@ impl<'a> Printer<'a> {
         }
 
         // Own-line block comments before the closing bracket, emitted as siblings after the
-        // last element and forcing the array to break. Only a spread's stripped-paren
-        // comments (which `build_spread_doc` skips) actually reach here: any *other*
-        // own-line block comment past the last element lies outside every element span, so
-        // `has_own_line_block_comments_in_array` sees it and `build_array_doc` routes the
-        // array to the expanding printer before this path runs. The collection stays
-        // general — it costs nothing and the spread case shares its shape.
+        // last element and forcing the array to break. Nothing known reaches here: an
+        // own-line block past the last element lies outside every element span, so
+        // `has_own_line_block_comments_in_array` routes the array to the expanding printer,
+        // and so does a last spread's own-line share (`last_slot_spread_has_share`), which
+        // that printer orders against the run past the `)`. The collection stays as the
+        // group path's end-of-array emitter so no future route can drop a comment here.
         let mut trailing_own_line_comments: CommentVec<'_> = smallvec![];
         // Zero-comment fast gate: the scan collects nothing but comments, so with none
         // anywhere in the array it is a no-op.
@@ -1076,23 +1084,6 @@ impl<'a> Printer<'a> {
             let past_comma =
                 |c: &tsv_lang::Comment| trailing_comma_pos.is_some_and(|pos| c.span.start > pos);
 
-            for comment in trailing.iter().filter(|c| c.is_block && !past_comma(c)) {
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
-            }
-
-            // Separator comma between elements; under `trailingComma: 'none'` the last
-            // REAL element gets no trailing comma, but a trailing-elision hole keeps its
-            // (syntactically significant) comma.
-            if !is_last || elem.is_none() {
-                parts.push(d.text(","));
-            }
-
-            for comment in trailing.iter().filter(|c| c.is_block && past_comma(c)) {
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
-            }
-
             // A spread whose stripped parens held a `//` already ends its line in one, so a
             // line comment written after the `)` takes its own line instead of welding onto
             // it — the array's spelling of `TrailingComments::demote_line_after_deferred`
@@ -1101,14 +1092,48 @@ impl<'a> Printer<'a> {
             let defers_line = elem
                 .as_ref()
                 .is_some_and(|e| self.defers_trailing_line_comment(e));
-            for comment in trailing.iter().filter(|c| !c.is_block) {
-                self.push_trailing_line_comment_demotion_aware(&mut parts, comment, defers_line);
-            }
+            let push_blocks = |parts: &mut DocBuf| {
+                for comment in trailing.iter().filter(|c| c.is_block && !past_comma(c)) {
+                    parts.push(d.text(" "));
+                    parts.push(self.build_comment_doc(comment));
+                }
+
+                // Separator comma between elements; under `trailingComma: 'none'` the last
+                // REAL element gets no trailing comma, but a trailing-elision hole keeps its
+                // (syntactically significant) comma.
+                if !is_last || elem.is_none() {
+                    parts.push(d.text(","));
+                }
+
+                for comment in trailing.iter().filter(|c| c.is_block && past_comma(c)) {
+                    parts.push(d.text(" "));
+                    parts.push(self.build_comment_doc(comment));
+                }
+            };
+            let push_line = |parts: &mut DocBuf| {
+                for comment in trailing.iter().filter(|c| !c.is_block) {
+                    self.push_trailing_line_comment_demotion_aware(parts, comment, defers_line);
+                }
+            };
+            // The LAST slot's spread share has no comma to follow: it and the run past the
+            // `)` take the last-element order (`Printer::push_last_element_share_and_run`),
+            // so the final scan below never reaches into the interior.
+            let last_interior = is_last
+                .then(|| elem.and_then(Expression::as_spread))
+                .flatten()
+                .map(internal::SpreadElement::paren_interior);
+            self.push_last_element_share_and_run(
+                &mut parts,
+                last_interior,
+                ShellRunOrder::HoistBlocks,
+                push_blocks,
+                push_line,
+            );
 
             // The array's share of a spread's stripped-paren interior, past the comma —
-            // the own-line comments the spread's own doc leaves behind. The LAST element has
-            // no comma to emit against, so its share is the final scan's second anchor
-            // instead (see `end_scan_emits_comment` and `final_scan_start` below).
+            // the own-line comments the spread's own doc leaves behind. The LAST slot has
+            // no comma to emit against, so its share was ordered against the run above
+            // (`Printer::push_last_element_share_and_run`).
             //
             // Carried across any elisions that follow the spread, so it lands past their
             // commas too — the same forward slide every other hole-region comment takes,
@@ -1183,13 +1208,8 @@ impl<'a> Printer<'a> {
         // already handled; past that, only what no one closer prints — see
         // `end_scan_emits_comment` for the two exclusions it composes.
         //
-        // `end_scan_start` is what reaches inside a LAST spread's stripped parens, which
-        // is how that element's own-line share gets to the array: there is no comma past
-        // it to emit against (a non-last spread's share is pushed by the loop above).
-        // Only this scan may see that region — pulling `last_real_emit_end` back too
-        // would hand it to the NEXT element's leading scan, which the element's own
-        // trailing claim has already emitted from: the anchor shift `docs/comments.md`
-        // names, and it DOUBLE-PRINTS every `//` written in the gap after the `)`.
+        // The scan never reaches inside a LAST spread's stripped parens: the loop above
+        // emitted that share, ordered against the run past the `)` (`end_scan_start`).
         let final_scan_start = trailing_hole_comments_end
             .or_else(|| self.end_scan_start(arr))
             .unwrap_or(span.start + 1);

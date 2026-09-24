@@ -27,4 +27,11 @@
 	),
 
 	c};
+
+	// on the LAST property, a line comment written after the `)` trails the own-line
+	// comment the parens held, keeping the order the author wrote them in
+	const o8 = {c, ...(b
+	/* i */
+	) // t
+	};
 </script>

@@ -508,11 +508,7 @@ impl<'a> Printer<'a> {
             }
             inner.push(self.build_frozen_expression_doc(spread.argument, frozen));
             if has_trailing_comments {
-                self.append_spread_trailing_paren_comments(
-                    &mut inner,
-                    argument_end,
-                    spread.span.end,
-                );
+                self.append_paren_interior_trailing_comments(&mut inner, spread.paren_interior());
             }
             if needs_parens {
                 inner.push(d.text(")"));
@@ -549,11 +545,7 @@ impl<'a> Printer<'a> {
             self.push_leading_run_before_breaking_value(&mut parts, &run, arg_start);
             parts.push(arg_doc);
             if has_trailing_comments {
-                self.append_spread_trailing_paren_comments(
-                    &mut parts,
-                    argument_end,
-                    spread.span.end,
-                );
+                self.append_paren_interior_trailing_comments(&mut parts, spread.paren_interior());
             }
             return d.concat(&parts);
         }
@@ -588,7 +580,7 @@ impl<'a> Printer<'a> {
             // (array/call) which places them as siblings after the spread's comma.
             // Using line_suffix for own-line block comments in spread causes them to
             // escape past the enclosing array/call brackets entirely.
-            self.append_spread_trailing_paren_comments(&mut parts, argument_end, spread.span.end);
+            self.append_paren_interior_trailing_comments(&mut parts, spread.paren_interior());
         }
         if needs_parens {
             parts.push(d.text(")"));

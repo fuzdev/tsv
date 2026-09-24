@@ -522,17 +522,41 @@ impl<'a> Printer<'a> {
         // in the enclosing list concat (which render + every fits pass would still walk).
         // Byte-identical: an empty comment run builds `concat(&[]) == empty()`, so pushing
         // it vs not is the same rendered output.
+        // The last element's comma is `None` (trailingComma: 'none'): nothing is pushed,
+        // for the same reason the empty runs are not.
+        self.push_element_comma_trailing_blocks(parts, trailing, comma);
+        self.push_element_trailing_line(parts, trailing);
+    }
+
+    /// [`Self::push_element_comma_trailing`] up to its line comment — the blocks and the
+    /// comma. The last-element emitter ([`Printer::push_last_element_share_and_run`])
+    /// takes the run in these two halves, since under
+    /// [`ShellRunOrder::HoistBlocks`](super::ShellRunOrder) a stripped-paren share lands
+    /// between them.
+    pub(in crate::printer) fn push_element_comma_trailing_blocks(
+        &self,
+        parts: &mut DocBuf,
+        trailing: &TrailingComments<'_>,
+        comma: Option<DocId>,
+    ) {
         if !trailing.before_comma.is_empty() {
             parts.push(self.build_block_comments_doc(&trailing.before_comma));
         }
-        // The last element's comma is `None` (trailingComma: 'none'): nothing is pushed,
-        // for the same reason the empty runs above are not.
         if let Some(comma) = comma {
             parts.push(comma);
         }
         if !trailing.after_comma.is_empty() {
             parts.push(self.build_block_comments_doc(&trailing.after_comma));
         }
+    }
+
+    /// The run's line comment — the other half of
+    /// [`Self::push_element_comma_trailing_blocks`].
+    pub(in crate::printer) fn push_element_trailing_line(
+        &self,
+        parts: &mut DocBuf,
+        trailing: &TrailingComments<'_>,
+    ) {
         if let Some(comment) = trailing.line {
             self.push_trailing_line_comment_demotion_aware(parts, comment, trailing.line_demoted);
         }

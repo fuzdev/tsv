@@ -259,11 +259,14 @@ impl<'a> Printer<'a> {
     /// (`a /* c */⏎/* d */`) are emitted on ONE line, where the space is a real separator.
     /// Only a `//` forces the break, so only a `//` before it can take the space away.
     ///
-    /// Asked of the comment itself rather than threaded through each caller's run, so the
-    /// three builders that emit trailing runs ([`Self::trailing_comment_docs`] for the value
-    /// heads, the `bind:` sequence's comma gaps, `{@debug}`) cannot answer it differently — or
-    /// forget to.
-    fn trailing_comment_starts_line(&self, comment: &Comment) -> bool {
+    /// Inside a run this source reading answers only the FIRST comment: every later one is
+    /// answered by the run itself ([`Self::trailing_comment_run_docs`], behind
+    /// [`Self::trailing_comment_docs`] for the value heads and behind `{@debug}`), since the
+    /// comment it emitted just before is the question's whole answer, while the bytes between
+    /// the two may still hold a grouping `)` the parser stripped (`{(a // c1⏎) // c2⏎}`),
+    /// which this reading takes for content. The `bind:` sequence's comma gaps still ask it
+    /// per comment ([`Self::build_trailing_js_comment_doc`]).
+    pub(super) fn trailing_comment_starts_line(&self, comment: &Comment) -> bool {
         // A `//` runs to end of line, so a line comment before this one necessarily left it
         // starting a fresh line — which the source bytes answer in a couple of steps. Almost
         // every trailing comment bails here, before the span search.
@@ -326,11 +329,29 @@ impl<'a> Printer<'a> {
         comment: &Comment,
         dedent_break: bool,
     ) -> DocId {
+        self.build_trailing_js_comment_doc_at(
+            comment,
+            dedent_break,
+            self.trailing_comment_starts_line(comment),
+        )
+    }
+
+    /// [`Self::build_trailing_js_comment_doc`] with the leading-separator question already
+    /// answered: `starts_line`, whether the output line the comment lands on is fresh. A run
+    /// that emitted the comment before this one knows it outright
+    /// ([`Self::trailing_comment_run_docs`]) — its own `//` ended the line, whatever source
+    /// bytes a stripped paren left between the two.
+    pub(super) fn build_trailing_js_comment_doc_at(
+        &self,
+        comment: &Comment,
+        dedent_break: bool,
+        starts_line: bool,
+    ) -> DocId {
         let d = self.d();
         // Every payload takes the same leading separator; only the trailing one differs,
         // so the arms are one assembly rather than per-kind spellings of the comment.
         let mut parts = DocBuf::new();
-        if !self.trailing_comment_starts_line(comment) {
+        if !starts_line {
             parts.push(d.text(" "));
         }
         parts.push(tsv_ts::build_comment_doc(d, comment, &self.ts_inputs()));

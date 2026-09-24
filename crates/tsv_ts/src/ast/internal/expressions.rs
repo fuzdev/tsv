@@ -243,6 +243,16 @@ impl<'arena> Expression<'arena> {
         }
     }
 
+    /// The rest element behind this expression, if it is one — an array pattern's rest
+    /// slot, the counterpart of [`Self::as_spread`] for the printer's stripped-paren
+    /// interior helpers.
+    pub fn as_rest(&self) -> Option<&RestElement<'arena>> {
+        match &self.kind {
+            ExpressionKind::RestElement(r) => Some(r),
+            _ => None,
+        }
+    }
+
     /// Check if this expression is a chain root that needs ChainExpression wrapping.
     ///
     /// Returns true if this is a MemberExpression/CallExpression (or TSNonNullExpression
@@ -845,6 +855,17 @@ pub struct FunctionExpression<'arena> {
 pub struct SpreadElement<'arena> {
     pub argument: &'arena Expression<'arena>,
     pub span: Span,
+}
+
+impl SpreadElement<'_> {
+    /// The source the grouping parens the parser stripped from the argument leave behind
+    /// — `[argument end, span end)`, the region between the argument and the shell's last
+    /// `)` (`...(x /* c */)`). Its comments are split between the spread's own doc and the
+    /// parent list (`docs/comments.md` §A stripped-paren interior is a partition too); the
+    /// rest twin is [`RestElement::paren_interior`].
+    pub fn paren_interior(&self) -> Span {
+        Span::new(self.argument.span().end, self.span.end)
+    }
 }
 
 /// Property kind: init (regular), get (getter), set (setter)
