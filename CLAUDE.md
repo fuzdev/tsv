@@ -920,7 +920,7 @@ Worked example + full design: ./docs/architecture.md §Two-AST Design.
 **Key Rules**:
 
 - Raw strings NEVER duplicated in the internal AST (extract via `source[span.range()]`)
-- The internal AST is NEVER the wire output — the wire JSON is hand-emitted by the writer; `serde_json` is used only for exact string-escape / `f64` parity (the writer substrate in `tsv_lang`) and, in `tsv_debug` alone, to read bytes back into a `Value` (the fixture gate, the audits, tests) — the shipped CLI's `--pretty` re-indents the compact bytes without a reader
+- The internal AST is NEVER the wire output — the wire JSON is hand-emitted by the writer; `serde_json` is used only for exact `f64` parity (the writer substrate in `tsv_lang`, whose hand string escaper is graded byte-for-byte against it) and, in `tsv_debug` alone, to read bytes back into a `Value` (the fixture gate, the audits, tests) — the shipped CLI's `--pretty` re-indents the compact bytes without a reader
 
 ### Position Types: u32 vs usize
 
@@ -1115,7 +1115,7 @@ cases; prettier, oxfmt and biome all get the JSDoc-cast paren binding wrong — 
 
 The shipped language/foundation crates' external deps (the `tsv_cli` binary adds only `argh`; dev tooling adds `tokio`, `futures-util`, and `serde` with its `derive` macro on top; `tsv_wasm` adds `wasm-bindgen`/`js-sys`):
 
-- `serde_json` — wire-JSON emission (exact string-escape / `f64` formatting), reached only through `tsv_lang`'s `json` feature; no shipped crate deserializes. The one reader is `tsv_debug::json` (the fixture gate, the audits, tests), which enables `unbounded_depth` — the default 128-level recursion limit refused wires the parser emits fine. `serde` itself is a dev-tooling dep (`tsv_debug`'s `derive`); the language crates see it only transitively
+- `serde_json` — wire-JSON emission (exact `f64` formatting; the oracle the hand string escaper is tested against), reached only through `tsv_lang`'s `json` feature; no shipped crate deserializes. The one reader is `tsv_debug::json` (the fixture gate, the audits, tests), which enables `unbounded_depth` — the default 128-level recursion limit refused wires the parser emits fine. `serde` itself is a dev-tooling dep (`tsv_debug`'s `derive`); the language crates see it only transitively
 - `smallvec` — stack-allocated vectors (printers + `tsv_check`)
 - `thiserror` — error type derivation
 - `phf` — compile-time perfect hash maps (keywords, entities)

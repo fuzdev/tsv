@@ -16,11 +16,12 @@
 /// `compact` is a valid JSON document with no whitespace outside strings — the
 /// writer's wire, or any `serde_json::to_vec` output. Whitespace outside strings
 /// is skipped rather than assumed absent, so a hand-written document re-indents
-/// too. For any document `serde_json` itself emitted — which is what the writer
-/// emits — the output is byte-identical to serializing the parsed `Value` with the
-/// tab formatter (the fixture tree's `expected.json` shape); a hand-written one
-/// keeps what serde would normalize (a `\u0041` stays an escape, a duplicate key
-/// stays doubled), since strings are copied, not decoded: `,` becomes `,` +
+/// too. For any document `serde_json` itself emitted — and the writer's wire is
+/// byte-identical to what `serde_json` emits — the output is byte-identical to
+/// serializing the parsed `Value` with the tab formatter (the fixture tree's
+/// `expected.json` shape); a hand-written one keeps what serde would normalize
+/// (a `\u0041` stays an escape, a duplicate key stays doubled), since strings
+/// are copied, not decoded: `,` becomes `,` +
 /// newline + indent, `:` becomes `: `, an opening bracket newlines and indents
 /// before its first member, a closing bracket newlines and dedents after its
 /// last, and an empty container stays `[]` / `{}`. Strings are copied verbatim,

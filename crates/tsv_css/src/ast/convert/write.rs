@@ -21,9 +21,9 @@
 //!
 //! CSS public nodes carry only `start`/`end` (no `loc`/columns), so there is no
 //! `LocationTracker`: each position is translated independently via a
-//! `ByteToCharMap` (identity on ASCII). Dynamic strings delegate to
-//! `serde_json` (via `JsonWriter::string`); static structure/tokens are written
-//! verbatim; integers are hand-formatted.
+//! `ByteToCharMap` (identity on ASCII). Dynamic strings are escaped by
+//! `JsonWriter::string` (byte-identical to `serde_json`); static
+//! structure/tokens are written verbatim; integers are hand-formatted.
 //!
 //! Node-header prefixes are single pre-fused `w.raw` literals per site,
 //! deliberately NOT extracted into a shared `open_node` helper: the helper —
@@ -611,7 +611,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             w.string(&name);
             w.raw(",\"matcher\":");
             // `as_str()` is a static escape-free operator (`=`/`~=`/`|=`/…), like
-            // the sibling `Combinator` name — skip the serde escape scan.
+            // the sibling `Combinator` name — skip the escape scan.
             write_or_null(w, matcher.as_ref(), |w, m| w.token(m.as_str()));
             w.raw(",\"value\":");
             write_or_null(w, value.as_ref(), |w, v| w.string(v));
