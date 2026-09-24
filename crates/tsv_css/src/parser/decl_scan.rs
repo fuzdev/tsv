@@ -33,10 +33,10 @@
 // stashed declaration the parser lexes nothing between the property and the terminator. A
 // declaration with no stash — a custom property, which the disambiguation never sees, or a
 // property whose disambiguation byte scan declined — runs the same head on its own.
-// The verdict tracks paren depth only (walk1's model): a `;` inside `[…]` really does end
-// the disambiguation run, even though the value scan (which tracks `[]`/`{}` too) reads
-// past it — the shared loop maintains both, and the two agree on the verdict because paren
-// depth evolves identically in each.
+// The verdict tracks paren depth only (the model of `scan_rule_or_declaration_tokens`): a
+// `;` inside `[…]` really does end the disambiguation run, even though the value scan
+// (which tracks `[]`/`{}` too) reads past it — the shared loop maintains both, and the two
+// agree on the verdict because paren depth evolves identically in each.
 
 use super::CssParser;
 use crate::comments::{comment_end_checked, is_comment_start};
@@ -234,29 +234,13 @@ enum Disambiguation {
 /// unterminated comment declines too, leaving the lexer its error.
 pub(super) fn scan_declaration_head_bytes(bytes: &[u8], from: usize) -> Option<DeclarationHead> {
     let len = bytes.len();
-    let mut i = from;
-    let mut gap_comment = false;
-
-    // To the `:` — the first significant byte (whitespace and comments are trivia).
-    let colon = loop {
-        while i < len && is_ascii_css_whitespace(bytes[i]) {
-            i += 1;
-        }
-        match bytes.get(i)? {
-            b':' => break i,
-            b'/' if is_comment_start(bytes, i) => {
-                gap_comment = true;
-                i = comment_end_checked(bytes, i)?;
-            }
-            // Decline to the token head rather than guess: the disambiguation caller has
-            // settled that a `:` follows, so anything else there means the bytes disagree with
-            // its lookahead, and for a custom property it is the token head's own
-            // missing-colon error to raise.
-            _ => return None,
-        }
-    };
+    // To the `:`. Anything else declines to the token head rather than guess: the
+    // disambiguation caller has settled that a `:` follows, so another byte there means the
+    // bytes disagree with its lookahead, and for a custom property it is the token head's
+    // own missing-colon error to raise.
+    let (colon, gap_comment) = colon_after_trivia(bytes, from)?;
     // Whitespace only after the `:` — a comment here opens the value.
-    i = colon + 1;
+    let mut i = colon + 1;
     while i < len && is_ascii_css_whitespace(bytes[i]) {
         i += 1;
     }
@@ -393,15 +377,29 @@ fn scan_rule_or_declaration_tokens(
 /// token lookahead, which steps the run — `read_declaration` ends the property at JS `\s`
 /// and `allow_whitespace()`s to the colon, so the gap is a juncture like any other.
 fn peek_significant_kind_bytes(bytes: &[u8], from: usize) -> Option<TokenKind> {
+    colon_after_trivia(bytes, from).map(|_| TokenKind::Colon)
+}
+
+/// The `:` that is the first significant byte at or past `from` — ASCII whitespace and
+/// comments are trivia — as its offset and whether a comment stood in the gap. `None` at any
+/// other byte, a non-ASCII one included, and at an unterminated comment. The one gap walk
+/// behind [`scan_declaration_head_bytes`] and [`peek_significant_kind_bytes`], which ask it
+/// of the same gap back to back.
+#[inline]
+fn colon_after_trivia(bytes: &[u8], from: usize) -> Option<(usize, bool)> {
     let len = bytes.len();
     let mut i = from;
+    let mut gap_comment = false;
     loop {
         while i < len && is_ascii_css_whitespace(bytes[i]) {
             i += 1;
         }
         match bytes.get(i)? {
-            b':' => return Some(TokenKind::Colon),
-            b'/' if is_comment_start(bytes, i) => i = comment_end_checked(bytes, i)?,
+            b':' => return Some((i, gap_comment)),
+            b'/' if is_comment_start(bytes, i) => {
+                gap_comment = true;
+                i = comment_end_checked(bytes, i)?;
+            }
             _ => return None,
         }
     }
@@ -505,11 +503,12 @@ enum ValueScanOutcome {
 /// (`WANT_VERDICT == true`).
 ///
 /// With the latch on, the first paren-depth-0 `{` returns `Rule` and the first paren-depth-0
-/// `;`/`}` fixes the verdict as a declaration — walk1's paren-only model — while the loop
-/// keeps tracking `[]`/`{}` for the *value* terminator (which a `;`/`}` inside them does not
-/// end). The two models share the one `paren` counter and it evolves identically in each, so
-/// the fused verdict is exactly what a standalone paren-only walk would return; the facts are
-/// exactly what the plain scan returns. `None` declines, for the reasons in the module docs.
+/// `;`/`}` fixes the verdict as a declaration — the paren-only model of
+/// `scan_rule_or_declaration_tokens` — while the loop keeps tracking `[]`/`{}` for the *value*
+/// terminator (which a `;`/`}` inside them does not end). The two models share the one `paren`
+/// counter and it evolves identically in each, so the fused verdict is exactly what a standalone
+/// paren-only walk would return; the facts are exactly what the plain scan returns. `None`
+/// declines, for the reasons in the module docs.
 fn scan_value_core<const WANT_VERDICT: bool>(
     source: &str,
     value_start: usize,
@@ -602,9 +601,10 @@ fn scan_value_core<const WANT_VERDICT: bool>(
             continue;
         }
         let at_top = paren == 0 && brace == 0 && bracket == 0;
-        // Verdict latch (paren-only, walk1's model): the first paren-depth-0 structural byte
-        // decides rule vs declaration. A `{` there is a rule; a `;`/`}` fixes a declaration
-        // and the loop reads on for the value terminator (`[]`/`{}` may push it further).
+        // Verdict latch (the paren-only model of `scan_rule_or_declaration_tokens`): the first
+        // paren-depth-0 structural byte decides rule vs declaration. A `{` there is a rule; a
+        // `;`/`}` fixes a declaration and the loop reads on for the value terminator (`[]`/`{}` may
+        // push it further).
         if WANT_VERDICT && !verdict_is_decl && paren == 0 {
             match b {
                 b'{' => return Some(ValueScanOutcome::Rule),

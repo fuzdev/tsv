@@ -26,9 +26,9 @@ impl<'a> Printer<'a> {
     /// (`docs/comments.md` §The element-comma seam, §A stripped-paren interior is a
     /// partition too): the ordinary gap `[prev_arg.end, next_arg_start)` above, and the
     /// parent's share of `prev_arg`'s own stripped-paren interior — the own-line comments a
-    /// spread's doc deliberately leaves behind ([`Printer::push_spread_own_line_comments`]),
-    /// emitted past the comma because the comma is what gives an outside block a home on
-    /// the argument's line. That share lies BEFORE `prev_arg`'s end, so a caller guarding
+    /// spread's doc deliberately leaves behind
+    /// ([`Printer::push_paren_interior_own_line_comments`]), emitted past the comma because
+    /// the comma is what gives an outside block a home on the argument's line. That share lies BEFORE `prev_arg`'s end, so a caller guarding
     /// this call on a plain gap scan must ask [`Printer::inter_arg_gap_has_comments`]
     /// instead or the interior is DROPPED.
     ///
@@ -51,10 +51,11 @@ impl<'a> Printer<'a> {
             PartitionedComments::for_routed_arg_gap(self, prev_arg.span().end, next_arg_start);
         // The argument's own doc may already end in a deferred `//` (a spread whose
         // stripped parens held one); a second one may not join that line.
-        let prev_defers_line = self.defers_trailing_line_comment(prev_arg);
+        let interior = prev_arg.paren_interior();
+        let prev_defers_line = self.paren_interior_defers_line_comment(interior);
         pc.demote_trailing_line_after_deferred(prev_defers_line);
         pc.emit_trailing_comments_around_comma(parts, self);
-        let own_line_interior = self.push_spread_own_line_comments(parts, prev_arg);
+        let own_line_interior = self.push_paren_interior_own_line_comments(parts, interior);
         InterArgGap {
             // An own-line interior block is a sibling line, and an interior `//` the
             // spread defers must flush INSIDE the list — on a collapsed one the buffer
@@ -78,7 +79,7 @@ impl<'a> Printer<'a> {
         next_arg_start: u32,
     ) -> bool {
         self.has_comments_to_emit_between(prev_arg.span().end, next_arg_start)
-            || self.spread_paren_comment_forces_expansion(prev_arg)
+            || self.paren_interior_forces_expansion(prev_arg.paren_interior())
     }
 }
 
@@ -256,7 +257,7 @@ fn is_comment_after_comma(comment: &internal::Comment, comma_pos: usize) -> bool
 /// - **This one** hands back the two docs and asks nothing. It does *not* emit a spread's
 ///   stripped-paren interior, nor demote a `//` behind an argument that already defers one.
 ///   Its callers are the layouts that never see either, because
-///   [`any_comment_forces_expansion`] (via `spread_paren_comment_forces_expansion`) routes
+///   [`any_comment_forces_expansion`] (via `paren_interior_forces_expansion`) routes
 ///   such a call to the comment-aware path before any of them is selected — the invariant
 ///   that makes the omission sound, and the thing to re-check before giving it a new caller.
 /// - [`Printer::open_inter_arg_gap`] emits into the caller's buffer, covers both of those,
@@ -484,7 +485,7 @@ pub(super) fn any_comment_forces_expansion_slice(
         // line of its own or because its deferred `//` would otherwise flush past the
         // call's `)`. Asked per argument: a non-last spread's interior needs the expansion
         // just as much as the last one's.
-        if printer.spread_paren_comment_forces_expansion(arg) {
+        if printer.paren_interior_forces_expansion(arg.paren_interior()) {
             return true;
         }
 
@@ -713,7 +714,7 @@ pub(super) fn emit_first_arg_leading_comments(
 /// all, so everything an author parked after the last argument is DROPPED.
 ///
 /// Two regions, and they must **partition**: the parent's share of the last argument's
-/// own stripped-paren interior ([`Printer::push_spread_own_line_comments`] — the
+/// own stripped-paren interior ([`Printer::push_paren_interior_own_line_comments`] — the
 /// own-line comments a spread's doc deliberately leaves for its parent), and the
 /// ordinary gap between the argument's end and `)`. The share goes first (source
 /// order) — except when it ends in a `//`, which nothing can glue after (see the
@@ -735,9 +736,7 @@ pub(super) fn emit_last_arg_trailing_comments(
     paren_close: u32,
 ) {
     // The share/gap emit order — see the emitter's doc for the rule it encodes.
-    let interior = last_arg
-        .as_spread()
-        .map(internal::SpreadElement::paren_interior);
+    let interior = last_arg.paren_interior();
     // `SourceOrder`: the argument lists' cataloged order — the run never separates.
     printer.push_last_element_share_and_run(
         parts,
@@ -752,7 +751,7 @@ pub(super) fn emit_last_arg_trailing_comments(
             if printer.has_comments_to_emit_between(arg_end, paren_close) {
                 let mut pc = PartitionedComments::for_closer_gap(printer, arg_end, paren_close);
                 pc.demote_trailing_line_after_deferred(
-                    printer.defers_trailing_line_comment(last_arg),
+                    printer.paren_interior_defers_line_comment(interior),
                 );
                 pc.emit_last_arg_comments(parts, printer);
             }
@@ -1070,7 +1069,7 @@ impl<'a> PartitionedComments<'a> {
 
     /// Reclassify this gap's same-line LINE comments as own-line when the node the gap
     /// opens after already ends in a DEFERRED line comment — `prev_defers_line`, the
-    /// caller's answer to [`Printer::defers_trailing_line_comment`] (asked there because
+    /// caller's answer to [`Printer::paren_interior_defers_line_comment`] (asked there because
     /// every caller also feeds it to its own force-expansion signal; same shape as the
     /// twin `TrailingComments::demote_line_after_deferred`).
     ///

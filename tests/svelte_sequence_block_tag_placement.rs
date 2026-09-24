@@ -3,7 +3,7 @@
 //! can hold.
 //!
 //! `input_invalid_*` asserts only that both parsers reject, so it cannot tell the placement
-//! rule apart from the accident that used to stand in for it: with the guard removed,
+//! rule apart from an accident that would stand in for it: with the guard removed,
 //! `{@debug e}` reaches the TypeScript expression parser and comes back as `Expected 'class'
 //! after 'decorator'`, and `{#if c}a{/if}` as `Expected 'in' after 'private name'` — right
 //! verdict, wrong question, and an answer that names a language the author never wrote in.
@@ -274,9 +274,9 @@ fn an_expression_still_interpolates_in_every_sequence() {
 /// shorthand the author never wrote.
 ///
 /// The **separated** spelling is the same message by a different route, and needs its own pin
-/// for that reason: the attach reader used to read the author's space as the keyword's first
-/// byte, and now skips the gap and reads `@html` — one message standing for two questions
-/// until `<div { @attach fn}>` (valid, and what prettier emits) proved they were different.
+/// for that reason: the attach reader skips the gap and reads `@html`, where reading the
+/// author's space as the keyword's first byte would let one message stand for two questions —
+/// and `<div { @attach fn}>` (valid, and what prettier emits) shows they are different.
 #[test]
 fn a_brace_attribute_marker_answers_in_its_own_words() {
     for (source, message) in [
@@ -312,9 +312,9 @@ fn a_brace_attribute_marker_answers_in_its_own_words() {
 /// Where the guard stops: an attribute value whose quote never closes dies in the **lexer**,
 /// before there is a value for the placement rule to speak about.
 ///
-/// This is the last spelling of the accident the guard removed from the closed case — a
-/// quoted value used to run past `{/if}`'s `/` onto a regex that never terminated and come
-/// back `Unterminated string literal in template`. With a closing quote every route now names
+/// This is the last spelling of the accident the guard removes from the closed case — without
+/// it, a quoted value runs past `{/if}`'s `/` onto a regex that never terminates and comes
+/// back `Unterminated string literal in template`. With a closing quote every route names
 /// the placement (the cases above); with none, the string genuinely does not close, so tsv
 /// reports the enclosing failure and the interior is never judged. Svelte answers from the
 /// other end — its `read_sequence` runs to EOF and reports the marker it passed on the way

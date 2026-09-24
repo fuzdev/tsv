@@ -8,11 +8,11 @@
 //! above the member's `| ` (prettier's fixed point, already stable under tsv), never
 //! relocated to trail the pipe.
 //!
-//! Regression this guards: the union's forced-multiline routing keys on the one-sided
-//! own-line test (`is_own_line_comment`), but the emission used to filter the comment out
-//! of the own-line bucket via the opposite-sided `comment_hugs_next`, emitting it glued
-//! after `| ` — pass 2 then saw no own-line comment, took the width-decided path, and
-//! collapsed the union flat: a 2-pass non-idempotency (the `|⟨⟩␣` blank-audit shape).
+//! The hazard this guards: the union's forced-multiline routing keys on the one-sided
+//! own-line test (`is_own_line_comment`), so an emission that filters the comment out of
+//! the own-line bucket via the opposite-sided `comment_hugs_next` emits it glued after
+//! `| ` — pass 2 then sees no own-line comment, takes the width-decided path, and
+//! collapses the union flat: a 2-pass non-idempotency (the `|⟨⟩␣` blank-audit shape).
 //!
 //! Not a fixture: the authored form's comment sits after the `|` while the normalized
 //! form's sits before it — a token move the `unformatted_*` rules exclude — so the

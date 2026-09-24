@@ -6,10 +6,10 @@
 //! Svelte's `read_selector_list` (`.../read/style.js`) captures the selector
 //! list's `end` **before** `allow_comment_or_whitespace`, so the `args`
 //! SelectorList (and every node nested under it) ends at the last content token,
-//! not at the closing `)`. tsv's `:nth-*()` path (`parse_nth_args`) previously set
-//! the `Nth` node's span end to the `)` position, so any trailing whitespace
-//! between the An+B value (or the `of S` selector) and `)` was wrongly absorbed
-//! into `args.end` / `args.children[].end` / …`selectors[].end`.
+//! not at the closing `)`. Ending the `Nth` node's span at the `)` instead (in
+//! tsv's `:nth-*()` path, `parse_nth_args`) wrongly absorbs any trailing whitespace
+//! between the An+B value (or the `of S` selector) and `)` into `args.end` /
+//! `args.children[].end` / …`selectors[].end`.
 //!
 //! Not fixturable: prettier collapses `:nth-child(\n n \n)` → `:nth-child(n)`, so
 //! `fixture_init` formats the trigger away and the collapsed form has no

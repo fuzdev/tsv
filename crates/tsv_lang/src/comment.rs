@@ -898,6 +898,19 @@ impl<'a> CommentFreeWindow<'a> {
         gap_start <= start && end <= gap_end
     }
 
+    /// Whether `[start, end)` is known to hold no comment of any kind **without a search**:
+    /// too narrow to hold one ([`range_too_narrow_for_a_comment`]), or lying inside the
+    /// window ([`Self::contains`]). `false` says only that a search would have to answer,
+    /// never that a comment is there.
+    ///
+    /// The whole gate, both tiers inline, for a site that asks them together. A printer
+    /// wrapper that keeps the narrow test inline and reads the window only in its outlined
+    /// search half asks [`Self::contains`] there instead.
+    #[inline]
+    pub fn known_comment_free(&self, start: u32, end: u32) -> bool {
+        range_too_narrow_for_a_comment(start, end) || self.contains(start, end)
+    }
+
     /// Where the first comment at or after `pos` starts, when the window knows: `pos`
     /// inside the window (its end included) puts that comment at the window's end —
     /// `u32::MAX` when there is none — and `None` means `pos` is outside it, so only a

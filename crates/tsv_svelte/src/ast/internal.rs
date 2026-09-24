@@ -2359,20 +2359,9 @@ mod collapsible_ws_tests {
     /// Every arrangement of the four members, a non-member ASCII space relative (`<FF>`), a
     /// multi-byte space (`<NBSP>`) and content, zero to four pieces long — the axis a corpus
     /// samples arbitrarily and a byte walk must get right at every offset.
-    fn for_every_arrangement(mut check: impl FnMut(&str)) {
+    fn for_every_arrangement(check: impl FnMut(&str)) {
         const PIECES: [&str; 8] = [" ", "\t", "\n", "\r", "\u{c}", "\u{a0}", "x", "é"];
-        let mut s = String::new();
-        for len in 0..=4u32 {
-            for code in 0..PIECES.len().pow(len) {
-                s.clear();
-                let mut c = code;
-                for _ in 0..len {
-                    s.push_str(PIECES[c % PIECES.len()]);
-                    c /= PIECES.len();
-                }
-                check(&s);
-            }
-        }
+        crate::test_support::for_every_arrangement(&PIECES, 4, check);
     }
 
     /// The byte trims agree with the char-predicate searchers.

@@ -78,7 +78,22 @@ const END_KEY: &str = ",\"end\":";
 
 /// [`END_KEY`] padded to one word, so it is stored as a single fixed-width
 /// move; the pad byte lands where the `end` digits begin and is overwritten.
-const END_KEY_WORD: &[u8; 8] = b",\"end\":\0";
+/// Built from [`END_KEY`] so the two cannot drift (a key a word or longer fails the
+/// build here).
+const END_KEY_WORD: [u8; 8] = {
+    let key = END_KEY.as_bytes();
+    let mut word = [0; 8];
+    let mut i = 0;
+    while i < key.len() {
+        word[i] = key[i];
+        i += 1;
+    }
+    assert!(
+        key.len() < word.len(),
+        "the `end` digits overwrite the pad byte"
+    );
+    word
+};
 
 /// The fixed window [`JsonWriter::start_end`] appends before trimming: both
 /// values at their full [`WORD_DIGITS`] width and the key between them.
@@ -317,7 +332,7 @@ fn fill_start_end(window: &mut [u8], start: (u64, usize), end: (u64, usize)) -> 
     let (end_word, end_digits) = end;
     let window = &mut window[..START_END_WINDOW];
     window[..WORD_DIGITS].copy_from_slice(&start_word.to_le_bytes());
-    window[start_digits..start_digits + END_KEY_WORD.len()].copy_from_slice(END_KEY_WORD);
+    window[start_digits..start_digits + END_KEY_WORD.len()].copy_from_slice(&END_KEY_WORD);
     let end_at = start_digits + END_KEY.len();
     window[end_at..end_at + WORD_DIGITS].copy_from_slice(&end_word.to_le_bytes());
     end_at + end_digits
@@ -326,11 +341,12 @@ fn fill_start_end(window: &mut [u8], start: (u64, usize), end: (u64, usize)) -> 
 /// Does `bytes` contain a byte JSON must escape?
 ///
 /// The predicate is exactly `serde_json`'s: `0x00..=0x1F`, `"`, and `\`. It
-/// answers eight bytes at a time because escaping is the *rare* case — the
-/// strings the wire writers push through [`JsonWriter::string`] are identifier
-/// names, string-literal bodies and comment text, nearly all of which spend the
-/// whole scan confirming misses, the same shape (and the same reason) as the
-/// line scans in [`crate::location`].
+/// answers eight bytes at a time because most strings are clean — the identifier
+/// names, string-literal bodies and comment text the wire writers push through
+/// [`JsonWriter::string`] nearly all spend the whole scan confirming misses, the
+/// same shape (and the same reason) as the line scans in [`crate::location`].
+/// Template text is the exception, and [`JsonWriter::string_escaped`] says by how
+/// much.
 ///
 /// The three lane masks are OR-ed and read as a **boolean**, never as a
 /// position, so the lowest-lane guarantee documented on [`zero_lanes`] /
@@ -430,12 +446,21 @@ const ESCAPE: [u8; 256] = {
 /// The hex digits of a `\u00XX` escape — lowercase, as `serde_json` writes them.
 const HEX_DIGITS: [u8; 16] = *b"0123456789abcdef";
 
-/// How far into an escape window [`escape_into`] may start a step; past it,
-/// [`JsonWriter::string_escaped`] cuts the window and opens a fresh one.
-const ESCAPE_LIMIT: usize = 85;
+/// The widest escape of one byte: a control byte's `\u00XX`.
+const MAX_BYTE_ESCAPE: usize = 6;
 
-/// An escape window: the widest a step can reach from [`ESCAPE_LIMIT`] is the
-/// sub-word tail, up to seven bytes of six each, plus the closing quote.
+/// The widest run [`escape_into`] writes in one step without re-checking
+/// [`ESCAPE_LIMIT`]: the sub-word tail, up to seven bytes (fewer than a word) of
+/// [`MAX_BYTE_ESCAPE`] each.
+const MAX_TAIL_ESCAPE: usize = 7 * MAX_BYTE_ESCAPE;
+
+/// How far into an escape window [`escape_into`] may start a step; past it,
+/// [`JsonWriter::string_escaped`] cuts the window and opens a fresh one. What is left
+/// of the window past it holds the widest step and the closing quote.
+const ESCAPE_LIMIT: usize = ESCAPE_WINDOW - MAX_TAIL_ESCAPE - 1;
+
+/// An escape window, 128 bytes: the widest a step can reach from [`ESCAPE_LIMIT`] is
+/// the sub-word tail ([`MAX_TAIL_ESCAPE`]), plus the closing quote.
 ///
 /// ⚠️ The bound is **exact and reachable**, not slack: a step that starts at
 /// exactly [`ESCAPE_LIMIT`] with seven `\u00XX` bytes left writes the last index,
@@ -447,12 +472,12 @@ const ESCAPE_LIMIT: usize = 85;
 /// 256-byte one restarted less often and measured no better (−0.006% to
 /// −0.03% instructions), since what it saves is a handful of stores per
 /// restart.
-const ESCAPE_WINDOW: usize = ESCAPE_LIMIT + 7 * 6 + 1;
+const ESCAPE_WINDOW: usize = 128;
 
-/// The window a string shorter than a word is escaped into: seven bytes of
-/// six each and both quotes. ⚠️ Exact and reachable, like [`ESCAPE_WINDOW`] —
-/// seven `\u00XX` bytes fill it to the last index.
-const SHORT_ESCAPE_WINDOW: usize = 7 * 6 + 2;
+/// The window a string shorter than a word is escaped into: the widest sub-word
+/// run ([`MAX_TAIL_ESCAPE`]) and both quotes. ⚠️ Exact and reachable, like
+/// [`ESCAPE_WINDOW`] — seven `\u00XX` bytes fill it to the last index.
+const SHORT_ESCAPE_WINDOW: usize = MAX_TAIL_ESCAPE + 2;
 
 /// Write `byte`'s escape at `window[at]` and return the position after it.
 /// `form` is `ESCAPE[byte]`, which the caller has already found non-zero.
@@ -503,6 +528,8 @@ fn escape_into(
 ) -> (usize, usize) {
     while at <= ESCAPE_LIMIT {
         let Some(word) = bytes.get(from..).and_then(<[u8]>::first_chunk::<8>) else {
+            // `from` never passes the end; the clamp states it, so the slice has no
+            // out-of-bounds arm.
             for &byte in &bytes[from.min(bytes.len())..] {
                 let form = ESCAPE[usize::from(byte)];
                 if form == 0 {
@@ -903,13 +930,12 @@ impl JsonWriter {
     /// two-byte short forms, `\u00XX` with lowercase hex for every other
     /// control byte, and everything else as itself.
     ///
-    /// ⚠️ It is not the rare arm the prescan was designed around. Over real
-    /// Svelte components 16% of the strings reaching `string` need escaping,
-    /// holding 30% of the bytes — template text is mostly the whitespace
-    /// between tags (`"\n\t\t"`) — and over real stylesheets it is 6% of the
-    /// strings and 24% of the bytes. `serde_json`'s loop, which this
-    /// replaces, paid a table lookup and slice bookkeeping per byte and a libc
-    /// `memcpy` call per clean run between escapes.
+    /// ⚠️ It is not a rare arm. Over real Svelte components 16% of the strings
+    /// reaching `string` need escaping, holding 30% of the bytes — template text
+    /// is mostly the whitespace between tags (`"\n\t\t"`) — and over real
+    /// stylesheets it is 6% of the strings and 24% of the bytes. A per-byte loop
+    /// (`serde_json`'s) pays a table lookup and slice bookkeeping per byte and a
+    /// libc `memcpy` call per clean run between escapes.
     ///
     /// The output goes into a **window** of the buffer — extended by a fixed
     /// width, written through a slice held in registers, then truncated to
@@ -1008,12 +1034,12 @@ impl JsonWriter {
 
     // ⚠️ `inline(never)`, and that is a **size** constraint. The body below is
     // small enough that LLVM will happily inline it at every writer call site,
-    // and each copy carries the fixed-width blit — which, measured when every
-    // `start`/`end` pair still came through here, grew the
-    // `@fuzdev/tsv-parse-wasm` bundle 6% and blew its publish size bound.
-    // Out-of-line the win is unaffected: it comes from removing the libc
-    // `memmove` **call** inside the body, not from removing the call *to* the
-    // body (which the pre-existing code also paid).
+    // and each copy carries the fixed-width blit — which, with every
+    // `start`/`end` pair routed through here, grew the `@fuzdev/tsv-parse-wasm`
+    // bundle 6% and blew its publish size bound. Out-of-line the win is
+    // unaffected: it comes from removing the libc `memmove` **call** inside the
+    // body, not from removing the call *to* the body, which any out-of-line
+    // integer emitter pays.
     #[inline(never)]
     pub fn u32(&mut self, n: u32) {
         // The append is a *constant*-length copy of [`digit_word`]'s register,
@@ -1046,8 +1072,8 @@ impl JsonWriter {
     /// overwritten by the `end` digits, which follow it at `+7`.
     ///
     /// `inline(never)` for [`JsonWriter::u32`]'s reason, and more so: the
-    /// body holds two inlined `digit_word` copies, which is the size the two
-    /// out-of-line calls it replaces used to share with every other integer.
+    /// body holds two inlined `digit_word` copies, where two `u32` calls would
+    /// share one out-of-line copy with every other integer.
     #[inline(never)]
     pub fn start_end(&mut self, start: u32, end: u32) {
         let (start_word, start_digits) = digit_word(start);
@@ -1439,10 +1465,13 @@ mod tests {
     /// `needs_escape` regression is reported here rather than only as a
     /// slower-but-correct fallback.
     ///
-    /// ⚠️ The **length** sweep is as load-bearing as the offset sweep: at a
-    /// length that is a multiple of 8 the scalar tail never runs, so a
-    /// tail-dropping corruption reads green. Every length 1–24 × every offset
-    /// within it puts each needle in both the word body and the tail.
+    /// ⚠️ The **length** sweep is as load-bearing as the offset sweep: the
+    /// prescan has three arms — whole words, then an overlapping final word for
+    /// a remainder (never reached at a multiple of 8), and for a slice shorter
+    /// than a word a gathered one (two overlapping four-byte loads, or the
+    /// first, middle and last byte under four) — and a corruption in an arm the
+    /// sweep skips reads green. Every length 1–24 × every offset within it puts
+    /// each needle in the word body, the overlap and the gather.
     #[test]
     fn needs_escape_matches_the_per_byte_predicate() {
         for needle in 0..=u8::MAX {
@@ -1508,24 +1537,15 @@ mod tests {
         }
     }
 
-    #[test]
-    fn u32_matches_std_across_its_whole_range() {
-        // `u32` is the worker, so grade it directly rather than only through
-        // the `u64` dispatcher. Every boundary — including 8→9 digits, where
-        // the register arm hands off to the wide one — plus an LCG sweep.
-        fn emit_u32(n: u32) -> String {
-            let mut w = JsonWriter::with_capacity(0);
-            w.u32(n);
-            String::from_utf8(w.into_bytes()).expect("digits are ASCII")
-        }
+    /// Grade an integer emitter against `u32::to_string` over its whole range: every
+    /// power-of-ten edge (including 8→9 digits, where the register arm hands off to the
+    /// wide one), the range ends, and an LCG sweep for digit-pair indexing errors. `name`
+    /// labels a failure.
+    fn assert_u32_emitter(name: &str, emit: impl Fn(u32) -> String) {
         let mut pow = 1u32;
         loop {
             for n in [pow.wrapping_sub(1), pow, pow + 1] {
-                assert_eq!(
-                    emit_u32(n),
-                    n.to_string(),
-                    "u32({n}) at a power-of-ten edge"
-                );
+                assert_eq!(emit(n), n.to_string(), "{name}({n}) at a power-of-ten edge");
             }
             match pow.checked_mul(10) {
                 Some(next) => pow = next,
@@ -1533,7 +1553,7 @@ mod tests {
             }
         }
         for n in [0, 1, u32::MAX, u32::MAX - 1, i32::MAX as u32] {
-            assert_eq!(emit_u32(n), n.to_string(), "u32({n})");
+            assert_eq!(emit(n), n.to_string(), "{name}({n})");
         }
         let mut state = 0x2545_f491_4f6c_dd1du64;
         for _ in 0..200_000 {
@@ -1541,9 +1561,20 @@ mod tests {
                 .wrapping_mul(6_364_136_223_846_793_005)
                 .wrapping_add(1_442_695_040_888_963_407);
             for n in [state as u32, (state >> 17) as u32, (state >> 33) as u32] {
-                assert_eq!(emit_u32(n), n.to_string(), "u32({n})");
+                assert_eq!(emit(n), n.to_string(), "{name}({n})");
             }
         }
+    }
+
+    #[test]
+    fn u32_matches_std_across_its_whole_range() {
+        // `u32` is the worker, so grade it directly rather than only through
+        // the `u64` dispatcher.
+        assert_u32_emitter("u32", |n| {
+            let mut w = JsonWriter::with_capacity(0);
+            w.u32(n);
+            String::from_utf8(w.into_bytes()).expect("digits are ASCII")
+        });
     }
 
     #[test]
@@ -1631,45 +1662,17 @@ mod tests {
 
     /// The staged emitter is a **second** arithmetic path to the same digits,
     /// and it is the one every node header now goes through — so it needs its
-    /// own oracle, not the direct path's. Same shape as
-    /// `u32_matches_std_across_its_whole_range`: every power-of-ten edge
-    /// (including 8→9 digits, where the register arm hands off to the cold
-    /// one), the range ends, and an LCG sweep for digit-pair indexing errors.
+    /// own oracle, not the direct path's — the same sweep
+    /// ([`assert_u32_emitter`]).
     #[test]
     fn stage_u32_matches_std_across_its_whole_range() {
-        fn emit_staged(n: u32) -> String {
+        assert_u32_emitter("stage_u32", |n| {
             let mut w = JsonWriter::with_capacity(0);
             w.stage_begin();
             w.stage_u32(n);
             w.stage_flush();
             String::from_utf8(w.into_bytes()).expect("digits are ASCII")
-        }
-        let mut pow = 1u32;
-        loop {
-            for n in [pow.wrapping_sub(1), pow, pow + 1] {
-                assert_eq!(
-                    emit_staged(n),
-                    n.to_string(),
-                    "stage_u32({n}) at a power-of-ten edge"
-                );
-            }
-            match pow.checked_mul(10) {
-                Some(next) => pow = next,
-                None => break,
-            }
-        }
-        for n in [0, 1, u32::MAX, u32::MAX - 1, i32::MAX as u32] {
-            assert_eq!(emit_staged(n), n.to_string(), "stage_u32({n})");
-        }
-        let mut state = 0x2545_f491_4f6c_dd1du64;
-        for _ in 0..200_000 {
-            state = state
-                .wrapping_mul(6_364_136_223_846_793_005)
-                .wrapping_add(1_442_695_040_888_963_407);
-            for n in [state as u32, (state >> 17) as u32, (state >> 33) as u32] {
-                assert_eq!(emit_staged(n), n.to_string(), "stage_u32({n})");
-            }
-        }
+        });
     }
 
     /// The staged `usize` channel (lines and columns), including the cold arm

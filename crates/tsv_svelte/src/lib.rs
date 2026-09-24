@@ -6,6 +6,8 @@ pub mod ast;
 mod lexer;
 mod parser;
 mod printer;
+#[cfg(test)]
+mod test_support;
 mod whitespace;
 
 pub use ast::Root;

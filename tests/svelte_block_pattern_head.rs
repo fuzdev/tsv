@@ -4,16 +4,16 @@
 //! the bracket's close (plus an optional `: T`). Whatever follows is the host's grammar — the
 //! declarator's `=`, the tag's `}`.
 //!
-//! The `{@const}` id and the `{:then}` / `{:catch}` value used to hand the whole binding side
-//! to the TypeScript expression parser, which read `(a)` as a parenthesized target and `a.b` as
-//! a member target. Canonical rejects both. For `{@const}` the spellings that open with a paren
-//! also broke the printer: the id's span stops inside the shell, so the byte the printer takes
-//! for the declarator's `=` was the `)` — a debug-assert panic in a debug build, and the parens
-//! silently dropped in a release one (`{@const (a.b) = x}` → `{@const a.b = x}`).
+//! Handing the whole binding side to the TypeScript expression parser instead reads `(a)` as a
+//! parenthesized target and `a.b` as a member target, both of which canonical rejects. For
+//! `{@const}` the spellings that open with a paren also break the printer: the id's span stops
+//! inside the shell, so the byte the printer takes for the declarator's `=` is the `)` — a
+//! debug-assert panic in a debug build, and the parens silently dropped in a release one
+//! (`{@const (a.b) = x}` → `{@const a.b = x}`).
 //!
 //! Each case is verified against canonical Svelte via `tsv_debug canonical_parse`.
 
-/// Format `src` as a Svelte component, the path whose printer the paren-shell ids panicked.
+/// Format `src` as a Svelte component — the path whose printer a paren-shell id would panic.
 fn format(src: &str) -> Result<String, String> {
     tsv_svelte::format_str(src).map_err(|e| e.to_string())
 }
@@ -156,5 +156,28 @@ fn valid_patterns_still_format() {
         let once = format(src).unwrap_or_else(|e| panic!("tsv should accept `{src}`: {e}"));
         let twice = format(&once).unwrap_or_else(|e| panic!("`{src}` formatted to `{once}`: {e}"));
         assert_eq!(once, twice, "`{src}` is not idempotent");
+    }
+}
+
+/// A destructure whose bracket never closes reports at its opening bracket, in the host
+/// document's coordinates, at every `read_pattern` position.
+#[test]
+fn unmatched_pattern_bracket_reports_at_the_bracket() {
+    const INVALID: &[(&str, &str)] = &[
+        ("<p>hi</p>\n{#await p then [a}{/await}", "[a}"),
+        ("<p>hi</p>\n{#await p}{:catch [e}{/await}", "[e}"),
+        ("<p>hi</p>\n{#each xs as [a}{/each}", "[a}"),
+        ("<p>hi</p>\n{#if c}{@const [a = 1}{/if}", "[a = 1}"),
+    ];
+    for (src, at) in INVALID {
+        let arena = bumpalo::Bump::new();
+        let Err(err) = tsv_svelte::parse(src, &arena) else {
+            panic!("tsv should reject `{src}`");
+        };
+        assert_eq!(
+            err.position(),
+            src.find(at),
+            "`{src}` should report at its opening bracket, got: {err}"
+        );
     }
 }

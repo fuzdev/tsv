@@ -15,9 +15,9 @@
 //! reproduce tsc's grouping — otherwise the formatter emits parens implying the
 //! opposite semantics.
 //!
-//! The divergence only surfaces when `??` is leftmost (`a ?? b || c`): tsv
-//! previously gave `??` a precedence *below* `||`, grouping `a ?? (b || c)` where
-//! tsc groups `(a ?? b) || c`. When `||`/`&&` is leftmost the groupings coincide.
+//! The divergence only surfaces when `??` is leftmost (`a ?? b || c`): a parser that
+//! gives `??` a precedence *below* `||` groups `a ?? (b || c)` where tsc groups
+//! `(a ?? b) || c`. When `||`/`&&` is leftmost the groupings coincide.
 
 use serde_json::Value;
 
@@ -41,7 +41,7 @@ fn op_at(json: &Value, pointer: &str) -> Option<String> {
 
 /// `a ?? b || c` groups as `(a ?? b) || c` — `||` at the top (same precedence as
 /// `??`, left-associative), the `??` nested as its left. This is the leftmost-`??`
-/// case that previously diverged.
+/// case a below-`||` precedence gets wrong.
 #[test]
 fn nullish_then_or_groups_left() {
     let json = parse_json("a ?? b || c;");

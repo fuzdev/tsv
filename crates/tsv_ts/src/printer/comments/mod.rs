@@ -39,6 +39,7 @@ pub(crate) use owned::ValueGap;
 mod paren;
 mod render;
 mod scan;
+pub(in crate::printer) use scan::ends_no_trivia;
 
 pub(crate) use declarations::{ClassMemberModifiers, ContinuationValue, HeritageKeyword};
 pub(super) use element_comma::{block_is_before_comma, next_real_element_start, run_defers_line};

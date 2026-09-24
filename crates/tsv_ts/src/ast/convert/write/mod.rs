@@ -275,15 +275,7 @@ pub fn write_program_embedded(
     w.raw("{\"type\":\"Program\",\"start\":");
     w.start_end(loc.pos(program.span.start), loc.pos(program.span.end));
     if let ProgramLoc::Emit(start_pos, end_pos) = program_loc {
-        w.raw(",\"loc\":{\"start\":{\"line\":");
-        w.usize(start_pos.line);
-        w.raw(",\"column\":");
-        w.usize(start_pos.column);
-        w.raw("},\"end\":{\"line\":");
-        w.usize(end_pos.line);
-        w.raw(",\"column\":");
-        w.usize(end_pos.column);
-        w.raw("}}");
+        write_loc_field(w, start_pos, end_pos);
     }
     w.raw(",\"body\":");
     write_body_array(w, program.body, &ctx, |w, s| write_statement(w, s, &ctx));
@@ -693,6 +685,14 @@ pub(super) fn node_header_wide_end(
     let start = emitted_position(ctx, span.start, start);
     let end = emitted_position(ctx, span.end, end);
     w.start_end_field(start_pos, ctx.loc.pos(wire_end));
+    write_loc_field(w, start, end);
+}
+
+/// A node's `,"loc":{"start":{"line","column"},"end":{…}}` field — the acorn `loc` shape
+/// every node header and the `Program` share.
+#[expect(clippy::inline_always)]
+#[inline(always)]
+fn write_loc_field(w: &mut JsonWriter, start: Position, end: Position) {
     w.raw(",\"loc\":{\"start\":{\"line\":");
     w.usize(start.line);
     w.raw(",\"column\":");

@@ -233,22 +233,15 @@ impl<'arena> Expression<'arena> {
         e
     }
 
-    /// The spread node behind this expression, if it is one — the adapter the printer's
-    /// spread-interior helpers unwrap to reach their `SpreadElement` core.
-    /// `ObjectProperty::as_spread` is the property-list counterpart.
-    pub fn as_spread(&self) -> Option<&SpreadElement<'arena>> {
+    /// The stripped-paren interior of a spread or rest element
+    /// ([`SpreadElement::paren_interior`], [`RestElement::paren_interior`]) — `None` for
+    /// every other expression, which has none. The list printers' one adapter:
+    /// `ObjectProperty::paren_interior` and `ObjectPatternProperty::paren_interior` are the
+    /// property-list counterparts.
+    pub fn paren_interior(&self) -> Option<Span> {
         match &self.kind {
-            ExpressionKind::SpreadElement(s) => Some(s),
-            _ => None,
-        }
-    }
-
-    /// The rest element behind this expression, if it is one — an array pattern's rest
-    /// slot, the counterpart of [`Self::as_spread`] for the printer's stripped-paren
-    /// interior helpers.
-    pub fn as_rest(&self) -> Option<&RestElement<'arena>> {
-        match &self.kind {
-            ExpressionKind::RestElement(r) => Some(r),
+            ExpressionKind::SpreadElement(s) => Some(s.paren_interior()),
+            ExpressionKind::RestElement(r) => Some(r.paren_interior()),
             _ => None,
         }
     }
@@ -388,12 +381,12 @@ impl<'arena> ObjectProperty<'arena> {
         }
     }
 
-    /// The spread node behind this property, if it is one — the adapter the printer's
-    /// spread-interior helpers take, since a property list has no `Expression` to hand
-    /// them the way an argument list or array does.
-    pub fn as_spread(&self) -> Option<&SpreadElement<'arena>> {
+    /// The spread's stripped-paren interior ([`SpreadElement::paren_interior`]), if this
+    /// property is a spread — the property-list counterpart of
+    /// [`Expression::paren_interior`].
+    pub fn paren_interior(&self) -> Option<Span> {
         match self {
-            ObjectProperty::SpreadElement(s) => Some(s),
+            ObjectProperty::SpreadElement(s) => Some(s.paren_interior()),
             ObjectProperty::Property(_) => None,
         }
     }

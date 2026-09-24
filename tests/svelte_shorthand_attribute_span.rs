@@ -10,9 +10,9 @@
 //! outside `name_loc`, and the synthesized `ExpressionTag` / `Identifier` carry that same
 //! narrow span (`{start: id.start, end: id.end}`).
 //!
-//! tsv used to take the whole braces interior for all three, which put the padding inside
-//! every span (`name_loc` 6..9 instead of 7..8 on `<div { x }>`). That made the
-//! **span-only** `--no-locations` wire wrong too, not just `loc`.
+//! Taking the whole braces interior for all three puts the padding inside every span
+//! (`name_loc` 6..9 instead of 7..8 on `<div { x }>`), which makes the **span-only**
+//! `--no-locations` wire wrong too, not just `loc`.
 //!
 //! Not fixturable: `format` normalizes `{ x }` → `{x}`, so no format-stable `input.svelte`
 //! can hold the trigger (the same reason the `:nth-*()` span trims live in
@@ -97,8 +97,8 @@ fn tight_shorthand_names_the_identifier() {
     assert_shorthand_spans(&attr, (5, 8), (6, 7), (1, 6));
 }
 
-/// `<div { x }>` — one space each side. The identifier is at 7..8; the braces interior
-/// (6..9) is what tsv used to report.
+/// `<div { x }>` — one space each side. The identifier is at 7..8, not the braces
+/// interior (6..9).
 #[test]
 fn padded_shorthand_excludes_the_padding() {
     let attr = first_attribute("<div { x }>t</div>");

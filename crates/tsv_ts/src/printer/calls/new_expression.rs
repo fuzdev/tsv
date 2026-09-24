@@ -608,7 +608,7 @@ impl<'a> Printer<'a> {
         // interior) gates the per-argument scan off the comment-free path, like the
         // call/chain entry gates.
         let spread_paren_comments_expand =
-            new_has_comments && self.any_spread_paren_comment_forces_expansion(new_expr.arguments);
+            new_has_comments && self.any_paren_interior_forces_expansion(new_expr.arguments);
         let has_trailing_comments_no_gap_line = new_has_comments
             && new_expr.arguments.last().is_some_and(|last_arg| {
                 let arg_end = last_arg.span().end;

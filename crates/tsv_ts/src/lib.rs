@@ -640,7 +640,7 @@ pub fn parse_pattern_with_comments<'arena>(
 ) -> Result<(Expression<'arena>, &'arena [ast::Comment])> {
     with_embedding_parser(source, base_offset, arena, |parser| {
         let expr = parser.parse_expression_unbounded()?;
-        let pattern = parser.expression_to_pattern(expr)?;
+        let pattern = parser.expression_to_svelte_pattern(expr)?;
         // The pattern must fill the whole slice the caller bounded. Without this a trailing
         // token is silently dropped, losing content.
         parser.expect_end_of_input()?;

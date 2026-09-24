@@ -372,7 +372,7 @@ impl<'a> Printer<'a> {
     ///
     /// The node's stripped-paren interior (`...(rest /* c */)`) is NOT this doc's: the
     /// enclosing brackets anchor their next gap at the binding's printed end
-    /// ([`binding_printed_end`]), so the interior and the gap past the `)` are one trailing
+    /// ([`element_printed_end`]), so the interior and the gap past the `)` are one trailing
     /// run — a binding pattern stays inline, so there is no own-line share to split off,
     /// and one run is what lets each comment take its separator from the one before it.
     fn build_rest_pattern_doc(&self, rest_span_start: u32, argument: &Expression<'_>) -> DocId {
@@ -561,7 +561,7 @@ impl<'a> Printer<'a> {
                 parts.push(self.build_pattern_doc(e));
                 // The element's PRINTED end: a rest's or a default value's stripped parens
                 // (`[b, ...(a /* c */)]`, `[a = (1 /* c */), b]`) are this gap's.
-                prev_end = binding_printed_end(e);
+                prev_end = element_printed_end(e.paren_interior(), e.printed_end());
             }
         }
         parts.push(self.build_pattern_trailing_comments(prev_end, span_end - 1));
@@ -639,12 +639,7 @@ impl<'a> Printer<'a> {
                         let s = p.span();
                         // The property's PRINTED end: a value's or a rest's stripped parens
                         // (`{ b: (a /* c */) }`, `{ ...(a /* c */) }`) are the next gap's.
-                        let end = match p {
-                            tsv_ts::ObjectPatternProperty::RestElement(r) => {
-                                r.paren_interior().start
-                            }
-                            tsv_ts::ObjectPatternProperty::Property(_) => p.value_end(),
-                        };
+                        let end = element_printed_end(p.paren_interior(), p.value_end());
                         (s.start, end, self.build_object_pattern_property_doc(p))
                     })
                     .collect();
@@ -657,10 +652,7 @@ impl<'a> Printer<'a> {
                     .iter()
                     .map(|p| {
                         let s = p.span();
-                        let end = match p {
-                            tsv_ts::ObjectProperty::SpreadElement(sp) => sp.paren_interior().start,
-                            tsv_ts::ObjectProperty::Property(_) => p.value_end(),
-                        };
+                        let end = element_printed_end(p.paren_interior(), p.value_end());
                         (s.start, end, self.build_object_expr_property_doc(p))
                     })
                     .collect();
@@ -903,14 +895,11 @@ impl<'a> Printer<'a> {
 ///
 /// A rest or spread stops at its argument: the stripped-paren interior (`...(a /* c */)`)
 /// is the gap's, one run with the comments past the `)` ([`Printer::build_rest_pattern_doc`]).
-/// Anything else stops at its [`Expression::printed_end`], so a default's `(1 /* c */)`
-/// shell is the gap's too.
-fn binding_printed_end(expr: &Expression<'_>) -> u32 {
-    match &expr.kind {
-        ExpressionKind::RestElement(r) => r.paren_interior().start,
-        ExpressionKind::SpreadElement(s) => s.paren_interior().start,
-        _ => expr.printed_end(),
-    }
+/// Anything else stops at `end` — its printed end, so a default's `(1 /* c */)` shell is the
+/// gap's too. `interior` is the element's `paren_interior()`, `None` for all but a rest or
+/// spread; one rule for a pattern element and for either kind of object property.
+fn element_printed_end(interior: Option<Span>, end: u32) -> u32 {
+    interior.map_or(end, |interior| interior.start)
 }
 
 #[cfg(test)]

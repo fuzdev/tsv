@@ -8,16 +8,13 @@
 //! line (`(` alone) — exactly how tsv lays out a leading multi-line block comment in
 //! any `(`/`[`-delimited list (a call, an array), and what prettier emits here too.
 //!
-//! Regression this guards: the printer used to strip the comment's *start-line*
-//! indentation and re-apply *context* indent per continuation line, so the interior
-//! grew a tab **every** format pass — an F1 fixed-point violation. Not a fixture: the
-//! case only reproduces at a non-zero base indent with a broken header.
+//! The hazard this guards: a printer that strips the comment's *start-line*
+//! indentation and re-applies *context* indent per continuation line grows the
+//! interior a tab **every** format pass — an F1 fixed-point violation. Not a fixture:
+//! the case only reproduces at a non-zero base indent with a broken header.
 //!
-//! Note: tsv formerly kept the comment glued to `for (` (init hugging the `(` line) as
-//! a deliberate divergence. Owning every glued block comment unified that with the
-//! `(`/`[`-list layout above — the owned comment now rides with the init — so tsv
-//! matches prettier here and the over-preservation divergence is closed. The F1
-//! invariant this test guards (no tab compounding) is unaffected.
+//! The comment is OWNED (every glued block comment is), so it rides with the init
+//! exactly as in the `(`/`[`-list layout above, and tsv matches prettier here.
 
 fn format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
@@ -41,8 +38,8 @@ const STABLE: &str = "function f() {
 }
 ";
 
-/// The stable form formats to itself — the interior no longer compounds a tab per
-/// pass (the fixed-point invariant the regression violated).
+/// The stable form formats to itself — the interior compounds no tab per pass (the
+/// fixed-point invariant).
 #[test]
 fn for_header_block_comment_is_idempotent() {
     assert_eq!(

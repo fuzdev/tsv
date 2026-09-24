@@ -4,8 +4,8 @@
 //! Type-only import/export specifier disambiguation: a leading contextual `type`
 //! may be the type-only modifier (`{ type A }`) or the imported/local name itself
 //! (`{ type as age }` — a value import/export of a binding named `type`,
-//! renamed). tsv used to over-reject `{ type as <name> }` and `{ type as as }`
-//! (reading `type` as the modifier when an `as` followed). These pin acorn's
+//! renamed). Reading `type` as the modifier whenever an `as` follows over-rejects
+//! `{ type as <name> }` and `{ type as as }`. These pin acorn's
 //! `parseTypeOnlyImportExportSpecifier` state machine directly on the wire AST —
 //! including `{ type as as }` (bare), which can't share a fixture with
 //! `{ type as }` (both bind local `as`, a duplicate the canonical parser rejects).
@@ -77,7 +77,7 @@ fn import_type_as_name_is_value_rename() {
 }
 
 /// `type as as` (bare, no trailing name) is a VALUE import of `type`, renamed to
-/// the local `as` — the second flip tsv used to reject.
+/// the local `as` — the second flip the modifier-first reading rejects.
 #[test]
 fn import_type_as_as_bare_is_value_rename_to_as() {
     assert_import_spec("import { type as as } from 'y'", "type", "as", "value");

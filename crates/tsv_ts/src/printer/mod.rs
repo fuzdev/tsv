@@ -41,6 +41,7 @@ mod layout;
 mod needs_parens;
 mod pre_body;
 mod program;
+mod statement_tail;
 mod statements;
 mod types;
 
@@ -653,16 +654,13 @@ impl<'a> Printer<'a> {
         self.comment_free_gap.search_from(start)
     }
 
-    /// Whether `[start, end)` is known to hold no comment of any kind **without a search**:
-    /// too narrow to hold one, or lying inside the comment-free window
-    /// ([`Self::comment_free_gap`]). The inline head of [`Self::first_index_between`], and
-    /// the gate a builder puts ahead of work whose only product on a comment-free gap is
-    /// "nothing" (`paren_split_for`, `collect_leading_comments`,
-    /// `broke_after_value_leading_run`, `build_empty_bracketed_with_comments_doc`) — `false`
-    /// says only that a search would have to answer, never that a comment is there.
+    /// Whether `[start, end)` is known to hold no comment of any kind **without a search**
+    /// ([`CommentFreeWindow::known_comment_free`] over [`Self::comment_free_gap`]). The
+    /// inline head of [`Self::first_index_between`], and the gate a builder puts ahead of
+    /// work whose only product on a comment-free gap is "nothing".
     #[inline]
     pub(crate) fn gap_known_comment_free(&self, start: u32, end: u32) -> bool {
-        range_too_narrow_for_a_comment(start, end) || self.comment_free_gap.contains(start, end)
+        self.comment_free_gap.known_comment_free(start, end)
     }
 
     /// The index a range walk over `[start, end)` on this printer starts at: `len` (an
@@ -1336,8 +1334,7 @@ impl<'a> Printer<'a> {
     /// silently vanish from a decision it is visibly part of.
     #[inline]
     pub(crate) fn has_comments_on_page_between(&self, start: u32, end: u32) -> bool {
-        !range_too_narrow_for_a_comment(start, end)
-            && !self.comment_free_gap.contains(start, end)
+        !self.gap_known_comment_free(start, end)
             && self.has_comments_on_page_between_wide(start, end)
     }
 
@@ -1449,9 +1446,12 @@ impl<'a> Printer<'a> {
     /// `[prev_end, next_start)`, ignoring commas inside comments. The shared anchor
     /// for splitting a gap's comments into before-comma (trailing the previous item)
     /// and after-comma (leading the next / stranded). Falls back to `next_start` when
-    /// none is found — a defensive case (list items always have a real separator);
-    /// the fallback keeps the split lossless: the whole gap then reads as before-comma
-    /// (trailing the previous item), so no comment is dropped.
+    /// none is found, which keeps the split lossless: the whole gap then reads as
+    /// before-comma (trailing the previous item), so no comment is dropped. A parsed
+    /// program always has the comma; the fallback is reached by a program the Svelte
+    /// compiler synthesizes (`tsv_svelte_compile`, printed through `format_canonical_in`),
+    /// whose borrowed spans need not run in source order — `prev_end` can lie past
+    /// `next_start`, and there the gap is empty.
     pub(crate) fn comma_between(&self, prev_end: u32, next_start: u32) -> u32 {
         self.find_char_outside_comments(prev_end, next_start, b',')
             .unwrap_or(next_start)

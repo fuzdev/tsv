@@ -370,6 +370,13 @@ impl<'a> Printer<'a> {
     /// Value comments aren't in the CSS AST, so a comment-bearing list isn't routed
     /// here (the dispatch guard); it stays on the source-extracting comment path.
     fn print_decl_value_list(&mut self, decl: &internal::CssDeclaration<'_>) {
+        debug_assert!(
+            matches!(
+                decl.value,
+                CssValue::CommaSeparated { .. } | CssValue::List { .. }
+            ),
+            "the declaration dispatch routes only comma and space lists here"
+        );
         let ctx = self.value_ctx();
         let doc = match &decl.value {
             CssValue::CommaSeparated { values, span } => {
@@ -385,9 +392,10 @@ impl<'a> Printer<'a> {
                     self.build_space_value_decl_doc(fill)
                 }
             }
-            // The dispatch in `print_css_declaration` only routes comma/space lists here;
-            // fall back to the plain `: value` form rather than panicking, matching the
-            // crate's other defensive value guards.
+            // The dispatch in `print_css_declaration` only routes comma/space lists here
+            // (debug-asserted above, and never reached by the fixtures, the injection audits
+            // or the corpus); a release build falls back to the plain `: value` form rather
+            // than panicking, like the crate's other defensive value guards.
             _ => {
                 let value_doc = self.build_css_value_doc(&decl.value);
                 let d = self.d();
@@ -986,9 +994,14 @@ impl<'a> Printer<'a> {
         first_members: Option<&'v [CssValue<'v>]>,
         ctx: ValueCtx,
     ) {
+        debug_assert!(
+            matches!(value, CssValue::CommaSeparated { .. }),
+            "`multiline_plan` routes only a comma list here"
+        );
         let CssValue::CommaSeparated { values, span } = value else {
-            // Unreachable via `multiline_plan` (which matches on `CommaSeparated`); fall
-            // back rather than panicking, like the crate's other defensive value guards.
+            // Unreachable via `multiline_plan` (which matches on `CommaSeparated`; asserted
+            // above); a release build falls back rather than panicking, like the crate's
+            // other defensive value guards.
             self.print_nested_value(value);
             return;
         };
@@ -1154,8 +1167,15 @@ impl<'a> Printer<'a> {
     /// Extracts each argument from the source string to preserve comments.
     fn print_function_args_from_source(&mut self, span: Span, args: &[CssValue<'_>]) {
         // Extract function args content from the function's OWN span, or fall back to
-        // semantic printing.
-        let Some(args_content) = self.function_args_source(span) else {
+        // semantic printing — lossy, so asserted unreachable: a parsed function's span is in
+        // bounds and holds its `(`, and neither the fixtures, the injection audits nor the
+        // corpus has ever reached the fallback.
+        let args_content = self.function_args_source(span);
+        debug_assert!(
+            args_content.is_some(),
+            "a parsed function's span holds its `(`"
+        );
+        let Some(args_content) = args_content else {
             self.print_function_args_semantic(args);
             return;
         };

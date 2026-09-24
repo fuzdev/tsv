@@ -51,6 +51,11 @@ use tsv_lang::{
 /// of it (`tsv_lang::printing::encode_leading_zwnbsp`). A `Fragment` — the body of a
 /// `<style>` nested inside a Svelte element, which the host formats on its own and indents
 /// into place — answers both as content: a U+FEFF at its offset 0 is the author's character.
+///
+/// The role is the PRINTER's alone. The lexer skips a U+FEFF at the offset 0 of whatever
+/// source it is handed (`tsv_lang::leading_bom_len`), a fragment's included, so no token
+/// starts there; a fragment's is kept because the boundary-whitespace claims read the
+/// source's own bytes from offset 0 and, under `Fragment`, do not exclude it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SourceRole {
     Document,
@@ -151,9 +156,7 @@ impl<'a> Printer<'a> {
     /// one `#[inline(never)]` body the `tsv_ts` printer spells (see `CommentFreeWindow`).
     #[inline]
     fn first_index_between(&self, start: u32, end: u32) -> usize {
-        if tsv_lang::range_too_narrow_for_a_comment(start, end)
-            || self.comment_free_gap.contains(start, end)
-        {
+        if self.comment_free_gap.known_comment_free(start, end) {
             self.comment_free_gap.comments().len()
         } else {
             self.first_index_between_wide(start)

@@ -26,7 +26,7 @@
 // (`a /* , */ /* x */, b`) is never mistaken for the separator and the following
 // comment is not relocated across it.
 
-use super::{CommentVec, Printer};
+use super::{CommentVec, Printer, ShellRunOrder};
 use crate::ast::internal::Expression;
 use smallvec::SmallVec;
 use std::borrow::Borrow;
@@ -125,8 +125,8 @@ pub(in crate::printer) struct TrailingComments<'a> {
 
 impl TrailingComments<'_> {
     /// Give this run's LINE comment a line of its own when the element's own doc
-    /// already ends in a DEFERRED `//` — today only a spread whose stripped grouping
-    /// parens held one ([`Printer::defers_trailing_line_comment`]).
+    /// already ends in a DEFERRED `//` — a spread or rest whose stripped grouping parens
+    /// held one ([`Printer::paren_interior_defers_line_comment`]).
     ///
     /// Its output line already terminates in a `//`, so nothing more may join it:
     /// deferring a second line comment onto the same line welds the two into ONE comment,
@@ -528,10 +528,37 @@ impl<'a> Printer<'a> {
         self.push_element_trailing_line(parts, trailing);
     }
 
+    /// [`Self::push_element_comma_trailing`] for a destructuring PATTERN's element, ordered
+    /// against a rest element's stripped-paren interior — the object literal's spread
+    /// partition in pattern form. The rest's own doc prints the interior's same-line share
+    /// (a `//` there already ends the line, so the run's own `//` is demoted rather than
+    /// welded onto it), and the own-line share is the pattern's. A rest is always the LAST
+    /// element, so the share and the run past its `)` take the last-element order
+    /// ([`Printer::push_last_element_share_and_run`]).
+    ///
+    /// `rest_interior` is `None` for every other element, and for a frozen one, which
+    /// printed its interior verbatim. Shared by the array and object pattern element loops.
+    pub(in crate::printer) fn push_pattern_element_comma_trailing(
+        &self,
+        parts: &mut DocBuf,
+        trailing: &mut TrailingComments<'_>,
+        rest_interior: Option<Span>,
+        comma: Option<DocId>,
+    ) {
+        trailing.demote_line_after_deferred(self.paren_interior_defers_line_comment(rest_interior));
+        self.push_last_element_share_and_run(
+            parts,
+            rest_interior,
+            ShellRunOrder::HoistBlocks,
+            |parts| self.push_element_comma_trailing_blocks(parts, trailing, comma),
+            |parts| self.push_element_trailing_line(parts, trailing),
+        );
+    }
+
     /// [`Self::push_element_comma_trailing`] up to its line comment — the blocks and the
     /// comma. The last-element emitter ([`Printer::push_last_element_share_and_run`])
     /// takes the run in these two halves, since under
-    /// [`ShellRunOrder::HoistBlocks`](super::ShellRunOrder) a stripped-paren share lands
+    /// [`ShellRunOrder::HoistBlocks`] a stripped-paren share lands
     /// between them.
     pub(in crate::printer) fn push_element_comma_trailing_blocks(
         &self,

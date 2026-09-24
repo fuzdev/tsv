@@ -9,20 +9,19 @@
 //! these tests cover the *printer*, which test262 never exercises. Each test asserts
 //! a single-pass stable round-trip plus idempotency.
 //!
-//! ⚠️ **"acorn rejects this syntax, so these can't be fixtures" — the reason these
-//! tests exist — is FALSE, and two stale claims grew behind it.** A canonical-parser
-//! rejection IS representable: `expected_ours.json` plus an `expected_svelte.json`
-//! holding `{"error": "failed to parse"}`, in a `_svelte_divergence` dir (see
-//! `docs/fixture_overview.md`). `import defer`'s comment handling is now fixtured that
-//! way — `tests/fixtures/typescript/modules/imports/phase_keyword_comment_svelte_prettier_divergence`.
-//! And because no fixture existed, nothing regenerated an `output_prettier.*`, so the
-//! cataloged "prettier drops the `import defer` phase" divergence went stale unnoticed:
-//! at the pinned prettier (3.9.6) the phase is preserved. That entry is deleted.
-//! `import source` (prettier throws) is still real and live-pinned in
-//! the `modules/imports/source_phase_svelte_prettier_divergence` fixture, whose
-//! `prettier_rejects.txt` pins prettier's throw and whose `expected_svelte.json` pins
-//! acorn's rejection. What remains here is the round-trip coverage that
-//! genuinely wants a Rust test — the `import.source(…)` / `import.defer(…)` dynamic
+//! ⚠️ **An acorn rejection does not keep this syntax out of the fixtures.** A
+//! canonical-parser rejection IS representable: `expected_ours.json` plus an
+//! `expected_svelte.json` holding `{"error": "failed to parse"}`, in a
+//! `_svelte_divergence` dir (see `docs/fixture_overview.md`). `import defer`'s comment
+//! handling is fixtured that way —
+//! `tests/fixtures/typescript/modules/imports/phase_keyword_comment_svelte_prettier_divergence`
+//! — and at the pinned prettier (3.9.6) the phase is preserved, so there is no divergence
+//! on it. A Rust test here regenerates no `output_prettier.*`, which is the reason to
+//! prefer a fixture wherever one can hold the case. `import source` (prettier throws) is
+//! live-pinned in the `modules/imports/source_phase_svelte_prettier_divergence` fixture,
+//! whose `prettier_rejects.txt` pins prettier's throw and whose `expected_svelte.json`
+//! pins acorn's rejection. What stays here is the round-trip coverage that genuinely
+//! wants a Rust test — the `import.source(…)` / `import.defer(…)` dynamic
 //! forms and the binding-shape rejections. The rest could migrate to fixtures.
 //!
 //! The prettier divergences are cataloged in `docs/conformance_prettier_ts.md` and

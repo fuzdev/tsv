@@ -457,7 +457,7 @@ fn instantiation_target_takes_plus_minus_assign_like_star_assign() {
     }
 }
 
-/// The CONTRAST that bounds the fix: a bare `+` / `-` and a prefix `++` / `--` DO start an
+/// The CONTRAST that bounds the rule: a bare `+` / `-` and a prefix `++` / `--` DO start an
 /// expression, so ahead of them the `<…>` stays a comparison chain on both oracles
 /// (`x = f<T> + c` is `x = (f < T) > +c`), and a line break before the `+=` changes
 /// nothing, the instantiation already holding there.

@@ -7,9 +7,9 @@
 //! raw text with live `{expr}` interpolation but no nested elements — a `<p>` inside
 //! is *text*, not a `RegularElement` — read up to a whitespace/attribute-tolerant
 //! `</textarea…>` (`regex_closing_textarea_tag = /<\/textarea(\s[^>]*)?>/iy` in
-//! `../svelte/packages/svelte/src/compiler/phases/1-parse/state/element.js`). tsv
-//! previously parsed the children as elements (and so rejected the wild close forms
-//! below outright — an over-rejection of valid Svelte markup).
+//! `../svelte/packages/svelte/src/compiler/phases/1-parse/state/element.js`). Parsing
+//! the children as elements instead rejects the wild close forms below outright — an
+//! over-rejection of valid Svelte markup.
 //!
 //! The everyday case (`<textarea>\n\t<p>x {expr}</p>\n</textarea>`) is pinned by the
 //! `tests/fixtures/svelte/elements/textarea_rcdata` fixture. These root tests pin
@@ -85,7 +85,7 @@ fn nested_tag_is_text() {
 /// Svelte's `parser-legacy/samples/textarea-end-tag`: the close is whitespace-tolerant
 /// and greedy, so three earlier `</textar…`/`</textarea…` runs are all *text* — the
 /// element closes only at the final `</textarea\n\n\n</textarea\n\n>` (the `[^>]*` runs to
-/// the first `>`). tsv used to reject this at the first `</textar `.
+/// the first `>`). An element-children reading rejects this at the first `</textar `.
 #[test]
 fn whitespace_tolerant_close_skips_false_ends() {
     let src = "<textarea>\n\t<p>not actu </textar ally an element. {foo}</p>\n</textare\n\n\n> </textaread >asdf</textarea\n\n\n</textarea\n\n>\n\n";

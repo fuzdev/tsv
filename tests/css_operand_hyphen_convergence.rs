@@ -2,18 +2,18 @@
 #![allow(clippy::expect_used)]
 
 //! Every authoring of a `-` that stands where an **operand** is expected reaches one
-//! form in one pass — the F1 invariant, which the whitespace around such a `-` used to
+//! form in one pass — the F1 invariant, which the whitespace around such a `-` must not
 //! decide.
 //!
-//! Regression this guards: the run splitter answered "is this `-` the operator?" with
+//! The hazard this guards: a run splitter that answers "is this `-` the operator?" with
 //! postcss's WORD notion, under which `#`, `.`, `!`, `%`, `[`, `]`, `~`, `^` and the rest
 //! of the fifteen bytes the CSS catalog's "Hyphen word extent at an operand position"
 //! entry enumerates are word content.
-//! Run-final the `-` is the operator on any reading, so `b: +- [a]` split into two
-//! operators and the head rule glued the `-` onto the block (`+-[a]`); read back, that
-//! same text was `+` plus the single word `-[a]`, and a head `+` before a word keeps its
+//! Run-final the `-` is the operator on any reading, so `b: +- [a]` splits into two
+//! operators and the head rule glues the `-` onto the block (`+-[a]`); read back, that
+//! same text is `+` plus the single word `-[a]`, and a head `+` before a word keeps its
 //! gap (`+ -[a]`). Two passes, two forms, and neither pass is wrong on its own terms.
-//! The splitter now asks css-syntax-3 of the `-` itself (§4.3.9 "would start an
+//! The splitter instead asks css-syntax-3 of the `-` itself (§4.3.9 "would start an
 //! identifier", §4.3.10's number — the lexer's `hyphen_starts_own_token`, the one reading
 //! the printer's glue refusal takes too), so the `-` is the operator at every authoring.
 //!

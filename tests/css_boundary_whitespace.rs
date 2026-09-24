@@ -136,11 +136,11 @@
 //!
 //! A `<ZWNBSP>` leading or trailing a declaration VALUE is closed the same way, and its
 //! assertion lives in `a_declarations_boundary_trims_are_the_js_class`: the wire's own trims
-//! are JS `\s` now (`ast/convert/mod.rs`'s `trim_wire*`, mirroring `read_value`'s
-//! `value.trim()`), where they used to be `str::trim` — which kept a `<ZWNBSP>` `read_value`
-//! drops and deleted a `<NEL>` it keeps. ⚠️ That is the WIRE's trim; the printer's
-//! property→colon trim is a second reader of the same seam and took the same correction from
-//! the other side (`trim_property_part`) — see the fourth corollary above, which is what
+//! are JS `\s` (`ast/convert/mod.rs`'s `trim_wire*`, mirroring `read_value`'s
+//! `value.trim()`), not `str::trim` — which keeps a `<ZWNBSP>` `read_value` drops and deletes
+//! a `<NEL>` it keeps. ⚠️ That is the WIRE's trim; the printer's property→colon trim is a
+//! second reader of the same seam and answers the same way from the other side
+//! (`trim_property_part`) — see the fourth corollary above, which is what
 //! happens when only one of them moves.
 //!
 //! The `<NEL>` (U+0085) gap is tracked separately below, with the raw-scan family it belongs
@@ -401,7 +401,7 @@ const COMMENT_AFTER_RUN_JUNCTURES: [(&str, &str); 10] = [
 ];
 
 /// The two junctures where `read_identifier` reaches the character first, so it is identifier
-/// CONTENT. These pass today and are the null controls the fix must not break — a widening
+/// CONTENT. These are the null controls the rule must not break — a widening
 /// applied at the lexer's every token start would turn the first into a parse error, since
 /// selectors-4 forbids whitespace between a sigil and its name and tsv rejects `. b`.
 const IDENT_CONTENT_JUNCTURES: [(&str, &str, &str); 2] = [
@@ -1207,9 +1207,9 @@ fn an_an_plus_b_juncture_steps_the_boundary_class() {
 
 /// A declaration's own boundary trims are `read_value`'s `value.trim()` / `value.trimStart()`
 /// and `read_declaration`'s `\s`-terminated property read — JS `\s`, so each drops a
-/// `<ZWNBSP>` and keeps a `<NEL>`. Both directions, since `str::trim` (which these used to be)
-/// gets each one wrong the other way: it kept the `<ZWNBSP>` and deleted the `<NEL>`, so a
-/// single-witness test would have graded a half-fix as done.
+/// `<ZWNBSP>` and keeps a `<NEL>`. Both directions, since `str::trim` gets each one wrong the
+/// other way — it keeps the `<ZWNBSP>` and deletes the `<NEL>` — so a single-witness test
+/// would grade a half-right trim as done.
 ///
 /// **Every arm, because they are one rule reached six ways.** `strip_css_comments_inner` owns
 /// the trim, and three shortcuts stand in for it where nothing needs stripping — the

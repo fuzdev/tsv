@@ -2085,7 +2085,7 @@ pub(super) fn build_args_joined_with_comments(
                 // The gap's `forces_expansion` obligation is the callers': the soft-join
                 // callers are unreachable when any spread interior forces expansion —
                 // their earlier trailing-comment arms, keyed on
-                // `any_spread_paren_comment_forces_expansion`, return first — and every
+                // `any_paren_interior_forces_expansion`, return first — and every
                 // other join is hardline.
                 debug_assert!(!gap.forces_expansion || use_hardline);
                 // A commented gap's blank is comment-aware (routed, so a comment's own

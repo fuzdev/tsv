@@ -957,20 +957,11 @@ mod tests {
     #[test]
     fn component_name_matches_its_reference() {
         const PIECES: [&str; 8] = [":", ".", "A", "a", "\u{394}", "\u{e9}", "-", "\u{1f600}"];
-        let mut name = String::new();
-        for len in 0..=5u32 {
-            for code in 0..PIECES.len().pow(len) {
-                name.clear();
-                let mut c = code;
-                for _ in 0..len {
-                    name.push_str(PIECES[c % PIECES.len()]);
-                    c /= PIECES.len();
-                }
-                let reference = !name.contains(':')
-                    && (name.contains('.') || name.chars().next().is_some_and(char::is_uppercase));
-                assert_eq!(is_component_name(&name), reference, "{name:?}");
-            }
-        }
+        crate::test_support::for_every_arrangement(&PIECES, 5, |name| {
+            let reference = !name.contains(':')
+                && (name.contains('.') || name.chars().next().is_some_and(char::is_uppercase));
+            assert_eq!(is_component_name(name), reference, "{name:?}");
+        });
     }
 
     #[test]
@@ -1094,24 +1085,15 @@ mod tests {
             "\u{1f600}",
             "|",
         ];
-        let mut name = String::new();
-        for len in 0..=5u32 {
-            for code in 0..PIECES.len().pow(len) {
-                name.clear();
-                let mut c = code;
-                for _ in 0..len {
-                    name.push_str(PIECES[c % PIECES.len()]);
-                    c /= PIECES.len();
-                }
-                let namespaced = namespaced_name_reference(&name);
-                assert_eq!(is_namespaced_name(&name), namespaced, "{name:?}");
-                assert_eq!(
-                    is_valid_element_name(&name),
-                    is_doctype_name(&name) || namespaced || is_valid_element_local_name(&name),
-                    "{name:?}"
-                );
-            }
-        }
+        crate::test_support::for_every_arrangement(&PIECES, 5, |name| {
+            let namespaced = namespaced_name_reference(name);
+            assert_eq!(is_namespaced_name(name), namespaced, "{name:?}");
+            assert_eq!(
+                is_valid_element_name(name),
+                is_doctype_name(name) || namespaced || is_valid_element_local_name(name),
+                "{name:?}"
+            );
+        });
         for (name, valid) in [
             ("svelte:head", true),
             ("a:bc", true),

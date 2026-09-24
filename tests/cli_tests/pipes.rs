@@ -101,12 +101,12 @@ fn assert_no_pipe_panic(label: &str, run: &PipedRun) {
 /// A consumer that exits early (`| head`) stops the output and nothing else.
 ///
 /// Rust sets `SIGPIPE` to `SIG_IGN`, so the write returns `EPIPE` rather than killing
-/// the process — and `println!` turned that into a panic (exit 134 under the release
-/// profile's `panic = "abort"`, 101 under an unwinding one) *after* every file had
-/// already been rewritten: the changes landed and the report of them became a crash
+/// the process — and `println!` turns that into a panic (exit 134 under the release
+/// profile's `panic = "abort"`, 101 under an unwinding one) *after* every file has
+/// already been rewritten: the changes land and the report of them becomes a crash
 /// notice. So `EPIPE` stops the write and the run finishes on its own terms, which is
-/// what `ls | head` looks like from the caller's side and what the JS mirror already
-/// did (`cli.js`'s `write_fd`; `scripts/test_npm.ts` carries the twin rows).
+/// what `ls | head` looks like from the caller's side and what the JS mirror does
+/// (`cli.js`'s `write_fd`; `scripts/test_npm.ts` carries the twin rows).
 ///
 /// **Both fds**, in two shapes that fail differently: bare `| head` closes stdout while
 /// stderr stays on the terminal, grading the changed-path write; `2>&1 | head` closes
@@ -248,9 +248,9 @@ fn test_parse_closed_pipe_is_not_a_parse_error() {
 /// shares with its parent — and a Node parent that opens its own piped
 /// `process.stdout` while `tsv` runs (a task runner logging beside an async child)
 /// flips that description to non-blocking under it. A full pipe then answers `EAGAIN` where a
-/// blocking one would park the write, and `write_all` panicked on it (exit 134 under
-/// `panic = "abort"`) after every file had already been rewritten — the same crash
-/// `cli.js`'s `write_fd` was fixed for. A `UnixStream` pair stands in for the flipped
+/// blocking one would park the write, and a bare `write_all` panics on it (exit 134 under
+/// `panic = "abort"`) after every file has already been rewritten — the same crash
+/// `cli.js`'s `write_fd` guards against. A `UnixStream` pair stands in for the flipped
 /// pipe: the child's end is set non-blocking before it is handed over as stdout, the
 /// reader holds the other end and drains late, and a socket's send buffer fills and
 /// answers `EAGAIN` exactly as a pipe's does — once it is full. A socket buffers
