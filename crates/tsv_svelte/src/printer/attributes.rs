@@ -546,21 +546,19 @@ impl<'a> Printer<'a> {
     /// value: having come from that alternative, it holds no whitespace and no `>`.
     fn attribute_value_delims(&self, parts: &[internal::AttributeValue<'_>]) -> (DocId, DocId) {
         let d = self.d();
-        let mut has_double = false;
-        let mut has_single = false;
-        for part in parts {
-            if let internal::AttributeValue::Text(text) = part {
-                let raw = text.raw(self.source);
-                has_double |= raw.contains('"');
-                has_single |= raw.contains('\'');
-            }
-        }
+        let mut texts = parts.iter().filter_map(|part| match part {
+            internal::AttributeValue::Text(text) => Some(text.raw(self.source)),
+            internal::AttributeValue::ExpressionTag(_) => None,
+        });
         // Each arm spells its literals, so the pair is a constant at the arm rather than a
-        // runtime `text()` at every attribute.
-        match (has_double, has_single) {
-            (true, true) => (d.text("="), d.text("")),
-            (true, false) => (d.text("='"), d.text("'")),
-            _ => (d.text("=\""), d.text("\"")),
+        // runtime `text()` at every attribute. A value with no `"` takes the double quotes
+        // whatever else it holds, so the `'` question is asked only of a value that has one.
+        if !texts.clone().any(|raw| raw.contains('"')) {
+            (d.text("=\""), d.text("\""))
+        } else if texts.any(|raw| raw.contains('\'')) {
+            (d.text("="), d.text(""))
+        } else {
+            (d.text("='"), d.text("'"))
         }
     }
 

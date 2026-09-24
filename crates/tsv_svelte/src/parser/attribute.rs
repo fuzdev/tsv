@@ -303,8 +303,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // split at all — `read_static_attribute` never looks at the name's `:`, so
         // `<script on:click={fn}>` is a plain attribute named `on:click` whose value is the
         // literal text `{fn}`, and a nameless `on:` is an attribute rather than an error.
+        //
+        // A byte search rather than `find(':')`: an attribute name is a few bytes, where the
+        // `char` pattern's out-of-line searcher costs more than the walk. The `:` is ASCII, so
+        // the index is a char boundary.
         if reader == AttributeReader::Element
-            && let Some(colon_idx) = name_str.find(':')
+            && let Some(colon_idx) = name_str.bytes().position(|b| b == b':')
             && let Some(directive_type) = DirectiveType::from_prefix(&name_str[..colon_idx])
         {
             return self.parse_directive(directive_type, name_str, colon_idx, name_end);

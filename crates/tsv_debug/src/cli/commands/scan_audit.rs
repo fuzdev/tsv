@@ -84,7 +84,6 @@ const DEFERRED_BUG: &str = "delimiter-deferred-bug";
 /// - `css-value` — `(`/`)` or function name of a `url()`/color/function value token
 ///   (url/color paren finds — not candidates).
 /// - `at-rule-range` — connector keyword in a normalized CSS at-rule range prelude.
-/// - `attr-name` — Svelte attribute-name `:` split (directive prefix).
 /// - `jsdoc-tag` — scans a value/comment string for `@type`/`@satisfies` cast tags.
 /// - `raw-text-close` — the `<` hop inside a raw-text close scan (`</script>` /
 ///   `</style>`). Comment/string blindness is this scan's **contract**, not an
@@ -148,11 +147,6 @@ const ALLOW: &[Allow] = &[
         "terminator-fold",
     ),
     // ── tsv_svelte ───────────────────────────────────────────────────────────
-    (
-        "tsv_svelte/src/parser/attribute.rs",
-        "&& let Some(colon_idx) = name_str.find(':')",
-        "attr-name",
-    ),
     (
         "tsv_svelte/src/parser/mod.rs",
         "while let Some(rel) = source.get(i..)?.find('<') {",
