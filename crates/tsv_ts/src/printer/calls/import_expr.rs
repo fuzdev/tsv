@@ -301,7 +301,7 @@ pub(super) fn build_import_expression_doc(
     // relocates it inside the parens. tsv answers the gap by POSITION at all three keywords
     // instead, which is the point (`docs/conformance_prettier_ts_comments.md` §Comment
     // relocation, the callee→`(` entries).
-    if let Some((split_start, paren)) = super::paren_split_for(
+    if let Some((split_start, paren)) = super::paren_split_for_outlined(
         printer,
         leading_scan_start,
         std::slice::from_ref(&import_expr.source),

@@ -171,7 +171,21 @@ impl<'a> Printer<'a> {
     /// built with what follows it in hand — the next comment, or the value at `to` — so an
     /// author blank after a `//` survives
     /// ([`build_leading_js_comment_doc_before`](Self::build_leading_js_comment_doc_before)).
+    ///
+    /// Nearly every head and value gap holds no comment, so the gate is inline at the caller
+    /// ([`Self::gap_known_comment_free`]): the empty run is written in place, with no call
+    /// and neither buffer built; only a gap a search must answer reaches the outlined collect.
+    #[inline]
     pub(in crate::printer) fn leading_comment_docs(&self, from: u32, to: u32) -> DocBuf {
+        if self.gap_known_comment_free(from, to) {
+            return DocBuf::new();
+        }
+        self.leading_comment_docs_wide(from, to)
+    }
+
+    /// The search half of [`Self::leading_comment_docs`] — one outlined copy.
+    #[inline(never)]
+    fn leading_comment_docs_wide(&self, from: u32, to: u32) -> DocBuf {
         let run: CommentRun<'_> = self.comments_to_emit_between(from, to).collect();
         self.leading_comment_run_docs(&run, to)
     }
@@ -239,7 +253,24 @@ impl<'a> Printer<'a> {
     /// and the closer is indented one level too deep — cosmetic, idempotent, and therefore
     /// invisible to every standing gate, so it is fixture-pinned instead
     /// ([`expr_trailing_indented_content`](../../../../../tests/fixtures/svelte/syntax/comments/expr_trailing_indented_content_prettier_divergence/)).
+    #[inline]
     pub(in crate::printer) fn trailing_comment_docs(
+        &self,
+        from: u32,
+        to: u32,
+        closer_owns_break: bool,
+    ) -> (DocBuf, bool) {
+        // The common gap holds no comment — an empty run, which ends in no line comment —
+        // answered inline at the caller; only a gap a search must answer pays the call.
+        if self.gap_known_comment_free(from, to) {
+            return (DocBuf::new(), false);
+        }
+        self.trailing_comment_docs_wide(from, to, closer_owns_break)
+    }
+
+    /// The search half of [`Self::trailing_comment_docs`] — one outlined copy.
+    #[inline(never)]
+    fn trailing_comment_docs_wide(
         &self,
         from: u32,
         to: u32,

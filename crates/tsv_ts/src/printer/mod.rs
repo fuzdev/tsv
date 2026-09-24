@@ -653,17 +653,28 @@ impl<'a> Printer<'a> {
         self.comment_free_gap.search_from(start)
     }
 
+    /// Whether `[start, end)` is known to hold no comment of any kind **without a search**:
+    /// too narrow to hold one, or lying inside the comment-free window
+    /// ([`Self::comment_free_gap`]). The inline head of [`Self::first_index_between`], and
+    /// the gate a builder puts ahead of work whose only product on a comment-free gap is
+    /// "nothing" (`paren_split_for`, `collect_leading_comments`,
+    /// `broke_after_value_leading_run`, `build_empty_bracketed_with_comments_doc`) — `false`
+    /// says only that a search would have to answer, never that a comment is there.
+    #[inline]
+    pub(crate) fn gap_known_comment_free(&self, start: u32, end: u32) -> bool {
+        range_too_narrow_for_a_comment(start, end) || self.comment_free_gap.contains(start, end)
+    }
+
     /// The index a range walk over `[start, end)` on this printer starts at: `len` (an
     /// empty walk) for a gap too narrow to hold a comment or lying inside the comment-free
-    /// window ([`Self::comment_free_gap`]), else the outlined search — the windowed form of
-    /// tsv_lang's `first_index_in_range`. The range walks ask about the same nested spans
-    /// the existence gates do, so the window answers most of them the same way (four range
-    /// walks in five on a real corpus); a builder that classifies a gap itself
+    /// window ([`Self::gap_known_comment_free`]), else the outlined search — the windowed
+    /// form of tsv_lang's `first_index_in_range`. The range walks ask about the same nested
+    /// spans the existence gates do, so the window answers most of them the same way (four
+    /// range walks in five on a real corpus); a builder that classifies a gap itself
     /// (`ClassifiedComments::from_index`) asks this and hands the index on.
     #[inline]
     pub(crate) fn first_index_between(&self, start: u32, end: u32) -> usize {
-        if range_too_narrow_for_a_comment(start, end) || self.comment_free_gap.contains(start, end)
-        {
+        if self.gap_known_comment_free(start, end) {
             self.comment_free_gap.comments().len()
         } else {
             self.first_index_between_wide(start)
