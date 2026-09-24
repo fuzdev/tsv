@@ -2317,8 +2317,15 @@ impl<'a> Printer<'a> {
         // drops such a comment onto a line of its own — a third form, and one that puts
         // this family at odds with the array literal, whose per-element group collapses
         // the same soft `line` (`docs/comments.md` §Array family vs params family).
+        //
+        // Not onto an honored directive leading the next element, which owns its line
+        // ([`Printer::directive_follows`]): glued behind this run it would be inert.
         let deferred_hugs = !deferred_own_line.is_empty()
-            && last_deferred.is_some_and(|c| self.comment_hugs_next(c));
+            && last_deferred.is_some_and(|c| self.comment_hugs_next(c))
+            && !self.directive_follows(
+                self.comments_to_emit_between(comma_pos + 1, next_start)
+                    .next(),
+            );
         parts.push(d.text(","));
         if deferred_hugs {
             // An author blank line belongs AHEAD of a hugging run, where it was written —

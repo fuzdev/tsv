@@ -443,9 +443,18 @@ ordinary fixtures `calls/args_prettier_ignore_member`,
 `patterns/prettier_ignore_element`, `parenthesized/jsdoc_cast_prettier_ignore_interior` (the
 directive inside a JSDoc cast's own parens, which freezes the cast's inner), and the Svelte
 `expressions/call_args_prettier_ignore_member` (the embedded-TS route, where the frozen
-slice is a raw range in host coordinates) all **match** prettier on the FREEZE. Two layouts
-part from it, and only one is a freeze question:
+slice is a raw range in host coordinates) all **match** prettier on the FREEZE. Three layouts
+part from it, and two are freeze questions:
 
+- A comment before an own-line directive — ◆design_choice ◆comment_preservation — a block
+  written before an item's comma (`b⏎/* t */,⏎// prettier-ignore⏎c  +  d`) leads the next
+  item once the comma moves up against `b`, with nothing but that comma between it and the
+  directive. Prettier glues the two (`/* t */ // prettier-ignore`) and still freezes, since it
+  decides a directive by attachment; under tsv's placement rule the glued directive is inert,
+  so tsv keeps the comment on a line of its own and the directive alone on its line above
+  what it freezes. The same holds in an object literal, both assignment patterns, and the
+  tuple and type-parameter / type-argument lists —
+  [after comment run](../tests/fixtures/typescript/syntax/comments/prettier_ignore_after_comment_run_prettier_divergence/)
 - Directive in the `(`→argument gap of a lone **multiline-template** argument —
   ◆design_choice ◆comment_preservation — the call expands where prettier hugs. This is the
   only argument position where prettier HAS a hug to disagree with (the flat form of

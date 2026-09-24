@@ -725,6 +725,10 @@ impl<'a> Printer<'a> {
     /// no such group (`docs/comments.md` §Array family vs params family), so the glue test
     /// is the whole answer there and the two families disagreed about one authoring.
     ///
+    /// The rule's one carve-out is about the comment AFTER this one, so it lives in the
+    /// run's emitter rather than here: nothing glues onto an honored format-ignore
+    /// directive ([`Self::directive_follows`]).
+    ///
     /// The single statement of the rule. [`push_leading_comment_run`](Self::push_leading_comment_run)
     /// is the emitter for the sites whose surrounding loop is the shared one; a site
     /// whose separator policy genuinely differs (the union member's own-line run,
@@ -2676,39 +2680,48 @@ impl<'a> Printer<'a> {
                 comment,
                 comments.peek().map_or(terminal_pos, |c| c.span.start),
             );
-            let hugs = match glue {
-                // `AdjacentValueGap` differs from `Adjacent` only in the blank-line
-                // rule below, not in the hug test — the soft `line` is the point at a
-                // value gap (it lets a value too long for the comment's line break
-                // below it), so it must not become an unconditional space.
-                LeadingGlue::Adjacent
-                | LeadingGlue::AdjacentValueGap
-                | LeadingGlue::AdjacentAnchorLine => self.comment_hugs_next(comment),
-                // A glued (not own-line) single-line block hugs across a source
-                // newline; the hugs-what-follows case still hugs as in `Adjacent`.
-                // ⚠️ That first half asks the comment's own neighbours, never the
-                // distance to `next`: for the LAST comment `next` is the value's span
-                // start, which sits INSIDE any grouping paren the author wrote, so a
-                // break they put after the `(` read as a break after the comment and
-                // un-glued a run prettier keeps glued (`= /* c */ (⏎v)`).
-                LeadingGlue::AdjacentGlued => {
-                    comment.is_block
-                        && (self.comment_hugs_next(comment)
-                            || !self.comment_cannot_glue_to_operator(comment))
-                }
-                // `Adjacent`, plus the stripped grouping paren the author glued the
-                // comment to (`/* c */ (⏎…`) — invisible in the output, so the newline it
-                // left behind must not un-glue the pair.
-                LeadingGlue::AdjacentStrippedParen => {
-                    self.comment_hugs_next(comment)
-                        || (comment.is_block
-                            && calls::has_stripped_paren_gap(self.source, comment.span.end, next))
-                }
-            };
+            // An honored format-ignore directive next in the run keeps its line whatever
+            // the source around THIS comment says (`Self::directive_follows`).
+            let directive_next = self.directive_follows(comments.peek().copied());
+            let hugs = !directive_next
+                && match glue {
+                    // `AdjacentValueGap` differs from `Adjacent` only in the blank-line
+                    // rule below, not in the hug test — the soft `line` is the point at a
+                    // value gap (it lets a value too long for the comment's line break
+                    // below it), so it must not become an unconditional space.
+                    LeadingGlue::Adjacent
+                    | LeadingGlue::AdjacentValueGap
+                    | LeadingGlue::AdjacentAnchorLine => self.comment_hugs_next(comment),
+                    // A glued (not own-line) single-line block hugs across a source
+                    // newline; the hugs-what-follows case still hugs as in `Adjacent`.
+                    // ⚠️ That first half asks the comment's own neighbours, never the
+                    // distance to `next`: for the LAST comment `next` is the value's span
+                    // start, which sits INSIDE any grouping paren the author wrote, so a
+                    // break they put after the `(` read as a break after the comment and
+                    // un-glued a run prettier keeps glued (`= /* c */ (⏎v)`).
+                    LeadingGlue::AdjacentGlued => {
+                        comment.is_block
+                            && (self.comment_hugs_next(comment)
+                                || !self.comment_cannot_glue_to_operator(comment))
+                    }
+                    // `Adjacent`, plus the stripped grouping paren the author glued the
+                    // comment to (`/* c */ (⏎…`) — invisible in the output, so the newline it
+                    // left behind must not un-glue the pair.
+                    LeadingGlue::AdjacentStrippedParen => {
+                        self.comment_hugs_next(comment)
+                            || (comment.is_block
+                                && calls::has_stripped_paren_gap(
+                                    self.source,
+                                    comment.span.end,
+                                    next,
+                                ))
+                    }
+                };
             if hugs {
                 // Value (or next comment) shares the `*/` line — keep it glued.
                 parts.push(d.text(" "));
-            } else if comment.is_block
+            } else if !directive_next
+                && comment.is_block
                 // `first_shares_anchor_line ||` reads as "this comment HAS no own line to
                 // keep, so don't ask" — and short-circuits the source scan when so.
                 && (first_shares_anchor_line || !self.is_own_line_comment(comment))

@@ -369,6 +369,20 @@ impl<'a> Printer<'a> {
                 .is_some_and(|c| self.is_honored_directive(c))
     }
 
+    /// Whether `next` — the comment that follows another in a leading run — is an honored
+    /// directive, which the comment before it may not glue onto. The in-run half of the
+    /// rule [`Self::leading_comment_is_honored_directive`] states for a run's opening
+    /// separator: an honored directive owns its line, and a comment glued ahead of it on
+    /// that line makes it inert, so the freeze it earned is gone on the next pass — the
+    /// wrong form being its own fixed point. The glue test reads the source right after the
+    /// comment ([`Self::comment_hugs_next`]), and where that is a comma the list re-emits
+    /// elsewhere (`b⏎/* t */,⏎// prettier-ignore⏎c`) it sees no line break before the
+    /// directive; the run's emitter ([`Self::push_leading_comment_run`]) asks this first,
+    /// and gives the directive its own line whatever the source around the comment says.
+    pub(in crate::printer) fn directive_follows(&self, next: Option<&Comment>) -> bool {
+        next.is_some_and(|c| self.is_honored_directive(c))
+    }
+
     /// The placement floor alone — [`tsv_lang::directive_alone_on_line`] against this
     /// document's source, for the emitters that ask about placement without the
     /// recognizer.
