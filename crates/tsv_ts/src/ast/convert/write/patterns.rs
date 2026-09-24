@@ -145,9 +145,16 @@ pub(super) fn write_property(w: &mut JsonWriter, prop: &internal::Property<'_>, 
     } else {
         w.raw(",\"value\":");
         write_property_value(w, prop, ctx);
-        w.raw(",\"kind\":\"");
-        w.raw(prop.kind.as_str());
-        w.raw("\"");
+        // Nearly every property is `init`, so that kind appends the whole
+        // field as one literal rather than a runtime-length copy of `as_str()`.
+        match prop.kind {
+            internal::PropertyKind::Init => w.raw(",\"kind\":\"init\""),
+            kind => {
+                w.raw(",\"kind\":\"");
+                w.raw(kind.as_str());
+                w.raw("\"");
+            }
+        }
     }
     close_node(w, "Property", prop.span, ctx);
 }

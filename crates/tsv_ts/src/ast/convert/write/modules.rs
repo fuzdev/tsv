@@ -5,7 +5,8 @@ use super::declarations::{write_class_declaration, write_function_declaration};
 use super::expressions::write_expression;
 use super::types::{write_declare_function, write_interface_declaration};
 use super::{
-    Ctx, JsonWriter, close_node, kind_token, node_header, write_identifier_plain, write_literal,
+    Ctx, JsonWriter, close_node, node_header, write_export_kind_field, write_identifier_plain,
+    write_import_kind_field, write_literal,
 };
 
 /// Emit an import specifier (`ImportDefaultSpecifier` / `ImportSpecifier` /
@@ -23,19 +24,12 @@ pub(super) fn write_import_specifier(
             close_node(w, "ImportDefaultSpecifier", default_spec.span, ctx);
         }
         internal::ImportSpecifier::Named(named_spec) => {
-            let import_kind = kind_token(
-                matches!(named_spec.import_kind, internal::ImportKind::Type),
-                ctx,
-            );
             node_header(w, "ImportSpecifier", named_spec.span, ctx);
             w.raw(",\"imported\":");
             write_module_export_name(w, &named_spec.imported, ctx);
             w.raw(",\"local\":");
             write_identifier_plain(w, &named_spec.local, ctx);
-            if let Some(kind) = import_kind {
-                w.raw(",\"importKind\":");
-                w.token(kind);
-            }
+            write_import_kind_field(w, named_spec.import_kind, ctx);
             close_node(w, "ImportSpecifier", named_spec.span, ctx);
         }
         internal::ImportSpecifier::Namespace(ns_spec) => {
@@ -71,16 +65,12 @@ pub(super) fn write_export_specifier(
     spec: &internal::ExportSpecifier<'_>,
     ctx: &Ctx<'_>,
 ) {
-    let export_kind = kind_token(matches!(spec.export_kind, internal::ExportKind::Type), ctx);
     node_header(w, "ExportSpecifier", spec.span, ctx);
     w.raw(",\"local\":");
     write_module_export_name(w, &spec.local, ctx);
     w.raw(",\"exported\":");
     write_module_export_name(w, &spec.exported, ctx);
-    if let Some(kind) = export_kind {
-        w.raw(",\"exportKind\":");
-        w.token(kind);
-    }
+    write_export_kind_field(w, spec.export_kind, ctx);
     close_node(w, "ExportSpecifier", spec.span, ctx);
 }
 
