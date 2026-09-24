@@ -92,8 +92,12 @@ fn is_root_slot_meta_tag(name: &str) -> bool {
 /// Port of Svelte's `is_valid_element_name` (`1-parse/state/element.js`): a doctype
 /// (`<!DOCTYPE>`), a namespaced meta/element name (`<svelte:head>`, `<foo:bar>`), or a valid
 /// HTML/SVG/MathML/custom element name (`REGEX_VALID_TAG_NAME`).
+///
+/// The three arms are pure and the answer is their union, so the order is free; the local
+/// name goes first because it is what nearly every tag is (`div`, `Button`, `my-elem`), and
+/// it answers those in one walk with no search for a `:` the other two arms would begin with.
 fn is_valid_element_name(name: &str) -> bool {
-    is_doctype_name(name) || is_namespaced_name(name) || is_valid_element_local_name(name)
+    is_valid_element_local_name(name) || is_doctype_name(name) || is_namespaced_name(name)
 }
 
 /// `regex_doctype_name` = `/^![a-zA-Z]+$/` — `!` then one or more ASCII letters.
@@ -107,16 +111,19 @@ fn is_doctype_name(name: &str) -> bool {
 /// starting with a letter and ending alphanumeric (interior `-` allowed). Covers `svelte:*`
 /// meta tags and namespaced regular elements (`foo:bar`).
 fn is_namespaced_name(name: &str) -> bool {
-    let Some((prefix, local)) = name.split_once(':') else {
+    // A byte search, not `split_once(':')`: a tag name is a few bytes, and the `char` pattern
+    // costs an out-of-line searcher call that outweighs the walk it does. The `:` is ASCII, so
+    // either side of it is a char boundary.
+    let bytes = name.as_bytes();
+    let Some(colon) = bytes.iter().position(|&b| b == b':') else {
         return false;
     };
-    let prefix = prefix.as_bytes();
+    let (prefix, local) = (&bytes[..colon], &bytes[colon + 1..]);
     if !prefix.first().is_some_and(u8::is_ascii_alphabetic)
         || !prefix[1..].iter().all(u8::is_ascii_alphanumeric)
     {
         return false;
     }
-    let local = local.as_bytes();
     local.len() >= 2
         && local[0].is_ascii_alphabetic()
         && local[local.len() - 1].is_ascii_alphanumeric()
@@ -900,8 +907,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 #[cfg(test)]
 mod tests {
     use super::{
-        is_namespaced_name, is_reserved_namespace_miss, is_root_slot_meta_tag,
-        is_valid_element_name, is_valid_tag_name, tag_name_end,
+        is_doctype_name, is_namespaced_name, is_reserved_namespace_miss, is_root_slot_meta_tag,
+        is_valid_element_local_name, is_valid_element_name, is_valid_tag_name, tag_name_end,
     };
     use crate::ast::internal::is_component_name;
 
@@ -941,6 +948,28 @@ mod tests {
         ] {
             let source = format!("{name}{tail}");
             assert_eq!(tag_name_end(&source, 0), name.len(), "{source:?}");
+        }
+    }
+
+    /// [`is_component_name`] agrees with its two-search spelling at every arrangement of the
+    /// characters it keys on — the refusing `:`, the admitting `.`, an ASCII and a non-ASCII
+    /// uppercase initial, their lowercase twins, and a character neither reads.
+    #[test]
+    fn component_name_matches_its_reference() {
+        const PIECES: [&str; 8] = [":", ".", "A", "a", "\u{394}", "\u{e9}", "-", "\u{1f600}"];
+        let mut name = String::new();
+        for len in 0..=5u32 {
+            for code in 0..PIECES.len().pow(len) {
+                name.clear();
+                let mut c = code;
+                for _ in 0..len {
+                    name.push_str(PIECES[c % PIECES.len()]);
+                    c /= PIECES.len();
+                }
+                let reference = !name.contains(':')
+                    && (name.contains('.') || name.chars().next().is_some_and(char::is_uppercase));
+                assert_eq!(is_component_name(&name), reference, "{name:?}");
+            }
         }
     }
 
@@ -1024,6 +1053,85 @@ mod tests {
         // Doctype must be `!` + ASCII letters only.
         assert!(!is_valid_element_name("!-"));
         assert!(!is_valid_element_name("!doc7"));
+    }
+
+    /// `regex_namespaced_name` transcribed through `split_once(':')`, the reference the byte
+    /// search in [`is_namespaced_name`] is graded against.
+    fn namespaced_name_reference(name: &str) -> bool {
+        let Some((prefix, local)) = name.split_once(':') else {
+            return false;
+        };
+        let (prefix, local) = (prefix.as_bytes(), local.as_bytes());
+        prefix.first().is_some_and(u8::is_ascii_alphabetic)
+            && prefix[1..].iter().all(u8::is_ascii_alphanumeric)
+            && local.len() >= 2
+            && local[0].is_ascii_alphabetic()
+            && local[local.len() - 1].is_ascii_alphanumeric()
+            && local[1..local.len() - 1]
+                .iter()
+                .all(|&b| b.is_ascii_alphanumeric() || b == b'-')
+    }
+
+    /// The element-name predicates agree with their reference spellings at every arrangement
+    /// of the characters each arm keys on — the namespace colon (one, two, leading, trailing),
+    /// the doctype `!`, the custom-element hyphen and its non-ASCII `PCENChar` tail (a BMP
+    /// letter, a middle dot, an astral character), and characters no arm admits — so the
+    /// union's order and the colon search are graded at every offset, not on the few names a
+    /// corpus spells.
+    #[test]
+    fn element_name_predicates_match_their_references() {
+        const PIECES: [&str; 12] = [
+            "a",
+            "Z",
+            "0",
+            "-",
+            ":",
+            "!",
+            ".",
+            "_",
+            "\u{e9}",
+            "\u{b7}",
+            "\u{1f600}",
+            "|",
+        ];
+        let mut name = String::new();
+        for len in 0..=5u32 {
+            for code in 0..PIECES.len().pow(len) {
+                name.clear();
+                let mut c = code;
+                for _ in 0..len {
+                    name.push_str(PIECES[c % PIECES.len()]);
+                    c /= PIECES.len();
+                }
+                let namespaced = namespaced_name_reference(&name);
+                assert_eq!(is_namespaced_name(&name), namespaced, "{name:?}");
+                assert_eq!(
+                    is_valid_element_name(&name),
+                    is_doctype_name(&name) || namespaced || is_valid_element_local_name(&name),
+                    "{name:?}"
+                );
+            }
+        }
+        for (name, valid) in [
+            ("svelte:head", true),
+            ("a:bc", true),
+            ("a:b-c", true),
+            ("a1:b2", true),
+            ("a:b", false),
+            ("a:b-", false),
+            (":ab", false),
+            ("1a:bc", false),
+            ("a::bc", false),
+            ("a:b:c", false),
+            ("a:bc:", false),
+            ("!DOCTYPE", true),
+            ("!", false),
+            ("my-caf\u{e9}", true),
+            ("x-\u{1f600}", true),
+            ("x\u{e9}", false),
+        ] {
+            assert_eq!(is_valid_element_name(name), valid, "{name:?}");
+        }
     }
 
     /// The reserved namespace is exactly `svelte:`, matched case-sensitively, and holds

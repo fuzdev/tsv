@@ -1172,9 +1172,20 @@ pub enum ElementKind {
 ///
 /// Examples: `Comp` → true, `ns.Comp` → true, `Object.component` → true, `div` → false,
 /// `foo:bar` → false, `Foo:bar` → false.
+///
+/// One walk answers both byte questions — any `:` refuses, any `.` admits — where
+/// `contains(':')` then `contains('.')` read the name twice; both are ASCII, so a byte match
+/// is the `char` match exactly.
 pub(crate) fn is_component_name(name: &str) -> bool {
-    !name.contains(':')
-        && (name.contains('.') || name.chars().next().is_some_and(char::is_uppercase))
+    let mut dotted = false;
+    for &b in name.as_bytes() {
+        match b {
+            b':' => return false,
+            b'.' => dotted = true,
+            _ => {}
+        }
+    }
+    dotted || name.chars().next().is_some_and(char::is_uppercase)
 }
 
 /// Every classification fact derivable from a tag *name* alone, packed into a `u16` and computed
@@ -1746,9 +1757,32 @@ pub fn text_edge_ws(raw: &str, leading: bool) -> &str {
 /// The number of newlines in a text node's `leading` (else trailing) edge whitespace run
 /// ([`text_edge_ws`]) — `0` for a glued edge, `1` for an authored line break, `2+` for an
 /// authored blank line. The one count every edge-newline question reads.
+///
+/// Counted in the walk that finds the edge — every member of the class is one ASCII byte, so
+/// the run is the [`collapsible_ws_prefix_len`] / [`collapsible_ws_suffix_len`] walk and the
+/// count is its `\n` bytes — rather than delimiting the edge first and then counting through
+/// `matches('\n')`, whose `char` searcher is an out-of-line call per newline on a run of a
+/// few bytes.
 #[inline]
 pub fn text_edge_newlines(raw: &str, leading: bool) -> usize {
-    text_edge_ws(raw, leading).matches('\n').count()
+    let bytes = raw.as_bytes();
+    let mut newlines = 0;
+    if leading {
+        for &b in bytes {
+            if !is_collapsible_ws(b) {
+                break;
+            }
+            newlines += usize::from(b == b'\n');
+        }
+    } else {
+        for &b in bytes.iter().rev() {
+            if !is_collapsible_ws(b) {
+                break;
+            }
+            newlines += usize::from(b == b'\n');
+        }
+    }
+    newlines
 }
 
 /// Svelte Text node - raw text content
@@ -2366,6 +2400,28 @@ mod collapsible_ws_tests {
                 "{s:?}"
             );
         });
+    }
+
+    /// The edge newline count is the `\n` count of the edge run [`text_edge_ws`] delimits, at
+    /// both ends — a `\r` (alone or before a `\n`) is edge whitespace but no newline, and a
+    /// form feed or a no-break space ends the edge like content.
+    #[test]
+    fn edge_newlines_match_the_edge_run() {
+        for_every_arrangement(|s| {
+            for leading in [true, false] {
+                assert_eq!(
+                    text_edge_newlines(s, leading),
+                    text_edge_ws(s, leading).matches('\n').count(),
+                    "{s:?} leading={leading}"
+                );
+            }
+        });
+        assert_eq!(text_edge_newlines("\r\n\r\n\tx", true), 2);
+        assert_eq!(text_edge_newlines("x\n\t\r\n  ", false), 2);
+        assert_eq!(text_edge_newlines("\n\u{c}\nx", true), 1);
+        assert_eq!(text_edge_newlines("x\n\u{a0}\n", false), 1);
+        assert_eq!(text_edge_newlines("\n\n", true), 2);
+        assert_eq!(text_edge_newlines("", false), 0);
     }
 
     /// The byte splitter yields exactly the words `split(is_collapsible_ws_char)` yields with
