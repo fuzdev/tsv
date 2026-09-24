@@ -1,0 +1,768 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 284,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a member expression is a DestructuringAssignmentTarget, so an ASSIGNMENT pattern",
+			"start": 10,
+			"end": 93,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " takes one; a binding pattern holds only identifiers and nested patterns",
+			"start": 95,
+			"end": 169,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 75
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 283,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 274,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 9,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 171,
+					"end": 182,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 12
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 171,
+						"end": 181,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 4,
+								"column": 11
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "ArrayPattern",
+							"start": 171,
+							"end": 177,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 1
+								},
+								"end": {
+									"line": 4,
+									"column": 7
+								}
+							},
+							"elements": [
+								{
+									"type": "MemberExpression",
+									"start": 172,
+									"end": 176,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 6
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 172,
+										"end": 174,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 4
+											}
+										},
+										"name": "a1"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 175,
+										"end": 176,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 5
+											},
+											"end": {
+												"line": 4,
+												"column": 6
+											}
+										},
+										"name": "b"
+									},
+									"computed": false,
+									"optional": false
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 180,
+							"end": 181,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 10
+								},
+								"end": {
+									"line": 4,
+									"column": 11
+								}
+							},
+							"name": "x"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a member expression is a DestructuringAssignmentTarget, so an ASSIGNMENT pattern",
+							"start": 10,
+							"end": 93
+						},
+						{
+							"type": "Line",
+							"value": " takes one; a binding pattern holds only identifiers and nested patterns",
+							"start": 95,
+							"end": 169
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 184,
+					"end": 202,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 19
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 185,
+						"end": 200,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 2
+							},
+							"end": {
+								"line": 5,
+								"column": 17
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "ObjectPattern",
+							"start": 185,
+							"end": 196,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 2
+								},
+								"end": {
+									"line": 5,
+									"column": 13
+								}
+							},
+							"properties": [
+								{
+									"type": "Property",
+									"start": 187,
+									"end": 194,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 4
+										},
+										"end": {
+											"line": 5,
+											"column": 11
+										}
+									},
+									"method": false,
+									"shorthand": false,
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 187,
+										"end": 188,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 4
+											},
+											"end": {
+												"line": 5,
+												"column": 5
+											}
+										},
+										"name": "k"
+									},
+									"value": {
+										"type": "MemberExpression",
+										"start": 190,
+										"end": 194,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 7
+											},
+											"end": {
+												"line": 5,
+												"column": 11
+											}
+										},
+										"object": {
+											"type": "Identifier",
+											"start": 190,
+											"end": 192,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 7
+												},
+												"end": {
+													"line": 5,
+													"column": 9
+												}
+											},
+											"name": "a2"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 193,
+											"end": 194,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 10
+												},
+												"end": {
+													"line": 5,
+													"column": 11
+												}
+											},
+											"name": "b"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"kind": "init"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 199,
+							"end": 200,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 16
+								},
+								"end": {
+									"line": 5,
+									"column": 17
+								}
+							},
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 204,
+					"end": 218,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 15
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 204,
+						"end": 217,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 1
+							},
+							"end": {
+								"line": 6,
+								"column": 14
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "ArrayPattern",
+							"start": 204,
+							"end": 213,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 1
+								},
+								"end": {
+									"line": 6,
+									"column": 10
+								}
+							},
+							"elements": [
+								{
+									"type": "RestElement",
+									"start": 205,
+									"end": 212,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 2
+										},
+										"end": {
+											"line": 6,
+											"column": 9
+										}
+									},
+									"argument": {
+										"type": "MemberExpression",
+										"start": 208,
+										"end": 212,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 5
+											},
+											"end": {
+												"line": 6,
+												"column": 9
+											}
+										},
+										"object": {
+											"type": "Identifier",
+											"start": 208,
+											"end": 210,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 5
+												},
+												"end": {
+													"line": 6,
+													"column": 7
+												}
+											},
+											"name": "a3"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 211,
+											"end": 212,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 8
+												},
+												"end": {
+													"line": 6,
+													"column": 9
+												}
+											},
+											"name": "b"
+										},
+										"computed": false,
+										"optional": false
+									}
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 216,
+							"end": 217,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 13
+								},
+								"end": {
+									"line": 6,
+									"column": 14
+								}
+							},
+							"name": "x"
+						}
+					}
+				},
+				{
+					"type": "ForOfStatement",
+					"start": 220,
+					"end": 239,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 20
+						}
+					},
+					"await": false,
+					"left": {
+						"type": "ArrayPattern",
+						"start": 225,
+						"end": 231,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 6
+							},
+							"end": {
+								"line": 7,
+								"column": 12
+							}
+						},
+						"elements": [
+							{
+								"type": "MemberExpression",
+								"start": 226,
+								"end": 230,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 11
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 226,
+									"end": 228,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 7
+										},
+										"end": {
+											"line": 7,
+											"column": 9
+										}
+									},
+									"name": "a4"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 229,
+									"end": 230,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 10
+										},
+										"end": {
+											"line": 7,
+											"column": 11
+										}
+									},
+									"name": "b"
+								},
+								"computed": false,
+								"optional": false
+							}
+						]
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 235,
+						"end": 237,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 16
+							},
+							"end": {
+								"line": 7,
+								"column": 18
+							}
+						},
+						"name": "xs"
+					},
+					"body": {
+						"type": "EmptyStatement",
+						"start": 238,
+						"end": 239,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 19
+							},
+							"end": {
+								"line": 7,
+								"column": 20
+							}
+						}
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 241,
+					"end": 273,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 33
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 250,
+						"end": 251,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 10
+							},
+							"end": {
+								"line": 8,
+								"column": 11
+							}
+						},
+						"name": "f"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "AssignmentPattern",
+							"start": 252,
+							"end": 269,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 12
+								},
+								"end": {
+									"line": 8,
+									"column": 29
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 252,
+								"end": 254,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 12
+									},
+									"end": {
+										"line": 8,
+										"column": 14
+									}
+								},
+								"name": "a5"
+							},
+							"right": {
+								"type": "AssignmentExpression",
+								"start": 258,
+								"end": 268,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 18
+									},
+									"end": {
+										"line": 8,
+										"column": 28
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "ArrayPattern",
+									"start": 258,
+									"end": 264,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 18
+										},
+										"end": {
+											"line": 8,
+											"column": 24
+										}
+									},
+									"elements": [
+										{
+											"type": "MemberExpression",
+											"start": 259,
+											"end": 263,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 19
+												},
+												"end": {
+													"line": 8,
+													"column": 23
+												}
+											},
+											"object": {
+												"type": "Identifier",
+												"start": 259,
+												"end": 261,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 19
+													},
+													"end": {
+														"line": 8,
+														"column": 21
+													}
+												},
+												"name": "b5"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 262,
+												"end": 263,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 22
+													},
+													"end": {
+														"line": 8,
+														"column": 23
+													}
+												},
+												"name": "c"
+											},
+											"computed": false,
+											"optional": false
+										}
+									]
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 267,
+									"end": 268,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 27
+										},
+										"end": {
+											"line": 8,
+											"column": 28
+										}
+									},
+									"name": "x"
+								}
+							}
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 271,
+						"end": 273,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 31
+							},
+							"end": {
+								"line": 8,
+								"column": 33
+							}
+						},
+						"body": []
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
