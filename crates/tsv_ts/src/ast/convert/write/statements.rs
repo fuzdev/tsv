@@ -19,8 +19,9 @@ use super::types::{
     write_declare_function, write_entity_name, write_enum_declaration, write_interface_declaration,
 };
 use super::{
-    Ctx, JsonWriter, close_node, kind_token, node_header, write_array, write_bare_node,
-    write_identifier_plain, write_literal, write_or_null,
+    Ctx, JsonWriter, close_node, node_header, write_array, write_bare_node,
+    write_export_kind_field, write_identifier_plain, write_import_kind_field, write_literal,
+    write_or_null,
 };
 use tsv_lang::Span;
 
@@ -109,7 +110,6 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &internal::Statement<'_>
         }
         internal::StatementKind::ExportNamedDeclaration(export_decl) => {
             let is_type_export = matches!(export_decl.export_kind, internal::ExportKind::Type);
-            let export_kind = kind_token(is_type_export, ctx);
             let start = export_start(
                 ctx.source,
                 stmt.span.start,
@@ -121,10 +121,7 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &internal::Statement<'_>
             );
             let export_span = Span::new(start, stmt.span.end);
             node_header(w, "ExportNamedDeclaration", export_span, ctx);
-            if let Some(kind) = export_kind {
-                w.raw(",\"exportKind\":");
-                w.token(kind);
-            }
+            write_export_kind_field(w, export_decl.export_kind, ctx);
             w.raw(",\"declaration\":");
             write_or_null(w, export_decl.declaration.as_ref(), |w, d| {
                 write_exported_declaration(w, d, ctx, is_type_export);
@@ -141,7 +138,6 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &internal::Statement<'_>
             close_node(w, "ExportNamedDeclaration", export_span, ctx);
         }
         internal::StatementKind::ExportDefaultDeclaration(export_decl) => {
-            let export_kind = kind_token(false, ctx);
             let start = export_start(
                 ctx.source,
                 stmt.span.start,
@@ -150,24 +146,14 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &internal::Statement<'_>
             );
             let export_span = Span::new(start, stmt.span.end);
             node_header(w, "ExportDefaultDeclaration", export_span, ctx);
-            if let Some(kind) = export_kind {
-                w.raw(",\"exportKind\":");
-                w.token(kind);
-            }
+            write_export_kind_field(w, internal::ExportKind::Value, ctx);
             w.raw(",\"declaration\":");
             write_export_default_value(w, &export_decl.declaration, ctx);
             close_node(w, "ExportDefaultDeclaration", export_span, ctx);
         }
         internal::StatementKind::ExportAllDeclaration(export_decl) => {
-            let export_kind = kind_token(
-                matches!(export_decl.export_kind, internal::ExportKind::Type),
-                ctx,
-            );
             node_header(w, "ExportAllDeclaration", stmt.span, ctx);
-            if let Some(kind) = export_kind {
-                w.raw(",\"exportKind\":");
-                w.token(kind);
-            }
+            write_export_kind_field(w, export_decl.export_kind, ctx);
             w.raw(",\"exported\":");
             write_or_null(w, export_decl.exported.as_ref(), |w, name| {
                 write_module_export_name(w, name, ctx);
@@ -190,15 +176,8 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &internal::Statement<'_>
             close_node(w, "TSNamespaceExportDeclaration", stmt.span, ctx);
         }
         internal::StatementKind::ImportDeclaration(import_decl) => {
-            let import_kind = kind_token(
-                matches!(import_decl.import_kind, internal::ImportKind::Type),
-                ctx,
-            );
             node_header(w, "ImportDeclaration", stmt.span, ctx);
-            if let Some(kind) = import_kind {
-                w.raw(",\"importKind\":");
-                w.token(kind);
-            }
+            write_import_kind_field(w, import_decl.import_kind, ctx);
             if let Some(phase) = import_decl.phase.as_str() {
                 w.raw(",\"phase\":");
                 w.token(phase);
@@ -411,8 +390,15 @@ pub(super) fn write_variable_declaration(
         write_or_null(w, d.init.as_ref(), |w, e| write_expression(w, e, ctx));
         close_node(w, "VariableDeclarator", d.span, ctx);
     });
-    w.raw(",\"kind\":");
-    w.token(var_decl.kind.as_str());
+    // One literal per kind, so each appends the whole field at once rather
+    // than a runtime-length copy of `as_str()`.
+    match var_decl.kind {
+        internal::VariableDeclarationKind::Const => w.raw(",\"kind\":\"const\""),
+        internal::VariableDeclarationKind::Let => w.raw(",\"kind\":\"let\""),
+        internal::VariableDeclarationKind::Var => w.raw(",\"kind\":\"var\""),
+        internal::VariableDeclarationKind::Using => w.raw(",\"kind\":\"using\""),
+        internal::VariableDeclarationKind::AwaitUsing => w.raw(",\"kind\":\"await using\""),
+    }
     if var_decl.declare && exported {
         w.raw(",\"declare\":true");
     }

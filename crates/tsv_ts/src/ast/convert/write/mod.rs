@@ -851,16 +851,36 @@ pub(super) fn write_return_type_field(
     }
 }
 
-/// The `importKind`/`exportKind` value under the parser variant: `"value"` is
-/// omitted in Svelte non-`lang="ts"` context, always present under acorn.
+/// Emit `,"importKind":"type"|"value"`. `"type"` is always written; `"value"` is
+/// omitted under vanilla acorn (Svelte non-`lang="ts"` context, see
+/// `Ctx::vanilla_acorn`) and written under acorn-typescript. Each emitting arm
+/// appends the whole field as one literal rather than the key followed by a
+/// runtime-chosen token.
 #[inline]
-pub(super) fn kind_token(is_type: bool, ctx: &Ctx<'_>) -> Option<&'static str> {
-    if is_type {
-        Some("type")
-    } else if ctx.vanilla_acorn {
-        None
-    } else {
-        Some("value")
+pub(super) fn write_import_kind_field(
+    w: &mut JsonWriter,
+    import_kind: internal::ImportKind,
+    ctx: &Ctx<'_>,
+) {
+    match import_kind {
+        internal::ImportKind::Type => w.raw(",\"importKind\":\"type\""),
+        internal::ImportKind::Value if ctx.vanilla_acorn => {}
+        internal::ImportKind::Value => w.raw(",\"importKind\":\"value\""),
+    }
+}
+
+/// Emit `,"exportKind":"type"|"value"`, with the same omission rule as
+/// [`write_import_kind_field`].
+#[inline]
+pub(super) fn write_export_kind_field(
+    w: &mut JsonWriter,
+    export_kind: internal::ExportKind,
+    ctx: &Ctx<'_>,
+) {
+    match export_kind {
+        internal::ExportKind::Type => w.raw(",\"exportKind\":\"type\""),
+        internal::ExportKind::Value if ctx.vanilla_acorn => {}
+        internal::ExportKind::Value => w.raw(",\"exportKind\":\"value\""),
     }
 }
 
