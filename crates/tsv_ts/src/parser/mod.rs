@@ -140,6 +140,15 @@ struct LtRegion {
     lt_pos: usize,
 }
 
+/// One discarded grouping paren pair, recorded while a binding pattern is read
+/// ([`Parser::record_grouping_parens`]): the span of the expression it wrapped, and
+/// where its `(` stands, which is where the binding-pattern error points.
+#[derive(Clone, Copy)]
+pub(super) struct GroupingParen {
+    pub(super) inner: Span,
+    pub(super) open: u32,
+}
+
 /// The parser state [`Parser::rewind`] restores after the grammar's one
 /// speculative parse ([`Parser::parse_arrow_or_rewind`]): the lexer cursor, the
 /// one-token window with its decoded values and line-terminator flags, `prev_end`,
@@ -157,6 +166,10 @@ struct LtRegion {
 /// struct — the destructuring in [`Parser::rewind`] guards only the other
 /// direction — so a field added below `grouping_depth` must be classified here
 /// by hand: carried, combinator-restored, or provably immutable for the parse.
+/// `record_grouping_parens` is combinator-restored. `grouping_parens` is deliberately
+/// not carried: an entry an abandoned parse leaves names a `(`…`)` pair that is in the
+/// source however the rest is read, so it can only ever mark a target the real parse
+/// also sees wrapped.
 pub(super) struct Checkpoint<'arena> {
     lexer: LexerCheckpoint,
     current: Token,
@@ -245,6 +258,19 @@ pub struct Parser<'a, 'arena> {
     /// `preserveParens: true` and skips `remove_parens`. Set via
     /// [`crate::parse_embedded_preserve_parens`].
     pub(crate) preserve_parens: bool,
+    /// When `true`, every discarded grouping paren is recorded in
+    /// [`Parser::grouping_parens`]. Set only while [`Parser::parse_binding_pattern`] reads
+    /// its pattern as an array/object literal, the one place a paren the internal AST
+    /// drops still decides the verdict: a binding pattern admits no parenthesized target.
+    /// The flag stays set through everything nested in the pattern — a default's
+    /// function or arrow body included — so those parens are recorded too; an entry matches
+    /// only a target whose own span it wraps, so the extra entries never decide a verdict.
+    record_grouping_parens: bool,
+    /// The grouping parens discarded while [`Parser::record_grouping_parens`] was set,
+    /// in parse order — acorn's `parenthesizedBind`, kept as a list because tsv refines
+    /// the literal after the parse instead of threading a record through it. Read and
+    /// truncated by [`Parser::parse_binding_pattern`]; never reaches the wire.
+    grouping_parens: Vec<GroupingParen>,
     /// True when parsing inside `declare namespace`/`declare module` (acorn/babel
     /// `inAmbientContext`). Relaxes a few ambient-only grammar rules — notably a
     /// single trailing comma after a rest parameter is tolerated throughout the
@@ -531,6 +557,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             top_level_as_is_assertion: true, // Enable by default (TypeScript context)
             grouping_depth: 0,               // Not inside any grouping delimiters
             preserve_parens: false,          // Discard grouping parens (paren-free public AST)
+            record_grouping_parens: false,   // Only while a binding pattern is read
+            grouping_parens: Vec::new(),     // Filled only while that flag is set
             in_ambient_context: false,       // Not in declare namespace/module
             lexer_error: None,               // No stored lexer error
             peek_had_line_terminator: false, // No peek cached yet
@@ -2652,11 +2680,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         matches!(self.current.kind, TokenKind::Colon)
     }
 
-    /// Convert an expression to a binding pattern.
+    /// Convert an expression to a Svelte block or tag pattern — an `{#each}` context, a
+    /// `{:then}` / `{:catch}` value, a `{@const}` id ([`crate::parse_pattern_with_comments`]).
     ///
     /// This converts ObjectExpression to ObjectPattern, ArrayExpression to ArrayPattern,
-    /// etc. Used when parsing destructuring patterns in variable declarations and
-    /// similar contexts.
+    /// etc., under Svelte's reading of the pattern as an assignment target. A
+    /// declaration's or parameter's binding pattern never comes through here; it is read
+    /// by `parse_binding_pattern`.
     ///
     /// # Arguments
     ///
@@ -2670,9 +2700,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &self,
         expr: Expression<'arena>,
     ) -> Result<Expression<'arena>, ParseError> {
-        // Svelte `{:then}` / `{:catch}` binding patterns — a binding context, so a
-        // type-assertion target is rejected (same as for-heads / function params).
-        self.to_assignable(expr, expression_assignable::AssignableContext::Binding)
+        // Svelte block and `{@const}` patterns, which Svelte reads as assignment
+        // targets: a member or parenthesized target is accepted, a type-assertion
+        // target still rejects (see `AssignableContext::SveltePattern`).
+        self.to_assignable(
+            expr,
+            expression_assignable::AssignableContext::SveltePattern,
+        )
     }
 
     /// Parse a string literal into a Literal node.

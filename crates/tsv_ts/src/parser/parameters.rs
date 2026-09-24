@@ -114,23 +114,40 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// caller: a destructured *parameter* / *declarator* binds the type on the
     /// pattern (`parse_destructured_binding`), whereas a rest element binds it on
     /// the enclosing `RestElement` (`...[a, b]: T`), matching acorn.
+    ///
+    /// The pattern is read as an array/object literal and refined afterward, so the
+    /// grouping parens the literal parse discards are recorded while it runs
+    /// ([`Parser::record_grouping_parens`]): a binding pattern admits no parenthesized
+    /// target (`let [(a)] = x`), and the refinement cannot see a paren the internal AST
+    /// has dropped. The record is cut back to where this pattern found it once the
+    /// refinement has read it.
     pub(super) fn parse_binding_pattern(&mut self) -> Result<Expression<'arena>, ParseError> {
-        let expr = if self.check(&TokenKind::BracketOpen) {
-            let (array, span) = self.parse_array_expression()?;
-            Expression {
-                span,
-                kind: ExpressionKind::ArrayExpression(array),
-            }
-        } else {
-            let (object, span) = self.parse_object_expression()?;
-            Expression {
-                span,
-                kind: ExpressionKind::ObjectExpression(object),
-            }
-        };
-        // Binding context: a type assertion is not a valid binding target
-        // (`let [x as T] = …` / `function f([x as T])` reject, matching acorn).
-        self.to_assignable(expr, AssignableContext::Binding)
+        let mark = self.grouping_parens.len();
+        let literal = self.with_context_flag(
+            |p| &mut p.record_grouping_parens,
+            true,
+            |p| {
+                Ok(if p.check(&TokenKind::BracketOpen) {
+                    let (array, span) = p.parse_array_expression()?;
+                    Expression {
+                        span,
+                        kind: ExpressionKind::ArrayExpression(array),
+                    }
+                } else {
+                    let (object, span) = p.parse_object_expression()?;
+                    Expression {
+                        span,
+                        kind: ExpressionKind::ObjectExpression(object),
+                    }
+                })
+            },
+        );
+        // Binding context: a type assertion, a member expression and a parenthesized
+        // target are none of them binding targets (`let [x as T] = …`, `let [a.b] = …`,
+        // `function f([(x)])` all reject, matching acorn).
+        let pattern = literal.and_then(|expr| self.to_assignable(expr, AssignableContext::Binding));
+        self.grouping_parens.truncate(mark);
+        pattern
     }
 
     /// Parse a destructuring binding (`[a, b]` / `{a, b}`) with an optional

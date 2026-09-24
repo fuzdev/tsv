@@ -1,0 +1,600 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 239,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 93,
+				"data": " a {@const} id is read as an assignment target, so a parenthesized target is grouping "
+			},
+			{
+				"type": "Text",
+				"start": 93,
+				"end": 94,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 94,
+				"end": 238,
+				"test": {
+					"type": "Identifier",
+					"start": 99,
+					"end": 100,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 5
+						},
+						"end": {
+							"line": 2,
+							"column": 6
+						}
+					},
+					"name": "a"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 101,
+							"end": 103,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ConstTag",
+							"start": 103,
+							"end": 131,
+							"declaration": {
+								"type": "VariableDeclaration",
+								"kind": "const",
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"id": {
+											"type": "ArrayPattern",
+											"start": 111,
+											"end": 123,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 10
+												},
+												"end": {
+													"line": 3,
+													"column": 22
+												}
+											},
+											"elements": [
+												{
+													"type": "Identifier",
+													"start": 112,
+													"end": 114,
+													"loc": {
+														"start": {
+															"line": 3,
+															"column": 11
+														},
+														"end": {
+															"line": 3,
+															"column": 13
+														}
+													},
+													"name": "b1"
+												},
+												{
+													"type": "AssignmentPattern",
+													"start": 116,
+													"end": 122,
+													"loc": {
+														"start": {
+															"line": 3,
+															"column": 15
+														},
+														"end": {
+															"line": 3,
+															"column": 21
+														}
+													},
+													"left": {
+														"type": "Identifier",
+														"start": 116,
+														"end": 118,
+														"loc": {
+															"start": {
+																"line": 3,
+																"column": 15
+															},
+															"end": {
+																"line": 3,
+																"column": 17
+															}
+														},
+														"name": "c1"
+													},
+													"right": {
+														"type": "Literal",
+														"start": 121,
+														"end": 122,
+														"loc": {
+															"start": {
+																"line": 3,
+																"column": 20
+															},
+															"end": {
+																"line": 3,
+																"column": 21
+															}
+														},
+														"value": 1,
+														"raw": "1"
+													}
+												}
+											]
+										},
+										"init": {
+											"type": "Identifier",
+											"start": 126,
+											"end": 130,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 24
+												},
+												"end": {
+													"line": 3,
+													"column": 28
+												}
+											},
+											"name": "expr"
+										},
+										"start": 111,
+										"end": 130
+									}
+								],
+								"start": 105,
+								"end": 130
+							}
+						},
+						{
+							"type": "Text",
+							"start": 131,
+							"end": 133,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ConstTag",
+							"start": 133,
+							"end": 166,
+							"declaration": {
+								"type": "VariableDeclaration",
+								"kind": "const",
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"id": {
+											"type": "ObjectPattern",
+											"start": 141,
+											"end": 158,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 10
+												},
+												"end": {
+													"line": 4,
+													"column": 27
+												}
+											},
+											"properties": [
+												{
+													"type": "Property",
+													"start": 143,
+													"end": 149,
+													"loc": {
+														"start": {
+															"line": 4,
+															"column": 12
+														},
+														"end": {
+															"line": 4,
+															"column": 18
+														}
+													},
+													"method": false,
+													"shorthand": false,
+													"computed": false,
+													"key": {
+														"type": "Identifier",
+														"start": 143,
+														"end": 145,
+														"loc": {
+															"start": {
+																"line": 4,
+																"column": 12
+															},
+															"end": {
+																"line": 4,
+																"column": 14
+															}
+														},
+														"name": "b2"
+													},
+													"value": {
+														"type": "Identifier",
+														"start": 147,
+														"end": 149,
+														"loc": {
+															"start": {
+																"line": 4,
+																"column": 16
+															},
+															"end": {
+																"line": 4,
+																"column": 18
+															}
+														},
+														"name": "c2"
+													},
+													"kind": "init"
+												},
+												{
+													"type": "RestElement",
+													"start": 151,
+													"end": 156,
+													"loc": {
+														"start": {
+															"line": 4,
+															"column": 20
+														},
+														"end": {
+															"line": 4,
+															"column": 25
+														}
+													},
+													"argument": {
+														"type": "Identifier",
+														"start": 154,
+														"end": 156,
+														"loc": {
+															"start": {
+																"line": 4,
+																"column": 23
+															},
+															"end": {
+																"line": 4,
+																"column": 25
+															}
+														},
+														"name": "d2"
+													}
+												}
+											]
+										},
+										"init": {
+											"type": "Identifier",
+											"start": 161,
+											"end": 165,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 29
+												},
+												"end": {
+													"line": 4,
+													"column": 33
+												}
+											},
+											"name": "expr"
+										},
+										"start": 141,
+										"end": 165
+									}
+								],
+								"start": 135,
+								"end": 165
+							}
+						},
+						{
+							"type": "Text",
+							"start": 166,
+							"end": 168,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ConstTag",
+							"start": 168,
+							"end": 191,
+							"declaration": {
+								"type": "VariableDeclaration",
+								"kind": "const",
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"id": {
+											"type": "ArrayPattern",
+											"start": 176,
+											"end": 183,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 10
+												},
+												"end": {
+													"line": 5,
+													"column": 17
+												}
+											},
+											"elements": [
+												{
+													"type": "RestElement",
+													"start": 177,
+													"end": 182,
+													"loc": {
+														"start": {
+															"line": 5,
+															"column": 11
+														},
+														"end": {
+															"line": 5,
+															"column": 16
+														}
+													},
+													"argument": {
+														"type": "Identifier",
+														"start": 180,
+														"end": 182,
+														"loc": {
+															"start": {
+																"line": 5,
+																"column": 14
+															},
+															"end": {
+																"line": 5,
+																"column": 16
+															}
+														},
+														"name": "b3"
+													}
+												}
+											]
+										},
+										"init": {
+											"type": "Identifier",
+											"start": 186,
+											"end": 190,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 19
+												},
+												"end": {
+													"line": 5,
+													"column": 23
+												}
+											},
+											"name": "expr"
+										},
+										"start": 176,
+										"end": 190
+									}
+								],
+								"start": 170,
+								"end": 190
+							}
+						},
+						{
+							"type": "Text",
+							"start": 191,
+							"end": 193,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ConstTag",
+							"start": 193,
+							"end": 226,
+							"declaration": {
+								"type": "VariableDeclaration",
+								"kind": "const",
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"id": {
+											"type": "ObjectPattern",
+											"start": 201,
+											"end": 218,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 10
+												},
+												"end": {
+													"line": 8,
+													"column": 2
+												}
+											},
+											"properties": [
+												{
+													"type": "Property",
+													"start": 205,
+													"end": 215,
+													"loc": {
+														"start": {
+															"line": 7,
+															"column": 2
+														},
+														"end": {
+															"line": 7,
+															"column": 12
+														}
+													},
+													"method": false,
+													"shorthand": false,
+													"computed": false,
+													"key": {
+														"type": "Identifier",
+														"start": 205,
+														"end": 207,
+														"loc": {
+															"start": {
+																"line": 7,
+																"column": 2
+															},
+															"end": {
+																"line": 7,
+																"column": 4
+															}
+														},
+														"name": "b4"
+													},
+													"value": {
+														"type": "ArrayPattern",
+														"start": 209,
+														"end": 215,
+														"loc": {
+															"start": {
+																"line": 7,
+																"column": 6
+															},
+															"end": {
+																"line": 7,
+																"column": 12
+															}
+														},
+														"elements": [
+															{
+																"type": "MemberExpression",
+																"start": 210,
+																"end": 214,
+																"loc": {
+																	"start": {
+																		"line": 7,
+																		"column": 7
+																	},
+																	"end": {
+																		"line": 7,
+																		"column": 11
+																	}
+																},
+																"object": {
+																	"type": "Identifier",
+																	"start": 210,
+																	"end": 212,
+																	"loc": {
+																		"start": {
+																			"line": 7,
+																			"column": 7
+																		},
+																		"end": {
+																			"line": 7,
+																			"column": 9
+																		}
+																	},
+																	"name": "c4"
+																},
+																"property": {
+																	"type": "Identifier",
+																	"start": 213,
+																	"end": 214,
+																	"loc": {
+																		"start": {
+																			"line": 7,
+																			"column": 10
+																		},
+																		"end": {
+																			"line": 7,
+																			"column": 11
+																		}
+																	},
+																	"name": "d"
+																},
+																"computed": false,
+																"optional": false
+															}
+														]
+													},
+													"kind": "init"
+												}
+											]
+										},
+										"init": {
+											"type": "Identifier",
+											"start": 221,
+											"end": 225,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 5
+												},
+												"end": {
+													"line": 8,
+													"column": 9
+												}
+											},
+											"name": "expr"
+										},
+										"start": 201,
+										"end": 225
+									}
+								],
+								"start": 195,
+								"end": 225
+							}
+						},
+						{
+							"type": "Text",
+							"start": 226,
+							"end": 228,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 228,
+							"end": 232,
+							"expression": {
+								"type": "Identifier",
+								"start": 229,
+								"end": 231,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 4
+									}
+								},
+								"name": "c1"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 232,
+							"end": 233,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"alternate": null
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

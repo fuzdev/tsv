@@ -6,7 +6,7 @@ use crate::ast::internal::{
     ArrayPattern, AssignmentOperator, AssignmentPattern, Expression, ExpressionKind, ObjectPattern,
     ObjectPatternProperty, ObjectProperty, Property, RestElement, SpreadElement,
 };
-use tsv_lang::ParseError;
+use tsv_lang::{ParseError, Span};
 
 use super::Parser;
 
@@ -17,9 +17,10 @@ use super::Parser;
 /// (`(x as T) = …`, `for (x! of …)`, `/** @type {T} */ (x) = …`) — tsc's
 /// `checkReferenceExpression` reads the two positions with one rule — and differ
 /// only on a non-simple target, which `Assignment` defers and `ForHead` rejects;
-/// `Binding` (function params, destructuring bindings, Svelte `{:then}`/`{:catch}`)
-/// rejects every wrapper. acorn-typescript's `isBinding` split puts the for-head on
-/// the binding side; tsv does not follow it there.
+/// `Binding` (function params, destructuring bindings) rejects every wrapper, and a
+/// member or parenthesized target too; `SveltePattern` (a Svelte block or `{@const}`
+/// pattern) rejects the wrappers but takes those two. acorn-typescript's `isBinding`
+/// split puts the for-head on the binding side; tsv does not follow it there.
 #[derive(Clone, Copy)]
 pub(in crate::parser) enum AssignableContext {
     /// `… = rhs` — a type-assertion wrapping a *simple* target is itself a valid target.
@@ -32,9 +33,21 @@ pub(in crate::parser) enum AssignableContext {
     /// acorn's AST) — but keeps rejecting a non-simple target (`for (f() of …)`),
     /// which `Assignment` defers.
     ForHead,
-    /// Binding position — a type-assertion *or* a (parenthesized) JSDoc-cast target
-    /// is rejected (even bare parens are illegal: `function f((x))`).
+    /// Binding position — a `BindingElement` / `BindingRestElement`, which ecma262
+    /// spells as a `BindingIdentifier` or a nested `BindingPattern` and nothing else. A
+    /// type-assertion or (parenthesized) JSDoc-cast target is rejected, and so are a
+    /// member expression (`let [a.b] = x`) and a parenthesized target
+    /// (`function f([(x)])`, read off [`Parser::grouping_parens`]): the grammar has no
+    /// production for either, so each is a syntax error rather than a deferred
+    /// early error, and the paren-free reprint would change the program.
     Binding,
+    /// A Svelte block or tag pattern — an `{#each}` context, a `{:then}` / `{:catch}`
+    /// value, a `{@const}` id. Svelte reads each as the LEFT side of an assignment
+    /// (`read_pattern` parses `(${pattern} = 1)`; `{@const}` parses `id = init`), so a
+    /// member expression and a parenthesized target are the
+    /// `DestructuringAssignmentTarget`s it admits, and tsv accepts both to match its
+    /// AST. Every other target is graded as `Binding` grades it.
+    SveltePattern,
 }
 
 impl<'a, 'arena> Parser<'a, 'arena> {
@@ -69,6 +82,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         expr: Expression<'arena>,
         context: AssignableContext,
     ) -> Result<Expression<'arena>, ParseError> {
+        // A parenthesized target is no binding target: `BindingElement` and
+        // `BindingRestElement` derive a `BindingIdentifier` or a nested pattern, never a
+        // parenthesized one, so `let [(a)] = x` is a syntax error (tsc TS1181, acorn
+        // "Parenthesized pattern"), and the paren-free reprint would be a different, valid
+        // program. Asked of every node the conversion reaches, ahead of the kind arms, so a
+        // grouped identifier, pattern, member or default (`[(a = 1)]`) rejects alike. A
+        // default's right side is never converted, so `[a = (1)]` stays an expression's
+        // own grouping.
+        if matches!(context, AssignableContext::Binding)
+            && let Some(open) = self.grouping_paren_around(expr.span())
+        {
+            return Err(self.error_msg_at(
+                "A binding pattern cannot contain a parenthesized target",
+                open as usize,
+            ));
+        }
+
         match &expr.kind {
             // A target on an optional chain (`a?.b`, `a?.b!`, `a?.[i].c`) rejects in a
             // for-head. ecma262 gives an `OptionalExpression` the invalid
@@ -98,6 +128,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
             // Identifier is already a valid assignment target
             ExpressionKind::Identifier(_) => Ok(expr),
+
+            // A member expression is an assignment target but no binding target: the
+            // binding grammar names only a `BindingIdentifier` or a nested pattern
+            // (tsc TS1005, acorn "Binding member expression").
+            ExpressionKind::MemberExpression(_)
+                if matches!(context, AssignableContext::Binding) =>
+            {
+                Err(self.error_msg_at(
+                    "A binding pattern cannot contain a member expression",
+                    expr.span().start_usize(),
+                ))
+            }
 
             // Member expression is a valid assignment target
             ExpressionKind::MemberExpression(_) => Ok(expr),
@@ -329,6 +371,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return Err(self.error_msg_at("Invalid assignment target", start));
         }
         Ok(target)
+    }
+
+    /// The `(` of the grouping paren pair wrapping exactly `span`, if one was recorded
+    /// while the enclosing binding pattern was read (the outermost pair, for `((a))`).
+    fn grouping_paren_around(&self, span: Span) -> Option<u32> {
+        self.grouping_parens
+            .iter()
+            .rev()
+            .find(|paren| paren.inner == span)
+            .map(|paren| paren.open)
     }
 
     /// Build the "trailing comma after a rest element" syntax error (`[...a,]` /

@@ -374,6 +374,14 @@ written in the flags position) is not a flags production at all and is rejected,
 - Rest patterns (`{...rest}`, `[...rest]`)
 - Rest parameter as a binding pattern (`function f(...[a, b]) {}`, `(...{ a }) => {}`)
 - Computed properties in patterns
+- Binding vs assignment targets: a declaration's, parameter's or catch clause's pattern
+  holds only identifiers and nested patterns, so a parenthesized target (`let [(a)] = x`)
+  or a member target (`let [a.b] = x`) is a syntax error; an assignment pattern takes both
+  (`[(a)] = x`, `[a.b] = x`), including one nested in a binding default
+  (`let { a = [(b)] = x } = y`). A Svelte block or `{@const}` pattern is read as an
+  assignment target and takes both too —
+  [paren_target](../tests/fixtures/typescript/expressions/destructuring/paren_target/),
+  [member_target](../tests/fixtures/typescript/expressions/destructuring/member_target/)
 
 ### Function Declarations
 

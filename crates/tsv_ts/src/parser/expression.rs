@@ -16,12 +16,12 @@ use tsv_lang::printing::visual_width;
 use tsv_lang::source_scan;
 use tsv_lang::{ParseError, Span, TAB_WIDTH};
 
-use super::Parser;
 use super::expression_lookahead::{ArrowHead, matching_angle_close, type_args_follower_refuses};
 use super::expression_type_args::TypeArgScan;
 use super::scan::{
     LeadingZeroLiteral, classify_leading_zero, parse_number_literal, skip_whitespace_and_comments,
 };
+use super::{GroupingParen, Parser};
 
 //
 // Binding Power Constants for Pratt Parser
@@ -1968,6 +1968,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // not closed by this `)`.
         self.exit_stripped_grouping();
         debug_assert_encloses(paren_start as u32, paren_end as u32, parsed, parsed);
+        // A binding pattern is read as a literal and refined after the parse, so the
+        // pair it would reject has to outlive the discard (`let [(a)] = x`).
+        if self.record_grouping_parens {
+            self.grouping_parens.push(GroupingParen {
+                inner: parsed.span(),
+                open: paren_start as u32,
+            });
+        }
 
         // Grouping parens are normally discarded (the inner's own allocation flows
         // through, paren-free like acorn/Svelte). Two positions preserve them as an
