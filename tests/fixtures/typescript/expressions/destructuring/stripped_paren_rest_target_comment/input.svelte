@@ -50,16 +50,9 @@
 		// c2
 	] = x;
 
-	// a comment after the `)` follows the interior's share; a line comment in the shell
-	// still ends the line, so the block after the `)` lands ahead of it
+	// a comment after the `)` follows the interior's share
 	[...a /* c1 */ /* c2 */] = x;
 	({ ...a /* c1 */ /* c2 */ } = x);
-	[
-		...a /* c2 */ // c1
-	] = x;
-	({
-		...a /* c2 */ // c1
-	} = x);
 
 	// an own-line comment in the shell, then a line comment after the `)`: the pair keeps
 	// the order the author wrote it in, the line comment trailing the one before it
@@ -72,17 +65,6 @@
 		/* c1 */ // c2
 	} = x);
 
-	// an own-line comment in the shell, then a block after the `)`: the block hoists onto
-	// the target's line, ahead of the one the shell held
-	[
-		...a /* c2 */
-		/* c1 */
-	] = x;
-	({
-		...a /* c2 */
-		/* c1 */
-	} = x);
-
 	// a multi-line block comment keeps its lines and breaks the pattern
 	[
 		...a /* c1
@@ -90,7 +72,7 @@
 	] = x;
 
 	// an own-line multi-line block in the shell keeps its own line, in the object pattern
-	// as in the array pattern, a block after the `)` hoisting ahead of it
+	// as in the array pattern
 	[
 		...a
 		/* c1
@@ -104,11 +86,6 @@
 	({
 		b,
 		...a
-		/* c1
-	c2 */
-	} = x);
-	({
-		...a /* t */
 		/* c1
 	c2 */
 	} = x);

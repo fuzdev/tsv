@@ -32,7 +32,7 @@ use super::test_patterns::{
     build_test_callee_flat_doc, is_test_call, test_call_flat_layout_applies,
 };
 use crate::ast::internal;
-use crate::printer::comments::ShellRunOrder;
+use crate::printer::comments::ShareSite;
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, function_signature_has_breaking_comments,
 };
@@ -1131,7 +1131,8 @@ fn build_call_with_arg_comments(
                 // Open the gap (reclassify hugging blocks, emit before/after-comma
                 // trailing comments + the comma, then the interior's own-line blocks);
                 // the separator + leading comments below finish it.
-                let gap = printer.open_inter_arg_gap(&mut arg_parts, arg, next_arg_start);
+                let interior = printer.arg_paren_interior(paren_open, call.arguments, i);
+                let gap = printer.open_inter_arg_gap(&mut arg_parts, arg, interior, next_arg_start);
                 let pc = gap.comments;
                 if gap.forces_expansion {
                     force_expansion = true;
@@ -1174,83 +1175,46 @@ fn build_call_with_arg_comments(
             // states the same split for the builders that need no force-expansion
             // feedback): the parent's share of a spread's stripped-paren interior —
             // own-line comments the spread's own doc deliberately leaves behind, each a
-            // sibling line the call cannot stay collapsed around — and the ordinary gap.
-            // Their order is `push_last_element_share_and_run`'s, under the argument
-            // lists' `SourceOrder`.
+            // sibling line the call cannot stay collapsed around — and the ordinary gap,
+            // whose trailing run follows the share (`push_element_share_and_run`).
             // A same-line `//` the spread's own doc defers must flush INSIDE the call:
             // on a collapsed list the buffer drains past the `)` and the `;`,
-            // re-binding the comment to the statement. Also feeds the demotion below.
-            let interior = arg.paren_interior();
-            let arg_defers_line = printer.paren_interior_defers_line_comment(interior);
-            if arg_defers_line {
+            // re-binding the comment to the statement.
+            let interior = printer.arg_paren_interior(paren_open, call.arguments, i);
+            if printer.paren_interior_defers_line_comment(interior) {
                 force_expansion = true;
             }
-            let mut run_forces_expansion = false;
-            let share_pushed = printer.push_last_element_share_and_run(
+            // The ordinary gap, on the argument's own end. Widening this anchor to reach the
+            // interior claims the spread's share a second time — the same-line blocks and
+            // interior `//`s print twice. The last-argument gap holds the list's own comma
+            // (`for_closer_gap`, never the delimiter reading) — see
+            // `emit_last_arg_trailing_comments`, the shared path this loop mirrors so it can
+            // feed `force_expansion`.
+            let pc = PartitionedComments::for_closer_gap(printer, arg.span().end, span.end);
+
+            // The trailing run, in source order: same-line blocks, then the same-line line
+            // comment (via `line_suffix`). With no trailing comma emitted (trailingComma:
+            // 'none'), a block that sat after the source comma simply trails the arg past
+            // where the comma was. Blocks alone don't force expansion — width/source
+            // newlines decide: fn({short} /* c */) stays inline, fn({long...} /* c */)
+            // expands. A line comment always forces the CALL to expand: it runs to end of
+            // line, and never counts toward width (prettier's `lineSuffix`), so the
+            // argument's own group can stay inline while the call breaks.
+            let share_pushed = printer.push_element_share_and_run(
                 &mut arg_parts,
                 interior,
-                ShellRunOrder::SourceOrder,
-                |arg_parts| {
-                    // The ordinary gap, on the argument's own end. Widening this anchor to
-                    // reach the interior claims the spread's share a second time — the
-                    // same-line blocks and interior `//`s print twice.
-                    let arg_end = arg.span().end;
-                    let paren_close = span.end;
-
-                    // The last-argument gap holds the list's own comma (`for_closer_gap`,
-                    // never the delimiter reading) — see `emit_last_arg_trailing_comments`,
-                    // the shared path this loop mirrors so it can feed `force_expansion`.
-                    let mut pc = PartitionedComments::for_closer_gap(printer, arg_end, paren_close);
-                    // The argument's own doc may already end in a deferred `//` (a spread
-                    // whose stripped parens held one); a second one may not join that line.
-                    pc.demote_trailing_line_after_deferred(arg_defers_line);
-
-                    // Trailing comments after the last arg, before the closing paren, in
-                    // source order: same-line block comments first, then the same-line
-                    // line comment (via `line_suffix`), then own-line comments (each on its
-                    // own line). Emitting same-line comments before own-line ones — and
-                    // never dropping a block — avoids merging consecutive comments onto one
-                    // line (which reverses their order) and content loss.
-
-                    // (1) Same-line block comments trail the arg in source order. With no
-                    // trailing comma emitted (trailingComma: 'none'), a block that sat after
-                    // the source comma simply trails the arg past where the comma was — no
-                    // split around the never-emitted comma. Don't force expansion on their
-                    // own — let width/source newlines decide: fn({short} /* c */) stays
-                    // inline, fn({long...} /* c */) expands.
-                    for comment in &pc.trailing_block {
-                        arg_parts.push(d.text(" "));
-                        arg_parts.push(printer.build_comment_doc(comment));
-                    }
-
-                    // (2) Same-line line comment after the last arg, via `line_suffix`. At
-                    // most one — the trailing run ends at the first `//`
-                    // (`Printer::closer_trailing_comment_run`); anything past it is
-                    // own-line and sits in `pc.leading` below. No trailing comma precedes
-                    // it (trailingComma: 'none').
-                    if pc.has_trailing_line() {
-                        // Line comments always force the CALL to expand - the newline
-                        // after the comment means the call must break to multiple lines. A
-                        // trailing line comment never counts toward width (prettier's
-                        // `lineSuffix`), so the argument's own group (array/object, binary,
-                        // conditional, …) can stay inline even when the comment exceeds
-                        // print_width; force_expansion ensures the call expands.
-                        run_forces_expansion = true;
-                        if let Some(comment) = pc.trailing_line {
-                            arg_parts.push(printer.build_trailing_line_comment_doc(comment));
-                        }
-                    }
-
-                    // (3) Own-line comments (block or line) after the last arg, before the
-                    // closing paren — emitted each on its own line, with no trailing comma
-                    // (trailingComma: 'none').
-                    if !pc.leading.is_empty() {
-                        run_forces_expansion = true;
-                        pc.emit_dangling_comments(arg_parts, printer);
-                    }
-                },
-                |_| {},
+                ShareSite::Closer,
+                pc.trailing_run(),
             );
+            let mut run_forces_expansion = pc.has_trailing_line();
+
+            // Own-line comments (block or line) after the last arg, before the closing
+            // paren — emitted each on its own line, with no trailing comma (trailingComma:
+            // 'none').
+            if !pc.leading.is_empty() {
+                run_forces_expansion = true;
+                pc.emit_dangling_comments(&mut arg_parts, printer);
+            }
             if share_pushed || run_forces_expansion {
                 force_expansion = true;
             }

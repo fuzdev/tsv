@@ -8,4 +8,13 @@
 		,
 		/* c */
 	];
+
+	// Two comments there keep a space between them, inline and on their own line
+	const c = [x, ,/* c1 */ /* c2 */];
+
+	const e = [
+		x,
+		,
+		/* c1 */ /* c2 */
+	];
 </script>

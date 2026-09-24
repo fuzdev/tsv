@@ -41,3 +41,13 @@ below it -->
 {#each items as { b: (a // c1
 ) // c2
 , d }}<div>{a} {d}</div>{/each}
+
+<!-- an own-line comment in the rest's parens, then a comment after the `)`: one run, in the
+order the author wrote it -->
+{#each items as [b, ...(a
+/* i */
+) /* t */]}<div>{a}</div>{/each}
+
+{#each items as { b, ...(a
+// i
+) /* t */ }}<div>{a}</div>{/each}

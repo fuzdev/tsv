@@ -1814,7 +1814,15 @@ pub(super) fn build_expand_first_arg_doc(
         prev_end = arg.span().end;
     }
     if let Some(last_arg) = arguments.last() {
-        emit_last_arg_trailing_comments(printer, &mut tail_parts, last_arg, call_end);
+        // No argument here is frozen: this layout builds each through
+        // `build_arg_expression_doc`, so the interior is the argument's own.
+        emit_last_arg_trailing_comments(
+            printer,
+            &mut tail_parts,
+            last_arg,
+            last_arg.paren_interior(),
+            call_end,
+        );
     }
 
     let all_args_broken =
@@ -2081,7 +2089,8 @@ pub(super) fn build_args_joined_with_comments(
             let next_arg_start = arguments[i + 1].span().start;
 
             if printer.inter_arg_gap_has_comments(arg, next_arg_start) {
-                let gap = printer.open_inter_arg_gap(&mut parts, arg, next_arg_start);
+                let interior = printer.arg_paren_interior(paren_open, arguments, i);
+                let gap = printer.open_inter_arg_gap(&mut parts, arg, interior, next_arg_start);
                 // The gap's `forces_expansion` obligation is the callers': the soft-join
                 // callers are unreachable when any spread interior forces expansion —
                 // their earlier trailing-comment arms, keyed on
@@ -2091,7 +2100,12 @@ pub(super) fn build_args_joined_with_comments(
                 // A commented gap's blank is comment-aware (routed, so a comment's own
                 // newlines don't read as one) and rides here rather than at the next
                 // iteration's top, whose guard skips a gap that holds a comment.
-                if join.preserves_blanks() && gap.comments.has_blank_line_in_gap(printer) {
+                // Behind a spread's stripped-paren interior the run past the `)` follows the
+                // interior on lines of its own, where an author blank below it survives in
+                // every layout, as it does when the run is a leading one.
+                if (join.preserves_blanks() || gap.comments.is_behind_interior())
+                    && gap.comments.has_blank_line_in_gap(printer)
+                {
                     parts.push(d.literalline());
                 }
                 // A line comment runs to EOL → hard-break; otherwise honor the caller's style.
@@ -2123,7 +2137,8 @@ pub(super) fn build_args_joined_with_comments(
             // triggers (function composition, the expand-first fallback) that preempt the
             // callers' own comment-aware paths, so nothing else emits it and the loss is
             // total.
-            emit_last_arg_trailing_comments(printer, &mut parts, arg, paren_close);
+            let interior = printer.arg_paren_interior(paren_open, arguments, i);
+            emit_last_arg_trailing_comments(printer, &mut parts, arg, interior, paren_close);
         }
     }
 

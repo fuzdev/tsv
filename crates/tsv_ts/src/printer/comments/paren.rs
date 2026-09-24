@@ -6,7 +6,7 @@
 // re-added with the parens when stripping would relocate them, or prepended at a
 // chain base.
 
-use super::{CommentSpacing, CommentVec, LeadingGlue, Printer, RunLeadingBlank, ShellRunOrder};
+use super::{CommentSpacing, CommentVec, LeadingGlue, Printer, RunLeadingBlank, ShareSite};
 use crate::ast::internal;
 use crate::printer::ParenContext;
 use crate::printer::chain::chain_paren_leading_gap;
@@ -791,67 +791,224 @@ impl<'a> Printer<'a> {
             .collect()
     }
 
-    /// Whether the parent's share of a stripped-paren interior
-    /// ([`Self::paren_interior_own_line_comments`]) ends in a `//` — the END-of-list
-    /// ordering question: a share whose last comment is a `//` can have nothing glued after
-    /// it, so the ordinary `[node end, closer)` gap run must emit FIRST, its inline blocks
-    /// landing on the argument's line ahead of any deferred suffix. Where a block-ending
-    /// share goes relative to that run is the list family's [`ShellRunOrder`].
+    /// Whether a spread's or rest's stripped-paren interior stands between the element's
+    /// own text and the comments written after its `)` — the element's trailing **run**.
     ///
-    /// Asked of the LAST element only. Between two elements the comma gives the gap's run a
-    /// home on the element's own line and the share follows it past the comma, whatever the
-    /// share ends in (`...b, // c⏎/* i */`). [`Self::push_last_element_share_and_run`] is
-    /// the one emitter of the ordering, for every list with a last element — the argument
-    /// lists, the array and object literals, and the array and object patterns.
-    fn paren_interior_share_ends_in_line_comment(&self, interior: Option<Span>) -> bool {
-        self.paren_interior_own_line_comments(interior)
-            .last()
-            .is_some_and(|c| !c.is_block)
+    /// Two things put a line between them on the page, and both come from the interior:
+    ///
+    /// - the parent's **share** ([`Self::paren_interior_own_line_comments`]) — own-line
+    ///   comments the parent prints on lines of their own below the element;
+    /// - a same-line `//` the element's own doc defers
+    ///   ([`Self::paren_interior_defers_line_comment`]) — it ends the element's line.
+    ///
+    /// Either way the run cannot trail the element's text, which is what it does when the
+    /// parens are absent, so it follows the interior instead: the source order, and the
+    /// order the same authoring without the parens prints in. At an element the list
+    /// continues past the element's comma therefore moves up against the element, ahead of
+    /// the interior and the run ([`Self::push_element_share_and_run`]). `None` has no
+    /// interior.
+    pub(crate) fn paren_interior_separates_run(&self, interior: Option<Span>) -> bool {
+        !self.paren_interior_own_line_comments(interior).is_empty()
+            || self.paren_interior_defers_line_comment(interior)
     }
 
-    /// Emit a LAST element's stripped-paren share and its closer-gap run, in the order
-    /// the list family names.
+    /// Emit an element's stripped-paren share, then its trailing run — the one emitter of
+    /// that order, for every list family: the argument lists, the array and object
+    /// literals, and the array and object patterns, at the last element and between two.
     ///
-    /// A share ending in a `//` goes last under every family
-    /// ([`Self::paren_interior_share_ends_in_line_comment`]): nothing can be glued behind
-    /// it. A share ending in a block splits the families, and only over the run's BLOCKS
-    /// ([`ShellRunOrder`]): the argument lists keep source order, a cataloged prettier
-    /// divergence ("Spread stripped-paren comment then an outside block, as the LAST
-    /// argument" in conformance_prettier_ts_comments.md §Comment relocation), while the
-    /// array and object literals and patterns match prettier, which hoists a block written
-    /// after the `)` onto the element's line. The run's `//` follows the share under both
-    /// (`...b⏎/* i */ // t`), where prettier agrees with the call family.
+    /// The share prints first because it was written first: the interior lies inside the
+    /// parens, the run behind the `)`. Every authoring is ordered as it would be without
+    /// the parens (`...b⏎/* i */ /* t */`, `...b⏎// i⏎/* t */`, `...b // i⏎/* t */`),
+    /// where both the comment inside the parens and the one written after them simply
+    /// trail the element in source order.
     ///
-    /// `interior` is `None` for an element with no interior (anything but a spread or a
-    /// rest), which leaves the run alone. The run comes in two halves, `push_blocks` and
-    /// `push_line`, whose shapes each list family keeps as its own; a family under
-    /// [`ShellRunOrder::SourceOrder`] never separates them, so it may pass its whole run as
-    /// `push_blocks`.
+    /// `run` is the element's trailing run in source order, as its list family collects it:
+    /// blocks that follow content on their source line, ending at most at one `//` (a `//`
+    /// ends its line, so it is always the run's last member). A caller between two
+    /// elements has already emitted the comma against the element
+    /// ([`Self::paren_interior_separates_run`]), and its run holds what does not lead the
+    /// next element ([`Self::run_leads_next_item`]): a run ending in a `//`, or blocks
+    /// above an author blank.
+    ///
+    /// Where the run lands is decided here, once, for every family:
+    ///
+    /// - behind a line ending in a `//` — the share's last comment, or with no share the
+    ///   element's own deferred one — the run opens the next line: a second deferred `//`
+    ///   WELDS with the first into one comment, the second `//` becoming text inside it, and
+    ///   a block placed ahead of the deferred one reverses the pair;
+    /// - [`ShareSite::NextElement`], a run of blocks alone — which reaches here only above
+    ///   an author blank, since without one it leads the next element
+    ///   ([`Self::run_leads_next_item`]) — opens the next line too, the blank below it;
+    /// - otherwise the run trails the line: each block glued on with a space, the `//`
+    ///   deferred through `line_suffix` (`...b⏎/* i */ /* t */`, `...b,⏎/* i */ // t⏎c`).
+    ///
+    /// A run on a fresh line keeps the glue the author gave its members.
     ///
     /// Returns whether the share printed anything — an own-line comment, which a list that
     /// may still collapse must force open (the call-argument loop's `force_expansion`).
-    pub(crate) fn push_last_element_share_and_run(
+    pub(crate) fn push_element_share_and_run<'c>(
         &self,
         parts: &mut DocBuf,
         interior: Option<Span>,
-        order: ShellRunOrder,
-        push_blocks: impl FnOnce(&mut DocBuf),
-        push_line: impl FnOnce(&mut DocBuf),
+        site: ShareSite,
+        run: impl IntoIterator<Item = &'c internal::Comment>,
     ) -> bool {
-        let mut pushed = false;
-        let share_ends_in_line = self.paren_interior_share_ends_in_line_comment(interior);
-        let block_share = interior.filter(|_| !share_ends_in_line);
-        if order == ShellRunOrder::SourceOrder {
-            pushed |= self.push_paren_interior_own_line_comments(parts, block_share);
+        self.push_element_share_and_run_with_blanks(parts, interior, site, true, run)
+    }
+
+    /// [`Self::push_element_share_and_run`] with the share's author-blank policy named — see
+    /// [`Self::push_paren_interior_own_line_comments`], whose array-elision case
+    /// is the one caller that passes `false`.
+    pub(crate) fn push_element_share_and_run_with_blanks<'c>(
+        &self,
+        parts: &mut DocBuf,
+        interior: Option<Span>,
+        site: ShareSite,
+        preserve_blanks: bool,
+        run: impl IntoIterator<Item = &'c internal::Comment>,
+    ) -> bool {
+        let share = self.paren_interior_own_line_comments(interior);
+        let line_ends_in_line_comment = share.last().map_or_else(
+            || self.paren_interior_defers_line_comment(interior),
+            |last| !last.is_block,
+        );
+        let pushed =
+            self.push_paren_interior_own_line_comments(parts, interior, site, preserve_blanks);
+        let run: CommentVec<'_> = run.into_iter().collect();
+        let Some(first) = run.first() else {
+            return pushed;
+        };
+        let run_has_line_comment = run.last().is_some_and(|c| !c.is_block);
+        let fresh_line =
+            line_ends_in_line_comment || (site == ShareSite::NextElement && !run_has_line_comment);
+        if fresh_line {
+            // Scanned from the run's own first comment: the run shared its source line with
+            // the `)` or the comma, so no author blank sits above it.
+            let scan_from = first.span.start;
+            self.push_trailing_comment_run(parts, run.iter().copied(), scan_from);
+        } else {
+            let d = self.d();
+            for comment in &run {
+                if comment.is_block {
+                    parts.push(d.text(" "));
+                    parts.push(self.build_comment_doc(comment));
+                } else {
+                    parts.push(self.build_trailing_line_comment_doc(comment));
+                }
+            }
         }
-        push_blocks(parts);
-        if order == ShellRunOrder::HoistBlocks {
-            pushed |= self.push_paren_interior_own_line_comments(parts, block_share);
-        }
-        push_line(parts);
-        pushed |= self
-            .push_paren_interior_own_line_comments(parts, interior.filter(|_| share_ends_in_line));
         pushed
+    }
+
+    /// Whether a comment ending at `comment_end` sits on the next item's line — the item at
+    /// `next_pos`, reached across nothing but whitespace, other comments and the grouping
+    /// `(`s the parser strips from it. The question every list family asks of a block the
+    /// author wrote after a separating comma: glued to the next item it LEADS that item
+    /// (`a, /* c */ b`), even behind an element whose stripped parens displaced its trailing
+    /// run past the comma, so run membership is one answer in every family — the call
+    /// family's routing (`PartitionedComments::route_after_comma_hugging_to_leading`), the
+    /// shared element-comma collector's displaced run
+    /// ([`Self::collect_element_trailing_comments`]) and the array literal's
+    /// `element_gap_split` all ask it here.
+    pub(crate) fn comment_hugs_next_item(&self, comment_end: u32, next_pos: u32) -> bool {
+        self.is_same_line(comment_end, next_pos)
+            || super::calls::has_stripped_paren_gap(self.source, comment_end, next_pos)
+    }
+
+    /// Whether an author blank line sits between `from` and the next item past it — the
+    /// first comment in source before `next_start`, else the item itself. A true empty
+    /// line, not two line breaks: behind a stripped-paren interior the comma is emitted up
+    /// against the element, so a comma the author gave a line of its own is not a line of
+    /// the output, and neither is the break around it.
+    pub(crate) fn blank_before_next_item(&self, from: u32, next_start: u32) -> bool {
+        let next = self
+            .comments_in_source_between(from, next_start)
+            .next()
+            .map_or(next_start, |c| c.span.start);
+        tsv_lang::printing::has_blank_line_between_strict(self.source, from, next)
+    }
+
+    /// Whether a run displaced past an element's comma
+    /// ([`Self::paren_interior_separates_run`]) LEADS the next item rather than following
+    /// the interior on a line of its own. An own-line block of the run — read with the
+    /// stripped `)` absent — keeps the line break the author wrote after it; otherwise the
+    /// run leads, and the comma, which now sits behind the element, is asked nothing. Three
+    /// conditions, all read from the source:
+    ///
+    /// - a run of blocks alone: a `//` ends its line, so a run holding one trails the
+    ///   interior;
+    /// - no author blank between the run and the next item: above one it keeps a line of
+    ///   its own, the blank below it;
+    /// - no own-line block the author broke after. After the comma the run holds only
+    ///   blocks not glued to the next item (a glued one is that item's own leading run, by
+    ///   [`Self::comment_hugs_next_item`]), so a run there ends a line and keeps it:
+    ///   `…), /* t */⏎c`. Before the comma the comma itself is what usually follows, and a
+    ///   break after the comma is not about the run: `…) /* t */, c` and `…) /* t */,⏎c`
+    ///   lead, and so does `…/* i */) /* t */⏎, c`, whose run shares a line with the
+    ///   interior's comment and so is not own-line — its break is dropped. What keeps its
+    ///   line is a run the author gave a line of its own apart from the stripped `)` and
+    ///   broke after (`…⏎) /* t */⏎, c`).
+    ///
+    /// A run that keeps its line takes one below the share — the share-pair rule, not the
+    /// paren-free spelling's own placement, which differs by list family.
+    /// `next_start` is the next item's start.
+    pub(crate) fn run_leads_next_item(
+        &self,
+        run: &[&internal::Comment],
+        comma: Option<u32>,
+        next_start: u32,
+    ) -> bool {
+        let (Some(first), Some(last)) = (run.first(), run.last()) else {
+            return false;
+        };
+        if !run.iter().all(|c| c.is_block) || self.blank_before_next_item(last.span.end, next_start)
+        {
+            return false;
+        }
+        if self.comment_hugs_next(last) {
+            return true;
+        }
+        // The author broke after the run: after the comma, or with nothing but the
+        // stripped `)` ahead of it on its line, that break is theirs to keep.
+        let before_comma = comma.is_some_and(|comma| last.span.start < comma);
+        before_comma && !self.line_holds_only_closers_before(first.span.start)
+    }
+
+    /// Whether the source line holding `pos` has nothing ahead of `pos` but whitespace and
+    /// `)`s — the closers of a stripped paren shell, which the output does not print, so a
+    /// comment there reads as one the author gave a line of its own.
+    fn line_holds_only_closers_before(&self, pos: u32) -> bool {
+        self.source.as_bytes()[..pos as usize]
+            .iter()
+            .rev()
+            .take_while(|&&b| b != b'\n' && b != b'\r')
+            .all(|&b| matches!(b, b' ' | b'\t' | b')'))
+    }
+
+    /// Emit a displaced run that leads the next item ([`Self::run_leads_next_item`]) — the
+    /// one rendering every list family gives it, ahead of that item's own leading run:
+    /// each block followed by a space, so the item (or its first leading comment) follows
+    /// on the block's line. The one exception is an honored format-ignore directive next,
+    /// which keeps its line ([`Self::directive_follows`]).
+    pub(crate) fn push_run_leading_next_item(
+        &self,
+        parts: &mut DocBuf,
+        run: &[&internal::Comment],
+        next_start: u32,
+    ) {
+        let d = self.d();
+        for (i, comment) in run.iter().enumerate() {
+            parts.push(self.build_comment_doc(comment));
+            let next = run.get(i + 1).copied().or_else(|| {
+                self.comments_to_emit_between(comment.span.end, next_start)
+                    .next()
+            });
+            parts.push(if self.directive_follows(next) {
+                d.hardline()
+            } else {
+                d.text(" ")
+            });
+        }
     }
 
     /// Whether a stripped-paren interior holds a comment the enclosing list must EXPAND
@@ -901,11 +1058,12 @@ impl<'a> Printer<'a> {
     /// [`Self::append_paren_interior_trailing_comments`] emits through `line_suffix` (an
     /// own-line `//` is the parent's share and defers nothing). `None` has no interior.
     ///
-    /// The caller that owns the gap *after* such a node must not let its own same-line
-    /// `//` defer onto the same output line: two deferred line comments emitted back to
-    /// back weld into ONE comment, the second `//` becoming text inside the first
-    /// (`// c1 // c2`). That is the merge prettier performs here and tsv refuses — see
-    /// `docs/comments.md` §Trailing and dangling runs.
+    /// Nothing the gap *after* such a node holds may share that output line: a second
+    /// deferred `//` welds with it into ONE comment, the second `//` becoming text inside
+    /// the first (`// c1 // c2`) — the merge prettier performs here and tsv refuses — and a
+    /// block placed there reverses the pair. [`Self::push_element_share_and_run`] reads it
+    /// for that reason, giving the run a fresh line; see `docs/comments.md` §Trailing and
+    /// dangling runs.
     pub(crate) fn paren_interior_defers_line_comment(&self, interior: Option<Span>) -> bool {
         interior.is_some_and(|interior| {
             let arg_end = interior.start;
@@ -915,52 +1073,42 @@ impl<'a> Printer<'a> {
     }
 
     /// Emit the parent's share of a stripped-paren interior
-    /// ([`Self::paren_interior_own_line_comments`], empty for `None`) into `parts`, each on
-    /// its own line with author blank lines preserved. Returns whether anything was emitted —
-    /// which is also the caller's signal to force its list open, since an own-line comment
-    /// is a sibling of the element rather than a trailer on its line.
+    /// ([`Self::paren_interior_own_line_comments`], empty for `None`) into `parts`: the
+    /// first comment on a line of its own below the element, and every later one either
+    /// on its own line too or — at a [`ShareSite::Closer`] only — glued to the one before
+    /// it where the author glued the pair ([`Printer::trailing_run_hugs_previous`]).
+    /// Before a next element ([`ShareSite::NextElement`]) the pair is split: the next pass
+    /// reads the share as that element's leading run, where a comment glued behind another
+    /// holds nothing open, and the list collapsed around it on the second pass.
     ///
-    /// Where this sits relative to the caller's own `[node end, closer)` gap
-    /// depends on whether a **comma** follows the element, and that is a position
-    /// question, not a source-order one:
+    /// Returns whether anything was emitted — which is also the caller's signal to force
+    /// its list open, since an own-line comment is a sibling of the element rather than a
+    /// trailer on its line.
     ///
-    /// - at the END of a list there is no comma, so both the interior and anything
-    ///   written after the `)` merely trail the element; source order decides, and this
-    ///   run's place is the list family's ([`Self::push_last_element_share_and_run`]).
-    /// - between two elements the comma gives an outside block a home on the element's
-    ///   own line, so the ordinary gap goes first and this run follows it, past the comma
-    ///   ([`Printer::open_inter_arg_gap`], the array element loop, the object property
-    ///   loop).
-    ///
-    /// Either way the caller does NOT carry a `prev_end` out of here: its own gap starts
-    /// at the node's end, which already lies past every interior comment, so its blank
-    /// scan cannot double-count a blank this loop already consumed.
+    /// Its one caller is [`Self::push_element_share_and_run_with_blanks`], which orders the
+    /// share against the element's trailing run — the share first, as it was written. The
+    /// caller does NOT carry a `prev_end` out of here: the run's own gap starts at the
+    /// node's end, which already lies past every interior comment, so its blank scan cannot
+    /// double-count a blank this loop already consumed.
     ///
     /// Every caller is a hard-broken (or comment-force-expanded) layout: an own-line
-    /// comment is exactly the thing that forces one. A `//` in the run is always
+    /// comment is exactly the thing that forces one. A `//` in the share is always
     /// last-on-its-line (nothing can share a line behind it), so the hardline before
     /// the next comment — or the caller's own break after the run — is what keeps it
     /// from swallowing what follows.
+    ///
+    /// `preserve_blanks` keeps an author blank line above a comment. It is `false` for a
+    /// share the caller emits **past an elision comma** (the array element loop, when holes
+    /// follow the spread). The blank was authored between the argument and the comment, a
+    /// gap the share no longer occupies once a structural comma sits in front of it — and
+    /// the array's own rule is that a hole carries **no** blank line after it
+    /// (`has_blank_line_after_slot`, prettier's `node &&`), so the reprint drops it.
+    /// Preserving it here would print a blank the next pass removes.
     pub(crate) fn push_paren_interior_own_line_comments(
         &self,
         parts: &mut DocBuf,
         interior: Option<Span>,
-    ) -> bool {
-        self.push_paren_interior_own_line_comments_with_blanks(parts, interior, true)
-    }
-
-    /// [`Self::push_paren_interior_own_line_comments`] with the author-blank policy named.
-    ///
-    /// `preserve_blanks: false` is for a run the caller emits **past an elision comma** (the
-    /// array element loop, when holes follow the spread). The blank was authored between the
-    /// argument and the comment, a gap the run no longer occupies once a structural comma
-    /// sits in front of it — and the array's own rule is that a hole carries **no** blank
-    /// line after it (`has_blank_line_after_slot`, prettier's `node &&`), so the reprint
-    /// drops it. Preserving it here would print a blank the next pass removes.
-    pub(crate) fn push_paren_interior_own_line_comments_with_blanks(
-        &self,
-        parts: &mut DocBuf,
-        interior: Option<Span>,
+        site: ShareSite,
         preserve_blanks: bool,
     ) -> bool {
         let Some(interior) = interior else {
@@ -970,12 +1118,12 @@ impl<'a> Printer<'a> {
         let mut prev_end = interior.start;
         let mut prev_comment: Option<&internal::Comment> = None;
         for comment in &comments {
-            // A pair the author GLUED onto one line keeps that line, whichever blank policy
-            // is in force ([`Printer::trailing_run_hugs_previous`]) — the glue question and
-            // the author-blank question are separate, so the predicate is asked directly
-            // rather than through `push_trailing_run_separator`, whose non-glue arm is
-            // always blank-preserving.
-            if self.trailing_run_hugs_previous(prev_comment, comment.span.start) {
+            // The glue question and the author-blank question are separate, so the
+            // predicate is asked directly rather than through `push_trailing_run_separator`,
+            // whose non-glue arm is always blank-preserving.
+            if site == ShareSite::Closer
+                && self.trailing_run_hugs_previous(prev_comment, comment.span.start)
+            {
                 parts.push(self.d().text(" "));
             } else if preserve_blanks {
                 self.push_blank_preserving_hardline(parts, prev_end, comment.span.start);

@@ -20,6 +20,9 @@ ahead of it**: the elision's own line break is structure, not authorship, which 
 as a blank made the form non-idempotent, the reprint measuring a blank the first pass had not
 written.
 
+Two comments in that region keep a space between them (`c`), as in the array literal: the
+separator goes before each comment, so the pair never welds into `/* c1 *//* c2 */`.
+
 See [conformance_prettier.md §Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy)
 and [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation)
 (`Array trailing-elision block comment`).

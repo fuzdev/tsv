@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 296,
+	"end": 384,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -105,24 +105,72 @@
 					"column": 9
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " Two comments there keep a space between them",
+			"start": 288,
+			"end": 335,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 348,
+			"end": 356,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 12
+				},
+				"end": {
+					"line": 16,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 357,
+			"end": 365,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 21
+				},
+				"end": {
+					"line": 16,
+					"column": 29
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 295,
+		"end": 383,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 286,
+			"end": 374,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 14,
+					"line": 17,
 					"column": 9
 				}
 			},
@@ -406,6 +454,113 @@
 							"value": " An own-line comment takes its own line there, still past the elision comma",
 							"start": 170,
 							"end": 247
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 337,
+					"end": 373,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 37
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 343,
+							"end": 372,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 7
+								},
+								"end": {
+									"line": 16,
+									"column": 36
+								}
+							},
+							"id": {
+								"type": "ArrayPattern",
+								"start": 343,
+								"end": 366,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 7
+									},
+									"end": {
+										"line": 16,
+										"column": 30
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 344,
+										"end": 345,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 8
+											},
+											"end": {
+												"line": 16,
+												"column": 9
+											}
+										},
+										"name": "c",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 348,
+												"end": 356
+											}
+										]
+									},
+									null
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 369,
+								"end": 372,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 33
+									},
+									"end": {
+										"line": 16,
+										"column": 36
+									}
+								},
+								"name": "arr",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 357,
+										"end": 365
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Two comments there keep a space between them",
+							"start": 288,
+							"end": 335
 						}
 					]
 				}

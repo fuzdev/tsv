@@ -8,7 +8,6 @@
 // - Blank line preservation between properties
 
 use crate::ast::internal::{self, Expression, ExpressionKind, Literal, LiteralValue};
-use crate::printer::comments::ShellRunOrder;
 use crate::printer::comments::ValueGap;
 use crate::printer::expressions::assignment::{AssignmentLeft, RhsCommentInfo};
 use crate::printer::expressions::literals::is_valid_js_identifier;
@@ -97,6 +96,12 @@ impl<'a> Printer<'a> {
             // This allows inline objects with block comments to stay inline if they fit
             let mut parts = d.pooled_docbuf();
             let mut prev_end = obj_span.start + 1; // After opening brace
+            // The previous property's run displaced past its comma — behind a spread's
+            // stripped-paren interior — and whether it was: the one leads this property
+            // (`Printer::push_run_leading_next_item`), and the other moves where an author
+            // blank before it is measured from.
+            let mut prev_leads_next: SmallVec<[&tsv_lang::Comment; 2]> = SmallVec::new();
+            let mut prev_behind_interior = false;
 
             // A comment trailing the opening `{` is kept on the `{` line when the
             // object expands — both a line comment and a block comment before a
@@ -131,7 +136,15 @@ impl<'a> Printer<'a> {
                 // paths disagreeing about one gap. Preserving it forces the object open,
                 // which is what the comment-free path's `literalline` does too.
                 if !is_first {
-                    if must_break || self.item_gap_has_blank_line(prev_end, prop_start) {
+                    if prev_behind_interior {
+                        // The comma was emitted against the spread, ahead of its interior,
+                        // so a comma the author gave a line of its own is not a line here
+                        // and a blank below it is still the author's.
+                        if self.blank_before_next_item(prev_end, prop_start) {
+                            parts.push(d.literalline());
+                        }
+                        parts.push(d.hardline());
+                    } else if must_break || self.item_gap_has_blank_line(prev_end, prop_start) {
                         // Must break: check for blank line preservation
                         self.push_item_blank_separator(&mut parts, prev_end, prop_start);
                     } else {
@@ -161,6 +174,7 @@ impl<'a> Printer<'a> {
                 // validated against it. Settle which family the object literal belongs to
                 // before cataloging the object / specifier / enum face of that divergence —
                 // sanctioning the own-line form first would pin whichever one this is.
+                self.push_run_leading_next_item(&mut parts, &prev_leads_next, prop_start);
                 self.push_leading_comments_before(&mut parts, &comments, prop_start);
 
                 // Build property doc — a preceding format-ignore directive keeps the
@@ -197,33 +211,23 @@ impl<'a> Printer<'a> {
                     .map_or(obj_span.end, |next| next.span().start);
 
                 let is_last = i == obj.properties.len() - 1;
-                let interior = prop.paren_interior();
-                let mut trailing = self.collect_trailing_comments(prop_end, upper_bound, is_last);
-                // A spread whose stripped parens held a `//` already ends its line in one;
-                // a second may not weld onto it.
-                trailing
-                    .demote_line_after_deferred(self.paren_interior_defers_line_comment(interior));
+                // A spread's stripped-paren interior: the own-line comments its own doc
+                // leaves behind are the object's share, each a sibling line the object
+                // cannot stay collapsed around, and the run past the `)` follows them
+                // (`Printer::push_element_share_and_run`). A frozen spread's verbatim slice
+                // already printed its interior, so it has none.
+                let trailing = self.collect_element_trailing_comments(
+                    prop_end,
+                    upper_bound,
+                    is_last,
+                    prop.paren_interior().filter(|_| frozen_span.is_none()),
+                );
                 let comma = (!is_last).then(|| d.text(","));
-                // The object's share of a spread's stripped-paren interior: the own-line
-                // comments the spread's own doc leaves behind, each a sibling line the
-                // object cannot stay collapsed around. Past a comma it follows the run
-                // (`...b, // c⏎/* i */`), like the array element loop and the argument-list
-                // gaps; on the LAST property there is no comma, and the two take the
-                // last-element order (`Printer::push_last_element_share_and_run`).
-                if is_last {
-                    self.push_last_element_share_and_run(
-                        &mut parts,
-                        interior,
-                        ShellRunOrder::HoistBlocks,
-                        |parts| self.push_element_comma_trailing_blocks(parts, &trailing, comma),
-                        |parts| self.push_element_trailing_line(parts, &trailing),
-                    );
-                } else {
-                    self.push_element_comma_trailing(&mut parts, &trailing, comma);
-                    self.push_paren_interior_own_line_comments(&mut parts, interior);
-                }
+                self.push_element_comma_trailing(&mut parts, &trailing, comma);
 
                 prev_end = trailing.end_pos;
+                prev_behind_interior = trailing.is_behind_interior();
+                prev_leads_next = trailing.leads_next;
             }
 
             // Trailing comments before the closing brace, through the shared end-of-body

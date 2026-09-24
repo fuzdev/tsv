@@ -9,7 +9,7 @@ use smallvec::SmallVec;
 
 use super::super::{LeadingGlue, Printer};
 use crate::ast::internal;
-use crate::printer::comments::ShellRunOrder;
+use crate::printer::comments::ShareSite;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -27,10 +27,16 @@ impl<'a> Printer<'a> {
     /// partition too): the ordinary gap `[prev_arg.end, next_arg_start)` above, and the
     /// parent's share of `prev_arg`'s own stripped-paren interior — the own-line comments a
     /// spread's doc deliberately leaves behind
-    /// ([`Printer::push_paren_interior_own_line_comments`]), emitted past the comma because
-    /// the comma is what gives an outside block a home on the argument's line. That share lies BEFORE `prev_arg`'s end, so a caller guarding
-    /// this call on a plain gap scan must ask [`Printer::inter_arg_gap_has_comments`]
-    /// instead or the interior is DROPPED.
+    /// ([`Printer::push_paren_interior_own_line_comments`]). That share lies BEFORE
+    /// `prev_arg`'s end, so a caller guarding this call on a plain gap scan must ask
+    /// [`Printer::inter_arg_gap_has_comments`] instead or the interior is DROPPED.
+    ///
+    /// Where the interior stands between the argument's text and its run
+    /// ([`Printer::paren_interior_separates_run`]) the order changes, to the order the same
+    /// argument prints in without its parens: the comma, then the share, then the run
+    /// ([`Printer::push_element_share_and_run`]). The comma sits against the argument, so a
+    /// block of the run that no `//` follows is past it and leads the next argument
+    /// ([`PartitionedComments::lead_run_blocks_behind_interior`]).
     ///
     /// Returns the routed [`PartitionedComments`] so the caller supplies the rest of the
     /// gap — its own separator policy (soft vs. hard line, blank-line preservation), then
@@ -41,28 +47,54 @@ impl<'a> Printer<'a> {
     /// route-then-emit ordering — and the respect-the-newline rule it encodes — lives in
     /// one place; only the separator, which genuinely differs per layout, stays at the
     /// call site.
+    ///
+    /// `interior` is the previous argument's stripped-paren interior as the loop printed it
+    /// ([`Self::arg_paren_interior`]) — `None` for a frozen one, whose verbatim slice already
+    /// carries it.
     pub(super) fn open_inter_arg_gap(
         &self,
         parts: &mut DocBuf,
         prev_arg: &internal::Expression<'_>,
+        interior: Option<Span>,
         next_arg_start: u32,
     ) -> InterArgGap<'a> {
         let mut pc =
             PartitionedComments::for_routed_arg_gap(self, prev_arg.span().end, next_arg_start);
-        // The argument's own doc may already end in a deferred `//` (a spread whose
-        // stripped parens held one); a second one may not join that line.
-        let interior = prev_arg.paren_interior();
-        let prev_defers_line = self.paren_interior_defers_line_comment(interior);
-        pc.demote_trailing_line_after_deferred(prev_defers_line);
-        pc.emit_trailing_comments_around_comma(parts, self);
-        let own_line_interior = self.push_paren_interior_own_line_comments(parts, interior);
+        if !self.paren_interior_separates_run(interior) {
+            pc.emit_trailing_comments_around_comma(parts, self);
+            return InterArgGap {
+                forces_expansion: false,
+                comments: pc,
+            };
+        }
+        pc.lead_run_blocks_behind_interior(self);
+        parts.push(self.d().text(","));
+        self.push_element_share_and_run(parts, interior, ShareSite::NextElement, pc.trailing_run());
         InterArgGap {
-            // An own-line interior block is a sibling line, and an interior `//` the
+            // An own-line interior comment is a sibling line, and an interior `//` the
             // spread defers must flush INSIDE the list — on a collapsed one the buffer
             // drains past the `)` and the `;`, re-binding the comment to the statement.
-            forces_expansion: own_line_interior || prev_defers_line,
+            // `paren_interior_separates_run` is exactly one of the two.
+            forces_expansion: true,
             comments: pc,
         }
+    }
+
+    /// The stripped-paren interior of argument `i` of the list opening at `container_start`
+    /// — `None` for anything but a spread, and for an argument a format-ignore directive
+    /// FROZE ([`Self::args_frozen_span`]): its verbatim slice already printed the interior,
+    /// so it has no share to emit and its run is an ordinary one. The argument loops ask it
+    /// beside `build_joined_argument_doc`, which makes the same freeze decision.
+    pub(super) fn arg_paren_interior(
+        &self,
+        container_start: u32,
+        args: &[&internal::Expression<'_>],
+        i: usize,
+    ) -> Option<Span> {
+        let interior = args[i].paren_interior()?;
+        self.args_frozen_span(container_start, args, i)
+            .is_none()
+            .then_some(interior)
     }
 
     /// Whether the region between `prev_arg` and the next argument holds anything for
@@ -372,15 +404,6 @@ pub(crate) fn has_stripped_paren_gap(source: &str, start: u32, end: u32) -> bool
     }
 }
 
-/// Check if a block comment ending at `comment_end` is effectively inline with `next_pos`.
-///
-/// True if they share a source line, or if the gap between them contains only stripped
-/// grouping parens on the same line as the comment (e.g., `/** @type {T} */ (\n\texpr)`).
-fn is_comment_inline_with_next(printer: &Printer<'_>, comment_end: u32, next_pos: u32) -> bool {
-    printer.is_same_line(comment_end, next_pos)
-        || has_stripped_paren_gap(printer.source, comment_end, next_pos)
-}
-
 /// Check if comments between `start` and `next_code_pos` should force expansion.
 ///
 /// Only truly standalone block comments — on a line of their own in SOURCE — force it. A
@@ -393,7 +416,7 @@ fn is_comment_inline_with_next(printer: &Printer<'_>, comment_end: u32, next_pos
 /// previous argument's end, or the `(`) and never of `next_code_pos`. The two positions
 /// only look alike: the comma the author wrote between them belongs to neither span.
 ///
-/// It subsumes what [`is_comment_inline_with_next`] answered here: that predicate's
+/// It subsumes what [`Printer::comment_hugs_next_item`] answered here: that predicate's
 /// stripped-paren arm requires the `(` on the comment's line, which is the hug reading
 /// already. It stays the anchor where a RUN is walked backwards comment by comment (the
 /// emitters), a different question with a different next.
@@ -716,11 +739,11 @@ pub(super) fn emit_first_arg_leading_comments(
 /// Two regions, and they must **partition**: the parent's share of the last argument's
 /// own stripped-paren interior ([`Printer::push_paren_interior_own_line_comments`] — the
 /// own-line comments a spread's doc deliberately leaves for its parent), and the
-/// ordinary gap between the argument's end and `)`. The share goes first (source
-/// order) — except when it ends in a `//`, which nothing can glue after (see the
-/// ordering note in the body). The gap keeps the plain `arg.span().end` anchor:
-/// widening it to reach the interior is what claims the spread's own share a second
-/// time.
+/// ordinary gap between the argument's end and `)`. The share goes first, in source
+/// order, and the gap's trailing run follows it on the line
+/// [`Printer::push_element_share_and_run`] names. The gap keeps the plain
+/// `arg.span().end` anchor: widening it to reach the interior is what claims the spread's
+/// own share a second time.
 ///
 /// The gap is partitioned with [`PartitionedComments::for_closer_gap`], not
 /// [`PartitionedComments::new`]: it holds the list's own **comma**, which under
@@ -729,35 +752,33 @@ pub(super) fn emit_first_arg_leading_comments(
 /// of its own to keep. The delimiter-line reading calls it own-line and dangles it below
 /// the argument, force-opening a call that fits (`docs/comments.md` §Own-line-ness is a
 /// SOURCE question).
+///
+/// `interior` is the argument's stripped-paren interior as the loop printed it
+/// ([`Printer::arg_paren_interior`]).
 pub(super) fn emit_last_arg_trailing_comments(
     printer: &Printer<'_>,
     parts: &mut DocBuf,
     last_arg: &internal::Expression<'_>,
+    interior: Option<Span>,
     paren_close: u32,
 ) {
-    // The share/gap emit order — see the emitter's doc for the rule it encodes.
-    let interior = last_arg.paren_interior();
-    // `SourceOrder`: the argument lists' cataloged order — the run never separates.
-    printer.push_last_element_share_and_run(
+    let arg_end = last_arg.span().end;
+    // Every argument list reaching these builders pays this call, comments or not, so
+    // skip the partition on the common empty gap (same guard as
+    // `emit_first_arg_leading_comments`). Both emits `PartitionedComments` would run
+    // walk only its own buckets, so an empty range is already a no-op.
+    let pc = printer
+        .has_comments_to_emit_between(arg_end, paren_close)
+        .then(|| PartitionedComments::for_closer_gap(printer, arg_end, paren_close));
+    printer.push_element_share_and_run(
         parts,
         interior,
-        ShellRunOrder::SourceOrder,
-        |parts| {
-            let arg_end = last_arg.span().end;
-            // Every argument list reaching these builders pays this call, comments or not, so
-            // skip the partition on the common empty gap (same guard as
-            // `emit_first_arg_leading_comments`). Both emits `PartitionedComments` would run
-            // walk only its own buckets, so an empty range is already a no-op.
-            if printer.has_comments_to_emit_between(arg_end, paren_close) {
-                let mut pc = PartitionedComments::for_closer_gap(printer, arg_end, paren_close);
-                pc.demote_trailing_line_after_deferred(
-                    printer.paren_interior_defers_line_comment(interior),
-                );
-                pc.emit_last_arg_comments(parts, printer);
-            }
-        },
-        |_| {},
+        ShareSite::Closer,
+        pc.iter().flat_map(PartitionedComments::trailing_run),
     );
+    if let Some(pc) = &pc {
+        pc.emit_dangling_comments(parts, printer);
+    }
 }
 
 /// Check if there are trailing comments (line OR block) on any arguments
@@ -843,6 +864,14 @@ pub(crate) struct PartitionedComments<'a> {
     pub trailing_line: Option<&'a internal::Comment>,
     pub trailing_block: SmallVec<[&'a internal::Comment; 2]>,
     pub leading: SmallVec<[&'a internal::Comment; 2]>,
+    /// A run displaced past the comma by the previous argument's stripped-paren interior
+    /// that LEADS the next argument ([`Self::lead_run_blocks_behind_interior`]), printed
+    /// ahead of `leading` by [`Self::emit_leading_comments_inline_aware`].
+    leads: SmallVec<[&'a internal::Comment; 2]>,
+    /// Whether the previous argument's run follows its stripped-paren interior — the
+    /// comma then sits against that argument, which moves where an author blank before the
+    /// next argument is measured from ([`Self::has_blank_line_in_gap`]).
+    behind_interior: bool,
     /// The gap the comments were partitioned over: `start` is the preceding element's
     /// end, `end` the following element's start. The emit/query methods operate on
     /// this gap (comma scan, blank-line check, dangling-comment base), so they read
@@ -897,6 +926,8 @@ impl<'a> PartitionedComments<'a> {
             trailing_line: classified.trailing_line.first().copied(),
             trailing_block: classified.trailing_block,
             leading,
+            leads: SmallVec::new(),
+            behind_interior: false,
             start,
             end,
         }
@@ -1011,6 +1042,8 @@ impl<'a> PartitionedComments<'a> {
             trailing_line,
             trailing_block,
             leading,
+            leads: SmallVec::new(),
+            behind_interior: false,
             start,
             end,
         }
@@ -1035,7 +1068,7 @@ impl<'a> PartitionedComments<'a> {
         let mut kept: SmallVec<[&'a internal::Comment; 2]> = SmallVec::new();
         for comment in self.trailing_block.drain(..) {
             if is_comment_after_comma(comment, comma_pos)
-                && is_comment_inline_with_next(printer, comment.span.end, self.end)
+                && printer.comment_hugs_next_item(comment.span.end, self.end)
             {
                 // Hugs the next arg → leads it. Source order holds: the hug sits on the
                 // next arg's line, after any own-line leading comments, so appending keeps
@@ -1067,30 +1100,42 @@ impl<'a> PartitionedComments<'a> {
         self.has_trailing_line() || !self.leading.is_empty()
     }
 
-    /// Reclassify this gap's same-line LINE comments as own-line when the node the gap
-    /// opens after already ends in a DEFERRED line comment — `prev_defers_line`, the
-    /// caller's answer to [`Printer::paren_interior_defers_line_comment`] (asked there because
-    /// every caller also feeds it to its own force-expansion signal; same shape as the
-    /// twin `TrailingComments::demote_line_after_deferred`).
-    ///
-    /// Its output line already terminates in a `//`, so nothing more may join it:
-    /// deferring a second line comment onto the same line welds the two into ONE comment,
-    /// the second `//` becoming text inside the first. Moving it to `leading` gives it the
-    /// line it needs — which is also where a reparse keeps it, so the form is a fixed
-    /// point. Prepended, because a same-line comment precedes every own-line one in
-    /// source.
-    ///
-    /// Asked at the gap rather than inside the emitters, so the two last-argument
-    /// consumers (the shared [`emit_last_arg_trailing_comments`] and
-    /// `call_formatting`'s own loop, which needs its `force_expansion` feedback) get the
-    /// rule from one place.
-    pub(super) fn demote_trailing_line_after_deferred(&mut self, prev_defers_line: bool) {
-        if !prev_defers_line {
-            return;
+    /// The gap's trailing RUN in source order — its same-line blocks, then the (at most
+    /// one) same-line `//` the run ends at — for [`Printer::push_element_share_and_run`],
+    /// which renders it behind an argument's stripped-paren interior.
+    pub(super) fn trailing_run(&self) -> impl Iterator<Item = &'a internal::Comment> + '_ {
+        self.trailing_block
+            .iter()
+            .chain(self.trailing_line.iter())
+            .copied()
+    }
+
+    /// Re-partition a NON-last argument gap whose run follows the argument's stripped-paren
+    /// interior ([`Printer::paren_interior_separates_run`]): the comma is emitted against
+    /// the argument, ahead of the interior, so every block of the run is past it. A run
+    /// that LEADS the next argument ([`Printer::run_leads_next_item`] — blocks with no
+    /// author line break or blank after them, the stripped `)` counted as absent:
+    /// `fn(...(b⏎/* i */⏎) /* t */, c)` → `...b,⏎/* i */⏎/* t */ c`) moves to
+    /// [`Self::emit_leading_comments_inline_aware`]; the rest — a run ending in a `//`, a
+    /// block on a line the author ended after it, blocks above an author blank — stays
+    /// behind the interior ([`Printer::push_element_share_and_run`]).
+    pub(super) fn lead_run_blocks_behind_interior(&mut self, printer: &Printer<'_>) {
+        self.behind_interior = true;
+        if self.trailing_line.is_none()
+            && printer.run_leads_next_item(
+                &self.trailing_block,
+                find_comma_pos(printer.source, self.start, self.end).map(|c| c as u32),
+                self.end,
+            )
+        {
+            self.leads = std::mem::take(&mut self.trailing_block);
         }
-        if let Some(comment) = self.trailing_line.take() {
-            self.leading.insert(0, comment);
-        }
+    }
+
+    /// Whether this gap follows the previous argument's stripped-paren interior
+    /// ([`Self::lead_run_blocks_behind_interior`]).
+    pub(super) fn is_behind_interior(&self) -> bool {
+        self.behind_interior
     }
 
     pub(crate) fn has_trailing_block(&self) -> bool {
@@ -1214,6 +1259,18 @@ impl<'a> PartitionedComments<'a> {
         } else {
             self.end
         };
+        if self.behind_interior {
+            // The comma was emitted against the argument, ahead of its interior, so a comma
+            // the author gave a line of its own is not a line of the output — a blank below
+            // it is the author's, measured from the end of what trails the argument.
+            let from = self
+                .trailing_run()
+                .chain(self.leads.iter().copied())
+                .map(|c| c.span.end)
+                .max()
+                .unwrap_or(self.start);
+            return printer.blank_before_next_item(from, check_end);
+        }
         printer.is_next_line_empty(self.start, check_end)
     }
 
@@ -1304,10 +1361,8 @@ impl<'a> PartitionedComments<'a> {
     /// unconditionally reads as the safer rule and is not — the run re-collapses on the
     /// next pass, because a comment printed onto a fresh line is no longer glued when it is
     /// reparsed, so the output never reaches a fixed point (F1). The first comment's
-    /// separator is unconditional: either it is own-line by construction (that is what put
-    /// it in `leading`), or [`Self::demote_trailing_line_after_deferred`] moved it here
-    /// precisely because it needs a line the previous node's deferred `//` denies it —
-    /// which is exactly what a `None` predecessor answers.
+    /// separator is unconditional: it is own-line by construction (that is what put it in
+    /// `leading`), which is exactly what a `None` predecessor answers.
     ///
     /// ⚠️ Despite the name this is not a *dangling* run in the
     /// [`Printer::push_dangling_comment_run`] sense (a container's only content, whose
@@ -1340,10 +1395,14 @@ impl<'a> PartitionedComments<'a> {
         self.emit_dangling_comments(parts, printer);
     }
 
-    /// Emit this gap's leading run, through the shared leading-comment emitter
-    /// ([`Printer::push_leading_comment_run`]) in the stripped-paren glue mode.
+    /// Emit everything this gap puts ahead of the next argument: first a run the previous
+    /// argument's stripped-paren interior displaced past the comma, when it leads this
+    /// argument ([`Self::lead_run_blocks_behind_interior`], rendered by
+    /// [`Printer::push_run_leading_next_item`]); then the gap's own leading run, through the
+    /// shared leading-comment emitter ([`Printer::push_leading_comment_run`]) in the
+    /// stripped-paren glue mode.
     ///
-    /// Two things make this run different from a plain one, and both are the mode's:
+    /// Two things make that leading run different from a plain one, and both are the mode's:
     /// paren stripping can put two JSDoc casts in one gap
     /// (`/** @type {A} */ (⏎/** @type {B} */ (expr))`), where the outer cast is glued to a
     /// `(` the printer deletes — so the glue test has to see through it, or the pair the
@@ -1359,6 +1418,7 @@ impl<'a> PartitionedComments<'a> {
         parts: &mut DocBuf,
         printer: &Printer<'_>,
     ) {
+        printer.push_run_leading_next_item(parts, &self.leads, self.end);
         printer.push_leading_comment_run(
             parts,
             self.leading.iter().copied(),
