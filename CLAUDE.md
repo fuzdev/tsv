@@ -589,7 +589,8 @@ See [Development Philosophy](#development-philosophy-test-driven-development-wit
 **Fixture File Structure:** `input.*` + `expected.json` at minimum. Every optional
 sibling makes a precise, validated claim — `expected_ours.json` / `expected_svelte.json`
 (parser divergence), `expected_<stem>.json` (a sibling variant `<stem>.*`'s parse pin: the
-canonical AST of a form no `input.*` can hold under F1 — the leading BOM),
+canonical AST of a form no `input.*` can hold under F1 — a leading BOM with nothing
+load-bearing behind it),
 `output_prettier.*` / `prettier_variant_*` / `variant_*` /
 `divergent_variant_*` / `prettier_intermediate_*` / `prettier_intermediate_to_variant_*` /
 `prettier_intermediate_to_divergent_variant_*` /
@@ -624,7 +625,7 @@ and validation rules (F/S/R/D): ./docs/fixture_overview.md.
 - **Prettier never converges (no oracle)**: Add `prettier_nonconvergent.txt` + README (requires `_prettier_divergence` suffix; excludes all prettier-claim files)
 - **Prettier rejects/throws on input (no oracle)**: Add `prettier_rejects.txt` (trimmed content = expected-error substring) + README (requires `_prettier_divergence` suffix; excludes all prettier-claim files; mutually exclusive with `prettier_nonconvergent.txt`)
 - **tsv over-rejects but canonical accepts**: Add `tsv_rejects.txt` (trimmed content = expected tsv-error substring) + `expected_svelte.json` + README (requires `_svelte_divergence` suffix; no `expected.json`/`expected_ours.json`; excludes all format-claim files, `input_invalid_*`, and the prettier no-oracle markers)
-- **The parse fact lives only in a form `input.*` can't hold** (a leading BOM — the format side strips it, so F1 forbids it): pin a variant instead — an empty `expected_<stem>.json` beside the variant `<stem>.*`, filled by `fixtures:update:parsed` (P4/S24; the in-tree case is each `bom_prettier_divergence`'s `expected_prettier_variant_bom.json`)
+- **The parse fact lives only in a form `input.*` can't hold** (a leading BOM with nothing load-bearing behind it — the format side strips it, so F1 forbids it): pin a variant instead — an empty `expected_<stem>.json` beside the variant `<stem>.*`, filled by `fixtures:update:parsed` (P4/S24; the in-tree case is each `bom_prettier_divergence`'s `expected_prettier_variant_bom.json`)
 - **Both differ**: Use `_svelte_prettier_divergence` suffix
 
 ## Debug Tooling
@@ -892,8 +893,10 @@ line-1 column one lower, the acorn islands included — Svelte hands acorn the s
 string); acorn counts it as whitespace, so the TypeScript writer builds `Counted` and keeps
 file coordinates. The `no-locations` JS helper makes the same split. Pinned by the three
 `bom_prettier_divergence` fixtures' `expected_prettier_variant_bom.json`, the variant pin
-(no `input.*` can carry a BOM: the format side strips it, so it is never its own fixed
-point).
+(no `input.*` can carry a BOM with nothing load-bearing behind it: the format side strips
+it, so it is never its own fixed point; a BOM ahead of a content U+FEFF is written back, so
+the `leading_zwnbsp_prettier_divergence` inputs carry one — see
+./docs/conformance_prettier.md#whitespace-bom-handling).
 
 **Counting lines is a separate question, and the Svelte wire answers it TWO ways** — because
 Svelte's parser does: Svelte's own positions open a line at `\n` alone, everything acorn parses

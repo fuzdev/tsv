@@ -113,7 +113,7 @@
 // writing it). Ratcheted in
 // [`tests/css_boundary_whitespace.rs`](../../../../tests/css_boundary_whitespace.rs).
 
-use super::Printer;
+use super::{Printer, SourceRole};
 use crate::ast::internal::CssBlockChild;
 use tsv_lang::Span;
 
@@ -202,9 +202,10 @@ impl<'a> Printer<'a> {
             };
             // A byte-order mark is excluded here for the same reason `boundary_run`
             // excludes it: `U+FEFF` is in JS `\s`, so it reaches this walk like any other
-            // member, and tsv strips BOMs by policy. Anchored at offset 0, which is what
-            // makes one a BOM — anywhere else it is an ordinary character and is kept.
-            let is_bom = i == 0 && c == '\u{feff}';
+            // member, and tsv strips BOMs by policy. Anchored at offset 0 of a whole
+            // document, which is what makes one a BOM — anywhere else, a fragment's offset 0
+            // included, it is an ordinary character and is kept.
+            let is_bom = i == 0 && c == '\u{feff}' && self.source_role == SourceRole::Document;
             if !is_bom && crate::whitespace::is_boundary_only_whitespace(c) {
                 out.push(c);
             }
@@ -388,11 +389,15 @@ impl<'a> Printer<'a> {
         // reaches this scan like any other member — but tsv strips BOMs by policy (a
         // cataloged prettier divergence, `docs/conformance_prettier.md` §Whitespace: BOM
         // Handling), and re-emitting it here would quietly undo that. The exclusion is
-        // anchored at offset 0 because that is what makes a `U+FEFF` a byte-order mark; one
-        // anywhere else is an ordinary character and is preserved with the rest — including a
-        // second one later in this same run, which the forward scan in `preserved_boundary_ws`
-        // still reaches.
-        if run_start == 0 && self.source.starts_with('\u{feff}') {
+        // anchored at offset 0 of a whole document because that is what makes a `U+FEFF` a
+        // byte-order mark; one anywhere else — a fragment's offset 0 included
+        // ([`SourceRole::Fragment`]) — is an ordinary character and is preserved with the
+        // rest, including a second one later in this same run, which the forward scan in
+        // `preserved_boundary_ws` still reaches.
+        if run_start == 0
+            && self.source_role == SourceRole::Document
+            && self.source.starts_with('\u{feff}')
+        {
             run_start = '\u{feff}'.len_utf8();
         }
         (run_start as u32, holds_member)

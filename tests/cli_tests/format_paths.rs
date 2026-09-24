@@ -116,6 +116,47 @@ fn test_format_check_clean_exits_zero() {
     assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "");
 }
 
+/// A file whose text begins with a content U+FEFF is written as `BOM` + `U+FEFF`, the one
+/// lossless UTF-8 spelling of it, and that form is clean under `--check`. The authored form
+/// that reaches it (a space the formatter trims ahead of the U+FEFF) would change. See
+/// `tsv_lang::printing::encode_leading_zwnbsp`.
+#[test]
+fn test_format_check_leading_zwnbsp_bom_is_a_fixed_point() {
+    let clean = temp_dir("check_zwnbsp_clean");
+    fs::write(clean.join("a.css"), "\u{FEFF}\u{FEFF}a {\n}\n").unwrap();
+    fs::write(clean.join("b.svelte"), "\u{FEFF}\u{FEFF}\n<div></div>\n").unwrap();
+    let output = tsv(&["format", "--check", clean.to_str().unwrap()]);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "");
+
+    let authored = temp_dir("check_zwnbsp_authored");
+    fs::write(authored.join("a.css"), " \u{FEFF}a{}\n").unwrap();
+    fs::write(authored.join("b.svelte"), " \u{FEFF}<div></div>\n").unwrap();
+    let output = tsv(&["format", "--check", authored.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(1));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("a.css"), "stdout: {stdout}");
+    assert!(stdout.contains("b.svelte"), "stdout: {stdout}");
+
+    // formatting it in place lands on the clean form
+    let output = tsv(&["format", authored.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        fs::read_to_string(authored.join("a.css")).unwrap(),
+        "\u{FEFF}\u{FEFF}a {\n}\n"
+    );
+    assert_eq!(
+        fs::read_to_string(authored.join("b.svelte")).unwrap(),
+        "\u{FEFF}\u{FEFF}\n<div></div>\n"
+    );
+}
+
 #[test]
 fn test_format_error_isolation() {
     let dir = temp_dir("error_isolation");

@@ -420,6 +420,45 @@ impl<'a> FoldedSource<'a> {
     }
 }
 
+/// The byte-order mark, which is also the character U+FEFF ZERO WIDTH NO-BREAK SPACE.
+const BOM: char = '\u{FEFF}';
+
+/// Write a byte-order mark ahead of a formatted HTML/Svelte or CSS document whose first
+/// character is a **content** U+FEFF, and return every other output unchanged.
+///
+/// A UTF-8 decode strips exactly one leading BOM (WHATWG Encoding, "UTF-8 decode": BOM
+/// sniffing consumes the first `EF BB BF`, and only the first). So a text that begins with
+/// U+FEFF has one lossless encoding, a BOM followed by that character; without the BOM, the
+/// next read takes the content character for a BOM and drops it. For Svelte that loses a
+/// text node that renders, and for CSS it changes an identifier. The result is its own fixed
+/// point: the next read strips the BOM, the content U+FEFF is output byte 0 again, and the
+/// BOM is written again.
+///
+/// This narrows tsv's BOM stripping rather than reversing it. A BOM with nothing
+/// load-bearing behind it is still never written. The only output that begins with U+FEFF
+/// is one whose printer kept the character as content, because the source's own leading BOM
+/// is skipped by every parser.
+///
+/// **HTML/Svelte and CSS only.** U+FEFF is content in both: it is not HTML whitespace, so
+/// Svelte keeps it in the DOM text, and it is not CSS whitespace (css-syntax-3 §4.2), so
+/// the CSS printer keeps it. In ECMAScript it is `WhiteSpace` (`<ZWNBSP>`, ecma262 §12.2), so
+/// the TypeScript formatter drops it as trivia and never outputs it first. Apply this to a
+/// whole standalone document only, never to an embedded `<style>` island or a nested
+/// `<style>` body, neither of which is at the start of the file.
+///
+/// A caller that hands over already-decoded text — an editor surface formatting its buffer —
+/// has lost the distinction this rule rests on: its decoder has already stripped the file's
+/// BOM, so a content U+FEFF arrives at offset 0 indistinguishable from a BOM, and the parse
+/// skips it as one. That loss predates this rule and happens before the formatter sees the
+/// text, so it is not something the formatter can recover.
+#[must_use]
+pub fn encode_leading_zwnbsp(mut formatted: String) -> String {
+    if formatted.starts_with(BOM) {
+        formatted.insert(0, BOM);
+    }
+    formatted
+}
+
 /// The line `position` sits on, as `(line_start, line_end, line_number)` — bounds in bytes,
 /// number 1-indexed — over the ECMAScript terminator class ([`line_terminator_len`]).
 ///
@@ -2374,6 +2413,21 @@ fn is_emoji_modifier(c: char) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn encode_leading_zwnbsp_writes_one_bom_ahead_of_content() {
+        assert_eq!(
+            encode_leading_zwnbsp("\u{FEFF}a\n".into()),
+            "\u{FEFF}\u{FEFF}a\n"
+        );
+        // already BOM-led content gains one more: the BOM the next read strips
+        assert_eq!(
+            encode_leading_zwnbsp("\u{FEFF}\u{FEFF}a\n".into()),
+            "\u{FEFF}\u{FEFF}\u{FEFF}a\n"
+        );
+        assert_eq!(encode_leading_zwnbsp("a\u{FEFF}\n".into()), "a\u{FEFF}\n");
+        assert_eq!(encode_leading_zwnbsp(String::new()), "");
+    }
 
     #[test]
     fn test_no_quotes_uses_preferred() {
