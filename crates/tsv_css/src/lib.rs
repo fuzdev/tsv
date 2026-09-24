@@ -120,6 +120,20 @@ pub fn format_in(
     printer::format_css_in(stylesheet, source, arena)
 }
 
+/// [`format_in`] over a stylesheet that is a FRAGMENT of a host file rather than a whole
+/// file: the body of a `<style>` nested inside a Svelte element, which the host formats on
+/// its own and indents into place. Its first character is not a file's first byte, so a
+/// leading U+FEFF is content — kept, where [`format_in`] strips it as a byte-order mark,
+/// and never given a BOM of its own (`tsv_lang::printing::encode_leading_zwnbsp` is for a
+/// whole document only).
+pub fn format_fragment_in(
+    stylesheet: &CssStyleSheet<'_>,
+    source: &str,
+    arena: &tsv_lang::doc::arena::DocArena,
+) -> String {
+    printer::format_css_fragment_in(stylesheet, source, arena)
+}
+
 /// [`format_in`] over a document the caller folded ahead of the parse
 /// (`tsv_lang::printing::normalize_carriage_returns`) — the format entry points that fold
 /// (the CLI, the bindings, [`format_str`]). Identical output; the document's line verdict

@@ -429,8 +429,9 @@ README.md required.
 parser's AST of that variant, which tsv's parse must reproduce (P4; S24 requires the
 variant). Never hand-written — `deno task fixtures:update:parsed` regenerates it, and an
 empty file of that name is how one is created. Reach for it only when the parse fact lives
-in a form `input.*` cannot hold under F1 (the in-tree case is the leading BOM, which the
-format side strips); an ordinary parse claim belongs on the input.
+in a form `input.*` cannot hold under F1 (the in-tree case is a leading BOM with nothing
+load-bearing behind it, which the format side strips); an ordinary parse claim belongs on
+the input.
 
 **No-oracle marker files** — three fixed filenames (not variant patterns), all rare;
 their claim semantics and coexistence rules are ./fixture_overview.md rules

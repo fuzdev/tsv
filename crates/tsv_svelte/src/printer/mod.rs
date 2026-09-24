@@ -1172,7 +1172,8 @@ pub(crate) fn format_svelte_folded_in(
 }
 
 /// The shared body of the two: register the document's comments, build the printer on
-/// its line table, print the root.
+/// its line table, print the root, and write a BOM ahead of a leading content U+FEFF
+/// (`tsv_lang::printing::encode_leading_zwnbsp`).
 fn format_root<'a>(
     root: &internal::Root<'_>,
     source: &'a str,
@@ -1218,7 +1219,8 @@ fn format_root<'a>(
         line_breaks,
     );
     printer.print_root(root);
-    printer.into_string()
+    // A content U+FEFF at output byte 0 needs a BOM ahead of it, or the next read strips it.
+    tsv_lang::printing::encode_leading_zwnbsp(printer.into_string())
 }
 
 /// Collect the spans of every `<!-- -->` (`FragmentNode::Comment`) in a fragment, recursing

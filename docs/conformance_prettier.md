@@ -22,7 +22,7 @@ units (search `◆` for every tag, `◆prettier_bug` for one category):
 - `◆prettier_bug` — Prettier is non-idempotent, emits invalid output, or changes meaning (e.g. strips required parens). tsv produces stable, valid, meaning-preserving output
 - `◆parser_compat` — Prettier's output breaks Svelte's parser. tsv produces Svelte-compatible output
 - `◆print_width` — Prettier allows lines to exceed printWidth. tsv breaks to stay within the limit
-- `◆bom_stripping` — Prettier preserves byte-order marks. tsv strips them
+- `◆bom_stripping` — Prettier preserves byte-order marks. tsv strips them, save a BOM that is load-bearing ([§Whitespace: BOM Handling](#whitespace-bom-handling))
 - `◆comment_preservation` — Prettier moves comments to a different syntactic position. tsv preserves comment position
 - `◆content_preservation` — Prettier silently drops authored content — usually comments, sometimes other semantics-bearing tokens (a directive `|modifier`, a list element). tsv preserves it
 - `◆design_choice` — Other deliberate behavior differences, with rationale in the fixture. Its narrow sense is a **representative** disagreement: both formatters normalize a document to exactly one form and they pick a *different* one (`@scope ()` vs `@scope()`; block-style vs a dangled delimiter). ⚠️ It is also the catch-all, so reach for the specific tag first — in particular, "tsv normalizes what prettier keeps per authoring" is `◆stable_quirk`, whatever the language. An entry can carry both: most of the Svelte whitespace rules converge the authorings **and** pick a different representative than prettier does
@@ -862,7 +862,8 @@ than repeating three times.
 
 ## Whitespace: BOM Handling
 
-**◆bom_stripping.** Prettier preserves byte-order marks. tsv strips them (they serve no purpose in UTF-8).
+**◆bom_stripping.** Prettier preserves byte-order marks. tsv strips a BOM with nothing
+load-bearing behind it (it serves no purpose in UTF-8).
 
 - Svelte — [bom](../tests/fixtures/svelte/syntax/whitespace/bom_prettier_divergence/)
 - CSS — [bom](../tests/fixtures/css/tokens/whitespace/bom_prettier_divergence/)
@@ -875,7 +876,24 @@ below the file's, a line-1 column one lower); acorn counts it as whitespace, so 
 TypeScript wire keeps file coordinates (`Program.start` 0, the first statement at 1). Each
 fixture above pins that through its BOM-led `prettier_variant_bom.*` and the
 `expected_prettier_variant_bom.json` beside it — the input itself carries no BOM, since the
-format side strips one and the input must be its own fixed point.
+format side strips one with nothing load-bearing behind it and the input must be its own
+fixed point.
+
+**◆content_preservation — the load-bearing BOM.** The one BOM tsv writes. When a Svelte or
+CSS document's formatted output would begin with a U+FEFF that is **content** — template
+text, or a character the CSS printer keeps — tsv writes a BOM ahead of it
+(`tsv_lang::printing::encode_leading_zwnbsp`). A UTF-8 decode strips exactly one leading
+BOM (WHATWG Encoding), so `BOM` + `U+FEFF` is the only lossless spelling of a text that
+begins with U+FEFF; without it the next read takes the character for a BOM and drops it —
+in Svelte a text node that renders (U+FEFF is not HTML whitespace), in CSS an ident code
+point (css-syntax-3 §4.2). The form is its own fixed point, and it is why these inputs carry
+a BOM. TypeScript has no such case: U+FEFF is ECMAScript `WhiteSpace` (ecma262 §12.2), so
+the formatter drops it. Prettier drops the content U+FEFF — its Svelte printer trims it as
+template whitespace (a render change), and postcss strips it after the BOM (a different
+selector).
+
+- Svelte — [leading_zwnbsp](../tests/fixtures/svelte/syntax/whitespace/leading_zwnbsp_prettier_divergence/)
+- CSS — [leading_zwnbsp](../tests/fixtures/css/tokens/whitespace/leading_zwnbsp_prettier_divergence/)
 
 ---
 
