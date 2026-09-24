@@ -57,6 +57,10 @@ exceptions:
   (`let v: /* format-ignore */ {…}`) — is an ordinary comment: the surrounding
   code formats normally.
 
+The formatter keeps an honored directive alone on its line: a comment written ahead of it
+never glues onto it, even where only a comma stood between them
+(`b⏎/* t */,⏎// format-ignore⏎c` prints `b,⏎/* t */⏎// format-ignore⏎c`).
+
 In a **Svelte template**, a `<!-- format-ignore -->` is a *node*, not
 line-attached trivia, so the line test doesn't apply: a directive comment node
 freezes the next sibling node wherever it was authored, and the formatter puts
