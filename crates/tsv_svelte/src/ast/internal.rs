@@ -1241,6 +1241,11 @@ impl TagFacts {
 
     /// Derive the facts from the tag name. The single source: [`Element::facts`] stores exactly
     /// this, and the equivalence test grades every accessor against the predicates named here.
+    ///
+    /// Never inlined: its one caller outside the tests is the element parser, whose frame every
+    /// level of element nesting pays, and the membership `match`es behind these predicates are
+    /// kilobytes of code whose spills would land in that frame.
+    #[inline(never)]
     pub(crate) fn compute(tag_name: &str) -> Self {
         let mut bits: u16 = 0;
         if tsv_html::is_block_element(tag_name) {
@@ -1284,6 +1289,15 @@ impl TagFacts {
 
     pub(crate) fn is_block(self) -> bool {
         self.0 & Self::BLOCK != 0
+    }
+    /// The kind a regular element with this name takes: `Component` for a component-shaped
+    /// name ([`is_component_name`]), `Html` for every other.
+    pub(crate) fn element_kind(self) -> ElementKind {
+        if self.is_component_name() {
+            ElementKind::Component
+        } else {
+            ElementKind::Html
+        }
     }
     pub(crate) fn is_void(self) -> bool {
         self.0 & Self::VOID != 0
@@ -2066,7 +2080,7 @@ mod tests {
     /// relied on to see.
     #[test]
     fn tag_facts_bits_agree_with_the_pure_predicates() {
-        use super::{TagFacts, is_component_name};
+        use super::{ElementKind, TagFacts, is_component_name};
         let probes = [
             // block members (hr is also void; pre is also ws-sensitive)
             "div",
@@ -2157,6 +2171,15 @@ mod tests {
                 facts.is_component_name(),
                 is_component_name(tag),
                 "component name: {tag:?}"
+            );
+            assert_eq!(
+                facts.element_kind(),
+                if is_component_name(tag) {
+                    ElementKind::Component
+                } else {
+                    ElementKind::Html
+                },
+                "element kind: {tag:?}"
             );
             assert_eq!(
                 facts.is_namespaced(),

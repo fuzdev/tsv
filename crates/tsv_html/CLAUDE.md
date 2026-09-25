@@ -11,7 +11,8 @@ LSP, compiler), not just the formatter. See the root
 
 Zero dependencies on other `tsv_*` crates (only `phf` at runtime;
 `serde_json` at build time — see `Cargo.toml`).
-Current consumers: `tsv_svelte`'s printer, `tsv_svelte_compile`, and `tsv_debug`'s render/authoring audits.
+Current consumers: `tsv_svelte` (its tokenizer, its parser — the element's `TagFacts` and
+implicit tag closing — and its printer), `tsv_svelte_compile`, and `tsv_debug`'s render/authoring audits.
 
 The printer-adapter layer — methods that resolve span-identity names and
 call into this crate — lives in `tsv_svelte/src/printer/classification/`,
@@ -39,10 +40,12 @@ not here. This crate stays AST-agnostic.
   by Svelte's compiler (`clean_nodes` `can_remove_entirely`) rather than
   collapsed to a rendered space; the exact Svelte set, a deliberate subset of
   what HTML collapses. A different question from `preserves_whitespace`.
-- **Optional end tags** (`elements.rs`): `closing_tag_omitted(current, next)`
-  — whether `current`'s end tag is implicitly omitted (auto-closed) when
-  `next` follows; mirrors Svelte's `closing_tag_omitted` over the
-  optional-end-tag table (`<li>`, `<p>`, table parts, …).
+- **Optional end tags** (`elements.rs`): `optional_end_tag(current)` →
+  `Option<OptionalEndTag>`, then `OptionalEndTag::is_closed_by(next)` —
+  Svelte's `closing_tag_omitted(current, next)` over the optional-end-tag
+  table (`<li>`, `<p>`, table parts, …), split so a parser settles whether an
+  element has a row once and asks the trigger per child. Having a row at all
+  is the `next` = end-of-parent answer.
 - **Entity decoding** (`entities.rs`): `decode_character_references` —
   named, decimal, and hex (lower- and uppercase) character references
   with HTML5 attribute-context rules and Windows-1252 / surrogate
