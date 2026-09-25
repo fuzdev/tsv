@@ -55,7 +55,7 @@ pub(crate) fn is_css_whitespace(c: char) -> bool {
 ///   for a gap that ends at a name (a compound, an explicit combinator). It takes a FLOOR,
 ///   because a run glued to the previous identifier is already inside that name's span and an
 ///   unbounded scan emits it a second time.
-/// - `Printer::boundary_ws_in_gap` — a FORWARD collection over a gap that ends at a
+/// - `Printer::spell_gap` — a FORWARD collection over a gap that ends at a
 ///   STRUCTURAL token instead (`,`, `{`, `)`, `]`, an attribute value), which has no node to
 ///   anchor on and may hold comments the printer emits separately.
 ///

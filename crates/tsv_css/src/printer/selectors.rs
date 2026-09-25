@@ -33,7 +33,7 @@ use std::borrow::Cow;
 use std::fmt::Write;
 
 use super::Printer;
-use super::boundary_ws::{closer_pos, prefixed_run, skip_gap_trivia, trim_regenerated_separator};
+use super::boundary_ws::{Edge, closer_pos, skip_gap_trivia};
 use super::value_normalization;
 use crate::ast::internal;
 use crate::whitespace::is_ascii_boundary_whitespace;
@@ -63,28 +63,16 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Split the comments in `[start, end)` — the gap between two selectors, which
-    /// holds the separating comma — into the comments before the comma and those
-    /// after, each joined as `/*…*/` text. The comma is found comment-aware (a `,`
-    /// inside a comment is not the separator). This is the principled replacement for
-    /// the old `normalize_selector_comment_spacing` string-replace: it preserves each
-    /// comment's side of the comma while normalizing the surrounding whitespace.
-    fn split_selector_comments_around_comma(&self, start: u32, end: u32) -> (String, String) {
-        // The comma is located only to decide which side of it each comment falls on — it
-        // is re-emitted as static text either way. With no comment in the gap both sides
-        // are empty regardless of where the comma sits, so check that first and skip the
-        // comment-aware byte scan entirely.
-        if !self.has_comments_to_emit_between(start, end) {
-            return (String::new(), String::new());
-        }
-        let comma = source_scan::find_char_skipping_comments(
-            self.source.as_bytes(),
-            start as usize,
-            end as usize,
-            b',',
-        )
-        .map(|pos| pos as u32);
-        self.split_comments_at(start, end, comma)
+    /// The comments between a selector's end (`start`) and the comma after it, joined as
+    /// `/*…*/` text — the ones that trail the previous selector.
+    fn comments_before_comma(&self, start: u32, comma: u32) -> String {
+        self.comment_blocks_in_range(start, comma)
+    }
+
+    /// The comments between a comma and the selector after it (`end`), joined as `/*…*/`
+    /// text — the ones that lead the next selector.
+    fn comments_after_comma(&self, comma: u32, end: u32) -> String {
+        self.comment_blocks_in_range(comma, end)
     }
 
     //
@@ -194,23 +182,49 @@ impl<'a> Printer<'a> {
         let mut parts = DocBuf::new();
         for (i, complex) in selectors.iter().enumerate() {
             if i > 0 {
-                let (before, after) = self.split_selector_comments_around_comma(
-                    selectors[i - 1].span.end,
-                    complex.span.start,
-                );
-                if !before.is_empty() {
-                    parts.push(d.text(" "));
-                    parts.push(d.text_pooled(&before));
+                let prev = &selectors[i - 1];
+                // The common gap — no comment, no member — is the comma and its separator.
+                if !self.has_comments_to_emit_between(prev.span.end, complex.span.start)
+                    && !self.gap_may_hold_boundary_ws(prev.span.end, complex.span.start)
+                {
+                    parts.push(d.text(","));
+                    parts.push(if breakable { d.line() } else { d.text(" ") });
+                    parts.push(self.build_complex_selector_doc(complex));
+                    continue;
                 }
-                let kept = self.pre_comma_boundary_ws(&selectors[i - 1], complex.span.start);
-                if !kept.is_empty() {
+                // Each side of the comma is one gap, and a gap holding a boundary member is
+                // printed whole by the run's claim, its comments in place among the members
+                // (`Printer::spell_gap_items`); only a member-free side keeps the comment
+                // spelling below. The comma is found comment-aware (a `,` inside a comment is
+                // not the separator).
+                let comma = self.comma_between(prev.span.end, complex.span.start);
+                // A side's comments are collected only where no claim prints them: the
+                // collector records each one it returns as printed, so asking a claimed side
+                // would report its comments printed twice.
+                let kept = self.pre_comma_boundary_ws(prev, complex.span.start);
+                if kept.is_empty() {
+                    let before = self.comments_before_comma(prev.span.end, comma);
+                    if !before.is_empty() {
+                        parts.push(d.text(" "));
+                        parts.push(d.text_pooled(&before));
+                    }
+                } else {
                     parts.push(d.text_pooled(&kept));
                 }
                 parts.push(d.text(","));
                 parts.push(if breakable { d.line() } else { d.text(" ") });
-                if !after.is_empty() {
-                    parts.push(d.text_pooled(&after));
-                    parts.push(d.text(" "));
+                // The comma→selector gap: the next selector's first anchor claims only the
+                // run contiguous with it, so a member a comment strands ahead of that run
+                // (`a, <NBSP>/* c */ b`) is this seam's or nobody's.
+                match self.claim_lead_gap(comma + 1, complex.span.start, Edge::Flush) {
+                    Some(lead) => parts.push(d.text_pooled(&lead)),
+                    None => {
+                        let after = self.comments_after_comma(comma, complex.span.start);
+                        if !after.is_empty() {
+                            parts.push(d.text_pooled(&after));
+                            parts.push(d.text(" "));
+                        }
+                    }
                 }
             }
             parts.push(self.build_complex_selector_doc(complex));
@@ -273,13 +287,25 @@ impl<'a> Printer<'a> {
                     if i > 0 {
                         parts.push(d.line());
                     }
-                    self.push_combinator_boundary_ws(&mut parts, floor, rel.combinator_span);
+                    self.push_combinator_boundary_ws(
+                        &mut parts,
+                        floor,
+                        rel.combinator_span,
+                        Edge::Flush,
+                        Edge::Presence,
+                    );
                     parts.push(d.text(combinator.as_str()));
                 } else if i == 0 {
                     // Leading combinator (e.g. `:has(> img)`): no break before it — but the
                     // run `parse_explicit_combinator` stepped ahead of it still belongs to
                     // the output (`:has(<NBSP>> b)`).
-                    self.push_combinator_boundary_ws(&mut parts, floor, rel.combinator_span);
+                    self.push_combinator_boundary_ws(
+                        &mut parts,
+                        floor,
+                        rel.combinator_span,
+                        Edge::Flush,
+                        Edge::Presence,
+                    );
                     let s = Self::leading_combinator_str(combinator);
                     if !s.is_empty() {
                         parts.push(d.text(s));
@@ -289,7 +315,17 @@ impl<'a> Printer<'a> {
                     // the next compound's `preserved_boundary_ws` — claiming it here too
                     // would print it twice.
                     if combinator != internal::Combinator::Descendant {
-                        self.push_combinator_boundary_ws(&mut parts, floor, rel.combinator_span);
+                        // The separator doc opens with the `line` that stands AFTER the run,
+                        // so the run's right edge is the printer's; its left edge is the
+                        // author's — or a name's, which the run would otherwise glue into.
+                        let lead = floor.map_or(Edge::Flush, |floor| self.name_run_edge(floor));
+                        self.push_combinator_boundary_ws(
+                            &mut parts,
+                            floor,
+                            rel.combinator_span,
+                            lead,
+                            Edge::Flush,
+                        );
                     }
                     parts.push(self.combinator_separator_doc(combinator));
                 }
@@ -322,35 +358,34 @@ impl<'a> Printer<'a> {
     /// an empty compound whose symbol is its only anchor) — goes through here, because they
     /// differ only in whether a break precedes the symbol, not in what the gap owes.
     ///
-    /// ⚠️ The ASCII TAIL is trimmed here and at no other anchor: this is the only one whose
-    /// separator is emitted AFTER the run (`combinator_separator_doc` opens with a `line`), so
-    /// keeping the author's trailing space would stack with the regenerated one and grow it by
-    /// a column on every pass — output that is not its own fixed point. Every other anchor
-    /// sits flush against the token it precedes and so has no tail to trim.
-    ///
-    /// ⚠️ The trimmed tail is also why the run's LEFT side needs `name_run_separator`: what
-    /// stands there is the previous compound, and where that ends in a name the run glues into
-    /// it (`a <NBSP>> b` came back as the name `a<NBSP>`, a selector that matches nothing and
-    /// is its own fixed point). The floor is the position to ask at — it *is* the previous
-    /// compound's end — and its absence means the gap opens on a `(` or the selector's own
-    /// start, where nothing can glue.
+    /// The two edges are the CALLER's, because the arms differ in what they print around the
+    /// run ([`Edge`]). Where the separator doc follows (`combinator_separator_doc` opens with a
+    /// `line`), the right edge is flush — the author's trailing space would stack with the
+    /// regenerated one and grow a column on every pass — and the left edge is the author's,
+    /// or [`Edge::Space`] where the previous compound ends in a name the run would glue into
+    /// (`a <NBSP>> b` came back as the name `a<NBSP>`, a selector that matches nothing and is
+    /// its own fixed point). Where the arm writes its own space ahead of the run and the
+    /// symbol flush behind it (the anchorless combinator, the comment-bearing builder), the
+    /// edges swap. The floor is the position to ask at — it *is* the previous compound's end
+    /// — and its absence means the gap opens on a `(` or the selector's own start, where only
+    /// the contiguous run is claimed, flush on its left.
     fn push_combinator_boundary_ws(
         &self,
         parts: &mut DocBuf,
         floor: Option<u32>,
         combinator_span: Option<Span>,
+        lead: Edge,
+        trail: Edge,
     ) {
         let Some(cs) = combinator_span else {
             return;
         };
-        let kept = self.gap_boundary_ws(floor, cs.start);
-        let kept = trim_regenerated_separator(&kept);
+        let kept = match floor {
+            Some(floor) => self.spell_gap_items(floor, cs.start, lead, trail),
+            None => self.contiguous_boundary_ws(0, cs.start, trail),
+        };
         if !kept.is_empty() {
-            let separator = floor.map_or("", |floor| self.name_run_separator(floor));
-            if !separator.is_empty() {
-                parts.push(self.d().text(separator));
-            }
-            parts.push(self.d().text_pooled(kept));
+            parts.push(self.d().text_pooled(&kept));
         }
     }
 
@@ -383,12 +418,12 @@ impl<'a> Printer<'a> {
     /// because a preservation that only one of them makes is a drop through the other.
     ///
     /// ⚠️ Flush against the comma is safe on the run's RIGHT and says nothing about its left,
-    /// which is the selector that just ended — so the answer carries `name_run_separator`'s
-    /// space wherever that selector ends in a name (`a.x <NBSP>, c` re-parsed with the class
-    /// `x<NBSP>`; `a[b] <NBSP>, c` and `* <NBSP>, c` never could, and neither can an `Nth`
-    /// term — `selector_run_separator`). Included in the returned string rather than left to
-    /// the two callers, which is what keeps them from disagreeing about it the way they once
-    /// disagreed about the run itself.
+    /// which is the selector that just ended — so the left edge is the author's separation,
+    /// forced to a space wherever that selector ends in a name (`a.x <NBSP>, c` re-parsed
+    /// with the class `x<NBSP>`; `a[b] <NBSP>, c` and `* <NBSP>, c` never could, and neither
+    /// can an `Nth` term — `selector_run_edge`). Included in the returned string rather
+    /// than left to the two callers, which is what keeps them from disagreeing about it the
+    /// way they once disagreed about the run itself.
     fn pre_comma_boundary_ws(
         &self,
         prev: &internal::ComplexSelector<'_>,
@@ -396,29 +431,30 @@ impl<'a> Printer<'a> {
     ) -> String {
         let prev_end = prev.span.end;
         // An all-ASCII gap can hold no member; settle before the comma scan (see
-        // `boundary_ws_in_gap`, whose own guard this mirrors one step earlier — bounds check
+        // `spell_gap`, whose own guard this mirrors one step earlier — bounds check
         // included, so a caller's inverted or out-of-range pair can never slice).
         if !self.gap_may_hold_boundary_ws(prev_end, next_start) {
             return String::new();
         }
-        let comma = source_scan::find_char_skipping_comments(
-            self.source.as_bytes(),
-            prev_end as usize,
-            next_start as usize,
-            b',',
-        )
-        .map_or(next_start, |pos| pos as u32);
-        let kept = self.boundary_ws_in_gap(prev_end, comma);
-        if kept.is_empty() {
-            return kept;
-        }
-        let mut out = String::from(self.selector_run_separator(prev));
-        out.push_str(&kept);
-        out
+        let comma = self.comma_between(prev_end, next_start);
+        self.spell_gap_items(prev_end, comma, self.selector_run_edge(prev), Edge::Flush)
     }
 
-    /// [`Self::name_run_separator`] for a run restored after a complex selector — the space
-    /// that keeps its last NAME closed — unless the selector ends in an `Nth` term.
+    /// The offset of the comma separating two selectors in the gap `[from, to)`, found
+    /// comment-aware (a `,` inside a comment is not the separator); `to` when there is none,
+    /// which only a malformed span pair could produce.
+    fn comma_between(&self, from: u32, to: u32) -> u32 {
+        source_scan::find_char_skipping_comments(
+            self.source.as_bytes(),
+            from as usize,
+            to as usize,
+            b',',
+        )
+        .map_or(to, |pos| pos as u32)
+    }
+
+    /// [`Self::name_run_edge`] for a run restored after a complex selector — the space that
+    /// keeps its last NAME closed — unless the selector ends in an `Nth` term.
     ///
     /// An An+B term re-parses through the byte scanner (`match_nth_value` /
     /// `nth_arg_terminator`), not `read_identifier`: the scanner steps the run as the
@@ -426,42 +462,44 @@ impl<'a> Printer<'a> {
     /// space ahead of the run would be an insertion the author did not write and prettier
     /// does not make (`:is(2n<NBSP>)`). The name predicate alone cannot tell — an An+B ends
     /// in a digit or an `n`, both of which continue a name.
-    fn selector_run_separator(&self, complex: &internal::ComplexSelector<'_>) -> &'static str {
+    fn selector_run_edge(&self, complex: &internal::ComplexSelector<'_>) -> Edge {
         let ends_in_nth = complex
             .children
             .last()
             .and_then(|relative| relative.selectors.last())
             .is_some_and(|simple| matches!(simple, internal::SimpleSelector::Nth { .. }));
         if ends_in_nth {
-            ""
+            Edge::Presence
         } else {
-            self.name_run_separator(complex.span.end)
+            self.name_run_edge(complex.span.end)
         }
     }
 
-    /// [`Self::selector_run_separator`] for the run a selector LIST's `)` gap restores: the
-    /// list's last selector decides. An empty list has no name to close.
-    fn list_run_separator(&self, list: &internal::SelectorList<'_>) -> &'static str {
+    /// [`Self::selector_run_edge`] for the run a selector LIST's `)` gap restores: the list's
+    /// last selector decides. An empty list has no name to close.
+    fn list_run_edge(&self, list: &internal::SelectorList<'_>) -> Edge {
         list.selectors
             .last()
-            .map_or("", |complex| self.selector_run_separator(complex))
+            .map_or(Edge::Presence, |complex| self.selector_run_edge(complex))
     }
 
     /// The `An+B` head and the ` of ` keyword text of an `:nth-*(An+B of S)` argument, with
     /// the boundary runs the parser skipped on either side of `of` restored.
     ///
-    /// Three claims meet at this keyword, and they partition the gap
-    /// `[value_span.end, selectors.span.start)`:
+    /// The gap `[value_span.end, selectors.span.start)` is this arm's whole wherever it holds
+    /// a member, its comments in place; a member-free gap is the plain `" of "` with its
+    /// comments leading `S`. Two halves:
     ///
     /// - the run BEFORE `of` (`2n + 1<NBSP> of`) has nothing but this arm to carry it, so it
-    ///   is swept whole and printed flush after the An+B text, ahead of the regenerated
+    ///   is swept whole and printed after the An+B text — flush where the author glued it,
+    ///   one space off where they did not (`2n + 1 <NBSP> of`) — ahead of the regenerated
     ///   space;
-    /// - the run contiguous with `S`'s first compound (`of<NBSP>.x`) is that compound's own
-    ///   claim — its backward scan reaches the run behind its name (the same partition the
-    ///   `:is(<NBSP>b)` arm relies on) — so this arm prints no space where that claim stands:
-    ///   the run IS the separator, as the author, canonical and prettier all spell it;
-    /// - what a comment strands between the two (`of<NBSP>/* c */ .x`) is this arm's again,
-    ///   bounded at the contiguous run's start (`boundary_ws_in_gap_before_anchor`).
+    /// - what follows the keyword is `S`'s lead gap, which this arm claims whole through
+    ///   `claim_lead_gap` (so `S`'s first anchor stands down) where it holds a member, behind
+    ///   the keyword's own space only where the author separated the gap from `of`: glued
+    ///   (`of<NBSP>.x`, `of/* c */<NBSP> .x`) the gap IS the separator, as the author,
+    ///   canonical and prettier all spell it. A member-free half keeps the plain spelling,
+    ///   its comments where that spelling puts them — before the keyword, or leading `S`.
     ///
     /// The keyword is located by stepping the gap's trivia (`skip_gap_trivia`): the parser
     /// keeps no span for it. Settled to the plain `" of "` on the document precondition —
@@ -471,24 +509,66 @@ impl<'a> Printer<'a> {
         head: Cow<'v, str>,
         value_span: Span,
         selectors: &internal::SelectorList<'_>,
-    ) -> (Cow<'v, str>, Cow<'static, str>) {
-        if !self.holds_boundary_ws {
-            return (head, Cow::Borrowed(" of "));
+    ) -> NthOf<'v> {
+        let plain = |head| NthOf {
+            head,
+            of: Cow::Borrowed(" of "),
+            comments_after: self.comment_blocks_in_range(value_span.end, selectors.span.start),
+        };
+        if !self.holds_boundary_ws || !self.gap_holds_member(value_span.end, selectors.span.start) {
+            return plain(head);
         }
         let of_start = skip_gap_trivia(self.source, value_span.end, selectors.span.start);
-        let before = self.boundary_ws_in_gap(value_span.end, of_start);
-        let stranded = self.boundary_ws_in_gap_before_anchor(of_start, selectors.span.start);
-        let compound_claims_run = self.boundary_run(of_start, selectors.span.start).1;
-        let mut after = stranded;
-        if !compound_claims_run {
-            after.push(' ');
-        }
+        // The keyword is two ASCII letters, whatever their case.
+        let of_end = (of_start + 2).min(selectors.span.start);
+        // Each half of the gap is claimed whole — its comments in place — where it holds a
+        // member, and otherwise keeps its comments where the member-free spelling puts them:
+        // the half before `of` right where it stands, the half after it leading `S`.
+        let before = if self.gap_holds_member(value_span.end, of_start) {
+            self.spell_gap_items(value_span.end, of_start, Edge::Presence, Edge::Flush)
+        } else {
+            let comments = self.comment_blocks_in_range(value_span.end, of_start);
+            if comments.is_empty() {
+                comments
+            } else {
+                format!(" {comments}")
+            }
+        };
+        // What follows is `S`'s lead gap. Holding a member, it is claimed whole here, its
+        // comments in place — `S`'s first anchor has no floor to reach past a comment with —
+        // and it keeps the author's separation from the keyword: a member or a comment glued
+        // to `of` stays glued (`of<NBSP>.x`, `of/* c */<NBSP>.x`), the gap then being the
+        // separator itself. A member-free gap gets the keyword's own space, its comments
+        // leading `S` as they always have.
+        let mut after = String::new();
+        let comments_after = match self.claim_lead_gap(of_end, first_anchor(selectors), Edge::Flush)
+        {
+            Some(lead) => {
+                let spaced = self.source[of_end as usize..].starts_with(|c: char| {
+                    crate::whitespace::is_boundary_whitespace(c)
+                        && !crate::whitespace::is_boundary_only_whitespace(c)
+                });
+                if spaced {
+                    after.push(' ');
+                }
+                after.push_str(&lead);
+                String::new()
+            }
+            None => {
+                after.push(' ');
+                self.comment_blocks_in_range(of_end, selectors.span.start)
+            }
+        };
         let head = if before.is_empty() {
             head
         } else {
             Cow::Owned(head.into_owned() + &before)
         };
-        (head, of_keyword_text("", &after))
+        NthOf {
+            head,
+            of: of_keyword_text("", &after),
+            comments_after,
+        }
     }
 
     /// Whether this complex selector carries a comment at a combinator boundary — any
@@ -549,7 +629,10 @@ impl<'a> Printer<'a> {
                         // Explicit space (this path renders inline, no `line()` break points).
                         parts.push(d.text(" "));
                     }
-                    if let Some(cs) = rel.combinator_span {
+                    // A gap holding a member is the run claim's whole, comments in place.
+                    if let Some(cs) = rel.combinator_span
+                        && !self.gap_holds_member(prev_end, cs.start)
+                    {
                         let before = self.comment_blocks_in_range(prev_end, cs.start);
                         if !before.is_empty() {
                             parts.push(d.text_pooled(&before));
@@ -557,8 +640,16 @@ impl<'a> Printer<'a> {
                         }
                     }
                     // The symbol is this compound's only anchor, so it carries the gap's run
-                    // too — the same claim the comment-free twin makes here.
-                    self.push_combinator_boundary_ws(&mut parts, floor, rel.combinator_span);
+                    // too — the same claim the comment-free twin makes here. The space this
+                    // path writes ahead of it stands on the run's left; the symbol follows
+                    // flush, so the right edge is the author's.
+                    self.push_combinator_boundary_ws(
+                        &mut parts,
+                        floor,
+                        rel.combinator_span,
+                        Edge::Flush,
+                        Edge::Presence,
+                    );
                     parts.push(d.text(combinator.as_str()));
                 }
                 prev_end = rel.span.end;
@@ -570,12 +661,22 @@ impl<'a> Printer<'a> {
                     // Leading combinator (`:has(> /* c */ img)`): the run ahead of the
                     // symbol, the symbol, then any comment sitting between it and the first
                     // compound.
-                    self.push_combinator_boundary_ws(&mut parts, floor, rel.combinator_span);
+                    self.push_combinator_boundary_ws(
+                        &mut parts,
+                        floor,
+                        rel.combinator_span,
+                        Edge::Flush,
+                        Edge::Presence,
+                    );
                     let s = Self::leading_combinator_str(combinator);
                     if !s.is_empty() {
                         parts.push(d.text(s));
                     }
-                    if let Some(cs) = rel.combinator_span {
+                    // …unless the gap holds a member: the first compound's claim then prints
+                    // it whole, its comments in place (`gap_boundary_ws`, floored at `cs.end`).
+                    if let Some(cs) = rel.combinator_span
+                        && !self.gap_holds_member(cs.end, first_start)
+                    {
                         let after = self.comment_blocks_in_range(cs.end, first_start);
                         if !after.is_empty() {
                             parts.push(d.text_pooled(&after));
@@ -663,9 +764,21 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = DocBuf::new();
         parts.push(d.text(" "));
+        // A side of the gap that holds a boundary member is printed whole by the run's claim,
+        // its comments in place among the members (`Printer::spell_gap_items`) — the next
+        // compound's `gap_boundary_ws` for the side ahead of it, `push_combinator_boundary_ws`
+        // for the side ahead of an explicit symbol. Only a member-free side keeps the comment
+        // spelling here.
+        let comments = |from: u32, to: u32| {
+            if self.gap_holds_member(from, to) {
+                String::new()
+            } else {
+                self.comment_blocks_in_range(from, to)
+            }
+        };
         match combinator {
             internal::Combinator::Descendant => {
-                let gap = self.comment_blocks_in_range(gap_start, gap_end);
+                let gap = comments(gap_start, gap_end);
                 if !gap.is_empty() {
                     parts.push(d.text_pooled(&gap));
                     parts.push(d.text(" "));
@@ -673,14 +786,8 @@ impl<'a> Printer<'a> {
             }
             other => {
                 let (before, after) = match combinator_span {
-                    Some(cs) => (
-                        self.comment_blocks_in_range(gap_start, cs.start),
-                        self.comment_blocks_in_range(cs.end, gap_end),
-                    ),
-                    None => (
-                        self.comment_blocks_in_range(gap_start, gap_end),
-                        String::new(),
-                    ),
+                    Some(cs) => (comments(gap_start, cs.start), comments(cs.end, gap_end)),
+                    None => (comments(gap_start, gap_end), String::new()),
                 };
                 if !before.is_empty() {
                     parts.push(d.text_pooled(&before));
@@ -689,7 +796,15 @@ impl<'a> Printer<'a> {
                 // The run on the symbol's own side of the gap, flush against it — the
                 // compound that follows floors its claim past `cs.end`, so this half is the
                 // symbol's or nobody's.
-                self.push_combinator_boundary_ws(&mut parts, Some(gap_start), combinator_span);
+                // This path writes its own space on the run's left and the symbol flush on
+                // its right, so only the right edge is the author's.
+                self.push_combinator_boundary_ws(
+                    &mut parts,
+                    Some(gap_start),
+                    combinator_span,
+                    Edge::Flush,
+                    Edge::Presence,
+                );
                 parts.push(d.text(other.as_str()));
                 parts.push(d.text(" "));
                 if !after.is_empty() {
@@ -790,7 +905,7 @@ impl<'a> Printer<'a> {
         // skipped non-ASCII whitespace run the printer would otherwise drop — the same
         // preservation the compound path applies (`preserved_boundary_ws`).
         let leading = namespace_span.unwrap_or(name_span).start;
-        result.push_str(self.preserved_boundary_ws(span.start, leading));
+        result.push_str(&self.preserved_boundary_ws(span.start, leading));
         if let Some(ns) = namespace_span {
             result.push_str(ns.extract(self.source));
             result.push('|');
@@ -806,11 +921,18 @@ impl<'a> Printer<'a> {
                 // The matcher has no span of its own: it is the first non-trivia byte past the
                 // name (no comment can sit here — the commented twin took those).
                 let m_start = skip_gap_trivia(self.source, name_span.end, vs.start);
-                let kept = self.boundary_ws_in_gap(name_span.end, m_start);
+                // Each run keeps the author's separation from the token after it — a quoted
+                // value glued to a run is a different token sequence to css-syntax-3.
+                let kept = self.spell_gap(name_span.end, m_start, Edge::Flush, Edge::Presence);
                 self.push_boundary_ws_after_name(&mut result, &kept);
                 let text = m.as_str();
                 result.push_str(text);
-                let kept = self.boundary_ws_in_gap(m_start + text.len() as u32, vs.start);
+                let kept = self.spell_gap(
+                    m_start + text.len() as u32,
+                    vs.start,
+                    Edge::Flush,
+                    Edge::Presence,
+                );
                 self.push_boundary_ws_after_name(&mut result, &kept);
                 self.push_attribute_value(&mut result, vs);
                 vs.end
@@ -987,6 +1109,10 @@ impl<'a> Printer<'a> {
     /// A comment is padded off its neighbours as the interior gaps pad theirs
     /// (`AttributeGap`): it is no token to any reader, so the space costs nothing.
     fn push_attribute_tail(&self, result: &mut String, from: u32, close: u32) {
+        if self.gap_holds_member(from, close) {
+            self.push_attribute_tail_in_place(result, from, close);
+            return;
+        }
         let (from, close) = (from as usize, close as usize);
         if from >= close {
             return;
@@ -1056,14 +1182,65 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// One interior gap of an attribute-selector rebuild: its boundary run, then its
-    /// comments.
+    /// [`Self::push_attribute_tail`] for a tail that holds a boundary member: every item —
+    /// the members, the comments and the case flag's letters — where the author put it, one
+    /// space where they put ASCII whitespace and none where they glued it (the spelling of
+    /// `Printer::spell_gap_items`, with the flag as one more item). A tail with a member in
+    /// it is where the bytes are the claim — to css-syntax-3 the member is identifier content
+    /// and a comment tokenizes to nothing, so a comment padded off a member it was glued to,
+    /// or a flag moved off one, changes what the member is glued to — so no item is spaced
+    /// that the author did not space.
+    fn push_attribute_tail_in_place(&self, result: &mut String, from: u32, close: u32) {
+        let (from, close) = (from as usize, close as usize);
+        let gap = &self.source[from..close];
+        let bytes = gap.as_bytes();
+        let mut pending_space = false;
+        let mut i = 0;
+        while i < gap.len() {
+            if crate::comments::is_comment_start(bytes, i) {
+                let end = crate::comments::comment_end(bytes, i);
+                if pending_space {
+                    result.push(' ');
+                }
+                // Through the recording emitter, over exactly this comment's span, so the
+                // print-once ledger sees it printed here.
+                self.push_comment_blocks_in_range(
+                    result,
+                    (from + i) as u32,
+                    (from + end) as u32,
+                    "",
+                );
+                pending_space = false;
+                i = end;
+                continue;
+            }
+            let Some(c) = gap[i..].chars().next() else {
+                break;
+            };
+            i += c.len_utf8();
+            if crate::whitespace::is_boundary_whitespace(c)
+                && !crate::whitespace::is_boundary_only_whitespace(c)
+            {
+                pending_space = true;
+                continue;
+            }
+            if pending_space {
+                result.push(' ');
+            }
+            result.push(c);
+            pending_space = false;
+        }
+    }
+
+    /// One interior gap of an attribute-selector rebuild: its boundary run and its comments.
     ///
     /// Every gap of this rebuild is also a juncture the parser stepped a boundary run at, and
     /// the rebuild is the only thing that can carry one — so the run goes in whether or not
-    /// the gap holds a comment. Ahead of the comments and of `pad_before`, so a `Glued` gap
-    /// (a `<wq-name>`'s or an `<attr-matcher>`'s, where whitespace is forbidden) still emits
-    /// nothing of its own around it.
+    /// the gap holds a comment. A gap holding a member is spelled whole, its comments in place
+    /// among the members (`Printer::spell_gap_items`); a member-free one keeps the comment
+    /// spelling (`pad_before` / `pad_after`), so a `Glued` gap (a `<wq-name>`'s or an
+    /// `<attr-matcher>`'s, where whitespace is forbidden) still emits nothing of its own
+    /// around it.
     ///
     /// ⚠️ The run goes in through `push_boundary_ws_after_name`, never flush: the gap this
     /// rebuild resumes at most often is the one right behind the attribute NAME, where a
@@ -1079,8 +1256,22 @@ impl<'a> Printer<'a> {
         if from >= to {
             return;
         }
-        let kept = self.boundary_ws_in_gap(from, to);
-        self.push_boundary_ws_after_name(result, &kept);
+        if gap != AttributeGap::Glued && self.gap_holds_member(from, to) {
+            let lead = if gap.pad_before() {
+                Edge::Presence
+            } else {
+                Edge::Flush
+            };
+            let kept = self.spell_gap_items(from, to, lead, Edge::Presence);
+            if kept.starts_with([' ', '/']) {
+                // Already apart from the name: its own space, or a comment, which no name
+                // can take in.
+                result.push_str(&kept);
+            } else {
+                self.push_boundary_ws_after_name(result, &kept);
+            }
+            return;
+        }
         self.push_attribute_gap_comments(result, from, to, gap);
     }
 
@@ -1376,23 +1567,32 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match args {
             internal::PseudoClassArgs::SelectorList { selectors, span } => {
-                // Interleave leading/trailing comments that sit inside the parens but
-                // outside the inner list span (`:is(/* lead */ .a /* trail */)`).
-                let inner = self.build_nested_selector_list_doc(selectors);
-                let inner = self.wrap_args_gap_comments(inner, *span, selectors.span);
-                // A run the parser skipped between the last selector and the `)` — see
-                // `boundary_ws_in_gap`. `span.end` is past the `)`, so the gap stops one byte
-                // short of it, and the separator ahead of it is what keeps the last
-                // selector's own name off it (`:is(a <NBSP>)` re-parsed as `:is(a<NBSP>)`).
-                let kept = self.boundary_ws_before_closer(selectors.span.end, *span);
-                let kept = prefixed_run(self.list_run_separator(selectors), kept);
-                // …and the lead gap's own, which only this arm can claim: the inner list's
-                // first compound reaches the run CONTIGUOUS with its name by scanning back
-                // (`:is(<NBSP>b)`), but it has no floor to sweep forward from, so a run a
+                // The lead gap, which only this arm can claim whole: the inner list's first
+                // compound reaches the run CONTIGUOUS with its name by scanning back
+                // (`:is(<NBSP>b)`), but it has no floor to sweep forward from, so a member a
                 // comment strands after the `(` is invisible to it (`:is(<NBSP>/* c */ a)`).
-                // Bounded at that contiguous run's start, so the two never claim one
-                // character twice — see `boundary_ws_in_gap_before_anchor`.
-                let lead = self.boundary_ws_in_gap_before_anchor(span.start, selectors.span.start);
+                // Claimed BEFORE the list is built, so its first anchor stands down.
+                let lead = self.claim_lead_gap(span.start, first_anchor(selectors), Edge::Flush);
+                let inner = self.build_nested_selector_list_doc(selectors);
+                // A run the parser skipped between the last selector and the `)` — see
+                // `spell_gap_items`. `span.end` is past the `)`, so the gap stops one byte
+                // short of it, and the edge ahead of it is what keeps the last selector's
+                // own name off it (`:is(a <NBSP>)` re-parsed as `:is(a<NBSP>)`).
+                let kept = self.spell_gap_before_closer(
+                    selectors.span.end,
+                    *span,
+                    self.list_run_edge(selectors),
+                );
+                // Interleave the leading/trailing comments that sit inside the parens but
+                // outside the inner list span (`:is(/* lead */ .a /* trail */)`) — on each
+                // side the two claims above did not already print in place.
+                let inner = self.wrap_args_gap_comments_unclaimed(
+                    inner,
+                    *span,
+                    selectors.span,
+                    (lead.is_some(), !kept.is_empty()),
+                );
+                let lead = lead.unwrap_or_default();
                 let inner = if kept.is_empty() && lead.is_empty() {
                     inner
                 } else {
@@ -1412,15 +1612,22 @@ impl<'a> Printer<'a> {
                 // become `/* a - b */`). Prettier prints the whole *selector* verbatim
                 // whenever it holds a comment — its selector parser gives up before
                 // reaching the An+B — so that spelling is a parser artifact, not a rule.
-                let normalized = Self::normalize_an_plus_b(value);
-                // Comments in the gaps around the An+B text are not part of
-                // `value`; interleave them like the SelectorList arm above.
-                let leading = self.comment_blocks_in_range(span.start, value_span.start);
-                // …and neither is the boundary run the argument-list start skipped
-                // (`:nth-child(<NBSP>2n)`), which `normalize_an_plus_b` would otherwise drop
-                // with the rest of the gap. Flush against the An+B text — see
-                // `boundary_ws_in_gap`.
-                let kept_leading = self.boundary_ws_in_gap(span.start, value_span.start);
+                let normalized = self.normalize_an_plus_b_before_gap(value, value_span.end);
+                // Comments in the gaps around the An+B text are not part of `value`;
+                // interleave them like the SelectorList arm above — unless the gap holds a
+                // boundary member, which `normalize_an_plus_b` would otherwise drop with the
+                // rest of the gap (`:nth-child(<NBSP>2n)`): then the gap's claim prints it
+                // whole, comments in place (`spell_gap_items`).
+                let comments_unless_claimed = |from: u32, to: u32| {
+                    if self.gap_holds_member(from, to) {
+                        String::new()
+                    } else {
+                        self.comment_blocks_in_range(from, to)
+                    }
+                };
+                let leading = comments_unless_claimed(span.start, value_span.start);
+                let kept_leading =
+                    self.spell_gap_items(span.start, value_span.start, Edge::Flush, Edge::Presence);
                 let normalized = if kept_leading.is_empty() {
                     normalized
                 } else {
@@ -1428,14 +1635,19 @@ impl<'a> Printer<'a> {
                 };
                 match of_selector {
                     None => {
-                        let trailing = self.comment_blocks_in_range(value_span.end, span.end);
+                        let trailing = comments_unless_claimed(value_span.end, span.end);
                         // …nor the run the `)` gap skipped (`:nth-child(2n<NBSP>)`), flush
                         // against the `)`. `span.end` IS the `)` here (the Nth span ends
                         // before it, unlike the other arms' — see `wrap_args_gap_comments`),
                         // so the gap needs no `closer_pos`. No separator ahead of it: an
                         // An+B re-parses through the byte scanner, which steps the run as
-                        // the terminator's gap, so nothing glues (`list_run_separator`).
-                        let kept_trailing = self.boundary_ws_in_gap(value_span.end, span.end);
+                        // the terminator's gap, so nothing glues (`list_run_edge`).
+                        let kept_trailing = self.spell_gap_items(
+                            value_span.end,
+                            span.end,
+                            Edge::Presence,
+                            Edge::Flush,
+                        );
                         let text = if kept_trailing.is_empty() {
                             normalized
                         } else {
@@ -1449,21 +1661,30 @@ impl<'a> Printer<'a> {
                         self.paren_wrap(inner)
                     }
                     Some(selectors) => {
-                        // The of-gap comments (`of /* c */ .a`) lead the selector list.
-                        let of_gap =
-                            self.comment_blocks_in_range(value_span.end, selectors.span.start);
+                        // The keyword first: where the of-gap holds a member it claims `S`'s
+                        // lead gap, which must happen before `S` is built.
+                        let NthOf {
+                            head,
+                            of,
+                            comments_after,
+                        } = self.nth_of_keyword(normalized, *value_span, selectors);
+                        // The of-gap comments the keyword's claims left (`of /* c */ .a`) lead
+                        // the selector list.
                         let list = self.wrap_inner_with_comments(
                             self.build_nested_selector_list_doc(selectors),
-                            &of_gap,
+                            &comments_after,
                             "",
                         );
-                        let trailing = self.comment_blocks_in_range(selectors.span.end, span.end);
-                        let (head, of) = self.nth_of_keyword(normalized, *value_span, selectors);
+                        let trailing = comments_unless_claimed(selectors.span.end, span.end);
                         // The run the `)` gap skipped after `S` (`of .b <NBSP>)`), flush against
                         // the `)` behind the separator its last name needs — the same claim the
                         // SelectorList arm makes; `S` is a nested list with no other emitter.
-                        let tail = self.boundary_ws_in_gap(selectors.span.end, span.end);
-                        let tail = prefixed_run(self.list_run_separator(selectors), tail);
+                        let tail = self.spell_gap_items(
+                            selectors.span.end,
+                            span.end,
+                            self.list_run_edge(selectors),
+                            Edge::Flush,
+                        );
                         let inner = if tail.is_empty() {
                             d.concat(&[d.text_pooled(&head), d.text_pooled(&of), list])
                         } else {
@@ -1495,14 +1716,24 @@ impl<'a> Printer<'a> {
                 // leading/trailing comments outside the run
                 // (`::part(/* lead */ a /* mid */ b /* trail */)`).
                 let run = self.build_part_idents_doc(idents, ident_spans, run_span);
-                let inner = self.wrap_args_gap_comments(run, *span, run_span);
                 // The runs the argument-list start and the `)` gap skipped — `::part` rebuilds
-                // its names from spans, so nothing else carries them. The tail's separator is
-                // the last name's (`::part(a <NBSP>)` re-parsed with the part `a<NBSP>`); the
-                // lead needs none, its left neighbour being the `(`.
-                let lead = self.boundary_ws_in_gap(span.start, run_span.start);
-                let tail = self.boundary_ws_before_closer(run_span.end, *span);
-                let tail = prefixed_run(self.name_run_separator(run_span.end), tail);
+                // its names from spans, so nothing else carries them. Each is claimed whole,
+                // its comments in place, and the comment wrapper below then leaves that side
+                // alone. The tail's edge is the last name's (`::part(a <NBSP>)` re-parsed with
+                // the part `a<NBSP>`); the lead needs none, its left neighbour being the `(`.
+                let lead =
+                    self.spell_gap_items(span.start, run_span.start, Edge::Flush, Edge::Presence);
+                let tail = self.spell_gap_before_closer(
+                    run_span.end,
+                    *span,
+                    self.name_run_edge(run_span.end),
+                );
+                let inner = self.wrap_args_gap_comments_unclaimed(
+                    run,
+                    *span,
+                    run_span,
+                    (!lead.is_empty(), !tail.is_empty()),
+                );
                 let inner = if lead.is_empty() && tail.is_empty() {
                     inner
                 } else {
@@ -1522,6 +1753,18 @@ impl<'a> Printer<'a> {
     /// Svelte-matching public-AST node span (it ends *before* the `)`, and convert
     /// reads it verbatim — see `convert_pseudo_class_args`), so it interleaves inline.
     fn wrap_args_gap_comments(&self, inner: DocId, args_span: Span, content_span: Span) -> DocId {
+        self.wrap_args_gap_comments_unclaimed(inner, args_span, content_span, (false, false))
+    }
+
+    /// [`Self::wrap_args_gap_comments`] with each side's comments left out where a boundary
+    /// claim has already printed that gap whole, in place (`claimed` is `(lead, tail)`).
+    fn wrap_args_gap_comments_unclaimed(
+        &self,
+        inner: DocId,
+        args_span: Span,
+        content_span: Span,
+        claimed: (bool, bool),
+    ) -> DocId {
         // Both gaps sit inside the argument parens, so comment-free parens mean both come
         // back empty and `wrap_inner_with_comments` hands `inner` straight back. One probe
         // replaces the two range-collects on the common path — this fires on every
@@ -1529,8 +1772,16 @@ impl<'a> Printer<'a> {
         if !self.has_comments_to_emit_between(args_span.start, args_span.end) {
             return inner;
         }
-        let leading = self.comment_blocks_in_range(args_span.start, content_span.start);
-        let trailing = self.comment_blocks_in_range(content_span.end, closer_pos(args_span));
+        let leading = if claimed.0 {
+            String::new()
+        } else {
+            self.comment_blocks_in_range(args_span.start, content_span.start)
+        };
+        let trailing = if claimed.1 {
+            String::new()
+        } else {
+            self.comment_blocks_in_range(content_span.end, closer_pos(args_span))
+        };
         self.wrap_inner_with_comments(inner, &leading, &trailing)
     }
 
@@ -1564,17 +1815,19 @@ impl<'a> Printer<'a> {
         for (i, ident) in idents.iter().enumerate() {
             if i > 0 {
                 parts.push(d.text(" "));
-                let gap =
-                    self.comment_blocks_in_range(ident_spans[i - 1].end, ident_spans[i].start);
-                if !gap.is_empty() {
-                    parts.push(d.text_pooled(&gap));
-                    parts.push(d.text(" "));
-                }
-                // Flush against the name that follows, like every other restore: a member
-                // parked against the PREVIOUS name would glue to it and read as one longer
-                // identifier on the next parse.
-                let kept = self.boundary_ws_in_gap(ident_spans[i - 1].end, ident_spans[i].start);
-                if !kept.is_empty() {
+                // A gap holding a member is printed whole, its comments in place among the
+                // members, with the author's separation kept against the name that follows;
+                // a member-free gap keeps the comment spelling. Never parked against the
+                // PREVIOUS name, where it would glue and read as one longer identifier.
+                let (from, to) = (ident_spans[i - 1].end, ident_spans[i].start);
+                let kept = self.spell_gap_items(from, to, Edge::Flush, Edge::Presence);
+                if kept.is_empty() {
+                    let gap = self.comment_blocks_in_range(from, to);
+                    if !gap.is_empty() {
+                        parts.push(d.text_pooled(&gap));
+                        parts.push(d.text(" "));
+                    }
+                } else {
                     parts.push(d.text_pooled(&kept));
                 }
             }
@@ -1625,6 +1878,34 @@ impl<'a> Printer<'a> {
             d.softline(),
             d.text(")"),
         ]))
+    }
+
+    /// [`Self::normalize_an_plus_b`] for a term whose text ends where the gap at `gap_start`
+    /// begins — reading the gap's first character too when it is a boundary member glued to
+    /// a comment the term's text ends on (`2n/* c */<NBSP>)`).
+    ///
+    /// The normalizer spaces a comment off its neighbours unless one of them is a member it is
+    /// glued to, and a member just past the term's text is one it cannot otherwise see: the
+    /// An+B reader ends the text at the comment and leaves the member to the gap's claim. So
+    /// the member is shown to the normalizer and taken back off its answer.
+    fn normalize_an_plus_b_before_gap<'v>(&self, value: &'v str, gap_start: u32) -> Cow<'v, str> {
+        let glued_member = if self.holds_boundary_ws && value.ends_with("*/") {
+            self.source
+                .get(gap_start as usize..)
+                .and_then(|rest| rest.chars().next())
+                .filter(|c| crate::whitespace::is_boundary_only_whitespace(*c))
+        } else {
+            None
+        };
+        let Some(member) = glued_member else {
+            return Self::normalize_an_plus_b(value);
+        };
+        let mut read = String::with_capacity(value.len() + member.len_utf8());
+        read.push_str(value);
+        read.push(member);
+        let mut normalized = Self::normalize_an_plus_b(&read).into_owned();
+        normalized.truncate(normalized.len() - member.len_utf8());
+        Cow::Owned(normalized)
     }
 
     /// Normalize An+B notation spacing (better than prettier)
@@ -1681,14 +1962,30 @@ impl<'a> Printer<'a> {
 
         while let Some(ch) = rest.chars().next() {
             // A comment is trivia standing in for whitespace: copy it verbatim, spaced
-            // off from whatever sits on either side of it.
+            // off from whatever sits on either side of it — except where the author glued it
+            // to a boundary member (`2n<NBSP>/* c */`, `2n/* c */<NBSP>`): a comment
+            // tokenizes to nothing, so spacing it off either side would split what the member
+            // is glued to (the in-place rule of `printer/boundary_ws.rs`).
             if let Some(end) = crate::comments::leading_comment_end(rest) {
-                if prev_exists && !result.ends_with(' ') {
+                let tail = &rest[end..];
+                let after_member = result
+                    .chars()
+                    .next_back()
+                    .is_some_and(crate::whitespace::is_boundary_only_whitespace);
+                let before_member = tail
+                    .chars()
+                    .next()
+                    .is_some_and(crate::whitespace::is_boundary_only_whitespace);
+                // A comment glued to a member on either side is part of that member's glue
+                // chain: both of its sides keep the author's spacing.
+                let in_chain = after_member || before_member;
+                if prev_exists && !result.ends_with(' ') && !in_chain {
                     result.push(' ');
                 }
                 result.push_str(&rest[..end]);
-                rest = rest[end..].trim_start_matches(is_ascii_boundary_whitespace);
-                if !rest.is_empty() {
+                rest = tail.trim_start_matches(is_ascii_boundary_whitespace);
+                let spaced_after = rest.len() != tail.len();
+                if !rest.is_empty() && (!in_chain || spaced_after) {
                     result.push(' ');
                 }
                 prev_exists = true;
@@ -1718,12 +2015,41 @@ impl<'a> Printer<'a> {
                 }
             }
 
+            // Any other ASCII whitespace stretch sits beside a boundary member the scanner
+            // folded into the term (`2n<NBSP><TAB><NBSP> + 1`, `+ <NBSP>⏎1`): one space, the
+            // spelling every boundary run takes (`printer/boundary_ws.rs`). A stretch ahead
+            // of an operator is truncated by the operator arm above, which regenerates its own.
+            if is_ascii_boundary_whitespace(ch) {
+                rest = rest.trim_start_matches(is_ascii_boundary_whitespace);
+                if !rest.is_empty() && !result.ends_with(' ') {
+                    result.push(' ');
+                }
+                continue;
+            }
+
             result.push(ch);
             prev_exists = true;
         }
 
         Cow::Owned(result)
     }
+}
+
+/// Where a selector list's first selector begins — the anchor whose lead gap a container
+/// claims ([`Printer::claim_lead_gap`]).
+fn first_anchor(list: &internal::SelectorList<'_>) -> u32 {
+    list.selectors
+        .first()
+        .map_or(list.span.start, |complex| complex.span.start)
+}
+
+/// The `of` keyword of an `:nth-*(An+B of S)` argument, as [`Printer::nth_of_keyword`] prints
+/// it: the An+B head with any claim before the keyword appended, the keyword's own text, and
+/// the gap comments no claim printed, which lead `S`.
+struct NthOf<'v> {
+    head: Cow<'v, str>,
+    of: Cow<'static, str>,
+    comments_after: String,
 }
 
 /// An `An+B of S` term's folded value, split at its `of`.
@@ -1836,7 +2162,7 @@ fn lowercase_an_plus_b_n(s: &str) -> Cow<'_, str> {
 /// juncture is bounded by the brackets and takes a space safely, so the comment is padded
 /// off its neighbours — glued only to `[` itself, the answer `:is()` and `::part()` already
 /// give inside their parens (the gap against `]` belongs to the tail's own emitter).
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum AttributeGap {
     /// A `<wq-name>` or `<attr-matcher>` juncture: no space added anywhere, a run
     /// included (the same rule that keeps `.a/* c *//* d */.b` a compound).
