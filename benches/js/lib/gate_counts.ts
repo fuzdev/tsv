@@ -1085,7 +1085,22 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// no hunk left. A snapshot move, not a formatter one: a baseline `--profile corpus` FFI
 	// build reads the same 1 over the refreshed tree, the styles harvest re-stamps at its
 	// unmoved block pin, and `corpus:compare:parse --all` holds every count.
-	svelte: 1,
+	//
+	// 1 → 0: `prettier/tests/format/html/js/template-literal.html` leaves for `known` — its
+	// unexplained hunk is FIXED. The `<script>` nested in `<body>` formats at its real depth
+	// and keeps its verbatim lines verbatim, so the template literal's continuation lines no
+	// longer take the script body's indent ahead of their own; what is left is the
+	// `<head> </head>` → `<head></head>` hunk it always carried, which `svelte_boundary_ws_trim`
+	// explains. The ONLY mover in any bucket: `--all --json` bucket lists set-diffed across
+	// `--profile corpus` builds of the nested-depth change's parent and of the change itself,
+	// over the whole 9,305-file gates view — `unknown`, `safety`, `errors` and
+	// `expected_errors` identical file-for-file in all three languages, `match` unmoved at
+	// 2716 — and a per-file hash of the native format output across those two builds changes
+	// on this one file alone. Against the tip this pin lands on, four more svelte outputs
+	// change (the inline-element break-before samples), none matching prettier before or
+	// after, so they stay `known` and no offsetting `match` ↔ `known` swap hides under the
+	// counts.
+	svelte: 0,
 	// 25 → 26: the author's repos join the pinned corpus; `fuz_ui/src/lib/project_stats_data.ts`
 	// arrives (its explained hunk is `fill_101_boundary`).
 	//
