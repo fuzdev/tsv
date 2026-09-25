@@ -1221,7 +1221,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // The `{:…}` braces are spelled by `clause`, so no literal reads as a format argument.
         let clause = |keyword: &str| format!("{{:{keyword}}}");
         let message = match expected {
-            "if" if self.source[self.current_end..].starts_with("elseif") => {
+            "if" if self.source[self.current_end()..].starts_with("elseif") => {
                 "'elseif' should be 'else if'".to_owned()
             }
             "if" => format!("Expected token {} or {}", clause("else"), clause("else if")),
@@ -1237,7 +1237,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 clause("...")
             ),
         };
-        self.error_msg_at(&message, self.current_start)
+        self.error_msg_at(&message, self.current_start())
     }
 
     /// Parse a key block: {#key expression}...{/key}
