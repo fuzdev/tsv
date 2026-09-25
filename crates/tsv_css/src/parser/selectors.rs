@@ -1,6 +1,6 @@
 use super::CssParser;
 use crate::ast::internal::*;
-use crate::lexer::{Lexer, TokenKind};
+use crate::lexer::TokenKind;
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{ParseError, Span};
@@ -606,8 +606,7 @@ fn comment_continues_selector(parser: &CssParser<'_, '_>) -> Result<bool, ParseE
 /// selector out of the run itself. The sibling reading of the same question is
 /// `comment_continues_selector`, and the two have to agree.
 fn compound_continues_across_comments(parser: &CssParser<'_, '_>) -> Result<bool, ParseError> {
-    let remaining = &parser.source()[parser.current_end()..];
-    let mut lexer = Lexer::at_offset(remaining, parser.base_offset() + parser.current_end());
+    let (remaining, mut lexer) = parser.lookahead_lexer();
     loop {
         let token = lexer.next_token()?;
         match token.kind {

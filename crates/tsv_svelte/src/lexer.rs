@@ -72,13 +72,10 @@ impl fmt::Display for TokenKind {
 }
 
 /// A lexed Svelte markup token: a small size-asserted POD with `u32` spans returned
-/// by value from `next_token`. Its 16-byte siblings `tsv_ts::Token` / `tsv_css::Token`
-/// are instead written in place on their parsers' hot path (`next_token_into`:
-/// `advance`'s current-token slot, and tsv_css's `peek_kind` lookahead slot), their
-/// by-value `next_token` left to every other caller — bootstrap, cold re-lexes,
-/// tsv_ts's `peek_kind`, temporary scan lexers. `Clone` (not `Copy`) mirrors
-/// those crates' convention — the parser is the single owner of `current` / `peek`,
-/// consuming via `.take()` / move rather than implicit copies.
+/// by value from `next_token` (its `tsv_ts::Token` / `tsv_css::Token` siblings are
+/// instead lexed in place on their parsers' hot path, `next_token_into`). `Clone` (not
+/// `Copy`) mirrors those crates' convention — the parser is the single owner of
+/// `current` / `peek`, consuming via `.take()` / move rather than implicit copies.
 /// There is **no out-of-band decoded value**: markup tokens are pure spans (the
 /// embedded TS/CSS/expression content is lexed by the other crates).
 #[derive(Debug, Clone)]
