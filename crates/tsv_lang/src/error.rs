@@ -297,21 +297,23 @@ impl ParseError {
 
     /// Lift a position out of a lexer's own coordinates into the document's.
     ///
-    /// A [`lex_err`] position indexes the lexer's `source`, which is routinely a **slice**
-    /// of the document the error is finally rendered against: a Svelte `<script>` /
-    /// `<style>` island, the CSS declaration-value scan (`source[from..]`), the Svelte
-    /// parser's own reseek after a jumped scan. [`ParseError::with_context`] is handed the
+    /// A [`lex_err`] position indexes the lexer's `source`, which for the TypeScript and
+    /// CSS lexers is routinely a **slice** of the document the error is finally rendered
+    /// against: a Svelte `<script>` / `<style>` island or template expression, the CSS
+    /// declaration-value scan (`source[from..]`). [`ParseError::with_context`] is handed the
     /// whole document, so a slice-local position points at the wrong construct — an error
     /// on line 4 of a component rendered against line 1, out in the markup.
     ///
-    /// Each lexer applies this **once**, at the entry point that PRODUCES the error; a
-    /// wrapper that delegates to such an entry point must not re-apply it. A double shift
-    /// runs the position past the end of the source, where `ErrorContext::from_source`
-    /// returns `None` and the caret disappears entirely.
+    /// Each of those lexers applies this **once**, at the entry point that PRODUCES the
+    /// error; a wrapper that delegates to such an entry point must not re-apply it. A
+    /// double shift runs the position past the end of the source, where
+    /// `ErrorContext::from_source` returns `None` and the caret disappears entirely.
     ///
-    /// The parser side needs none of this: its positions are already host coordinates
-    /// (each parser's `current_pos` adds the same `base_offset`), which is why parser
-    /// errors were always right and only lexer errors drifted.
+    /// The parser side needs none of this: its positions are already host coordinates (the
+    /// TypeScript and CSS parsers' `current_pos` adds the same `base_offset`; the Svelte
+    /// parser's tokens are document offsets). Nor does the Svelte lexer: it always scans
+    /// the whole document, resuming at a document offset after a jumped scan, so its
+    /// positions are document offsets by construction.
     #[cold]
     #[inline(never)]
     pub fn shift_position(mut self, base_offset: usize) -> Self {

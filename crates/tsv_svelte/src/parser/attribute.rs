@@ -236,13 +236,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// under an exhaustive match — re-listing the brace kinds here is what let three of them
     /// slip past in the first place.
     fn current_token_opens_a_brace_attribute(&self) -> bool {
-        self.current_kind.starts_with_brace()
+        self.current_kind().starts_with_brace()
     }
 
     /// Peek at the first non-whitespace character after the opening brace — Svelte's
     /// `parser.eat('{')` + `allow_whitespace()` before the spread/shorthand split.
     fn peek_char_after_brace(&self) -> Option<char> {
-        let pos = brace_interior_start(self.source, self.current_start);
+        let pos = brace_interior_start(self.source, self.current_start());
         char_at(self.source, pos).map(|(c, _)| c)
     }
 
@@ -251,7 +251,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// `{`/`<` (spread/shorthand/attach) and `>`/`/` (tag close) first, so a non-terminator here
     /// is a leading-symbol name like `<p }>` (Svelte's `read_static_attribute` raw run).
     fn current_token_starts_attribute_name(&self) -> bool {
-        is_attr_name_char_at(self.source, self.current_start)
+        is_attr_name_char_at(self.source, self.current_start())
     }
 
     /// End of the current attribute/directive name run — Svelte's `read_tag`, measured from
@@ -279,7 +279,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// `svelte/attributes/name_leading_brace/`). The symbol-led *tag* name it would otherwise
     /// pair with is refused separately, by `element.rs`'s `is_valid_tag_name`.
     fn attribute_name_run_end(&self) -> usize {
-        attr_name_end(self.source, self.current_start)
+        attr_name_end(self.source, self.current_start())
     }
 
     /// Parse an attribute or directive
@@ -295,7 +295,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // or over-ran (`ysc%%gibberish`, `{ #a}`) is whole before the directive `:` split and
         // both paths see the same bytes. `&'a str` borrows the source, so it survives the
         // `&mut self` calls below.
-        let name_start = self.current_start;
+        let name_start = self.current_start();
         let name_end = self.attribute_name_run_end();
         let name_str = &self.source[name_start..name_end];
 
@@ -328,7 +328,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         colon_idx: usize,
         name_end: usize,
     ) -> Result<AttributeNode<'arena>, ParseError> {
-        let start = self.current_start;
+        let start = self.current_start();
         let head_span = Span {
             start: start as u32,
             end: name_end as u32,
@@ -490,8 +490,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// opening quote, and `<div style:color="#fff">` — valid Svelte — would have its `#`
     /// read as a block marker and be rejected.
     fn check_directive_value_placement(&self) -> Result<(), ParseError> {
-        if matches!(self.current_kind, TokenKind::BlockOpen | TokenKind::TagOpen) {
-            self.check_sequence_placement(self.current_start, SequenceLocation::AttributeValue)?;
+        if matches!(
+            self.current_kind(),
+            TokenKind::BlockOpen | TokenKind::TagOpen
+        ) {
+            self.check_sequence_placement(self.current_start(), SequenceLocation::AttributeValue)?;
         }
         Ok(())
     }
@@ -668,7 +671,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// - An arrow function: {@attach (el) => el.focus()}
     pub(crate) fn parse_attach_tag(&mut self) -> Result<AttachTag<'arena>, ParseError> {
         // We're at the `{` of `{@attach expr}`; scan forward to find the closing `}`.
-        let start = self.current_start;
+        let start = self.current_start();
 
         // Svelte's `read_attribute` runs `allow_whitespace()` after `eat('{')` before it tries
         // `eat('@attach')`, so the marker need not be glued: `start + 2` read the author's
@@ -741,10 +744,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// - A call expression: {...getProps()}
     /// - A member expression: {...obj.nested}
     fn parse_spread_attribute(&mut self) -> Result<SpreadAttribute<'arena>, ParseError> {
-        let start = self.current_start;
+        let start = self.current_start();
 
         // We're at '{', scan forward to find the closing '}'
-        let brace_start = self.current_start;
+        let brace_start = self.current_start();
 
         let content_start = brace_start + 1; // Skip "{"
 
@@ -799,10 +802,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ///
     /// The content must be a valid identifier.
     fn parse_shorthand_attribute(&mut self) -> Result<Attribute<'arena>, ParseError> {
-        let start = self.current_start;
+        let start = self.current_start();
 
         // We're at '{', scan forward to find the closing '}'
-        let brace_start = self.current_start;
+        let brace_start = self.current_start();
 
         // Find the closing brace
         let content_start = brace_start + 1; // Skip "{"
@@ -976,7 +979,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             start: start as u32,
             end: name_end as u32,
         };
-        if !(self.check(TokenKind::Equals) && self.current_start == name_end) {
+        if !(self.check(TokenKind::Equals) && self.current_start() == name_end) {
             return Ok(Attribute {
                 value: None,
                 span: name_span,
@@ -1164,7 +1167,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // across the `&mut self` `parse_expression_tag_at` call below.
         let src = self.source;
         let bytes = src.as_bytes();
-        let start = self.current_start;
+        let start = self.current_start();
         let mut parts: BumpVec<'arena, AttributeValue<'arena>> = self.bvec();
         let mut text_start = start;
         let mut pos = start;

@@ -9,7 +9,7 @@ use super::parser_impl::SvelteParser;
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
     pub(crate) fn parse_style_tag(&mut self) -> Result<Style<'arena>, ParseError> {
-        let start = self.current_start;
+        let start = self.current_start();
 
         // Expect <
         self.expect(TokenKind::LeftAngle)?;
@@ -30,7 +30,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         }
 
         // Content starts right after the >
-        let content_start = self.current_end;
+        let content_start = self.current_end();
 
         // Find closing </style> tag (raw scan, `/<\/style\s*>/`; see
         // `find_raw_text_close` for the shared string-context limitation).

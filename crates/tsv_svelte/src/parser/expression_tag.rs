@@ -41,7 +41,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             return Err(self.error_expected_found("'{'"));
         }
 
-        let tag = self.parse_expression_tag_at(self.current_start)?;
+        let tag = self.parse_expression_tag_at(self.current_start())?;
 
         // Resume lexing AFTER the closing brace (not at it), preserving tag-vs-template
         // context. Repositioning past `}` means the lexer never tokenizes it, so a `}`

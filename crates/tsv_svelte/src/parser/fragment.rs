@@ -23,8 +23,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// The current token is TokenKind::Comment, which includes the full
     /// <!-- ... --> delimiters. We extract just the content field.
     pub(crate) fn parse_comment(&mut self) -> Result<HtmlComment, ParseError> {
-        let start = self.current_start;
-        let end = self.current_end;
+        let start = self.current_start();
+        let end = self.current_end();
 
         // Token value is the full comment including <!-- and -->
         let token_value = self.current_value();

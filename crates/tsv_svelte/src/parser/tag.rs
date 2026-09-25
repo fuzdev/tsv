@@ -17,7 +17,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ///
     /// Dispatches to specific tag parsers based on the keyword.
     pub(crate) fn parse_template_tag(&mut self) -> Result<FragmentNode<'arena>, ParseError> {
-        let start = self.current_start;
+        let start = self.current_start();
 
         // We're at {@, consume it
         if !self.check(TokenKind::TagOpen) {
@@ -25,7 +25,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         }
 
         // After {@ we expect a tag keyword: html, const, debug, render
-        let keyword = self.keyword_at(self.current_end);
+        let keyword = self.keyword_at(self.current_end());
 
         match keyword {
             "html" => self.parse_html_tag(start),
@@ -46,7 +46,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         start: usize,
         keyword: &str,
     ) -> Result<(&'arena Expression<'arena>, Span), ParseError> {
-        let tag_content_start = self.current_end;
+        let tag_content_start = self.current_end();
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
         // Svelte requires whitespace after the keyword. Leading whitespace only — the
@@ -74,7 +74,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     /// Parse a const tag: {@const name = expression}
     fn parse_const_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
-        let tag_content_start = self.current_end;
+        let tag_content_start = self.current_end();
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
         // Parse: "const name = expression" — Svelte requires whitespace after the keyword.
@@ -102,7 +102,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// alphabetic-run read gives the `\b` word boundary for free, so identifiers
     /// like `constant`/`letter` and expressions like `cond ? …` fall through).
     pub(crate) fn opens_declaration_tag(&self) -> bool {
-        let after_brace = self.current_end;
+        let after_brace = self.current_end();
         let rest = &self.source[after_brace..];
         let kw_start = after_brace + (rest.len() - rest.trim_start_matches(is_svelte_ws).len());
         matches!(self.keyword_at(kw_start), "const" | "let")
@@ -113,7 +113,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Shared by the root, element-children, and block-children fragment loops.
     pub(crate) fn parse_brace_tag(&mut self) -> Result<FragmentNode<'arena>, ParseError> {
         if self.opens_declaration_tag() {
-            self.parse_declaration_tag(self.current_start)
+            self.parse_declaration_tag(self.current_start())
         } else {
             Ok(FragmentNode::ExpressionTag(self.parse_expression_tag()?))
         }
@@ -128,7 +128,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         start: usize,
     ) -> Result<FragmentNode<'arena>, ParseError> {
-        let tag_content_start = self.current_end;
+        let tag_content_start = self.current_end();
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
         let tsv_ts::StatementKind::VariableDeclaration(declaration) = self
@@ -281,7 +281,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// tags; parsing via `parse_ts_expression` collects them into `Root.comments`
     /// for lookup by span.
     fn parse_debug_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
-        let tag_content_start = self.current_end;
+        let tag_content_start = self.current_end();
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
         // Content after the `debug` keyword. Svelte does not require whitespace
