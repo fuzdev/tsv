@@ -1390,6 +1390,21 @@ pub struct DocArena {
     /// legitimate pair overwrites, so only the hold-without-probe miswire is caught.
     #[cfg(debug_assertions)]
     flow_probe_fresh: Cell<bool>,
+    /// The mode each id-bearing group resolved to, one bit per [`GroupId`] (set = broke) —
+    /// prettier's `groupModeMap`, one map for the whole render. An unresolved group and a
+    /// flat one read the same (flat), so one bit per id is the whole map.
+    ///
+    /// It lives on the arena, not on a render's policy, because a render is not one loop:
+    /// every fill item and every line-suffix flush renders through a nested sub-render,
+    /// and a keyed `if_break` / `indent_if_break` inside a fill item must read the group
+    /// its item resolved (a Svelte block head's `}` dangle, a TS curried chain's body
+    /// indent). A map scoped to one loop would read every keyed group in a sub-render as flat.
+    ///
+    /// Owned by the top-level render, which clears it on entry
+    /// ([`Self::clear_keyed_groups`]). Written only by the render loop when it resolves an
+    /// id-bearing group; `arena_fits` never reads or writes it (a fits walk measures a
+    /// keyed conditional as flat).
+    keyed_group_breaks: Cell<u8>,
     /// Diagnostic side-set: indices of text nodes that are line comments,
     /// recorded by `line_comment_text_pooled` only while the swallow check is
     /// enabled (empty and untouched otherwise). Appended in `alloc` order, so
@@ -1549,6 +1564,7 @@ impl DocArena {
             flow_probe_broke: Cell::new(false),
             #[cfg(debug_assertions)]
             flow_probe_fresh: Cell::new(false),
+            keyed_group_breaks: Cell::new(0),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
             #[cfg(feature = "comment_check")]
@@ -1607,6 +1623,7 @@ impl DocArena {
             flow_probe_broke: Cell::new(false),
             #[cfg(debug_assertions)]
             flow_probe_fresh: Cell::new(false),
+            keyed_group_breaks: Cell::new(0),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
             #[cfg(feature = "comment_check")]
@@ -2821,6 +2838,48 @@ impl DocArena {
             self.flow_probe_fresh.set(false);
         }
         self.flow_probe_broke.get()
+    }
+
+    /// Start a top-level render's keyed-group map empty, as prettier's `printDocToString`
+    /// starts from an empty `groupModeMap`. Only the top-level render calls this; the
+    /// sub-renders nested in it (fill items, line-suffix flushes) share its map. Top-level
+    /// renders on one arena cannot nest (see `render_doc_iterative`), so clearing on
+    /// entry is the whole lifecycle — whatever a previous render left, a panicked one
+    /// included, is gone before anything reads it.
+    #[inline]
+    pub(super) fn clear_keyed_groups(&self) {
+        self.keyed_group_breaks.set(0);
+    }
+
+    /// Record the mode an id-bearing group resolved to. Last write wins: a [`GroupId`] is
+    /// one slot per render, not one per group, so a reader sees the most recent resolution
+    /// of its id. That is its own group's only where no group of the same id can sit
+    /// between the group and its reader: `BlockHead` (the head's contents are a TS
+    /// expression, which holds no block head), `BlockKey` (its own id for exactly that
+    /// reason), and the after-operator markers (`Assignment` and the two type-parameter
+    /// ids, whose `indent_if_break` is entered right after its marker). **Not**
+    /// `ArrowChain`: a curried chain nested between a chain's heads group and a reader
+    /// keyed on it (a chain in the body read before an immediately-invoked callee's
+    /// closing `)`, or in a parameter default of a call-argument chain) overwrites the
+    /// outer chain's resolution, and the outer reader takes the inner chain's mode.
+    // TODO: key the map per group instance (e.g. by the group's `DocId`) rather than per
+    // `GroupId` variant, so a nested same-id group cannot overwrite an enclosing one's mode.
+    #[inline]
+    pub(super) fn record_keyed_group(&self, id: GroupId, mode: Mode) {
+        let bit = id.keyed_bit();
+        let breaks = self.keyed_group_breaks.get();
+        self.keyed_group_breaks.set(if mode == Mode::Break {
+            breaks | bit
+        } else {
+            breaks & !bit
+        });
+    }
+
+    /// Whether the group keyed `id` broke, in the current render. An unresolved group
+    /// reads as flat.
+    #[inline]
+    pub(super) fn keyed_group_broke(&self, id: GroupId) -> bool {
+        self.keyed_group_breaks.get() & id.keyed_bit() != 0
     }
 
     //

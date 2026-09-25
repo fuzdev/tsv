@@ -1806,4 +1806,39 @@ mod arena_tests {
         let followed = a.concat(&[a.text_pooled("ab\nc"), a.text_pooled(&"y".repeat(50))]);
         assert!(fits_flat(&a, followed, 2));
     }
+
+    /// A keyed group and the conditionals keyed on it, as ONE fill item: `head` wraps at
+    /// its `line` when it does not fit, a keyed `if_break` marks it, and a keyed
+    /// `indent_if_break` indents a following hardline only when it broke.
+    fn keyed_fill_item(a: &DocArena) -> DocId {
+        let head = a.group_with_id(
+            a.concat(&[a.text("aaaa"), a.line(), a.text("bbbb")]),
+            GroupId::BlockHead,
+        );
+        let dangle = a.if_break_with_id(a.text("!"), a.text("."), GroupId::BlockHead);
+        let body = a.indent_if_break(a.concat(&[a.hardline(), a.text("c")]), GroupId::BlockHead);
+        a.concat(&[head, dangle, body])
+    }
+
+    #[test]
+    fn test_keyed_conditionals_in_a_fill_item_read_its_group() {
+        let a = DocArena::new();
+        let doc = a.fill(&[keyed_fill_item(&a), a.line(), a.text("tail")]);
+        // Fits: the group stays flat, so the keyed conditionals take their flat arms.
+        assert_eq!(render_pw_spaces(&a, doc, 100), "aaaa bbbb.\nc tail");
+        // Too narrow: the group breaks inside the fill item's sub-render, and the keyed
+        // conditionals in the same item read that — not an unresolved (flat) group.
+        assert_eq!(render_pw_spaces(&a, doc, 6), "aaaa\nbbbb!\n  c\ntail");
+    }
+
+    #[test]
+    fn test_keyed_group_map_is_scoped_to_its_top_level_render() {
+        let a = DocArena::new();
+        let broken = a.fill(&[keyed_fill_item(&a), a.line(), a.text("tail")]);
+        assert_eq!(render_pw_spaces(&a, broken, 6), "aaaa\nbbbb!\n  c\ntail");
+        // A later render starts from a cleared map, so its conditional with no group of
+        // its own reads flat, however the previous render resolved that id.
+        let reader = a.if_break_with_id(a.text("!"), a.text("."), GroupId::BlockHead);
+        assert_eq!(render_pw_spaces(&a, reader, 6), ".");
+    }
 }
