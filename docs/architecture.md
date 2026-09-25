@@ -679,10 +679,11 @@ like one and are not:
 Neither stands in for the other. Five of the six rows above seed from the class difference
 alone, so a document without a lone `<CR>` / `<LS>` / `<PS>` leaves them inert — question 2
 is `false` while question 1 may still be `true`. And the **annotation** row goes the other
-way: acorn is entered five bytes behind the colon, on an `_ as ` that *overwrites* those
-bytes, so a plain `\n` the author wrote between a block binding and its `: T` is erased
-before acorn ever sees it and the annotation's nodes stay on the *binding's* line — question
-2 is `true` on a pure-LF source where question 1 is `false`.
+way: the five code units ending at the colon are *overwritten* with an `_ as `, and acorn is
+entered at the first of them, so a plain `\n` in the four units before a block binding's `:`
+is erased before acorn ever sees it and the annotation's nodes sit that many lines higher (a
+newline further back survives the prefix blanking, which keeps every `\n`) — question 2 is
+`true` on a pure-LF source where question 1 is `false`.
 
 `tsv_svelte`'s writer therefore computes the seeds (one per region, once per document) and
 activates the route when the classes differ **or** some seed is non-identity. Computing them
@@ -722,9 +723,11 @@ Carrying both would let a record site pass a pair that disagrees, and nothing co
 that; the line class is also inert on a pure-LF document, so the disagreement would surface
 nowhere. The two synthetic tokens differ in kind, and the difference is load-bearing for the
 dedent alone: `read_pattern`'s `(` is **spliced** between prefix and region, where
-`read_type_annotation`'s `_ as ` **overwrites** the five bytes it covers — it can swallow an
-author's `\n` (the line then opens further back than the document's does), and a line opening
-on the insert itself has no document indentation to read. The blanking is `String.replace`,
+`read_type_annotation`'s `_ as ` **overwrites** the five UTF-16 code units it covers (the
+colon and the four before it; behind non-ASCII text that is more than five bytes, and it can
+open between a surrogate pair's halves) — it can swallow an author's `\n` (the line then
+opens further back than the document's does), and a line opening on the insert itself has no
+document indentation to read. The blanking is `String.replace`,
 which lays one space per UTF-16 code unit, so any non-ASCII ahead of the comment on its line
 makes a byte count too long. Pinned by `tests/comment_dedent_manufactured_source.rs` and the
 frozen fixture `tests/fixtures/svelte/syntax/comments/head_multiline_comment_dedent`; the

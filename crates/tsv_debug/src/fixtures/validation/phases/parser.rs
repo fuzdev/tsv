@@ -248,8 +248,9 @@ pub(in crate::fixtures::validation) fn read_variant_pins(
 /// byte-strict — the P2b claim, made about the variant instead of the input.
 ///
 /// The pin exists for a parse fact no `input.*` can carry: a leading BOM with nothing
-/// load-bearing behind it, which the format side strips, so such an input is never its own
-/// fixed point (F1). Pure Rust, like P2b;
+/// load-bearing behind it, which the format side strips, or a newline inside a region the
+/// canonical parser overwrites (Svelte's `_ as ` annotation window), which tsv's formatter
+/// always removes — so such an input is never its own fixed point (F1). Pure Rust, like P2b;
 /// a semantically-equal mismatch is reported as the field-order kind, like P2b's.
 pub(in crate::fixtures::validation) fn validate_variant_parse_pins_ours(
     result: &mut FixtureValidation,

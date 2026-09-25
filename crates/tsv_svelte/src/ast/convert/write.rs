@@ -184,10 +184,10 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
     // zero, and both column origins are the same line start).
     //
     // `origin != lex_start` is exactly one region kind — the block-binding `: T`,
-    // which Svelte's `read_type_annotation` enters five bytes behind the colon on a
-    // synthetic `_ as ` that OVERWRITES them, so a newline the author wrote there is
-    // erased before acorn sees it and the annotation's nodes stay on the binding's
-    // line. It is asked as a *property* rather than a kind tag, so a future region
+    // which Svelte's `read_type_annotation` enters on a synthetic `_ as ` that OVERWRITES
+    // the five UTF-16 code units ending at the colon, so a newline the author wrote in the
+    // four before it is erased before acorn sees it and the annotation's nodes sit that many
+    // lines higher. It is asked as a *property* rather than a kind tag, so a future region
     // that inserts synthetic text is covered the day it appears.
     //
     // `emit_loc` comes first throughout: the `no-locations` path emits no

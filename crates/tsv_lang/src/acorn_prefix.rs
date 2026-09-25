@@ -38,7 +38,7 @@ use crate::whitespace::is_js_whitespace;
 /// | [`Document`](Self::Document) | `read_expression`, `parse_statement_at` | `parser.template`, untouched |
 /// | [`Blanked`](Self::Blanked) | `read/script.js` | `slice(0, start).replace(/[^\n]/g, ' ') + data` |
 /// | [`BlankedThenParen`](Self::BlankedThenParen) | `read/context.js` `read_pattern` | the same, **minus its first space**, then `(pattern = 1)` |
-/// | [`BlankedThenAs`](Self::BlankedThenAs) | `read/context.js` `read_type_annotation` | the same, then `_ as ` over the five bytes it covers |
+/// | [`BlankedThenAs`](Self::BlankedThenAs) | `read/context.js` `read_type_annotation` | the same, then `_ as ` over the five UTF-16 code units ending at the colon |
 /// | [`WhitespaceKept`](Self::WhitespaceKept) | `state/tag.js`, the `{#snippet}` head | `slice(0, params_start).replace(/\S/g, ' ')` — only the NON-whitespace is blanked |
 ///
 /// The distinctions are not cosmetic. `Blanked` and its two siblings erase every terminator
@@ -58,9 +58,10 @@ pub enum AcornPrefixText {
     /// `read_pattern`'s `(pattern = 1)` wrapper. Removing that one space is what keeps the
     /// pattern's columns where the document put them.
     BlankedThenParen,
-    /// The same as [`Blanked`](Self::Blanked), with `_ as ` standing over the five bytes at
-    /// the prefix's end — `read_type_annotation`'s trick for making a type annotation into an
-    /// expression acorn will parse.
+    /// The same as [`Blanked`](Self::Blanked), with `_ as ` standing over the five UTF-16
+    /// code units ending at the colon — `read_type_annotation`'s trick for making a type
+    /// annotation into an expression acorn will parse. The manufacture runs out one past the
+    /// colon, where acorn starts lexing the document again.
     BlankedThenAs,
     /// Every non-**whitespace** byte ahead of the region became a space; the author's own
     /// whitespace bytes are still standing.
@@ -72,12 +73,48 @@ impl AcornPrefixText {
     /// [`BlankedThenAs`](Self::BlankedThenAs) stands at the end of its prefix, and the only
     /// one that OVERWRITES document bytes rather than being spliced between them.
     ///
-    /// **One spelling, because two places measure the same five bytes from opposite ends**:
-    /// `tsv_svelte`'s parser subtracts this length from the colon to place the region's
-    /// `origin`, and `AcornPrefix::synthetic_insert_range` rebuilds the window forward from
-    /// that same `origin`. A second copy would let the two cover different bytes, and the
-    /// only symptom would be a comment dedented against a line acorn never measured.
+    /// Its length is counted in **UTF-16 code units** — Svelte's `parser.index -
+    /// insert.length` indexes a JS string — so it covers five units, not five bytes, of the
+    /// document: [`as_insert_origin`](Self::as_insert_origin) is the one place that walks
+    /// them back from the colon, for the parser's `origin` and for the dedent's window alike.
+    /// The literal is ASCII, so its `len()` is that unit count.
     pub const AS_INSERT: &'static str = "_ as ";
+
+    /// Where `read_type_annotation`'s `_ as ` begins, as a **byte offset**: the character
+    /// holding the first of the five UTF-16 code units that end at `lex_start` (one past the
+    /// annotation's colon).
+    ///
+    /// Svelte counts the window in code units, so behind a non-ASCII binding it reaches more
+    /// than five bytes back — and it can open **between the halves of a surrogate pair**
+    /// (`𝑎é⏎\t:`), a position with no byte offset at all. The answer is then the astral
+    /// character's own start: its high half stayed in the blanked prefix and its low half is
+    /// the insert's `_`, and neither half is a line terminator, so every question asked of
+    /// this offset — which line the parse was entered on, which `\n`s the insert swallowed —
+    /// has the same answer at the character's start. (The one question that tells the halves
+    /// apart, how many units the blanked prefix spans, is measured from the colon instead;
+    /// see `AcornPrefix::line_indentation`.)
+    ///
+    /// Walks bytes, never a `str` slice, so no `lex_start` can make it panic: a UTF-8 lead
+    /// byte opens a character, a four-byte lead is two units, and a continuation byte is none.
+    ///
+    /// `None` when fewer than five units precede `lex_start` — no window fits, so this is not
+    /// a block binding's annotation at all (every head that reaches one spends more than five
+    /// units before its colon; the shortest, `{@const x:`, spends nine). The caller decides
+    /// what an impossible window means rather than being handed a quietly short one.
+    #[must_use]
+    pub fn as_insert_origin(source: &str, lex_start: usize) -> Option<usize> {
+        let bytes = source.as_bytes();
+        let mut units = 0;
+        let mut at = lex_start.min(bytes.len());
+        while at > 0 {
+            at -= 1;
+            units += utf16_units_of_byte(bytes[at]);
+            if units >= Self::AS_INSERT.len() {
+                return Some(at);
+            }
+        }
+        None
+    }
 
     /// Whether a synthetic token stands where this preparation's prefix ends, so no run of
     /// source bytes can continue through it.
@@ -88,8 +125,8 @@ impl AcornPrefixText {
 }
 
 /// One parse's preparation and where it ends — [`AcornPrefixText`] plus the offset the
-/// manufactured bytes run out at (the parse's `origin`, which is where Svelte's own slicing
-/// put the boundary).
+/// manufactured bytes run out at (where Svelte's own slicing put the boundary: the parse's
+/// `origin`, or one past the colon for the `_ as ` that overwrites up to there).
 ///
 /// The pair travels together because neither half answers anything alone: a kind with no
 /// boundary cannot say which bytes it covers, and a boundary with no kind cannot say what
@@ -98,7 +135,10 @@ impl AcornPrefixText {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AcornPrefix {
     text: AcornPrefixText,
-    /// One past the last manufactured byte. Unread under [`AcornPrefixText::Document`].
+    /// One past the last manufactured byte — the parse's `origin` for the preparations that
+    /// splice between document bytes, and one past the colon for
+    /// [`BlankedThenAs`](AcornPrefixText::BlankedThenAs), whose `_ as ` overwrites the
+    /// document up to there. Unread under [`AcornPrefixText::Document`].
     end: u32,
 }
 
@@ -132,19 +172,19 @@ impl AcornPrefix {
     ///
     /// ⚠️ **A preparation that OVERWRITES bytes can swallow the author's newline**, and then
     /// acorn's line opens further back than the document's does. `read_type_annotation`'s
-    /// `_ as ` is the one that can: it stands over the five bytes ending at the parse's
-    /// `origin`, so `{#each xs as x⏎\t: /* … */ T}` — a newline the author wrote between a
-    /// binding and its colon — is erased before acorn sees it, and the annotation's comment
-    /// is measured from the *binding's* line. The same five bytes are why that region needs a
-    /// line seed at all (`tsv_ts::AcornSeed`), so this is one fact read at a second place.
+    /// `_ as ` is the one that can: it stands over the five code units ending at the colon,
+    /// so `{#each xs as x⏎\t: /* … */ T}` — a newline in the four units before the colon —
+    /// is erased before acorn sees it, and the annotation's comment is measured from the line
+    /// the window opens on. The same five units are why that region needs a line seed at all
+    /// (`tsv_ts::AcornSeed`), so this is one fact read at a second place.
     ///
     /// The blanking preparations cannot do it: `[^\n]` and `\S` both leave every `\n`
     /// standing, and `read_pattern`'s wrapper deletes a *space* and inserts a `(`.
     #[must_use]
     pub(crate) fn line_start(self, source: &str, comment_start: usize) -> usize {
         let bytes = source.as_bytes();
-        let insert = self.synthetic_insert_range();
-        let mut at = comment_start;
+        let insert = self.synthetic_insert_range(source);
+        let mut at = comment_start.min(bytes.len());
         while at > 0 {
             let before = at - 1;
             // A `\n` a synthetic token stands over is not a line start, because it is not in
@@ -159,12 +199,14 @@ impl AcornPrefix {
 
     /// The document bytes a synthetic token stands over — empty for every preparation but
     /// [`BlankedThenAs`](AcornPrefixText::BlankedThenAs), whose `_ as ` is the only insert
-    /// that *replaces* text rather than being spliced between it.
+    /// that *replaces* text rather than being spliced between it: the five code units ending
+    /// one short of `end` ([`AcornPrefixText::as_insert_origin`]).
     #[inline]
-    fn synthetic_insert_range(self) -> std::ops::Range<usize> {
+    fn synthetic_insert_range(self, source: &str) -> std::ops::Range<usize> {
         if self.text == AcornPrefixText::BlankedThenAs {
             let end = self.end as usize;
-            end..end + AcornPrefixText::AS_INSERT.len()
+            // No full window is no insert a `\n` could be under: an offset no parse produces.
+            AcornPrefixText::as_insert_origin(source, end).unwrap_or(end)..end
         } else {
             0..0
         }
@@ -206,31 +248,36 @@ impl AcornPrefix {
     #[must_use]
     pub(crate) fn line_indentation<'s>(self, source: &'s str, line_start: usize) -> Cow<'s, str> {
         let bytes = source.as_bytes();
-        let run_from = |at: usize| {
+        // Every offset below is read through `bytes` or `str::get`, never an indexing slice
+        // of `source`: a caller's offset that is not a character boundary answers, it does
+        // not panic.
+        let ascii_run = |at: usize| {
             let mut end = at;
             while matches!(bytes.get(end), Some(b' ' | b'\t')) {
                 end += 1;
             }
-            end
+            // `[ \t]` bytes only, so the slice is valid wherever it starts.
+            source.get(at..end).unwrap_or("")
         };
-        let manufactured_end = self.end as usize;
-        // Where the document's own bytes take over — past the blanked prefix AND past any
-        // synthetic token standing over document text. The two are the same offset at every
-        // preparation but `BlankedThenAs`, whose `_ as ` OVERWRITES the five bytes it covers:
-        // a line opening exactly at that insert opens on its `_`, so the run acorn saw is
-        // empty where the document's is whatever `[ \t]` the author put under the insert.
-        let document_bytes_from = manufactured_end.max(self.synthetic_insert_range().end);
-        if self.text == AcornPrefixText::Document || line_start >= document_bytes_from {
+        // Where the document's own bytes take over, past the blanked prefix and any synthetic
+        // token standing over document text — `end` for every preparation, including
+        // `BlankedThenAs`, whose manufacture runs out one past the colon.
+        let manufactured_end = (self.end as usize).min(bytes.len());
+        if self.text == AcornPrefixText::Document || line_start >= manufactured_end {
             // Past the manufacture the region's own bytes are standing, so this is the
             // document's own run either way.
-            return Cow::Borrowed(&source[line_start..run_from(line_start)]);
+            return Cow::Borrowed(ascii_run(line_start));
         }
 
         let mut run = String::new();
         if self.text == AcornPrefixText::WhitespaceKept {
             // The author's whitespace survived; everything else became a space. A whitespace
             // character that is not ` ` or `\t` ends the run just as it would in the document.
-            for ch in source[line_start..manufactured_end].chars() {
+            for ch in source
+                .get(line_start..manufactured_end)
+                .unwrap_or("")
+                .chars()
+            {
                 match ch {
                     ' ' | '\t' => run.push(ch),
                     _ if is_js_whitespace(ch) => return Cow::Owned(run),
@@ -240,22 +287,25 @@ impl AcornPrefix {
             }
         } else {
             // `[^\n]` became a space, and no `\n` can sit between a line's start and a
-            // position on that same line — so the whole span is spaces. Empty when the line
-            // opens AT a synthetic insert: it is past the blanking already, so nothing of the
-            // prefix is on it and the insert's own first byte ends the run at zero.
-            //
-            // The span cannot run backwards: the early return took every `line_start` at or
-            // past the manufacture, and a `\n` inside a synthetic insert cannot open a line
-            // (see `line_start`), so nothing is left that opens between the two.
-            debug_assert!(
-                line_start <= manufactured_end,
-                "a line opening inside the manufacture at {line_start} has no blanked run"
-            );
-            let mut width = blanked_width(&source[line_start..manufactured_end]);
-            if self.text == AcornPrefixText::BlankedThenParen
-                && paren_space_fell_here(source, line_start)
-            {
-                width -= 1;
+            // position on that same line — so the whole span is spaces.
+            let mut width = blanked_width(&bytes[line_start..manufactured_end]);
+            match self.text {
+                // The `_ as ` overwrote the last five of those units (the colon's included),
+                // so the blanking reached only the ones before them. Counted back from the
+                // colon, never forward from `as_insert_origin`: a window opening between a
+                // surrogate pair's halves blanked the high one, which no byte offset can say.
+                // Empty when the line opens AT the insert — the `\n` one unit short of the
+                // window survived — since the insert's `_` then ends the run at zero. A line
+                // cannot open INSIDE the window, since a `\n` there is the one the insert
+                // swallowed (see `line_start`); the subtraction saturates rather than asserts
+                // so an offset no parse produces still answers.
+                AcornPrefixText::BlankedThenAs => {
+                    width = width.saturating_sub(AcornPrefixText::AS_INSERT.len());
+                }
+                AcornPrefixText::BlankedThenParen if paren_space_fell_here(source, line_start) => {
+                    width -= 1;
+                }
+                _ => {}
             }
             run.extend(std::iter::repeat_n(' ', width));
         }
@@ -263,7 +313,7 @@ impl AcornPrefix {
         if !self.text.ends_in_synthetic_token() {
             // Nothing stands between the prefix and the region, so the run carries on into the
             // region's own leading whitespace.
-            run.push_str(&source[manufactured_end..run_from(manufactured_end)]);
+            run.push_str(ascii_run(manufactured_end));
         }
         Cow::Owned(run)
     }
@@ -277,14 +327,31 @@ impl AcornPrefix {
 /// astral one becomes two (its surrogate pair) where its UTF-8 form is four. The manufactured
 /// string is therefore SHORTER than the document span it stands over whenever that span is not
 /// pure ASCII, and this run's length is the whole answer — it is what the dedent strips.
+///
+/// Counted over BYTES ([`utf16_units_of_byte`]), so a span whose ends are not character
+/// boundaries is still an answer rather than a panic.
 #[inline]
-fn blanked_width(blanked: &str) -> usize {
+fn blanked_width(blanked: &[u8]) -> usize {
     // `len()` is the answer for the ASCII prefix that essentially every document has; the walk
     // only runs when it isn't.
     if blanked.is_ascii() {
         blanked.len()
     } else {
-        blanked.chars().map(char::len_utf16).sum()
+        blanked.iter().map(|&b| utf16_units_of_byte(b)).sum()
+    }
+}
+
+/// The UTF-16 code units the UTF-8 byte `b` opens: one for a single-byte character or the lead
+/// of a two- or three-byte one, two for the lead of a four-byte (astral) one, and none for a
+/// continuation byte — so summing over a character's bytes gives its `len_utf16`.
+#[inline]
+const fn utf16_units_of_byte(b: u8) -> usize {
+    if b & 0xC0 == 0x80 {
+        0
+    } else if b >= 0xF0 {
+        2
+    } else {
+        1
     }
 }
 
@@ -339,10 +406,10 @@ mod tests {
 
     #[test]
     fn a_synthetic_token_ends_the_run() {
-        // `_ as ` stands over the five bytes ending at the colon, so the run is the blanked
+        // `_ as ` stands over the five units ending at the colon, so the run is the blanked
         // span alone — never the region's own leading whitespace behind the insert.
         let source = "\t{@const x:  /* a\n\t b */";
-        let prefix = AcornPrefix::manufactured(AcornPrefixText::BlankedThenAs, 6);
+        let prefix = AcornPrefix::manufactured(AcornPrefixText::BlankedThenAs, 11);
         assert_eq!(prefix.line_indentation(source, 0), " ".repeat(6));
     }
 
@@ -373,19 +440,81 @@ mod tests {
 
     #[test]
     fn a_line_opening_at_the_as_insert_reads_the_inserts_own_bytes() {
-        // The author's `\n` sits one byte AHEAD of the insert window, so it survives and the
+        // The author's `\n` sits one unit AHEAD of the insert window, so it survives and the
         // line opens exactly where `_ as ` begins. Under the insert are four spaces the
         // document holds and acorn never saw — the run is `_`'s, which is empty.
         let source = "{#each xs as x\n    : /* a\n    b */ T}";
-        let prefix = AcornPrefix::manufactured(AcornPrefixText::BlankedThenAs, 15);
+        let prefix = AcornPrefix::manufactured(AcornPrefixText::BlankedThenAs, 20);
         assert_eq!(prefix.line_start(source, 21), 15);
         assert_eq!(prefix.line_indentation(source, 15), "");
         // The null control on the same shape: with the `\n` INSIDE the window the insert
         // swallows it, the line opens back on the binding's, and the run is the blanking's.
         let swallowed = "{#each xs as x\n\t: /* a\n\tb */ T}";
-        let prefix = AcornPrefix::manufactured(AcornPrefixText::BlankedThenAs, 12);
+        let prefix = AcornPrefix::manufactured(AcornPrefixText::BlankedThenAs, 17);
         assert_eq!(prefix.line_start(swallowed, 18), 0);
         assert_eq!(prefix.line_indentation(swallowed, 0), " ".repeat(12));
+    }
+
+    #[test]
+    fn the_as_insert_window_is_five_code_units() {
+        // `as⏎éé:` — the window is `\n`, `é`, `é` and the colon's four units back reach the
+        // `s`: five units over seven bytes. The `\n` is swallowed.
+        let source = "{#each xs as\néé: /* a\n b */ T}";
+        let lex_start = source.find(':').unwrap_or_default() + 1;
+        assert_eq!(
+            AcornPrefixText::as_insert_origin(source, lex_start),
+            Some(11)
+        );
+        let prefix = AcornPrefix::manufactured(AcornPrefixText::BlankedThenAs, lex_start as u32);
+        assert_eq!(prefix.line_start(source, lex_start + 1), 0);
+        // `{#each xs a` blanked: eleven units, the `_ as ` over the rest.
+        assert_eq!(prefix.line_indentation(source, 0), " ".repeat(11));
+
+        // `as⏎éééé:` — four units of binding fill the window, and the `\n` survives.
+        let source = "{#each xs as\néééé: /* a\n b */ T}";
+        let lex_start = source.find(':').unwrap_or_default() + 1;
+        let prefix = AcornPrefix::manufactured(AcornPrefixText::BlankedThenAs, lex_start as u32);
+        assert_eq!(prefix.line_start(source, lex_start + 1), 13);
+        assert_eq!(prefix.line_indentation(source, 13), "");
+    }
+
+    #[test]
+    fn an_as_insert_window_can_open_between_a_surrogate_pair() {
+        // `𝑎é⏎\t:` — four units back from the colon is the LOW half of `𝑎`. The origin is the
+        // character's start; its high half is one blanked space, so `{#each xs as 𝑎` blanks
+        // to fourteen units, not fifteen and not thirteen.
+        let source = "{#each xs as \u{1d44e}é\n\t: /* a\n b */ T}";
+        let lex_start = source.find(':').unwrap_or_default() + 1;
+        assert_eq!(
+            AcornPrefixText::as_insert_origin(source, lex_start),
+            Some(13)
+        );
+        // fewer than five units ahead: no window
+        assert_eq!(AcornPrefixText::as_insert_origin("\u{1d44e}é:", 7), None);
+        let prefix = AcornPrefix::manufactured(AcornPrefixText::BlankedThenAs, lex_start as u32);
+        assert_eq!(prefix.line_start(source, lex_start + 1), 0);
+        assert_eq!(prefix.line_indentation(source, 0), " ".repeat(14));
+    }
+
+    #[test]
+    fn offsets_off_a_character_boundary_answer_rather_than_panic() {
+        // Every offset lands inside `é` (bytes 1..3); none may slice the `str` there.
+        let source = "xé: /* a\n b */";
+        for end in 0..=source.len() + 1 {
+            let _ = AcornPrefixText::as_insert_origin(source, end);
+            for text in [
+                AcornPrefixText::Blanked,
+                AcornPrefixText::BlankedThenParen,
+                AcornPrefixText::BlankedThenAs,
+                AcornPrefixText::WhitespaceKept,
+            ] {
+                let prefix = AcornPrefix::manufactured(text, end as u32);
+                for at in 0..=source.len() + 1 {
+                    let _ = prefix.line_start(source, at);
+                    let _ = prefix.line_indentation(source, at.min(source.len()));
+                }
+            }
+        }
     }
 
     #[test]

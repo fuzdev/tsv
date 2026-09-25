@@ -242,16 +242,16 @@ a distinct narrower product, not a second encoding of the drop-in contract.
 
 ### Line/Column Reconstruction Helper (`npm/locations.js`)
 
-Because `loc` is a pure function of `start`/`end` + source — with one exception,
-below — a consumer holding only the span-only wire recovers it in JS — and, for a consumer that needs full
+Because `loc` is a pure function of `start`/`end` + source — with two exceptions,
+below: one refused, one read off the tree — a consumer holding only the span-only wire recovers it in JS — and, for a consumer that needs full
 `loc`, no-loc-wire + JS-reconstruct beats the full loc-bearing wire end-to-end
 (the full wire's `loc` bytes cost real `JSON.parse` tokenization; a line-start
 table + binary search is cheaper). `npm/locations.js` (pure JS, zero deps, no
 WASM) is that reconstruction, shipped so callers don't reimplement the line
 rules — in every package that parses, native `@fuzdev/tsv` included: `reconstruct_locations(ast, source, opts?)` (one-shot, adds `loc` to every
 node, **mutates in place**), `create_locator(source, opts?)` (amortized — holds
-the prebuilt line table, exposes `loc_of(node)` / `reconstruct(ast)`), and a bare
-`loc_of(node, source, opts?)` convenience. **Exact for TypeScript**; **approximate
+the prebuilt line table, exposes `loc_of(node)` / `reconstruct(ast)`; a Svelte `loc_of`
+needs `opts.ast`, below), and a bare `loc_of(node, source, opts?)` convenience. **Exact for TypeScript**; **approximate
 for Svelte** (doesn't replicate the `<script>` tag-position or destructure
 `+1`-column parser quirks, and adds `loc` to template nodes Svelte's own wire
 omits — but `name_loc` is restored exactly, its span derived from each node's own
@@ -264,11 +264,11 @@ pushed into the host-element pass explicitly);
 **a no-op for CSS**. A leading BOM is stripped ahead of the Svelte and CSS line tables and
 kept for the TypeScript one, because that is what each wire indexes: Svelte's `parse` and
 `parseCss` strip it before parsing, acorn counts it as whitespace (`tsv_lang::LeadingBom`
-on the Rust side). The exception is not an approximation but a **refusal**: a Svelte
+on the Rust side). The first exception is not an approximation but a **refusal**: a Svelte
 source holding a lone CR, U+2028 or U+2029 carries two line counts — acorn's on the nodes
 it parsed, `locate-character`'s on the rest — and which one a node takes is not a function
 of its offsets, so every entry point throws rather than returning quietly-wrong lines
-(parse those with `loc`; see [docs/architecture.md §`loc` lines](../../docs/architecture.md#loc-lines-two-classes-one-per-acorn-parse)). The `reconstruct` forms carry a second refusal on the same principle — a block binding whose `: T` sits behind a newline, whose annotation acorn reads under a seed the offsets cannot supply — checked against the tree rather than the source, since only a parse says where a block binding is.
+(parse those with `loc`; see [docs/architecture.md §`loc` lines](../../docs/architecture.md#loc-lines-two-classes-one-per-acorn-parse)). The second is **reconstructed exactly from the tree**: a block binding's `: T` (`{#each xs as e: T}`, `{:then}` / `{:catch}` / `{@const}`) is read by its own acorn parse over a template whose five code units ending at the colon are overwritten with `_ as `, so a newline in the four units before the colon is never counted and the annotation's nodes sit that many lines higher — and a destructure binding's `loc.end` stops at its closing bracket though its `end` runs over the annotation. Both follow from the binding, which only the tree identifies (by slot — `EachBlock.context`, `AwaitBlock.value`/`error`, the `ConstTag` declarator's `id` — never by shape), so `reconstruct` applies them on its walk, and a Svelte `loc_of` requires the span-only tree as `opts.ast` and throws without it rather than answer a node differently from `reconstruct`.
 It rides every package that parses —
 `@fuzdev/tsv-parse-wasm`, `@fuzdev/tsv-wasm`, and the native `@fuzdev/tsv` loader
 (`build_napi_packages.ts` stages it there) — it operates on the

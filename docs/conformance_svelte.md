@@ -621,7 +621,7 @@ input produced one ([audits.md §Wire-Injection](./audits.md#wire-injection-audi
 `{@const a: T as U = x}`, `{:then v: T satisfies U}`, `{#await p then v: T + 1}`,
 `{#each xs as x: A ? B : C (x)}`. Canonical accepts; **tsv rejects**, a `tsv_rejects.txt`
 over-rejection. It is the same reader as the entry above. `read_type_annotation` does not parse
-a type. It eats the `:`, overwrites the five bytes ending at it with `_ as `, and hands acorn
+a type. It eats the `:`, overwrites the five code units ending at it with `_ as `, and hands acorn
 an *expression* parse from there. It then trims only two things off the result: a
 `{@const}`'s `= init` (an `AssignmentExpression` is re-parsed up to its `=`) and anything after
 a top-level `,` (a `SequenceExpression` keeps its first operand). Whatever else acorn-typescript

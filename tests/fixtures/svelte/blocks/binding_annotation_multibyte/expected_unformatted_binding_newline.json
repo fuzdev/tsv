@@ -1,0 +1,1770 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 933,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 436,
+				"data": "\n\tA block binding's type annotation behind non-ASCII text: two-byte (`éé`), three-byte\n\t(`中中`) and astral (`𝑎`, two UTF-16 units) bindings, and U+3000 / U+00A0 between a\n\tbinding and its colon; `ab` is the ASCII control. unformatted_binding_newline and\n\tunformatted_colon_newline put a newline in the four code units before each multibyte\n\tbinding's colon — except `𝑎𝑎`, four units wide, whose newline sits just outside them.\n"
+			},
+			{
+				"type": "Text",
+				"start": 436,
+				"end": 437,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Text",
+				"start": 492,
+				"end": 494,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 494,
+				"end": 524,
+				"expression": {
+					"type": "Identifier",
+					"start": 501,
+					"end": 503,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 7
+						},
+						"end": {
+							"line": 13,
+							"column": 9
+						}
+					},
+					"name": "xs"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 513,
+							"end": 517,
+							"expression": {
+								"type": "Identifier",
+								"start": 514,
+								"end": 516,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 7
+									},
+									"end": {
+										"line": 14,
+										"column": 9
+									}
+								},
+								"name": "éé"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "éé",
+					"start": 507,
+					"end": 509,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 0,
+							"character": 507
+						},
+						"end": {
+							"line": 14,
+							"column": 2,
+							"character": 509
+						}
+					},
+					"typeAnnotation": {
+						"type": "TSTypeAnnotation",
+						"start": 509,
+						"end": 512,
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 511,
+							"end": 512,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 17
+								},
+								"end": {
+									"line": 13,
+									"column": 18
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 511,
+								"end": 512,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 17
+									},
+									"end": {
+										"line": 13,
+										"column": 18
+									}
+								},
+								"name": "T"
+							}
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 524,
+				"end": 525,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 525,
+				"end": 555,
+				"expression": {
+					"type": "Identifier",
+					"start": 532,
+					"end": 534,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 7
+						},
+						"end": {
+							"line": 15,
+							"column": 9
+						}
+					},
+					"name": "xs"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 544,
+							"end": 548,
+							"expression": {
+								"type": "Identifier",
+								"start": 545,
+								"end": 547,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 7
+									},
+									"end": {
+										"line": 16,
+										"column": 9
+									}
+								},
+								"name": "中中"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "中中",
+					"start": 538,
+					"end": 540,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 0,
+							"character": 538
+						},
+						"end": {
+							"line": 16,
+							"column": 2,
+							"character": 540
+						}
+					},
+					"typeAnnotation": {
+						"type": "TSTypeAnnotation",
+						"start": 540,
+						"end": 543,
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 542,
+							"end": 543,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 17
+								},
+								"end": {
+									"line": 15,
+									"column": 18
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 542,
+								"end": 543,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 17
+									},
+									"end": {
+										"line": 15,
+										"column": 18
+									}
+								},
+								"name": "T"
+							}
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 555,
+				"end": 556,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 556,
+				"end": 586,
+				"expression": {
+					"type": "Identifier",
+					"start": 563,
+					"end": 565,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 7
+						},
+						"end": {
+							"line": 17,
+							"column": 9
+						}
+					},
+					"name": "xs"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 575,
+							"end": 579,
+							"expression": {
+								"type": "Identifier",
+								"start": 576,
+								"end": 578,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 7
+									},
+									"end": {
+										"line": 18,
+										"column": 9
+									}
+								},
+								"name": "𝑎"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "𝑎",
+					"start": 569,
+					"end": 571,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 0,
+							"character": 569
+						},
+						"end": {
+							"line": 18,
+							"column": 2,
+							"character": 571
+						}
+					},
+					"typeAnnotation": {
+						"type": "TSTypeAnnotation",
+						"start": 571,
+						"end": 574,
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 573,
+							"end": 574,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 17
+								},
+								"end": {
+									"line": 17,
+									"column": 18
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 573,
+								"end": 574,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 17
+									},
+									"end": {
+										"line": 17,
+										"column": 18
+									}
+								},
+								"name": "T"
+							}
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 586,
+				"end": 587,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 587,
+				"end": 621,
+				"expression": {
+					"type": "Identifier",
+					"start": 594,
+					"end": 596,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 7
+						},
+						"end": {
+							"line": 19,
+							"column": 9
+						}
+					},
+					"name": "xs"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 608,
+							"end": 614,
+							"expression": {
+								"type": "Identifier",
+								"start": 609,
+								"end": 613,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 9
+									},
+									"end": {
+										"line": 20,
+										"column": 13
+									}
+								},
+								"name": "𝑎𝑎"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "𝑎𝑎",
+					"start": 600,
+					"end": 604,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 0,
+							"character": 600
+						},
+						"end": {
+							"line": 20,
+							"column": 4,
+							"character": 604
+						}
+					},
+					"typeAnnotation": {
+						"type": "TSTypeAnnotation",
+						"start": 604,
+						"end": 607,
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 606,
+							"end": 607,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 6
+								},
+								"end": {
+									"line": 20,
+									"column": 7
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 606,
+								"end": 607,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 6
+									},
+									"end": {
+										"line": 20,
+										"column": 7
+									}
+								},
+								"name": "T"
+							}
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 621,
+				"end": 622,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 622,
+				"end": 652,
+				"expression": {
+					"type": "Identifier",
+					"start": 629,
+					"end": 631,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 7
+						},
+						"end": {
+							"line": 21,
+							"column": 9
+						}
+					},
+					"name": "xs"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 641,
+							"end": 645,
+							"expression": {
+								"type": "Identifier",
+								"start": 642,
+								"end": 644,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 7
+									},
+									"end": {
+										"line": 22,
+										"column": 9
+									}
+								},
+								"name": "ab"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "ab",
+					"start": 635,
+					"end": 637,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 0,
+							"character": 635
+						},
+						"end": {
+							"line": 22,
+							"column": 2,
+							"character": 637
+						}
+					},
+					"typeAnnotation": {
+						"type": "TSTypeAnnotation",
+						"start": 637,
+						"end": 640,
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 639,
+							"end": 640,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 17
+								},
+								"end": {
+									"line": 21,
+									"column": 18
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 639,
+								"end": 640,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 17
+									},
+									"end": {
+										"line": 21,
+										"column": 18
+									}
+								},
+								"name": "T"
+							}
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 652,
+				"end": 653,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 653,
+				"end": 690,
+				"expression": {
+					"type": "Identifier",
+					"start": 660,
+					"end": 662,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 7
+						},
+						"end": {
+							"line": 23,
+							"column": 9
+						}
+					},
+					"name": "xs"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 679,
+							"end": 683,
+							"expression": {
+								"type": "Identifier",
+								"start": 680,
+								"end": 682,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 14
+									},
+									"end": {
+										"line": 24,
+										"column": 16
+									}
+								},
+								"name": "éé"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "éé",
+					"start": 666,
+					"end": 668,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 0,
+							"character": 666
+						},
+						"end": {
+							"line": 24,
+							"column": 2,
+							"character": 668
+						}
+					},
+					"typeAnnotation": {
+						"type": "TSTypeAnnotation",
+						"start": 668,
+						"end": 671,
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 670,
+							"end": 671,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 17
+								},
+								"end": {
+									"line": 23,
+									"column": 18
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 670,
+								"end": 671,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 17
+									},
+									"end": {
+										"line": 23,
+										"column": 18
+									}
+								},
+								"name": "T"
+							}
+						}
+					}
+				},
+				"index": "i",
+				"key": {
+					"type": "Identifier",
+					"start": 676,
+					"end": 677,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 10
+						},
+						"end": {
+							"line": 24,
+							"column": 11
+						}
+					},
+					"name": "i"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 690,
+				"end": 691,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 691,
+				"end": 719,
+				"expression": {
+					"type": "Identifier",
+					"start": 698,
+					"end": 700,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 7
+						},
+						"end": {
+							"line": 25,
+							"column": 9
+						}
+					},
+					"name": "xs"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 709,
+							"end": 712,
+							"expression": {
+								"type": "Identifier",
+								"start": 710,
+								"end": 711,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 19
+									},
+									"end": {
+										"line": 25,
+										"column": 20
+									}
+								},
+								"name": "e"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "e",
+					"start": 704,
+					"end": 705,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 13,
+							"character": 704
+						},
+						"end": {
+							"line": 25,
+							"column": 14,
+							"character": 705
+						}
+					},
+					"typeAnnotation": {
+						"type": "TSTypeAnnotation",
+						"start": 705,
+						"end": 708,
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 707,
+							"end": 708,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 16
+								},
+								"end": {
+									"line": 25,
+									"column": 17
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 707,
+								"end": 708,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 16
+									},
+									"end": {
+										"line": 25,
+										"column": 17
+									}
+								},
+								"name": "T"
+							}
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 719,
+				"end": 720,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 720,
+				"end": 750,
+				"expression": {
+					"type": "Identifier",
+					"start": 727,
+					"end": 729,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 7
+						},
+						"end": {
+							"line": 26,
+							"column": 9
+						}
+					},
+					"name": "xs"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 740,
+							"end": 743,
+							"expression": {
+								"type": "Identifier",
+								"start": 741,
+								"end": 742,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 21
+									},
+									"end": {
+										"line": 26,
+										"column": 22
+									}
+								},
+								"name": "e"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "ArrayPattern",
+					"start": 733,
+					"end": 739,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 14
+						},
+						"end": {
+							"line": 26,
+							"column": 17
+						}
+					},
+					"elements": [
+						{
+							"type": "Identifier",
+							"start": 734,
+							"end": 735,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 15
+								},
+								"end": {
+									"line": 26,
+									"column": 16
+								}
+							},
+							"name": "e"
+						}
+					],
+					"typeAnnotation": {
+						"type": "TSTypeAnnotation",
+						"start": 736,
+						"end": 739,
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 738,
+							"end": 739,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 18
+								},
+								"end": {
+									"line": 26,
+									"column": 19
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 738,
+								"end": 739,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 18
+									},
+									"end": {
+										"line": 26,
+										"column": 19
+									}
+								},
+								"name": "T"
+							}
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 750,
+				"end": 751,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 751,
+				"end": 783,
+				"expression": {
+					"type": "Identifier",
+					"start": 758,
+					"end": 760,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 7
+						},
+						"end": {
+							"line": 27,
+							"column": 9
+						}
+					},
+					"name": "xs"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 771,
+							"end": 776,
+							"expression": {
+								"type": "Identifier",
+								"start": 772,
+								"end": 775,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 21
+									},
+									"end": {
+										"line": 27,
+										"column": 24
+									}
+								},
+								"name": "𝑎é"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "𝑎é",
+					"start": 764,
+					"end": 767,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 13,
+							"character": 764
+						},
+						"end": {
+							"line": 27,
+							"column": 16,
+							"character": 767
+						}
+					},
+					"typeAnnotation": {
+						"type": "TSTypeAnnotation",
+						"start": 767,
+						"end": 770,
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 769,
+							"end": 770,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 18
+								},
+								"end": {
+									"line": 27,
+									"column": 19
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 769,
+								"end": 770,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 18
+									},
+									"end": {
+										"line": 27,
+										"column": 19
+									}
+								},
+								"name": "T"
+							}
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 783,
+				"end": 784,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 784,
+				"end": 817,
+				"expression": {
+					"type": "Identifier",
+					"start": 792,
+					"end": 793,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 8
+						},
+						"end": {
+							"line": 28,
+							"column": 9
+						}
+					},
+					"name": "p"
+				},
+				"value": {
+					"type": "Identifier",
+					"name": "éé",
+					"start": 799,
+					"end": 801,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 0,
+							"character": 799
+						},
+						"end": {
+							"line": 29,
+							"column": 2,
+							"character": 801
+						}
+					},
+					"typeAnnotation": {
+						"type": "TSTypeAnnotation",
+						"start": 801,
+						"end": 804,
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 803,
+							"end": 804,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 19
+								},
+								"end": {
+									"line": 28,
+									"column": 20
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 803,
+								"end": 804,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 19
+									},
+									"end": {
+										"line": 28,
+										"column": 20
+									}
+								},
+								"name": "T"
+							}
+						}
+					}
+				},
+				"error": null,
+				"pending": null,
+				"then": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 805,
+							"end": 809,
+							"expression": {
+								"type": "Identifier",
+								"start": 806,
+								"end": 808,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 7
+									},
+									"end": {
+										"line": 29,
+										"column": 9
+									}
+								},
+								"name": "éé"
+							}
+						}
+					]
+				},
+				"catch": null
+			},
+			{
+				"type": "Text",
+				"start": 817,
+				"end": 818,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 818,
+				"end": 854,
+				"expression": {
+					"type": "Identifier",
+					"start": 826,
+					"end": 827,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 8
+						},
+						"end": {
+							"line": 30,
+							"column": 9
+						}
+					},
+					"name": "p"
+				},
+				"value": {
+					"type": "Identifier",
+					"name": "éé",
+					"start": 836,
+					"end": 838,
+					"loc": {
+						"start": {
+							"line": 31,
+							"column": 0,
+							"character": 836
+						},
+						"end": {
+							"line": 31,
+							"column": 2,
+							"character": 838
+						}
+					},
+					"typeAnnotation": {
+						"type": "TSTypeAnnotation",
+						"start": 838,
+						"end": 841,
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 840,
+							"end": 841,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 22
+								},
+								"end": {
+									"line": 30,
+									"column": 23
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 840,
+								"end": 841,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 22
+									},
+									"end": {
+										"line": 30,
+										"column": 23
+									}
+								},
+								"name": "T"
+							}
+						}
+					}
+				},
+				"error": null,
+				"pending": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 828,
+							"end": 829,
+							"raw": "x",
+							"data": "x"
+						}
+					]
+				},
+				"then": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 842,
+							"end": 846,
+							"expression": {
+								"type": "Identifier",
+								"start": 843,
+								"end": 845,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 7
+									},
+									"end": {
+										"line": 31,
+										"column": 9
+									}
+								},
+								"name": "éé"
+							}
+						}
+					]
+				},
+				"catch": null
+			},
+			{
+				"type": "Text",
+				"start": 854,
+				"end": 855,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 855,
+				"end": 892,
+				"expression": {
+					"type": "Identifier",
+					"start": 863,
+					"end": 864,
+					"loc": {
+						"start": {
+							"line": 32,
+							"column": 8
+						},
+						"end": {
+							"line": 32,
+							"column": 9
+						}
+					},
+					"name": "p"
+				},
+				"value": null,
+				"error": {
+					"type": "Identifier",
+					"name": "𝑎",
+					"start": 874,
+					"end": 876,
+					"loc": {
+						"start": {
+							"line": 33,
+							"column": 0,
+							"character": 874
+						},
+						"end": {
+							"line": 33,
+							"column": 2,
+							"character": 876
+						}
+					},
+					"typeAnnotation": {
+						"type": "TSTypeAnnotation",
+						"start": 876,
+						"end": 879,
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 878,
+							"end": 879,
+							"loc": {
+								"start": {
+									"line": 32,
+									"column": 23
+								},
+								"end": {
+									"line": 32,
+									"column": 24
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 878,
+								"end": 879,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 23
+									},
+									"end": {
+										"line": 32,
+										"column": 24
+									}
+								},
+								"name": "T"
+							}
+						}
+					}
+				},
+				"pending": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 865,
+							"end": 866,
+							"raw": "x",
+							"data": "x"
+						}
+					]
+				},
+				"then": null,
+				"catch": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 880,
+							"end": 884,
+							"expression": {
+								"type": "Identifier",
+								"start": 881,
+								"end": 883,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 7
+									},
+									"end": {
+										"line": 33,
+										"column": 9
+									}
+								},
+								"name": "𝑎"
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 892,
+				"end": 893,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 893,
+				"end": 932,
+				"test": {
+					"type": "Identifier",
+					"start": 898,
+					"end": 899,
+					"loc": {
+						"start": {
+							"line": 34,
+							"column": 5
+						},
+						"end": {
+							"line": 34,
+							"column": 6
+						}
+					},
+					"name": "p"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 900,
+							"end": 902,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ConstTag",
+							"start": 902,
+							"end": 920,
+							"declaration": {
+								"type": "VariableDeclaration",
+								"kind": "const",
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"id": {
+											"type": "Identifier",
+											"name": "中中",
+											"start": 910,
+											"end": 912,
+											"loc": {
+												"start": {
+													"line": 36,
+													"column": 0,
+													"character": 910
+												},
+												"end": {
+													"line": 36,
+													"column": 2,
+													"character": 912
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 912,
+												"end": 915,
+												"typeAnnotation": {
+													"type": "TSTypeReference",
+													"start": 914,
+													"end": 915,
+													"loc": {
+														"start": {
+															"line": 35,
+															"column": 13
+														},
+														"end": {
+															"line": 35,
+															"column": 14
+														}
+													},
+													"typeName": {
+														"type": "Identifier",
+														"start": 914,
+														"end": 915,
+														"loc": {
+															"start": {
+																"line": 35,
+																"column": 13
+															},
+															"end": {
+																"line": 35,
+																"column": 14
+															}
+														},
+														"name": "T"
+													}
+												}
+											}
+										},
+										"init": {
+											"type": "Identifier",
+											"start": 918,
+											"end": 919,
+											"loc": {
+												"start": {
+													"line": 36,
+													"column": 8
+												},
+												"end": {
+													"line": 36,
+													"column": 9
+												}
+											},
+											"name": "p"
+										},
+										"start": 910,
+										"end": 919
+									}
+								],
+								"start": 904,
+								"end": 919
+							}
+						},
+						{
+							"type": "Text",
+							"start": 920,
+							"end": 922,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 922,
+							"end": 926,
+							"expression": {
+								"type": "Identifier",
+								"start": 923,
+								"end": 925,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 2
+									},
+									"end": {
+										"line": 37,
+										"column": 4
+									}
+								},
+								"name": "中中"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 926,
+							"end": 927,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"alternate": null
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 437,
+		"end": 492,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 455,
+			"end": 483,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 457,
+					"end": 469,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 461,
+							"end": 468,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 5
+								},
+								"end": {
+									"line": 9,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 461,
+								"end": 468,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 5
+									},
+									"end": {
+										"line": 9,
+										"column": 12
+									}
+								},
+								"name": "xs",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 463,
+									"end": 468,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 7
+										},
+										"end": {
+											"line": 9,
+											"column": 12
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSAnyKeyword",
+										"start": 465,
+										"end": 468,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 9
+											},
+											"end": {
+												"line": 9,
+												"column": 12
+											}
+										}
+									}
+								}
+							},
+							"init": null
+						}
+					],
+					"kind": "let"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 471,
+					"end": 482,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 12
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 475,
+							"end": 481,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 5
+								},
+								"end": {
+									"line": 10,
+									"column": 11
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 475,
+								"end": 481,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 5
+									},
+									"end": {
+										"line": 10,
+										"column": 11
+									}
+								},
+								"name": "p",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 476,
+									"end": 481,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 6
+										},
+										"end": {
+											"line": 10,
+											"column": 11
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSAnyKeyword",
+										"start": 478,
+										"end": 481,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 8
+											},
+											"end": {
+												"line": 10,
+												"column": 11
+											}
+										}
+									}
+								}
+							},
+							"init": null
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module",
+			"leadingComments": [
+				{
+					"type": "Line",
+					"value": "\n\tA block binding's type annotation behind non-ASCII text: two-byte (`éé`), three-byte\n\t(`中中`) and astral (`𝑎`, two UTF-16 units) bindings, and U+3000 / U+00A0 between a\n\tbinding and its colon; `ab` is the ASCII control. unformatted_binding_newline and\n\tunformatted_colon_newline put a newline in the four code units before each multibyte\n\tbinding's colon — except `𝑎𝑎`, four units wide, whose newline sits just outside them.\n"
+				}
+			]
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 445,
+				"end": 454,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 8,
+						"character": 445
+					},
+					"end": {
+						"line": 8,
+						"column": 12,
+						"character": 449
+					}
+				},
+				"value": [
+					{
+						"start": 451,
+						"end": 453,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

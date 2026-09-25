@@ -713,28 +713,38 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// `annotation_lex_start` steps the run either way.
     ///
     /// Svelte reads it with a second parse over `blanked_prefix + "_ as " +
-    /// rest`, entered at `a = parser.index - "_ as ".len()` with `parser.index`
-    /// just past the `:` — so acorn seeds five bytes behind the colon and starts
-    /// lexing real source again one past it. Those five bytes are the ones the
-    /// synthetic `_ as ` overwrites, which is why `origin` may sit mid-token: the
-    /// seed only reads the source *behind* it.
+    /// rest`, entered at `a = parser.index - "_ as ".length` with `parser.index`
+    /// just past the `:` — so acorn seeds on the four UTF-16 code units before the
+    /// colon and starts lexing real source again one past it. Those five units (the
+    /// colon's included) are the ones the synthetic `_ as ` overwrites, which is why
+    /// `origin` may sit mid-token: the seed only reads the source *behind* it.
     ///
-    /// The step back cannot underflow — an annotation colon is always inside a
-    /// block or tag head, and every head that reaches here spends more than five
-    /// bytes ahead of the colon. The shortest is `{@const x:`, whose colon sits at
-    /// offset 9; `{:then v:` / `{:catch e:` are shorter heads but never stand
-    /// alone, and `{#each … as x:` is longer still.
+    /// The window is counted in **code units**, because Svelte indexes a JS string:
+    /// behind a non-ASCII binding it reaches more than five bytes back, and it may
+    /// open between a surrogate pair's halves, where no byte offset exists.
+    /// [`AcornPrefixText::as_insert_origin`] states both, and `origin` is the byte
+    /// offset of the character the window opens in — a line start and a line number
+    /// read the same there as at the unit itself, since that character is no line
+    /// terminator.
+    ///
+    /// The walk cannot run out (`as_insert_origin`'s `None`, asserted in debug) — an
+    /// annotation colon is always inside a block or tag head, and every head that reaches
+    /// here spends more than five units ahead of the colon. The shortest is `{@const x:`,
+    /// whose colon sits at offset 9; `{:then v:` / `{:catch e:` are shorter heads but never
+    /// stand alone, and `{#each … as x:` is longer still. Were it to run out, release reads
+    /// it as no insert at all — the origin at `lex_start`, one past the colon — as
+    /// `synthetic_insert_range` does.
     fn record_annotation_acorn_region(&mut self, at: u32, end: usize) {
-        const AS_INSERT_LEN: usize = AcornPrefixText::AS_INSERT.len();
         let lex_start = internal::AcornRegion::annotation_lex_start(self.source, at) as usize;
+        let origin = AcornPrefixText::as_insert_origin(self.source, lex_start);
         debug_assert!(
-            lex_start >= AS_INSERT_LEN,
+            origin.is_some(),
             "an annotation at {at} leaves no room for Svelte's synthetic `_ as `, so this \
              is not a block-pattern annotation at all"
         );
         self.record_acorn_region_at(
             lex_start,
-            lex_start - AS_INSERT_LEN,
+            origin.unwrap_or(lex_start),
             end,
             AcornPrefixText::BlankedThenAs,
         );
@@ -744,7 +754,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// the first non-whitespace byte: `<script>` content, which `read_script`
     /// reaches by lexing from offset 0 (so its leading whitespace is acorn's to
     /// count), and a block pattern's trailing `: T`, whose parse starts on
-    /// Svelte's synthetic `_ as ` five bytes behind the real ones.
+    /// Svelte's synthetic `_ as `, over the four code units before the colon.
     ///
     /// `lex_start` is the first byte of the component acorn lexes for real;
     /// `origin` is acorn's `startPos`; `end` is one past the slice the sub-parse
