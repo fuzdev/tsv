@@ -13,7 +13,6 @@ use crate::ast::internal::{
 };
 use crate::printer::comments::ValueGap;
 use crate::printer::comments::next_real_element_start;
-use crate::printer::layout::hang_after_operator;
 use crate::printer::{
     CommentVec, ContinuationValue, ParenContext, PatternContext, Printer,
     object_pattern_should_expand,
@@ -21,6 +20,7 @@ use crate::printer::{
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
+use tsv_lang::doc::after_operator::hang_after_operator;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 

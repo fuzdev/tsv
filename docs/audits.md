@@ -733,8 +733,8 @@ the anchor rule is `Printer::element_claim_anchor`.
 # grows the doc-node count exponentially in nesting depth (hang/OOM on a deeply-nested
 # but ordinary file). Builds synthetic nested inputs across one axis per
 # candidate-building construct (svelte elements / {#if} / {#each} / {#await} /
-# sibling-`>` dangle / glued inline-element runs / element→block dangles nested behind
-# block-holding wrappers, compact and authored-multiline / {#snippet} / {#key}; ts member
+# sibling-`>` dangle / glued inline-element runs and element→block dangles nested behind
+# block-holding wrappers, each compact and authored-multiline / {#snippet} / {#key}; ts member
 # chains, ternaries, conditional types, nested calls, and the expand-last arrow family
 # — plain, multi-arg, `new`, chain, object-body, conditional-body, `function`, and
 # curried, the last in untyped / typed / `new` / chain / object-TERMINAL spellings,

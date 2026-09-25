@@ -55,7 +55,6 @@ pub(super) use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{TSImportType, TSIntersectionType, TSParenthesizedType, TSType};
 use crate::printer::calls::{ImportOptionsArg, build_import_args_comment_layout};
 use crate::printer::ignore::{RoutedScope, is_freeze_target};
-use crate::printer::layout::hang_after_operator;
 use crate::printer::{CommentVec, ShellLeadingRun, ShellPair};
 use helpers::TypeParenRule;
 use helpers::outermost_paren;
@@ -69,6 +68,7 @@ use helpers::type_needs_parens_in_union_or_intersection;
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
+use tsv_lang::doc::after_operator::hang_after_operator;
 use tsv_lang::doc::arena::DocId;
 
 use crate::printer::comments::TrailingBlank;

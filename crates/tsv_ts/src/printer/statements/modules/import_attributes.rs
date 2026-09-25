@@ -5,10 +5,10 @@
 use super::Printer;
 use super::specifier_list::{CommaListBlanks, CommaListSpans};
 use crate::ast::internal;
-use crate::printer::layout::hang_after_operator;
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
+use tsv_lang::doc::after_operator::hang_after_operator;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 

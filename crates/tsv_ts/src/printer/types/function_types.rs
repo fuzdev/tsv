@@ -12,9 +12,9 @@ use super::helpers::{
 use super::{BlankRule, CommentSpacing, Printer, UnionValueDoc};
 use crate::ast::internal::{self, TSConstructorType, TSFunctionType, TSType};
 use crate::printer::comments::LeadingGlue;
-use crate::printer::layout::hang_after_operator;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
+use tsv_lang::doc::after_operator::hang_after_operator;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::source_scan::find_char_skipping_comments;
 

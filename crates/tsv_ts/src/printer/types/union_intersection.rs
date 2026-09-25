@@ -19,11 +19,11 @@ use crate::printer::CommentVec;
 use crate::printer::LeadingGlue;
 use crate::printer::comments::TrailingBlank;
 use crate::printer::ignore::LeadingRunFreeze;
-use crate::printer::layout::hang_after_operator;
 use crate::printer::{ShellLeadingRun, ShellPair};
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
+use tsv_lang::doc::after_operator::hang_after_operator;
 use tsv_lang::doc::arena::DocId;
 
 /// The union VALUE doc an operator seam prints, from

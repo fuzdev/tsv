@@ -91,7 +91,7 @@ interface Tally {
  * over it). A Svelte source holding one carries TWO line counts — acorn's on the nodes it
  * parsed, `locate-character`'s on the rest — and which one a node takes is not a function
  * of its offsets, so the wire is genuinely not reconstructible there. Re-derived rather
- * than imported, like everything else here: this file is the independent oracle.
+ * than imported, like everything else here: this file is an independent transcription.
  */
 const TWO_LINE_CLASSES = /\r(?!\n)|[\u2028\u2029]/;
 
@@ -137,7 +137,7 @@ function has_seeded_annotation(node: unknown, source: string): boolean {
 // The Svelte name span is derivable from the node's own start/end + type, so the
 // no-locations wire keeps `name_loc` recoverable too. Re-derived here rather than
 // imported from the shipped helper (crates/tsv_wasm/npm/locations.js) — this file
-// is the independent oracle that gates it.
+// grades its own transcription of the rules, not the helper.
 
 /** Node types whose name is the tag-name run right after `<`. */
 const ELEMENT_NAME_TYPES = new Set([
@@ -169,10 +169,10 @@ const DIRECTIVE_NAME_TYPES = new Set([
 ]);
 
 /**
- * The chars that end an attribute/directive name run — tsv's parse of Svelte's
- * `read_tag` (`/[\s=/>"']/`), ASCII whitespace only.
+ * The chars that end an attribute/directive name run — Svelte's `read_tag`
+ * (`/[\s=/>"']/`), whose `\s` is JavaScript's full whitespace class, as tsv's parser reads it.
  */
-const NAME_TERMINATORS = ' \t\n\r\v\f=/>"\'';
+const NAME_TERMINATOR = /[\s=/>"']/;
 
 /** The `[start, end]` offsets a node's `name_loc` covers, or null if it carries none. */
 function name_span_of(node: Record<string, unknown>, source: string): [number, number] | null {
@@ -186,7 +186,7 @@ function name_span_of(node: Record<string, unknown>, source: string): [number, n
 	if (ELEMENT_NAME_TYPES.has(type)) return [start + 1, start + 1 + name.length];
 	if (DIRECTIVE_NAME_TYPES.has(type)) {
 		let head_end = start;
-		while (head_end < end && !NAME_TERMINATORS.includes(source[head_end])) head_end++;
+		while (head_end < end && !NAME_TERMINATOR.test(source[head_end])) head_end++;
 		return [start, head_end];
 	}
 	if (type === 'Attribute') {

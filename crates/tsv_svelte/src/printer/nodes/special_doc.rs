@@ -88,7 +88,7 @@ impl<'a> Printer<'a> {
                 self.build_special_empty_doc(element, tag_name, &attr_docs, &ctx)
             }
             ElementLayout::WithContent(boundary) => {
-                self.build_content_element_doc(&parts, &ctx, &attr_docs, boundary)
+                self.build_content_element_doc(&parts, &ctx, &attr_docs, boundary, false, None)
             }
         }
     }

@@ -6,7 +6,6 @@ use crate::printer::class_common::ClassHeaderOptions;
 use crate::printer::class_common::ClassTypeParamsGap;
 use crate::printer::comments::ValueGap;
 use crate::printer::expressions::assignment::{AssignmentLeft, RhsCommentInfo};
-use crate::printer::layout::hang_after_operator;
 use crate::printer::{
     ClassMemberModifiers, ContinuationValue, MemberBlankScan, MemberBody, MemberFloor,
     MemberFreeze, MemberSeam,
@@ -14,6 +13,7 @@ use crate::printer::{
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
+use tsv_lang::doc::after_operator::hang_after_operator;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 

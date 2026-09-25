@@ -5,13 +5,13 @@
 // markers (`?` / `!`), in the marker→`:` and keyword→name gaps, and within
 // heritage clauses (`extends` / `implements`).
 
-use super::layout::hang_after_operator;
 use super::{CommentFilter, CommentSpacing, CommentVec, LeadingGlue, Printer};
 use crate::ast::internal;
 use crate::printer::analysis;
 use crate::printer::types::ShiftRescan;
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::DocBuf;
+use tsv_lang::doc::after_operator::hang_after_operator;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{TriviaProfile, find_char, find_char_skipping_comments};
 

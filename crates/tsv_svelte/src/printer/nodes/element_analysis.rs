@@ -73,11 +73,9 @@ struct MultilineInputs {
 /// is invariant under [`Printer::boundary_trimmed`]'s trim anyway — the trim removes only
 /// whitespace-only `Text` nodes.)
 ///
-/// It once had a second reader, a mirror answering what a width-broken element's OUTPUT
-/// re-parses as, so that the tail boundary after such an element could pre-empt the next pass.
-/// There is no such reader: the tail boundary's space spelling is decided per width at every
-/// site, and its newline spelling reads the actual render (the flow probe), so nothing needs
-/// to predict the re-parse.
+/// It has one reader and needs no mirror predicting what a width-broken element's OUTPUT
+/// re-parses as: the tail boundary's space spelling is decided per width at every site, and its
+/// newline spelling reads the actual render (the flow probe).
 fn content_is_text_only(nodes: &[FragmentNode<'_>]) -> bool {
     nodes.iter().all(|n| matches!(n, FragmentNode::Text(_)))
 }
@@ -240,11 +238,10 @@ impl<'a> Printer<'a> {
     /// tables before the readers were unified). There are exactly two readers, both in
     /// [`Self::has_source_breaks_in_content`]'s interior scan: the content-text arm and the
     /// whitespace-ONLY-text arm.
-    /// The whitespace-only arm was the last holdout, and it failed in the shape the other
-    /// cannot reach: a run whose prose and whose newline live in DIFFERENT nodes
+    /// The whitespace-only arm covers the shape the other cannot reach: a run whose prose and whose newline live in DIFFERENT nodes
     /// (`<code>a</code>⏎<code>b</code> text1`), where the separator carrying the break holds
-    /// nothing but whitespace. Its space twin already collapsed, so the two spellings of one
-    /// document reached two layouts — `elements/inline_content_flow_collapse_prettier_divergence`
+    /// nothing but whitespace. Its space twin collapses, so without this arm the two spellings of
+    /// one document reach two layouts — `elements/inline_content_flow_collapse_prettier_divergence`
     /// carries the case.
     ///
     /// Takes the already-trimmed content run (the caller shares
@@ -565,17 +562,11 @@ impl<'a> Printer<'a> {
             return MultilineCause::None;
         }
 
-        // Multiple block children
-        let block_child_count = nodes
-            .iter()
-            .filter(|n| self.is_block_element_child(n))
-            .count();
-        if block_child_count > 1 {
-            return MultilineCause::Structural;
-        }
-
-        // Mixed content (block + non-block children). Every node that is not a block element or
-        // whitespace is the non-block half — a tag, a comment, a declaration, and EVERY
+        // A block element child beside any other non-whitespace child — a second block element,
+        // or mixed content — is prettier's `forceBreakContent`, the element-side twin of
+        // `fragment_should_force_break_content` with a block-ELEMENT trigger only (a
+        // control-flow block alone does not break an element). Every node that is not a block
+        // element or whitespace is the non-block half — a tag, a comment, a declaration, and EVERY
         // control-flow block, the `{#await}` and a glued `{#snippet}` included, not only the three
         // whose own expansion already makes the element multiline (`has_any_expanding_blocks`).
         // The layout must not read a signal its own output rewrites: an element this rule let
@@ -586,16 +577,14 @@ impl<'a> Printer<'a> {
         // newlines as authored, built the multiline layout and gave the block element its own
         // line, splitting the two (and the same for the `{#await}`-first order, in a block
         // parent too, whose sibling rule below reads only a block AFTER a breakable sibling).
-        let has_block_children = block_child_count > 0;
-        if has_block_children {
-            let has_non_block = nodes.iter().any(|n| match n {
-                FragmentNode::Text(t) => !t.is_collapsible_ws_only,
-                FragmentNode::Element(e) => !self.is_block_element(e),
-                _ => true,
-            });
-            if has_non_block {
-                return MultilineCause::Structural;
-            }
+        if nodes.iter().any(|n| self.is_block_element_child(n))
+            && nodes
+                .iter()
+                .filter(|n| !n.is_whitespace_only_text())
+                .nth(1)
+                .is_some()
+        {
+            return MultilineCause::Structural;
         }
 
         // A declaration that owns its own line is the same kind of child as a block element

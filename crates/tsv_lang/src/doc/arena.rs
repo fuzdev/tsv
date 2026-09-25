@@ -78,31 +78,31 @@ impl DocId {
 /// Minted only by [`DocArena::group_with_id`] / [`DocArena::group_with_id_break`], which
 /// allocate the group it names; [`Self::doc`] is the node to place in the tree, and the
 /// readers ([`DocArena::if_break_with_id`], [`DocArena::indent_if_break`]) take the id.
-/// Held as `index + 1` so `Option<GroupId>` is four bytes and a keyed `IfBreak` stays
-/// within [`DocNode`]'s size.
+/// Held as the bare index — node 0 is the prelude's empty text (`seed_prelude`), never a
+/// group — so `Option<GroupId>` is four bytes and a keyed `IfBreak` stays within
+/// [`DocNode`]'s size.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GroupId(NonZeroU32);
+
+const _: () = assert!(size_of::<Option<GroupId>>() == 4);
 
 impl GroupId {
     /// The id of the group node at `doc`. Called once per keyed group, at build time — the
     /// render keys its map on the bare [`DocId`] and never mints an id.
     #[inline]
     fn of(doc: DocId) -> Self {
-        // A `DocId` is a `nodes.len()` taken as `u32` at allocation, so `u32::MAX` would
-        // need four billion nodes; the check is one predictable branch per keyed group.
+        // Every arena seeds its prelude before its first allocation, so a group is never
+        // node 0; the check is one predictable branch per keyed group.
         #[expect(clippy::expect_used)]
-        let raw = doc
-            .0
-            .checked_add(1)
-            .and_then(NonZeroU32::new)
-            .expect("a keyed group's DocId is below u32::MAX");
+        let raw =
+            NonZeroU32::new(doc.0).expect("node 0 is the prelude's empty text, never a group");
         Self(raw)
     }
 
     /// The group node this id names — the doc to place in the tree.
     #[inline]
     pub const fn doc(self) -> DocId {
-        DocId(self.0.get() - 1)
+        DocId(self.0.get())
     }
 }
 
@@ -1442,8 +1442,9 @@ pub struct DocArena {
     /// another group of the same shape resolved between them — a curried chain nested in
     /// an outer chain's parameter default or body resolves after the outer chain's heads
     /// and before the outer's body indent / callee `)` reads them. The newest-first search
-    /// is short in practice because a reader sits close behind its group (the fluid
-    /// assignment marker's `indent_if_break` is its very next command), and a group
+    /// finds its group at or next to the newest entry on real code, because a reader sits
+    /// close behind its group (the fluid assignment marker's `indent_if_break` is the next
+    /// keyed read after it — only a `line_suffix_boundary` sits between), and a group
     /// rendered twice in one render reads its latest resolution, as prettier's map does.
     ///
     /// It lives on the arena, not on a render's policy, because a render is not one loop:
@@ -1818,8 +1819,10 @@ impl DocArena {
     /// alongside the cached width, gated by the arena's `format_gen` so a
     /// `reset()` invalidates every interned node in O(1). Sharing is
     /// output-identical — statics are position-free at render, nodes are
-    /// append-only and immutable, and no consumer compares `DocId` identity
-    /// (`join_doc` has always shared separator ids). The width half is
+    /// append-only and immutable, and no consumer keys on an interned node's
+    /// identity (the identity-keyed tables — the keyed-group map, the swallow and
+    /// comment side-sets — key only on nodes that are never interned;
+    /// `join_doc` has always shared separator ids). The width half is
     /// amortized the same way as before (measured once per unique string per
     /// arena *lifetime* — the *per-node* eager measure was a measured loss);
     /// fits queries answer from the node alone and `render_text`'s column

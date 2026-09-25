@@ -20,6 +20,7 @@
 //! When checking if a group fits, we pass the remaining command stack so the
 //! algorithm can look ahead at what comes after the current group.
 
+pub mod after_operator;
 pub mod arena;
 mod arena_fits;
 mod arena_render;

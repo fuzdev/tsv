@@ -52,7 +52,7 @@ pub(crate) use paren::{
 };
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`.
-pub(super) use super::{Printer, calls, layout};
+pub(super) use super::{Printer, calls};
 
 use smallvec::SmallVec;
 use tsv_lang::Comment;
@@ -2880,7 +2880,7 @@ impl<'a> Printer<'a> {
             self.push_soft_run_tail(&mut content, last);
         }
         content.push(value_doc);
-        layout::hang_after_operator(d, d.concat(&content))
+        tsv_lang::doc::after_operator::hang_after_operator(d, d.concat(&content))
     }
 
     /// Push a broke-after run and its newline-after soft `line` — the
@@ -3386,7 +3386,10 @@ impl<'a> Printer<'a> {
                 .unwrap_or_else(|| d.empty());
             Some(d.concat(&[
                 d.text(operator),
-                layout::hang_after_operator(d, d.concat(&[comments_doc, build_value()])),
+                tsv_lang::doc::after_operator::hang_after_operator(
+                    d,
+                    d.concat(&[comments_doc, build_value()]),
+                ),
             ]))
         } else {
             // Only an inline block glued to `=`: caller emits `= /* c */ value`.

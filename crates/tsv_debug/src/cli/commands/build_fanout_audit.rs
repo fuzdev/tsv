@@ -109,6 +109,16 @@ fn gen_svelte_glued_run(depth: usize) -> String {
     format!("{opens}x{closes}\n")
 }
 
+/// [`gen_svelte_glued_run`] with every member's content authored on its own lines
+/// (`<b>⏎{a}⏎</b><i>⏎…⏎</i>`), so each shedder is multiline by its authored line breaks — the
+/// multiline arm of the shed / receive roles, which the compact nest (every member `Soft`)
+/// never reaches.
+fn gen_svelte_glued_run_multiline(depth: usize) -> String {
+    let opens = "<b>\n{a}\n</b><i>\n".repeat(depth);
+    let closes = "\n</i>".repeat(depth);
+    format!("{opens}{{x}}{closes}\n")
+}
+
 /// An inline element that sheds its `>` onto a glued control-flow block, nested inside an inline
 /// wrapper that holds a block of its own (`<b><i>…{#if c}x{/if}</i></b>{#if c}x{/if}`), so the
 /// wrapper is structurally multiline and each level's shedder sits in the one below — the
@@ -124,7 +134,7 @@ fn gen_svelte_block_dangle_nest(depth: usize) -> String {
     s
 }
 
-/// [`gen_svelte_block_dangle_nest`] authored on its own lines — the shape tsv prints it in. Each
+/// [`gen_svelte_block_dangle_nest`] with every boundary authored on its own line. Each
 /// shedder is then multiline by its authored line breaks, which sheds its `>` exactly as the
 /// compact form's width-broken shedder does, so a re-format walks the same dangle path.
 fn gen_svelte_block_dangle_nest_multiline(depth: usize) -> String {
@@ -584,6 +594,12 @@ const CONSTRUCTS: &[Construct] = &[
         name: "svelte_glued_run",
         parser: ParserType::Svelte,
         generate: gen_svelte_glued_run,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "svelte_glued_run_multiline",
+        parser: ParserType::Svelte,
+        generate: gen_svelte_glued_run_multiline,
         depths: &[4, 8, 12],
     },
     Construct {
