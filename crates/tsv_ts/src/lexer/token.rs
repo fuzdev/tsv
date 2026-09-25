@@ -513,8 +513,10 @@ const _: () = assert!(size_of::<Token>() == 16);
 /// is no runtime keyword table. The unit tests cross-check those arms — plus
 /// [`KEYWORD_MIN_LEN`]/[`KEYWORD_MAX_LEN`] and [`KEYWORD_LENGTHS_BY_FIRST_LETTER`] —
 /// against this list, so adding a keyword to one without the other fails the suite.
+/// The lexer's full-token identifier sweeps (`lexer::core`'s tests) grade their keyword
+/// verdicts against it too.
 #[cfg(test)]
-static KEYWORDS: &[(&str, KeywordKind)] = &[
+pub(super) static KEYWORDS: &[(&str, KeywordKind)] = &[
     // Declaration keywords
     ("const", KeywordKind::Const),
     ("let", KeywordKind::Let),

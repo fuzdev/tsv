@@ -1926,12 +1926,13 @@ hold no `\t` and no `\n` at all (`IdentifierPart`'s ASCII subset is
 and the search that establishes it finds nothing 99.9994% of the time.
 
 ⭐⭐⭐⭐ **And the fact it establishes was computed one phase earlier.**
-`Lexer::scan_identifier_into` walks exactly those bytes: an ASCII fast path over
-`[A-Za-z0-9_$]`, a separate branch for a non-ASCII `IdentifierPart`, another for
-a `\u` escape. *Whether the non-ASCII branch was taken is the answer.* It
-reaches the printer as one `bool` in tail padding `IdentName` and `Identifier`
-both already had (`Expression` stays 72 B), and the printer routes a plain name
-to a `source_span_plain(span)` that takes no `source` at all.
+The lexer's identifier scan walks exactly those bytes: an ASCII fast path over
+`[A-Za-z0-9_$]` (`Lexer::scan_ascii_identifier_into`), a separate branch for a
+non-ASCII `IdentifierPart`, another for a `\u` escape. *Whether the non-ASCII
+branch was taken is the answer.* It reaches the printer as one `bool` in tail
+padding `IdentName` and `Identifier` both already had (`Expression` stays 72 B),
+and the printer routes a plain name to a `source_span_plain(span)` that takes no
+`source` at all.
 
 `objdump` prices both sides. `source_span`'s hot path is **71 instructions** for
 a one-word name — prologue 7, span guard 5, four SWAR constants and their setup
