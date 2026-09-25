@@ -46,7 +46,10 @@ use comments::read_comment;
 pub(crate) use identifiers::{
     IDENT_CONTINUE_LUT, hyphen_starts_own_token, is_non_ascii_identifier_codepoint,
 };
-use identifiers::{is_ascii_identifier_start, is_identifier_start, read_identifier};
+use identifiers::{
+    ascii_identifier_run_end, is_ascii_identifier_start, is_identifier_start, read_identifier,
+    run_stop_ends_identifier,
+};
 use numbers::read_number;
 use strings::read_string;
 pub(crate) use strings::string_end;
@@ -243,21 +246,87 @@ impl<'a> Lexer<'a> {
     }
 
     /// Lex an identifier into `*dst`, stashing any decoded escape value out-of-band in the
-    /// lexer's `decode_scratch`. Thin wrapper over the free
-    /// `identifiers::read_identifier` so the dispatch's identifier arms (`$`-prefixed,
-    /// ASCII-led and non-ASCII-led) share the handoff.
+    /// lexer's `decode_scratch`. The dispatch's identifier arms (`$`-prefixed, ASCII-led and
+    /// non-ASCII-led) share this handoff.
+    ///
+    /// The common identifier — an optional `$` and an ASCII continuation run that stops on an
+    /// ASCII byte other than `\` (or at end of input) — is read here, with no char decode and
+    /// nothing to decode out-of-band (the dispatch cleared `has_decoded` before it got here).
+    /// A run that stops on a non-ASCII byte or a `\` hands the whole identifier to the
+    /// cold [`Lexer::read_decoded_identifier_into`], which re-reads it from its start.
+    ///
+    /// `inline(always)`, not `inline`: a plain hint leaves this an outlined call per
+    /// identifier (the dispatch is large), and the call, its return and the reloads of the
+    /// lexer's fields around it are a measured share of the common path, which is otherwise
+    /// a table walk and three stores. The escape, non-ASCII and `<url-token>` work stay out
+    /// of line, so each identifier arm of the dispatch takes on a copy of the table walk
+    /// alone. (Sending the non-ASCII-led arm straight to the cold reader, whose copy can
+    /// never exit fast, measured slower: the dispatch's layout moved.)
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
     fn read_identifier_into(&mut self, dst: &mut Token) -> Result<(), ParseError> {
-        let (token, decoded) = read_identifier(self.source, &mut self.pos)?;
+        let bytes = self.source.as_bytes();
+        let start = self.pos;
+        let run_from = start + usize::from(bytes.get(start) == Some(&b'$'));
+        let end = ascii_identifier_run_end(bytes, run_from);
+        if !run_stop_ends_identifier(bytes.get(end).copied()) {
+            return self.read_decoded_identifier_into(dst);
+        }
+        self.pos = end;
         // css-syntax "consume an ident-like token": an ident whose value is an
         // ASCII-case-insensitive `url`, immediately followed by `(` whose first
         // non-whitespace content isn't a quote, is a `<url-token>` — consume it opaquely
         // to the matching `)` so an interior `/*`, `:`, `,` etc. is literal content, not
         // a comment / colon / separator. Quoted `url("…")` stays ident + `(` + string (a
-        // function-token). Match the decoded value so an escaped spelling still counts.
-        let ident_text = decoded
-            .as_deref()
-            .unwrap_or_else(|| &self.source[token.start as usize..token.end as usize]);
-        if ident_text.eq_ignore_ascii_case("url")
+        // function-token). An unescaped spelling is its own source bytes, three of them to be
+        // a `url` at all.
+        if end - start == 3
+            && bytes[start..end].eq_ignore_ascii_case(b"url")
+            && self.cur_byte() == Some(b'(')
+        {
+            self.url_token_or_identifier_into(dst, start, end);
+            return Ok(());
+        }
+        *dst = Token {
+            kind: TokenKind::Identifier,
+            start: start as u32,
+            end: end as u32,
+        };
+        Ok(())
+    }
+
+    /// The `<url-token>` fork of [`Lexer::read_identifier_into`], at the `(` after the
+    /// unescaped `url` identifier `start..end`: the url-token when
+    /// [`Lexer::consume_url_token`] takes one, else the identifier. Kept out of line so the
+    /// common identifier's path makes no call, and so saves no registers; the identifier
+    /// crosses as its two offsets, which travel in registers where a `Token` would not.
+    #[inline(never)]
+    fn url_token_or_identifier_into(&mut self, dst: &mut Token, start: usize, end: usize) {
+        *dst = self.consume_url_token(start as u32).unwrap_or(Token {
+            kind: TokenKind::Identifier,
+            start: start as u32,
+            end: end as u32,
+        });
+    }
+
+    /// [`Lexer::read_identifier_into`]'s general reader, for an identifier whose ASCII run
+    /// stops on a non-ASCII byte or a `\`: the free `identifiers::read_identifier` from the
+    /// identifier's start.
+    #[cold]
+    #[inline(never)]
+    fn read_decoded_identifier_into(&mut self, dst: &mut Token) -> Result<(), ParseError> {
+        let (token, decoded) = read_identifier(self.source, &mut self.pos)?;
+        // The same `<url-token>` fork as the common path's, matched on the decoded value so
+        // an escaped spelling (`u\rl(`) still counts.
+        let is_url = match decoded.as_deref() {
+            None => {
+                token.end - token.start == 3
+                    && self.source.as_bytes()[token.start as usize..token.end as usize]
+                        .eq_ignore_ascii_case(b"url")
+            }
+            Some(text) => text.eq_ignore_ascii_case("url"),
+        };
+        if is_url
             && self.cur_byte() == Some(b'(')
             && let Some(url) = self.consume_url_token(token.start)
         {
