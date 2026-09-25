@@ -37,7 +37,7 @@ pub(crate) fn is_keyframes_atrule(name: &str) -> bool {
 /// CSS grammar keywords are ASCII case-insensitive (CSS Syntax 3 §"tokenizing"),
 /// so `AND`/`Or`/`NOT` are the same keyword as `and`/`or`/`not`. This drives
 /// argument/connector *recognition* only; the printer preserves the keyword's
-/// source case (matching prettier — see `connector_run` and the boolean-operator
+/// source case (matching prettier — see `ConnectorRun::text` and the boolean-operator
 /// case note in `docs/conformance_prettier_css.md`).
 pub(super) fn is_boolean_operator_keyword(ident: &str) -> bool {
     ident.eq_ignore_ascii_case("and")
@@ -170,7 +170,25 @@ pub(crate) fn parse_atrule<'arena>(
     // those tokens unconsumed; re-emit the whole prelude verbatim instead of erroring at
     // the block boundary below. (`@import` needs none: its reader consumes every prelude to
     // the boundary, structuring what it can and keeping the rest as one verbatim tail.)
-    let prelude = if matches!(name_lc, "supports" | "container") && !parser.at_prelude_end() {
+    //
+    // A prelude the reader found no part in at all is no condition either, and when it holds a
+    // boundary run it takes the same path: the run sits among the prelude's words (a container
+    // name, an operator with no operand — `@container x <NBSP>;`, `@supports and <NBSP>;`),
+    // where only the verbatim reader, whose ends are spelled as gaps, keeps each where it was.
+    let partless_with_run = match &prelude {
+        PreludeValue::Supports { condition, .. } | PreludeValue::Container { condition, .. } => {
+            condition.parts.is_empty()
+                && crate::whitespace::holds_boundary_member(
+                    parser.source(),
+                    prelude_start_raw,
+                    parser.current_start(),
+                )
+        }
+        _ => false,
+    };
+    let prelude = if matches!(name_lc, "supports" | "container")
+        && (!parser.at_prelude_end() || partless_with_run)
+    {
         reconsume_prelude_as_raw(parser, prelude_start_raw)?
     } else {
         prelude
@@ -219,7 +237,15 @@ pub(super) fn reconsume_prelude_as_raw<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     prelude_start_raw: usize,
 ) -> Result<PreludeValue<'arena>, ParseError> {
+    // Re-read from the prelude's first token, so its ends are observed over all of it. The
+    // registry keeps everything the abandoned reader registered (the truncation is to its own
+    // length): only the cursor moves. Every token is taken verbatim, so the output length at a
+    // token is its raw offset.
+    let comments_len = parser.comments.len();
+    parser.rewind_to(prelude_start_raw, comments_len)?;
+    let mut ends = raw::PreludeEnds::default();
     while !parser.at_prelude_end() {
+        ends.observe(parser, parser.current_start() - prelude_start_raw, 0);
         parser.advance()?;
     }
 
@@ -227,11 +253,22 @@ pub(super) fn reconsume_prelude_as_raw<'arena>(
     // whitespace is trimmed so the public AST (from `span`) and printer `content` agree.
     // Escape-aware, and CSS-whitespace-only: a prelude can end in an escape whose payload
     // is that whitespace (`@layer a\ ;`), and an NBSP is prelude content, not padding.
+    // Only the printer-facing `content` takes the ends' respelling (`raw::PreludeEnds`); the
+    // span, which the wire extracts from, is the author's.
     let raw = &parser.source()[prelude_start_raw..parser.current_start()];
     let lead = crate::escapes::trim_start_css(raw);
-    let content = crate::escapes::trim_end_preserving_escape(lead);
+    let trimmed = crate::escapes::trim_end_preserving_escape(lead);
     let content_start_raw = prelude_start_raw + (raw.len() - lead.len());
-    let content_end_raw = content_start_raw + content.len();
+    let content_end_raw = content_start_raw + trimmed.len();
+    let respelled = ends.respell(
+        parser.source(),
+        prelude_start_raw,
+        parser.current_start(),
+        raw,
+    );
+    let content = respelled
+        .as_deref()
+        .map_or(trimmed, |respelled| crate::escapes::trim_css(respelled));
 
     Ok(PreludeValue::Raw {
         content: parser.alloc_str_in(content),

@@ -1171,11 +1171,9 @@ pub fn build_program_doc(
     line_table: LineTable<'_>,
     embed: EmbedContext,
 ) -> DocId {
-    let comments = tsv_lang::merge_nestled_block_comments(source, program.comments);
-    let inputs = PrinterInputs::for_document(source, &comments, line_table);
-    let mut printer = make_doc_printer(arena, &inputs, embed);
-    printer.program_start = program.span.start;
-    printer.build_program_doc(program)
+    with_program_printer(arena, program, source, line_table, embed, |printer| {
+        printer.build_program_doc(program)
+    })
 }
 
 /// [`build_program_doc`] without the program's trailing newline, or `None` when the program
@@ -1196,12 +1194,30 @@ pub fn build_program_body_doc(
     line_table: LineTable<'_>,
     embed: EmbedContext,
 ) -> Option<DocId> {
+    let (body, has_output) =
+        with_program_printer(arena, program, source, line_table, embed, |printer| {
+            printer.build_program_body_doc(program)
+        });
+    has_output.then_some(body)
+}
+
+/// Run `build` on the doc-only printer a whole `<script>` program prints through: its own
+/// island-local comments in the merged view, the host's `source` and `line_table`, and the
+/// program's span start as the document start the format-ignore placement floor reads
+/// (`Printer::program_start`) — the environment [`build_program_doc`] documents.
+fn with_program_printer<R>(
+    arena: &DocArena,
+    program: &Program<'_>,
+    source: &str,
+    line_table: LineTable<'_>,
+    embed: EmbedContext,
+    build: impl FnOnce(&printer::Printer<'_>) -> R,
+) -> R {
     let comments = tsv_lang::merge_nestled_block_comments(source, program.comments);
     let inputs = PrinterInputs::for_document(source, &comments, line_table);
     let mut printer = make_doc_printer(arena, &inputs, embed);
     printer.program_start = program.span.start;
-    let (body, has_output) = printer.build_program_body_doc(program);
-    has_output.then_some(body)
+    build(&printer)
 }
 
 // Assignment-layout predicates for embedders: tsv_svelte's {@const} tag

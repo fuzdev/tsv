@@ -167,6 +167,196 @@ pub(crate) fn boundary_split_offset(text: &str) -> Option<usize> {
     None
 }
 
+/// Whether `[from, to)` of `source` holds a boundary MEMBER outside its comments — the test
+/// that hands a gap to the speller. A non-ASCII character inside a comment (`/* é */`) is not
+/// a member, and neither is a `U+FEFF` at offset 0, the byte-order mark tsv strips by policy.
+///
+/// The one statement of the question for the printer's claims (`Printer::gap_holds_member`,
+/// which asks it behind the document precondition) and the parser's prelude readers, which
+/// spell a gap into text a node carries.
+pub(crate) fn holds_boundary_member(source: &str, from: usize, to: usize) -> bool {
+    let bytes = source.as_bytes();
+    if from >= to || to > bytes.len() || bytes[from..to].is_ascii() {
+        return false;
+    }
+    let mut i = from;
+    while i < to {
+        if crate::comments::is_comment_start(bytes, i) {
+            i = crate::comments::comment_end(bytes, i);
+            continue;
+        }
+        let Some(c) = source[i..].chars().next() else {
+            break;
+        };
+        if !(i == 0 && c == tsv_lang::BOM) && is_boundary_only_whitespace(c) {
+            return true;
+        }
+        i += c.len_utf8();
+    }
+    false
+}
+
+// ## Spelling a boundary gap
+//
+// The one spelling every boundary claim emits, and its edge vocabulary. Named here rather than
+// in the printer because the parser spells three kinds of gap into text a node carries — a
+// condition part's `not` gap and an operator run's gaps (`parser/atrules/preludes.rs`), and a
+// verbatim prelude's two ends (`parser/atrules/raw.rs`, `PreludeEnds`) — and a second speller
+// is the drift this module exists to prevent; see `printer/boundary_ws.rs` §How a claim is
+// spelled for the model.
+
+/// How a spelled boundary gap meets the output on one side of it.
+///
+/// The gap's own interior is not a choice: its items (members, and comments where the claim
+/// prints them) stay in source order, and each ASCII whitespace stretch between two is one
+/// space, whoever claims it. What differs per claim is only what stands BESIDE the gap,
+/// which the claim knows and the speller does not.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Edge {
+    /// Nothing on this side: the printer regenerates what stands there (a line's indentation,
+    /// a combinator's separator, the ` {` after a rule's head), or it is a delimiter the run
+    /// may touch (the `(` it opens after, the `,` / `)` / `]` / `}` it closes against).
+    Flush,
+    /// One space if the author put ASCII whitespace between the gap's outermost item and this
+    /// side, and nothing if they glued it. The answer beside a NAME or a TERM, where the
+    /// author's presence is the claim: `a <ZWNBSP>{` must not come back as `a<ZWNBSP> {`,
+    /// and `2n<NBSP>)` must not grow a space the author never wrote.
+    Presence,
+    /// One space whatever the author wrote: a name the run is about to be emitted after
+    /// would otherwise take it in (`read_identifier` treats every code point at or above
+    /// U+00A0 as content) — see `Printer::name_run_edge`.
+    Space,
+}
+
+/// What [`spell_run`] does with a comment in the gap it spells.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Comments {
+    /// Print it, in place, as an item of the run — the gap's one emitter owns it.
+    InPlace,
+    /// Leave it to the emitter that owns it elsewhere; to the spelling it is only
+    /// separation between the members either side of it.
+    Elsewhere,
+    /// Print it in place, as [`Comments::InPlace`] does, into text a NODE carries rather than
+    /// into the output — the parser's spellings (a condition part's `not` gap, an operator
+    /// run's gaps, a verbatim prelude's two ends). This seam reports nothing to the print-once
+    /// ledger, because it prints nothing: the comment's accounting stays with the printer
+    /// that emits the carrying text. Where the comment is registered at all, that is already
+    /// settled there — a verbatim prelude's printer declares its whole span verbatim
+    /// (`record_verbatim_range`), which covers a comment an abandoned structured reader
+    /// registered before the prelude fell back; a BOUND operator run's text is printed only
+    /// between its operators, where the run un-registers what it carries, while a gap outside
+    /// them stays registered and is claimed from source; an UNBOUND run
+    /// (`ConditionQuery::trailing_operators`, through `OperatorRun::finish`) prints its whole
+    /// buffer and un-registers everything it collected; and a `not` gap's comments are never
+    /// registered.
+    Carried,
+}
+
+/// The one spelling of a boundary gap, which every claim emits (the printer's, in
+/// `printer/boundary_ws.rs`, and the parser's three that spell a gap into a node's text — see
+/// [`Comments::Carried`]): its ITEMS —
+/// the members and, where the claim owns them ([`Comments::InPlace`]), the comments — in
+/// source order, every ASCII whitespace stretch between two items as ONE space and its
+/// absence as none, and the two edges as `lead` and `trail` say ([`Edge`]).
+///
+/// Two readers make the rule, and they agree on it. `parseCss` skips the whole run, so
+/// nothing about the AST depends on the spelling. css-syntax-3, whose whitespace is ASCII
+/// only, reads each member as identifier content, each ASCII stretch as one
+/// `<whitespace-token>`, and a comment as nothing at all, so the spelling IS the
+/// tokenization: `<NBSP><NBSP>` is one identifier where `<NBSP> <NBSP>` is two, a stretch
+/// welded to nothing merges two tokens, a comment glued to a member keeps it glued to what
+/// is on the comment's other side (`<NBSP>/* c */:hover` is the compound `<NBSP>:hover`),
+/// and a stretch respelled as a tab or a line break is the same token — but a line break
+/// carried inside the text the printer emits is one the doc renderer neither indents after
+/// nor counts. So the items stay where the author put them and each stretch between them is
+/// one space: the spelling that keeps every token the author wrote and nothing else, and
+/// prettier's too, at every juncture where prettier keeps the run.
+///
+/// Scans `[from, to)` of `source`. Any other character in the gap (the `(` a caller's range
+/// opens on) is neither an item nor a separation. `bom_at_zero` excludes a `U+FEFF` at
+/// offset 0: the byte-order mark of a whole document, which tsv strips by policy (see
+/// `Printer::boundary_run`); it is neither a member nor a separation. An in-place comment
+/// is reported to the print-once ledger here, since this is the seam that prints it.
+pub(crate) fn spell_run(
+    source: &str,
+    from: usize,
+    to: usize,
+    bom_at_zero: bool,
+    edges: (Edge, Edge),
+    comments: Comments,
+) -> String {
+    let (lead, trail) = edges;
+    let bytes = source.as_bytes();
+    let mut out = String::new();
+    // Whether ASCII whitespace (or, to a members-only spelling, a comment) stands between
+    // the previous item (or the gap's start) and this position.
+    let mut separated = false;
+    let mut i = from;
+    while i < to {
+        let item_start = i;
+        if crate::comments::is_comment_start(bytes, i) {
+            let end = crate::comments::comment_end(bytes, i).min(to);
+            i = end;
+            if comments == Comments::Elsewhere {
+                separated = true;
+                continue;
+            }
+            #[cfg(feature = "comment_check")]
+            if comments == Comments::InPlace {
+                tsv_lang::comment_ledger::record_emitted(
+                    source,
+                    tsv_lang::Span {
+                        start: item_start as u32,
+                        end: end as u32,
+                    },
+                );
+            }
+            push_item(&mut out, &source[item_start..end], separated, lead, false);
+            separated = false;
+            continue;
+        }
+        let Some(c) = source[i..].chars().next() else {
+            break;
+        };
+        i += c.len_utf8();
+        if bom_at_zero && item_start == 0 && c == tsv_lang::BOM {
+            continue;
+        }
+        if is_boundary_only_whitespace(c) {
+            push_item(&mut out, &source[item_start..i], separated, lead, true);
+            separated = false;
+        } else if is_boundary_whitespace(c) {
+            separated = true;
+        }
+    }
+    if !out.is_empty() && (trail == Edge::Space || (trail == Edge::Presence && separated)) {
+        out.push(' ');
+    }
+    out
+}
+
+/// Append one item of a spelled gap: behind one space when `separated` says the author put
+/// ASCII whitespace ahead of it — or, for the gap's first item, as `lead` says.
+///
+/// [`Edge::Space`] is a claim about a MEMBER, which a name ahead of it would take in; a
+/// comment cannot be taken in (the name's token ends at its `/*`, and a comment tokenizes to
+/// nothing), so a gap that opens on a comment keeps the author's separation there instead.
+fn push_item(out: &mut String, item: &str, separated: bool, lead: Edge, is_member: bool) {
+    let space = if out.is_empty() {
+        match lead {
+            Edge::Flush => false,
+            Edge::Presence => separated,
+            Edge::Space => is_member || separated,
+        }
+    } else {
+        separated
+    };
+    if space {
+        out.push(' ');
+    }
+    out.push_str(item);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

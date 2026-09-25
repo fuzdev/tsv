@@ -148,13 +148,12 @@
 //!
 //! **The printer's known residue**: the stylesheet's own trailing whitespace, ratcheted by
 //! `the_stylesheets_trailing_run_is_a_tracked_drop` (the outermost gap has no following
-//! construct at all, and a Svelte `<style>` host trims the island's tail before writing it),
-//! and the at-rule preludes whose selector list the printer structures with no boundary claim
-//! (`@scope`, `@custom-selector`), untested here. At every juncture these tables name —
-//! every selector juncture and the gap after a list's comma, every rebuilt block-child head
-//! (a declaration's property, an at-rule's `@`, a comment's `/*`), the property→colon gap on
-//! either side of a comment, a block's tail before its `}`, and every gap of a `@supports` /
-//! `@container` condition prelude — the character comes back.
+//! construct at all, and a Svelte `<style>` host trims the island's tail before writing it).
+//! At every juncture these tables name — every selector juncture and the gap after a list's
+//! comma, every rebuilt block-child head (a declaration's property, an at-rule's `@`, a
+//! comment's `/*`), the property→colon gap on either side of a comment, a block's tail before
+//! its `}`, and every gap of an at-rule prelude (`PRELUDE_JUNCTURES`) — the character comes
+//! back.
 //!
 //! ⚠️ Two members of the class are LINE TERMINATORS to the shared line table (`<LS>`, `<PS>`),
 //! so preserving one beside a regenerated newline made the next pass read a blank line where
@@ -1790,6 +1789,119 @@ fn a_connector_never_absorbs_the_run_behind_it() {
     }
 }
 
+/// A run in a condition prelude's gap leaves the prelude READ as the condition it is: its
+/// parts take the condition reader's spacing (`(a:b)` → `(a: b)`), which the verbatim path a
+/// prelude it cannot structure falls to never applies.
+///
+/// The one tell the counting sweeps cannot see: a prelude that fell to that path keeps every
+/// member and is its own fixed point, so only its NORMALIZATION stops. `@container` is asked
+/// directly because prettier keeps its prelude verbatim, so no fixture can grade its spacing
+/// against the oracle (`container_spacing_prettier_divergence`).
+#[test]
+fn a_condition_beside_a_run_is_still_read_as_one() {
+    let mut failures = Vec::new();
+    for (label, ch) in JS_WHITESPACE_AT_OR_ABOVE_A0 {
+        for template in [
+            "<style>@container x {T}(a:b) { e { color: red; } }</style>",
+            "<style>@container {T} x (a:b) { e { color: red; } }</style>",
+            "<style>@container x {T} not (a:b) { e { color: red; } }</style>",
+            "<style>@container not {T}(a:b) { e { color: red; } }</style>",
+            "<style>@container (a:b){T} and (c:d) { e { color: red; } }</style>",
+            "<style>@container (a:b) and {T}(c:d) { e { color: red; } }</style>",
+            "<style>@container (a:b){T}{ e { color: red; } }</style>",
+            "<style>@supports {T}(a:b) { e { color: red; } }</style>",
+            "<style>@supports not {T}(a:b) { e { color: red; } }</style>",
+            "<style>@supports (a:b){T} and (c:d) { e { color: red; } }</style>",
+            "<style>@supports (a:b) and {T}(c:d) { e { color: red; } }</style>",
+            "<style>@supports (a:b){T}{ e { color: red; } }</style>",
+        ] {
+            for run in [
+                format!(" {ch} "),
+                format!("\n{ch}\n"),
+                format!(" {ch}/* c */ "),
+            ] {
+                // A comment ahead of a container NAME ends the reading on its own, run or no
+                // run: the name is then no name and the prelude no condition
+                // (`@container /* c */ x (a:b)` is verbatim at every spelling).
+                if template.contains("{T} x") && run.contains("/*") {
+                    continue;
+                }
+                let style = template.replace("{T}", &run);
+                for (host, out) in format_in_every_host(&style) {
+                    let fault = format_error_fault(&out).or_else(|| {
+                        (out.contains("(a:b)") || out.contains("(c:d)") || !out.contains("(a: b)"))
+                            .then_some("the condition was not read as one")
+                    });
+                    if let Some(fault) = fault {
+                        failures.push(format!("{label} {host} {style:?}: {fault}: {out:?}"));
+                    }
+                }
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "{} condition preludes stop normalizing beside a run:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+}
+
+/// A run glued on BOTH sides between two condition parts that share no connector
+/// (`(a: b)<NBSP>selector(.a)`) is one token run with them to css-syntax-3 — here the function
+/// token `<NBSP>selector(` — so no width may put a line break inside it.
+///
+/// The one question every other sweep here cannot ask: their templates are all far below the
+/// print width, and the break a wrap would take is its own fixed point, so counting, the
+/// fixed-point check and the css-syntax-3 reading at short widths are all blind to it. The
+/// condition's fill breaks at every item boundary it has to, whatever the separator holds, so
+/// the glued run must not sit at one; this sweeps each shape's width across column 100.
+#[test]
+fn a_glued_run_between_two_parts_survives_every_width() {
+    let mut failures = Vec::new();
+    for (label, ch) in JS_WHITESPACE_AT_OR_ABOVE_A0 {
+        for (template, next) in [
+            (
+                "<style>@supports (x{P}:b){T}selector(.a) { e { color: red; } }</style>",
+                "selector(",
+            ),
+            (
+                "<style>@container name (min-width:x{P}){T}style(--a:b) { e { color: red; } }</style>",
+                "style(",
+            ),
+            (
+                "<style>@supports (x{P}:b) and (c:d){T}(e:f) { g { color: red; } }</style>",
+                "(e: f)",
+            ),
+        ] {
+            for pad in 40..110 {
+                let style = template.replace("{P}", &"x".repeat(pad)).replace("{T}", ch);
+                let glued = format!("){ch}{next}");
+                for (host, out) in format_in_every_host(&style) {
+                    let fault = format_error_fault(&out)
+                        .or_else(|| (members_in(&out, ch) != 1).then_some("member count"))
+                        .or_else(|| {
+                            (!out.contains(&glued))
+                                .then_some("the run no longer glues the two parts")
+                        })
+                        .or_else(|| (reformat(host, &out) != out).then_some("not a fixed point"));
+                    if let Some(fault) = fault {
+                        failures.push(format!(
+                            "{label} {host} pad {pad} {template}: {fault}: {out:?}"
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "{} widths break a glued run between two condition parts:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+}
+
 /// A rebuilt head and the claim beside it must not BOTH keep the run.
 ///
 /// The mirror image of the test above, and the other failure mode
@@ -1839,14 +1951,328 @@ fn a_rebuilt_head_and_its_claim_never_both_keep_the_run() {
     }
 }
 
-/// Every template the two ASCII-spelling tests below sweep: the three juncture tables, plus
-/// the claims whose templates live in single tests above — the gaps that end against a
-/// delimiter behind a NAME (`,`, `)`, a combinator symbol, the attribute selector's tail), the
-/// gap before a rule's `{`, the property→colon gap, and the An+B junctures.
+/// The gaps of an at-rule PRELUDE, one entry per juncture kind of every prelude reader: the
+/// selector-list clauses (`@scope`, `@custom-selector`, a `selector()` argument), the condition
+/// reader (`@supports`, `@container` — the head, both sides of a connector, after `not`, the
+/// tail, an operator run's interior), the media-query list's entries (`@media`, `@import`),
+/// and the head and tail of a prelude printed verbatim (`@keyframes`, `@layer`, `@page`, and
+/// every other raw prelude).
 ///
-/// ⚠️ A condition prelude's part heads (`@supports <NBSP> (a: b)`) are NOT here: an ASCII
-/// stretch after the run sends the whole prelude down the raw verbatim path, where no claim
-/// spells anything — the prelude reader's gap, not a spelling one.
+/// `parseCss` reads a prelude raw (`read_value`) and trims it, so to the canonical AST a run
+/// here is either prelude text or — at the prelude's two ends — nothing at all; to
+/// css-syntax-3 it is identifier content. Either way it is the author's, and tsv keeps it,
+/// spelled like any other gap: its items in place, each ASCII stretch beside them one space.
+/// Prettier drops the run at many of these (`@scope <NBSP> (.a)`, `@keyframes <NBSP> k`, a
+/// media-list entry, `@custom-selector`'s gaps) and keeps it at others
+/// (`css/at_rules/scope_boundary_run`, `css/at_rules/condition_boundary_run`).
+///
+/// A run INSIDE a verbatim prelude (`@layer a,{T}b`) is not a gap of this kind: it is prelude
+/// text to every reader, and stays verbatim with the ASCII around it, exactly as the
+/// member-free `@layer a⏎, b` does. A name beside `{T}` is separated by an ASCII space,
+/// since a run glued to a name is that name's own content — except where the template says
+/// it is glued, and then the output must keep it glued (`to<NBSP>` is one identifier to
+/// css-syntax-3, and the name the prelude reader splits off it is still `to`).
+const PRELUDE_JUNCTURES: [(&str, &str); 71] = [
+    // `@scope`: its clauses are selector lists in parens, and its structural gaps.
+    (
+        "a `@scope` prelude's head",
+        "<style>@scope {T}(.a) { b { color: red; } }</style>",
+    ),
+    (
+        "a bare `@scope` prelude",
+        "<style>@scope {T}{ b { color: red; } }</style>",
+    ),
+    (
+        "a limit-only `@scope` prelude's head",
+        "<style>@scope {T} to (.b) { c { color: red; } }</style>",
+    ),
+    (
+        "a limit-only `@scope` prelude's head, glued to `to`",
+        "<style>@scope {T}to (.b) { c { color: red; } }</style>",
+    ),
+    (
+        "a block-less `@scope` prelude",
+        "<style>@scope {T};</style>",
+    ),
+    (
+        "a block-less `@scope` prelude's tail",
+        "<style>@scope (.a){T};</style>",
+    ),
+    (
+        "a `@scope` gap before `to`, glued to it",
+        "<style>@scope (.a){T}to (.b) { c { color: red; } }</style>",
+    ),
+    (
+        "a `@scope` gap after `to`, glued to it",
+        "<style>@scope (.a) to{T}(.b) { c { color: red; } }</style>",
+    ),
+    (
+        "a `@scope` root clause's lead",
+        "<style>@scope ({T}.a) { b { color: red; } }</style>",
+    ),
+    (
+        "a `@scope` root clause's `)`",
+        "<style>@scope (.a {T}) { b { color: red; } }</style>",
+    ),
+    (
+        "a `@scope` gap before `to`",
+        "<style>@scope (.a){T} to (.b) { c { color: red; } }</style>",
+    ),
+    (
+        "a `@scope` gap after `to`",
+        "<style>@scope (.a) to {T}(.b) { c { color: red; } }</style>",
+    ),
+    (
+        "a `@scope` limit clause's `)`",
+        "<style>@scope (.a) to (.b {T}) { c { color: red; } }</style>",
+    ),
+    (
+        "a `@scope` root clause's pre-`{` gap",
+        "<style>@scope (.a){T}{ b { color: red; } }</style>",
+    ),
+    (
+        "a `@scope` limit clause's pre-`{` gap",
+        "<style>@scope (.a) to (.b){T}{ c { color: red; } }</style>",
+    ),
+    // `@custom-selector`: its head, the name→list gap, and the tail before `;`.
+    (
+        "a `@custom-selector` prelude's head",
+        "<style>@custom-selector {T}:--x a;</style>",
+    ),
+    (
+        "a `@custom-selector` name→list gap",
+        "<style>@custom-selector :--x {T} a;</style>",
+    ),
+    (
+        "a `@custom-selector` name→list gap, glued to the name",
+        "<style>@custom-selector :--x{T} a;</style>",
+    ),
+    (
+        "a `@custom-selector` list's tail",
+        "<style>@custom-selector :--x a {T};</style>",
+    ),
+    // A `@supports selector()` argument: a selector list in parens.
+    (
+        "a `selector()` argument's lead",
+        "<style>@supports selector({T}a) { b { color: red; } }</style>",
+    ),
+    (
+        "a `selector()` argument's `)`",
+        "<style>@supports selector(a {T}) { b { color: red; } }</style>",
+    ),
+    // The condition reader, `@supports` and `@container` alike.
+    (
+        "a `@supports` prelude's head",
+        "<style>@supports {T}(a:b) { c { color: red; } }</style>",
+    ),
+    (
+        "a `@supports` prelude's head before `not`",
+        "<style>@supports {T} not (a:b) { c { color: red; } }</style>",
+    ),
+    (
+        "a `@supports` gap after `not`",
+        "<style>@supports not {T}(a:b) { c { color: red; } }</style>",
+    ),
+    (
+        "a `@supports` gap after `not`, before a function",
+        "<style>@supports not {T}selector(a) { c { color: red; } }</style>",
+    ),
+    (
+        "a `@supports` gap after a connector, before a function",
+        "<style>@supports (a:b) and {T}selector(a) { c { color: red; } }</style>",
+    ),
+    // A run glued to a connector's FRONT is one identifier with it to css-syntax-3
+    // (`<NBSP>and`), so the connector is still read and the run stays glued to it.
+    (
+        "a `@supports` gap before a connector, glued to it",
+        "<style>@supports (a:b) {T}and (c:d) { e { color: red; } }</style>",
+    ),
+    (
+        "a `@supports` leading connector, glued to its run",
+        "<style>@supports {T}and (a:b) { c { color: red; } }</style>",
+    ),
+    (
+        "a `@supports` operator run's interior, glued to its second operator",
+        "<style>@supports (a:b) or {T}or (c:d) { e { color: red; } }</style>",
+    ),
+    (
+        "a `@supports` gap between two parts with no connector, glued to the second",
+        "<style>@supports (a:b) {T}selector(a) { e { color: red; } }</style>",
+    ),
+    (
+        "a `@container` gap before a connector, glued to it",
+        "<style>@container (a:b) {T}and (c:d) { e { color: red; } }</style>",
+    ),
+    (
+        "a `@container` name→connector gap, glued to it",
+        "<style>@container x {T}and (a:b) { c { color: red; } }</style>",
+    ),
+    (
+        "a `@supports` gap before a connector",
+        "<style>@supports (a:b){T} and (c:d) { e { color: red; } }</style>",
+    ),
+    (
+        "a `@supports` gap after a connector",
+        "<style>@supports (a:b) and {T}(c:d) { e { color: red; } }</style>",
+    ),
+    (
+        "a `@supports` gap after `or`",
+        "<style>@supports (a:b) or {T}(c:d) { e { color: red; } }</style>",
+    ),
+    (
+        "a `@supports` gap after `and not`",
+        "<style>@supports (a:b) and not {T}(c:d) { e { color: red; } }</style>",
+    ),
+    (
+        "a `@supports` operator run's interior",
+        "<style>@supports (a:b) and {T} or (c:d) { e { color: red; } }</style>",
+    ),
+    (
+        "a `@supports` trailing operator's tail",
+        "<style>@supports (a:b) and {T};</style>",
+    ),
+    (
+        "a `@supports` prelude's pre-`{` tail",
+        "<style>@supports (a:b){T}{ c { color: red; } }</style>",
+    ),
+    (
+        "a `@supports` prelude's pre-`;` tail",
+        "<style>@supports (a:b){T};</style>",
+    ),
+    (
+        "a `@container` prelude's head",
+        "<style>@container {T} x (a:b) { c { color: red; } }</style>",
+    ),
+    (
+        "a `@container` name→condition gap",
+        "<style>@container x {T}(a:b) { c { color: red; } }</style>",
+    ),
+    (
+        "a `@container` name→`not` gap",
+        "<style>@container x {T} not (a:b) { c { color: red; } }</style>",
+    ),
+    (
+        "a `@container` gap before a connector",
+        "<style>@container (a:b){T} and (c:d) { e { color: red; } }</style>",
+    ),
+    (
+        "a `@container` gap after a connector",
+        "<style>@container (a:b) and {T}(c:d) { e { color: red; } }</style>",
+    ),
+    (
+        "a `@container` gap after `not`",
+        "<style>@container not {T}(a:b) { c { color: red; } }</style>",
+    ),
+    (
+        "a `@container` prelude's pre-`{` tail",
+        "<style>@container (a:b){T}{ c { color: red; } }</style>",
+    ),
+    // A `<media-query-list>`'s entries, which one splitter serves in both preludes.
+    (
+        "a `@media` list's head",
+        "<style>@media {T} screen, print { a { color: red; } }</style>",
+    ),
+    (
+        "a `@media` list entry before its `,`",
+        "<style>@media screen {T},print { a { color: red; } }</style>",
+    ),
+    (
+        "a `@media` list entry after a `,`",
+        "<style>@media screen,{T} print { a { color: red; } }</style>",
+    ),
+    (
+        "a `@media` list's tail",
+        "<style>@media screen, print {T}{ a { color: red; } }</style>",
+    ),
+    (
+        "an `@import` media list entry before its `,`",
+        "<style>@import 'a.css' screen {T},print;</style>",
+    ),
+    (
+        "an `@import` media list entry after a `,`",
+        "<style>@import 'a.css' screen,{T} print;</style>",
+    ),
+    (
+        "an `@import` media list's tail",
+        "<style>@import 'a.css' screen, print {T};</style>",
+    ),
+    (
+        "an `@import` prelude's head",
+        "<style>@import {T}'a.css';</style>",
+    ),
+    // The head and tail of a prelude printed verbatim — the two ends `parseCss` trims.
+    (
+        "a `@keyframes` prelude's head",
+        "<style>@keyframes {T} k { 0% { color: red; } }</style>",
+    ),
+    (
+        "a `@keyframes` prelude's tail",
+        "<style>@keyframes k {T}{ 0% { color: red; } }</style>",
+    ),
+    (
+        "a `@layer` statement's head",
+        "<style>@layer {T} a, b;</style>",
+    ),
+    (
+        "a `@layer` statement's tail",
+        "<style>@layer a, b {T};</style>",
+    ),
+    (
+        "a `@layer` block's tail",
+        "<style>@layer a {T}{ b { color: red; } }</style>",
+    ),
+    (
+        "a `@page` prelude's head",
+        "<style>@page {T} :first { color: red; }</style>",
+    ),
+    (
+        "a `@page` prelude's tail",
+        "<style>@page :first {T}{ color: red; }</style>",
+    ),
+    (
+        "a `@font-face` prelude",
+        "<style>@font-face {T}{ font-family: a; }</style>",
+    ),
+    (
+        "a `@property` prelude's head",
+        "<style>@property {T} --x { inherits: true; }</style>",
+    ),
+    (
+        "a `@counter-style` prelude's tail",
+        "<style>@counter-style x {T}{ system: cyclic; }</style>",
+    ),
+    (
+        "a `@position-try` prelude's head",
+        "<style>@position-try {T} --x { top: 0; }</style>",
+    ),
+    (
+        "a `@namespace` prelude's head",
+        "<style>@namespace {T} svg url(x);</style>",
+    ),
+    (
+        "an unknown at-rule's prelude head",
+        "<style>@foo {T} bar;</style>",
+    ),
+    (
+        "an unknown at-rule's prelude tail",
+        "<style>@foo bar {T};</style>",
+    ),
+    (
+        "an unknown at-rule's pre-`{` tail",
+        "<style>@foo bar {T}{ color: red; }</style>",
+    ),
+    // A condition prelude the reader cannot structure falls to the verbatim path, whose two
+    // ends are the same gaps as any other raw prelude's.
+    (
+        "an unstructurable `@supports` prelude's head",
+        "<style>@supports {T} foo;</style>",
+    ),
+];
+
+/// Every template the two ASCII-spelling tests below sweep: the juncture tables, plus the
+/// claims whose templates live in single tests above — the gaps that end against a delimiter
+/// behind a NAME (`,`, `)`, a combinator symbol, the attribute selector's tail), the gap before
+/// a rule's `{`, the property→colon gap, and the An+B junctures.
 fn ascii_spelling_templates() -> Vec<&'static str> {
     BOUNDARY_JUNCTURES
         .iter()
@@ -1857,6 +2283,7 @@ fn ascii_spelling_templates() -> Vec<&'static str> {
                 .map(|(_, template)| *template),
         )
         .chain(PRINTER_ONLY_JUNCTURES.iter().map(|(_, template)| *template))
+        .chain(PRELUDE_JUNCTURES.iter().map(|(_, template)| *template))
         .chain([
             "<style>a {T}> b { color: red; }</style>",
             "<style>a {T}~ b { color: red; }</style>",
@@ -1911,13 +2338,26 @@ fn format_in_every_host(style: &str) -> [(&'static str, String); 3] {
     ]
 }
 
+/// A format that fails comes back as a marker the graders read as a fault — a member count
+/// of zero, a spelling that is not the run's — rather than a panic, so a sweep reports every
+/// cell it fails on instead of stopping at the first.
 fn format_svelte(src: &str) -> String {
-    tsv_svelte::format_str(src).expect("component should format")
+    tsv_svelte::format_str(src).unwrap_or_else(|error| format!("{FORMAT_ERROR}{error}>"))
 }
 
 fn format_css(src: &str) -> String {
-    tsv_css::format_str(src).expect("sheet should format")
+    tsv_css::format_str(src).unwrap_or_else(|error| format!("{FORMAT_ERROR}{error}>"))
 }
+
+/// The marker [`format_svelte`] / [`format_css`] return for a format that failed, as the
+/// first fault every sweep asks: the error text excerpts the source, so a count of members or
+/// comments taken over the marker can pass by accident.
+fn format_error_fault(out: &str) -> Option<&'static str> {
+    out.starts_with(FORMAT_ERROR)
+        .then_some("the format failed (a parse error on input canonical accepts)")
+}
+
+const FORMAT_ERROR: &str = "<FORMAT ERROR: ";
 
 /// `out` formatted again under the host that produced it.
 fn reformat(host: &str, out: &str) -> String {
@@ -1977,7 +2417,8 @@ fn an_ascii_stretch_in_or_beside_a_run_is_one_space() {
                 let style = template.replace("{T}", &run);
                 let input = component(&style);
                 for (host, out) in format_in_every_host(&style) {
-                    let fault = spelling_fault(&out, ch, &run, interior)
+                    let fault = format_error_fault(&out)
+                        .or_else(|| spelling_fault(&out, ch, &run, interior))
                         .or_else(|| {
                             (members_in(&out, ch) != run.matches(ch).count())
                                 .then_some("member count")
@@ -2068,6 +2509,15 @@ fn meaning_fault(input: &str, out: &str, ch: &str) -> Option<&'static str> {
 /// - the declaration's property→colon gap (`color{T}:`), whose comments take the cataloged
 ///   property-comment spelling (`left<NBSP> /* comment */ : 0`, `property_nonascii_space`).
 fn gap_owns_its_comments(template: &str) -> bool {
+    // A media query list's entries are the media reader's text, and that reader pads a comment
+    // at query level whatever it is glued to — a cataloged divergence that is not the run's
+    // (conformance_prettier_css.md §CSS: At-Rules, the query-level node split). The run there
+    // is entry content (`media_query_list`'s CSS-only trim), not a claimed gap.
+    if template.starts_with("<style>@media ")
+        || template.starts_with("<style>@import 'a.css' screen")
+    {
+        return false;
+    }
     let at = template.find("{T}").expect("a `{T}` template");
     let before = template[..at].trim_end();
     let block_head =
@@ -2222,7 +2672,11 @@ fn a_line_break_in_a_run_formats_as_a_space() {
                 let expected = format_in_every_host(&template.replace("{T}", &spaced));
                 let actual = format_in_every_host(&template.replace("{T}", &broken));
                 for ((host, want), (_, out)) in expected.iter().zip(actual.iter()) {
-                    let fault = if !comment_follows && !holds_comment && out != want {
+                    let fault = if let Some(fault) =
+                        format_error_fault(out).or_else(|| format_error_fault(want))
+                    {
+                        Some(fault)
+                    } else if !comment_follows && !holds_comment && out != want {
                         Some("differs from the spaced run")
                     } else if (comment_follows || holds_comment) && out.contains(&format!("{ch}\n"))
                     {
@@ -2280,7 +2734,8 @@ fn a_member_on_one_side_of_of_keeps_the_comment_on_the_other() {
                     );
                     let input = component(&style);
                     for (host, out) in format_in_every_host(&style) {
-                        let fault = comment_fault(&input, &out)
+                        let fault = format_error_fault(&out)
+                            .or_else(|| comment_fault(&input, &out))
                             .or_else(|| {
                                 (members_in(&out, ch) != input.matches(ch).count())
                                     .then_some("member count")

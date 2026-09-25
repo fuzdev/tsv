@@ -489,20 +489,20 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         // Prettier strips all but the assertions (docs/conformance_prettier_ts.md
         // §TypeScript, "Non-LHS assignment target parens"). Non-null `x!` is a valid
         // bare target, so it isn't wrapped.
-        ParenContext::AssignmentTarget => matches!(
-            expr.kind,
-            ExpressionKind::TSAsExpression(_)
-                | ExpressionKind::TSSatisfiesExpression(_)
-                | ExpressionKind::TSTypeAssertion(_)
-                | ExpressionKind::UnaryExpression(_)
-                | ExpressionKind::UpdateExpression(_)
-                | ExpressionKind::AwaitExpression(_)
-                | ExpressionKind::BinaryExpression(_)
-                | ExpressionKind::ConditionalExpression(_)
-                | ExpressionKind::ArrowFunctionExpression(_)
-                | ExpressionKind::YieldExpression(_)
-                | ExpressionKind::FunctionExpression(_)
-        ),
+        ParenContext::AssignmentTarget => {
+            is_type_assertion(expr)
+                || matches!(
+                    expr.kind,
+                    ExpressionKind::UnaryExpression(_)
+                        | ExpressionKind::UpdateExpression(_)
+                        | ExpressionKind::AwaitExpression(_)
+                        | ExpressionKind::BinaryExpression(_)
+                        | ExpressionKind::ConditionalExpression(_)
+                        | ExpressionKind::ArrowFunctionExpression(_)
+                        | ExpressionKind::YieldExpression(_)
+                        | ExpressionKind::FunctionExpression(_)
+                )
+        }
     }
 }
 
@@ -800,13 +800,9 @@ pub(crate) fn leftmost_no_lookahead_reached<'a>(
             // and wraps the leftmost node inside (`(({}).x as T) = 1`), so for the three
             // cast kinds the walk goes on, matching it.
             ExpressionKind::AssignmentExpression(a) => {
-                let cast_target = matches!(
-                    a.left.kind,
-                    ExpressionKind::TSAsExpression(_)
-                        | ExpressionKind::TSSatisfiesExpression(_)
-                        | ExpressionKind::TSTypeAssertion(_)
-                );
-                if !cast_target && needs_parens(a.left, ParenContext::AssignmentTarget, false) {
+                if !is_type_assertion(a.left)
+                    && needs_parens(a.left, ParenContext::AssignmentTarget, false)
+                {
                     (expr, computed_member_object)
                 } else {
                     walk(a.left, false)

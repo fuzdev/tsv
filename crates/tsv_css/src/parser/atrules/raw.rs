@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use super::{CssParser, is_boolean_operator};
 use crate::lexer::TokenKind;
 use crate::url::trim_url_raw;
+use crate::whitespace::{Comments, Edge, holds_boundary_member, spell_run};
 use tsv_lang::printing::format_string_literal;
 use tsv_lang::{ParseError, Span};
 
@@ -27,7 +28,8 @@ pub(super) fn parse_raw_prelude_content<'arena>(
     normalize_quotes: bool,
 ) -> Result<(&'arena str, Span), ParseError> {
     // Add spaces around boolean operators (and, or, not) and after ':' for prettier compatibility
-    let prelude_start = parser.span_pos(parser.current_start());
+    let prelude_start_raw = parser.current_start();
+    let prelude_start = parser.span_pos(prelude_start_raw);
     // One growable buffer rather than a `Vec<String>` of per-token / per-space pieces
     // joined at the end (the `parse_declaration` raw-buffer idiom, extended to the at-rule
     // prelude siblings): each token value is `push_str`ed directly and each normalized
@@ -81,7 +83,9 @@ pub(super) fn parse_raw_prelude_content<'arena>(
     // - No prelude (@font-face, @starting-style): No prelude to normalize
     // - Identifier preludes (@keyframes, @layer): No colons to worry about
 
+    let mut ends = PreludeEnds::default();
     while !parser.at_prelude_end() {
+        ends.observe(parser, prelude.len(), trailing_spaces);
         if parser.check(TokenKind::Whitespace) {
             // Verbatim mode (every raw at-rule off the media reader): preserve the source
             // whitespace exactly — prettier and Svelte keep it (`@layer a  ,  b` stays
@@ -401,9 +405,15 @@ pub(super) fn parse_raw_prelude_content<'arena>(
     // §4.3.7). Trimming it strands the backslash onto the `;` (or the block's `{`), which
     // it then escapes — output that no longer parses. The CSS-only trim also leaves an
     // NBSP alone: it is prelude content, not padding.
-    let content = parser.alloc_str_in(crate::escapes::trim_end_preserving_escape(
-        crate::escapes::trim_start_css(&prelude),
-    ));
+    let prelude = ends
+        .respell(
+            parser.source(),
+            prelude_start_raw,
+            parser.current_start(),
+            &prelude,
+        )
+        .unwrap_or(prelude);
+    let content = parser.alloc_str_in(crate::escapes::trim_css(&prelude));
     let prelude_end = parser.span_pos(parser.current_start());
     let span = Span {
         start: prelude_start,
@@ -411,6 +421,99 @@ pub(super) fn parse_raw_prelude_content<'arena>(
     };
 
     Ok((content, span))
+}
+
+/// Where an at-rule prelude's first and last REAL tokens sit, so its two ENDS — the stretch
+/// before the first and the stretch after the last — can be spelled as the boundary gaps they
+/// are.
+///
+/// `parseCss` reads a prelude raw and trims it with JS `\s`, so a non-ASCII space at either end
+/// is outside the canonical prelude altogether (and the wire, extracted from the span and
+/// trimmed the same way, agrees); to css-syntax-3 it is identifier content, and so the
+/// author's. A prelude reader keeps the author's bytes in between — verbatim, or through the
+/// media reader's normalization — but its two ends are a GAP: their items (members and
+/// comments) print in place and each ASCII stretch beside them is one space
+/// (`crate::whitespace::spell_run`), the same spelling every boundary claim in the printer
+/// emits. Only a gap that holds a member is respelled; every other prelude keeps the reader's
+/// own text byte for byte.
+///
+/// A gap token is whitespace, a comment, or an identifier that is nothing but a run — the
+/// token boundaries fall exactly where the gap does, since a run GLUED to a name is inside
+/// that name's identifier token and is name content (`<NBSP>foo`).
+#[derive(Default)]
+pub(super) struct PreludeEnds {
+    /// The first real token: its raw start, and the reader's output length ahead of it.
+    head: Option<(usize, usize)>,
+    /// The first gap token after the last real token seen so far: its raw start, and the
+    /// output length at the last real token's end (the reader's programmatic trailing spaces
+    /// excluded, so a pad after that token is the gap's to spell, not a second separator).
+    tail: Option<(usize, usize)>,
+}
+
+impl PreludeEnds {
+    /// Record the current token, before the reader consumes it. `out_len` and
+    /// `trailing_spaces` are the reader's output so far and the programmatic spaces at its
+    /// end (zero for a reader that keeps its text verbatim).
+    pub(super) fn observe(
+        &mut self,
+        parser: &CssParser<'_, '_>,
+        out_len: usize,
+        trailing_spaces: usize,
+    ) {
+        let is_gap = match parser.current_kind() {
+            TokenKind::Whitespace | TokenKind::Comment => true,
+            TokenKind::Identifier => {
+                parser.boundary_run_len() == parser.current_end() - parser.current_start()
+            }
+            _ => false,
+        };
+        if !is_gap {
+            self.head
+                .get_or_insert_with(|| (parser.current_start(), out_len));
+            self.tail = None;
+        } else if self.head.is_some() && self.tail.is_none() {
+            self.tail = Some((parser.current_start(), out_len - trailing_spaces));
+        }
+    }
+
+    /// The reader's output `out` with each end that holds a member respelled, or `None` when
+    /// neither does — every prelude in every real stylesheet. `[start, end)` is the prelude's
+    /// raw source range.
+    pub(super) fn respell(
+        &self,
+        source: &str,
+        start: usize,
+        end: usize,
+        out: &str,
+    ) -> Option<String> {
+        let spell = |from: usize, to: usize, edges: (Edge, Edge)| {
+            spell_run(source, from, to, false, edges, Comments::Carried)
+        };
+        let Some((head_raw, head_len)) = self.head else {
+            // No real token at all: the whole prelude is one gap.
+            return holds_boundary_member(source, start, end)
+                .then(|| spell(start, end, (Edge::Flush, Edge::Flush)));
+        };
+        let (tail_raw, tail_len) = self.tail.unwrap_or((end, out.len()));
+        let head_holds = holds_boundary_member(source, start, head_raw);
+        let tail_holds = holds_boundary_member(source, tail_raw, end);
+        if !head_holds && !tail_holds {
+            return None;
+        }
+        let mut respelled = String::with_capacity(out.len());
+        if head_holds {
+            respelled.push_str(&spell(start, head_raw, (Edge::Flush, Edge::Presence)));
+        } else {
+            respelled.push_str(&out[..head_len]);
+        }
+        respelled.push_str(&out[head_len..tail_len]);
+        if tail_holds {
+            respelled.push_str(&spell(tail_raw, end, (Edge::Presence, Edge::Flush)));
+        } else {
+            respelled.push_str(&out[tail_len..]);
+        }
+        Some(respelled)
+    }
 }
 
 /// Normalize the inner string quote of a `url("x")` / `url('x')` to prettier's

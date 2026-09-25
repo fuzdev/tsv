@@ -1,0 +1,416 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 476,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 80,
+				"end": 112,
+				"name": "import",
+				"prelude": "'a.css' screen, print",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 114,
+				"end": 145,
+				"name": "import",
+				"prelude": "'a.css' screen, print",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 147,
+				"end": 199,
+				"name": "media",
+				"prelude": "screen, print",
+				"block": {
+					"type": "Block",
+					"start": 170,
+					"end": 199,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 174,
+								"end": 175,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 174,
+										"end": 175,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 174,
+														"end": 175
+													}
+												],
+												"start": 174,
+												"end": 175
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 176,
+								"end": 196,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 181,
+										"end": 191,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 174,
+							"end": 196
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 201,
+				"end": 253,
+				"name": "media",
+				"prelude": "screen  , print",
+				"block": {
+					"type": "Block",
+					"start": 224,
+					"end": 253,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 228,
+								"end": 229,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 228,
+										"end": 229,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 228,
+														"end": 229
+													}
+												],
+												"start": 228,
+												"end": 229
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 230,
+								"end": 250,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 235,
+										"end": 245,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 228,
+							"end": 250
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 255,
+				"end": 307,
+				"name": "media",
+				"prelude": "screen, ﻿ print",
+				"block": {
+					"type": "Block",
+					"start": 278,
+					"end": 307,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 282,
+								"end": 283,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 282,
+										"end": 283,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 282,
+														"end": 283
+													}
+												],
+												"start": 282,
+												"end": 283
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 284,
+								"end": 304,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 289,
+										"end": 299,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 282,
+							"end": 304
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 309,
+				"end": 361,
+				"name": "media",
+				"prelude": "screen, print",
+				"block": {
+					"type": "Block",
+					"start": 332,
+					"end": 361,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 336,
+								"end": 337,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 336,
+										"end": 337,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 336,
+														"end": 337
+													}
+												],
+												"start": 336,
+												"end": 337
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 338,
+								"end": 358,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 343,
+										"end": 353,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 336,
+							"end": 358
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 363,
+				"end": 414,
+				"name": "media",
+				"prelude": "screen , print",
+				"block": {
+					"type": "Block",
+					"start": 385,
+					"end": 414,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 389,
+								"end": 390,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 389,
+										"end": 390,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 389,
+														"end": 390
+													}
+												],
+												"start": 389,
+												"end": 390
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 391,
+								"end": 411,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 396,
+										"end": 406,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 389,
+							"end": 411
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 416,
+				"end": 467,
+				"name": "media",
+				"prelude": "screen, print",
+				"block": {
+					"type": "Block",
+					"start": 438,
+					"end": 467,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 442,
+								"end": 443,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 442,
+										"end": 443,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 442,
+														"end": 443
+													}
+												],
+												"start": 442,
+												"end": 443
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 444,
+								"end": 464,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 449,
+										"end": 459,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 442,
+							"end": 464
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a boundary run in a media query list stays where it was written ",
+				"start": 9,
+				"end": 78
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 468,
+			"styles": "\n\t/* a boundary run in a media query list stays where it was written */\n\t@import 'a.css' screen, print  ;\n\t@import 'a.css' screen, print﻿;\n\t@media   screen, print {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media screen  , print {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media screen, ﻿ print {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media screen, print   {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media screen , print {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media screen, print﻿ {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 477,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

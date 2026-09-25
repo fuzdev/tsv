@@ -444,10 +444,11 @@ the canonical parser, so it is conformance-tier at best). Standing findings:
   head, in the property gap, and at a block's tail (`preserved_boundary_ws` /
   `spell_gap_items`, which partition each gap between them and print its items — members and
   comments — in place, each ASCII stretch between them as one space; an attribute selector's
-  tail and the property gap keep the author's tokenization outright). Known printer positions
-  drop the run: the stylesheet's trailing whitespace, ratcheted in
-  [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs), and the unclaimed
-  at-rule prelude selector lists (`@scope`, `@custom-selector`). See
+  tail and the property gap keep the author's tokenization outright), and at every gap of an
+  at-rule prelude — its two ends, a condition's gaps, `@scope`'s and `@custom-selector`'s,
+  an `@import`'s value gaps. The one known printer position that drops the run: the
+  stylesheet's trailing whitespace, ratcheted in
+  [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs). See
   [conformance_svelte.md §Boundary whitespace](./conformance_svelte.md).
 
 ## Blank-Line Injection Audit (`blanks:audit`)

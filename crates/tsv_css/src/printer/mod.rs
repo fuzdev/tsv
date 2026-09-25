@@ -918,25 +918,6 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Split the comments in `[start, end)` around `split_pos` (a delimiter byte
-    /// offset — a comma or an `and`/`or` keyword), returning the joined `/*…*/` text
-    /// before and after it. With no split position the whole run goes to the first
-    /// element. Comments never straddle a delimiter, so the range split is exact.
-    pub(crate) fn split_comments_at(
-        &self,
-        start: u32,
-        end: u32,
-        split_pos: Option<u32>,
-    ) -> (String, String) {
-        match split_pos {
-            Some(pos) => (
-                self.comment_blocks_in_range(start, pos),
-                self.comment_blocks_in_range(pos, end),
-            ),
-            None => (self.comment_blocks_in_range(start, end), String::new()),
-        }
-    }
-
     /// Try to print inline comments after the current item
     ///
     /// Checks if the next item is a comment on the same line as `prev_end`.

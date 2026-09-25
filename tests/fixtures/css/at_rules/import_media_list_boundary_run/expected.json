@@ -1,0 +1,58 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 197,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 88,
+				"end": 120,
+				"name": "import",
+				"prelude": "'a.css'   screen, print",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 122,
+				"end": 154,
+				"name": "import",
+				"prelude": "'a.css' screen  , print",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 156,
+				"end": 188,
+				"name": "import",
+				"prelude": "'a.css' screen, ﻿ print",
+				"block": null
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a boundary run in an import media query list stays where it was written ",
+				"start": 9,
+				"end": 86
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 189,
+			"styles": "\n\t/* a boundary run in an import media query list stays where it was written */\n\t@import 'a.css'   screen, print;\n\t@import 'a.css' screen  , print;\n\t@import 'a.css' screen, ﻿ print;\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 198,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
