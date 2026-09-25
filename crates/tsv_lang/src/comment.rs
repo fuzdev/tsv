@@ -5,7 +5,7 @@ use std::cell::Cell;
 use crate::Span;
 use crate::acorn_prefix::AcornPrefix;
 use crate::printing::{self, LineTable};
-use crate::source_scan::{self, has_newline_after_position, has_newline_before_position};
+use crate::source_scan::{self, has_newline_after_position};
 use crate::whitespace::{trim_end_js_whitespace, trim_start_js_whitespace};
 use smallvec::SmallVec;
 
@@ -409,21 +409,34 @@ pub fn is_format_ignore_directive(content: &str) -> bool {
 /// line (whitespace aside). Every other placement — trailing a token, glued before the
 /// construct, sharing a line with an opening delimiter — is an ordinary comment.
 ///
-/// A file boundary counts as a line boundary, so a directive at byte 0 or at EOF still
-/// qualifies. A line comment trivially satisfies the after side (it consumes to EOL);
-/// only a block spelling can share its line with what follows.
+/// A document boundary counts as a line boundary, so a directive at EOF, or with nothing
+/// but spaces and tabs between it and `doc_start`, still qualifies. `doc_start` is where
+/// the document the directive belongs to begins: 0 for a whole file, and the island's
+/// first byte for a body embedded in a host file and spanned against it — a Svelte
+/// `<script>` body is its own document to this rule, as it is to prettier, which formats
+/// it as its own text, so `<script>// prettier-ignore` opens a line even though the
+/// host's tag precedes it on the physical one. A line comment trivially satisfies the
+/// after side (it consumes to EOL); only a block spelling can share its line with what
+/// follows.
 ///
 /// Shared across the language printers because it is the one question they must not
 /// answer differently: a printer that freezes from a placement its own emitter would
 /// then relocate loses the freeze on the next pass.
-pub fn is_honored_format_ignore(source: &str, comment: &Comment) -> bool {
-    is_format_ignore_directive(comment.content(source)) && directive_alone_on_line(source, comment)
+pub fn is_honored_format_ignore(source: &str, comment: &Comment, doc_start: u32) -> bool {
+    is_format_ignore_directive(comment.content(source))
+        && directive_alone_on_line(source, comment, doc_start)
 }
 
 /// The placement floor of [`is_honored_format_ignore`], split out for the emitters that
 /// need the placement question alone.
-pub fn directive_alone_on_line(source: &str, comment: &Comment) -> bool {
-    (comment.span.start == 0 || has_newline_before_position(source, comment.span.start))
+pub fn directive_alone_on_line(source: &str, comment: &Comment, doc_start: u32) -> bool {
+    let before = &source.as_bytes()[doc_start as usize..comment.span.start as usize];
+    let opens_line = before
+        .iter()
+        .rev()
+        .find(|b| !matches!(b, b' ' | b'\t'))
+        .is_none_or(|b| matches!(b, b'\n' | b'\r'));
+    opens_line
         && (comment.span.end as usize == source.len()
             || has_newline_after_position(source, comment.span.end))
 }

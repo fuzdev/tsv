@@ -24,6 +24,7 @@
 
 mod atrules;
 mod boundary_ws;
+pub(crate) use boundary_ws::source_holds_boundary_ws;
 mod declarations;
 mod rules;
 mod selectors;
@@ -41,26 +42,6 @@ use tsv_lang::{
     has_comments_to_emit_from, is_format_ignore_directive,
     printing::{self, FoldedSource, LineBreaks, LineTable},
 };
-
-/// What a standalone stylesheet's `source` is: a whole file, or a piece of a host file.
-///
-/// Two questions turn on it, and both are about a file's first byte. Only a whole file can
-/// begin with a byte-order mark, so only a `Document`'s offset-0 U+FEFF is a BOM for the
-/// boundary-whitespace claims to strip ([`boundary_ws`]), and only a `Document`'s output is
-/// the start of a file, so only there does a leading content U+FEFF need a BOM written ahead
-/// of it (`tsv_lang::printing::encode_leading_zwnbsp`). A `Fragment` — the body of a
-/// `<style>` nested inside a Svelte element, which the host formats on its own and indents
-/// into place — answers both as content: a U+FEFF at its offset 0 is the author's character.
-///
-/// The role is the PRINTER's alone. The lexer skips a U+FEFF at the offset 0 of whatever
-/// source it is handed (`tsv_lang::leading_bom_len`), a fragment's included, so no token
-/// starts there; a fragment's is kept because the boundary-whitespace claims read the
-/// source's own bytes from offset 0 and, under `Fragment`, do not exclude it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum SourceRole {
-    Document,
-    Fragment,
-}
 
 /// Printer state for building output
 pub(crate) struct Printer<'a> {
@@ -103,9 +84,6 @@ pub(crate) struct Printer<'a> {
     /// its own — a `<style>` block's printer shares nothing with the Svelte printer around
     /// it — so the window starts empty here and is never handed across.
     comment_free_gap: CommentFreeWindow<'a>,
-    /// Whether `source` is a whole file or a fragment of one ([`SourceRole`]) — which decides
-    /// whether a U+FEFF at its offset 0 is a byte-order mark.
-    source_role: SourceRole,
     /// The anchor whose LEAD gap a container has already printed whole, if any — a selector
     /// list's comma, a pseudo-argument list's `(`, an `of` keyword claims the gap ahead of
     /// the selector it opens when that gap holds a boundary member, and the selector's own
@@ -114,30 +92,38 @@ pub(crate) struct Printer<'a> {
 }
 
 impl<'a> Printer<'a> {
-    /// Create a new printer for a standalone stylesheet with source, comments, the
-    /// document's line table, and what the source is ([`SourceRole`]).
+    /// Create a new printer for a standalone stylesheet with source, comments and the
+    /// document's line table.
     pub(crate) fn new(
         arena: &'a DocArena,
         source: &'a str,
         comments: &'a [Comment],
         line_table: LineTable<'a>,
-        source_role: SourceRole,
     ) -> Self {
-        Self {
-            source_role,
-            ..Self::with_embed(arena, source, comments, line_table, EmbedContext::default())
-        }
+        let holds_boundary_ws = source_holds_boundary_ws(source);
+        Self::with_embed(
+            arena,
+            source,
+            comments,
+            line_table,
+            EmbedContext::default(),
+            holds_boundary_ws,
+        )
     }
 
-    /// Create a new printer with the given embedding context. The source is the host's
-    /// whole document, so its role is [`SourceRole::Document`] (an island's content never
-    /// sits at offset 0, so the role never decides anything there).
+    /// Create a new printer with the given embedding context. `source` is always a whole
+    /// document — a standalone stylesheet, or the Svelte host every `<style>` island (top
+    /// level or nested in markup) is spanned against — so a U+FEFF at its offset 0 is a
+    /// byte-order mark, and an island's content never sits there. `holds_boundary_ws` is
+    /// [`source_holds_boundary_ws`] over that whole `source` — taken by the caller so a host
+    /// with several islands scans once (`crate::HostBoundaryScan`).
     pub(crate) fn with_embed(
         arena: &'a DocArena,
         source: &'a str,
         comments: &'a [Comment],
         line_table: LineTable<'a>,
         embed: EmbedContext,
+        holds_boundary_ws: bool,
     ) -> Self {
         Self {
             buffer: OutputBuffer::with_capacity(source.len()),
@@ -149,10 +135,9 @@ impl<'a> Printer<'a> {
             line_table,
             in_keyframes: false,
             value_scope: values::ValueScope::default(),
-            holds_boundary_ws: boundary_ws::source_holds_boundary_ws(source),
+            holds_boundary_ws,
             claimed_lead: std::cell::Cell::new(None),
             comment_free_gap: CommentFreeWindow::new(comments),
-            source_role: SourceRole::Document,
         }
     }
 
@@ -1277,18 +1262,7 @@ pub(crate) fn format_css_in(
     // multi-file driver's files instead of a fresh Vec per file — filled only if a line
     // question falls back to it).
     let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
-    format_stylesheet(stylesheet, source, line_breaks, arena, SourceRole::Document)
-}
-
-/// [`format_css_in`] over a stylesheet [`SourceRole::Fragment`]: a nested `<style>` body the
-/// Svelte host indents into place, whose first character is not a file's first byte.
-pub(crate) fn format_css_fragment_in(
-    stylesheet: &CssStyleSheet<'_>,
-    source: &str,
-    arena: &DocArena,
-) -> String {
-    let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
-    format_stylesheet(stylesheet, source, line_breaks, arena, SourceRole::Fragment)
+    format_stylesheet(stylesheet, source, line_breaks, arena)
 }
 
 /// [`format_css_in`] over a document the caller folded ahead of the parse: the line
@@ -1299,25 +1273,17 @@ pub(crate) fn format_css_folded_in(
     arena: &DocArena,
 ) -> String {
     let line_breaks = LineBreaks::of_folded(folded, arena.take_line_breaks_scratch());
-    format_stylesheet(
-        stylesheet,
-        folded.text(),
-        line_breaks,
-        arena,
-        SourceRole::Document,
-    )
+    format_stylesheet(stylesheet, folded.text(), line_breaks, arena)
 }
 
 /// The shared body of the standalone entry points: register the stylesheet's comments,
-/// build the printer on its line table, print, park the table, and — for a whole
-/// [`SourceRole::Document`] only — write a BOM ahead of a leading content U+FEFF
-/// (`tsv_lang::printing::encode_leading_zwnbsp`).
+/// build the printer on its line table, print, park the table, and write a BOM ahead of a
+/// leading content U+FEFF (`tsv_lang::printing::encode_leading_zwnbsp`).
 fn format_stylesheet(
     stylesheet: &CssStyleSheet<'_>,
     source: &str,
     line_breaks: LineBreaks<'_>,
     arena: &DocArena,
-    source_role: SourceRole,
 ) -> String {
     // The print-once comment ledger's expectation for this stylesheet — detached comments
     // plus in-block `CssBlockChild::Comment` AST nodes (diagnostic; see
@@ -1325,23 +1291,12 @@ fn format_stylesheet(
     #[cfg(feature = "comment_check")]
     register_stylesheet_comments(stylesheet, source);
 
-    let mut printer = Printer::new(
-        arena,
-        source,
-        &stylesheet.comments,
-        line_breaks.table(),
-        source_role,
-    );
+    let mut printer = Printer::new(arena, source, &stylesheet.comments, line_breaks.table());
     printer.print_css_nodes(stylesheet.nodes);
     let output = printer.into_string();
     arena.park_line_breaks_scratch(line_breaks.into_scratch());
-    match source_role {
-        // A content U+FEFF at output byte 0 needs a BOM ahead of it, or the next read strips
-        // it.
-        SourceRole::Document => printing::encode_leading_zwnbsp(output),
-        // Not the start of a file: the host places this output after its own bytes.
-        SourceRole::Fragment => output,
-    }
+    // A content U+FEFF at output byte 0 needs a BOM ahead of it, or the next read strips it.
+    printing::encode_leading_zwnbsp(output)
 }
 
 /// Embedded CSS formatting into a caller-provided doc arena — the arena-sharing
@@ -1358,6 +1313,7 @@ pub(crate) fn format_css_embedded_in(
     source: &str,
     line_table: LineTable<'_>,
     embed: EmbedContext,
+    host_scan: crate::HostBoundaryScan,
     arena: &DocArena,
 ) -> String {
     // Render at the host's final indentation directly (fold `base_indent_offset`
@@ -1381,7 +1337,14 @@ pub(crate) fn format_css_embedded_in(
         base_indent_offset: 0,
         ..embed
     };
-    let mut printer = Printer::with_embed(arena, source, &stylesheet.comments, line_table, embed);
+    let mut printer = Printer::with_embed(
+        arena,
+        source,
+        &stylesheet.comments,
+        line_table,
+        embed,
+        host_scan.holds_boundary_ws,
+    );
     printer.indent_level = base;
     printer.print_css_nodes(stylesheet.nodes);
     printer.into_string()

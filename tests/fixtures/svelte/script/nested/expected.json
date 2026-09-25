@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 296,
+	"end": 440,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -360,6 +360,95 @@
 									}
 								]
 							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 295,
+				"end": 297,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 297,
+				"end": 366,
+				"data": " blank lines between statements and around a comment are kept "
+			},
+			{
+				"type": "Text",
+				"start": 366,
+				"end": 367,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 367,
+				"end": 439,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 19,
+						"column": 1,
+						"character": 368
+					},
+					"end": {
+						"line": 19,
+						"column": 4,
+						"character": 371
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 372,
+							"end": 374,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 374,
+							"end": 432,
+							"name": "script",
+							"name_loc": {
+								"start": {
+									"line": 20,
+									"column": 2,
+									"character": 375
+								},
+								"end": {
+									"line": 20,
+									"column": 8,
+									"character": 381
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 382,
+										"end": 423,
+										"type": "Text",
+										"data": "\n\t\tconst b = 1;\n\n\t\t// c\n\n\t\tconst d = 2;\n\t",
+										"raw": "\n\t\tconst b = 1;\n\n\t\t// c\n\n\t\tconst d = 2;\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 432,
+							"end": 433,
+							"raw": "\n",
+							"data": "\n"
 						}
 					]
 				}

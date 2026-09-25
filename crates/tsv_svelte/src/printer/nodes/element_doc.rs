@@ -999,6 +999,11 @@ impl<'a> Printer<'a> {
     ///
     /// This handles nested style/script elements (inside other elements like `<div>`)
     /// that need their content formatted as CSS/JS rather than as regular fragment nodes.
+    /// The body formats exactly as the top-level section's does, one indent level per
+    /// enclosing container deeper: parsed at host-absolute offsets and laid out at the column
+    /// it renders at, so width is measured from there and verbatim text — a template
+    /// literal's quasis, a comment interior, a `prettier-ignore` slice — keeps its authored
+    /// columns (the two positions are held equal by `tests/svelte_nested_raw_content_parity.rs`).
     pub(super) fn build_raw_content_element_doc(
         &self,
         kind: RawTextKind,
@@ -1065,53 +1070,37 @@ impl<'a> Printer<'a> {
             return d.concat(&[opening_tag, d.hardline(), closing_tag]);
         }
 
-        // Parse and format content based on tag type
-        // Using base_indent_offset of 0 because we'll handle indentation in the doc structure.
-        // The parse arena is a local: the parsed AST (CSS or TS) is consumed into an owned
-        // formatted `String` here, so it never escapes this call. Pre-sized to the content
-        // length to avoid the bump's chunk-doubling tail.
+        // The body is parsed where it sits — at host-absolute offsets, against the host's
+        // source and line table — exactly as the top-level `<script>` / `<style>` islands
+        // are, so the two positions share one formatter path and differ only in how deep the
+        // body is indented. The parse arena is a local: nothing the doc keeps borrows the AST
+        // (its leaves are pooled text or host-source spans). Pre-sized to the content length
+        // to avoid the bump's chunk-doubling tail. A raw-text `Text` never decodes, so
+        // `content` is the author's bytes at `raw_span`.
         let arena =
             bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(content.len()));
-        // Format into the host document's doc arena rather than a fresh per-element
-        // one — the same arena-sharing as the top-level `<style>`/`<script>` path
-        // (`format_embedded_in` / the TS build helpers). The parsed content renders to
-        // an owned `String` here, so nothing borrowed from the arena escapes and the
-        // arena is not reset. A `<style>` body is a FRAGMENT of this document, not a file
-        // (`tsv_css::format_fragment_in`): a U+FEFF at its offset 0 is the author's
-        // character, kept as the top-level `<style>` island keeps it, and no BOM is
-        // written ahead of it — the output lands mid-document, where a BOM is content too.
-        let formatted = match kind {
-            RawTextKind::Style => tsv_css::parse(&content, &arena)
+        let base_offset = text.raw_span.start as usize;
+        let body = match kind {
+            RawTextKind::Script => tsv_ts::parse_embedded(&content, base_offset, &arena)
                 .ok()
-                .map(|ast| tsv_css::format_fragment_in(&ast, &content, self.d())),
-            RawTextKind::Script => tsv_ts::parse(&content, &arena)
+                .and_then(|program| self.build_nested_script_body_doc(&program)),
+            RawTextKind::Style => tsv_css::parse_embedded(&content, base_offset, &arena)
                 .ok()
-                .map(|ast| tsv_ts::format_in(&ast, &content, self.d())),
+                .and_then(|stylesheet| self.build_nested_style_body_doc(&stylesheet)),
         };
 
-        match formatted {
-            Some(formatted) if !formatted.trim().is_empty() => {
-                // Build doc with properly indented content
-                // Each line of formatted content goes on its own line with indent
-                let lines: Vec<&str> = formatted.trim_end().lines().collect();
-                let mut content_lines: DocBuf = DocBuf::with_capacity(lines.len() * 2);
-                for line in lines {
-                    content_lines.push(d.hardline());
-                    if !line.is_empty() {
-                        content_lines.push(d.text_pooled(line));
-                    }
-                }
-
-                let content_concat = d.concat(&content_lines);
-                let indented = d.indent(content_concat);
-                d.concat(&[opening_tag, indented, d.hardline(), closing_tag])
-            }
-            _ => {
+        match body {
+            Some(body) => d.concat(&[
+                opening_tag,
+                d.indent(d.concat(&[d.hardline(), body])),
+                d.hardline(),
+                closing_tag,
+            ]),
+            None => {
                 // Fallback: preserve raw content. Reachable only for a FORMATTABLE-lang
                 // body (css/ts/absent) — a frozen body froze before the parse above — and
-                // it catches TWO cases, not one: a body whose content doesn't parse
-                // (`None`), and a body that parses but formats to EMPTY (`Some` whose trim
-                // is empty — `<script>;</script>`, guarded out by the arm above).
+                // it catches TWO cases, not one: a body whose content doesn't parse, and a
+                // body that parses but prints nothing (`<script>;</script>`).
                 // TODO: route through the freeze emitter for a cleaner shape? For the
                 // parse-fail half prettier has only its degraded error-swallow path (no
                 // clean oracle to pin a fixture against); the formats-to-empty half DOES
@@ -1121,6 +1110,74 @@ impl<'a> Printer<'a> {
                 d.concat(&[opening_tag, d.text_pooled(&content), closing_tag])
             }
         }
+    }
+
+    /// The body doc of a `<script>` nested in markup: the program's own doc
+    /// (`tsv_ts::build_program_body_doc`), embedded in this document's doc so the host's
+    /// renderer indents it — which indents only the breaks the TS printer owns, leaving the
+    /// newlines inside verbatim text (a template literal's quasis, a non-indentable block
+    /// comment's interior, a `prettier-ignore` slice) at the columns the author gave them,
+    /// and measuring every line from the column it actually lands at. `None` when the
+    /// program prints nothing.
+    ///
+    /// The embed is [`tsv_lang::EmbedContext::line_owning`], the top-level `<script>`'s: a
+    /// nested body's statements end their own lines too, and its closing tag takes a fresh
+    /// one, so a `//` deferred to a line end still lands in JS.
+    fn build_nested_script_body_doc(&self, program: &tsv_ts::Program<'_>) -> Option<DocId> {
+        // The body is raw text to the canonical parser, so the host's `Root.comments` holds
+        // none of its comments: they are this island's, registered here under the host
+        // source they are spanned against (the MERGED view, the one the TS printer emits).
+        #[cfg(feature = "comment_check")]
+        tsv_lang::comment_ledger::register_parsed(
+            self.source,
+            &tsv_lang::merge_nestled_block_comments(self.source, program.comments),
+        );
+        tsv_ts::build_program_body_doc(
+            self.d(),
+            program,
+            self.source,
+            self.line_table(),
+            tsv_lang::EmbedContext::line_owning(),
+        )
+    }
+
+    /// The body doc of a `<style>` nested in markup, or `None` when it prints nothing.
+    ///
+    /// The CSS printer writes its output rather than building one doc, so the body cannot
+    /// ride this document's indentation the way a nested `<script>` does. It is formatted
+    /// the way the top-level `<style>` is instead (`tsv_css::format_embedded_in`), at the
+    /// indent level it will render at — [`Printer::body_indent_level`], read while this
+    /// element's parent fragment is being built — so width is measured from the real column
+    /// and verbatim text (a comment's interior, an escaped-newline string, a raw at-rule
+    /// prelude) keeps its column. The result is placed as literal text: the leading `hardline`
+    /// the caller emits indents the first line, and every later line already carries its own.
+    fn build_nested_style_body_doc(
+        &self,
+        stylesheet: &tsv_css::CssStyleSheet<'_>,
+    ) -> Option<DocId> {
+        let level = self.body_indent_level();
+        let embed = tsv_lang::EmbedContext {
+            base_indent_offset: level,
+            ..tsv_lang::EmbedContext::default()
+        };
+        let formatted = tsv_css::format_embedded_in(
+            stylesheet,
+            self.source,
+            self.line_table(),
+            embed,
+            self.css_host_scan(),
+            self.d(),
+        );
+        let formatted = formatted.trim_end();
+        if formatted.trim_start().is_empty() {
+            return None;
+        }
+        // The first line carries the body's indentation, which the caller's `hardline`
+        // supplies instead.
+        Some(
+            self.d()
+                .multiline_text_literal(formatted.trim_start_matches('\t')),
+        )
     }
 
     /// Build docs for element attributes.

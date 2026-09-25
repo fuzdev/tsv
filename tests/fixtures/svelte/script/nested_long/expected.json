@@ -1,0 +1,210 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 783,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 77,
+				"data": " statements inside a nested script measure from their rendered column "
+			},
+			{
+				"type": "Text",
+				"start": 77,
+				"end": 78,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 78,
+				"end": 412,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 79
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 82
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 83,
+							"end": 85,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 85,
+							"end": 405,
+							"name": "script",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 2,
+									"character": 86
+								},
+								"end": {
+									"line": 3,
+									"column": 8,
+									"character": 92
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 93,
+										"end": 396,
+										"type": "Text",
+										"data": "\n\t\t// 100 columns: stays on one line\n\t\tfn(argument1, argument2, argument3, argument4, argument5, argument6, argument7, aaaaaaaaaaaaaa);\n\t\t// 101 columns: the arguments break\n\t\tfn(\n\t\t\targument1,\n\t\t\targument2,\n\t\t\targument3,\n\t\t\targument4,\n\t\t\targument5,\n\t\t\targument6,\n\t\t\targument7,\n\t\t\taaaaaaaaaaaaaaa\n\t\t);\n\t",
+										"raw": "\n\t\t// 100 columns: stays on one line\n\t\tfn(argument1, argument2, argument3, argument4, argument5, argument6, argument7, aaaaaaaaaaaaaa);\n\t\t// 101 columns: the arguments break\n\t\tfn(\n\t\t\targument1,\n\t\t\targument2,\n\t\t\targument3,\n\t\t\targument4,\n\t\t\targument5,\n\t\t\targument6,\n\t\t\targument7,\n\t\t\taaaaaaaaaaaaaaa\n\t\t);\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 405,
+							"end": 406,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 412,
+				"end": 414,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 414,
+				"end": 782,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 20,
+						"column": 1,
+						"character": 415
+					},
+					"end": {
+						"line": 20,
+						"column": 4,
+						"character": 418
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 419,
+							"end": 421,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 421,
+							"end": 775,
+							"name": "section",
+							"name_loc": {
+								"start": {
+									"line": 21,
+									"column": 2,
+									"character": 422
+								},
+								"end": {
+									"line": 21,
+									"column": 9,
+									"character": 429
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 430,
+										"end": 433,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 433,
+										"end": 763,
+										"name": "script",
+										"name_loc": {
+											"start": {
+												"line": 22,
+												"column": 3,
+												"character": 434
+											},
+											"end": {
+												"line": 22,
+												"column": 9,
+												"character": 440
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"start": 441,
+													"end": 754,
+													"type": "Text",
+													"data": "\n\t\t\t// 100 columns: stays on one line\n\t\t\tfn(argument1, argument2, argument3, argument4, argument5, argument6, argument7, aaaaaaaaaaaa);\n\t\t\t// 101 columns: the arguments break\n\t\t\tfn(\n\t\t\t\targument1,\n\t\t\t\targument2,\n\t\t\t\targument3,\n\t\t\t\targument4,\n\t\t\t\targument5,\n\t\t\t\targument6,\n\t\t\t\targument7,\n\t\t\t\taaaaaaaaaaaaa\n\t\t\t);\n\t\t",
+													"raw": "\n\t\t\t// 100 columns: stays on one line\n\t\t\tfn(argument1, argument2, argument3, argument4, argument5, argument6, argument7, aaaaaaaaaaaa);\n\t\t\t// 101 columns: the arguments break\n\t\t\tfn(\n\t\t\t\targument1,\n\t\t\t\targument2,\n\t\t\t\targument3,\n\t\t\t\targument4,\n\t\t\t\targument5,\n\t\t\t\targument6,\n\t\t\t\targument7,\n\t\t\t\taaaaaaaaaaaaa\n\t\t\t);\n\t\t"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 763,
+										"end": 765,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 775,
+							"end": 776,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

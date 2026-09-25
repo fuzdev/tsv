@@ -74,10 +74,9 @@ fn span_of(node: &serde_json::Value) -> Option<(usize, usize)> {
 /// sites and +8–12% CPU over `tests/fixtures`. Switching it on is the queued follow-up.
 /// Two constraints when it lands: this function is shared substrate, and `ignore_audit`
 /// injects the JS `// prettier-ignore` spelling, which is wrong inside CSS — so the region
-/// must be a per-consumer opt-in beside this walk, never a line inside it; and only the
-/// TOP-LEVEL `<style>` qualifies, whose island registers host-absolute spans under the
-/// host's ledger key — a nested `<style>` ELEMENT re-parses island-relative and would trip
-/// the mis-attribution hazard `gap_audit`'s bystander mapping names.
+/// must be a per-consumer opt-in beside this walk, never a line inside it. Every `<style>`
+/// island — top-level or nested in markup — registers host-absolute spans under the host's
+/// ledger key, so `gap_audit`'s bystander mapping stays sound for any of them.
 pub(crate) fn code_regions(source: &str, parser: ParserType) -> Vec<(usize, usize)> {
     match parser {
         ParserType::TypeScript | ParserType::Css => vec![(0, source.len())],
@@ -375,8 +374,8 @@ pub(crate) fn injection_sites(
     // Sorted by start; comments never overlap, so at most one can contain a given offset —
     // the one with the largest start `<= offset`. (`comment_spans` is scoped to the host
     // document key by `parsed_comment_spans`, so every span here is host-absolute over
-    // `source` — a nested `<style>` island's own-key spans are excluded by construction, not
-    // just by failing to match.)
+    // `source` — another document's spans are excluded by construction, not just by failing
+    // to match.)
     let mut comments: Vec<(usize, usize)> = comment_spans
         .iter()
         .map(|s| (s.start as usize, s.end as usize))

@@ -412,6 +412,7 @@ impl<'a> Printer<'a> {
         &self,
         nodes: &[FragmentNode<'_>],
     ) -> DocId {
+        let _fragment = self.enter_fragment();
         // Whitespace is significant here (`<pre>`/`<textarea>`): a block must not
         // dangle its `}` or expand its body — that would inject rendered whitespace.
         // The dedicated ws-sensitive if/each builders already hug; this also gates

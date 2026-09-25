@@ -43,10 +43,8 @@
 // compound `<NBSP>:hover` where `a /* c */ <NBSP> :hover` is a descendant — a comment moved to
 // the other side of a member, or spaced off one it was glued to, changes what a browser
 // reads. And the doc renderer: a line break carried inside the text the printer emits is one
-// it neither indents after nor counts, so the anchor lands at column 0, and under a host that
-// re-indents every line of the formatted sheet (a nested `<style>`) the next pass reads that
-// indentation back as part of the run and grows it by a level. It is prettier's answer at
-// every juncture where prettier keeps the run.
+// it neither indents after nor counts, so the anchor lands at column 0. It is prettier's
+// answer at every juncture where prettier keeps the run.
 //
 // ⚠️ The rule holds at the CLAIMED junctures — the table below. An at-rule prelude the parser
 // cannot structure is printed verbatim (`@layer`, `@page`, `@keyframes`' name, a condition
@@ -148,7 +146,7 @@
 // at-rule preludes whose selector list the printer structures with no claim in the table
 // above (`@scope`, `@custom-selector`), where the parser steps a run no emitter puts back.
 
-use super::{Printer, SourceRole};
+use super::Printer;
 use crate::ast::internal::CssBlockChild;
 use tsv_lang::Span;
 
@@ -236,7 +234,7 @@ impl<'a> Printer<'a> {
             self.source,
             from as usize,
             to as usize,
-            self.source_role == SourceRole::Document,
+            true,
             (lead, trail),
             Comments::Elsewhere,
         )
@@ -263,7 +261,7 @@ impl<'a> Printer<'a> {
             self.source,
             from as usize,
             to as usize,
-            self.source_role == SourceRole::Document,
+            true,
             (lead, trail),
             Comments::InPlace,
         )
@@ -288,7 +286,7 @@ impl<'a> Printer<'a> {
             let Some(c) = self.source[i..].chars().next() else {
                 break;
             };
-            let is_bom = i == 0 && c == tsv_lang::BOM && self.source_role == SourceRole::Document;
+            let is_bom = i == 0 && c == tsv_lang::BOM;
             if !is_bom && crate::whitespace::is_boundary_only_whitespace(c) {
                 return true;
             }
@@ -427,7 +425,7 @@ impl<'a> Printer<'a> {
             self.source,
             run_start as usize,
             start as usize,
-            self.source_role == SourceRole::Document,
+            true,
             (Edge::Flush, trail),
             Comments::Elsewhere,
         )
@@ -490,12 +488,12 @@ impl<'a> Printer<'a> {
         // reaches this scan like any other member — but tsv strips BOMs by policy (a
         // cataloged prettier divergence, `docs/conformance_prettier.md` §Whitespace: BOM
         // Handling), and re-emitting it here would quietly undo that. The exclusion is
-        // anchored at offset 0 of a whole document because that is what makes a `U+FEFF` a
-        // byte-order mark; one anywhere else — a fragment's offset 0 included
-        // ([`SourceRole::Fragment`]) — is an ordinary character and is preserved with the
-        // rest, including a second one later in this same run, which the forward scan in
+        // anchored at offset 0 of the document because that is what makes a `U+FEFF` a
+        // byte-order mark; one anywhere else — an embedded island's first character
+        // included — is an ordinary character and is preserved with the rest, including a
+        // second one later in this same run, which the forward scan in
         // `preserved_boundary_ws` still reaches.
-        if run_start == 0 && self.source_role == SourceRole::Document {
+        if run_start == 0 {
             run_start = tsv_lang::leading_bom_len(self.source);
         }
         (run_start as u32, holds_member)
@@ -771,7 +769,7 @@ pub(super) fn closer_pos(span: Span) -> u32 {
 /// what it lands on, so a stylesheet whose only non-ASCII characters are content (an arrow in
 /// a `content:` string, an emoji in a comment) pays one word-wise pass and a handful of
 /// decodes.
-pub(super) fn source_holds_boundary_ws(source: &str) -> bool {
+pub(crate) fn source_holds_boundary_ws(source: &str) -> bool {
     let bytes = source.as_bytes();
     let mut i = 0;
     loop {

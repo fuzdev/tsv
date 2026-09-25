@@ -350,7 +350,7 @@ impl<'a> Printer<'a> {
     /// from its neighbors for no reason. [`Self::member_gap_frozen`] keeps its own copy,
     /// where the flag buys something this one can't: skipping the range scan entirely.
     pub(in crate::printer) fn is_honored_directive(&self, c: &Comment) -> bool {
-        self.has_format_ignore && is_honored_format_ignore(self.source, c)
+        self.has_format_ignore && is_honored_format_ignore(self.source, c, self.program_start)
     }
 
     /// Whether the FIRST comment a run in `[start, end)` emits is an honored directive —
@@ -384,10 +384,10 @@ impl<'a> Printer<'a> {
     }
 
     /// The placement floor alone — [`tsv_lang::directive_alone_on_line`] against this
-    /// document's source, for the emitters that ask about placement without the
-    /// recognizer.
+    /// document's source, from [`Printer::program_start`], for the emitters that ask about
+    /// placement without the recognizer.
     pub(in crate::printer) fn directive_alone_on_line(&self, c: &Comment) -> bool {
-        directive_alone_on_line(self.source, c)
+        directive_alone_on_line(self.source, c, self.program_start)
     }
 
     /// [`Self::member_gap_frozen`] for a mapped type's two key-side gaps, anchored per

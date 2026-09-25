@@ -1173,8 +1173,35 @@ pub fn build_program_doc(
 ) -> DocId {
     let comments = tsv_lang::merge_nestled_block_comments(source, program.comments);
     let inputs = PrinterInputs::for_document(source, &comments, line_table);
-    let printer = make_doc_printer(arena, &inputs, embed);
+    let mut printer = make_doc_printer(arena, &inputs, embed);
+    printer.program_start = program.span.start;
     printer.build_program_doc(program)
+}
+
+/// [`build_program_doc`] without the program's trailing newline, or `None` when the program
+/// prints nothing (every statement a dropped `;`, no comment).
+///
+/// For an embedder that places the body between delimiters of its own, inside its own
+/// document's doc rather than rendering it separately: a `<script>` nested in Svelte markup,
+/// whose closing tag takes the line break the program would otherwise end with. The body
+/// renders at whatever indentation the host's doc gives it, so verbatim text — a template
+/// literal's quasis, a non-indentable block comment's interior, a `prettier-ignore` slice —
+/// keeps its columns while every break the printer owns is indented. The contract is
+/// [`build_program_doc`]'s: `source` is the whole host document, `program` was parsed at
+/// host-absolute offsets ([`parse_embedded`]), and `line_table` is the host's.
+pub fn build_program_body_doc(
+    arena: &DocArena,
+    program: &Program<'_>,
+    source: &str,
+    line_table: LineTable<'_>,
+    embed: EmbedContext,
+) -> Option<DocId> {
+    let comments = tsv_lang::merge_nestled_block_comments(source, program.comments);
+    let inputs = PrinterInputs::for_document(source, &comments, line_table);
+    let mut printer = make_doc_printer(arena, &inputs, embed);
+    printer.program_start = program.span.start;
+    let (body, has_output) = printer.build_program_body_doc(program);
+    has_output.then_some(body)
 }
 
 // Assignment-layout predicates for embedders: tsv_svelte's {@const} tag

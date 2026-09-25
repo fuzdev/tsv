@@ -1073,7 +1073,7 @@ pub fn block_comment_end_before(bytes: &[u8], pos: usize, glue: CommentGlue) -> 
 ///
 /// Walks backwards from `pos`, skipping spaces and tabs; `true` when a newline is
 /// reached before any other byte. The start of the source is **not** a newline —
-/// callers that treat a file boundary as a line boundary test `pos == 0` themselves
+/// callers that treat a document boundary as a line boundary test for it themselves
 /// (`crate::directive_alone_on_line` does).
 ///
 /// Mirrors prettier's `hasNewline(text, index, { backwards: true })`.

@@ -226,6 +226,7 @@ impl<'a> Printer<'a> {
         nodes: &[FragmentNode<'_>],
         cause: MultilineCause,
     ) -> DocId {
+        let _fragment = self.enter_fragment();
         let multiline = cause.is_multiline();
         let d = self.d();
         if nodes.is_empty() {
@@ -1660,6 +1661,7 @@ impl<'a> Printer<'a> {
     /// builds through the ordinary path (its parent is the block, not the container), matching the
     /// compiler.
     pub(super) fn build_container_content_doc(&self, nodes: &[FragmentNode<'_>]) -> DocId {
+        let _fragment = self.enter_fragment();
         let d = self.d();
         let mut parts = d.pooled_docbuf();
         let mut format_ignore_next = false;

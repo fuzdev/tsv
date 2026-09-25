@@ -27,3 +27,18 @@
 </div>
 
 <div><style data-attr="value"></style></div>
+
+<!-- blank lines between declarations and between rules are kept -->
+<div>
+	<style>
+		.class1 {
+			color: red;
+
+			margin: 0;
+		}
+
+		.class2 {
+			color: blue;
+		}
+	</style>
+</div>

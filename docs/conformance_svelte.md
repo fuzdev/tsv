@@ -152,8 +152,7 @@ whitespace is ASCII only and to which a comment is nothing, that spelling IS the
 tokenization (`<NBSP><NBSP>` is one identifier, `<NBSP> <NBSP>` two; `<NBSP>/* c */:hover` a
 compound, `/* c */ <NBSP> :hover` a descendant), and a line break carried inside the
 printer's text is one the doc renderer neither indents after nor counts — the anchor lands
-at column 0, and under a nested `<style>`, whose host re-indents every line of the sheet, it
-grows a level per pass. The run's ASCII head against a regenerated line or separator, and
+at column 0. The run's ASCII head against a regenerated line or separator, and
 its edge against a delimiter it may touch (`(`, `,`, `)`, `]`), are the printer's. The rule
 holds at every CLAIMED juncture; an at-rule prelude the parser cannot structure (`@layer`,
 `@page`, a condition prelude whose head holds ASCII after a member) is printed verbatim, raw

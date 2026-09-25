@@ -120,20 +120,6 @@ pub fn format_in(
     printer::format_css_in(stylesheet, source, arena)
 }
 
-/// [`format_in`] over a stylesheet that is a FRAGMENT of a host file rather than a whole
-/// file: the body of a `<style>` nested inside a Svelte element, which the host formats on
-/// its own and indents into place. Its first character is not a file's first byte, so a
-/// leading U+FEFF is content — kept, where [`format_in`] strips it as a byte-order mark,
-/// and never given a BOM of its own (`tsv_lang::printing::encode_leading_zwnbsp` is for a
-/// whole document only).
-pub fn format_fragment_in(
-    stylesheet: &CssStyleSheet<'_>,
-    source: &str,
-    arena: &tsv_lang::doc::arena::DocArena,
-) -> String {
-    printer::format_css_fragment_in(stylesheet, source, arena)
-}
-
 /// [`format_in`] over a document the caller folded ahead of the parse
 /// (`tsv_lang::printing::normalize_carriage_returns`) — the format entry points that fold
 /// (the CLI, the bindings, [`format_str`]). Identical output; the document's line verdict
@@ -158,6 +144,9 @@ pub fn format_folded_in(
 /// embedded CSS renders to an owned `String`), and the arena is **not** reset, so the
 /// host's in-flight doc nodes stay valid across the call.
 ///
+/// `host_scan` is [`HostBoundaryScan::of`] over the same `source`, taken once per host and
+/// handed to every island in it.
+///
 /// There is no fresh-arena twin: an embedded stylesheet always has a host arena to lend,
 /// and the Svelte host is the only caller.
 pub fn format_embedded_in(
@@ -165,9 +154,33 @@ pub fn format_embedded_in(
     source: &str,
     line_table: tsv_lang::printing::LineTable<'_>,
     embed: tsv_lang::EmbedContext,
+    host_scan: HostBoundaryScan,
     arena: &tsv_lang::doc::arena::DocArena,
 ) -> String {
-    printer::format_css_embedded_in(stylesheet, source, line_table, embed, arena)
+    printer::format_css_embedded_in(stylesheet, source, line_table, embed, host_scan, arena)
+}
+
+/// A host document's answer to the CSS printer's boundary-whitespace precondition — whether
+/// the whole source holds a member of the class anywhere (the CSS printer's
+/// §The document precondition, in `printer/boundary_ws.rs`).
+///
+/// One answer per host, not per island: every `<style>` island of a Svelte component is
+/// spanned against the same host source, so the host takes it once ([`Self::of`]) and hands
+/// it to each [`format_embedded_in`] call instead of paying a whole-source scan per island.
+/// Opaque, so the only way to hold one is to have scanned a source.
+#[derive(Clone, Copy, Debug)]
+pub struct HostBoundaryScan {
+    holds_boundary_ws: bool,
+}
+
+impl HostBoundaryScan {
+    /// Scan `source`, the whole host document the islands are spanned against.
+    #[must_use]
+    pub fn of(source: &str) -> Self {
+        Self {
+            holds_boundary_ws: printer::source_holds_boundary_ws(source),
+        }
+    }
 }
 
 /// Convert CSS AST to compact JSON wire bytes — the **sole emission path**
