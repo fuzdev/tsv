@@ -365,9 +365,11 @@ fn compound_default_rejected_in_every_context() {
 
 /// A parenthesized assignment as the WHOLE target — `(a = b) = 1`,
 /// `for ((a = b) of xs)` — would put an `AssignmentPattern` where acorn's grammar has
-/// none (`AssignmentExpression.left`, the for-head's `left`), and its bare reprint
-/// `a = b = 1` re-parses as a different, valid program. Rejected ahead of the
-/// deferral; the unparenthesized `a = b = 1` is right-associative and unaffected.
+/// none (`AssignmentExpression.left`, the for-head's `left`): target conversion turns
+/// the parenthesized `=` into that pattern node, so no assignment survives for a kept
+/// pair to wrap. Rejected ahead of the deferral; the unparenthesized `a = b = 1` is
+/// right-associative and unaffected. A parenthesized conditional, arrow or `yield` is
+/// never converted and survives as itself — `tests/operator_assignment_target.rs`.
 #[test]
 fn whole_target_default_pattern_rejected() {
     for source in [

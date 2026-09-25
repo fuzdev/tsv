@@ -32,6 +32,48 @@ governs every entry here live in [conformance_prettier.md](./conformance_prettie
 - Statement-head cast parens — ◆prettier_bug ◆parser_compat — [statement_cast_paren](../tests/fixtures/typescript/syntax/contextual_keywords/statement_cast_paren_prettier_divergence/), [async_cast_paren](../tests/fixtures/typescript/syntax/contextual_keywords/async_cast_paren_prettier_divergence/)
 - Exponentiation type-assertion operand — ◆prettier_bug — [exponentiation_type_assertion](../tests/fixtures/typescript/expressions/exponentiation_type_assertion_prettier_divergence/)
 - `<` `<` kept apart where tsc never splits a `<<` — ◆prettier_bug — [shift_left_type_assertion](../tests/fixtures/typescript/expressions/binary/shift_left_type_assertion_prettier_divergence/), [shift_left_typeof_query](../tests/fixtures/typescript/expressions/binary/shift_left_typeof_query_prettier_divergence/), [shift_left_heritage](../tests/fixtures/typescript/expressions/binary/shift_left_heritage_prettier_divergence/), [shift_left_no_split_long](../tests/fixtures/typescript/expressions/binary/shift_left_no_split_long_prettier_divergence/)
+- Non-LHS assignment target parens — ◆prettier_bug — [operator_target_paren](../tests/fixtures/typescript/expressions/assignment/operator_target_paren_svelte_prettier_divergence/), [assignment_tier_target_paren](../tests/fixtures/typescript/expressions/assignment/assignment_tier_target_paren_svelte_prettier_divergence/), [function_target_paren](../tests/fixtures/typescript/expressions/assignment/function_target_paren_svelte_prettier_divergence/)
+
+**Non-LHS assignment target parens**: An assignment's left must be a
+`LeftHandSideExpression` (ecma262 §13.15). A parenthesized one always is — a
+`ParenthesizedExpression` is a `PrimaryExpression` — so `(-a) = 1`, `(a ? b : c) = 1` and
+`x = (function () {}) = 1` parse, tsc's parser included, and only the
+`AssignmentTargetType` early error refuses them: the deferred class tsv parses (see
+[conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections)).
+Bare, the same operand is NOT a `LeftHandSideExpression`, so the pair is load-bearing, and
+prettier strips it anyway. What the stripped form becomes depends on the operand's kind, one
+fixture per consequence:
+
+- **An operator expression** — unary, update, `await`, binary, logical — strips to a
+  *grammar* error: `-a = 1`, `a ?? b = 1`, `[-a = 1] = x` parse under no parser, prettier's
+  own second pass included (tsc TS1005) —
+  [operator_target_paren](../tests/fixtures/typescript/expressions/assignment/operator_target_paren_svelte_prettier_divergence/).
+- **An alternative of `AssignmentExpression` itself** — a conditional, an arrow, a `yield` —
+  strips to a *different, valid program*, since each absorbs the `=` that follows it:
+  `a ? b : c = 1` is `a ? b : (c = 1)`, `() => b = 1` is `() => (b = 1)`, `yield a = 1` is
+  `yield (a = 1)` — prettier's second pass prints exactly those (the fixture's
+  `audit_signature.txt`) —
+  [assignment_tier_target_paren](../tests/fixtures/typescript/expressions/assignment/assignment_tier_target_paren_svelte_prettier_divergence/).
+- **A function expression** off statement start strips to a form tsc's parser does not read
+  past the body of: `x = function () {} = 1` is TS2809, where acorn's grammar reads the same
+  program (and its early error then refuses it, `Assigning to rvalue`) —
+  [function_target_paren](../tests/fixtures/typescript/expressions/assignment/function_target_paren_svelte_prettier_divergence/).
+  tsc does read the bare compound `x = function () {} += 1`, and prettier prints it; tsv
+  keeps the author's pair there too (`x = (function () {}) += 1`) and REPAIRS both bare
+  spellings, `x = function () {} = 1` and `x = function () {} += 1`, to that kept pair
+  (the fixture's `unformatted_ours_bare_compound`), because the rule is one
+  rule keyed on the target's KIND under every assignment operator, the way the
+  type-assertion pair already is (`(a as T) += 1`). A class expression needs no pair —
+  tsc reads `x = class {} = 1` as the same program — and at statement start both formatters
+  keep a function's pair for the statement's own sake.
+
+tsv keeps the pair for exactly those kinds (`ParenContext::AssignmentTarget` in
+`needs_parens`), at every seam that prints a target: the whole left, a destructuring
+default's target (`[(-a) = 1] = x`), and inside the pair an assignment takes of its own in
+a call argument, a template hole or an arrow's concise body (`f(((-a) = 1))`). The bare
+spellings of the operator kinds are rejected by both parsers and pinned as the
+`input_invalid_*` files of
+[operator_target](../tests/fixtures/typescript/expressions/assignment/operator_target/).
 
 **Instantiation expression parens**: Prettier strips parentheses from ternary and binary expressions in `TSInstantiationExpression` (`(x ? y : z)<T>` → `x ? y : z<T>`), changing semantics. Without parens, `<T>` only applies to the last operand. tsv preserves parens to maintain the original meaning. Both formatters agree on preserving parens for assignment expressions (`(x = y)<T>`). A class-expression operand in `export default` position — `export default (class {}<T>)` — is the same bug but sharper: stripping the parens makes the leading `class {}` a class _declaration_, so Prettier's output re-parses to a `ClassDeclaration` plus a dangling `<T>;` statement (a different AST), while tsv keeps the parens (adjudicated by `export_default_needs_parens`; see [export_default_instantiation](../tests/fixtures/typescript/modules/exports/default_wrappable_leftmost_operators/instantiation_prettier_divergence/)). The pair AROUND an instantiation is the mirror case: Prettier strips it whatever token follows, but a type argument list is only read as one where the next token cannot continue a comparison chain (tsc's `canFollowTypeArgumentsInExpression`) — `fn<T> + 1` re-parses as `fn < T > +1` (a different program, which Prettier's own second pass then prints), and `fn<T> < 1` / `> 1` / `>= 1` / `>> 1` / `>>> 1`, `fn<T>!` and `fn<T>++` do not parse at all under tsc. tsv keeps the pair ahead of exactly those followers — `+`, `-`, `<`, `>`, `>=`, `>>`, `>>>`, `<<` (which tsc reads as an instantiation but acorn-typescript, tsv's parse oracle, rejects), a non-null `!` (`(fn<T>)!.prop` included, where the chain would otherwise drop the type arguments) and a postfix `++` / `--` — and strips it ahead of every other operator, the set [instantiation_operator_follow](../tests/fixtures/typescript/typescript_specific/generics/instantiation_operator_follow/) pins from the bare side — alongside the `input_invalid_*` files there, which carry the followers neither parser admits. The axis is the join of two tokens, not the operand's node: an operand that merely ENDS on the close — a binary's right operand (`a * fn<T> + 1`, `1 + fn<T> + 2`), a prefix operator's argument (`-fn<T> + 1`), an angle-bracket assertion's operand (`<T>fn<U> + 1`) — re-lexes the same way, so the pair wraps that whole operand (`(a * fn<T>) + 1`, `(<T>fn<U>) + 1`), and a pair authored around the instantiation alone moves out to it. The walk stops at a child that takes its own pair by precedence in that position, which ends the operand on a `)` instead: `<T>(<U>fn<V>) + 1` keeps only the inner pair, and both formatters agree. `as` / `satisfies` end on a TYPE rather than on an expression, so they are never in the class (`ends_with_instantiation_close`; see [instantiation_paren_follow](../tests/fixtures/typescript/typescript_specific/generics/instantiation_paren_follow_prettier_divergence/)). The bare side of two of those followers is tsv's own: `fn<T> < 1` and `fn<T> >= 1` ARE instantiation expressions to acorn-typescript — tsv's parse oracle, and the parser Svelte itself uses — where tsc's grammar rejects them (TS1005 `'>' expected.`, TS1109 `Expression expected.`), so tsv accepts them and the formatter REPAIRS them to `(fn<T>) < 1` and `(fn<T>) >= 1`, the same tree in the spelling every parser reads alike. Accepting therefore costs nothing downstream, while rejecting would refuse a `<script lang="ts">` Svelte compiles today; `fn<T> << 1` is the mirror — tsc's instantiation, acorn's reject — and repairs the same way. Where a bare spelling is fixturable is the TEMPLATE, not the `<script>` body — prettier runs two parsers over one component, and they see disjoint halves of it: `prettier-plugin-svelte` snips every `<script>` / `<style>` body out before Svelte's parser runs (`snipScriptAndStyleTagContent` substitutes `{}` / `''`), so Svelte parses the markup alone — a template expression is acorn-typescript's and both bare spellings survive — while the snipped body goes to prettier's own TypeScript parser, which is tsc's and throws there (`'>' expected.`). So the fixture's template cells carry the first two repairs, and its `unformatted_ours_bare_follow` variant bares `{fn<T> < 1}` and `{fn<T> >= 1}` for tsv to put the pair back. `fn<T> << 1` is blocked by the canonical parser instead, on both arms a variant is graded by: Svelte rejects the bare cell, so in the template prettier throws on the whole component (`https://svelte.dev/e/js_parse_error`) where N6 needs it to LAND on some form other than input, and `svelte compile` — the render-equivalence oracle a `.svelte` variant is graded against — has nothing to render. A `<script lang="ts">` spelling escapes only the first (prettier reads that body with tsc's parser, which takes `fn<T> << 1`) and still fails the second. So that one repair is pinned in [tests/instantiation_follow_parens.rs](../tests/instantiation_follow_parens.rs), beside the `+` / `-` contrast that bounds the class from the other side.
 

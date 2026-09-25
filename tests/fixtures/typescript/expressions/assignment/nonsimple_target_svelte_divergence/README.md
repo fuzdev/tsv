@@ -2,11 +2,12 @@
 
 This fixture pins that a *non-simple* assignment target parses: a call (`foo() = bar`),
 a compound assignment to one (`foo() += 1`), a literal (`1 >>= 2`), `this`
-(`this = x`), and an instantiation expression (`f<T> += c`, `a.b<T> -= c`,
-`f<(a: T) => U> += c`). A `+=` / `-=` after the type arguments is its own token, not the
-`+` / `-` ahead of which tsc and acorn read `<…>` as a comparison chain, so both parsers
-read the instantiation as the target. The `unformatted_paren_instantiation` variant
-parenthesizes that target, `(f<T>) += c`, and both formatters strip the parens.
+(`this = x`), a `new` expression (`new a() = 1`), and an instantiation expression
+(`f<T> += c`, `a.b<T> -= c`, `f<(a: T) => U> += c`). A `+=` / `-=` after the type
+arguments is its own token, not the `+` / `-` ahead of which tsc and acorn read `<…>` as
+a comparison chain, so both parsers read the instantiation as the target. The
+`unformatted_paren_instantiation` variant parenthesizes that target, `(f<T>) += c`, and
+both formatters strip the parens.
 
 ## Why tsv Differs
 
@@ -41,12 +42,24 @@ operator cannot cover a default (`[a += b] = xs`, in a pattern, a parameter, a f
 or a parenthesized target alike): the pattern node has no slot for the operator, so
 converting would silently delete it — the faithful-reprint floor, not an early error.
 And a parenthesized assignment as the *whole* target (`(a = b) = 1`,
-`for ((a = b) of xs)`) would put an `AssignmentPattern` where acorn's grammar has none,
-and its bare reprint `a = b = 1` re-parses as a different, valid program — the
-representability floor. Both reject, as acorn does (`Only '=' operator can be used for
-specifying default value` / `Assigning to rvalue`); tsc's parser accepts both and its
-checker rejects them (TS2364). The unparenthesized `a = b = 1` is right-associative and
+`for ((a = b) of xs)`) is CONVERTED: target conversion turns the parenthesized `=` into an
+`AssignmentPattern`, a node acorn's grammar has at neither position (it exists only as a
+pattern child) — the representability floor. Keeping the pair would not help, since the
+tree no longer holds an assignment to wrap. A parenthesized conditional, arrow or `yield`
+target is never converted and survives as itself, so it defers and keeps its pair —
+[assignment_tier_target_paren](../assignment_tier_target_paren_svelte_prettier_divergence/).
+Both reject, as acorn does (`Only '=' operator can be used for specifying default value`
+/ `Assigning to rvalue`); tsc's parser accepts both and its checker rejects them
+(TS2364). The unparenthesized `a = b = 1` is right-associative and
 untouched.
+
+**Contrast — an operator expression is no target at all.** A bare unary, update,
+`await`, binary or logical left (`-a = 1`, `a++ = 1`, `a + b = 1`, and as a destructuring
+default's target, `[-a = 1] = x`) is not a `LeftHandSideExpression`, so no production
+derives it: a *grammar* error, which tsv rejects with tsc's parser, acorn and prettier —
+[operator_target](../operator_target/). Parenthesized, it is this fixture's class again
+and keeps its pair —
+[operator_target_paren](../operator_target_paren_svelte_prettier_divergence/).
 
 **Contrast — the deferral does not reach a `for`-in/of head.** A no-declaration head is a
 `LeftHandSideExpression` position that is *not* an assignment context, so a non-simple

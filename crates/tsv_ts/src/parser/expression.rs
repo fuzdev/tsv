@@ -741,6 +741,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             && min_bp <= BP_ASSIGNMENT
             && let Some(operator) = self.try_assignment_operator()
         {
+            // A bare operator expression is no `LeftHandSideExpression` — a grammar
+            // error, read before the operator is consumed while `prev_token_end` still
+            // closes the left side.
+            self.check_bare_assignment_left(left, expr_start)?;
             self.advance()?; // consume assignment operator
 
             // Parse right-hand side (assignment is right-associative, so same precedence)
