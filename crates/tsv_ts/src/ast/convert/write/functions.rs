@@ -6,8 +6,9 @@ use super::expressions::{
 };
 use super::statements::write_block_statement;
 use super::{
-    Ctx, JsonWriter, close_node, node_header, write_identifier_with_optional, write_or_null,
-    write_return_type_field, write_type_arguments_field, write_type_parameters_field,
+    Ctx, JsonWriter, close_node, node_header, write_function_flags_fields,
+    write_identifier_with_optional, write_or_null, write_return_type_field,
+    write_type_arguments_field, write_type_parameters_field,
 };
 use tsv_lang::Span;
 
@@ -42,17 +43,20 @@ pub(super) fn write_arrow_function_expression(
         w.raw(",\"params\":");
         write_expressions(w, arrow.params, ctx);
         write_return_type_field(w, arrow.return_type.as_ref(), ctx);
-        w.raw(",\"id\":null,\"expression\":");
-        w.bool(arrow.body.is_expression());
-        w.raw(",\"generator\":false,\"async\":true,\"body\":");
+        w.raw_pick(
+            arrow.body.is_expression(),
+            b",\"id\":null,\"expression\":true,\"generator\":false,\"async\":true,\"body\":",
+            b",\"id\":null,\"expression\":false,\"generator\":false,\"async\":true,\"body\":",
+        );
         write_arrow_body(w, &arrow.body, ctx);
     } else {
         write_return_type_field(w, arrow.return_type.as_ref(), ctx);
-        w.raw(",\"id\":null,\"expression\":");
-        w.bool(arrow.body.is_expression());
-        w.raw(",\"generator\":false,\"async\":");
-        w.bool(arrow.r#async);
-        w.raw(",\"params\":");
+        w.raw_pick(
+            arrow.body.is_expression(),
+            b",\"id\":null,\"expression\":true,\"generator\":false,\"async\":",
+            b",\"id\":null,\"expression\":false,\"generator\":false,\"async\":",
+        );
+        w.raw_pick(arrow.r#async, b"true,\"params\":", b"false,\"params\":");
         write_expressions(w, arrow.params, ctx);
         w.raw(",\"body\":");
         write_arrow_body(w, &arrow.body, ctx);
@@ -84,10 +88,7 @@ pub(super) fn write_function_expression(
     write_or_null(w, func.id.as_ref(), |w, id| {
         write_identifier_with_optional(w, id, ctx);
     });
-    w.raw(",\"expression\":false,\"generator\":");
-    w.bool(func.generator);
-    w.raw(",\"async\":");
-    w.bool(func.r#async);
+    write_function_flags_fields(w, func.generator, func.r#async);
     if !type_params_last {
         write_type_parameters_field(w, func.type_parameters.as_ref(), ctx);
     }
@@ -173,8 +174,7 @@ pub(super) fn write_call_expression(
                 && span.start >= call.callee.span().start
                 && call.callee.has_optional_in_chain())
         {
-            w.raw(",\"optional\":");
-            w.bool(call.optional);
+            w.raw_pick(call.optional, b",\"optional\":true", b",\"optional\":false");
         }
     }
     close_node(w, "CallExpression", span, ctx);
@@ -206,13 +206,28 @@ pub(super) fn write_member_expression(
     );
     w.raw(",\"property\":");
     write_expression(w, member.property, ctx);
-    w.raw(",\"computed\":");
-    w.bool(member.computed);
+    // One literal per value, `optional` folded in where it is written: both
+    // flags are nearly always `false`, so each branch predicts at its site.
     if strip_optional {
-        // Omitted along an unparenthesized decorator's call/member spine.
+        // `optional` is omitted along an unparenthesized decorator's
+        // call/member spine.
+        w.raw_pick(
+            member.computed,
+            b",\"computed\":true",
+            b",\"computed\":false",
+        );
+    } else if force_optional || member.optional {
+        w.raw_pick(
+            member.computed,
+            b",\"computed\":true,\"optional\":true",
+            b",\"computed\":false,\"optional\":true",
+        );
     } else {
-        w.raw(",\"optional\":");
-        w.bool(force_optional || member.optional);
+        w.raw_pick(
+            member.computed,
+            b",\"computed\":true,\"optional\":false",
+            b",\"computed\":false,\"optional\":false",
+        );
     }
     close_node(w, "MemberExpression", span, ctx);
 }

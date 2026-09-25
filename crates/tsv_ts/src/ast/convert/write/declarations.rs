@@ -9,9 +9,9 @@ use super::types::{
     write_entity_name, write_index_signature, write_type, write_type_parameter_instantiation,
 };
 use super::{
-    Ctx, JsonWriter, close_node, node_header, write_array, write_identifier_plain,
-    write_identifier_with_optional, write_name, write_or_null, write_return_type_field,
-    write_type_annotation_field, write_type_parameters_field,
+    Ctx, JsonWriter, close_node, node_header, write_array, write_function_flags_fields,
+    write_identifier_plain, write_identifier_with_optional, write_name, write_or_null,
+    write_return_type_field, write_type_annotation_field, write_type_parameters_field,
 };
 use tsv_lang::Span;
 use tsv_lang::source_scan::{self, TriviaProfile};
@@ -89,10 +89,7 @@ pub(super) fn write_function_declaration(
     write_or_null(w, func_decl.id.as_ref(), |w, id| {
         write_identifier_plain(w, id, ctx);
     });
-    w.raw(",\"expression\":false,\"generator\":");
-    w.bool(func_decl.generator);
-    w.raw(",\"async\":");
-    w.bool(func_decl.r#async);
+    write_function_flags_fields(w, func_decl.generator, func_decl.r#async);
     write_type_parameters_field(w, func_decl.type_parameters.as_ref(), ctx);
     w.raw(",\"params\":");
     write_expressions(w, func_decl.params, ctx);
@@ -442,10 +439,7 @@ fn write_method_definition(
     write_or_null(w, func.id.as_ref(), |w, id| {
         write_identifier_with_optional(w, id, ctx);
     });
-    w.raw(",\"expression\":false,\"generator\":");
-    w.bool(func.generator);
-    w.raw(",\"async\":");
-    w.bool(func.r#async);
+    write_function_flags_fields(w, func.generator, func.r#async);
     w.raw(",\"params\":");
     write_expressions(w, func.params, ctx);
     write_return_type_field(w, func.return_type.as_ref(), ctx);

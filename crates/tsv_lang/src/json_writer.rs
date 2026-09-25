@@ -878,6 +878,41 @@ impl JsonWriter {
         self.buf.extend_from_slice(s.as_bytes());
     }
 
+    /// [`JsonWriter::raw`] for a fragment whose length is part of its type.
+    ///
+    /// For a branch whose arms each append a different literal: arms calling
+    /// `raw` are identical calls with different arguments, so in a large
+    /// function LLVM may sink them into one call with a runtime-chosen pointer
+    /// and length — a `memcpy` behind an outlined `raw`. Here each length is
+    /// its own instantiation, so the body is a capacity check plus stores of a
+    /// width known at compile time, never a runtime-length copy. `#[inline]`
+    /// is only a hint: a copy LLVM leaves outlined keeps that body behind the
+    /// call. The bytes must be valid JSON structure, as for `raw`.
+    #[inline]
+    pub fn raw_fixed<const N: usize>(&mut self, s: &[u8; N]) {
+        self.buf.extend_from_slice(s);
+    }
+
+    /// Append `if_true` or `if_false` by `b`, each as a fixed-width
+    /// [`JsonWriter::raw_fixed`] — the shape for a boolean field whose key (and
+    /// the constant key after it) folds into one literal per value, so the
+    /// field is one append rather than a key, a value and a key. The body is a
+    /// branch into two fixed-width appends, inlined or not (`#[inline]` is a
+    /// hint; a cold site may keep an outlined copy).
+    #[inline]
+    pub fn raw_pick<const T: usize, const F: usize>(
+        &mut self,
+        b: bool,
+        if_true: &[u8; T],
+        if_false: &[u8; F],
+    ) {
+        if b {
+            self.raw_fixed(if_true);
+        } else {
+            self.raw_fixed(if_false);
+        }
+    }
+
     /// A quoted static token (node type, operator, kind, keyword). These are
     /// compile-time ASCII strings that never contain `"`, `\`, or control
     /// characters, so they skip the escape scan.
@@ -1200,9 +1235,12 @@ impl JsonWriter {
         self.u64(n as u64);
     }
 
+    /// `true` or `false`, each arm its own fixed-width append (see
+    /// [`JsonWriter::raw_fixed`]) rather than one copy of a runtime-chosen
+    /// literal.
     #[inline]
     pub fn bool(&mut self, b: bool) {
-        self.raw(if b { "true" } else { "false" });
+        self.raw_pick(b, b"true", b"false");
     }
 
     #[inline]
@@ -1861,6 +1899,36 @@ mod tests {
             expected.push_str(&n.to_string());
         }
         assert_eq!(String::from_utf8(w.into_bytes()).expect("ASCII"), expected);
+    }
+
+    #[test]
+    fn raw_fixed_and_raw_pick_match_raw() {
+        // At an empty buffer, and at one filled exactly to capacity so the
+        // fixed-width append has to grow it.
+        for prefill in [0, 16] {
+            let fresh = |prefix: &str| {
+                let mut w = JsonWriter::with_capacity(prefill);
+                w.raw(prefix);
+                assert_eq!(w.buf.len(), w.buf.capacity(), "prefilled to capacity");
+                w
+            };
+            let prefix = &"x".repeat(prefill);
+            let mut fixed = fresh(prefix);
+            let mut plain = fresh(prefix);
+            fixed.raw_fixed(b",\"computed\":false");
+            plain.raw(",\"computed\":false");
+            assert_eq!(fixed.as_bytes(), plain.as_bytes());
+            for b in [true, false] {
+                let mut picked = fresh(prefix);
+                let mut plain = fresh(prefix);
+                picked.raw_pick(b, b",\"a\":true", b",\"a\":false");
+                plain.raw(if b { ",\"a\":true" } else { ",\"a\":false" });
+                assert_eq!(picked.as_bytes(), plain.as_bytes());
+                let mut boolean = fresh(prefix);
+                boolean.bool(b);
+                assert_eq!(boolean.as_bytes(), format!("{prefix}{b}").as_bytes());
+            }
+        }
     }
 
     #[test]

@@ -369,7 +369,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 let unary = UnaryExpression {
                     operator: UnaryOperator::Minus,
-                    prefix: true,
                     argument: self.alloc(Expression::from_literal(argument)),
                     span: Span::new(start as u32, num_end as u32),
                 };

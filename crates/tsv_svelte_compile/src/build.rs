@@ -591,7 +591,6 @@ impl<'arena> Builder<'arena> {
         Expression::from_unary_expression(UnaryExpression {
             operator: UnaryOperator::Void,
             argument: zero,
-            prefix: true,
             span,
         })
     }

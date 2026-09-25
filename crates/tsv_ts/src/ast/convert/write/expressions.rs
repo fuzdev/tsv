@@ -168,9 +168,9 @@ pub(super) fn write_expression_inner(
             node_header(w, "UnaryExpression", unary.span, ctx);
             w.raw(",\"operator\":\"");
             w.raw(unary.operator.as_str());
-            w.raw("\",\"prefix\":");
-            w.bool(unary.prefix);
-            w.raw(",\"argument\":");
+            // Constant: acorn's `UnaryExpression` is always prefix (postfix
+            // `++`/`--` is an `UpdateExpression`).
+            w.raw_fixed(b"\",\"prefix\":true,\"argument\":");
             write_expression(w, unary.argument, ctx);
             close_node(w, "UnaryExpression", unary.span, ctx);
         }
@@ -178,9 +178,11 @@ pub(super) fn write_expression_inner(
             node_header(w, "UpdateExpression", expr.span, ctx);
             w.raw(",\"operator\":\"");
             w.raw(update.operator.as_str());
-            w.raw("\",\"prefix\":");
-            w.bool(update.prefix);
-            w.raw(",\"argument\":");
+            w.raw_pick(
+                update.prefix,
+                b"\",\"prefix\":true,\"argument\":",
+                b"\",\"prefix\":false,\"argument\":",
+            );
             write_expression(w, update.argument, ctx);
             close_node(w, "UpdateExpression", expr.span, ctx);
         }
