@@ -21,9 +21,14 @@ use tsv_lang::{ParseError, Span};
 pub(crate) struct CssParser<'a, 'arena> {
     source: &'a str,
     lexer: Lexer<'a>,
-    pub(crate) current_kind: TokenKind,
-    pub(crate) current_start: usize,
-    pub(crate) current_end: usize,
+    /// The current token. A fresh lex in [`advance`](Self::advance) has the lexer write it
+    /// in place (`Lexer::next_token_into`); every other writer assigns a whole token — the
+    /// bootstrap, `advance`'s consume of a cached lookahead, the boundary re-read
+    /// (`Lexer::token_at`) and [`seat_at_terminator`](Self::seat_at_terminator). Read
+    /// through [`current_kind`](Self::current_kind), [`current_start`](Self::current_start)
+    /// and [`current_end`](Self::current_end), the last two widening its `u32` offsets to the
+    /// `usize` every `source` index takes.
+    current: Token,
     /// Decoded value for the current token (only set for escaped identifiers),
     /// copied into the AST arena at receipt so it is a `Copy` `&'arena str` rather
     /// than an owned `String` — the lexer decodes into a reused scratch buffer and
@@ -73,9 +78,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         Ok(Self {
             source,
             lexer,
-            current_kind: token.kind,
-            current_start: token.start as usize,
-            current_end: token.end as usize,
+            current: token,
             current_decoded: decoded,
             peek: None,
             base_offset,
@@ -165,23 +168,23 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// from `content_span`. Does not advance — callers decide whether to register it
     /// (`register_current_comment`) or consume and return it (`parse_block_comment`).
     fn build_current_comment(&self) -> Comment {
-        debug_assert!(matches!(self.current_kind, TokenKind::Comment));
+        debug_assert!(matches!(self.current_kind(), TokenKind::Comment));
         // Content excludes the `/* */` delimiters; recovered on demand as a
         // source slice rather than copied.
         let multiline = Comment::content_is_multiline(
             true,
-            &self.source[self.current_start + 2..self.current_end - 2],
+            &self.source[self.current_start() + 2..self.current_end() - 2],
         );
         let comment = Comment {
             content_span: Span {
-                start: self.span_pos(self.current_start + 2),
-                end: self.span_pos(self.current_end - 2),
+                start: self.span_pos(self.current_start() + 2),
+                end: self.span_pos(self.current_end() - 2),
             },
             is_block: true,
             multiline,
             span: Span {
-                start: self.span_pos(self.current_start),
-                end: self.span_pos(self.current_end),
+                start: self.span_pos(self.current_start()),
+                end: self.span_pos(self.current_end()),
             },
             emit_character_field: false,
             bump_pattern_columns: false,
@@ -207,13 +210,12 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         // peeked-then-consumed escaped identifier would silently lose its decode and
         // fall back to the verbatim slice. Near-free: `decoded_str` is `None` for the
         // common no-escape token, so `decoded_to_arena` allocates nothing.
-        let token = match self.peek.take() {
-            Some(token) => token,
-            None => self.lexer.next_token()?,
-        };
-        self.current_kind = token.kind;
-        self.current_start = token.start as usize;
-        self.current_end = token.end as usize;
+        match self.peek.take() {
+            Some(token) => self.current = token,
+            // Lexed straight into the current slot (`&mut self.current` is disjoint from
+            // `&mut self.lexer`), so no intermediate token is returned and re-scattered.
+            None => self.lexer.next_token_into(&mut self.current)?,
+        }
         self.current_decoded = self.decoded_to_arena();
         Ok(())
     }
@@ -254,9 +256,11 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         self.peek = None;
         // `seek` also drops the lexer's parked decode — a `;` / `}` / EOF never carries one.
         self.lexer.seek(end);
-        self.current_kind = kind;
-        self.current_start = terminator;
-        self.current_end = end;
+        self.current = Token {
+            kind,
+            start: terminator as u32,
+            end: end as u32,
+        };
         self.current_decoded = None;
     }
 
@@ -270,17 +274,19 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// measurement without the step (the step is `parse_combinator`'s, which turns the same
     /// run into the descendant combinator that replaces the break).
     pub(in crate::parser) fn boundary_run_len(&self) -> usize {
-        if self.current_kind != TokenKind::Identifier {
+        if self.current_kind() != TokenKind::Identifier {
             return 0;
         }
         // Every member of the class is non-ASCII, so an ASCII head byte settles this before
         // the `str` range index below (two char-boundary checks) and before any decode. Asked
         // of every IDENTIFIER token at every juncture — the densest token in a stylesheet —
         // where the answer is `0` in every document that holds no member at all.
-        if self.source.as_bytes()[self.current_start].is_ascii() {
+        if self.source.as_bytes()[self.current_start()].is_ascii() {
             return 0;
         }
-        crate::whitespace::boundary_prefix_len(&self.source[self.current_start..self.current_end])
+        crate::whitespace::boundary_prefix_len(
+            &self.source[self.current_start()..self.current_end()],
+        )
     }
 
     /// Step over `parseCss`'s `allow_whitespace()` — whose class is JS `\s`
@@ -348,8 +354,8 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             if run == 0 {
                 return Ok(());
             }
-            let at = self.current_start + run;
-            if at != self.current_end {
+            let at = self.current_start() + run;
+            if at != self.current_end() {
                 // Any lookahead was lexed from past this token and is void once the cursor
                 // moves (`resume_at` drops it on the other arm).
                 self.peek = None;
@@ -357,10 +363,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
                 // `token_at` runs the WHOLE dispatch, not `read_identifier` — the run glues to
                 // a digit as readily as to a letter, so `{<NBSP>0%` must come back a
                 // `<percentage-token>` and not an identifier.
-                let token = self.lexer.token_at(at)?;
-                self.current_kind = token.kind;
-                self.current_start = token.start as usize;
-                self.current_end = token.end as usize;
+                self.current = self.lexer.token_at(at)?;
                 self.current_decoded = self.decoded_to_arena();
                 return Ok(());
             }
@@ -400,7 +403,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         loop {
             saw_whitespace |= self.check(TokenKind::Whitespace) || self.boundary_run_len() > 0;
             self.skip_boundary_whitespace()?;
-            if !matches!(&self.current_kind, TokenKind::Comment) {
+            if !matches!(self.current_kind(), TokenKind::Comment) {
                 return Ok(saw_whitespace);
             }
             self.register_current_comment();
@@ -416,10 +419,18 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         if let Some(token) = &self.peek {
             return Ok(token.kind);
         }
-        let token = self.lexer.next_token()?;
-        let kind = token.kind;
-        self.peek = Some(token);
-        Ok(kind)
+        // Lexed straight into the lookahead slot, as `advance` lexes into the current one.
+        // A failed lex leaves the slot empty, as it found it.
+        let slot = self.peek.insert(Token {
+            kind: TokenKind::Eof,
+            start: 0,
+            end: 0,
+        });
+        if let Err(err) = self.lexer.next_token_into(slot) {
+            self.peek = None;
+            return Err(err);
+        }
+        Ok(slot.kind)
     }
 
     /// Peek past a run of `/* */` comments — and **only** comments — to the next
@@ -494,8 +505,8 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// the seam both `peek_past_*` lookaheads spell, so parser state (the `peek` slot
     /// included) is untouched.
     fn lookahead_lexer(&self) -> (&'a str, Lexer<'a>) {
-        let remaining = &self.source()[self.current_end..];
-        let lexer = Lexer::at_offset(remaining, self.base_offset + self.current_end);
+        let remaining = &self.source()[self.current_end()..];
+        let lexer = Lexer::at_offset(remaining, self.base_offset + self.current_end());
         (remaining, lexer)
     }
 
@@ -507,7 +518,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// [`Self::skip_boundary_whitespace_and_comments`]'s drop) is what lets the printer
     /// re-emit the comment at its authored position.
     pub(crate) fn register_and_skip_comments(&mut self) -> Result<(), ParseError> {
-        while matches!(&self.current_kind, TokenKind::Comment) {
+        while matches!(self.current_kind(), TokenKind::Comment) {
             self.register_current_comment();
             self.advance()?;
         }
@@ -515,14 +526,14 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     }
 
     pub(crate) fn check(&self, kind: TokenKind) -> bool {
-        self.current_kind == kind
+        self.current_kind() == kind
     }
 
     /// True at the end of an at-rule prelude: a block `{`, a statement `;`, or EOF.
     /// The shared stop condition for the prelude-consuming loops.
     pub(crate) fn at_prelude_end(&self) -> bool {
         matches!(
-            self.current_kind,
+            self.current_kind(),
             TokenKind::LeftBrace | TokenKind::Semicolon | TokenKind::Eof
         )
     }
@@ -540,7 +551,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         if !self.check(kind) {
             return Err(self.error_expected_found(&kind.to_string()));
         }
-        let end = self.span_pos(self.current_end);
+        let end = self.span_pos(self.current_end());
         self.advance()?;
         Ok(end)
     }
@@ -577,7 +588,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         let mut saw_comment = false;
         loop {
             self.skip_boundary_whitespace()?;
-            if !matches!(&self.current_kind, TokenKind::Comment) {
+            if !matches!(self.current_kind(), TokenKind::Comment) {
                 return Ok(saw_comment);
             }
             saw_comment = true;
@@ -611,7 +622,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             if self.check(TokenKind::Whitespace) {
                 saw_whitespace = true;
                 self.advance()?;
-            } else if matches!(&self.current_kind, TokenKind::Comment) {
+            } else if matches!(self.current_kind(), TokenKind::Comment) {
                 self.register_current_comment();
                 self.advance()?;
             } else {
@@ -659,9 +670,9 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// registered so far stands; any lookahead was lexed from before the jump and is dropped.
     pub(in crate::parser) fn resume_at(&mut self, pos: usize) -> Result<(), ParseError> {
         debug_assert!(
-            pos >= self.current_start,
+            pos >= self.current_start(),
             "resume_at moves forward only ({pos} < {})",
-            self.current_start
+            self.current_start()
         );
         self.peek = None;
         // `seek` also drops the lexer's parked decode, which belonged to the token left behind.
@@ -676,7 +687,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// The whole-token case is a plain [`advance`](Self::advance), which keeps a cached
     /// lookahead; a split re-seats through [`resume_at`](Self::resume_at), which drops it.
     pub(in crate::parser) fn advance_from(&mut self, end: usize) -> Result<(), ParseError> {
-        if end == self.current_end {
+        if end == self.current_end() {
             self.advance()
         } else {
             self.resume_at(end)
@@ -709,13 +720,13 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     pub(crate) fn skip_html_comment_markers(&mut self) -> Result<(), ParseError> {
         self.skip_boundary_whitespace()?;
         while self.check(TokenKind::LessThan)
-            && self.source[self.current_start..].starts_with("<!--")
+            && self.source[self.current_start()..].starts_with("<!--")
         {
             // Scan raw for the required `-->` terminator — trivia-unaware, exactly like
             // Svelte's `read_until(/-->/)`: a `-->` inside a string/comment between the
             // markers still ends the span. ASCII, so a plain byte scan is boundary-safe.
             let bytes = self.source.as_bytes();
-            let mut i = self.current_start + 4; // past `<!--`
+            let mut i = self.current_start() + 4; // past `<!--`
             let after = loop {
                 if bytes[i..].starts_with(b"-->") {
                     break i + 3;
@@ -734,7 +745,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// Get the current token's value from source (for most tokens)
     #[inline]
     pub(crate) fn current_value(&self) -> &str {
-        &self.source[self.current_start..self.current_end]
+        &self.source[self.current_start()..self.current_end()]
     }
 
     /// Get the current identifier's resolved text.
@@ -761,8 +772,22 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             .unwrap_or_else(|| self.arena.alloc_str(self.current_value()))
     }
 
-    pub(crate) fn current_start(&self) -> usize {
-        self.current_start
+    /// The current token's kind.
+    #[inline]
+    pub(in crate::parser) fn current_kind(&self) -> TokenKind {
+        self.current.kind
+    }
+
+    /// The current token's start, a `source`-relative byte offset.
+    #[inline]
+    pub(in crate::parser) fn current_start(&self) -> usize {
+        self.current.start as usize
+    }
+
+    /// The current token's end, a `source`-relative byte offset.
+    #[inline]
+    pub(in crate::parser) fn current_end(&self) -> usize {
+        self.current.end as usize
     }
 
     pub(crate) fn base_offset(&self) -> usize {
@@ -776,7 +801,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// Get current position (base_offset + current_start)
     #[inline]
     pub(crate) fn current_pos(&self) -> usize {
-        self.base_offset + self.current_start
+        self.base_offset + self.current_start()
     }
 
     /// Convert a raw `source`-relative offset into an absolute `Span` coordinate:
@@ -830,7 +855,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
 
     /// Create an error: "Expected X, found Y"
     pub(crate) fn error_expected_found(&self, what: &str) -> ParseError {
-        let kind = &self.current_kind;
+        let kind = self.current_kind();
         ParseError::invalid_syntax(format!("Expected {what}, found {kind}"), self.current_pos())
     }
 
@@ -857,7 +882,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
 
         while !self.check(TokenKind::Eof) {
             // Handle comments at top level - add to comments Vec
-            if matches!(&self.current_kind, TokenKind::Comment) {
+            if matches!(self.current_kind(), TokenKind::Comment) {
                 self.register_current_comment();
                 self.advance()?;
                 self.skip_html_comment_markers()?;

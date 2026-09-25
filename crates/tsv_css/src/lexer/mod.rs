@@ -8,9 +8,9 @@
 //
 // We keep the separate lexer (rather than Svelte's inline single-pass parsing): it's the
 // more readable/debuggable factoring and carries no per-token UTF-8-decode tax the inline
-// approach would save — `next_token` dispatches byte-first (see `cur_byte`), decoding a
-// `char` only at the non-ASCII branches, and the per-identifier decode allocation is lazy
-// (see `read_identifier`).
+// approach would save — the token dispatch (`next_token_into_local`) runs byte-first (see
+// `cur_byte`), decoding a `char` only at the non-ASCII branches, and the per-identifier decode
+// allocation is lazy (see `read_identifier`).
 //
 // One caller deliberately does NOT pull tokens: a declaration's value. Its text is re-parsed
 // from source by `parser::value` regardless, so tokenizing it merely to find its `;`/`}`
@@ -56,8 +56,8 @@ use tsv_lang::{ParseError, lex_err};
 
 pub struct Lexer<'a> {
     source: &'a str,
-    /// `source.as_bytes()`, cached so the hot `next_token` dispatch peeks a byte
-    /// without re-slicing + UTF-8-decoding a char per call. Char decoding is done
+    /// `source.as_bytes()`, cached so the hot `next_token_into_local` dispatch peeks a
+    /// byte without re-slicing + UTF-8-decoding a char per call. Char decoding is done
     /// only at the non-ASCII branches (the dispatch tail, non-ASCII whitespace, the
     /// `$`-ident peek, the url-token scan), which go through `source` at `pos`.
     /// Mirrors `tsv_ts`'s lexer.
@@ -72,13 +72,13 @@ pub struct Lexer<'a> {
     /// **reused across the file** (cleared per escape, capacity retained), so no
     /// per-identifier `String` (plus its `Box`) allocates on the rare escape path.
     /// `has_decoded` is the presence flag `decoded_str` reads; it is cleared at the
-    /// top of `next_token` (and by `seek`) so it reflects only the current token, and
-    /// set by the escaped-identifier path. `advance`/`new` copy the borrowed scratch
-    /// into the AST arena right after lexing; `peek` leaves it parked here for the
-    /// matching `advance`-from-cache to claim, so a peeked escaped identifier keeps
-    /// its decode (nothing re-lexes between the peek and its consume, so the scratch
-    /// is intact). The scratch is never read while `has_decoded` is false, so its
-    /// stale contents are inert.
+    /// top of every token's scan (`next_token_into_local`) and by `seek`, so it
+    /// reflects only the current token, and set by the escaped-identifier path.
+    /// `advance`/`new` copy the borrowed scratch into the AST arena right after
+    /// lexing; `peek_kind` leaves it parked here for the matching `advance`-from-cache to
+    /// claim, so a peeked escaped identifier keeps its decode (nothing re-lexes
+    /// between the peek and its consume, so the scratch is intact). The scratch is
+    /// never read while `has_decoded` is false, so its stale contents are inert.
     decode_scratch: String,
     has_decoded: bool,
     /// Byte offset of `source` within the document this lexer's ERRORS are rendered
@@ -118,8 +118,8 @@ impl<'a> Lexer<'a> {
     /// Lift an error this lexer produced into the coordinates of the document it will be
     /// rendered against (`ParseError::shift_position`).
     ///
-    /// Applied once, at [`Lexer::next_token`] — this lexer's only fallible entry point,
-    /// and so its only producer.
+    /// Applied once, at [`Lexer::next_token_into`] — this lexer's only fallible scan (the
+    /// by-value [`Lexer::next_token`] wraps it), and so its only producer.
     #[cold]
     #[inline(never)]
     fn host_err(&self, err: ParseError) -> ParseError {
@@ -142,19 +142,21 @@ impl<'a> Lexer<'a> {
     }
 
     /// Reposition the cursor to an absolute byte offset (a char boundary of
-    /// `source`) and drop any parked decode. Used by the parser to skip past a
-    /// legacy `<!-- ... -->` HTML-comment span (CDO/CDC) it scanned raw — the
-    /// only construct where Svelte's `parseCss` consumes a token range the
-    /// context-free `next_token` dispatch does not.
+    /// `source`) and drop any parked decode. The parser's jumps go through it: the
+    /// boundary re-read (`token_at`), a rewind or resume, seating a scanned
+    /// terminator, and the skip past a legacy `<!-- ... -->` HTML-comment span
+    /// (CDO/CDC) — the only construct where Svelte's `parseCss` consumes a token
+    /// range the context-free token dispatch does not. Temporary scan lexers seek to
+    /// their start the same way.
     #[inline]
     pub(crate) fn seek(&mut self, pos: usize) {
         self.pos = pos;
         self.has_decoded = false;
     }
 
-    /// The byte at the cursor, or `None` at EOF. Drives the hot `next_token`
-    /// dispatch; non-ASCII bytes (`>= 0x80`) are decoded to a `char` only where a
-    /// branch needs one (`current_char`).
+    /// The byte at the cursor, or `None` at EOF. Drives the hot
+    /// `next_token_into_local` dispatch; non-ASCII bytes (`>= 0x80`) are decoded to a
+    /// `char` only where a branch needs one (`current_char`).
     #[inline]
     fn cur_byte(&self) -> Option<u8> {
         self.bytes.get(self.pos).copied()
@@ -179,8 +181,9 @@ impl<'a> Lexer<'a> {
         self.source[self.pos..].chars().nth(offset)
     }
 
-    fn skip_whitespace(&mut self) -> Token {
-        let start = self.pos;
+    /// Step the cursor over a whitespace run; the dispatch builds the token from the
+    /// positions either side of it.
+    fn skip_whitespace(&mut self) {
         loop {
             match self.cur_byte() {
                 // ASCII whitespace fast path — the overwhelming common case. Advances
@@ -215,11 +218,6 @@ impl<'a> Lexer<'a> {
                 None => break,
             }
         }
-        Token {
-            kind: TokenKind::Whitespace,
-            start: start as u32,
-            end: self.pos as u32,
-        }
     }
 
     /// Lex a token starting at `at`, re-reading from a position the parser has stepped the
@@ -244,11 +242,11 @@ impl<'a> Lexer<'a> {
         self.next_token()
     }
 
-    /// Lex an identifier, stashing any decoded escape value out-of-band in the
+    /// Lex an identifier into `*dst`, stashing any decoded escape value out-of-band in the
     /// lexer's `decode_scratch`. Thin wrapper over the free
-    /// `identifiers::read_identifier` so both dispatch arms (`$`-prefixed and plain)
-    /// share the handoff.
-    fn read_identifier(&mut self) -> Result<Token, ParseError> {
+    /// `identifiers::read_identifier` so the dispatch's identifier arms (`$`-prefixed,
+    /// ASCII-led and non-ASCII-led) share the handoff.
+    fn read_identifier_into(&mut self, dst: &mut Token) -> Result<(), ParseError> {
         let (token, decoded) = read_identifier(self.source, &mut self.pos)?;
         // css-syntax "consume an ident-like token": an ident whose value is an
         // ASCII-case-insensitive `url`, immediately followed by `(` whose first
@@ -265,7 +263,8 @@ impl<'a> Lexer<'a> {
         {
             // The url-token text is recovered verbatim from its span — no decode.
             self.has_decoded = false;
-            return Ok(url);
+            *dst = url;
+            return Ok(());
         }
         // Escaped identifiers are near-zero in real code; funnel the rare local
         // buffer into the parked scratch so `decoded_str` reads it uniformly.
@@ -277,7 +276,8 @@ impl<'a> Lexer<'a> {
             }
             None => self.has_decoded = false,
         }
-        Ok(token)
+        *dst = token;
+        Ok(())
     }
 
     /// From `self.pos` at the `(` after a `url` ident, try to consume an opaque
@@ -304,15 +304,40 @@ impl<'a> Lexer<'a> {
         })
     }
 
-    /// The lexer's one fallible entry point — so the error path is lifted into host
-    /// coordinates here ([`Lexer::host_err`]); the scan itself reports in the lexer's own.
+    /// Lex the next token straight into `*dst` — the parser's hot path, which writes its
+    /// current-token slot (`advance`) and its lookahead slot (`peek_kind`) in place. A
+    /// `Result<Token, ParseError>` does not come back in registers: it is returned through
+    /// a stack slot the caller then reloads, copies and re-scatters, once per token.
+    /// Writing through the caller's slot leaves only the error pointer to return. `*dst`
+    /// is written only on success, so an error leaves the caller's token as it was.
+    ///
+    /// The lexer's one fallible scan, so the error path is lifted into host coordinates here
+    /// ([`Lexer::host_err`]); the scan itself reports in the lexer's own.
     #[inline]
-    pub fn next_token(&mut self) -> Result<Token, ParseError> {
-        self.next_token_local().map_err(|err| self.host_err(err))
+    pub fn next_token_into(&mut self, dst: &mut Token) -> Result<(), ParseError> {
+        self.next_token_into_local(dst)
+            .map_err(|err| self.host_err(err))
     }
 
-    /// [`Lexer::next_token`]'s scan, reporting an error at its position in `self.source`.
-    fn next_token_local(&mut self) -> Result<Token, ParseError> {
+    /// By-value next-token for every caller but the parser's hot path: its bootstrap
+    /// (`CssParser::new`, lexing the first token) and its boundary re-read
+    /// ([`Lexer::token_at`], whose token the parser then assigns to its current slot), the
+    /// short-lived lexers the parser opens to scan ahead or re-read a slice (the
+    /// `peek_past_*` scans, `decl_scan`, the selector scans), the printer's own token
+    /// scans, and `debug_token_stream`. The hot path — `advance` and `peek_kind` — writes
+    /// the current token and the lookahead slot in place through [`Lexer::next_token_into`].
+    pub fn next_token(&mut self) -> Result<Token, ParseError> {
+        let mut token = Token {
+            kind: TokenKind::Eof,
+            start: 0,
+            end: 0,
+        };
+        self.next_token_into(&mut token)?;
+        Ok(token)
+    }
+
+    /// [`Lexer::next_token_into`]'s scan, reporting an error at its position in `self.source`.
+    fn next_token_into_local(&mut self, dst: &mut Token) -> Result<(), ParseError> {
         // Start each token with a clean decoded flag. Callers copy the prior token's
         // decode out (`advance`/`new` at once, `peek` via its matching
         // `advance`-from-cache), so a stale decode never leaks onto a later token.
@@ -321,11 +346,12 @@ impl<'a> Lexer<'a> {
 
         let start = self.pos;
         let Some(b) = self.cur_byte() else {
-            return Ok(Token {
+            *dst = Token {
                 kind: TokenKind::Eof,
                 start: start as u32,
                 end: start as u32,
-            });
+            };
+            return Ok(());
         };
 
         // Helper macro for single-byte (ASCII) tokens — every arm below advances one
@@ -334,11 +360,17 @@ impl<'a> Lexer<'a> {
         macro_rules! single_byte_token {
             ($kind:expr) => {{
                 self.pos += 1;
-                Ok(Token {
-                    kind: $kind,
-                    start: start as u32,
-                    end: self.pos as u32,
-                })
+                $kind
+            }};
+        }
+        // A scanner's token, written through the slot and returned. Only the arms that
+        // build their token from `start` and the cursor fall through to the one store
+        // below: merging a scanner's token with theirs would route every token through a
+        // stack temporary.
+        macro_rules! store_scanned {
+            ($token:expr) => {{
+                *dst = $token;
+                return Ok(());
             }};
         }
 
@@ -347,22 +379,27 @@ impl<'a> Lexer<'a> {
         // the non-ASCII tail. The arm order mirrors the former char dispatch exactly —
         // whitespace, then the number/comment/`||` lookahead arms, then punctuation, then
         // the identifier-start catch-all — so the token stream is byte-identical.
-        match b {
+        let kind = match b {
             // Whitespace (ASCII subset of `char::is_whitespace`; non-ASCII whitespace is
             // handled in the tail below).
-            _ if is_ascii_css_whitespace(b) => Ok(self.skip_whitespace()),
+            _ if is_ascii_css_whitespace(b) => {
+                self.skip_whitespace();
+                TokenKind::Whitespace
+            }
 
             // Comments
-            b'/' if self.peek_byte(1) == Some(b'*') => read_comment(self.source, &mut self.pos),
+            b'/' if self.peek_byte(1) == Some(b'*') => {
+                store_scanned!(read_comment(self.source, &mut self.pos)?)
+            }
 
             // Strings
-            b'"' => read_string(self.source, &mut self.pos, '"'),
-            b'\'' => read_string(self.source, &mut self.pos, '\''),
+            b'"' => store_scanned!(read_string(self.source, &mut self.pos, '"')?),
+            b'\'' => store_scanned!(read_string(self.source, &mut self.pos, '\'')?),
 
             // Numbers (including percentage and dimension)
-            _ if b.is_ascii_digit() => Ok(read_number(self.source, &mut self.pos)),
+            _ if b.is_ascii_digit() => store_scanned!(read_number(self.source, &mut self.pos)),
             b'.' if self.peek_byte(1).is_some_and(|b| b.is_ascii_digit()) => {
-                Ok(read_number(self.source, &mut self.pos))
+                store_scanned!(read_number(self.source, &mut self.pos))
             }
             // Negative numbers: -10px, -100%, -.5em (lookahead to distinguish from identifier)
             // Note: -. must be followed by digit (-.5), otherwise it's identifier prefix (-.class is combinator + class)
@@ -370,7 +407,7 @@ impl<'a> Lexer<'a> {
                 || (self.peek_byte(1) == Some(b'.')
                     && self.peek_byte(2).is_some_and(|b| b.is_ascii_digit())) =>
             {
-                Ok(read_number(self.source, &mut self.pos))
+                store_scanned!(read_number(self.source, &mut self.pos))
             }
             // Positive numbers with explicit + sign: +10px, +100%, +.5em
             // Note: +. must be followed by digit (+.5), otherwise it's combinator + class (+.class)
@@ -378,7 +415,7 @@ impl<'a> Lexer<'a> {
                 || (self.peek_byte(1) == Some(b'.')
                     && self.peek_byte(2).is_some_and(|b| b.is_ascii_digit())) =>
             {
-                Ok(read_number(self.source, &mut self.pos))
+                store_scanned!(read_number(self.source, &mut self.pos))
             }
 
             // Braces and delimiters
@@ -415,7 +452,9 @@ impl<'a> Lexer<'a> {
             // the `$=` attribute selector) falls through to the Dollar token below.
             // The peek keeps `char` form: the char after `$` can be a non-ASCII
             // identifier code point (`$♥`).
-            b'$' if self.peek_char(1).is_some_and(is_identifier_start) => self.read_identifier(),
+            b'$' if self.peek_char(1).is_some_and(is_identifier_start) => {
+                return self.read_identifier_into(dst);
+            }
             b'$' => single_byte_token!(TokenKind::Dollar),
             b'!' => single_byte_token!(TokenKind::Bang),
             b'|' => {
@@ -423,11 +462,7 @@ impl<'a> Lexer<'a> {
                 if self.peek_byte(1) == Some(b'|') {
                     self.pos += 1; // skip first |
                     self.pos += 1; // skip second |
-                    Ok(Token {
-                        kind: TokenKind::ColumnCombinator,
-                        start: start as u32,
-                        end: self.pos as u32,
-                    })
+                    TokenKind::ColumnCombinator
                 } else {
                     single_byte_token!(TokenKind::Pipe)
                 }
@@ -436,14 +471,16 @@ impl<'a> Lexer<'a> {
             // Identifiers (ASCII start: letters, `-`, `_`, `\`; the non-ASCII identifier
             // code points are handled in the tail). `is_ascii_identifier_start` is false
             // for every non-ASCII byte, so a `>= 0x80` byte falls through to the tail.
-            _ if is_ascii_identifier_start(b) => self.read_identifier(),
+            _ if is_ascii_identifier_start(b) => return self.read_identifier_into(dst),
 
             // Any other ASCII byte is not a valid token start — error. `b as char` is the
             // exact character the char dispatch would have reported (ASCII round-trips).
-            _ if b < 0x80 => Err(lex_err(
-                format!("Unexpected character in CSS: '{}'", b as char),
-                self.pos,
-            )),
+            _ if b < 0x80 => {
+                return Err(lex_err(
+                    format!("Unexpected character in CSS: '{}'", b as char),
+                    self.pos,
+                ));
+            }
 
             // Non-ASCII lead byte: decode the full char and dispatch. Every code point
             // ≥ U+00A0 opens an identifier — `parseCss`'s `read_identifier` takes it, and a
@@ -451,20 +488,28 @@ impl<'a> Lexer<'a> {
             // parser's (`CssParser::skip_boundary_whitespace`), because only it knows
             // whether an `allow_whitespace()` would have run here first.
             _ => match self.current_char() {
-                Some(ch) if is_identifier_start(ch) => self.read_identifier(),
-                Some(ch) if ch.is_whitespace() => Ok(self.skip_whitespace()),
-                Some(ch) => Err(lex_err(
-                    format!("Unexpected character in CSS: '{ch}'"),
-                    self.pos,
-                )),
-                // Unreachable: `cur_byte` returned `Some`, so a char decodes here.
-                None => Ok(Token {
-                    kind: TokenKind::Eof,
-                    start: start as u32,
-                    end: start as u32,
-                }),
+                Some(ch) if is_identifier_start(ch) => return self.read_identifier_into(dst),
+                Some(ch) if ch.is_whitespace() => {
+                    self.skip_whitespace();
+                    TokenKind::Whitespace
+                }
+                Some(ch) => {
+                    return Err(lex_err(
+                        format!("Unexpected character in CSS: '{ch}'"),
+                        self.pos,
+                    ));
+                }
+                // Unreachable: `cur_byte` returned `Some`, so a char decodes here — and the
+                // cursor has not moved, so this is the empty token at `start`.
+                None => TokenKind::Eof,
             },
-        }
+        };
+        *dst = Token {
+            kind,
+            start: start as u32,
+            end: self.pos as u32,
+        };
+        Ok(())
     }
 }
 

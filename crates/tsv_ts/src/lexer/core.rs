@@ -208,8 +208,8 @@ pub struct Lexer<'a> {
     /// **reused across the file** (cleared per escape, capacity retained), so no
     /// per-literal `String` allocates — the escaped-string decode churn a fresh
     /// `String` (plus its `Box`) produced per token is gone. `has_decoded` is the
-    /// presence flag `decoded_str` reads; it is cleared at the top of
-    /// every token-producing entry point (`next_token`, `continue_template_from_brace`,
+    /// presence flag `decoded_str` reads; it is cleared at the top of every
+    /// token-producing entry point (`next_token_into_local`, `continue_template_from_brace`,
     /// `read_regex_literal`) so it reflects only the current token, and set by the
     /// escape paths. The scratch is never read while `has_decoded` is false, so its
     /// stale contents are inert.
@@ -1049,14 +1049,17 @@ impl<'a> Lexer<'a> {
 
     /// Lex the next token directly into `*dst` — the hot advance path. Writing
     /// through the caller's slot (`&mut self.current`) instead of returning a
-    /// `Result<Token>` keeps the 16-byte token in registers and elides the sret
-    /// round-trip the by-value return forces (the intermediate `Token` built on
-    /// the lexer frame, returned, and re-scattered). The match yields a `Token`
-    /// value only for the short punctuation/operator paths; the
-    /// identifier/number/string/template/hashbang scanners and the error paths
-    /// write `dst` (or propagate the error) via an early `return`.
-    /// [`Lexer::next_token`] is the thin by-value wrapper kept for the
-    /// peek/seek/bootstrap callers.
+    /// `Result<Token, ParseError>` elides the round trip the by-value return
+    /// makes through the caller's frame (the intermediate `Token` built,
+    /// returned through a slot, then reloaded and re-scattered into the
+    /// parser's field). The match yields a `Token` value only for the short
+    /// punctuation/operator paths; the identifier/number/string/template/hashbang
+    /// scanners and the error paths write `dst` (or propagate the error) via an
+    /// early `return`. [`Lexer::next_token`] is the thin by-value wrapper every
+    /// other caller takes: the parser's bootstrap, its `peek_kind` lookahead, and
+    /// its cold re-lexes (the comment drain, the regex relex, and the
+    /// compound-token split through [`Lexer::seek_and_next_token`]), and
+    /// `debug_token_stream`.
     ///
     /// The error path is lifted into host coordinates here, at the producer
     /// ([`Lexer::host_err`]); the scan itself works in — and reports in — the lexer's own.
@@ -1437,8 +1440,11 @@ impl<'a> Lexer<'a> {
         Ok(())
     }
 
-    /// By-value next-token for the peek/seek/bootstrap callers. The hot advance
-    /// path uses [`Lexer::next_token_into`] to write the parser cursor in place.
+    /// By-value next-token for every caller but the hot advance path: the parser's
+    /// bootstrap, its `peek_kind` lookahead, its cold re-lexes (the comment drain,
+    /// the regex relex, [`Lexer::seek_and_next_token`]'s compound-token split), and
+    /// `debug_token_stream`. The advance path uses [`Lexer::next_token_into`] to
+    /// write the parser's current token in place.
     pub fn next_token(&mut self) -> Result<Token, ParseError> {
         let mut tok = Token {
             kind: TokenKind::Eof,

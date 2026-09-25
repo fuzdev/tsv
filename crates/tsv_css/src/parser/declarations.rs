@@ -19,7 +19,7 @@ use tsv_lang::{ParseError, Span};
 /// For identifiers, we need to look ahead: if next non-whitespace/comment token is `:`, it's a declaration.
 /// Custom-property identifiers (`--*`) are always declarations and bypass the lookahead.
 pub(crate) fn is_nested_rule_start(parser: &CssParser<'_, '_>) -> Result<bool, ParseError> {
-    match &parser.current_kind {
+    match parser.current_kind() {
         // Unambiguous selector start tokens
         TokenKind::Ampersand
         | TokenKind::Dot
@@ -83,7 +83,7 @@ pub(crate) fn is_nested_rule_start(parser: &CssParser<'_, '_>) -> Result<bool, P
 /// and its debug-time oracle) and, in that one pass, also collects the value facts, which it
 /// stashes on the parser for `parse_declaration` to reuse rather than re-scan.
 fn is_type_selector_with_pseudo(parser: &CssParser<'_, '_>) -> Result<bool, ParseError> {
-    super::decl_scan::scan_rule_or_declaration(parser, parser.current_end)
+    super::decl_scan::scan_rule_or_declaration(parser, parser.current_end())
 }
 
 /// Parse a CSS rule: `selector { property: value; }`
@@ -103,7 +103,7 @@ pub(crate) fn parse_rule<'arena>(
     // load-bearing skip and not only a guard on the span capture. The selector list skips
     // again on its own: the two captures are separate and neither derivable from the other.
     parser.skip_boundary_whitespace()?;
-    let start = parser.span_pos(parser.current_start);
+    let start = parser.span_pos(parser.current_start());
 
     // Nested rules use relative selectors (can start with combinators like `> .child`)
     // Top-level rules use complex selectors (cannot start with combinators)
@@ -116,14 +116,14 @@ pub(crate) fn parse_rule<'arena>(
     // Capture any comments after selector (before {)
     let mut declarations = parser.bvec();
     parser.skip_whitespace()?;
-    while matches!(&parser.current_kind, TokenKind::Comment) {
+    while matches!(parser.current_kind(), TokenKind::Comment) {
         let comment = parser.parse_block_comment()?;
         declarations.push(CssBlockChild::Comment(comment));
         parser.skip_whitespace()?;
     }
 
     // Expect { and capture its start
-    let block_start = parser.span_pos(parser.current_start);
+    let block_start = parser.span_pos(parser.current_start());
     parser.expect(TokenKind::LeftBrace)?;
     parser.skip_whitespace()?;
 
@@ -137,7 +137,7 @@ pub(crate) fn parse_rule<'arena>(
             break;
         }
 
-        if matches!(&parser.current_kind, TokenKind::Comment) {
+        if matches!(parser.current_kind(), TokenKind::Comment) {
             let comment = parser.parse_block_comment()?;
             declarations.push(CssBlockChild::Comment(comment));
             continue;
@@ -177,7 +177,7 @@ pub(crate) fn parse_rule<'arena>(
     if !parser.check(TokenKind::RightBrace) {
         return Err(parser.error_expected("'}'"));
     }
-    let block_end = parser.span_pos(parser.current_end);
+    let block_end = parser.span_pos(parser.current_end());
     parser.advance()?; // consume }
 
     Ok(CssRule {
@@ -211,7 +211,7 @@ fn lex_declaration_head(parser: &mut CssParser<'_, '_>) -> Result<DeclarationHea
 
     // The parser sits on the colon here — whitespace and comments already skipped — and
     // `expect` below guarantees it is one.
-    let colon = parser.current_start;
+    let colon = parser.current_start();
     parser.expect(TokenKind::Colon)?;
     // Only skip whitespace, NOT comments - comments in values need to be preserved
     parser.skip_whitespace()?;
@@ -219,7 +219,7 @@ fn lex_declaration_head(parser: &mut CssParser<'_, '_>) -> Result<DeclarationHea
     Ok(DeclarationHead {
         colon,
         gap_comment,
-        value_start: parser.current_start,
+        value_start: parser.current_start(),
     })
 }
 
@@ -244,7 +244,7 @@ fn assert_token_head_agrees(
 pub(crate) fn parse_declaration<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<CssDeclaration<'arena>, ParseError> {
-    let start = parser.base_offset() + parser.current_start;
+    let start = parser.base_offset() + parser.current_start();
 
     // Parse property
     if !parser.check(TokenKind::Identifier) {
@@ -253,7 +253,7 @@ pub(crate) fn parse_declaration<'arena>(
     // Internal AST: use decoded value (spec-compliant)
     // Svelte quirk (raw value) will be applied in conversion layer
     let property = parser.current_identifier_in_arena();
-    let property_end = parser.current_end;
+    let property_end = parser.current_end();
 
     // Locate the value and scan it to its terminator (`;` / `}` at depth zero, or EOF),
     // collecting the few facts the declaration node needs: where its span ends, whether it

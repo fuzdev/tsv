@@ -47,7 +47,7 @@ pub(super) fn is_boolean_operator_keyword(ident: &str) -> bool {
 
 /// Check if current token is a CSS boolean operator keyword (and, or, not)
 pub(super) fn is_boolean_operator(parser: &CssParser<'_, '_>) -> bool {
-    if let TokenKind::Identifier = &parser.current_kind {
+    if let TokenKind::Identifier = parser.current_kind() {
         is_boolean_operator_keyword(parser.current_identifier())
     } else {
         false
@@ -61,7 +61,7 @@ pub(crate) fn parse_atrule<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     nested_in_rule: bool,
 ) -> Result<CssAtrule<'arena>, ParseError> {
-    let start = parser.span_pos(parser.current_start);
+    let start = parser.span_pos(parser.current_start());
 
     // Expect @ symbol
     parser.expect(TokenKind::AtSign)?;
@@ -76,8 +76,8 @@ pub(crate) fn parse_atrule<'arena>(
     // preserving), not from the decoded string (which may hold a raw control char).
     let name = parser.current_identifier_in_arena();
     let name_span = Span {
-        start: parser.span_pos(parser.current_start),
-        end: parser.span_pos(parser.current_end),
+        start: parser.span_pos(parser.current_start()),
+        end: parser.span_pos(parser.current_end()),
     };
     parser.advance()?;
 
@@ -98,7 +98,7 @@ pub(crate) fn parse_atrule<'arena>(
 
     // Raw source offset of the first prelude token — for the conditional-at-rule raw
     // fallback after the dispatch. Captured before any prelude parsing consumes tokens.
-    let prelude_start_raw = parser.current_start;
+    let prelude_start_raw = parser.current_start();
 
     // Parse prelude based on at-rule type
     let prelude = if name_lc == "import" {
@@ -183,7 +183,7 @@ pub(crate) fn parse_atrule<'arena>(
         (Some(block), end)
     } else if parser.check(TokenKind::Semicolon) {
         // Statement at-rule (no block)
-        let end = parser.span_pos(parser.current_end);
+        let end = parser.span_pos(parser.current_end());
         parser.advance()?;
         return Ok(CssAtrule {
             name,
@@ -227,7 +227,7 @@ pub(super) fn reconsume_prelude_as_raw<'arena>(
     // whitespace is trimmed so the public AST (from `span`) and printer `content` agree.
     // Escape-aware, and CSS-whitespace-only: a prelude can end in an escape whose payload
     // is that whitespace (`@layer a\ ;`), and an NBSP is prelude content, not padding.
-    let raw = &parser.source()[prelude_start_raw..parser.current_start];
+    let raw = &parser.source()[prelude_start_raw..parser.current_start()];
     let lead = crate::escapes::trim_start_css(raw);
     let content = crate::escapes::trim_end_preserving_escape(lead);
     let content_start_raw = prelude_start_raw + (raw.len() - lead.len());
@@ -254,7 +254,7 @@ fn parse_atrule_block<'arena>(
     atrule_name: &str,
     nested_in_rule: bool,
 ) -> Result<CssAtruleBlock<'arena>, ParseError> {
-    let start = parser.span_pos(parser.current_start);
+    let start = parser.span_pos(parser.current_start());
 
     // Expect {
     parser.expect(TokenKind::LeftBrace)?;
@@ -296,7 +296,7 @@ fn parse_atrule_block<'arena>(
     // inside a rule likewise fall through here.
 
     while !parser.check(TokenKind::RightBrace) && !parser.check(TokenKind::Eof) {
-        if matches!(&parser.current_kind, TokenKind::Comment) {
+        if matches!(parser.current_kind(), TokenKind::Comment) {
             let comment = parser.parse_block_comment()?;
             children.push(CssBlockChild::Comment(comment));
             continue;
@@ -339,7 +339,7 @@ fn parse_atrule_block<'arena>(
     if !parser.check(TokenKind::RightBrace) {
         return Err(parser.error_expected("'}'"));
     }
-    let end = parser.span_pos(parser.current_end);
+    let end = parser.span_pos(parser.current_end());
     parser.advance()?; // consume }
 
     Ok(CssAtruleBlock {

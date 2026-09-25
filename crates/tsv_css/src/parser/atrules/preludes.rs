@@ -18,7 +18,7 @@ use tsv_lang::{ParseError, Span};
 /// disagree about what a function is.
 fn is_function_token(parser: &CssParser<'_, '_>) -> bool {
     parser.check(TokenKind::Identifier) && {
-        let end_pos = parser.current_end;
+        let end_pos = parser.current_end();
         parser.source.get(end_pos..=end_pos) == Some("(")
     }
 }
@@ -100,7 +100,7 @@ fn skip_gap_registering_comments(
     while parser.check(TokenKind::Comment) {
         parser.register_current_comment();
         run.push_comment(parser.current_value());
-        *end = parser.base_offset() + parser.current_end;
+        *end = parser.base_offset() + parser.current_end();
         parser.advance()?;
         parser.skip_whitespace()?;
     }
@@ -305,7 +305,7 @@ pub(super) fn parse_condition_query<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     reader: ConditionReader,
 ) -> Result<(ConditionQuery<'arena>, Span), ParseError> {
-    let start = parser.base_offset() + parser.current_start;
+    let start = parser.base_offset() + parser.current_start();
     let mut parts = parser.bvec();
     let mut current_connector: Option<ConditionConnector> = None;
     let mut end_pos = start;
@@ -346,7 +346,7 @@ pub(super) fn parse_condition_query<'arena>(
                 // Widen over the keyword itself, so a connector that never finds its
                 // part still lies inside the query's span (a part that does follow
                 // widens past it anyway).
-                end_pos = parser.base_offset() + parser.current_end;
+                end_pos = parser.base_offset() + parser.current_end();
                 parser.advance()?;
                 // The gap after a connector (`and /* comment */ (b)`)
                 skip_gap_registering_comments(parser, &mut end_pos, &mut run)?;
@@ -445,7 +445,7 @@ fn parse_condition_part<'arena>(
     mut end_pos: usize,
     reader: ConditionReader,
 ) -> Result<ConditionPartOutcome<'arena>, ParseError> {
-    let part_start = parser.span_pos(parser.current_start);
+    let part_start = parser.span_pos(parser.current_start());
     // One growable buffer instead of a `Vec<String>` of per-token / per-space pieces
     // joined at the end (mirrors `parse_raw_prelude_content` and
     // `parse_declaration`): tokens `push_str` straight in, separators are a single
@@ -474,7 +474,7 @@ fn parse_condition_part<'arena>(
             // Widen over the keyword before consuming it: a `not` whose operand never
             // arrives is handed back to the query with this end (`NotAPart`), and the
             // query's span has to reach it.
-            end_pos = parser.base_offset() + parser.current_end;
+            end_pos = parser.base_offset() + parser.current_end();
             parser.advance()?;
             parser.skip_whitespace()?;
             // Include comments after `not` in content (e.g., `not /* comment */ (...)`)
@@ -484,7 +484,7 @@ fn parse_condition_part<'arena>(
                 part_buf.push(' ');
                 part_buf.push_str(parser.current_value());
                 trailing_spaces = 0;
-                end_pos = parser.base_offset() + parser.current_end;
+                end_pos = parser.base_offset() + parser.current_end();
                 parser.advance()?;
                 parser.skip_whitespace()?;
             }
@@ -548,7 +548,7 @@ fn parse_condition_part<'arena>(
             part_buf.push('(');
             trailing_spaces = 0;
             parser.advance()?; // consume '('
-            let arg_start = parser.current_start;
+            let arg_start = parser.current_start();
             let comments_len = parser.comments.len();
             if let Some(selectors) = parse_selector_argument(parser, arg_start, comments_len)? {
                 if !part_buf.is_empty() {
@@ -559,7 +559,7 @@ fn parse_condition_part<'arena>(
                 // Seated on the closing `)`; the `(` it matches was consumed above,
                 // so the two cancel and `paren_depth` never saw either.
                 part_buf.push(')');
-                end_pos = parser.base_offset() + parser.current_end;
+                end_pos = parser.base_offset() + parser.current_end();
                 parser.advance()?;
                 prev_token_kind = Some(TokenKind::RightParen);
                 last_significant_kind = Some(TokenKind::RightParen);
@@ -597,7 +597,7 @@ fn parse_condition_part<'arena>(
         if paren_depth == 0 && parser.check(TokenKind::RightParen) {
             // Include the closing paren (loop ends here, so no counter reset needed)
             part_buf.push(')');
-            end_pos = parser.base_offset() + parser.current_end;
+            end_pos = parser.base_offset() + parser.current_end();
             parser.advance()?;
             closed = true;
             break;
@@ -625,13 +625,13 @@ fn parse_condition_part<'arena>(
             continue;
         }
 
-        let is_comment = matches!(parser.current_kind, TokenKind::Comment);
+        let is_comment = matches!(parser.current_kind(), TokenKind::Comment);
 
         // Check if this is a boolean operator (and/or/not) inside nested parens.
         // Match on the decoded value, not the verbatim source slice, so an escaped
         // operator still spaces correctly — and only where the grammar can start
         // one, so an identifier that merely spells `and` keeps its own spacing.
-        let is_bool_op = matches!(&parser.current_kind, TokenKind::Identifier)
+        let is_bool_op = matches!(parser.current_kind(), TokenKind::Identifier)
             && is_boolean_operator_keyword(parser.current_identifier())
             && boolean_operator_position(
                 last_significant_kind,
@@ -667,7 +667,7 @@ fn parse_condition_part<'arena>(
         // twice: `@container` is on neither of prettier's reader lists (its params are
         // verbatim, comma included), and inside a `<general-enclosed>` `selector()`
         // argument the comma separates a selector list the selector printer owns.
-        let pads_comma = matches!(parser.current_kind, TokenKind::Comma)
+        let pads_comma = matches!(parser.current_kind(), TokenKind::Comma)
             && reader == ConditionReader::Value
             && general_enclosed_selector.is_none();
 
@@ -679,7 +679,7 @@ fn parse_condition_part<'arena>(
         // `selector(div :hover)` is not `selector(div:hover)`. One statement of which
         // tokens strip, the `raw.rs` sibling's shape.
         let strips_leading_space = pads_comma
-            || (matches!(parser.current_kind, TokenKind::Colon)
+            || (matches!(parser.current_kind(), TokenKind::Colon)
                 && general_enclosed_selector.is_none());
         if strips_leading_space {
             part_buf.truncate(part_buf.len() - trailing_spaces);
@@ -688,18 +688,19 @@ fn parse_condition_part<'arena>(
         // Emit the token verbatim from source: identifiers serialize their raw slice so
         // escapes survive (`\@foo` stays `\@foo`), a string keeps its surrounding quotes,
         // and a comment is included verbatim.
-        match &parser.current_kind {
+        match parser.current_kind() {
             TokenKind::String { quote } => {
-                let content = &parser.source()[parser.current_start + 1..parser.current_end - 1];
-                part_buf.push(*quote);
+                let content =
+                    &parser.source()[parser.current_start() + 1..parser.current_end() - 1];
+                part_buf.push(quote);
                 part_buf.push_str(content);
-                part_buf.push(*quote);
+                part_buf.push(quote);
             }
             _ => part_buf.push_str(parser.current_value()),
         }
         trailing_spaces = 0;
-        let current_kind = parser.current_kind;
-        end_pos = parser.base_offset() + parser.current_end;
+        let current_kind = parser.current_kind();
+        end_pos = parser.base_offset() + parser.current_end();
         parser.advance()?;
 
         // Add space after boolean operators — a separator to the operand the grammar
@@ -820,7 +821,7 @@ fn parse_condition_part<'arena>(
 pub(super) fn parse_supports_function_condition<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<Option<(ConditionQuery<'arena>, Span)>, ParseError> {
-    let start = parser.base_offset() + parser.current_start;
+    let start = parser.base_offset() + parser.current_start();
     let ConditionPartOutcome::Parsed {
         part,
         end,
@@ -862,7 +863,7 @@ pub(super) fn parse_supports_function_condition<'arena>(
 pub(super) fn parse_container_prelude<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<(Option<&'arena str>, ConditionQuery<'arena>, Span), ParseError> {
-    let start = parser.span_pos(parser.current_start);
+    let start = parser.span_pos(parser.current_start());
 
     // Check for optional container name: an identifier before the first '(' that
     // isn't a `not`/`and`/`or` keyword or a function call (`style(...)`, no space
@@ -908,7 +909,7 @@ fn parse_scope_clause<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     what: &str,
 ) -> Result<ScopeClause<'arena>, ParseError> {
-    let paren_start = parser.span_pos(parser.current_start);
+    let paren_start = parser.span_pos(parser.current_start());
     parser.advance()?; // consume '('
     parser.skip_whitespace_registering_comments()?; // leading comment
     let list = parse_forgiving_selector_list(parser)?;
@@ -916,7 +917,7 @@ fn parse_scope_clause<'arena>(
     if !parser.check(TokenKind::RightParen) {
         return Err(parser.error_expected_after("')'", what));
     }
-    let paren_end = parser.span_pos(parser.current_end);
+    let paren_end = parser.span_pos(parser.current_end());
     parser.advance()?; // consume ')'
     Ok(ScopeClause {
         list,
@@ -951,7 +952,7 @@ pub(super) fn parse_scope_prelude<'arena>(
     // comment is the current token on entry. Capturing `start` *after* this keeps it out
     // of the wire prelude (extracted from `span`), matching parseCss, which drops it.
     parser.skip_whitespace_registering_comments()?;
-    let start = parser.span_pos(parser.current_start);
+    let start = parser.span_pos(parser.current_start());
     // Widens to each clause's closing `)`; stays at `start` when no clause is present.
     let mut end = start;
 
@@ -974,8 +975,8 @@ pub(super) fn parse_scope_prelude<'arena>(
         && parser.current_identifier().eq_ignore_ascii_case("to")
     {
         let to_span = Span {
-            start: parser.span_pos(parser.current_start),
-            end: parser.span_pos(parser.current_end),
+            start: parser.span_pos(parser.current_start()),
+            end: parser.span_pos(parser.current_end()),
         };
         parser.advance()?; // consume "to"
         parser.skip_whitespace_registering_comments()?; // after-`to` comment
@@ -1023,7 +1024,7 @@ pub(super) fn parse_custom_selector_prelude<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<PreludeValue<'arena>, ParseError> {
     // The raw offset the replay restarts from, and the registrations it discards.
-    let prelude_start_raw = parser.current_start;
+    let prelude_start_raw = parser.current_start();
     let comments_len = parser.comments.len();
     let span_start = parser.span_pos(prelude_start_raw);
 
@@ -1035,7 +1036,7 @@ pub(super) fn parse_custom_selector_prelude<'arena>(
         if parser.at_prelude_end() {
             let span = Span {
                 start: span_start,
-                end: parser.span_pos(parser.current_start),
+                end: parser.span_pos(parser.current_start()),
             };
             return Ok(PreludeValue::CustomSelector { name, list, span });
         }
@@ -1064,18 +1065,18 @@ fn parse_custom_selector_head_and_list<'arena>(
     if !parser.check(TokenKind::Colon) {
         return Ok(None);
     }
-    let name_start = parser.span_pos(parser.current_start);
-    let colon_end = parser.current_end;
+    let name_start = parser.span_pos(parser.current_start());
+    let colon_end = parser.current_end();
     parser.advance()?;
     if !parser.check(TokenKind::Identifier)
-        || parser.current_start != colon_end
+        || parser.current_start() != colon_end
         || !parser.current_identifier().starts_with("--")
     {
         return Ok(None);
     }
     let name = Span {
         start: name_start,
-        end: parser.span_pos(parser.current_end),
+        end: parser.span_pos(parser.current_end()),
     };
     parser.advance()?;
 
@@ -1138,8 +1139,8 @@ pub(super) fn parse_import_prelude<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<PreludeValue<'arena>, ParseError> {
     // Raw offset of the prelude's first token, for the raw fallback below.
-    let prelude_start_raw = parser.current_start;
-    let start = parser.span_pos(parser.current_start);
+    let prelude_start_raw = parser.current_start();
+    let start = parser.span_pos(parser.current_start());
     let mut values = parser.bvec();
 
     // Register a leading comment between `@import` and the first value (e.g.
@@ -1156,11 +1157,11 @@ pub(super) fn parse_import_prelude<'arena>(
 
     // The two head openers the loop below does not take: a bare string, and an unquoted
     // url-token. A function opens the head through the loop like any later one.
-    if let TokenKind::String { .. } = &parser.current_kind {
+    if let TokenKind::String { .. } = parser.current_kind() {
         // Bare string — the inner text is recovered verbatim from `span` at print time
         // (span-for-verbatim, zero alloc); the quote char from `source[span.start]`.
-        let value_start = parser.span_pos(parser.current_start);
-        let value_end = parser.span_pos(parser.current_end);
+        let value_start = parser.span_pos(parser.current_start());
+        let value_end = parser.span_pos(parser.current_end());
         values.push(CssValue::String {
             content: StringCooked::Verbatim,
             span: Span {
@@ -1169,8 +1170,10 @@ pub(super) fn parse_import_prelude<'arena>(
             },
         });
         parser.advance()?;
-    } else if matches!(parser.current_kind, TokenKind::Url)
-        && !url_token_has_unclosed_paren(&parser.source()[parser.current_start..parser.current_end])
+    } else if matches!(parser.current_kind(), TokenKind::Url)
+        && !url_token_has_unclosed_paren(
+            &parser.source()[parser.current_start()..parser.current_end()],
+        )
     {
         // Unquoted `url(...)` — the lexer consumed it as one opaque `<url-token>`. Mirror
         // `parse_function_value`'s empty-args url shape (name + span): the printer and the
@@ -1184,8 +1187,8 @@ pub(super) fn parse_import_prelude<'arena>(
         // reject at the trailing `)`. parseCss reads such a prelude raw to `;` (and prettier
         // prints it verbatim), so it goes to the tail below — the same verbatim text
         // `@namespace url(a(b))` takes.
-        let value_start = parser.span_pos(parser.current_start);
-        let value_end = parser.span_pos(parser.current_end);
+        let value_start = parser.span_pos(parser.current_start());
+        let value_end = parser.span_pos(parser.current_end());
         // The name is the token text up to its `(` — the ident that opened the url-token,
         // so the `(` is the first one in it. The printer reads this span only as a
         // url-detection key (`function_name_is(.., "url")`, which decodes an escaped
@@ -1227,8 +1230,8 @@ pub(super) fn parse_import_prelude<'arena>(
         } else if parser.check(TokenKind::Identifier) && parser.current_identifier() == "layer" {
             // Bare "layer" keyword (without function call); text recovered from
             // `span` at print time (span-for-verbatim).
-            let value_start = parser.span_pos(parser.current_start);
-            let value_end = parser.span_pos(parser.current_end);
+            let value_start = parser.span_pos(parser.current_start());
+            let value_end = parser.span_pos(parser.current_end());
             values.push(CssValue::Identifier {
                 span: Span {
                     start: value_start,
@@ -1248,13 +1251,13 @@ pub(super) fn parse_import_prelude<'arena>(
     // non-whitespace token's, so the value's span (and the wire prelude read from it)
     // is outer-trimmed like every other prelude.
     if !parser.at_prelude_end() {
-        let tail_local_start = parser.current_start;
+        let tail_local_start = parser.current_start();
         let tail_start = parser.span_pos(tail_local_start);
-        let mut tail_local_end = parser.current_end;
+        let mut tail_local_end = parser.current_end();
 
         while !parser.at_prelude_end() {
             if !parser.check(TokenKind::Whitespace) {
-                tail_local_end = parser.current_end;
+                tail_local_end = parser.current_end();
             }
             parser.advance()?;
         }
@@ -1313,8 +1316,8 @@ fn take_comment_run(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>, Pars
         if parser.check(TokenKind::Whitespace) {
             parser.advance()?;
         } else if parser.check(TokenKind::Comment) {
-            start.get_or_insert_with(|| parser.span_pos(parser.current_start));
-            end = parser.span_pos(parser.current_end);
+            start.get_or_insert_with(|| parser.span_pos(parser.current_start()));
+            end = parser.span_pos(parser.current_end());
             parser.advance()?;
         } else {
             break;
@@ -1346,15 +1349,15 @@ fn consume_function_args(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>,
     let mut end = 0u32;
     let mut depth: u32 = 0;
     while !parser.check(TokenKind::Eof) {
-        match parser.current_kind {
+        match parser.current_kind() {
             TokenKind::RightParen if depth == 0 => break,
             TokenKind::LeftParen => depth += 1,
             TokenKind::RightParen => depth -= 1,
             _ => {}
         }
         if !parser.check(TokenKind::Whitespace) {
-            start.get_or_insert_with(|| parser.span_pos(parser.current_start));
-            end = parser.span_pos(parser.current_end);
+            start.get_or_insert_with(|| parser.span_pos(parser.current_start()));
+            end = parser.span_pos(parser.current_end());
         }
         parser.advance()?;
     }
@@ -1365,7 +1368,7 @@ fn consume_function_args(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>,
 fn parse_function_value<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<CssValue<'arena>, ParseError> {
-    let value_start = parser.span_pos(parser.current_start);
+    let value_start = parser.span_pos(parser.current_start());
 
     // Get function name (current token should be identifier). Kept verbatim from
     // source so the author's case survives to output; every *recognition* test below
@@ -1383,8 +1386,8 @@ fn parse_function_value<'arena>(
     // so the stored name is this span, never the decoded text (prettier preserves the
     // escape too).
     let name_span = Span {
-        start: parser.span_pos(parser.current_start),
-        end: parser.span_pos(parser.current_end),
+        start: parser.span_pos(parser.current_start()),
+        end: parser.span_pos(parser.current_end()),
     };
     // `supports()` keeps a text name (its printer prints the condition, not a span), so
     // the same fact reaches it as the verbatim token slice — the copy is an `@import`
@@ -1423,9 +1426,9 @@ fn parse_function_value<'arena>(
     if name.eq_ignore_ascii_case("url") {
         // url() - parse the URL argument (string or bare URL)
         parser.skip_whitespace()?;
-        if let TokenKind::String { .. } = &parser.current_kind {
-            let arg_start = parser.span_pos(parser.current_start);
-            let arg_end = parser.span_pos(parser.current_end);
+        if let TokenKind::String { .. } = parser.current_kind() {
+            let arg_start = parser.span_pos(parser.current_start());
+            let arg_end = parser.span_pos(parser.current_end());
             // Bare string arg — inner text recovered verbatim from `span` at print
             // time (span-for-verbatim, zero alloc); quote char from `source[span.start]`.
             args.push(CssValue::String {
@@ -1486,7 +1489,7 @@ fn parse_function_value<'arena>(
         return Err(parser.error_expected("')' to close function"));
     }
 
-    let value_end = parser.span_pos(parser.current_end);
+    let value_end = parser.span_pos(parser.current_end());
     parser.advance()?; // consume ')'
 
     Ok(CssValue::Function {

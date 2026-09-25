@@ -416,7 +416,7 @@ fn colon_after_trivia(bytes: &[u8], from: usize) -> Option<(usize, bool)> {
 /// that should have been the `:`, classified the child a nested rule, and rejected the
 /// document.
 pub(super) fn peek_significant_kind(parser: &CssParser<'_, '_>) -> Result<TokenKind, ParseError> {
-    match peek_significant_kind_bytes(parser.source().as_bytes(), parser.current_end) {
+    match peek_significant_kind_bytes(parser.source().as_bytes(), parser.current_end()) {
         Some(kind) => {
             #[cfg(debug_assertions)]
             {
@@ -427,7 +427,7 @@ pub(super) fn peek_significant_kind(parser: &CssParser<'_, '_>) -> Result<TokenK
                     expected.as_ref().is_ok_and(|expected| *expected == kind),
                     "significant-kind byte scan disagreed with the token lookahead at {}: \
                      scan said {kind:?}, lookahead said {expected:?}",
-                    parser.current_end
+                    parser.current_end()
                 );
             }
             Ok(kind)

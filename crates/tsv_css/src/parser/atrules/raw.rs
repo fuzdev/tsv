@@ -27,7 +27,7 @@ pub(super) fn parse_raw_prelude_content<'arena>(
     normalize_quotes: bool,
 ) -> Result<(&'arena str, Span), ParseError> {
     // Add spaces around boolean operators (and, or, not) and after ':' for prettier compatibility
-    let prelude_start = parser.span_pos(parser.current_start);
+    let prelude_start = parser.span_pos(parser.current_start());
     // One growable buffer rather than a `Vec<String>` of per-token / per-space pieces
     // joined at the end (the `parse_declaration` raw-buffer idiom, extended to the at-rule
     // prelude siblings): each token value is `push_str`ed directly and each normalized
@@ -159,7 +159,7 @@ pub(super) fn parse_raw_prelude_content<'arena>(
         // `url::trim_url_raw`) and prettier's `printer-postcss.js`. Only the lowercase
         // `url(` is canonicalized; `URL(  …  )` stays verbatim (postcss preserves it), so
         // trimming is gated on the lowercase spelling.
-        if matches!(parser.current_kind, TokenKind::Url) {
+        if matches!(parser.current_kind(), TokenKind::Url) {
             let raw = parser.current_value();
             if raw.starts_with("url(") {
                 match trim_url_raw(raw) {
@@ -186,28 +186,28 @@ pub(super) fn parse_raw_prelude_content<'arena>(
         // the peek cache (which the whitespace branch above populates), so
         // `current_identifier()` is unreliable here — and a `url(` function requires the
         // literal `url` anyway. Only the lowercase spelling is canonicalized (as above).
-        if matches!(parser.current_kind, TokenKind::Identifier)
+        if matches!(parser.current_kind(), TokenKind::Identifier)
             && parser.current_value().eq_ignore_ascii_case("url")
             && matches!(parser.peek_kind(), Ok(TokenKind::LeftParen))
         {
             let is_lowercase_url = parser.current_value() == "url";
-            let url_start = parser.current_start;
+            let url_start = parser.current_start();
             parser.advance()?; // consume `url`
             // Consume the balanced parens, tracking depth so a nested `(` can't end it early.
             let mut depth: u32 = 0;
             let mut url_end;
             loop {
-                match parser.current_kind {
+                match parser.current_kind() {
                     TokenKind::LeftParen => depth += 1,
                     TokenKind::RightParen => depth = depth.saturating_sub(1),
                     TokenKind::Eof => {
-                        url_end = parser.current_start;
+                        url_end = parser.current_start();
                         break;
                     }
                     _ => {}
                 }
-                let is_close = depth == 0 && matches!(parser.current_kind, TokenKind::RightParen);
-                url_end = parser.current_end;
+                let is_close = depth == 0 && matches!(parser.current_kind(), TokenKind::RightParen);
+                url_end = parser.current_end();
                 parser.advance()?;
                 if is_close {
                     break;
@@ -236,7 +236,7 @@ pub(super) fn parse_raw_prelude_content<'arena>(
         // Add space before boolean operators (and, or, not) or comments if not preceded by space
         // Note: @scope preludes are parsed structurally, so they don't go through this code
         let is_bool_op = is_boolean_operator(parser);
-        let is_comment = matches!(parser.current_kind, TokenKind::Comment);
+        let is_comment = matches!(parser.current_kind(), TokenKind::Comment);
         // Add space before comments or boolean operators if not already preceded
         // by space — but not for a boolean operator right after `(`: `(not …)`
         // stays tight (matching prettier and the structured @supports/@container
@@ -282,7 +282,7 @@ pub(super) fn parse_raw_prelude_content<'arena>(
             // Inside a feature expression only the SPLITTING colon strips: it is where
             // `parseMediaFeature` trims the name. A later colon and every comma there are
             // value text (`(a: b,c)`, `(a , b)` are both prettier fixed points).
-            let strips_leading_space = match parser.current_kind {
+            let strips_leading_space = match parser.current_kind() {
                 TokenKind::Colon => paren_depth == 0 || !feature_colon_seen,
                 TokenKind::Comma => paren_depth == 0,
                 _ => false,
@@ -296,15 +296,16 @@ pub(super) fn parse_raw_prelude_content<'arena>(
         // raw slice so escapes survive (`@keyframes \@mymove` must not collapse to
         // `@keyframes @mymove`, `\31 23` must not collapse to `123`); only a string's
         // surrounding quotes are normalized under `normalize_quotes`.
-        match &parser.current_kind {
+        match parser.current_kind() {
             TokenKind::String { quote } => {
-                let content = &parser.source()[parser.current_start + 1..parser.current_end - 1];
+                let content =
+                    &parser.source()[parser.current_start() + 1..parser.current_end() - 1];
                 if normalize_quotes {
-                    prelude.push_str(&format_string_literal(content, *quote));
+                    prelude.push_str(&format_string_literal(content, quote));
                 } else {
-                    prelude.push(*quote);
+                    prelude.push(quote);
                     prelude.push_str(content);
-                    prelude.push(*quote);
+                    prelude.push(quote);
                 }
             }
             _ => prelude.push_str(parser.current_value()),
@@ -312,7 +313,7 @@ pub(super) fn parse_raw_prelude_content<'arena>(
         trailing_spaces = 0;
         ends_in_verbatim_run = false;
 
-        let current_kind = parser.current_kind;
+        let current_kind = parser.current_kind();
 
         parser.advance()?;
 
@@ -325,7 +326,7 @@ pub(super) fn parse_raw_prelude_content<'arena>(
             } else if pads_comment {
                 // Add space after comment, but not if followed by comma, close paren, or semicolon
                 if !matches!(
-                    parser.current_kind,
+                    parser.current_kind(),
                     TokenKind::Comma | TokenKind::RightParen | TokenKind::Semicolon
                 ) {
                     prelude.push(' ');
@@ -403,7 +404,7 @@ pub(super) fn parse_raw_prelude_content<'arena>(
     let content = parser.alloc_str_in(crate::escapes::trim_end_preserving_escape(
         crate::escapes::trim_start_css(&prelude),
     ));
-    let prelude_end = parser.span_pos(parser.current_start);
+    let prelude_end = parser.span_pos(parser.current_start());
     let span = Span {
         start: prelude_start,
         end: prelude_end,

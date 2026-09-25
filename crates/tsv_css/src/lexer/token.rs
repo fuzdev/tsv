@@ -99,12 +99,15 @@ impl fmt::Display for TokenKind {
     }
 }
 
-/// A lexed CSS token: a 16-byte POD (`kind` + two `u32` spans) returned by value
-/// from `next_token`. The decoded value of an escaped identifier is kept
-/// **out-of-band** on the `Lexer` (a reused `decode_scratch` buffer, borrowed via
-/// `decoded_str`) rather than inline here, so the common no-escape identifier costs
-/// no allocation and the hot token does not carry a `String`. `Clone` (not `Copy`)
-/// mirrors `tsv_ts::Token`.
+/// A lexed CSS token: a 16-byte POD (`kind` + two `u32` spans). The parser's hot path
+/// — `advance` and `peek_kind` — has the lexer write it in place into the current-token
+/// and lookahead slots (`next_token_into`); every other caller takes it by value
+/// (`next_token`): the parser's bootstrap and its boundary re-read (`token_at`), the
+/// temporary scan lexers, the printer's token scans, and `debug_token_stream`. The
+/// decoded value of an escaped identifier is kept **out-of-band** on the `Lexer` (a reused
+/// `decode_scratch` buffer, borrowed via `decoded_str`) rather than inline here, so the
+/// common no-escape identifier costs no allocation and the hot token does not carry a
+/// `String`. `Clone` (not `Copy`) mirrors `tsv_ts::Token`.
 #[derive(Debug, Clone)]
 pub struct Token {
     pub kind: TokenKind,
@@ -112,7 +115,10 @@ pub struct Token {
     pub end: u32,
 }
 
-// The 16-byte size is load-bearing: it keeps `next_token`'s by-value return in
-// registers. `TokenKind`'s widest payload is `String { quote: char }` (align 4),
-// so `kind` is 8 bytes + two `u32` spans = 16.
+// Guards the hot-path invariant: `Token` is a 16-byte POD with no heap-owning field, so
+// the parser's in-place write of it (`next_token_into`, into the current-token or the
+// lookahead slot) stays one 16-byte store per token. The size does NOT make a
+// `Result<Token, ParseError>` return come back in registers — that goes through a stack
+// slot, which is why the hot path writes in place. `TokenKind`'s widest payload is
+// `String { quote: char }` (align 4), so `kind` is 8 bytes + two `u32` spans = 16.
 const _: () = assert!(size_of::<Token>() == 16);

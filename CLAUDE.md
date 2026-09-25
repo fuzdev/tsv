@@ -928,7 +928,7 @@ Worked example + full design: ./docs/architecture.md §Two-AST Design.
 ### Position Types: u32 vs usize
 
 - **Span**: `u32` for start/end (8 bytes total, 50% memory savings vs usize)
-- **`Token`**: `u32` start/end — a 16-byte POD `{kind, start, end}` returned from `next_token` in registers (size pinned by a `const` assert in tsv_ts and tsv_css; tsv_svelte's leaner `Token` pins at 12 B); the decoded value (escapes only) lives out-of-band on the lexer (the reused `Lexer::decode_scratch` buffer, borrowed via `decoded_str`)
+- **`Token`**: `u32` start/end — a 16-byte POD `{kind, start, end}`, its size pinned by a `const` assert in tsv_ts and tsv_css (tsv_svelte's leaner `Token` pins at 12 B). On the hot advance path (both parsers' `advance`, plus tsv_css's `peek_kind`) the TS and CSS lexers write it straight into the parser's token slot through `next_token_into`, since a by-value `Result<Token, ParseError>` comes back through a stack slot the parser would reload and re-scatter; everything else — bootstrap, cold re-lexes, lookahead scans (tsv_ts's `peek_kind`), temporary scan lexers, the CSS printer's token scans — takes the token by value (`next_token`). The decoded value (escapes only) lives out-of-band on the lexer (the reused `Lexer::decode_scratch` buffer, borrowed via `decoded_str`)
 - **Lexer/Parser positions**: `usize` (natural for `source[pos]` indexing); the lexer dispatches on raw bytes (`cur_byte`) and decodes a `char` only at non-ASCII branches
 - **Conversions at boundaries only**: `as u32` when creating Spans/`Token` fields, `as usize` when extracting; prefer `span.extract(source)` / `span.range()` over manual casts
 
