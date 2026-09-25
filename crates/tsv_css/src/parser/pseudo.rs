@@ -49,7 +49,11 @@ pub(crate) fn parse_pseudo_selector<'arena>(
     // LeftParen` is that same condition one token earlier. `peek_kind` parks the `(` in
     // the lookahead slot without touching `current_decoded`, so `current_identifier()`
     // still yields the name.
-    let arg_kind = if parser.peek_kind()? == TokenKind::LeftParen {
+    //
+    // The peek stays out of line: an optimized build inlines this parse (through
+    // `parse_simple_selector`) into `parse_complex_selector`, whose frame every level of a
+    // nested selector-list argument stacks, and an inlined lex grows that frame.
+    let arg_kind = if parser.peek_kind_outlined()? == TokenKind::LeftParen {
         Some(classify_pseudo_args(
             parser.current_identifier(),
             is_pseudo_element,
