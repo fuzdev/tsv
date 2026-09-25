@@ -151,10 +151,11 @@ pub enum ParenContext {
     /// operands but still parenthesized for clarity).
     SuperClass,
 
-    /// Left side of an assignment: `<expr> = …` / `<expr> += …`.
-    /// A type-assertion target (`as` / `satisfies` / `<T>`) must be parenthesized —
-    /// `(x as T) = 1` (bare `x as T = 1` is a parse error). Non-null `x!` is valid
-    /// bare, so it isn't wrapped (matches prettier).
+    /// Left side of an assignment: `<expr> = …` / `<expr> += …`, whole or as a
+    /// destructuring default's target. Every left the grammar's
+    /// `LeftHandSideExpression` does not derive bare keeps a pair — see the arm in
+    /// [`needs_parens`]. Non-null `x!` is valid bare, so it isn't wrapped (matches
+    /// prettier).
     AssignmentTarget,
 }
 
@@ -472,13 +473,35 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
                 )
         }
 
-        // A type-assertion target needs parens to round-trip (`(x as T) = …`);
-        // non-null `x!` is a valid bare assignment target, so it isn't wrapped.
+        // An assignment's left must be a `LeftHandSideExpression`; a target that is not
+        // one bare parsed only because the author parenthesized it (the deferred
+        // `AssignmentTargetType` early error — tsc's parser accepts the pair), so the
+        // pair is load-bearing and stays, by KIND, under every assignment operator:
+        // - a type assertion (`(x as T) = …`; bare `x as T = 1` is a tsc parse error);
+        // - an operator expression — unary, update, `await`, binary, logical — whose
+        //   bare reprint (`-a = 1`) is a grammar error;
+        // - an alternative of `AssignmentExpression` itself — conditional, arrow,
+        //   `yield` — whose bare reprint absorbs the `=` (`a ? b : c = 1` is
+        //   `a ? b : (c = 1)`), a different program;
+        // - a function expression, whose body tsc's parser does not continue past into
+        //   an `=` (TS2809 on `x = function () {} = 1`); a class expression it does, so
+        //   that one stays bare.
+        // Prettier strips all but the assertions (docs/conformance_prettier_ts.md
+        // §TypeScript, "Non-LHS assignment target parens"). Non-null `x!` is a valid
+        // bare target, so it isn't wrapped.
         ParenContext::AssignmentTarget => matches!(
             expr.kind,
             ExpressionKind::TSAsExpression(_)
                 | ExpressionKind::TSSatisfiesExpression(_)
                 | ExpressionKind::TSTypeAssertion(_)
+                | ExpressionKind::UnaryExpression(_)
+                | ExpressionKind::UpdateExpression(_)
+                | ExpressionKind::AwaitExpression(_)
+                | ExpressionKind::BinaryExpression(_)
+                | ExpressionKind::ConditionalExpression(_)
+                | ExpressionKind::ArrowFunctionExpression(_)
+                | ExpressionKind::YieldExpression(_)
+                | ExpressionKind::FunctionExpression(_)
         ),
     }
 }
@@ -770,7 +793,25 @@ pub(crate) fn leftmost_no_lookahead_reached<'a>(
         match &expr.kind {
             // Binary and logical share `BinaryExpression` here — recurse into `.left`.
             ExpressionKind::BinaryExpression(b) => walk(b.left, false),
-            ExpressionKind::AssignmentExpression(a) => walk(a.left, false),
+            // A non-LHS target that takes its own pair (`(function () {}) = 1`, `(a + b)
+            // = 1`) already prints `(` first, so the walk stops there, as at an IIFE
+            // callee — descending would wrap a leading function a second time. A cast
+            // target's pair is older and prettier's: prettier still descends through it
+            // and wraps the leftmost node inside (`(({}).x as T) = 1`), so for the three
+            // cast kinds the walk goes on, matching it.
+            ExpressionKind::AssignmentExpression(a) => {
+                let cast_target = matches!(
+                    a.left.kind,
+                    ExpressionKind::TSAsExpression(_)
+                        | ExpressionKind::TSSatisfiesExpression(_)
+                        | ExpressionKind::TSTypeAssertion(_)
+                );
+                if !cast_target && needs_parens(a.left, ParenContext::AssignmentTarget, false) {
+                    (expr, computed_member_object)
+                } else {
+                    walk(a.left, false)
+                }
+            }
             ExpressionKind::MemberExpression(m) => walk(m.object, m.computed && !m.optional),
             ExpressionKind::ConditionalExpression(c) => walk(c.test, false),
             ExpressionKind::SequenceExpression(s) => s

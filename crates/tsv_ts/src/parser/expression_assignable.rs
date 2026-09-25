@@ -353,13 +353,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// property value, a parameter): `AssignmentExpression.left` and the for-head's
     /// `left` derive `LeftHandSideExpression` / `AssignmentPattern`-proper, and neither
     /// covers an `Initializer` of its own. So a parenthesized assignment there —
-    /// `(a = b) = 1`, `for ((a = b) of xs)` — has no wire shape: acorn never emits an
-    /// `AssignmentPattern` at either position and rejects ("Assigning to rvalue"), and
-    /// the bare reprint `a = b = 1` re-parses as a different, valid program. The
-    /// representability and faithful-reprint floors both say reject, ahead of the
-    /// non-simple-target deferral. Only the parenthesized spelling reaches this: an
-    /// unparenthesized `a = b = 1` parses right-associative, so its left is never an
-    /// assignment.
+    /// `(a = b) = 1`, `for ((a = b) of xs)` — has no wire shape: conversion turns the
+    /// parenthesized `=` into an `AssignmentPattern`, which acorn never emits at either
+    /// position (it rejects, "Assigning to rvalue"), and no assignment is left in the
+    /// tree for a kept pair to wrap. The representability floor says reject, ahead of
+    /// the non-simple-target deferral. A parenthesized conditional, arrow or `yield` is
+    /// never converted, so it survives as itself and defers with the rest. Only the
+    /// parenthesized spelling reaches this: an unparenthesized `a = b = 1` parses
+    /// right-associative, so its left is never an assignment.
     pub(super) fn to_whole_assignable(
         &self,
         expr: Expression<'arena>,
@@ -371,6 +372,66 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return Err(self.error_msg_at("Invalid assignment target", start));
         }
         Ok(target)
+    }
+
+    /// Reject an assignment left that no `LeftHandSideExpression` derives — the
+    /// GRAMMAR error, as opposed to the deferred `AssignmentTargetType` early error
+    /// `to_assignable` lets through.
+    ///
+    /// `AssignmentExpression : LeftHandSideExpression AssignmentOperator
+    /// AssignmentExpression` (ecma262 §13.15, and the same left for `=` and the logical
+    /// assignments) takes a `LeftHandSideExpression`, which an unparenthesized operator
+    /// expression is not: a unary (`-a`, `typeof a`), an update (`++a`, `a++`), an
+    /// `await`, a binary or a logical expression. tsc's parser rejects every one
+    /// (TS1005), and so do acorn (`Assigning to rvalue`) and prettier. Parenthesized, the
+    /// same operand is a `ParenthesizedExpression` — a `PrimaryExpression` — and only the
+    /// early error refuses it, so `(-a) = 1` defers like `foo() = bar` (tsc's parser
+    /// accepts it) and the printer keeps the pair (`ParenContext::AssignmentTarget`).
+    ///
+    /// A bare type assertion (`a as T = 1`, `<T>a = 1`) is no `LeftHandSideExpression`
+    /// either, and tsc's parser refuses it; tsv follows acorn-typescript, which accepts
+    /// one over a SIMPLE operand (an identifier or a member, through further assertions)
+    /// — the printer repairs it to `(a as T) = 1`, the spelling every parser reads alike.
+    /// Over any other operand (`-a as T = 1`, `fn() as T = 1`, `[a, b] as T = c`) both
+    /// oracles reject, and so does this.
+    ///
+    /// "Unparenthesized" is read off the node's extent against the expression's: a
+    /// grouped operand starts after the `(` the parse began at (`expr_start`) and ends
+    /// before the `)` last consumed (`prev_token_end`), whatever comments or line breaks
+    /// sit inside the pair. A node whose operator came first (`-(a)`) or last (`(a)++`),
+    /// or that a binary built from the pair outward (`(a) + b`), fails one side.
+    pub(super) fn check_bare_assignment_left(
+        &self,
+        left: &Expression<'arena>,
+        expr_start: usize,
+    ) -> Result<(), ParseError> {
+        let span = left.span();
+        let parenthesized =
+            span.start_usize() > expr_start && (span.end as usize) < self.prev_token_end();
+        if parenthesized {
+            return Ok(());
+        }
+        let refused = match &left.kind {
+            ExpressionKind::UnaryExpression(_)
+            | ExpressionKind::UpdateExpression(_)
+            | ExpressionKind::AwaitExpression(_)
+            // a logical expression too: the internal AST folds `&&` / `||` / `??` into
+            // `BinaryExpression`
+            | ExpressionKind::BinaryExpression(_) => true,
+            ExpressionKind::TSAsExpression(_)
+            | ExpressionKind::TSSatisfiesExpression(_)
+            | ExpressionKind::TSTypeAssertion(_) => !matches!(
+                left.skip_type_assertions().kind,
+                ExpressionKind::Identifier(_) | ExpressionKind::MemberExpression(_)
+            ),
+            _ => false,
+        };
+        if refused {
+            return Err(
+                self.error_msg_at("Invalid left-hand side in assignment", span.start_usize())
+            );
+        }
+        Ok(())
     }
 
     /// The `(` of the grouping paren pair wrapping exactly `span`, if one was recorded

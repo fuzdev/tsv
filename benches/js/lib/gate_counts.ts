@@ -250,11 +250,19 @@ export const TS_FIXTURES_PINS: GatePins = { scanned: 226, both_accept: 202, over
  * is the checker's TS1155 on `for (using of;;)`, the missing initializer tsv defers
  * like `const x;`'s (conformance_svelte.md §TypeScript Corrections, the
  * for_head_c_style_of_binding entry); every other bucket unmoved.
+ *
+ * 19 → 16 `over_acceptance_parser`: `incrementAndDecrement.ts` (`x++ = 4`),
+ * `awaitUsingDeclarations.4.ts` (`await using [a] = null`, read as `await (using[a])`)
+ * and `privateNameInInExpressionTransform.ts` (`'prop' in v = 10`) left it for reject
+ * parity — each TS1005 in tsc's parser — when a bare operator expression stopped being
+ * accepted as an assignment's left (no `LeftHandSideExpression` derives it; conformance_svelte.md
+ * §TypeScript Corrections, the non-simple assignment target entry). A head-vs-new parse A/B
+ * over all of tests/cases moved no other file, and every other bucket is unmoved.
  */
 export const TS_REPO_PINS = {
 	scanned: 13708,
 	accept_parity: 12284,
-	over_acceptance_parser: 19,
+	over_acceptance_parser: 16,
 	over_acceptance_checker: 468,
 	units_scanned: 7874,
 	units_accept_parity: 7858
