@@ -507,9 +507,9 @@ spelling that reaches those two unguarded assignments instead:
   and `{#each}`'s repeated `{:else}`
   (`Duplicate {:else} clause`,
   [each/else_duplicate](../tests/fixtures/svelte/blocks/each/else_duplicate_svelte_divergence/)).
-  A continuation that is neither (`{:catch}` after an `{:else}`) is left to the
-  unclosed-block error, since canonical rejects it too and the verdict already
-  matches.
+  A continuation that is neither (`{:catch}` after an `{:else}`) takes the
+  misplaced-continuation error in canonical's wording (`Expected token {:else} or
+  {:else if}`), since canonical rejects it too and the verdict already matches.
 
 The `{#await}` arm is **matched**, not corrected — the permissive reading there
 (overwriting `then` / `catch` exactly the way canonical's `{:else}` does) is what
@@ -608,6 +608,66 @@ arrow, pinned in
 regex finds nothing to substitute — which is why this stayed invisible until an injected
 input produced one ([audits.md §Wire-Injection](./audits.md#wire-injection-audit-wireaudit)) —
 [context_annotation_optional_member](../tests/fixtures/svelte/blocks/each/context_annotation_optional_member_svelte_divergence/)
+
+**An expression tail after a block binding's type annotation** —
+`{@const a: T as U = x}`, `{:then v: T satisfies U}`, `{#await p then v: T + 1}`,
+`{#each xs as x: A ? B : C (x)}`. Canonical accepts; **tsv rejects**, a `tsv_rejects.txt`
+over-rejection. It is the same reader as the entry above. `read_type_annotation` does not parse
+a type. It eats the `:`, overwrites the five bytes ending at it with `_ as `, and hands acorn
+an *expression* parse from there. It then trims only two things off the result: a
+`{@const}`'s `= init` (an `AssignmentExpression` is re-parsed up to its `=`) and anything after
+a top-level `,` (a `SequenceExpression` keeps its first operand). Whatever else acorn-typescript
+reads as one expression becomes the annotation's extent. The node emitted is
+`{ type: 'TSTypeAnnotation', typeAnnotation: expression.typeAnnotation }` — the *outermost*
+expression's own field — so the annotation has no tree for anything but its last type:
+
+- **An `as` / `satisfies` chain** — `T as U`, `T satisfies U`, `T as U as V`, `T | U as V`,
+  `keyof T as U`, `(T) as U`, `T as const` — is accepted in every `read_pattern` position:
+  `{@const}`, `{#each}`, both `{#await}` shorthands, `{:then}`, `{:catch}`. The span covers
+  the whole run, but `typeAnnotation` is only the **last** type. `T` is dropped, and `as const`
+  comes back as a `TSTypeReference` named `const`.
+- **Any other binary, logical or conditional operator** — `T + 1`, `T && U`, `T ?? U`,
+  `T == U`, `T in U`, `T instanceof U`, `T > U`, `T ? U : V` — is accepted in every block
+  position, with **no `typeAnnotation` at all**. `{@const}` rejects these, because its `= init`
+  lands inside the operand (`T ? U : V = x` puts the assignment in the alternate) or makes the
+  target invalid (`T + 1 = x`).
+- **The `{#each}` key is swallowed by any operator tail.** An operator tail's last operand is a
+  `LeftHandSideExpression`, so the key's `(` continues it as a call:
+  `{#each xs as x: A ? B : C (x)}`, `x: T + C (x)`, `x: T && C (x)` and `[a]: T + 1 (a)` each
+  yield an annotation that runs through the parenthesized key, and a block with **no key**. An
+  `as` / `satisfies` chain keeps the key (`x: T as U (x)` → key `x`), because a type cannot be
+  called, and so does an index (`x: T + 1, i (x)`), because the top-level `,` ends the parse
+  before the key.
+
+None of these is a type. tsc's parser rejects every one in every annotation position, variable,
+parameter, `catch` binding and `for` head alike, with TS1005 (`',' expected.`,
+`';' expected.` or `')' expected.`, depending on where the error lands). So this is an unconditional, local grammar
+error. acorn-typescript and prettier's `typescript` parser reject `let v: T as U` too. The
+acceptance comes only from the synthetic `_ as` expression. That is the class tsv
+rejects rather than defers ([§Strictness](../CLAUDE.md#strictness-module-strict-script-by-directive)).
+No faithful tree exists to emit. Canonical's own tree either loses the author's type or has
+none. prettier-plugin-svelte prints `{@const}` verbatim, but in the block positions it prints from
+that tree, so it drops `T` (`{#await p then v: U}`) and throws on the type-less ones. So tsv rejects rather than build either
+tree, as it does with the bare assertion under `**`
+([exponentiation_type_assertion_bare](../tests/fixtures/typescript/expressions/exponentiation_type_assertion_bare_svelte_divergence/))
+and the decorated modifier line break
+([decorators/declare_line_break](../tests/fixtures/typescript/typescript_specific/decorators/declare_line_break_svelte_divergence/)).
+tsv's annotation is a TS type parse bounded by the type's own end, so the tail is left for the
+caller's grammar: `{@const}` reports `Expected token =`, and the block heads report
+`Expected '}'`. Canonical accepts these spellings only in a `lang="ts"` component. In a non-TS
+component it rejects every block-binding annotation, a plain `x: T` included, with
+`expected_token`. tsv accepts a plain annotation there, a separate over-acceptance tracked under
+[§TypeScript-mode gating](#typescript-mode-gating-tracked-over-acceptance), and rejects these
+tails in both. Four `tsv_rejects.txt` fixtures across three contexts:
+[const_annotation_expression_tail](../tests/fixtures/svelte/tags/const/const_annotation_expression_tail_svelte_divergence/)
+(an `as` chain in `{@const}`),
+[typed_value_expression_tail](../tests/fixtures/svelte/blocks/await/typed_value_expression_tail_svelte_divergence/)
+(a `satisfies` chain in `{:then}`),
+[typed_value_operator_tail](../tests/fixtures/svelte/blocks/await/typed_value_operator_tail_svelte_divergence/)
+(a type-less operator tail in the `then` shorthand),
+[context_annotation_key_swallow](../tests/fixtures/svelte/blocks/each/context_annotation_key_swallow_svelte_divergence/)
+(the swallowed `{#each}` key). **Upstream candidate**: Svelte — `read_type_annotation` should
+read a type (acorn-typescript's type parser), not the tail of a synthetic `_ as` expression.
 
 **A strict-mode-reserved word as a name** ([strict_reserved_name](../tests/fixtures/typescript/declarations/variable/strict_reserved_name_svelte_divergence/); the load-bearing parens that follow from it are [statement_head_paren](../tests/fixtures/typescript/statements/expression/statement_head_paren_svelte_divergence/)) — `implements`, `interface`, `let`, `package`, `private`, `protected`, `public`, `static`, `yield` are barred as names by a *single* bullet of ecma262 §sec-identifiers-static-semantics-early-errors, a Static Semantics early error tsv defers. So tsv parses all nine as names in every position — `var let = 1`, `function f(yield) {}`, `class implements {}`, `function f(private) {}`, `enum yield {}`, `private: for (;;) break private;`, `type T = X extends Y ? infer let : never` — as tsc's parser and prettier do, while acorn enforces the early error and rejects. Most of the list was always accepted, because tsv's lexer leaves those words as plain `Identifier`s; the holes were `let`/`yield` (keyword-lexed) and `implements`/`private`/`protected`/`public` (swallowed by a competing syntactic role), and both are artifacts of tokenization and lookahead rather than rules.
 
@@ -1319,6 +1379,7 @@ because regex bodies are opaque, so it does not meet this section's bar and will
 
 - each-`as` stale `loc.end` — TS-mode as-expression unwrap patches the expression's `end` offset but not `loc.end`
 - Block-annotation `?:` rewrite — `read_type_annotation`'s `.replace(/\?\s*:/g, ':')` edits the string acorn measures positions in, so an optional member in a block binding's `: T` loses `optional` and shifts every later offset one byte short (see §TypeScript Corrections)
+- Block-annotation expression tail — `read_type_annotation` parses the annotation as the tail of a synthetic `_ as` *expression*, so an `as` / `satisfies` chain keeps only its last type, any other operator tail leaves the annotation with no type at all, and in `{#each}` an operator tail swallows the `(key)` as a call. It should read a type (see §TypeScript Corrections)
 
 ### Comment Attachment Differences
 

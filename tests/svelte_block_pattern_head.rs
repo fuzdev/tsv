@@ -11,6 +11,9 @@
 //! debug-assert panic in a debug build, and the parens silently dropped in a release one
 //! (`{@const (a.b) = x}` → `{@const a.b = x}`).
 //!
+//! The same reader decides whether a `{:then}` / `{:catch}` continuation HAS a value, and the
+//! continuation dispatch ahead of it decides which keyword the `{:` names.
+//!
 //! Each case is verified against canonical Svelte via `tsv_debug canonical_parse`.
 
 /// Format `src` as a Svelte component — the path whose printer a paren-shell id would panic.
@@ -179,5 +182,81 @@ fn unmatched_pattern_bracket_reports_at_the_bracket() {
             src.find(at),
             "`{src}` should report at its opening bracket, got: {err}"
         );
+    }
+}
+
+/// Every character canonical's `is_whitespace` admits (`1-parse/index.js`) — tsv's
+/// `is_svelte_ws`, JS `\s`. CR is in the class, though the format path folds it to LF first.
+const SVELTE_WS: &[char] = &[
+    '\t', '\n', '\u{b}', '\u{c}', '\r', ' ', '\u{a0}', '\u{1680}', '\u{2000}', '\u{2001}',
+    '\u{2002}', '\u{2003}', '\u{2004}', '\u{2005}', '\u{2006}', '\u{2007}', '\u{2008}', '\u{2009}',
+    '\u{200a}', '\u{2028}', '\u{2029}', '\u{202f}', '\u{205f}', '\u{3000}', '\u{feff}',
+];
+
+/// A `{:then}` / `{:catch}` continuation is valueless only when its `}` follows the keyword
+/// directly. Canonical's `next` tries `eat('}')` first and otherwise commits to a pattern, so
+/// any whitespace run with no pattern behind it is `expected_pattern` — while the same run
+/// ahead of a pattern, and the opening shorthand's `{#await p then<ws>}`, stay valid.
+#[test]
+fn await_continuation_whitespace_only_value_is_a_parse_error() {
+    for &ws in SVELTE_WS {
+        for keyword in ["then", "catch"] {
+            let src = format!("{{#await p}}x{{:{keyword}{ws}}}y{{/await}}");
+            let err = format(&src).expect_err(&format!("tsv should reject {src:?}"));
+            assert!(
+                err.contains("Expected identifier or destructure pattern"),
+                "{src:?} should fail at the missing pattern, got: {err}"
+            );
+        }
+        for src in [
+            format!("{{#await p}}x{{:then{ws}v}}{{v}}{{/await}}"),
+            format!("{{#await p}}x{{:catch v{ws}}}{{v}}{{/await}}"),
+            format!("{{#await p then{ws}}}x{{/await}}"),
+            format!("{{#await p catch{ws}}}x{{/await}}"),
+        ] {
+            format(&src).unwrap_or_else(|e| panic!("tsv should accept {src:?}: {e}"));
+        }
+    }
+    for src in [
+        "{#await p}x{:then}y{/await}",
+        "{#await p}x{:catch}y{/await}",
+    ] {
+        format(src).unwrap_or_else(|e| panic!("tsv should accept `{src}`: {e}"));
+    }
+}
+
+/// A continuation keyword must follow the `:` directly — canonical's `next` eats it with no
+/// whitespace skip, though `allow_whitespace` runs between the `{` and the `:`. Reading past
+/// the gap bound a value NAMED `then` in `{: then}` (printed `{:then then}`), and a gap holding
+/// a multi-byte space panicked when `else` was sliced off by its byte length.
+#[test]
+fn continuation_keyword_after_whitespace_is_a_parse_error() {
+    const INVALID: &[&str] = &[
+        "{#await p}x{: then}y{/await}",
+        "{#await p}x{ : then}y{/await}",
+        "{#await p}x{: then v}y{/await}",
+        "{#await p}x{: catch}y{/await}",
+        "{#await p then v}x{: catch e}y{/await}",
+        "{#if a}x{: else}y{/if}",
+        "{#if a}x{: else if b}y{/if}",
+        "{#each xs as x}x{: else}y{/each}",
+        "{#if a}x{:\u{a0}\u{3000}else}y{/if}",
+        "{#if a}x{:\u{a0}\u{3000}else if b}y{/if}",
+        "{#each xs as x}x{:\u{a0}\u{3000}else}y{/each}",
+        "{#await p}x{:\u{a0}\u{3000}then}y{/await}",
+    ];
+    for src in INVALID {
+        assert!(format(src).is_err(), "tsv should reject `{src}`");
+    }
+    const VALID: &[&str] = &[
+        "{#await p}x{ :then}y{/await}",
+        "{#await p}x{ :then v}{v}{/await}",
+        "{#await p}x{:then}y{ :catch e}{e}{/await}",
+        "{#if a}x{ :else}y{/if}",
+        "{#if a}x{ :else if b}y{/if}",
+        "{#each xs as x}x{ :else}y{/each}",
+    ];
+    for src in VALID {
+        format(src).unwrap_or_else(|e| panic!("tsv should accept `{src}`: {e}"));
     }
 }
