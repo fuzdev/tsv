@@ -27,4 +27,9 @@ tsv puts the keyword's space after the run (`2n + 1<NBSP> of`). After the keywor
 agree: the run stands in for the space (`of<NBSP>.class1`), since an ASCII space beside it
 would be a second separator.
 
+Both are the GLUED authorings. A run the author separated from the term or the keyword with
+ASCII whitespace keeps that separation as one space on each side it was written
+(`2n + 1 <NBSP> of`, `of <NBSP> .class1`) — every boundary run's spelling, and prettier's
+answer too, so no divergence there.
+
 See [conformance_prettier_css.md §CSS: Selectors](../../../../../../docs/conformance_prettier_css.md#css-selectors).

@@ -65,13 +65,13 @@
 //! **A skip and a preservation are one change.** Every juncture the parser steps a run at is
 //! a juncture the printer must put it back at, and the printer regenerates most of these gaps
 //! from parts rather than copying source — so a new skip with no matching
-//! `preserved_boundary_ws` / `boundary_ws_in_gap` turns a graceful over-rejection into
+//! `preserved_boundary_ws` / `spell_gap` turns a graceful over-rejection into
 //! content loss, which is the worse trade. Two shapes of claim partition every gap: the
 //! backward scan takes the run CONTIGUOUS with the anchor (and needs a FLOOR wherever the
 //! previous node's own span can end inside the run, or it emits a character the preceding
-//! NAME already carried), and a forward sweep takes what a comment or a symbol strands
-//! earlier in the gap (`Printer::boundary_ws_in_gap_before_anchor`, bounded at the
-//! contiguous run's start so the two never claim one character twice). Three standing
+//! NAME already carried), and a forward sweep takes a gap whole, its comments in place
+//! (`Printer::spell_gap_items`; `Printer::claim_lead_gap` where a container claims a
+//! selector's lead gap and the selector's own backward scan stands down). Three standing
 //! corollaries, each of which has been a live bug: a gap gate keyed on COMMENTS blinds the
 //! preservation that shares it (`::part()`'s `join(" ")`); a printer scan that locates a part
 //! by stepping trivia owes the boundary class too, or it reports the RUN as the part's start
@@ -80,7 +80,7 @@
 //! neighbour can be a name puts an ASCII space ahead of it — which is **five** claims, not
 //! one (`[a<HERE>]`, a list's `,`, an explicit combinator's symbol, a pseudo-argument list's
 //! `)`, and the commented attribute rebuild's interior gaps), all answering
-//! `Printer::name_run_separator` / `name_run_separator_after`. Pinned by
+//! `Printer::name_run_edge` / `name_run_separator_after`. Pinned by
 //! `a_preserved_run_never_moves_a_names_boundary`, whose templates are one per EMITTER.
 //!
 //! A fourth corollary runs the other way, and `a_rebuilt_head_and_its_claim_never_both_keep_the_run`
@@ -146,14 +146,15 @@
 //! The `<NEL>` (U+0085) gap is tracked separately below, with the raw-scan family it belongs
 //! to rather than with this class.
 //!
-//! **The printer's own residue is one position**, ratcheted by
-//! `the_stylesheets_trailing_run_is_a_tracked_drop`: the stylesheet's own trailing
-//! whitespace (the outermost gap has no following construct at all, and a Svelte `<style>`
-//! host trims the island's tail before writing it). Everywhere else — every selector
-//! juncture, every rebuilt block-child head (a declaration's property, an at-rule's `@`, a
-//! comment's `/*`), the property→colon gap on either side of a comment, a block's tail before
-//! its `}`, and every gap of a `@supports` / `@container` condition prelude — the character
-//! comes back.
+//! **The printer's known residue**: the stylesheet's own trailing whitespace, ratcheted by
+//! `the_stylesheets_trailing_run_is_a_tracked_drop` (the outermost gap has no following
+//! construct at all, and a Svelte `<style>` host trims the island's tail before writing it),
+//! and the at-rule preludes whose selector list the printer structures with no boundary claim
+//! (`@scope`, `@custom-selector`), untested here. At every juncture these tables name —
+//! every selector juncture and the gap after a list's comma, every rebuilt block-child head
+//! (a declaration's property, an at-rule's `@`, a comment's `/*`), the property→colon gap on
+//! either side of a comment, a block's tail before its `}`, and every gap of a `@supports` /
+//! `@container` condition prelude — the character comes back.
 //!
 //! ⚠️ Two members of the class are LINE TERMINATORS to the shared line table (`<LS>`, `<PS>`),
 //! so preserving one beside a regenerated newline made the next pass read a blank line where
@@ -796,7 +797,7 @@ fn the_blank_line_rule_is_prettiers_walk_not_a_terminator_count() {
     }
 }
 
-/// ⚠️ **RATCHET for the printer's residue.** One position still DROPS a boundary run the
+/// ⚠️ **RATCHET for the printer's residue.** A known position DROPS a boundary run the
 /// parser skipped: the stylesheet's own trailing whitespace. The outermost gap has no
 /// following construct at all, and under a Svelte `<style>` the host trims the island's tail
 /// before writing it (`formatted_css.trim_end()`, whose Unicode class takes these members) —
@@ -1472,8 +1473,10 @@ fn a_half_skipped_run_would_move_the_selector_lists_own_start() {
 ///
 /// The parser skips them because `parseCss` skips them, but that is a statement about the
 /// AST; dropping one from the OUTPUT is content loss the corpus safety check reads as
-/// `content_lost`. prettier keeps the run verbatim from its first non-ASCII member on — the
-/// ASCII head is indentation, which the printer regenerates — and tsv matches it there.
+/// `content_lost`. prettier keeps the run from its first non-ASCII member on, each ASCII
+/// stretch after it as one space — the ASCII head is indentation, which the printer
+/// regenerates — and tsv matches it there (`an_ascii_stretch_in_or_beside_a_run_is_one_space`
+/// pins the spelling).
 #[test]
 fn the_printer_keeps_every_member_of_a_mixed_run() {
     for (label, ch) in JS_WHITESPACE_AT_OR_ABOVE_A0 {
@@ -1671,7 +1674,7 @@ const PRINTER_ONLY_JUNCTURES: [(&str, &str); 17] = [
 /// (`:is(a <NBSP>)`), every interior gap of the commented attribute rebuild
 /// (`[a/* c */ <NBSP>=b]`), and a condition prelude's part head behind a CONNECTOR
 /// (`@supports and <NBSP>(a: b)`). One rule answers all of them —
-/// `Printer::name_run_separator` from a source position, `name_run_separator_after` from
+/// `Printer::name_run_edge` from a source position, `name_run_separator_after` from
 /// built text — so the templates below are one per EMITTER, with the non-name left
 /// neighbours (`a[b] <NBSP>,`, `* <NBSP>,`) beside them as the controls that keep the
 /// separator from becoming unconditional.
@@ -1836,23 +1839,468 @@ fn a_rebuilt_head_and_its_claim_never_both_keep_the_run() {
     }
 }
 
-/// ⚠️ **RATCHET.** An ASCII whitespace run *interior* to a preserved run keeps the author's
-/// spelling; prettier respells it as a single space.
+/// Every template the two ASCII-spelling tests below sweep: the three juncture tables, plus
+/// the claims whose templates live in single tests above — the gaps that end against a
+/// delimiter behind a NAME (`,`, `)`, a combinator symbol, the attribute selector's tail), the
+/// gap before a rule's `{`, the property→colon gap, and the An+B junctures.
 ///
-/// Nothing is lost either way — both are ASCII whitespace, and every non-ASCII member
-/// survives — so this is a spelling difference, in a run no authored stylesheet contains.
-/// It is the one place `preserved_boundary_ws` and prettier disagree, and it is pinned rather
-/// than closed because collapsing it would give the printer two whitespace policies inside
-/// one run, and prettier is not a coherent oracle in this corner anyway: at the `[` juncture
-/// it DROPS the character outright (`[<NBSP>a]` → `[a]`) where tsv keeps it.
+/// ⚠️ A condition prelude's part heads (`@supports <NBSP> (a: b)`) are NOT here: an ASCII
+/// stretch after the run sends the whole prelude down the raw verbatim path, where no claim
+/// spells anything — the prelude reader's gap, not a spelling one.
+fn ascii_spelling_templates() -> Vec<&'static str> {
+    BOUNDARY_JUNCTURES
+        .iter()
+        .map(|(_, template, _)| *template)
+        .chain(
+            COMMENT_AFTER_RUN_JUNCTURES
+                .iter()
+                .map(|(_, template)| *template),
+        )
+        .chain(PRINTER_ONLY_JUNCTURES.iter().map(|(_, template)| *template))
+        .chain([
+            "<style>a {T}> b { color: red; }</style>",
+            "<style>a {T}~ b { color: red; }</style>",
+            "<style>a {T}:hover { color: red; }</style>",
+            "<style>a {T}[b] { color: red; }</style>",
+            "<style>:is(a {T}> b) { color: red; }</style>",
+            "<style>a {T}, b { color: red; }</style>",
+            "<style>a.x {T}, c { color: red; }</style>",
+            "<style>@keyframes k { 0% {T}, 50% { color: red; } }</style>",
+            "<style>:is(a {T}) { color: red; }</style>",
+            "<style>:is(a, b {T}) { color: red; }</style>",
+            "<style>a:has(b {T}) { color: red; }</style>",
+            "<style>::part(a {T}) { color: red; }</style>",
+            "<style>[a {T}] { color: red; }</style>",
+            "<style>[a='b' {T}] { color: red; }</style>",
+            "<style>[a='b' {T}i] { color: red; }</style>",
+            "<style>a {T}{ color: red; }</style>",
+            "<style>a,{T}b { color: red; }</style>",
+            "<style>a /* c */{T}{}</style>",
+            "<style>a{T}/* c */{}</style>",
+            "<style>a { color{T}: red; }</style>",
+            "<style>a { --x{T}: 1; }</style>",
+            "<style>:nth-child({T}2n) { color: red; }</style>",
+            "<style>:nth-child(2n{T}) { color: red; }</style>",
+            "<style>:nth-child(2n{T}+ 1) { color: red; }</style>",
+            "<style>:nth-child(2n +{T}1) { color: red; }</style>",
+            "<style>:nth-child(2n{T}of .b) { color: red; }</style>",
+            "<style>:nth-child(2n of{T}.b) { color: red; }</style>",
+        ])
+        .collect()
+}
+
+/// `style` (a `<style>…</style>` template, filled) formatted under each host that prints a
+/// stylesheet: a top-level `<style>`, a `<style>` nested in an element, and a `.css` file.
+///
+/// The `.css` source opens on a line break so that no member of the run sits at SOURCE offset
+/// 0, where a `<ZWNBSP>` would be read as a byte-order mark and stripped by policy. The OUTPUT
+/// may still begin with that member — the leading break is not kept — and then tsv writes the
+/// protective BOM ahead of it (`leading_zwnbsp_prettier_divergence`); [`members_in`] steps it.
+fn format_in_every_host(style: &str) -> [(&'static str, String); 3] {
+    let sheet = style
+        .strip_prefix("<style>")
+        .and_then(|s| s.strip_suffix("</style>"))
+        .expect("a `<style>` template");
+    [
+        ("top-level", format_svelte(&component(style))),
+        (
+            "nested",
+            format_svelte(&format!("<div>\n{style}\n</div>\n")),
+        ),
+        ("css", format_css(&format!("\n{sheet}\n"))),
+    ]
+}
+
+fn format_svelte(src: &str) -> String {
+    tsv_svelte::format_str(src).expect("component should format")
+}
+
+fn format_css(src: &str) -> String {
+    tsv_css::format_str(src).expect("sheet should format")
+}
+
+/// `out` formatted again under the host that produced it.
+fn reformat(host: &str, out: &str) -> String {
+    match host {
+        "css" => format_css(out),
+        _ => format_svelte(out),
+    }
+}
+
+/// How many times `ch` occurs in `out` as a CONTENT character — a leading BOM written to
+/// protect a content `<ZWNBSP>` behind it is not one.
+fn members_in(out: &str, ch: &str) -> usize {
+    let content = out
+        .strip_prefix('\u{feff}')
+        .filter(|rest| rest.starts_with('\u{feff}'))
+        .unwrap_or(out);
+    content.matches(ch).count()
+}
+
+/// Every ASCII whitespace stretch inside or beside a preserved run prints as ONE space — its
+/// presence kept, its spelling normalized — never a tab, a double space or a line break, and
+/// never nothing where the author wrote something: a stretch between two members stays one
+/// space (`<NBSP><TAB><NBSP>` → `<NBSP><SP><NBSP>`), and a stretch that separated the run
+/// from a NAME or an An+B term keeps it separated (`a <ZWNBSP>{` never becomes `a<ZWNBSP> {`,
+/// `2n<TAB><NBSP><TAB>+ 1` never `2n<TAB><NBSP> + 1`).
+///
+/// prettier's answer at every juncture where it keeps the run (it drops the run inside a `[`,
+/// where tsv keeps it — a cataloged divergence this test takes no side on). Nothing about the
+/// selector moves either way under `parseCss`, which skips the whole run; under css-syntax-3
+/// the spelling is the claim — `<NBSP><NBSP>` is one identifier where `<NBSP> <NBSP>` is two,
+/// and `a<ZWNBSP>` one where `a <ZWNBSP>` is a type selector and a descendant — so a stretch
+/// welded to nothing changes the selector a browser reads, and one respelled as a line break
+/// rides out raw inside a text node. Fitting output only: every template is far from the
+/// print width, so no break here is tsv's own.
 #[test]
-fn an_interior_ascii_run_keeps_its_spelling() {
-    let out = tsv_svelte::format_str(&component(
-        "<style>\u{a0}\t\u{a0}zz { color: red; }</style>",
-    ))
-    .expect("component should format");
+fn an_ascii_stretch_in_or_beside_a_run_is_one_space() {
+    let mut failures = Vec::new();
+    for template in ascii_spelling_templates() {
+        for (label, ch) in JS_WHITESPACE_AT_OR_ABOVE_A0 {
+            for (run, interior) in [
+                (format!("{ch}\t{ch}"), true),
+                (format!("{ch}\n{ch}"), true),
+                (format!("{ch}  {ch}"), true),
+                (format!(" {ch} "), false),
+                (format!("\t{ch}\t"), false),
+                // A comment among the members: each item stays where the author put it, glued
+                // where they glued it (`printer/boundary_ws.rs` §How a claim is spelled).
+                (format!("{ch}/* c */{ch}"), false),
+                (format!(" {ch}/* c */"), false),
+                (format!("/* c */{ch} "), false),
+                (format!(" {ch} /* c */ {ch} "), false),
+                (format!(" /* c */ {ch} /* d */ "), false),
+            ] {
+                if run.contains("/*") && !gap_owns_its_comments(template) {
+                    continue;
+                }
+                let style = template.replace("{T}", &run);
+                let input = component(&style);
+                for (host, out) in format_in_every_host(&style) {
+                    let fault = spelling_fault(&out, ch, &run, interior)
+                        .or_else(|| {
+                            (members_in(&out, ch) != run.matches(ch).count())
+                                .then_some("member count")
+                        })
+                        .or_else(|| meaning_fault(&input, &out, ch))
+                        .or_else(|| comment_fault(&input, &out))
+                        .or_else(|| (reformat(host, &out) != out).then_some("not a fixed point"));
+                    if let Some(fault) = fault {
+                        failures.push(format!(
+                            "{label} {host} {template} (run {run:?}): {fault}: {out:?}"
+                        ));
+                    }
+                }
+            }
+        }
+    }
     assert!(
-        out.contains("\u{a0}\t\u{a0}zz"),
-        "the interior TAB is kept as written; prettier respells it as a space — got {out:?}"
+        failures.is_empty(),
+        "{} cells print an ASCII stretch in or beside a run as other than one space:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+}
+
+/// The first member of `ch` whose css-syntax-3 reading changed between `input` and `out`, or
+/// `None`.
+///
+/// css-syntax-3's whitespace is ASCII only, so every member is identifier content, and a
+/// comment tokenizes to nothing: what a member MEANS to a browser is which neighbours it is
+/// glued to, read past any comment. So, side by side and in order, each member must stay glued
+/// where the author glued it and apart where they spaced it — to an identifier code point on
+/// its left, and on its right to anything that continues a compound (an identifier, `.`, `#`,
+/// `[`, `:`, `*`, `&`). What is NOT a change is ASCII whitespace ahead of a delimiter the
+/// printer regenerates flush (`a <NBSP> ,` → `a <NBSP>,`), or the separator the printer
+/// materializes after a non-name at the compound break (`*<NBSP>b` → `* <NBSP>b`, cataloged),
+/// neither of which is an identifier on the member's side.
+fn meaning_fault(input: &str, out: &str, ch: &str) -> Option<&'static str> {
+    let member = ch.chars().next().expect("a member");
+    let content = out
+        .strip_prefix('\u{feff}')
+        .filter(|rest| rest.starts_with('\u{feff}'))
+        .unwrap_or(out);
+    let sides = |s: &str| -> Vec<(bool, bool)> {
+        s.char_indices()
+            .filter(|&(_, c)| c == member)
+            .map(|(i, c)| {
+                let before = skip_comments_back(&s[..i]);
+                // …and the same keyword on the member's LEFT: `of` takes its own space ahead
+                // of whatever follows it that is not a member glued to it.
+                let after_of_keyword = before
+                    .strip_suffix("of")
+                    .is_some_and(|head| head.ends_with(|p: char| p.is_ascii_whitespace()));
+                let left = !after_of_keyword
+                    && before.chars().next_back().is_some_and(|p| {
+                        p.is_alphanumeric() || p == '-' || p == '_' || !p.is_ascii()
+                    });
+                let rest = skip_comments_forward(&s[i + c.len_utf8()..]);
+                let mut next = rest.chars();
+                // An `:nth-*()` term's `of` keyword takes its own space after a run glued to
+                // it (`2n<NBSP>of` → `2n<NBSP> of`) — cataloged (`nth_nbsp_of`), and a keyword
+                // the An+B grammar reads, not an identifier the run continues.
+                let of_keyword = rest.strip_prefix("of").is_some_and(|after| {
+                    after.starts_with(|n: char| n.is_ascii_whitespace() || ".#[:*".contains(n))
+                });
+                let right = !of_keyword
+                    && match next.next() {
+                        // A pseudo-class or -element continues the compound; a colon with space
+                        // behind it is a declaration's (`color <NBSP>: red`).
+                        Some(':') => next.next().is_some_and(|n| n.is_alphabetic() || n == ':'),
+                        Some(n) => n.is_alphanumeric() || !n.is_ascii() || "-_.#[*&'\"".contains(n),
+                        None => false,
+                    };
+                (left, right)
+            })
+            .collect()
+    };
+    let (before, after) = (sides(input), sides(content));
+    (before.len() == after.len() && before != after)
+        .then_some("a member's css-syntax-3 neighbours changed")
+}
+
+/// Whether the gap at `{T}` is one whose claim prints the gap's comments in place — a
+/// selector's internal gaps, a selector list's commas, a pseudo-argument list's, a rule's
+/// pre-`{` gap. Two families of juncture are not, and the comment spellings skip them:
+///
+/// - a block child's HEAD (`{T}div`, `a { color: red;{T}top: 0; }`), where a comment is a
+///   block child of its own and takes its own line — block layout, not a boundary claim;
+/// - the declaration's property→colon gap (`color{T}:`), whose comments take the cataloged
+///   property-comment spelling (`left<NBSP> /* comment */ : 0`, `property_nonascii_space`).
+fn gap_owns_its_comments(template: &str) -> bool {
+    let at = template.find("{T}").expect("a `{T}` template");
+    let before = template[..at].trim_end();
+    let block_head =
+        before == "<style>" || before.ends_with(['{', ';', '}']) || before.ends_with("{ /* c */");
+    let property_gap =
+        template[at + 3..].starts_with(':') && before.ends_with(char::is_alphanumeric);
+    !block_head && !property_gap
+}
+
+/// `Some` when `out` does not carry exactly `input`'s comments — the same texts, each as
+/// often. A gap whose comments a boundary claim prints in place is a gap two emitters could
+/// both print, or neither: the multiset is what either failure changes.
+fn comment_fault(input: &str, out: &str) -> Option<&'static str> {
+    (comment_texts(input) != comment_texts(out)).then_some("a comment dropped or printed twice")
+}
+
+/// Every `/* … */` in `s`, sorted.
+fn comment_texts(s: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let mut rest = s;
+    while let Some(open) = rest.find("/*") {
+        let Some(close) = rest[open + 2..].find("*/") else {
+            break;
+        };
+        let end = open + 2 + close + 2;
+        out.push(&rest[open..end]);
+        rest = &rest[end..];
+    }
+    out.sort_unstable();
+    out
+}
+
+/// `s` with every comment at its END stepped over (a comment tokenizes to nothing).
+fn skip_comments_back(s: &str) -> &str {
+    let mut s = s;
+    while let Some(head) = s.strip_suffix("*/") {
+        match head.rfind("/*") {
+            Some(open) => s = &head[..open],
+            None => break,
+        }
+    }
+    s
+}
+
+/// `s` with every comment at its START stepped over.
+fn skip_comments_forward(s: &str) -> &str {
+    let mut s = s;
+    while let Some(rest) = s.strip_prefix("/*") {
+        match rest.find("*/") {
+            Some(close) => s = &rest[close + 2..],
+            None => break,
+        }
+    }
+    s
+}
+
+/// What may stand directly before a member of a run the author opened with ASCII whitespace:
+/// a delimiter, never a name or a term.
+const FLUSH_BEFORE_A_RUN: &str = "([=,{;}>+~";
+
+/// The first way `out` spells an ASCII stretch in or beside a member of `ch` as other than one
+/// space, for a run authored as `run`.
+fn spelling_fault(out: &str, ch: &str, run: &str, interior: bool) -> Option<&'static str> {
+    let member = ch.chars().next().expect("a member");
+    for (i, c) in out.char_indices() {
+        if c != member {
+            continue;
+        }
+        let before = &out[..i];
+        let after = &out[i + c.len_utf8()..];
+        // A tab, a double space or a line break AFTER a member.
+        if after.starts_with(['\t', '\n']) || after.starts_with("  ") {
+            return Some("respelled after a member");
+        }
+        // …and BEFORE one, between it and content on the same line (a line's own
+        // indentation is the printer's, not the run's).
+        let stretch_start = before.trim_end_matches([' ', '\t']).len();
+        let stretch = &before[stretch_start..];
+        let line_start =
+            before[..stretch_start].is_empty() || before[..stretch_start].ends_with('\n');
+        if !line_start && !stretch.is_empty() && stretch != " " {
+            return Some("respelled before a member");
+        }
+        // A run the author opened with ASCII whitespace is never welded to what precedes it:
+        // only a delimiter, whitespace or the protective BOM may stand flush against it. One
+        // the author glued is that name's own content (`[a='b' i<NBSP>]`), so it is not asked.
+        if run.starts_with([' ', '\t']) {
+            let flush_ok = match before.chars().next_back() {
+                None => true,
+                Some('\u{feff}') => before.len() == '\u{feff}'.len_utf8(),
+                Some(p) => FLUSH_BEFORE_A_RUN.contains(p) || p.is_whitespace(),
+            };
+            if !flush_ok {
+                return Some("welded to what precedes the run");
+            }
+        }
+        // …and one the author closed with ASCII whitespace keeps it against a NAME or a TERM
+        // that follows (`:nth-child(<NBSP> 2n)`, `:is(<ZWNBSP> b)`, `a <NBSP> :hover`); flush
+        // against a delimiter (`,`, `)`, `]`, `{`, a property's `:`) it is the delimiter's.
+        if run.ends_with([' ', '\t']) {
+            let mut next = after.chars();
+            let welded = match next.next() {
+                Some(':') => next
+                    .next()
+                    .is_some_and(|n| n.is_ascii_alphabetic() || n == ':'),
+                Some(n) => n.is_ascii_alphanumeric() || "-_.#*&[".contains(n),
+                None => false,
+            };
+            if welded {
+                return Some("welded to what follows the run");
+            }
+        }
+    }
+    (interior && !out.contains(&format!("{ch} {ch}"))).then_some("members not one space apart")
+}
+
+/// No line break the author's run supplied survives formatting: a run spelled with a line
+/// break formats exactly as the same run spelled with a space, under every host.
+///
+/// The statement as an equality rather than as a search for `\n`, because tsv's own width
+/// breaks may legitimately follow a run; what may not is the author's newline riding out
+/// inside the run's text, where the doc renderer neither indents after it nor counts it — so
+/// the anchor lands at column 0 (a `.css` file, a top-level `<style>`), or, under a host that
+/// re-indents every line of the formatted sheet (a nested `<style>`), the indentation the last
+/// pass added reads back as part of the run and grows by a host level per pass.
+///
+/// Also counted (every member survives) and asked for a fixed point.
+///
+/// ⚠️ Where the run is directly followed by a comment (`{T}/* c */`), or holds one, the
+/// equality is not asked: there the break decides whether the comment stands on its own
+/// line, which is authorship the printer reads, so the two forms may rightly differ. Those
+/// cells are still counted, read for their css-syntax-3 meaning, asked for a fixed point,
+/// and held to no line break directly after a member.
+#[test]
+fn a_line_break_in_a_run_formats_as_a_space() {
+    let mut failures = Vec::new();
+    for template in ascii_spelling_templates() {
+        let comment_follows = template.contains("{T}/*");
+        for (label, ch) in JS_WHITESPACE_AT_OR_ABOVE_A0 {
+            for (broken, spaced) in [
+                (format!("{ch}\n"), format!("{ch} ")),
+                (format!("\n{ch}\n"), format!(" {ch} ")),
+                (format!("{ch}\n{ch}"), format!("{ch} {ch}")),
+                (format!("{ch}\n/* c */\n{ch}"), format!("{ch} /* c */ {ch}")),
+                (format!("\n/* c */{ch}\n"), format!(" /* c */{ch} ")),
+            ] {
+                let holds_comment = broken.contains("/*");
+                if holds_comment && !gap_owns_its_comments(template) {
+                    continue;
+                }
+                let input = component(&template.replace("{T}", &broken));
+                let expected = format_in_every_host(&template.replace("{T}", &spaced));
+                let actual = format_in_every_host(&template.replace("{T}", &broken));
+                for ((host, want), (_, out)) in expected.iter().zip(actual.iter()) {
+                    let fault = if !comment_follows && !holds_comment && out != want {
+                        Some("differs from the spaced run")
+                    } else if (comment_follows || holds_comment) && out.contains(&format!("{ch}\n"))
+                    {
+                        Some("a line break directly after a member")
+                    } else if members_in(out, ch) != broken.matches(ch).count() {
+                        Some("member count")
+                    } else if let Some(fault) =
+                        meaning_fault(&input, out, ch).or_else(|| comment_fault(&input, out))
+                    {
+                        Some(fault)
+                    } else if &reformat(host, out) != out {
+                        Some("not a fixed point")
+                    } else {
+                        None
+                    };
+                    if let Some(fault) = fault {
+                        failures.push(format!(
+                            "{label} {host} {template} (run {broken:?}): {fault}: {out:?}, \
+                             spaced {want:?}"
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "{} cells format a line-broken run differently from a spaced one, drop a member, or \
+         are not a fixed point:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+}
+
+/// Each half of an `:nth-*(An+B of S)` gap is claimed on its own: a member on one side of
+/// `of` and a comment only on the other must leave the comment printed, where it was written,
+/// and must not weld the keyword onto `S`.
+///
+/// The keyword's claim takes a half whole — its comments in place — only where that half
+/// holds a member; the other half keeps the member-free spelling, its comments included. A
+/// claim that took the WHOLE gap's comments whenever EITHER half held a member printed the
+/// comment-only half's comments nowhere (`2n <NBSP> of /* c */ .b` → `2n <NBSP> of .b`), and a
+/// keyword read as "glued" to a comment welded onto `S` (`of.b`).
+#[test]
+fn a_member_on_one_side_of_of_keeps_the_comment_on_the_other() {
+    let mut failures = Vec::new();
+    for (label, ch) in JS_WHITESPACE_AT_OR_ABOVE_A0 {
+        let members = [format!(" {ch} "), format!(" {ch}"), format!("{ch} ")];
+        let comments = [" /* c */ ", "/* c */ ", " /* c */", "/* c */"];
+        for member in &members {
+            for comment in comments {
+                for (before, after) in [(member.as_str(), comment), (comment, member.as_str())] {
+                    let style = format!(
+                        "<style>:nth-child(2n{before}of{after}.b) {{ color: red; }}</style>"
+                    );
+                    let input = component(&style);
+                    for (host, out) in format_in_every_host(&style) {
+                        let fault = comment_fault(&input, &out)
+                            .or_else(|| {
+                                (members_in(&out, ch) != input.matches(ch).count())
+                                    .then_some("member count")
+                            })
+                            .or_else(|| out.contains(" of.b").then_some("`of` welded onto `S`"))
+                            .or_else(|| {
+                                (reformat(host, &out) != out).then_some("not a fixed point")
+                            });
+                        if let Some(fault) = fault {
+                            failures.push(format!("{label} {host} {style:?}: {fault}: {out:?}"));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "{} cells lose a comment at an `of`, weld it, or are not a fixed point:\n{}",
+        failures.len(),
+        failures.join("\n")
     );
 }

@@ -106,6 +106,11 @@ pub(crate) struct Printer<'a> {
     /// Whether `source` is a whole file or a fragment of one ([`SourceRole`]) — which decides
     /// whether a U+FEFF at its offset 0 is a byte-order mark.
     source_role: SourceRole,
+    /// The anchor whose LEAD gap a container has already printed whole, if any — a selector
+    /// list's comma, a pseudo-argument list's `(`, an `of` keyword claims the gap ahead of
+    /// the selector it opens when that gap holds a boundary member, and the selector's own
+    /// first anchor must then claim nothing. See `boundary_ws::Printer::claim_lead_gap`.
+    pub(crate) claimed_lead: std::cell::Cell<Option<u32>>,
 }
 
 impl<'a> Printer<'a> {
@@ -145,6 +150,7 @@ impl<'a> Printer<'a> {
             in_keyframes: false,
             value_scope: values::ValueScope::default(),
             holds_boundary_ws: boundary_ws::source_holds_boundary_ws(source),
+            claimed_lead: std::cell::Cell::new(None),
             comment_free_gap: CommentFreeWindow::new(comments),
             source_role: SourceRole::Document,
         }

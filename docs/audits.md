@@ -442,10 +442,12 @@ the canonical parser, so it is conformance-tier at best). Standing findings:
   the attribute selector's interior, and a declaration's property→colon gap — and the printer
   puts the non-ASCII members back at every selector juncture, at every rebuilt block-child
   head, in the property gap, and at a block's tail (`preserved_boundary_ws` /
-  `boundary_ws_in_gap`, which partition each gap between them; an attribute selector's tail
-  and the property gap keep the author's bytes outright). One printer position still drops
-  the run — the stylesheet's trailing whitespace — ratcheted in
-  [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs). See
+  `spell_gap_items`, which partition each gap between them and print its items — members and
+  comments — in place, each ASCII stretch between them as one space; an attribute selector's
+  tail and the property gap keep the author's tokenization outright). Known printer positions
+  drop the run: the stylesheet's trailing whitespace, ratcheted in
+  [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs), and the unclaimed
+  at-rule prelude selector lists (`@scope`, `@custom-selector`). See
   [conformance_svelte.md §Boundary whitespace](./conformance_svelte.md).
 
 ## Blank-Line Injection Audit (`blanks:audit`)

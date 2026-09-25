@@ -21,6 +21,7 @@
 use std::borrow::Cow;
 
 use super::Printer;
+use super::boundary_ws::Edge;
 use super::value_normalization;
 use super::value_normalization::ValueReader;
 use crate::ast::internal;
@@ -872,9 +873,11 @@ impl<'a> Printer<'a> {
     /// span start, so it can never reach back over the connector whose side of the gap rides
     /// out in the separator.
     fn condition_part_head_ws(&self, gap_start: u32, part: &internal::ConditionPart<'_>) -> String {
-        self.boundary_ws_in_gap(
+        self.spell_gap(
             gap_start,
             super::boundary_ws::skip_gap_trivia(self.source, part.span.start, part.span.end),
+            Edge::Flush,
+            Edge::Flush,
         )
     }
 

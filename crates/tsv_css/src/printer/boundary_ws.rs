@@ -17,32 +17,62 @@
 //   CONTIGUOUS with it. It needs a FLOOR wherever the previous node's span can end inside the
 //   run (`read_identifier` folds a trailing run into the name it follows), or it emits a
 //   character that name already carried.
-// - [`Printer::boundary_ws_in_gap`] sweeps FORWARD over a gap, stepping comment interiors, and
-//   takes every member in it. A backward scan alone stops at a `*/` and drops whatever a
-//   comment strands behind it (`a <NBSP>/* c */ b`).
+// - [`Printer::spell_gap_items`] sweeps FORWARD over a whole gap, printing its members AND its
+//   comments. A backward scan alone stops at a `*/` and drops whatever a comment strands
+//   behind it (`a <NBSP>/* c */ b`).
 //
-// [`Printer::boundary_ws_in_gap_before_anchor`] bounds the forward sweep at
-// [`Printer::boundary_run`]'s offset — the backward scan's own starting point — so a gap can be
-// claimed whole without either emitter printing one character twice.
-// [`Printer::gap_boundary_ws`] is the composite, and the answer every emitter of a gap ending
-// at a NAME should use.
+// A claim that sweeps a gap forward owns the gap's comments too, wherever the gap holds a
+// member ([`Printer::gap_holds_member`]), and the site's own comment seam then stands down
+// for that gap; a member-free gap keeps the site's comment spelling. [`Printer::claim_lead_gap`]
+// lets a container (a list's comma, a pseudo-argument's `(`, an `of`) claim a selector's lead
+// gap whole and stand the selector's own backward scan down ([`Printer::claimed_lead`]), so
+// the two never print one character twice. [`Printer::gap_boundary_ws`] is the answer every
+// emitter of a gap ending at a compound's first simple selector uses.
 //
-// ## Where a claim is emitted
+// ## How a claim is spelled
 //
-// Flush against the token that FOLLOWS the run, because there it can only re-parse as the run
-// the parser skipped — but that is only half the question, and the other half is what stands
-// BEHIND it:
+// Every claim emits its gap through one speller (`spell_run`), which reads the gap as a
+// SEQUENCE OF ITEMS — the members, and the comments where the claim owns them — and prints
+// them in source order, in place: between two items, and at each edge, the author's ASCII
+// whitespace is ONE space (a tab, a line break or a double space alike) and its absence is
+// none. Three readers make that the rule. `parseCss` skips the whole run, so nothing about
+// the AST depends on it. css-syntax-3, whose whitespace is ASCII only, reads every member as
+// identifier content and a comment as nothing at all, so the spelling IS the tokenization:
+// `<NBSP><NBSP>` is one identifier where `<NBSP> <NBSP>` is two, `a<ZWNBSP>` one where
+// `a <ZWNBSP>` is a type selector and a descendant, and `a <NBSP>/* c */:hover` holds the
+// compound `<NBSP>:hover` where `a /* c */ <NBSP> :hover` is a descendant — a comment moved to
+// the other side of a member, or spaced off one it was glued to, changes what a browser
+// reads. And the doc renderer: a line break carried inside the text the printer emits is one
+// it neither indents after nor counts, so the anchor lands at column 0, and under a host that
+// re-indents every line of the formatted sheet (a nested `<style>`) the next pass reads that
+// indentation back as part of the run and grows it by a level. It is prettier's answer at
+// every juncture where prettier keeps the run.
 //
-// - a run emitted flush after a NAME glues INTO it (`read_identifier` takes every code point
-//   at or above U+00A0 as content), so `[a <NBSP>]` comes back with the name `a<NBSP>` — an
-//   AST that changed under a format, and one that is its own fixed point, so no idempotency,
-//   reparse or content-count gate can see it. Every claim whose left neighbour can be a name
-//   therefore asks [`Printer::name_run_separator`] (from the source position it resumes at) or
-//   [`name_run_separator_after`] (from the text it is appending to) for the ASCII space that
-//   ends the name first. ⚠️ That is **not** one gap: the attribute selector's `[name<HERE>]`,
-//   a selector list's `,` (`a.x <NBSP>, c`), an explicit combinator's symbol
-//   (`a <NBSP>> b`), a pseudo-argument list's `)` (`:is(a <NBSP>)`), the commented
-//   attribute rebuild's every interior gap, and a condition prelude's part head behind a
+// ⚠️ The rule holds at the CLAIMED junctures — the table below. An at-rule prelude the parser
+// cannot structure is printed verbatim (`@layer`, `@page`, `@keyframes`' name, a condition
+// prelude whose head holds ASCII after a member), and its raw text keeps whatever the author
+// wrote, tabs and line breaks included; that is the raw-prelude path's, not a claim's.
+//
+// What varies per claim is only the two EDGES, and the claim says which ([`Edge`]):
+//
+// - **[`Edge::Flush`]** where the printer regenerates what stands there — a line's
+//   indentation ahead of a block child's head, the space a combinator's separator doc or a
+//   `::part()` join writes, the ` {` after a rule's head — or where it is a delimiter the run
+//   may touch: the `(` / `[` it opens after, the `,` / `)` / `]` / `}` it closes against.
+// - **[`Edge::Presence`]** beside a NAME or a TERM: one space if the author separated the
+//   gap's outermost item from it, none if they glued it. `a <ZWNBSP>{` stays `a <ZWNBSP> {`,
+//   `2n <NBSP>)` stays spaced, and `2n<NBSP>)` does not grow a space the author never wrote.
+// - **[`Edge::Space`]** where a MEMBER is about to be emitted after a NAME the printer cannot
+//   see the author's separation from (`read_identifier` takes every code point at or above
+//   U+00A0 as content, so the run would glue into it — `[a <NBSP>]` came back with the name
+//   `a<NBSP>`, an AST that changed under a format and its own fixed point, which no
+//   idempotency, reparse or content-count gate sees). A gap that opens on a comment takes the
+//   author's separation instead, since no name can take a comment in. [`Printer::name_run_edge`]
+//   (from a source position) and [`name_run_separator_after`] (from built text) ask the
+//   question. ⚠️ That is **not** one gap: the attribute selector's `[name<HERE>]`, a selector
+//   list's `,` (`a.x <NBSP>, c`), an explicit combinator's symbol (`a <NBSP>> b`), a
+//   pseudo-argument list's `)` (`:is(a <NBSP>)`), the commented attribute rebuild's every
+//   interior gap, a rule's pre-`{` gap, and a condition prelude's part head behind a
 //   CONNECTOR (`@supports and <NBSP>(a: b)` — the connector is an identifier like any other)
 //   all have a name on their left, and each was a live glue. A claim added anywhere new owes
 //   the same question. The condition one answers it structurally rather than by asking:
@@ -50,8 +80,11 @@
 //   run can never land flush against the last of them; its tell is not a changed name in the
 //   wire but a prelude that stops reading as a condition at all
 //   (`a_connector_never_absorbs_the_run_behind_it`).
-// - ahead of a COMBINATOR symbol the printer regenerates a space after the run, so the run's
-//   own ASCII tail is trimmed or the line grows a column per pass.
+//
+// Two emitters spell a gap's items without a claim, each for its own construct: the An+B
+// normalizer (`Printer::normalize_an_plus_b`), which folds the runs around an operator into
+// the term's own text (`2n<NBSP> + 1`) and keeps a comment glued to a member glued, and the
+// attribute selector's tail (`Printer::push_attribute_tail`), whose flag is one more item.
 //
 // ## Who claims where
 //
@@ -62,10 +95,10 @@
 // | --- | --- |
 // | a compound's first simple selector | `gap_boundary_ws` (both complex-selector builders) |
 // | an explicit / anchorless combinator | `push_combinator_boundary_ws` |
-// | a selector list's `,` | `pre_comma_boundary_ws` |
-// | a rule's pre-`{` gap | `boundary_ws_in_gap` (`printer/rules.rs`) |
-// | a pseudo-argument list's lead and its `)` | `build_pseudo_args_doc` |
-// | an `:nth-*()` term's lead, its `)`, both sides of its `of`, the `)` after `S` | `build_pseudo_args_doc`'s `Nth` arm |
+// | a selector list's `,`, and the gap after it | `pre_comma_boundary_ws`, and `build_comma_list_doc` through `claim_lead_gap` |
+// | a rule's pre-`{` gap, its comments included | `spell_gap_items` (`printer/rules.rs`) |
+// | a pseudo-argument list's lead and its `)` | `build_pseudo_args_doc` (the lead through `claim_lead_gap`) |
+// | an `:nth-*()` term's lead, its `)`, both sides of its `of`, the `)` after `S` | `build_pseudo_args_doc`'s `Nth` arm (`S`'s lead through `claim_lead_gap`) |
 // | `::part()`'s inter-name gaps | `build_part_idents_doc` |
 // | every attribute-selector interior gap, and its tail | `push_attribute_gap` / `push_attribute_tail` |
 // | a declaration's property→colon gap | `extract_property_name`, through [`boundary_run_spelling`] |
@@ -108,25 +141,50 @@
 //
 // ## Residue
 //
-// One position still drops the run: the stylesheet's own trailing whitespace (the outermost
+// Known positions that drop the run: the stylesheet's own trailing whitespace (the outermost
 // gap has no following construct, and a Svelte `<style>` host trims the island's tail before
-// writing it). Ratcheted in
-// [`tests/css_boundary_whitespace.rs`](../../../../tests/css_boundary_whitespace.rs).
+// writing it), ratcheted in
+// [`tests/css_boundary_whitespace.rs`](../../../../tests/css_boundary_whitespace.rs); and the
+// at-rule preludes whose selector list the printer structures with no claim in the table
+// above (`@scope`, `@custom-selector`), where the parser steps a run no emitter puts back.
 
 use super::{Printer, SourceRole};
 use crate::ast::internal::CssBlockChild;
 use tsv_lang::Span;
 
+/// How a spelled boundary gap meets the output on one side of it.
+///
+/// The gap's own interior is not a choice: its items (members, and comments where the claim
+/// prints them) stay in source order, and each ASCII whitespace stretch between two is one
+/// space, whoever claims it. What differs per claim is only what stands BESIDE the gap,
+/// which the claim knows and this module does not.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(super) enum Edge {
+    /// Nothing on this side: the printer regenerates what stands there (a line's indentation,
+    /// a combinator's separator, the ` {` after a rule's head), or it is a delimiter the run
+    /// may touch (the `(` it opens after, the `,` / `)` / `]` / `}` it closes against).
+    Flush,
+    /// One space if the author put ASCII whitespace between the gap's outermost item and this
+    /// side, and nothing if they glued it. The answer beside a NAME or a TERM, where the
+    /// author's presence is the claim: `a <ZWNBSP>{` must not come back as `a<ZWNBSP> {`,
+    /// and `2n<NBSP>)` must not grow a space the author never wrote.
+    Presence,
+    /// One space whatever the author wrote: a name the run is about to be emitted after
+    /// would otherwise take it in (`read_identifier` treats every code point at or above
+    /// U+00A0 as content) — see [`Printer::name_run_edge`].
+    Space,
+}
+
 impl<'a> Printer<'a> {
-    /// Every boundary member of the gap that ends at `anchor`, in source order: the ones a
-    /// comment or a symbol strands earlier in the gap, then the contiguous run against the
-    /// anchor itself.
+    /// Every boundary member of the gap that ends at `anchor`, spelled ([`spell_run`]) flush
+    /// on its left — whatever stood there, the printer regenerates it — and with the author's
+    /// separation kept against the anchor on its right.
     ///
     /// The single answer both complex-selector builders give at every anchor, so that the
     /// comment-bearing path cannot quietly restore less than its twin — the two are emitters
-    /// of one run, and a claim on only one of them is the bug spelled once. In a comment-free
-    /// gap the first half is always empty (nothing but whitespace stands between the floor and
-    /// the run), which is why this reads as a no-op there and as the fix on the other path.
+    /// of one run, and a claim on only one of them is the bug spelled once. Floored, the gap
+    /// is claimed whole with its comments in place ([`Self::spell_gap_items`]), so the
+    /// comment-bearing builder's separator leaves them alone wherever the gap holds a member.
     ///
     /// ⚠️ `floor` is `None` where nothing printed so far bounds the gap — a complex selector's
     /// FIRST compound, whose leading run sits outside its own span. The backward scan still
@@ -141,89 +199,121 @@ impl<'a> Printer<'a> {
     /// more often than it answers, so what the caller needs folded in is the branch, not the
     /// work behind it: with the test at the call site the empty answer costs no call, no
     /// `String` to construct and drop, and no `is_empty` test the caller cannot see through.
-    /// The same split is why [`Self::boundary_run`] returns its flag from the scan it already
-    /// ran rather than making the caller ask twice.
     #[inline]
     pub(super) fn gap_boundary_ws(&self, floor: Option<u32>, anchor: u32) -> String {
         if !self.holds_boundary_ws {
             return String::new();
         }
-        self.scan_gap_boundary_ws(floor, anchor)
+        match floor {
+            Some(floor) => self.spell_gap_items(floor, anchor, Edge::Flush, Edge::Presence),
+            None => self.preserved_boundary_ws(0, anchor),
+        }
     }
 
-    /// [`Self::gap_boundary_ws`]'s scan, past the document precondition.
-    fn scan_gap_boundary_ws(&self, floor: Option<u32>, anchor: u32) -> String {
-        let mut out = match floor {
-            Some(floor) => self.boundary_ws_in_gap_before_anchor(floor, anchor),
-            None => String::new(),
-        };
-        out.push_str(self.preserved_boundary_ws(floor.unwrap_or(0), anchor));
-        out
-    }
-
-    /// Every boundary-whitespace member the parser skipped in the gap `[from, to)`, in
-    /// source order, with comment interiors stepped over.
+    /// Every boundary-whitespace member the parser skipped in the gap `[from, to)`, spelled
+    /// by [`spell_run`] with `lead` and `trail` deciding the two edges.
     ///
-    /// The counterpart of [`Self::preserved_boundary_ws`] for a gap that ends at a
-    /// STRUCTURAL token rather than at a name — a selector list's `,`, a rule's `{`, a
-    /// pseudo-argument's `)`. Those have no node to anchor a backward scan on, and the gap
-    /// may hold comments the printer emits separately, so the run is collected forward and
-    /// re-emitted flush against the terminator. Flush is what keeps it safe: a member left
-    /// against the *name* side would glue to it (`0%<NBSP>` reads as one identifier), where
-    /// against a `,`/`{`/`)` it can only re-parse as the same skipped run.
+    /// The forward sweep: for a gap whose far end is a STRUCTURAL token (a selector list's
+    /// `,`, a rule's `{`, a pseudo-argument's `)`), or any gap a claim can bound on both
+    /// sides. The gap may hold comments the printer emits separately, so they are stepped —
+    /// and count as separation, since the members either side of one are two tokens to every
+    /// reader. The run is re-emitted flush against a delimiter it can only re-parse beside as
+    /// the run the parser skipped; against a NAME it keeps the author's separation, or it
+    /// glues into the name (`0%<NBSP>` reads as one identifier).
     ///
-    /// Returns an owned `String` because the members need not be contiguous in source; the
+    /// Returns an owned `String` because the spelling need not be contiguous in source; the
     /// common no-run case returns an empty one and costs a scan of a gap that is a handful
     /// of bytes.
     ///
     /// Gated inline, scanned out of line — see [`Self::gap_boundary_ws`] for why the split is
     /// where the per-site cost of this family actually lives.
     #[inline]
-    pub(super) fn boundary_ws_in_gap(&self, from: u32, to: u32) -> String {
+    pub(super) fn spell_gap(&self, from: u32, to: u32, lead: Edge, trail: Edge) -> String {
         if !self.gap_may_hold_boundary_ws(from, to) {
             return String::new();
         }
-        self.scan_boundary_ws_in_gap(from, to)
+        spell_run(
+            self.source,
+            from as usize,
+            to as usize,
+            self.source_role == SourceRole::Document,
+            (lead, trail),
+            Comments::Elsewhere,
+        )
     }
 
-    /// [`Self::boundary_ws_in_gap`]'s sweep, past the gap's own guard.
-    fn scan_boundary_ws_in_gap(&self, from: u32, to: u32) -> String {
-        let mut out = String::new();
-        let (from, to) = (from as usize, to as usize);
+    /// [`Self::spell_gap`] for a gap whose COMMENTS this claim prints too, in place among the
+    /// members: every item where the author put it, each ASCII stretch between two as one
+    /// space ([`spell_run`]).
+    ///
+    /// The answer wherever a gap holds both a member and a comment and one emitter can take
+    /// the whole gap. Printed apart — the comments by the site's comment seam, the run by its
+    /// claim — the two land in whatever order the two emitters run, and a comment moved to
+    /// the other side of a member changes what a browser reads: `a <NBSP>/* c */:hover` is
+    /// the compound `<NBSP>:hover`, and `a /* c */ <NBSP> :hover` a descendant. A caller
+    /// takes this path only where [`Self::gap_holds_member`] says so, and must then leave the
+    /// gap's comments to it; a member-free gap keeps the site's own comment spelling.
+    pub(super) fn spell_gap_items(&self, from: u32, to: u32, lead: Edge, trail: Edge) -> String {
+        // The member test, not the fast gate: a gap whose only non-ASCII is inside a comment
+        // spells to nothing here, so its comment stays with the site's own seam.
+        if !self.gap_holds_member(from, to) {
+            return String::new();
+        }
+        spell_run(
+            self.source,
+            from as usize,
+            to as usize,
+            self.source_role == SourceRole::Document,
+            (lead, trail),
+            Comments::InPlace,
+        )
+    }
+
+    /// Whether `[from, to)` holds a boundary MEMBER outside its comments — the test that hands
+    /// a gap's comments to [`Self::spell_gap_items`]. Exact where
+    /// [`Self::gap_may_hold_boundary_ws`] is a fast gate: a non-ASCII character inside a
+    /// comment (`/* é */`) is not a member, and a gap holding only that keeps its comments
+    /// where the site's own seam prints them.
+    pub(super) fn gap_holds_member(&self, from: u32, to: u32) -> bool {
+        if !self.gap_may_hold_boundary_ws(from, to) {
+            return false;
+        }
         let bytes = self.source.as_bytes();
-        let mut i = from;
+        let (mut i, to) = (from as usize, to as usize);
         while i < to {
             if crate::comments::is_comment_start(bytes, i) {
-                i = crate::comments::comment_end(bytes, i).min(to);
+                i = crate::comments::comment_end(bytes, i);
                 continue;
             }
             let Some(c) = self.source[i..].chars().next() else {
                 break;
             };
-            // A byte-order mark is excluded here for the same reason `boundary_run`
-            // excludes it: `U+FEFF` is in JS `\s`, so it reaches this walk like any other
-            // member, and tsv strips BOMs by policy. Anchored at offset 0 of a whole
-            // document, which is what makes one a BOM — anywhere else, a fragment's offset 0
-            // included, it is an ordinary character and is kept.
             let is_bom = i == 0 && c == tsv_lang::BOM && self.source_role == SourceRole::Document;
             if !is_bom && crate::whitespace::is_boundary_only_whitespace(c) {
-                out.push(c);
+                return true;
             }
             i += c.len_utf8();
         }
-        out
+        false
     }
 
-    /// [`Self::boundary_ws_in_gap`] over the part of a gap its far ANCHOR will not claim.
+    /// Claim the LEAD gap of the selector that begins at `anchor` — the gap `[from, anchor)`
+    /// between a container's opener (a list's comma, a pseudo-argument's `(`, an `of`) and
+    /// the selector's first anchor — whole and in place, if it holds a member; `None` when
+    /// it does not, and the container's own comment spelling stands.
     ///
-    /// The two restores partition every gap that ends at a name: the anchor's own
-    /// [`Self::preserved_boundary_ws`] claims the contiguous run directly behind it, and this
-    /// claims everything before that — the members a comment, a combinator symbol or an ASCII
-    /// gap separates from the anchor, which a backward scan stops short of and drops
-    /// (`a <NBSP>/* c */ b`). Bounding at [`Self::boundary_run`]'s offset rather than at the
-    /// anchor is what keeps the two from both claiming the same character.
-    pub(super) fn boundary_ws_in_gap_before_anchor(&self, floor: u32, anchor: u32) -> String {
-        self.boundary_ws_in_gap(floor, self.boundary_run(floor, anchor).0)
+    /// The selector's first anchor has no floor of its own (its builder is not told what
+    /// opened it), so on its own it claims only the run CONTIGUOUS with it — which stops at a
+    /// comment and leaves every member ahead of it to nobody (`a, <NBSP>/* c */ b` lost the
+    /// `<NBSP>`). The container knows the floor, so it takes the gap, and records the anchor
+    /// in [`Printer::claimed_lead`] so the first anchor's own claim stands down; the record is
+    /// keyed by position, so it can only ever silence the one anchor it names.
+    pub(super) fn claim_lead_gap(&self, from: u32, anchor: u32, lead: Edge) -> Option<String> {
+        if !self.gap_holds_member(from, anchor) {
+            return None;
+        }
+        self.claimed_lead.set(Some(anchor));
+        Some(self.spell_gap_items(from, anchor, lead, Edge::Presence))
     }
 
     /// Whether `[from, to)` is a well-formed, non-empty gap that could hold a member of the
@@ -260,16 +350,17 @@ impl<'a> Printer<'a> {
         !self.source.as_bytes()[from..to].is_ascii()
     }
 
-    /// [`Self::boundary_ws_in_gap`] over the gap that ends at a construct's CLOSING delimiter.
+    /// [`Self::spell_gap`] over the gap that ends at a construct's CLOSING delimiter, flush
+    /// against it.
     ///
     /// Exists so the boundary claim states the bound as a name rather than as arithmetic; the
     /// arithmetic itself is [`closer_pos`], which every reader of that position shares.
-    pub(super) fn boundary_ws_before_closer(&self, from: u32, span: Span) -> String {
-        self.boundary_ws_in_gap(from, closer_pos(span))
+    pub(super) fn spell_gap_before_closer(&self, from: u32, span: Span, lead: Edge) -> String {
+        self.spell_gap_items(from, closer_pos(span), lead, Edge::Flush)
     }
 
-    /// The tail of the boundary whitespace run before `start` that this printer must emit
-    /// verbatim: everything from its first **non-ASCII** member on.
+    /// The boundary whitespace run contiguous with `start`, spelled ([`spell_run`]) flush on
+    /// its left and with the author's separation kept against `start` on its right.
     ///
     /// The parser skipped the whole run because `parseCss` skips it (JS `\s` at every
     /// `allow_whitespace()` juncture — see `tsv_lang::is_js_whitespace`), but that is a
@@ -277,18 +368,19 @@ impl<'a> Printer<'a> {
     /// characters is a content difference the corpus SAFETY check reads as `content_lost` —
     /// its semantic-character count excludes only ASCII whitespace, so a `<NBSP>` or `<LS>` is
     /// a character like any other. Same call the escaped-selector names make: the AST mirrors
-    /// Svelte, the printer emits the author's bytes.
+    /// Svelte, the printer emits the author's members.
     ///
-    /// ⚠️ The run is scanned back over **both** classes and emitted from the first non-ASCII
-    /// member — not scanned back over the non-ASCII class alone. The two differ exactly on a
-    /// mixed run, and only the first is prettier's answer: `<NBSP><SP>div` keeps `<NBSP><SP>`
-    /// there, where a non-ASCII-only scan stops on the space, finds nothing, and DELETES the
-    /// `<NBSP>`. What the ASCII *head* of the run contributes is indentation, which the
-    /// printer regenerates — so it is dropped, while an interior one rides along inside the
-    /// slice as the author spelled it. prettier respells that interior run as a single space
-    /// (`<NBSP><TAB><NBSP>div` → `<NBSP><SP><NBSP>div`); tsv keeps the bytes, which is a
-    /// whitespace-SPELLING difference with no content at stake, in a run no authored
-    /// stylesheet contains. Pinned in `tests/css_boundary_whitespace.rs`.
+    /// ⚠️ The run is scanned back over **both** classes — not over the non-ASCII class alone.
+    /// The two differ exactly on a mixed run: `<NBSP><SP>div` holds a member behind the space,
+    /// where a non-ASCII-only scan stops on the space, finds nothing, and DELETES the
+    /// `<NBSP>`. The run's ASCII *head* is indentation, which the printer regenerates, so it
+    /// is dropped ([`Edge::Flush`]); every ASCII stretch after the first member is spelled as
+    /// one space — prettier's answer (`<NBSP><TAB><NBSP>div` → `<NBSP><SP><NBSP>div`,
+    /// `<ZWNBSP>⏎div` → `<ZWNBSP><SP>div`), and the only one that survives the doc renderer: a
+    /// line break carried inside the run's text is neither indented after nor counted, so it
+    /// lands the anchor at column 0, and under a host that re-indents every line of the
+    /// formatted sheet it grows a level on every pass.
+    ///
     /// ⚠️ The scan takes a FLOOR — the end of the node printed just before this anchor — and
     /// there is no unfloored spelling on purpose.
     ///
@@ -305,15 +397,23 @@ impl<'a> Printer<'a> {
     /// Gated inline, scanned out of line — see [`Self::gap_boundary_ws`] for why the split is
     /// where the per-site cost of this family actually lives.
     #[inline]
-    pub(super) fn preserved_boundary_ws(&self, floor: u32, start: u32) -> &'a str {
-        if !self.holds_boundary_ws {
-            return "";
-        }
-        self.scan_preserved_boundary_ws(floor, start)
+    pub(super) fn preserved_boundary_ws(&self, floor: u32, start: u32) -> String {
+        self.contiguous_boundary_ws(floor, start, Edge::Presence)
     }
 
-    /// [`Self::preserved_boundary_ws`]'s backward scan, past the document precondition.
-    fn scan_preserved_boundary_ws(&self, floor: u32, start: u32) -> &'a str {
+    /// [`Self::preserved_boundary_ws`] with the right-hand edge the caller's: flush where the
+    /// printer emits its own separator AFTER the run (an explicit combinator's `line`), so
+    /// the author's trailing space does not stack with the regenerated one.
+    #[inline]
+    pub(super) fn contiguous_boundary_ws(&self, floor: u32, start: u32, trail: Edge) -> String {
+        if !self.holds_boundary_ws || (floor == 0 && self.claimed_lead.get() == Some(start)) {
+            return String::new();
+        }
+        self.scan_contiguous_boundary_ws(floor, start, trail)
+    }
+
+    /// [`Self::contiguous_boundary_ws`]'s backward scan, past the document precondition.
+    fn scan_contiguous_boundary_ws(&self, floor: u32, start: u32, trail: Edge) -> String {
         let (run_start, holds_member) = self.boundary_run(floor, start);
         // The common answer, settled by the scan that just ran rather than by a second pass:
         // every member of this class is non-ASCII, so an all-ASCII run carries nothing to
@@ -321,14 +421,16 @@ impl<'a> Printer<'a> {
         // and per DECLARATION — the densest construct in a stylesheet — so the empty answer
         // has to cost one branch.
         if !holds_member {
-            return "";
+            return String::new();
         }
-        let (run_start, start) = (run_start as usize, start as usize);
-        let kept = self.source[run_start..start]
-            .char_indices()
-            .find(|(_, c)| crate::whitespace::is_boundary_only_whitespace(*c))
-            .map_or(start, |(i, _)| run_start + i);
-        &self.source[kept..start]
+        spell_run(
+            self.source,
+            run_start as usize,
+            start as usize,
+            self.source_role == SourceRole::Document,
+            (Edge::Flush, trail),
+            Comments::Elsewhere,
+        )
     }
 
     /// The contiguous boundary-whitespace run ending at `anchor`: where it begins (floored),
@@ -337,10 +439,9 @@ impl<'a> Printer<'a> {
     /// Two answers from one scan, because the two callers want opposite halves of it and
     /// neither should pay for a second pass:
     ///
-    /// - the offset is the **partition point** every forward collector over the same gap
-    ///   needs — what it excludes is exactly what the backward scan is about to claim, so
-    ///   [`Self::boundary_ws_in_gap_before_anchor`] can sweep the rest of the gap without
-    ///   either emitter printing a character twice;
+    /// - the offset is the **partition point** between a backward scan and a forward sweep
+    ///   over the same gap — what it excludes is exactly what the backward scan is about to
+    ///   claim, so the two never print one character twice;
     /// - the flag is [`Self::preserved_boundary_ws`]'s early-out, and it is what keeps a claim
     ///   asked per DECLARATION down to a few byte compares on the path every real stylesheet
     ///   takes.
@@ -414,7 +515,8 @@ impl<'a> Printer<'a> {
         result.push_str(kept);
     }
 
-    /// The ASCII space a boundary run resumed at `at` needs, or `""`.
+    /// The left edge a boundary run resumed at `at` takes: [`Edge::Space`] where a NAME ends
+    /// there and would take the run in, else [`Edge::Presence`] (the author's separation).
     ///
     /// The SOURCE-position face of [`name_run_separator_after`], for the doc-builder claims
     /// that have no accumulated string to look at — a selector list's `,`, an explicit
@@ -424,12 +526,16 @@ impl<'a> Printer<'a> {
     /// the gap is rewritten, so the source byte and the emitted one are the same character.
     /// A claim over a REBUILT construct must ask the other face instead, since there they
     /// are not.
-    pub(super) fn name_run_separator(&self, at: u32) -> &'static str {
+    pub(super) fn name_run_edge(&self, at: u32) -> Edge {
         let at = at as usize;
         if at == 0 || at > self.source.len() || !self.source.is_char_boundary(at) {
-            return "";
+            return Edge::Presence;
         }
-        name_run_separator_after(&self.source[..at])
+        if name_run_separator_after(&self.source[..at]).is_empty() {
+            Edge::Presence
+        } else {
+            Edge::Space
+        }
     }
 
     /// Emit the boundary run the parser skipped ahead of a node whose head this printer
@@ -448,7 +554,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn write_head_boundary_ws(&mut self, start: u32) {
         let kept = self.preserved_boundary_ws(0, start);
         if !kept.is_empty() {
-            self.write(kept);
+            self.write(&kept);
         }
     }
 
@@ -468,7 +574,7 @@ impl<'a> Printer<'a> {
         let from = children
             .last()
             .map_or(block_span.start, |child| child.span().end);
-        let kept = self.boundary_ws_in_gap(from, closer_pos(block_span));
+        let kept = self.spell_gap(from, closer_pos(block_span), Edge::Flush, Edge::Flush);
         if !kept.is_empty() {
             self.write(&kept);
         }
@@ -478,11 +584,10 @@ impl<'a> Printer<'a> {
 /// The ASCII space a boundary run appended to `before` needs, or `""`.
 ///
 /// The one answer to "would this run glue backwards?", asked of the text a claim is about to
-/// extend. It is the whole of the second half of this module's §Where a claim is emitted: a
-/// run against a `,`, a `{`, a `)`, a quote or a combinator symbol can only re-parse as the
-/// run the parser skipped, while one against a NAME becomes part of it — so the test is
-/// exactly the lexer's identifier-continuation predicate, read backwards over the last
-/// character.
+/// extend — the [`Edge::Space`] question of this module's §How a claim is spelled: a run
+/// against a `,`, a `{`, a `)`, a quote or a combinator symbol can only re-parse as the run
+/// the parser skipped, while one against a NAME becomes part of it — so the test is exactly
+/// the lexer's identifier-continuation predicate, read backwards over the last character.
 ///
 /// ⚠️ The lexer's, not a re-spelling: `IDENT_CONTINUE_LUT` for ASCII and
 /// `is_non_ascii_identifier_codepoint` above it, which is what `read_identifier` will do to
@@ -495,43 +600,10 @@ pub(super) fn name_run_separator_after(before: &str) -> &'static str {
     }
 }
 
-/// A claim's ASCII TAIL removed — for the one juncture whose separator the printer emits
-/// AFTER the run rather than before it (an explicit combinator's `line`). Keeping the
-/// author's trailing space there would stack with the regenerated one and grow the line a
-/// column per pass; every other claim sits flush against the token it precedes and has no
-/// tail to trim — or spells the gap whole, as [`boundary_run_spelling`] does.
-///
-/// The empty answer — every claim's answer on real code — returns before `trim_end_matches`,
-/// whose char-predicate machinery is an out-of-line call that a per-declaration and
-/// per-combinator site pays whether or not there is anything to trim.
-#[inline]
-pub(super) fn trim_regenerated_separator(kept: &str) -> &str {
-    if kept.is_empty() {
-        return kept;
-    }
-    kept.trim_ascii_end()
-}
-
-/// `separator` ahead of `kept`, or `kept` untouched when there is no run to separate.
-///
-/// The doc-builder counterpart of [`Printer::push_boundary_ws_after_name`]: those claims hand
-/// their run to `text_pooled` rather than to a `String` they own, so the separator has to ride
-/// inside the same value. Keeping the empty case allocation-free is what lets every claim ask
-/// unconditionally.
-pub(super) fn prefixed_run(separator: &'static str, kept: String) -> String {
-    if kept.is_empty() || separator.is_empty() {
-        return kept;
-    }
-    let mut out = String::with_capacity(separator.len() + kept.len());
-    out.push_str(separator);
-    out.push_str(&kept);
-    out
-}
-
 /// A whitespace-only gap's boundary run, spelled with the author's ASCII whitespace
-/// PRESENCE kept: every member of the class verbatim, each ASCII run beside one collapsed to
-/// a single space, and a trailing ASCII run dropped. Empty when the gap holds no member —
-/// which is every gap in every real stylesheet — so a caller can append it unconditionally.
+/// PRESENCE kept on its left and dropped on its right: [`spell_run`] with
+/// [`Edge::Presence`] / [`Edge::Flush`]. Empty when the gap holds no member — which is every
+/// gap in every real stylesheet — so a caller can append it unconditionally.
 ///
 /// For a gap the printer REBUILDS between two parts whose separator it regenerates — a
 /// declaration's property→colon gap, ahead of each comment in it and ahead of the colon —
@@ -542,24 +614,130 @@ pub(super) fn prefixed_run(separator: &'static str, kept: String) -> String {
 /// lets the output tokenize as the input did under both readers; the space AFTER the run is
 /// the regenerated separator's to emit, which is why the trailing one is dropped.
 pub(super) fn boundary_run_spelling(gap: &str) -> String {
+    debug_assert!(
+        gap.chars().all(crate::whitespace::is_boundary_whitespace),
+        "boundary_run_spelling over a gap holding more than whitespace: {gap:?}"
+    );
+    spell_run(
+        gap,
+        0,
+        gap.len(),
+        false,
+        (Edge::Presence, Edge::Flush),
+        Comments::Elsewhere,
+    )
+}
+
+/// What [`spell_run`] does with a comment in the gap it spells.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Comments {
+    /// Print it, in place, as an item of the run — the gap's one emitter owns it.
+    InPlace,
+    /// Leave it to the emitter that owns it elsewhere; to the spelling it is only
+    /// separation between the members either side of it.
+    Elsewhere,
+}
+
+/// The one spelling of a boundary gap, which every claim in this module emits: its ITEMS —
+/// the members and, where the claim owns them ([`Comments::InPlace`]), the comments — in
+/// source order, every ASCII whitespace stretch between two items as ONE space and its
+/// absence as none, and the two edges as `lead` and `trail` say ([`Edge`]).
+///
+/// Two readers make the rule, and they agree on it. `parseCss` skips the whole run, so
+/// nothing about the AST depends on the spelling. css-syntax-3, whose whitespace is ASCII
+/// only, reads each member as identifier content, each ASCII stretch as one
+/// `<whitespace-token>`, and a comment as nothing at all, so the spelling IS the
+/// tokenization: `<NBSP><NBSP>` is one identifier where `<NBSP> <NBSP>` is two, a stretch
+/// welded to nothing merges two tokens, a comment glued to a member keeps it glued to what
+/// is on the comment's other side (`<NBSP>/* c */:hover` is the compound `<NBSP>:hover`),
+/// and a stretch respelled as a tab or a line break is the same token — but a line break
+/// carried inside the text the printer emits is one the doc renderer neither indents after
+/// nor counts. So the items stay where the author put them and each stretch between them is
+/// one space: the spelling that keeps every token the author wrote and nothing else, and
+/// prettier's too, at every juncture where prettier keeps the run.
+///
+/// Scans `[from, to)` of `source`. Any other character in the gap (the `(` a caller's range
+/// opens on) is neither an item nor a separation. `bom_at_zero` excludes a `U+FEFF` at
+/// offset 0: the byte-order mark of a whole document, which tsv strips by policy (see
+/// [`Printer::boundary_run`]); it is neither a member nor a separation. An in-place comment
+/// is reported to the print-once ledger here, since this is the seam that prints it.
+fn spell_run(
+    source: &str,
+    from: usize,
+    to: usize,
+    bom_at_zero: bool,
+    edges: (Edge, Edge),
+    comments: Comments,
+) -> String {
+    let (lead, trail) = edges;
+    let bytes = source.as_bytes();
     let mut out = String::new();
-    let mut pending_space = false;
-    for c in gap.chars() {
-        if crate::whitespace::is_boundary_only_whitespace(c) {
-            if pending_space {
-                out.push(' ');
-                pending_space = false;
+    // Whether ASCII whitespace (or, to a members-only spelling, a comment) stands between
+    // the previous item (or the gap's start) and this position.
+    let mut separated = false;
+    let mut i = from;
+    while i < to {
+        let item_start = i;
+        if crate::comments::is_comment_start(bytes, i) {
+            let end = crate::comments::comment_end(bytes, i).min(to);
+            i = end;
+            match comments {
+                Comments::Elsewhere => separated = true,
+                Comments::InPlace => {
+                    #[cfg(feature = "comment_check")]
+                    tsv_lang::comment_ledger::record_emitted(
+                        source,
+                        Span {
+                            start: item_start as u32,
+                            end: end as u32,
+                        },
+                    );
+                    push_item(&mut out, &source[item_start..end], separated, lead, false);
+                    separated = false;
+                }
             }
-            out.push(c);
+            continue;
+        }
+        let Some(c) = source[i..].chars().next() else {
+            break;
+        };
+        i += c.len_utf8();
+        if bom_at_zero && item_start == 0 && c == tsv_lang::BOM {
+            continue;
+        }
+        if crate::whitespace::is_boundary_only_whitespace(c) {
+            push_item(&mut out, &source[item_start..i], separated, lead, true);
+            separated = false;
         } else if crate::whitespace::is_boundary_whitespace(c) {
-            pending_space = true;
-        } else {
-            // Not a whitespace-only gap after all: keep the byte rather than lose it.
-            debug_assert!(false, "boundary_run_spelling over a gap holding {c:?}");
-            out.push(c);
+            separated = true;
         }
     }
+    if !out.is_empty() && (trail == Edge::Space || (trail == Edge::Presence && separated)) {
+        out.push(' ');
+    }
     out
+}
+
+/// Append one item of a spelled gap: behind one space when `separated` says the author put
+/// ASCII whitespace ahead of it — or, for the gap's first item, as `lead` says.
+///
+/// [`Edge::Space`] is a claim about a MEMBER, which a name ahead of it would take in; a
+/// comment cannot be taken in (the name's token ends at its `/*`, and a comment tokenizes to
+/// nothing), so a gap that opens on a comment keeps the author's separation there instead.
+fn push_item(out: &mut String, item: &str, separated: bool, lead: Edge, is_member: bool) {
+    let space = if out.is_empty() {
+        match lead {
+            Edge::Flush => false,
+            Edge::Presence => separated,
+            Edge::Space => is_member || separated,
+        }
+    } else {
+        separated
+    };
+    if space {
+        out.push(' ');
+    }
+    out.push_str(item);
 }
 
 /// The byte offset of the CLOSING delimiter a bracketed construct's `span` ends one past —
