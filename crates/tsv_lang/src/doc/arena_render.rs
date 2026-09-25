@@ -781,6 +781,8 @@ impl RenderPolicy for TopLevelPolicy {
 /// `should_break` shortcut (preserved drift — see
 /// [`RenderPolicy::CONDITIONAL_GROUP_HONORS_SHOULD_BREAK`]), and fills see no
 /// pending-command lookahead through `WithContext`.
+// TODO: a fill item renders here with no group-mode map, so a keyed `if_break` inside it (a
+// Svelte block head's `}` dangle, `GroupId::BlockHead`) reads flat even when its group broke.
 struct SingleDocPolicy {
     tracking_suffix: bool,
     /// Joins the enclosing render's swallow state machine — see

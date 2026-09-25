@@ -274,11 +274,11 @@ impl<'a> Printer<'a> {
         // its tail elements are skipped, so the build is O(run length), not the O(run length²) a
         // rebuild-at-each-element would cost on a long glued run (generated per-token `<span>`s).
         let mut glued_run_consumed_until = 0usize;
-        // Running `has_preceding_breakable` flag (see `build_nodes_doc`): OR-in the
-        // prior node once per iteration rather than re-scanning `trimmed_nodes[..i]` at each of the
-        // two use sites below. Reading `trimmed_nodes[i - 1]` at the top keeps the flag equal to
-        // `trimmed_nodes[..i]` through the `continue`s (format-ignore, whitespace-run collapse,
-        // glued-run skip).
+        // Running `has_preceding_breakable` flag (see `build_nodes_doc`): OR-in the prior node
+        // once per iteration rather than re-scanning `trimmed_nodes[..i]` at its use site below (a
+        // root inline-run block's inline build). Reading `trimmed_nodes[i - 1]` at the top keeps
+        // the flag equal to `trimmed_nodes[..i]` through the `continue`s (format-ignore,
+        // whitespace-run collapse, glued-run skip).
         let mut has_preceding_breakable = false;
         // A glued HTML-comment run that prefixes the NEXT text child, built at the run's head and
         // carried forward instead of pushed — `handle_text_child` fuses it into the text's fill so
@@ -432,56 +432,67 @@ impl<'a> Printer<'a> {
                 // same the control-flow arm would produce); a snippet glued to content on
                 // both sides does not own a line and keeps the control-flow path below.
                 self.handle_own_line_tag(trimmed_nodes, i, &mut child_docs);
-            } else if multiline && is_control_flow_block(node) {
-                // Control-flow block (`{#if}`/`{#each}`/`{#await}`/`{#key}`, and a
-                // `{#snippet}` glued to content on both sides) in the convergence path.
-                // Mirror path 1's block dispatch.
+            } else if is_control_flow_block(node)
+                && let Some(unit) = prev_unit
+                && let Some((element_doc, block_doc)) =
+                    self.try_block_sibling_gt_dangle(trimmed_nodes, i, unit.head)
+            {
+                // Axis-3 sibling-`>` dangle, in BOTH arms: a control-flow block (`{#if}` /
+                // `{#each}` / `{#await}` / `{#key}`, and a `{#snippet}` glued to content on both
+                // sides) directly following an inline-element sibling (no whitespace between)
+                // sheds that element's closing `>` onto the block-head line (`</span⏎>{#if…}`) — a
+                // deliberate tsv divergence (block-tag wrapping). The element's unit was already
+                // pushed as the previous child: pop it, re-push the unit rebuilt with its last `>`
+                // split off (under the lead it was pushed with), and append the block that now
+                // owns the `>`.
                 //
-                // Axis-3 sibling-`>` dangle first: a block directly following an inline-element
-                // sibling (no whitespace between) sheds that element's closing `>` onto the
-                // block-head line (`</span⏎>{#if…}`) — a deliberate tsv divergence (block-tag
-                // wrapping). The element's unit was already pushed as the previous child: pop
-                // it, re-push the unit rebuilt with its last `>` split off (under the lead it
-                // was pushed with), and append the block that now owns the `>`.
-                if let Some(unit) = prev_unit
-                    && let Some((element_doc, block_doc)) =
-                        self.try_block_sibling_gt_dangle(trimmed_nodes, i, unit.head)
-                {
-                    // Glued to the element: no whitespace node stands between them, so no
-                    // separator can have deferred to this block.
-                    debug_assert!(!prev_text_ws);
-                    // Back to the mark the unit's push started at — its lead may have spent more
-                    // than one entry — then re-push the rebuilt unit under that same lead.
-                    child_docs.truncate(unit.docs_len);
-                    self.push_inline_child_doc(&mut child_docs, element_doc, unit.lead);
-                    child_docs.push(block_doc);
+                // The inline arm needs it as much as the multiline one: it serves an inline
+                // parent (a component, an inline element) whose content an `{#await}` or a
+                // both-sides-glued `{#snippet}` does not force multiline, so the parent breaks
+                // only when the block's own layout breaks it — and the next pass reads that
+                // output's boundary newlines as `MultilineCause::SourceBreaks` and prints it
+                // through the multiline arm. The dangle is layout-keyed, so a block that stays
+                // inline keeps the `>` hugged.
+                //
+                // Placed after the own-line-declaration arm, so a `{#snippet}` that owns its line
+                // in the multiline arm still takes it there; the block-element arm above takes
+                // only elements, and no arm below takes a control-flow block before the final one,
+                // so the move changes nothing but which arm serves the inline dangle.
+                //
+                // Glued to the element: no whitespace node stands between them, so no separator
+                // can have deferred to this block.
+                debug_assert!(!prev_text_ws);
+                // Back to the mark the unit's push started at — its lead may have spent more than
+                // one entry — then re-push the rebuilt unit under that same lead.
+                child_docs.truncate(unit.docs_len);
+                self.push_inline_child_doc(&mut child_docs, element_doc, unit.lead);
+                child_docs.push(block_doc);
+            } else if multiline && is_control_flow_block(node) {
+                // Control-flow block in the convergence path, no dangle. A block the root marked
+                // as part of a SINGLE-LINE inline run builds in inline context (its long body
+                // inner-breaks rather than dropping to its own line — `is_root_inline_run_block`);
+                // every other block builds with `in_multiline_context=true`, which is what lets a
+                // wrapped head (`{#if a || b || …}`) break its condition and dangle the `}` (the
+                // block-tag wrapping work). The inline arm builds its blocks the same way (the
+                // final arm below).
+                let node_doc = if self.is_root_inline_run_block(node) {
+                    self.build_fragment_node_doc_with_preceding_context(
+                        node,
+                        has_preceding_breakable,
+                    )
                 } else {
-                    // No dangle. A block the root marked as part of a SINGLE-LINE inline run builds
-                    // in inline context (its long body inner-breaks rather than dropping to its own
-                    // line — `is_root_inline_run_block`); every other block builds with
-                    // `in_multiline_context=true`, which is what lets a wrapped head
-                    // (`{#if a || b || …}`) break its condition and dangle the `}` (the block-tag
-                    // wrapping work). The non-multiline callers keep the inline
-                    // `build_fragment_node_doc_*` path below.
-                    let node_doc = if self.is_root_inline_run_block(node) {
-                        self.build_fragment_node_doc_with_preceding_context(
-                            node,
-                            has_preceding_breakable,
-                        )
+                    self.build_fragment_node_doc_in_multiline(node)
+                };
+                // The deferred boundary space, honored exactly as the inline arm does: the block
+                // leads with the per-width wrap, and one that renders multiline breaks it and
+                // drops to a fresh line whole ([`LeadBoundary::Spaced`]).
+                if let Some(node_doc) = node_doc {
+                    let lead = if prev_text_ws {
+                        LeadBoundary::Spaced
                     } else {
-                        self.build_fragment_node_doc_in_multiline(node)
+                        LeadBoundary::Plain
                     };
-                    // The deferred boundary space, honored exactly as the inline arm does: the
-                    // block leads with the per-width wrap, and one that renders multiline breaks
-                    // it and drops to a fresh line whole ([`LeadBoundary::Spaced`]).
-                    if let Some(node_doc) = node_doc {
-                        let lead = if prev_text_ws {
-                            LeadBoundary::Spaced
-                        } else {
-                            LeadBoundary::Plain
-                        };
-                        self.push_inline_child_doc(&mut child_docs, node_doc, lead);
-                    }
+                    self.push_inline_child_doc(&mut child_docs, node_doc, lead);
                 }
             } else if is_inline_content(node) {
                 // The unit's leading-boundary treatment — the glue test is asked at the unit's
@@ -593,10 +604,16 @@ impl<'a> Printer<'a> {
                 pending_glued_prefix = Some((prefix, i));
                 glued_run_consumed_until = text_idx;
             } else {
-                // Other nodes (comments, `{@const}`/`{@debug}`/`{const}`/`{let}` tags).
-                // `has_preceding_breakable` (tracked above) affects whether block conditions use
-                // remove_lines(): with preceding breakable content, content breaks first so it
-                // respects print_width; without, allow wrapping.
+                // Other nodes (comments, `{@const}`/`{@debug}`/`{const}`/`{let}` tags), and the
+                // inline arm's control-flow block when the dangle arm above did not claim it.
+                //
+                // A control-flow block builds in MULTILINE context here too — in the inline arm
+                // that is an inline parent's content, which lays out block-style exactly when the
+                // block breaks it, and then the next pass reads that output through the multiline
+                // arm. Building it with the preceding-breakable context instead (`remove_lines` on
+                // the head, so the content before it breaks first) left a head past print width
+                // unwrapped on the first pass and wrapped on the second. The two builds agree
+                // whenever the parent fits on one line, since every group then prints flat.
                 //
                 // This arm honors `prev_text_ws` exactly as the inline and block arms do, which is
                 // what makes the flag's consumer TOTAL: `handle_text_child` arms it for every
@@ -610,9 +627,14 @@ impl<'a> Printer<'a> {
                 // control-flow block: a space before a run-ending follower is that follower's own
                 // per-width wrap after any sibling, as it is after text. `SpacedBare` only for a
                 // declaration that owns its line — see the variants' contracts.
-                if let Some(node_doc) = self
-                    .build_fragment_node_doc_with_preceding_context(node, has_preceding_breakable)
-                {
+                // (The preceding-breakable context is read only by a control-flow block, so every
+                // other node here takes the plain build.)
+                let node_doc = if is_control_flow_block(node) {
+                    self.build_fragment_node_doc_in_multiline(node)
+                } else {
+                    self.build_fragment_node_doc(node)
+                };
+                if let Some(node_doc) = node_doc {
                     let lead = if !prev_text_ws {
                         LeadBoundary::Plain
                     } else if self.is_own_line_declaration(trimmed_nodes, i) {
@@ -1839,10 +1861,11 @@ impl<'a> Printer<'a> {
         self.build_fragment_node_doc_impl(node, false, false)
     }
 
-    /// Build a fragment node doc with multiline context awareness.
-    ///
-    /// When `in_multiline_context` is true, blocks with symmetric spaces
-    /// (spaces but no newlines) will expand to multiline format.
+    /// Build a fragment node doc in multiline context — what every fragment arm but a root
+    /// inline-run block uses for a control-flow block. The context reaches only the block's
+    /// HEAD: it lets a head past print width wrap and dangle its `}` (`block_head_can_wrap`).
+    /// The body's inline-vs-dropped choice is width's alone either way, and a space-only body
+    /// boundary is trimmed in both contexts.
     fn build_fragment_node_doc_in_multiline(&self, node: &FragmentNode<'_>) -> Option<DocId> {
         self.build_fragment_node_doc_impl(node, true, false)
     }

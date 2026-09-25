@@ -116,11 +116,14 @@ impl<'a> Printer<'a> {
     /// Applies to the four rendering block heads (`{#if}` / `{#each}` / `{#key}` /
     /// `{#await}`) — and to the one `{#snippet}` shape that still reaches the control-flow
     /// arm, a snippet glued to content on BOTH sides (an own-line snippet takes its line
-    /// via [`Self::is_own_line_declaration`] before this can fire). A control-flow block
-    /// with any preceding sibling routes its block parent through the multiline-fragment
-    /// layout (`has_control_flow_after_sibling` → `compute_multiline_cause`), so the
-    /// block's body-drop keys on `can_wrap` (true here) and the dangle is a one-pass fixed
-    /// point — including for `{#await}`, whose body-drop is likewise gated on `can_wrap`.
+    /// via [`Self::is_own_line_declaration`] before this can fire, and forces its parent
+    /// multiline). One caller serves both arms of `build_nodes_doc_trimmed`: the multiline
+    /// arm — which a block parent takes once a control-flow block follows a sibling
+    /// (`has_control_flow_after_sibling` → `compute_multiline_cause`) — and the inline arm,
+    /// which an inline parent (a component, an inline element) takes for an `{#await}` or a
+    /// both-sides-glued `{#snippet}`, neither of which forces it multiline. Either way the
+    /// block builds in multiline context, and whether its body drops is width's decision in
+    /// `build_expanding_construct`, so the dangle is a one-pass fixed point in both.
     ///
     /// `unit_head` is the index the previously pushed sibling doc BEGINS at — the element itself,
     /// or the head of the glued unit it ends (a glued element run, a glued comment prefix, or
