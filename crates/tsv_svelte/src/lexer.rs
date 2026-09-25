@@ -1,5 +1,5 @@
 use std::fmt;
-// Shared lexer-error constructor: used by the unterminated/unexpected sites in `next_token`.
+// Shared lexer-error constructor: used by the unterminated/unexpected sites in the token scan.
 use tsv_lang::{ParseError, lex_err, source_scan};
 
 use crate::whitespace::{brace_interior_start, char_at, is_svelte_ws, skip_svelte_ws};
@@ -71,11 +71,12 @@ impl fmt::Display for TokenKind {
     }
 }
 
-/// A lexed Svelte markup token: a small size-asserted POD with `u32` spans returned
-/// by value from `next_token` (its `tsv_ts::Token` / `tsv_css::Token` siblings are
-/// instead lexed in place on their parsers' hot path, `next_token_into`). `Clone` (not
-/// `Copy`) mirrors those crates' convention — the parser is the single owner of
-/// `current` / `peek`, consuming via `.take()` / move rather than implicit copies.
+/// A lexed Svelte markup token: a small size-asserted POD with `u32` document offsets,
+/// lexed in place into the parser's current-token and lookahead slots
+/// (`Lexer::next_token_into`) — the lexer's only token entry point, so there is no
+/// by-value form. `Clone` (not `Copy`) mirrors the `tsv_ts::Token` / `tsv_css::Token`
+/// convention — the parser is the single owner of `current` / `peek`, consuming via
+/// `.take()` / move rather than implicit copies.
 /// There is **no out-of-band decoded value**: markup tokens are pure spans (the
 /// embedded TS/CSS/expression content is lexed by the other crates).
 #[derive(Debug, Clone)]
@@ -85,13 +86,15 @@ pub struct Token {
     pub end: u32,
 }
 
-// Compact POD — keeps `next_token`'s by-value return cheap. 12 bytes (not the TS/CSS
-// 16): the fieldless `TokenKind` is 1 byte, whereas theirs carries a `char` payload.
+// Guards the hot-path invariant: `Token` is a small POD with no heap-owning field, so the
+// in-place write (`next_token_into`) stays a few plain stores per token. 12 bytes (not the
+// TS/CSS 16): the fieldless `TokenKind` is 1 byte, whereas theirs carries a `char` payload.
 const _: () = assert!(size_of::<Token>() == 12);
 
 pub struct Lexer<'a> {
     source: &'a str,
-    /// The cursor, as a byte offset into `source` — always on a character boundary.
+    /// The cursor, as a byte offset into `source` — always on a character boundary. `source`
+    /// is the whole document, so the cursor and every token span are document offsets.
     ///
     /// ⚠️ **The only cursor, and it is a BYTE cursor.** Every construct this lexer
     /// recognises opens with an ASCII byte and UTF-8 is self-synchronising, so the dispatch
@@ -102,14 +105,7 @@ pub struct Lexer<'a> {
     /// charges every byte of the document a UTF-8 decode and a `len_utf8` to answer a
     /// question the byte already answers: don't reintroduce one.
     position: usize,
-    pub inside_tag: bool,    // Track if we're inside <...>
-    initial_position: usize, // Position after BOM skip (0 or 3)
-    /// Byte offset of `source` within the document this lexer's ERRORS are rendered
-    /// against — zero for a whole component, `pos` for the slice the parser rebuilds this
-    /// lexer over after a jumped scan (`SvelteParser::advance_to_position`). Token
-    /// positions are unaffected (the parser shifts those by its own `base_offset`).
-    /// See [`Lexer::host_err`].
-    base_offset: usize,
+    pub inside_tag: bool, // Track if we're inside <...>
 }
 
 /// The `#` or `@` that makes a brace a `{#…}` block or a `{@…}` tag rather than an
@@ -194,45 +190,34 @@ impl BlockOrTagMarker {
 }
 
 impl<'a> Lexer<'a> {
-    /// A lexer over `source`, which sits at `base_offset` in the document its errors will
-    /// be rendered against.
-    ///
-    /// The offset is a required argument rather than a `new(source)` default because a
-    /// silent zero is the failure mode: the parser rebuilds this lexer over `source[pos..]`
-    /// whenever it jumps the cursor, so after any such jump a zero-offset lexer reports
-    /// every error in the coordinates of that slice rather than the component's.
-    pub fn at_offset(source: &'a str, base_offset: usize) -> Self {
+    /// A lexer over the whole document `source`, its cursor past a leading byte-order mark
+    /// ([`tsv_lang::leading_bom_len`]).
+    pub fn new(source: &'a str) -> Self {
         // Skip UTF-8 BOM (U+FEFF) at start of file if present.
         // BOM is a legacy artifact; we strip it (like deno fmt, VS Code).
         // Position starts after BOM so token spans reflect actual file bytes; the WIRE
         // elides it at emission (`LeadingBom::Elided` in the writer), since Svelte's
         // `parse` strips it before parsing and its offsets index the BOM-less string.
-        let position = tsv_lang::leading_bom_len(source);
-
         Self {
             source,
-            position,
+            position: tsv_lang::leading_bom_len(source),
             inside_tag: false,
-            initial_position: position,
-            base_offset,
         }
     }
 
-    /// Lift an error this lexer produced into the coordinates of the document it will be
-    /// rendered against (`ParseError::shift_position`).
+    /// Move the cursor to the document offset `pos`, a character boundary, in either
+    /// direction — the parser's resume after a scan it ran over the source itself
+    /// (`SvelteParser::advance_to_position`). The mode (`inside_tag`) is kept.
     ///
-    /// Applied once, at [`Lexer::next_token`] — this lexer's only fallible entry point,
-    /// and so its only producer.
-    #[cold]
-    #[inline(never)]
-    fn host_err(&self, err: ParseError) -> ParseError {
-        err.shift_position(self.base_offset)
-    }
-
-    /// Returns the initial position after BOM skip (0 if no BOM, 3 if BOM was skipped).
-    /// Used by parser to initialize gap tracking.
-    pub fn initial_position(&self) -> usize {
-        self.initial_position
+    /// No byte-order-mark skip at `pos`: the only BOM is at byte 0 ([`Lexer::new`]). A
+    /// U+FEFF at a resume point is skipped by the next token's scan either way — it is
+    /// Svelte whitespace ([`is_svelte_ws`]) in tag mode, and not `<` or `{` in template mode.
+    pub fn seek(&mut self, pos: usize) {
+        assert!(
+            self.source.is_char_boundary(pos),
+            "seek to {pos}, not a character boundary of the document"
+        );
+        self.position = pos;
     }
 
     /// The byte at the cursor, or `None` at end of input.
@@ -259,16 +244,6 @@ impl<'a> Lexer<'a> {
     fn advance(&mut self) {
         if let Some((_, width)) = char_at(self.source, self.position) {
             self.position += width;
-        }
-    }
-
-    /// Create a token with the current position as end.
-    #[inline]
-    fn make_token(&self, kind: TokenKind, start: usize) -> Token {
-        Token {
-            kind,
-            start: start as u32,
-            end: self.position as u32,
         }
     }
 
@@ -347,7 +322,7 @@ impl<'a> Lexer<'a> {
     /// already past the name's first character.
     ///
     /// Svelte's `read_tag` name run, and the one place its character class is spelled —
-    /// both name-opening arms of [`Lexer::next_token_local`] (ASCII-led and non-ASCII-led)
+    /// both name-opening arms of [`Lexer::next_token_into`] (ASCII-led and non-ASCII-led)
     /// reach it, so the class cannot drift between them. ⚠️ Not the *unquoted numeric value*
     /// run, which that function scans inline: a narrower class (`is_alphanumeric`, `_`, `-`)
     /// answering to HTML's unquoted-attribute-value grammar rather than to `read_tag`.
@@ -411,15 +386,15 @@ impl<'a> Lexer<'a> {
         self.position = i;
     }
 
-    /// The lexer's one fallible entry point — so the error path is lifted into host
-    /// coordinates here ([`Lexer::host_err`]); the scan itself reports in the lexer's own.
-    #[inline]
-    pub fn next_token(&mut self) -> Result<Token, ParseError> {
-        self.next_token_local().map_err(|err| self.host_err(err))
-    }
-
-    /// [`Lexer::next_token`]'s scan, reporting an error at its position in `self.source`.
-    fn next_token_local(&mut self) -> Result<Token, ParseError> {
+    /// Lex the next token straight into `*dst` — the parser's current-token slot or its
+    /// lookahead slot. A `Result<Token, ParseError>` does not come back in registers: it is
+    /// returned through a stack slot the caller then reloads and re-scatters, once per
+    /// token, so writing through the caller's slot leaves only the error pointer to return.
+    /// `*dst` is written only on success.
+    ///
+    /// The dispatch yields only the token's KIND — every token spans `start` to the cursor —
+    /// so the one store at the end is the only write of `*dst`.
+    pub fn next_token_into(&mut self, dst: &mut Token) -> Result<(), ParseError> {
         // Template mode (outside tags): skip text content, only tokenize special chars
         // Tag mode (inside <...>): tokenize everything including identifiers
         if self.inside_tag {
@@ -430,12 +405,9 @@ impl<'a> Lexer<'a> {
 
         let start = self.position;
 
-        match self.cur_byte() {
-            None => Ok(Token {
-                kind: TokenKind::Eof,
-                start: start as u32,
-                end: start as u32,
-            }),
+        let kind = match self.cur_byte() {
+            // The cursor has not moved, so this is the empty token at `start`.
+            None => TokenKind::Eof,
             Some(b'<') => {
                 // Check for HTML comment: <!--
                 if self.starts_with(b"<!--") {
@@ -443,30 +415,32 @@ impl<'a> Lexer<'a> {
 
                     // Scan until "-->". An ASCII needle again, so the scan steps a byte at
                     // a time and still cannot stop inside a character.
-                    while self.position < self.source.len() {
+                    loop {
+                        if self.position >= self.source.len() {
+                            // Unterminated comment
+                            return Err(lex_err("Unterminated HTML comment", start));
+                        }
                         if self.starts_with(b"-->") {
                             self.position += b"-->".len();
-                            return Ok(self.make_token(TokenKind::Comment, start));
+                            break;
                         }
                         self.position += 1;
                     }
-
-                    // Unterminated comment
-                    return Err(lex_err("Unterminated HTML comment", start));
+                    TokenKind::Comment
+                } else {
+                    self.inside_tag = true; // Enter tag mode
+                    self.advance();
+                    TokenKind::LeftAngle
                 }
-
-                self.inside_tag = true; // Enter tag mode
-                self.advance();
-                Ok(self.make_token(TokenKind::LeftAngle, start))
             }
             Some(b'>') => {
                 self.inside_tag = false; // Exit tag mode, back to template mode
                 self.advance();
-                Ok(self.make_token(TokenKind::RightAngle, start))
+                TokenKind::RightAngle
             }
             Some(b'/') => {
                 self.advance();
-                Ok(self.make_token(TokenKind::Slash, start))
+                TokenKind::Slash
             }
             Some(b'{') => {
                 self.advance();
@@ -483,12 +457,12 @@ impl<'a> Lexer<'a> {
                     Some(b'#') => {
                         self.skip_whitespace();
                         self.advance();
-                        Ok(self.make_token(TokenKind::BlockOpen, start))
+                        TokenKind::BlockOpen
                     }
                     Some(b':') => {
                         self.skip_whitespace();
                         self.advance();
-                        Ok(self.make_token(TokenKind::BlockContinue, start))
+                        TokenKind::BlockContinue
                     }
                     // `{/if}` close vs `{/* */}` / `{// }` comment expression: a `*`/`/`
                     // after the marker `/` means a comment, so fall through to LeftBrace.
@@ -501,23 +475,23 @@ impl<'a> Lexer<'a> {
                         // Block close: {/if}, {/each}, etc
                         self.skip_whitespace();
                         self.advance();
-                        Ok(self.make_token(TokenKind::BlockClose, start))
+                        TokenKind::BlockClose
                     }
                     Some(b'@') => {
                         self.skip_whitespace();
                         self.advance();
-                        Ok(self.make_token(TokenKind::TagOpen, start))
+                        TokenKind::TagOpen
                     }
-                    _ => Ok(self.make_token(TokenKind::LeftBrace, start)),
+                    _ => TokenKind::LeftBrace,
                 }
             }
             Some(b'}') => {
                 self.advance();
-                Ok(self.make_token(TokenKind::RightBrace, start))
+                TokenKind::RightBrace
             }
             Some(b'=') => {
                 self.advance();
-                Ok(self.make_token(TokenKind::Equals, start))
+                TokenKind::Equals
             }
             Some(quote @ (b'\'' | b'"')) => {
                 // Quoted attribute value. Only two things matter here: the closing quote,
@@ -560,10 +534,13 @@ impl<'a> Lexer<'a> {
                 let source = self.source;
                 let bytes = source.as_bytes();
 
-                while let Some(&b) = bytes.get(self.position) {
+                let closed = loop {
+                    let Some(&b) = bytes.get(self.position) else {
+                        break false;
+                    };
                     if b == quote {
                         self.position += 1; // consume closing quote
-                        return Ok(self.make_token(TokenKind::String, start));
+                        break true;
                     }
                     if b == b'{' && !sequence_is_invalid {
                         if BlockOrTagMarker::in_sequence_at(source, self.position).is_some() {
@@ -574,7 +551,7 @@ impl<'a> Lexer<'a> {
                                 self.position + 1,
                                 source.len(),
                             ) else {
-                                break; // unterminated `{` — the value can't close
+                                break false; // unterminated `{` — the value can't close
                             };
                             self.seek_to(close + '}'.len_utf8());
                             continue;
@@ -590,9 +567,12 @@ impl<'a> Lexer<'a> {
                     // Both needles are ASCII, so — as in `skip_to_special_char` — stepping
                     // one byte cannot stop inside a character.
                     self.position += 1;
+                };
+                if !closed {
+                    // Unterminated string
+                    return Err(lex_err("Unterminated string literal in template", start));
                 }
-                // Unterminated string
-                Err(lex_err("Unterminated string literal in template", start))
+                TokenKind::String
             }
             Some(b) if b.is_ascii_alphabetic() || matches!(b, b'_' | b'$' | b'-' | b'!') => {
                 // Tag names and identifiers.
@@ -610,7 +590,7 @@ impl<'a> Lexer<'a> {
                 // steps its first character whole).
                 self.position += 1;
                 self.scan_name_run();
-                Ok(self.make_token(TokenKind::Identifier, start))
+                TokenKind::Identifier
             }
             Some(b) if b.is_ascii_digit() => {
                 // Unquoted numeric attribute values (e.g., data-count=123)
@@ -637,7 +617,7 @@ impl<'a> Lexer<'a> {
                     }
                 }
                 self.position = i;
-                Ok(self.make_token(TokenKind::Identifier, start))
+                TokenKind::Identifier
             }
             // A non-ASCII letter opens a name run too (`<café>`, `<Ωmega>`). This arm and
             // the ASCII-led one above are the two halves of a single `is_alphabetic` test,
@@ -646,7 +626,7 @@ impl<'a> Lexer<'a> {
             Some(b) if b >= 0x80 && self.cur_char().is_some_and(char::is_alphabetic) => {
                 self.advance();
                 self.scan_name_run();
-                Ok(self.make_token(TokenKind::Identifier, start))
+                TokenKind::Identifier
             }
             // Any other char inside a tag is a name char per Svelte's `read_tag`
             // (a name run is anything but `/[\s=/>"']/`, and every one of those
@@ -662,8 +642,14 @@ impl<'a> Lexer<'a> {
             // this arm never turns an invalid tag name into an accepted element.
             Some(_) => {
                 self.advance();
-                Ok(self.make_token(TokenKind::Identifier, start))
+                TokenKind::Identifier
             }
-        }
+        };
+        *dst = Token {
+            kind,
+            start: start as u32,
+            end: self.position as u32,
+        };
+        Ok(())
     }
 }

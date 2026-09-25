@@ -264,7 +264,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ///
     /// Dispatches to specific block parsers based on the keyword.
     pub(crate) fn parse_block(&mut self) -> Result<FragmentNode<'arena>, ParseError> {
-        let start = self.current_start;
+        let start = self.current_start();
 
         // We're at {#, consume it
         if !self.check(TokenKind::BlockOpen) {
@@ -272,7 +272,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         }
 
         // After {# we expect a block keyword: if, each, await, key, snippet
-        let keyword = self.keyword_at(self.current_end);
+        let keyword = self.keyword_at(self.current_end());
 
         match keyword {
             "if" => self.parse_if_block(start),
@@ -296,7 +296,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         is_elseif: bool,
     ) -> Result<FragmentNode<'arena>, ParseError> {
         // Get the content start position (after {# or {:)
-        let tag_content_start = self.current_end;
+        let tag_content_start = self.current_end();
 
         // Scan to find closing } and extract content
         let (expr_content, content_start) = self.scan_block_tag_content(tag_content_start)?;
@@ -336,7 +336,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // Peek at what follows {:. Match the first two whitespace-delimited
             // words allocation-free (the old `.take(2).join(" ")` normalized
             // "else  if" -> "else if" only to compare against these two forms).
-            let keyword = self.continuation_keyword_at(self.current_end);
+            let keyword = self.continuation_keyword_at(self.current_end());
             let mut words = continuation_words(keyword);
             let first = words.next();
             let second = words.next();
@@ -345,7 +345,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
             if is_else_if {
                 // {:else if} - parse as nested if block
-                let elseif_start = self.current_start;
+                let elseif_start = self.current_start();
                 let elseif_block = self.parse_if_block_inner(elseif_start, true)?;
                 let mut nodes = self.bvec();
                 nodes.push(elseif_block);
@@ -354,7 +354,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 })
             } else if is_else {
                 // {:else} - parse else branch
-                let else_tag_start = self.current_end;
+                let else_tag_start = self.current_end();
                 let (else_tag_content, else_content_start) =
                     self.scan_block_tag_content(else_tag_start)?; // consume "else}"
                 // Only whitespace may follow `else` before the `}` — Svelte's
@@ -432,7 +432,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Parse an each block: {#each expression as context, index (key)}...{:else}...{/each}
     fn parse_each_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
         // Get the content start position (after {#)
-        let tag_content_start = self.current_end;
+        let tag_content_start = self.current_end();
 
         // Scan to find closing } and extract content
         let (tag_content, content_start) = self.scan_block_tag_content(tag_content_start)?;
@@ -546,9 +546,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // `{:keyword}` (e.g. `{:catch}`, `{:then}`) is left unconsumed so it
         // surfaces as an orphan-continuation error, matching the canonical parser.
         let fallback = if self.check(TokenKind::BlockContinue)
-            && self.continuation_keyword_at(self.current_end) == "else"
+            && self.continuation_keyword_at(self.current_end()) == "else"
         {
-            let else_tag_start = self.current_end;
+            let else_tag_start = self.current_end();
             let (else_tag_content, else_content_start) =
                 self.scan_block_tag_content(else_tag_start)?; // consume "else}"
             // The same gate the `{#if}` continuation applies to its own `{:else}`
@@ -808,7 +808,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Parse an await block: {#await expression}...{:then value}...{:catch error}...{/await}
     fn parse_await_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
         // Get the content start position (after {#)
-        let tag_content_start = self.current_end;
+        let tag_content_start = self.current_end();
 
         // Scan to find closing } and extract content
         let (tag_content, content_start) = self.scan_block_tag_content(tag_content_start)?;
@@ -969,7 +969,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         if !self.check(TokenKind::BlockContinue) {
             return Ok(());
         }
-        let mut words = continuation_words(self.continuation_keyword_at(self.current_end));
+        let mut words = continuation_words(self.continuation_keyword_at(self.current_end()));
         if words.next() != Some("else") {
             return Ok(());
         }
@@ -984,7 +984,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     fn check_await_continuation(&self, keyword: &str) -> bool {
         self.check(TokenKind::BlockContinue)
             && self
-                .continuation_keyword_at(self.current_end)
+                .continuation_keyword_at(self.current_end())
                 .starts_with(keyword)
     }
 
@@ -997,7 +997,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         keyword: &str,
         stop_keywords: &[&str],
     ) -> Result<(Option<Fragment<'arena>>, Option<&'arena Expression<'arena>>), ParseError> {
-        let tag_start = self.current_end;
+        let tag_start = self.current_end();
         let (tag_content, content_start) = self.scan_block_tag_content(tag_start)?;
         // The value is absent only when the `}` follows the keyword directly (`{:then}`).
         // Canonical's `next` tries `eat('}')` first and otherwise commits to a pattern
@@ -1194,11 +1194,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         }
 
         // The keyword after `{/` must match the open block.
-        if self.keyword_at(self.current_end) != expected {
-            return Err(self.error_expected_at(&format!("{{/{expected}}}"), self.current_start));
+        if self.keyword_at(self.current_end()) != expected {
+            return Err(self.error_expected_at(&format!("{{/{expected}}}"), self.current_start()));
         }
 
-        let close_tag_start = self.current_end;
+        let close_tag_start = self.current_end();
         let (close_content, after_close) = self.scan_block_tag_content(close_tag_start)?;
 
         // Only whitespace may follow the keyword: `{/each foo}` is rejected.
@@ -1243,7 +1243,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Parse a key block: {#key expression}...{/key}
     fn parse_key_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
         // Get the content start position (after {#)
-        let tag_content_start = self.current_end;
+        let tag_content_start = self.current_end();
 
         // Scan to find closing } and extract content
         let (tag_content, content_start) = self.scan_block_tag_content(tag_content_start)?;
@@ -1285,7 +1285,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Also handles TypeScript generics: `{#snippet name<T>(params)}`
     fn parse_snippet_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
         // Get the content start position (after {#)
-        let tag_content_start = self.current_end;
+        let tag_content_start = self.current_end();
 
         // Scan to find closing } and extract content
         let (tag_content, content_start) = self.scan_block_tag_content(tag_content_start)?;
@@ -1536,14 +1536,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
             // Check for block close {/keyword}
             if self.check(TokenKind::BlockClose)
-                && stop_keywords.contains(&self.keyword_at(self.current_end))
+                && stop_keywords.contains(&self.keyword_at(self.current_end()))
             {
                 break;
             }
 
             // Check for block continue {:keyword}
             if self.check(TokenKind::BlockContinue) {
-                let keyword = self.continuation_keyword_at(self.current_end);
+                let keyword = self.continuation_keyword_at(self.current_end());
 
                 // Stop when the continuation keyword begins with a stop keyword,
                 // so the two-word `{:else if}` matches the `else` stop.

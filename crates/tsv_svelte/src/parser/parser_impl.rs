@@ -48,14 +48,15 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     pub(crate) arena: &'arena Bump,
     pub(crate) source: &'a str, // Full original source
     pub(crate) lexer: Lexer<'a>,
-    pub(crate) current_kind: TokenKind,
-    pub(crate) current_start: usize, // Global position in full source
-    pub(crate) current_end: usize,   // Global position in full source
-    /// One-token lookahead. Holds the raw lexer token (positions are
-    /// **slice-relative** — `base_offset` is added when it's consumed, exactly
-    /// as for a freshly lexed token); cleared whenever the lexer is re-seeked.
+    /// The current token, in document coordinates. The lexer writes it in place
+    /// (`Lexer::next_token_into`); consuming a cached lookahead moves the whole token in.
+    /// Read through [`current_kind`](Self::current_kind),
+    /// [`current_start`](Self::current_start) and [`current_end`](Self::current_end), the
+    /// last two widening its `u32` offsets to the `usize` every `source` index takes.
+    current: Token,
+    /// One-token lookahead, lexed in place like `current` (document coordinates);
+    /// cleared whenever the lexer is re-seeked.
     pub(crate) peek: Option<Token>,
-    pub(crate) base_offset: usize, // Offset of lexer's source in full source
     /// TS comments collected from template expressions (e.g., {@debug /* comment */ a})
     pub(crate) expression_comments: Vec<Comment>,
     /// Every embedded acorn parse, in the order the reads happen — which is
@@ -161,21 +162,19 @@ fn is_reserved_word(name: &str) -> bool {
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
     pub(crate) fn new(source: &'a str, arena: &'arena Bump) -> Result<Self, ParseError> {
-        let mut lexer = Lexer::at_offset(source, 0);
-        // Extract token data immediately to avoid keeping token alive
-        let (kind, start, end) = {
-            let token = lexer.next_token()?;
-            (token.kind, token.start as usize, token.end as usize)
+        let mut lexer = Lexer::new(source);
+        let mut current = Token {
+            kind: TokenKind::Eof,
+            start: 0,
+            end: 0,
         };
+        lexer.next_token_into(&mut current)?;
         Ok(Self {
             arena,
             source,
             lexer,
-            current_kind: kind,
-            current_start: start,
-            current_end: end,
+            current,
             peek: None,
-            base_offset: 0,
             expression_comments: Vec::new(),
             acorn_regions: BumpVec::new_in(arena),
             in_svelte_head: false,
@@ -208,25 +207,54 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         self.arena.alloc_str(s)
     }
 
-    /// Returns the lexer's initial position (after BOM skip).
-    /// Used by parser to initialize gap tracking.
-    pub(crate) fn initial_position(&self) -> usize {
-        self.lexer.initial_position()
-    }
-
     pub(crate) fn advance(&mut self) -> Result<(), ParseError> {
-        let token = match self.peek.take() {
-            Some(token) => token,
-            None => self.lexer.next_token()?,
-        };
-        self.current_kind = token.kind;
-        self.current_start = self.base_offset + token.start as usize;
-        self.current_end = self.base_offset + token.end as usize;
+        match self.peek.take() {
+            Some(token) => self.current = token,
+            // Lexed straight into the current slot (`&mut self.current` is disjoint from
+            // `&mut self.lexer`), so no intermediate token is returned and re-scattered.
+            None => self.lexer.next_token_into(&mut self.current)?,
+        }
         Ok(())
     }
 
+    /// Lex the next token into the lookahead slot unless it is cached there already, in
+    /// place as [`advance`](Self::advance) lexes into the current one. A failed lex leaves
+    /// the slot empty, as it found it.
+    pub(crate) fn fill_peek(&mut self) -> Result<(), ParseError> {
+        if self.peek.is_none() {
+            let slot = self.peek.insert(Token {
+                kind: TokenKind::Eof,
+                start: 0,
+                end: 0,
+            });
+            if let Err(err) = self.lexer.next_token_into(slot) {
+                self.peek = None;
+                return Err(err);
+            }
+        }
+        Ok(())
+    }
+
+    /// The current token's kind.
+    #[inline]
+    pub(crate) fn current_kind(&self) -> TokenKind {
+        self.current.kind
+    }
+
+    /// The current token's start, a document byte offset.
+    #[inline]
+    pub(crate) fn current_start(&self) -> usize {
+        self.current.start as usize
+    }
+
+    /// The current token's end, a document byte offset.
+    #[inline]
+    pub(crate) fn current_end(&self) -> usize {
+        self.current.end as usize
+    }
+
     pub(crate) fn current_pos(&self) -> (usize, usize) {
-        (self.current_start, self.current_end)
+        (self.current_start(), self.current_end())
     }
 
     /// The current token's verbatim source text. Returns `&'a str` (borrowing the
@@ -234,11 +262,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// (and other `&mut self` calls) without a borrow-escape `.to_string()`.
     pub(crate) fn current_value(&self) -> &'a str {
         // current_start/end are global, so use them directly
-        &self.source[self.current_start..self.current_end]
+        &self.source[self.current_start()..self.current_end()]
     }
 
     pub(crate) fn check(&self, kind: TokenKind) -> bool {
-        self.current_kind == kind
+        self.current_kind() == kind
     }
 
     pub(crate) fn expect(&mut self, kind: TokenKind) -> Result<(), ParseError> {
@@ -261,18 +289,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             return Ok(false);
         }
 
-        // Peek at next token
-        if self.peek.is_none() {
-            self.peek = Some(self.lexer.next_token()?);
-        }
-
+        self.fill_peek()?;
         if let Some(peek) = &self.peek
             && peek.kind == TokenKind::Identifier
         {
-            // Compare directly without allocating (peek positions are
-            // slice-relative, so shift by base_offset to index the full source).
-            let name_start = self.base_offset + peek.start as usize;
-            let name_end = tag_name_end(self.source, self.base_offset + peek.end as usize);
+            // Compare directly without allocating.
+            let name_start = peek.start as usize;
+            let name_end = tag_name_end(self.source, peek.end as usize);
             return Ok(&self.source[name_start..name_end] == tag_name);
         }
 
@@ -283,11 +306,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Does not consume current token or advance parser
     /// Returns true if next token matches kind, false otherwise
     pub(crate) fn is_next_token(&mut self, kind: TokenKind) -> Result<bool, ParseError> {
-        // Populate peek cache if not already cached
-        if self.peek.is_none() {
-            self.peek = Some(self.lexer.next_token()?);
-        }
-
+        self.fill_peek()?;
         Ok(self.peek.as_ref().is_some_and(|p| p.kind == kind))
     }
 
@@ -298,8 +317,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         last_end: usize,
         nodes: &mut BumpVec<'arena, FragmentNode<'arena>>,
     ) -> Result<(), ParseError> {
-        if self.current_start > last_end {
-            let text = self.parse_text(last_end, self.current_start)?;
+        if self.current_start() > last_end {
+            let text = self.parse_text(last_end, self.current_start())?;
             nodes.push(FragmentNode::Text(text));
         }
         Ok(())
@@ -316,24 +335,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// KNOWN mode past an unrelated token must set `self.lexer.inside_tag` explicitly
     /// first — see `parse_rcdata_content`, which forces template mode after `</textarea>`.
     pub(crate) fn advance_to_position(&mut self, pos: usize) -> Result<(), ParseError> {
-        // Save the inside_tag state before creating new lexer
-        let was_inside_tag = self.lexer.inside_tag;
-
-        // Reset the lexer to start from the new position. Token positions are reported
-        // relative to the slice; the parser shifts them by base_offset, and the lexer
-        // carries the same offset so its ERRORS are reported against the whole document.
-        self.lexer = Lexer::at_offset(&self.source[pos..], pos);
-        self.base_offset = pos;
+        // Resume the lexer at the new position (its mode is kept); any lookahead was lexed
+        // from the old one.
+        self.lexer.seek(pos);
         self.peek = None;
 
-        // Restore inside_tag state
-        self.lexer.inside_tag = was_inside_tag;
-
         // Get the next token at the new position
-        let token = self.lexer.next_token()?;
-        self.current_kind = token.kind;
-        self.current_start = self.base_offset + token.start as usize;
-        self.current_end = self.base_offset + token.end as usize;
+        self.lexer.next_token_into(&mut self.current)?;
 
         Ok(())
     }
@@ -346,7 +354,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// (`parser/element.rs`) and the attribute/directive name (`parser/attribute.rs`) — since
     /// each reads a raw run the lexer's narrower identifier scan can stop short of.
     pub(crate) fn advance_past_name(&mut self, name_end: usize) -> Result<(), ParseError> {
-        if name_end == self.current_end {
+        if name_end == self.current_end() {
             self.advance()
         } else {
             self.advance_to_position(name_end)
@@ -361,7 +369,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ///
     /// Returns `true` if a comment was consumed, `false` if it's a regular slash.
     pub(crate) fn try_read_js_comment(&mut self) -> Result<bool, ParseError> {
-        let pos = self.current_start;
+        let pos = self.current_start();
         let bytes = self.source.as_bytes();
 
         if pos + 1 >= bytes.len() {
@@ -426,7 +434,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     /// Create error with custom message at current position
     pub(crate) fn error_msg(&self, message: &str) -> ParseError {
-        ParseError::invalid_syntax(message.to_string(), self.current_start)
+        ParseError::invalid_syntax(message.to_string(), self.current_start())
     }
 
     /// Create error with custom message at specified position
@@ -442,8 +450,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Create "Expected X, found Y" error at current position
     pub(crate) fn error_expected_found(&self, what: &str) -> ParseError {
         ParseError::invalid_syntax(
-            format!("Expected {what}, found {}", self.current_kind),
-            self.current_start,
+            // The field, not `current_kind()`: formatting borrows it in place, where the
+            // accessor's copy would take a stack slot in every frame this inlines into.
+            format!("Expected {what}, found {}", self.current.kind),
+            self.current_start(),
         )
     }
 
@@ -454,7 +464,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     /// Create "Duplicate X found" error at current position
     pub(crate) fn error_duplicate(&self, what: &str) -> ParseError {
-        ParseError::invalid_syntax(format!("Duplicate {what} found"), self.current_start)
+        ParseError::invalid_syntax(format!("Duplicate {what} found"), self.current_start())
     }
 
     /// Create "Duplicate {:kw} clause found" error at current position — a block
@@ -478,7 +488,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     pub(crate) fn error_clause_after(&self, clause: &str, predecessor: &str) -> ParseError {
         ParseError::invalid_syntax(
             format!("{{:{clause}}} cannot follow {{:{predecessor}}}"),
-            self.current_start,
+            self.current_start(),
         )
     }
 

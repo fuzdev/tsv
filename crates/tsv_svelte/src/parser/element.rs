@@ -221,7 +221,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Detects special elements (svelte:*, slot) and parses them appropriately.
     /// Returns a ParsedElement enum to distinguish between regular and special elements.
     pub(crate) fn parse_element_or_special(&mut self) -> Result<ParsedElement<'arena>, ParseError> {
-        let start = self.current_start;
+        let start = self.current_start();
 
         // Parse opening tag: <tag>
         self.expect(TokenKind::LeftAngle)?;
@@ -237,8 +237,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // the tail as an attribute, spacing it away from the name — turning source Svelte
         // rejects into source it accepts. `&'a str` borrows the source, so the name survives
         // the `&mut self` calls below.
-        let name_start = self.current_start;
-        let name_end = tag_name_end(self.source, self.current_end);
+        let name_start = self.current_start();
+        let name_end = tag_name_end(self.source, self.current_end());
         let tag_name = &self.source[name_start..name_end];
         let name_span = Span {
             start: name_start as u32,
@@ -310,8 +310,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         }
 
         // Read both offsets before consuming `>` — see `OpeningTagEnd` for which is which.
-        let gt = self.current_start as u32;
-        let after_gt = self.current_end;
+        let gt = self.current_start() as u32;
+        let after_gt = self.current_end();
         self.expect(TokenKind::RightAngle)?;
 
         Ok(OpeningTagEnd {
@@ -644,7 +644,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     // unwinds to the matching ancestor (or errors at the root if none
                     // matches). A non-HTML parent takes the strict mismatch error.
                     let end = if is_html && !self.is_closing_tag_for(tag_name) {
-                        self.current_start as u32
+                        self.current_start() as u32
                     } else {
                         self.parse_closing_tag(tag_name)?
                     };
@@ -656,7 +656,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     && let Some(next_name) = self.peek_open_tag_name()?
                     && tsv_html::closing_tag_omitted(tag_name, Some(next_name))
                 {
-                    return Ok((child_nodes, self.current_start as u32));
+                    return Ok((child_nodes, self.current_start() as u32));
                 }
                 // Parse child element (may be special or regular)
                 let child = self.parse_element_or_special()?;
@@ -679,13 +679,21 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 last_end = tag.span().end_usize();
                 child_nodes.push(tag);
             } else if self.check(TokenKind::Eof) {
-                return Err(self.error_unclosed_at(&format!("element: <{tag_name}>"), start));
+                return Err(self.error_unclosed_element(tag_name, start));
             } else {
                 return Err(self.error_expected_found(
                     "element, expression tag, comment, block, or closing tag",
                 ));
             }
         }
+    }
+
+    /// The "Unclosed element" error for `parse_children`, outlined so the `format!` of the
+    /// tag name holds no stack slot in that recursive frame.
+    #[cold]
+    #[inline(never)]
+    fn error_unclosed_element(&self, tag_name: &str, start: usize) -> ParseError {
+        self.error_unclosed_at(&format!("element: <{tag_name}>"), start)
     }
 
     /// Whether the `</…>` closing tag at the current `<` names `tag_name`.
@@ -702,7 +710,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// tag's name run ends at — so the whitespace arm is the full
     /// [`crate::whitespace::is_svelte_ws`] set, not just ASCII: `</div\u{a0}>` closes a `div`.
     fn is_closing_tag_for(&self, tag_name: &str) -> bool {
-        let name_start = self.current_start + 2; // past `</`
+        let name_start = self.current_start() + 2; // past `</`
         if !self
             .source
             .get(name_start..)
@@ -731,13 +739,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// but the same shortcut *was* a live bug in `is_next_tag`, so this asks the same
     /// question the same way rather than resting on the downstream reject.
     fn peek_open_tag_name(&mut self) -> Result<Option<&'a str>, ParseError> {
-        if self.peek.is_none() {
-            self.peek = Some(self.lexer.next_token()?);
-        }
+        self.fill_peek()?;
         Ok(self.peek.as_ref().and_then(|p| {
             (p.kind == TokenKind::Identifier).then(|| {
-                let name_start = self.base_offset + p.start as usize;
-                let name_end = tag_name_end(self.source, self.base_offset + p.end as usize);
+                let name_start = p.start as usize;
+                let name_end = tag_name_end(self.source, p.end as usize);
                 &self.source[name_start..name_end]
             })
         }))
@@ -768,7 +774,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         }
         self.advance()?;
 
-        let end = self.current_end;
+        let end = self.current_end();
         self.expect(TokenKind::RightAngle)?;
 
         Ok(end as u32)

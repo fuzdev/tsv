@@ -10,7 +10,7 @@ use super::parser_impl::SvelteParser;
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Parse a script tag: `<script lang="ts">...</script>`
     pub(crate) fn parse_script_tag(&mut self) -> Result<Script<'arena>, ParseError> {
-        let start = self.current_start;
+        let start = self.current_start();
 
         // Expect <
         self.expect(TokenKind::LeftAngle)?;
@@ -32,7 +32,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Content starts right after the >
         // Don't advance() here because the Svelte lexer can't tokenize script content
-        let content_start = self.current_end;
+        let content_start = self.current_end();
 
         // TODO(future): `find_raw_text_close` is a raw scan that doesn't handle:
         // - Nested <script> in string literals or comments: `const a = "</script>";`

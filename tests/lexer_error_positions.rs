@@ -4,15 +4,17 @@
 //! Lexer error positions are **host** coordinates — the document the error is rendered
 //! against.
 //!
-//! A `Lexer` is routinely built over a *slice*: a Svelte `<script>` / `<style>` island,
-//! the CSS declaration-value scan (`source[from..]`), the Svelte parser's own reseek
-//! after a jumped scan. `ErrorContext::from_source` is always handed the WHOLE document,
-//! so a position in any other coordinate space points at the wrong construct — a
-//! component whose script fails on line 4 reported at `1:13`, out in the markup, and a
-//! plain `.css` file whose declaration value fails at column 15 reported at column 3.
+//! A TypeScript or CSS `Lexer` is routinely built over a *slice*: a Svelte `<script>` /
+//! `<style>` island, the CSS declaration-value scan (`source[from..]`).
+//! `ErrorContext::from_source` is always handed the WHOLE document, so a position in any
+//! other coordinate space points at the wrong construct — a component whose script fails
+//! on line 4 reported at `1:13`, out in the markup, and a plain `.css` file whose
+//! declaration value fails at column 15 reported at column 3. The Svelte template lexer
+//! scans the whole document, resuming at a document offset after a jumped scan, so its
+//! positions are document offsets by construction; its cases here guard that resume.
 //!
-//! The parser side has always shifted (`Parser::current_pos` adds `base_offset`), so
-//! *parser* errors are correct and only *lexer* errors drift. That asymmetry is why a
+//! The TypeScript and CSS parsers shift (`current_pos` adds `base_offset`), so *parser*
+//! errors are correct and only *lexer* errors drift. That asymmetry is why a
 //! standalone `.ts` test can't see this: the same input as a `.ts` file reports
 //! correctly.
 //!
@@ -147,10 +149,11 @@ fn style_island_lexer_errors_land_where_the_standalone_parse_lands() {
     );
 }
 
-/// The Svelte template lexer is rebuilt over `source[pos..]` whenever the parser jumps
-/// the cursor (`advance_to_position`), so without the slice's own offset its errors carry
-/// the offset of whatever island preceded them. The pair is the control: **the same
-/// failing line reports the same column whether or not a reseek preceded it.**
+/// The parser reseeks the Svelte template lexer after a scan it ran over the source itself
+/// (`advance_to_position`), and the lexer's errors must stay document positions across that
+/// resume rather than pick up the offset of whatever island preceded them. The pair is the
+/// control: **the same failing line reports the same column whether or not a reseek
+/// preceded it.**
 #[test]
 fn template_lexer_errors_do_not_depend_on_a_preceding_reseek() {
     let plain = "<p>hello</p>\n<div class=\"unterminated\n";
@@ -164,11 +167,11 @@ fn template_lexer_errors_do_not_depend_on_a_preceding_reseek() {
     assert_eq!(
         svelte_error(after_reseek),
         (2, expected_column, line_text(after_reseek, 2)),
-        "a reseek moves the lexer's slice, not the reported position"
+        "a reseek moves the lexer's cursor, not the reported position"
     );
 }
 
-/// An island the parser skips wholesale (raw text, `<style>`) is the same reseek class.
+/// An island the parser skips wholesale (raw text, `<style>`) ends in the same resume.
 #[test]
 fn template_lexer_error_after_a_skipped_island_points_at_its_own_line() {
     let source = "<textarea>x</textarea>\n<!-- unterminated\n";

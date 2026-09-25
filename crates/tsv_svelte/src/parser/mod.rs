@@ -46,8 +46,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let mut css = None;
         let mut options = None;
         let mut fragment_nodes = self.bvec();
-        // Start gap tracking at lexer's initial position (accounts for BOM skip)
-        let mut last_end = self.initial_position();
+        // Start gap tracking where the lexer's cursor starts: past a leading byte-order mark
+        let mut last_end = tsv_lang::leading_bom_len(self.source);
 
         // Parse the entire file linearly
         while !self.check(TokenKind::Eof) {
@@ -142,7 +142,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 } else {
                     return Err(self.error_msg(&format!(
                         "Unexpected token in markup: {}",
-                        self.current_kind
+                        self.current_kind()
                     )));
                 }
             }
@@ -156,8 +156,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // witnesses wrong at once: it TRIMS U+0085 NEL, which is not `\s`, dropping the
         // trailing `Text` node canonical emits; and it KEEPS U+FEFF, which is, emitting a
         // node canonical does not (and printing the character where prettier deletes it).
-        if self.current_start > last_end {
-            let trailing_text = &self.source[last_end..self.current_start];
+        if self.current_start() > last_end {
+            let trailing_text = &self.source[last_end..self.current_start()];
             let trimmed = trailing_text.trim_end_matches(is_svelte_ws);
             if !trimmed.is_empty() {
                 // Only capture up to the end of non-whitespace content
@@ -213,13 +213,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// (`<svelte:options></svelte:options>`), whose `>` the span must reach.
     /// It configures component behavior via attributes like `runes`, `customElement`, etc.
     fn parse_svelte_options(&mut self) -> Result<SvelteOptions<'arena>, ParseError> {
-        let start = self.current_start;
+        let start = self.current_start();
 
         // Parse opening: <svelte:options
         self.expect(TokenKind::LeftAngle)?;
         // Read the name's end before consuming it — the attribute list's leading comment gap
         // starts here.
-        let name_end = self.current_end as u32;
+        let name_end = self.current_end() as u32;
         self.expect(TokenKind::Identifier)?; // "svelte:options"
 
         // Parse attributes
@@ -241,7 +241,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // letting it fall out to the ROOT fragment, which fabricates a node Svelte's
             // AST never contains. One position test covers every kind of content, since
             // the lexer skips whitespace but never moves a token backward.
-            if self.current_start != opening.after_gt {
+            if self.current_start() != opening.after_gt {
                 return Err(
                     self.error_msg_at("<svelte:options> cannot have children", opening.after_gt)
                 );

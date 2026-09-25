@@ -928,7 +928,7 @@ Worked example + full design: ./docs/architecture.md §Two-AST Design.
 ### Position Types: u32 vs usize
 
 - **Span**: `u32` for start/end (8 bytes total, 50% memory savings vs usize)
-- **`Token`**: `u32` start/end — a 16-byte POD `{kind, start, end}`, its size pinned by a `const` assert in tsv_ts and tsv_css (tsv_svelte's leaner `Token` pins at 12 B). On the parsers' hot path the TS and CSS lexers write it straight into the parser's token slot (`next_token_into`), since a by-value `Result<Token, ParseError>` comes back through a stack slot the parser would reload and re-scatter; every other caller takes it by value (`next_token`). The decoded value (escapes only) lives out-of-band on the lexer (the reused `Lexer::decode_scratch` buffer, borrowed via `decoded_str`)
+- **`Token`**: `u32` start/end — a 16-byte POD `{kind, start, end}`, its size pinned by a `const` assert in tsv_ts and tsv_css (tsv_svelte's leaner `Token` pins at 12 B). On the parsers' hot path the lexers write it straight into the parser's token slot (`next_token_into`), since a by-value `Result<Token, ParseError>` comes back through a stack slot the parser would reload and re-scatter; every other TS and CSS caller takes it by value (`next_token`), and the Svelte lexer has no by-value form. The decoded value (escapes only) lives out-of-band on the lexer (the reused `Lexer::decode_scratch` buffer, borrowed via `decoded_str`)
 - **Lexer/Parser positions**: `usize` (natural for `source[pos]` indexing); the lexer dispatches on raw bytes (`cur_byte`) and decodes a `char` only at non-ASCII branches
 - **Conversions at boundaries only**: `as u32` when creating Spans/`Token` fields, `as usize` when extracting; prefer `span.extract(source)` / `span.range()` over manual casts
 
