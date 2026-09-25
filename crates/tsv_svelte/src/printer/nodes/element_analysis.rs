@@ -574,19 +574,24 @@ impl<'a> Printer<'a> {
             return MultilineCause::Structural;
         }
 
-        // Mixed content (block + non-block children)
+        // Mixed content (block + non-block children). Every node that is not a block element or
+        // whitespace is the non-block half — a tag, a comment, a declaration, and EVERY
+        // control-flow block, the `{#await}` and a glued `{#snippet}` included, not only the three
+        // whose own expansion already makes the element multiline (`has_any_expanding_blocks`).
+        // The layout must not read a signal its own output rewrites: an element this rule let
+        // through is multiline only by its authored line breaks (`SourceBreaks`), and those are
+        // what its output writes. With the `{#await}` left out, a `<b>` too wide for its line
+        // holding `<div …>{y}</div>{#await p}x{/await}` built collapsible on pass 1 and printed
+        // the `{#await}` hugging `</div>` on the content line; pass 2 read that output's boundary
+        // newlines as authored, built the multiline layout and gave the block element its own
+        // line, splitting the two (and the same for the `{#await}`-first order, in a block
+        // parent too, whose sibling rule below reads only a block AFTER a breakable sibling).
         let has_block_children = block_child_count > 0;
         if has_block_children {
             let has_non_block = nodes.iter().any(|n| match n {
                 FragmentNode::Text(t) => !t.is_collapsible_ws_only,
                 FragmentNode::Element(e) => !self.is_block_element(e),
-                FragmentNode::ExpressionTag(_) => true,
-                FragmentNode::HtmlTag(_)
-                | FragmentNode::ConstTag(_)
-                | FragmentNode::DeclarationTag(_)
-                | FragmentNode::DebugTag(_)
-                | FragmentNode::RenderTag(_) => true,
-                _ => !super::helpers::is_control_flow_block(n),
+                _ => true,
             });
             if has_non_block {
                 return MultilineCause::Structural;

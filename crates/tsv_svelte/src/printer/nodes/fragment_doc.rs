@@ -744,13 +744,23 @@ impl<'a> Printer<'a> {
     /// it — the neighbour the compiler's whitespace rules actually see, which is what decides
     /// whether breaking there would inject a rendered space.
     ///
-    /// Three things make a neighbour not-content, and each is the compiler's own answer:
-    /// a **hoisted** sibling vanishes from those rules, so the scan steps over it (a run of
+    /// Four things make a neighbour not-content. Three are the compiler's own answer: a
+    /// **hoisted** sibling vanishes from those rules, so the scan steps over it (a run of
     /// `{@const}`s is not glued to itself — stepping over hoisted neighbours can only end at a
     /// text, whose edges answer, or at the fragment edge, which is not content); a
     /// **whitespace-only** text is the separator, not the content; and a content **text** counts
     /// only when its facing edge carries no collapsible whitespace, since that whitespace is the
-    /// separator instead. Anything else is content and glues.
+    /// separator instead. The fourth is the default display's: a **block element** owns its own
+    /// line ([`Self::owns_own_line`]), so the boundary beside it is a break whatever the author
+    /// wrote, and whitespace at a block-level boundary is not rendered under the default display
+    /// of a block box (a closed `<dialog>` or a nested `<style>` / `<script>` renders no box, the
+    /// known exceptions). Anything else is content and glues.
+    ///
+    /// The block-element answer is what keeps the declaration's own line a one-pass fixed point:
+    /// the layout must not read a signal its own output rewrites. Counted as glued content, a
+    /// block element made `<div>{y}</div>{@const z = 1}t` glued on both sides, so pass 1 gave the
+    /// block element its own line and kept `{@const z = 1}t` glued; pass 2 read the declaration as
+    /// glued on one side only and split the `t` off onto a line of its own.
     ///
     /// ⚠️ There is deliberately **no byte-adjacency test** here, and adding one was a render
     /// bug. Sibling spans tile every fragment except the ROOT, where `<script>` / `<style>` /
@@ -783,6 +793,7 @@ impl<'a> Printer<'a> {
                     };
                 }
                 n if n.is_hoisted_from_fragment() => cur = j,
+                n if self.is_block_element_node(n) => return false,
                 _ => return true,
             }
         }
