@@ -16,8 +16,9 @@ pub(crate) fn is_non_ascii_identifier_codepoint(ch: char) -> bool {
     ch as u32 >= 0xA0
 }
 
-/// 256-entry lookup table for the ASCII identifier-continuation fast path in
-/// `read_identifier`. Each entry is computed from the same byte predicate the
+/// 256-entry lookup table for the ASCII identifier-continuation fast path
+/// ([`ascii_identifier_run_end`], run by `read_identifier` and by the lexer's common-case
+/// identifier handoff). Each entry is computed from the same byte predicate the
 /// per-char continuation arm expands to for ASCII (`[a-zA-Z0-9_-]`), so a lookup
 /// replaces the alnum/eq OR-chain plus a full UTF-8 decode with one L1 load on the
 /// hot identifier-body loop. Non-ASCII bytes are all `false`, so the fast path stops
@@ -37,6 +38,25 @@ pub(crate) const IDENT_CONTINUE_LUT: [bool; 256] = {
     }
     t
 };
+
+/// The end of the run of ASCII identifier-continuation bytes (`[a-zA-Z0-9_-]`,
+/// [`IDENT_CONTINUE_LUT`]) that starts at `from` — `from` itself when none does.
+#[inline]
+pub(crate) fn ascii_identifier_run_end(bytes: &[u8], from: usize) -> usize {
+    let mut p = from;
+    while p < bytes.len() && IDENT_CONTINUE_LUT[bytes[p] as usize] {
+        p += 1;
+    }
+    p
+}
+
+/// Whether the byte an ASCII continuation run stopped on (`None` at end of input) ends the
+/// identifier outright: any ASCII byte but the `\` escape introducer. The run already took
+/// every ASCII continuation byte, so only a non-ASCII code point or an escape can extend it.
+#[inline]
+pub(crate) fn run_stop_ends_identifier(stop: Option<u8>) -> bool {
+    stop.is_none_or(|b| b.is_ascii() && b != b'\\')
+}
 
 /// Whether `ch` can begin a CSS identifier token in the lexer dispatch.
 ///
@@ -98,7 +118,9 @@ pub(crate) fn is_ascii_identifier_start(b: u8) -> bool {
     b.is_ascii_alphabetic() || b == b'-' || b == b'_' || b == b'\\'
 }
 
-/// Read a CSS identifier
+/// Read a CSS identifier — the general reader, which the lexer reaches only for an
+/// identifier whose ASCII run stops on a non-ASCII byte or a `\` (the common identifier is
+/// read by the lexer's handoff, [`crate::lexer::Lexer::read_identifier_into`]).
 /// CSS identifiers can contain unicode escapes; the characters a-z, A-Z, 0-9, -, _;
 /// any non-ASCII code point at or above U+00A0 (symbols and emoji, matching Svelte's
 /// `>= 160` rule); plus an optional leading `$` (SCSS-style; the lexer dispatch only
@@ -109,7 +131,7 @@ pub(crate) fn is_ascii_identifier_start(b: u8) -> bool {
 /// the common no-escape identifier returns `None` (no allocation — its text is the
 /// verbatim source slice `source[start..end]`). The decoded buffer is materialized
 /// lazily from the verbatim run scanned so far the first time a `\` escape is seen;
-/// the caller ([`crate::lexer::Lexer::read_identifier_into`]) funnels it into the lexer's reused
+/// the caller (`Lexer::read_decoded_identifier_into`) funnels it into the lexer's reused
 /// `decode_scratch`, so this owned `String` is the only allocation on the escape path.
 pub(crate) fn read_identifier(
     source: &str,
@@ -125,13 +147,13 @@ pub(crate) fn read_identifier(
     // attribute selector) is kept as a Dollar token by the lexer dispatch, so this
     // arm is only reached when `$` begins an identifier. No push: the `$` is part of
     // the verbatim run captured if/when an escape later materializes the buffer.
-    if source[*pos..].starts_with('$') {
+    //
+    // Byte view for the `$` test and the ASCII continuation fast path (coexists with the
+    // `source` `&str` slices the escape arms take — both are immutable borrows).
+    let bytes = source.as_bytes();
+    if bytes.get(*pos) == Some(&b'$') {
         *pos += 1;
     }
-
-    // Byte view for the ASCII continuation fast path (coexists with the `source`
-    // `&str` slices the escape arms take — both are immutable borrows).
-    let bytes = source.as_bytes();
 
     // CSS identifiers can contain escape sequences that must be decoded
     loop {
@@ -143,12 +165,17 @@ pub(crate) fn read_identifier(
         // byte that arm would not consume — byte-identical, skipping the per-char decode.
         // Once an escape materializes the decoded buffer, each following char must be
         // pushed, so the fast path yields to the char loop.
+        //
+        // The run's stop byte settles the common identifier on the spot: at end of input,
+        // or on an ASCII byte other than `\`, the char match below can only take its
+        // `None` / `_` arm and end the identifier (the table already rejected every ASCII
+        // continuation byte), so the fast path ends it without decoding the byte again.
+        // Only a non-ASCII byte or an escape goes on to the char loop.
         if decoded.is_none() {
-            let mut p = *pos;
-            while p < bytes.len() && IDENT_CONTINUE_LUT[bytes[p] as usize] {
-                p += 1;
+            *pos = ascii_identifier_run_end(bytes, *pos);
+            if run_stop_ends_identifier(bytes.get(*pos).copied()) {
+                break;
             }
-            *pos = p;
         }
 
         let current_char = source[*pos..].chars().next();
