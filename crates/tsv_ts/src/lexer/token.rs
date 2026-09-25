@@ -479,20 +479,23 @@ impl fmt::Display for TokenKind {
     }
 }
 
-// Token design with escape handling
-// - `decoded`: owned string for escape-processed values (only allocated when needed)
+// Token design: classification + span, no text
 // - Raw text: extracted via source[start..end] on demand (zero duplication)
+// - Decoded value (escapes only): held out-of-band on the lexer, not in the token
+//   (`Lexer::decode_scratch`, borrowed via `decoded_str`), so the per-token value
+//   carried on the hot pump is just classification + span
 //
 // This follows the "single source of truth" principle from docs/architecture.md:
 // "Raw strings are NEVER duplicated in the AST" - applies to tokens too (pre-AST).
-// A 16-byte POD: small enough to return from `next_token` in registers (SysV ABI
-// returns ≤16-byte integer aggregates in `rax:rdx` — no `Copy` needed) and store
-// straight into the parser's `current_*` fields, with no heap-owning field to
-// move. The rare decoded string (escapes only) lives out-of-band on the lexer
-// (`Lexer::decode_scratch` / `decoded_str`), so the per-token value carried on the hot
-// pump is just classification + span. Left non-`Copy` (like the original) so
-// `TokenKind` can stay non-`Copy` and avoid a `trivially_copy_pass_by_ref` cascade
-// on the many `&TokenKind` params; moving an 8-byte `TokenKind` field is just as cheap.
+// A 16-byte POD with no heap-owning field. The hot advance path has the lexer write
+// it straight into the parser's current-token slot (`next_token_into`); the size does
+// not buy a register return, since a by-value `Result<Token, ParseError>` from
+// `next_token` is a round trip through a slot in the caller's frame that the parser
+// would then reload and re-scatter — the round trip `next_token_into` elides. Every
+// other token (bootstrap, cold re-lexes, the `peek_kind` lookahead) comes back by
+// value. Left non-`Copy` so `TokenKind` can stay non-`Copy` and avoid a
+// `trivially_copy_pass_by_ref` cascade on the many `&TokenKind` params; moving an
+// 8-byte `TokenKind` field is just as cheap.
 #[derive(Debug, Clone)]
 pub struct Token {
     pub kind: TokenKind,
@@ -502,9 +505,10 @@ pub struct Token {
     pub end: u32,
 }
 
-// Guards the hot-path invariant: `Token` is a 16-byte `Copy` POD (returns in
-// registers, no heap-owning field). Anything that re-bloats it — re-adding a
-// `String`/`Box` field, widening `start`/`end` to `usize` — fails the build here.
+// Guards the hot-path invariant: `Token` is a 16-byte POD with no heap-owning field,
+// so the parser's in-place write of it stays one 16-byte store. Anything that re-bloats
+// it — re-adding a `String`/`Box` field, widening `start`/`end` to `usize` — fails the
+// build here.
 const _: () = assert!(size_of::<Token>() == 16);
 
 /// The reserved-word set — the independent oracle the SWAR matcher is validated

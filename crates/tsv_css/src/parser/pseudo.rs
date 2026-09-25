@@ -60,7 +60,7 @@ pub(crate) fn parse_pseudo_selector<'arena>(
     // The name token's end is kept on the node: it is where the `<function-token>`'s `(`
     // begins, and no later scan of the span can re-derive it (an identity-escaped `(`
     // inside the name — `:foo\(bar(.x)` — is an earlier one).
-    let name_end = parser.span_pos(parser.current_end);
+    let name_end = parser.span_pos(parser.current_end());
     let mut end = name_end;
     parser.advance()?;
 
@@ -216,7 +216,7 @@ fn parse_pseudo_args<'arena>(
 ) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
     parser.expect(TokenKind::LeftParen)?;
 
-    let args_start = parser.current_start;
+    let args_start = parser.current_start();
 
     match arg_kind {
         PseudoArgKind::SelectorList(grammar) => selector_list_args(parser, args_start, grammar),
@@ -290,8 +290,8 @@ fn parse_part_args<'arena>(
         let ident = parser.current_identifier_in_arena();
         idents.push(ident);
         ident_spans.push(Span {
-            start: parser.span_pos(parser.current_start),
-            end: parser.span_pos(parser.current_end),
+            start: parser.span_pos(parser.current_start()),
+            end: parser.span_pos(parser.current_end()),
         });
         parser.advance()?;
 
@@ -377,7 +377,7 @@ fn parse_nth_args<'arena>(
     args_start: usize,
 ) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
     parser.skip_boundary_whitespace_registering_comments()?;
-    let anb_start = parser.current_start;
+    let anb_start = parser.current_start();
 
     // Not a clean `<an+b> [of S]?`: parse as an ordinary complex-selector-list (like
     // `:is()`/`:not()`), matching parseCss for selector-shaped `:nth-*()` arguments.
@@ -435,7 +435,7 @@ fn parse_nth_args<'arena>(
     // is trimmed to the last content token at convert time (`write_pseudo_class_args`),
     // matching Svelte's `read_selector_list`, which captures its end before
     // `allow_comment_or_whitespace`.
-    let span_end = parser.span_pos(parser.current_start); // `)` position
+    let span_end = parser.span_pos(parser.current_start()); // `)` position
     let paren_end = parser.expect_and_capture(TokenKind::RightParen)?; // End after closing paren
 
     Ok((

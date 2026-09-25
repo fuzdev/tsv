@@ -22,7 +22,7 @@ fn skip_comments_before_comma(parser: &mut CssParser<'_, '_>) -> Result<(), Pars
     // and the comma is trivia. A plain lookahead saw an identifier there and declined, and a
     // plain skip then left the run standing where the `,` was due — `a /* c */<NBSP>, b`
     // rejected on input canonical accepts.
-    if matches!(&parser.current_kind, TokenKind::Comment)
+    if matches!(parser.current_kind(), TokenKind::Comment)
         && parser.peek_past_boundary_whitespace()? == TokenKind::Comma
     {
         parser.skip_boundary_whitespace_registering_comments()?;
@@ -145,7 +145,7 @@ pub(crate) fn parse_forgiving_selector_list<'arena>(
 
     loop {
         let selector_start = parser.base_offset() + parser.current_start();
-        let source_start = parser.current_start; // Raw source position for extraction
+        let source_start = parser.current_start(); // Raw source position for extraction
 
         // Try to parse a selector
         match parse_complex_selector(parser) {
@@ -235,7 +235,7 @@ fn extract_selector_until_comma_or_end<'a>(
     let mut depth = 0; // Track nesting depth for parens/brackets
 
     loop {
-        match &parser.current_kind {
+        match parser.current_kind() {
             TokenKind::RightParen if depth == 0 => {
                 // End of selector list - don't consume the closing paren
                 break;
@@ -267,7 +267,7 @@ fn extract_selector_until_comma_or_end<'a>(
     }
 
     // Extract raw text from source (from start_pos to current position)
-    let end_pos = parser.current_start;
+    let end_pos = parser.current_start();
     let raw = &parser.source()[start_pos..end_pos];
     Ok(raw)
 }
@@ -351,7 +351,7 @@ pub(crate) fn parse_complex_selector<'arena>(
         // the run so its `+`/`-` binds to the coefficient, not a next-sibling combinator.
         if let Some((c, c_span)) = pending
             && !pseudo_arg_terminal_nth(parser)
-            && let Some(next) = explicit_combinator_kind(parser.current_kind)
+            && let Some(next) = explicit_combinator_kind(parser.current_kind())
         {
             children.push(RelativeSelector {
                 combinator: Some(c),
@@ -361,7 +361,7 @@ pub(crate) fn parse_complex_selector<'arena>(
             });
             let next_span = Span {
                 start: parser.span_pos(parser.current_start()),
-                end: parser.span_pos(parser.current_end),
+                end: parser.span_pos(parser.current_end()),
             };
             pending = Some((next, next_span));
             parser.advance()?; // consume the combinator token
@@ -436,8 +436,8 @@ pub(crate) fn parse_explicit_combinator(
     parser.skip_boundary_whitespace()?;
     let combinator_start = parser.span_pos(parser.current_start());
 
-    if let Some(comb) = explicit_combinator_kind(parser.current_kind) {
-        let end = parser.span_pos(parser.current_end);
+    if let Some(comb) = explicit_combinator_kind(parser.current_kind()) {
+        let end = parser.span_pos(parser.current_end());
         parser.advance()?; // consume combinator token
         skip_combinator_gap(parser)?;
 
@@ -474,7 +474,7 @@ pub(crate) fn parse_combinator(
     // unconsumed for the caller's pre-brace / pseudo-arg handling. `had_gap_comment`
     // lets a descendant combinator be recognized even when the gap is comment-only.
     let had_gap_comment =
-        matches!(&parser.current_kind, TokenKind::Comment) && comment_continues_selector(parser)?;
+        matches!(parser.current_kind(), TokenKind::Comment) && comment_continues_selector(parser)?;
     if had_gap_comment {
         // Boundary-aware, to agree with the lookahead that just predicted it: the run behind
         // the comment is part of the same `allow_comment_or_whitespace`, and `combinator_start`
@@ -489,7 +489,7 @@ pub(crate) fn parse_combinator(
     // whitespace (or a gap comment) between the selectors — an adjacent selector token is
     // part of the same compound (handled by the is_simple_selector_chain loop) and must
     // never fabricate a zero-width combinator.
-    let combinator = explicit_combinator_kind(parser.current_kind).or_else(|| {
+    let combinator = explicit_combinator_kind(parser.current_kind()).or_else(|| {
         if (combinator_start > whitespace_start || had_gap_comment)
             && (is_selector_start(parser) || pseudo_arg_terminal_nth(parser))
         {
@@ -504,7 +504,7 @@ pub(crate) fn parse_combinator(
             // Descendant is whitespace - span from end of previous to start of next
             (whitespace_start, combinator_start)
         } else {
-            (combinator_start, parser.span_pos(parser.current_end))
+            (combinator_start, parser.span_pos(parser.current_end()))
         };
 
         if comb != Combinator::Descendant {
@@ -558,7 +558,7 @@ fn is_explicit_combinator_kind(kind: TokenKind) -> bool {
 
 /// Check if current token could start a selector
 fn is_selector_start(parser: &CssParser<'_, '_>) -> bool {
-    is_selector_start_kind(parser.current_kind)
+    is_selector_start_kind(parser.current_kind())
 }
 
 /// Inside functional pseudo-class args, a bare `<number>`/`<an+b>` term terminated by
@@ -606,8 +606,8 @@ fn comment_continues_selector(parser: &CssParser<'_, '_>) -> Result<bool, ParseE
 /// selector out of the run itself. The sibling reading of the same question is
 /// `comment_continues_selector`, and the two have to agree.
 fn compound_continues_across_comments(parser: &CssParser<'_, '_>) -> Result<bool, ParseError> {
-    let remaining = &parser.source()[parser.current_end..];
-    let mut lexer = Lexer::at_offset(remaining, parser.base_offset() + parser.current_end);
+    let remaining = &parser.source()[parser.current_end()..];
+    let mut lexer = Lexer::at_offset(remaining, parser.base_offset() + parser.current_end());
     loop {
         let token = lexer.next_token()?;
         match token.kind {
@@ -652,9 +652,9 @@ fn parse_relative_selector<'arena>(
         // continue only when a simple-selector start follows it glued; a whitespace
         // anywhere in the run (`.a/* c */ .b`) ends the compound and the combinator loop
         // reads it as a descendant.
-        if matches!(&parser.current_kind, TokenKind::Comment) {
+        if matches!(parser.current_kind(), TokenKind::Comment) {
             if compound_continues_across_comments(parser)? {
-                while matches!(&parser.current_kind, TokenKind::Comment) {
+                while matches!(parser.current_kind(), TokenKind::Comment) {
                     parser.register_current_comment();
                     parser.advance()?;
                 }
@@ -711,7 +711,7 @@ fn parse_relative_selector<'arena>(
 /// a simple selector is also one that *continues* a glued compound — so this delegates
 /// rather than re-listing the kinds, keeping the two in lockstep.
 fn is_simple_selector_chain(parser: &CssParser<'_, '_>) -> bool {
-    is_selector_start_kind(parser.current_kind)
+    is_selector_start_kind(parser.current_kind())
 }
 
 /// Parse a simple selector: type, class, id, attribute, pseudo-class, pseudo-element
@@ -744,7 +744,7 @@ pub(crate) fn parse_simple_selector<'arena>(
         });
     }
 
-    match &parser.current_kind {
+    match parser.current_kind() {
         TokenKind::Identifier => {
             // Type selector: div, span, etc. Could also be a namespace prefix:
             // svg|rect, svg|*. Both forms recover their text verbatim from `span` at
@@ -759,7 +759,7 @@ pub(crate) fn parse_simple_selector<'arena>(
                 // `SimpleSelector::Type`.
                 let namespace_span = Some(Span {
                     start: start as u32,
-                    end: parser.span_pos(parser.current_end),
+                    end: parser.span_pos(parser.current_end()),
                 });
                 parser.advance()?; // consume the namespace identifier
                 parser.register_and_skip_comments()?;
@@ -776,7 +776,7 @@ pub(crate) fn parse_simple_selector<'arena>(
                 }
                 let span = Span {
                     start: start as u32,
-                    end: parser.span_pos(parser.current_end),
+                    end: parser.span_pos(parser.current_end()),
                 };
                 parser.advance()?;
 
@@ -818,7 +818,7 @@ pub(crate) fn parse_simple_selector<'arena>(
             }
             // The class name's text is recovered from `span` at print time, so
             // nothing is copied into the arena.
-            let end = parser.span_pos(parser.current_end);
+            let end = parser.span_pos(parser.current_end());
             parser.advance()?;
             Ok(SimpleSelector::Class {
                 span: Span {
@@ -835,7 +835,7 @@ pub(crate) fn parse_simple_selector<'arena>(
             }
             // The ID name's text is recovered from `span` at print time, so nothing
             // is copied into the arena.
-            let end = parser.span_pos(parser.current_end);
+            let end = parser.span_pos(parser.current_end());
             parser.advance()?;
             Ok(SimpleSelector::Id {
                 span: Span {
@@ -852,7 +852,7 @@ pub(crate) fn parse_simple_selector<'arena>(
             let namespaced = matches!(parser.peek_past_comments()?, TokenKind::Pipe);
             let namespace_span = Span {
                 start: start as u32,
-                end: parser.span_pos(parser.current_end),
+                end: parser.span_pos(parser.current_end()),
             };
             parser.advance()?;
             if namespaced {
@@ -878,7 +878,7 @@ pub(crate) fn parse_simple_selector<'arena>(
                 // nothing is copied into the arena.
                 let span = Span {
                     start: start as u32,
-                    end: parser.span_pos(parser.current_end),
+                    end: parser.span_pos(parser.current_end()),
                 };
                 parser.advance()?;
 
@@ -916,7 +916,7 @@ pub(crate) fn parse_simple_selector<'arena>(
         }
         TokenKind::Ampersand => {
             // Nesting selector: &
-            let end = parser.span_pos(parser.current_end);
+            let end = parser.span_pos(parser.current_end());
             parser.advance()?;
             Ok(SimpleSelector::Nesting {
                 span: Span {
@@ -928,11 +928,11 @@ pub(crate) fn parse_simple_selector<'arena>(
         TokenKind::Percentage => {
             // Percentage selector: 0%, 50%, 100% (used in @keyframes)
             // Extract value without the % suffix
-            let value_str = &parser.source()[parser.current_start..parser.current_end - 1];
+            let value_str = &parser.source()[parser.current_start()..parser.current_end() - 1];
             let value = value_str.parse::<f64>().map_err(|_| {
                 parser.error_msg_at(&format!("Invalid percentage value: {value_str}"), start)
             })?;
-            let end = parser.span_pos(parser.current_end);
+            let end = parser.span_pos(parser.current_end());
             parser.advance()?;
             Ok(SimpleSelector::Percentage {
                 value,
@@ -957,7 +957,7 @@ pub(crate) fn parse_simple_selector<'arena>(
             if parser.check(TokenKind::Identifier) {
                 // The element name's text is recovered from `span` at print time, so
                 // nothing is copied into the arena.
-                let end = parser.span_pos(parser.current_end);
+                let end = parser.span_pos(parser.current_end());
                 parser.advance()?;
 
                 Ok(SimpleSelector::Type {
@@ -969,7 +969,7 @@ pub(crate) fn parse_simple_selector<'arena>(
                 })
             } else if parser.check(TokenKind::Asterisk) {
                 // |* - universal selector with explicit no namespace
-                let end = parser.span_pos(parser.current_end);
+                let end = parser.span_pos(parser.current_end());
                 parser.advance()?;
 
                 Ok(SimpleSelector::Universal {
@@ -984,7 +984,7 @@ pub(crate) fn parse_simple_selector<'arena>(
             }
         }
         _ => Err(parser.error_msg_at(
-            &format!("Unexpected token in selector: {}", parser.current_kind),
+            &format!("Unexpected token in selector: {}", parser.current_kind()),
             start,
         )),
     }

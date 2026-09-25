@@ -38,8 +38,8 @@ pub(crate) fn parse_attribute_selector<'arena>(
         // Universal namespace: *|attr — the `*` can only be a wq-name prefix here, so a
         // comment before the `|` is unambiguous.
         let prefix = Span {
-            start: parser.span_pos(parser.current_start),
-            end: parser.span_pos(parser.current_end),
+            start: parser.span_pos(parser.current_start()),
+            end: parser.span_pos(parser.current_end()),
         };
         parser.advance()?;
         parser.register_and_skip_comments()?;
@@ -53,8 +53,8 @@ pub(crate) fn parse_attribute_selector<'arena>(
         // Explicit no namespace: |attr — the prefix's leading token is absent, so its
         // span is empty at the `|`.
         let prefix = Span {
-            start: parser.span_pos(parser.current_start),
-            end: parser.span_pos(parser.current_start),
+            start: parser.span_pos(parser.current_start()),
+            end: parser.span_pos(parser.current_start()),
         };
         parser.advance()?; // consume |
         parser.register_and_skip_comments()?;
@@ -64,8 +64,8 @@ pub(crate) fn parse_attribute_selector<'arena>(
         // span before consuming it: it is the verbatim span of either reading — the attribute
         // *name*, or the `<ns-prefix>`'s leading token.
         let maybe_namespace_span = Span {
-            start: parser.span_pos(parser.current_start),
-            end: parser.span_pos(parser.current_end),
+            start: parser.span_pos(parser.current_start()),
+            end: parser.span_pos(parser.current_end()),
         };
         parser.advance()?;
         // Whitespace here is legal only under the `|=` reading — see the ⚠️ above. The
@@ -163,8 +163,8 @@ pub(crate) fn parse_attribute_selector<'arena>(
     // ast/convert/mod.rs). The `Identifier` check above guarantees a name token, so no decoded
     // copy is stored.
     let name_span = Span {
-        start: parser.span_pos(parser.current_start),
-        end: parser.span_pos(parser.current_end),
+        start: parser.span_pos(parser.current_start()),
+        end: parser.span_pos(parser.current_end()),
     };
     parser.advance()?;
     // `read_selector`'s `allow_whitespace()` after the name — see the no-namespace twin above.
@@ -225,7 +225,7 @@ fn parse_attribute_flags<'arena>(
     if !parser.check(TokenKind::Identifier) {
         return Ok(None);
     }
-    let (start, end) = (parser.current_start, parser.current_end);
+    let (start, end) = (parser.current_start(), parser.current_end());
     let raw = &parser.source()[start..end];
     let letters = raw.bytes().take_while(u8::is_ascii_alphabetic).count();
     let flag = &raw[..letters];
@@ -253,8 +253,8 @@ fn parse_attribute_flags<'arena>(
 /// steps the run as it steps one the lexer tokenized on its own; the head of the token was
 /// stepped by the matcher→value juncture before it was read.
 fn parse_attribute_value(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>, ParseError> {
-    let (start, mut end) = (parser.current_start, parser.current_end);
-    match &parser.current_kind {
+    let (start, mut end) = (parser.current_start(), parser.current_end());
+    match parser.current_kind() {
         TokenKind::Identifier => {
             if let Some(split) = boundary_split_offset(&parser.source()[start..end]) {
                 end = start + split;
@@ -283,7 +283,7 @@ fn parse_attribute_value(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>,
 /// gives none of `~ | ^ $ =` a case in *consume a token*), so a comment may sit between them
 /// — but a `<whitespace-token>` may not, which is why only comments are skipped.
 fn parse_attribute_matcher(parser: &mut CssParser<'_, '_>) -> Result<AttributeMatcher, ParseError> {
-    let matcher = match &parser.current_kind {
+    let matcher = match parser.current_kind() {
         TokenKind::Equals => AttributeMatcher::Exact, // =
         TokenKind::Tilde => {
             // ~= (contains in whitespace-separated list)
@@ -338,7 +338,7 @@ fn parse_attribute_matcher(parser: &mut CssParser<'_, '_>) -> Result<AttributeMa
         _ => {
             return Err(parser.error_msg(&format!(
                 "Unsupported attribute matcher: {:?}",
-                parser.current_kind
+                parser.current_kind()
             )));
         }
     };
