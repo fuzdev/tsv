@@ -727,21 +727,21 @@ the anchor rule is `Printer::element_claim_anchor`.
 ## Build-Fanout Audit (`fanout:audit`)
 
 ```bash
-# build_fanout_audit - guard the O(1)-doc-builds-per-source-node invariant. A
-# builder that assembles `conditional_group` candidates by RE-INVOKING the recursive
-# builder on the same nodes — instead of building the subtree once and reusing the
-# DocId — grows the doc-node count exponentially in nesting depth (hang/OOM on a
-# deeply-nested but ordinary file). Builds synthetic nested inputs across one axis per
+# build_fanout_audit - guard the O(1)-doc-builds-per-source-node invariant. A builder
+# that assembles `conditional_group` candidates by RE-INVOKING the recursive builder
+# on the same nodes — instead of building the subtree once and reusing the DocId —
+# grows the doc-node count exponentially in nesting depth (hang/OOM on a deeply-nested
+# but ordinary file). Builds synthetic nested inputs across one axis per
 # candidate-building construct (svelte elements / {#if} / {#each} / {#await} /
-# sibling-`>` dangle / {#snippet} / {#key}; ts member chains, ternaries, conditional
-# types, nested calls, and the expand-last arrow family — plain, multi-arg, `new`,
-# chain, object-body, conditional-body, `function`, and curried, the last in untyped /
-# typed / `new` / chain / object-TERMINAL spellings, the object-terminal one again in
-# single-argument, multi-argument and chain forms) at increasing depth, failing if the
-# doc-node count grows faster than ~depth^3. An axis earns its place by REACHING a
-# builder no other axis does; the curried axes came from real 2^depth regressions that
-# the family as it then stood could not see. Deterministic, pure Rust, no Deno. Exits 1
-# on any super-linear case.
+# sibling-`>` dangle / glued inline-element runs / {#snippet} / {#key}; ts member
+# chains, ternaries, conditional types, nested calls, and the expand-last arrow family
+# — plain, multi-arg, `new`, chain, object-body, conditional-body, `function`, and
+# curried, the last in untyped / typed / `new` / chain / object-TERMINAL spellings,
+# the object-terminal one again in single-argument, multi-argument and chain forms) at
+# increasing depth, failing if the doc-node count grows faster than ~depth^3. An axis
+# earns its place by REACHING a builder no other axis does; the curried axes came from
+# real 2^depth regressions that the family as it then stood could not see.
+# Deterministic, pure Rust, no Deno. Exits 1 on any super-linear case.
 cargo run -p tsv_debug build_fanout_audit
 # Also: --json. Gated in `deno task check` via the `fanout:audit` task.
 ```
