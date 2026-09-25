@@ -13,6 +13,7 @@ unformatted_crlf.svelte -text
 input_invalid_raw_cr.svelte -text
 unformatted_cr_reindent.svelte -text
 unformatted_crlf_reindent.svelte -text
+unformatted_ours_before_instance_crlf.svelte -text
 
 # Recorded oracle outputs — committed on purpose, but generated:
 # collapse in GitHub diffs and exclude from language stats.
