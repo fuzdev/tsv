@@ -35,6 +35,23 @@ impl<'a> Printer<'a> {
     /// - Program trailing comments after the last statement
     pub(crate) fn build_program_doc(&self, program: &internal::Program<'_>) -> DocId {
         let d = self.d();
+        let (body, has_output) = self.build_program_body_doc(program);
+        // Trailing newline (only if there's content — empty files stay empty)
+        if has_output {
+            d.concat(&[body, d.hardline()])
+        } else {
+            body
+        }
+    }
+
+    /// [`Self::build_program_doc`] without the trailing newline, paired with whether the
+    /// program has any output — a statement or a comment — for that newline to end.
+    ///
+    /// The shape an embedder wants when it places the body between delimiters of its own —
+    /// a `<script>` nested in Svelte markup, whose closing tag supplies the line break the
+    /// program would otherwise end with.
+    pub(crate) fn build_program_body_doc(&self, program: &internal::Program<'_>) -> (DocId, bool) {
+        let d = self.d();
         let mut parts = d.pooled_docbuf();
 
         // The shared statement-list walk — the same one every block, function body and
@@ -69,12 +86,7 @@ impl<'a> Printer<'a> {
             has_output = true;
         }
 
-        // Trailing newline (only if there's content — empty files stay empty)
-        if has_output {
-            parts.push(d.hardline());
-        }
-
-        d.concat(&parts)
+        (d.concat(&parts), has_output)
     }
 
     /// Build docs for trailing comments at the end of the program

@@ -1,0 +1,210 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 806,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 78,
+				"data": " declarations inside a nested style measure from their rendered column "
+			},
+			{
+				"type": "Text",
+				"start": 78,
+				"end": 79,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 79,
+				"end": 425,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 80
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 83
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 84,
+							"end": 86,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 86,
+							"end": 418,
+							"name": "style",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 2,
+									"character": 87
+								},
+								"end": {
+									"line": 3,
+									"column": 7,
+									"character": 92
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 93,
+										"end": 410,
+										"type": "Text",
+										"data": "\n\t\t.class {\n\t\t\t/* 100 columns: stays on one line */\n\t\t\tbackground: linear-gradient(0deg, rgba(0, 0, 0, 0.8) 0%, rgba(1, 1, 1, 0.8) 50%, var(--aaaa));\n\t\t\t/* 101 columns: the arguments break */\n\t\t\tbackground: linear-gradient(\n\t\t\t\t0deg,\n\t\t\t\trgba(0, 0, 0, 0.8) 0%,\n\t\t\t\trgba(1, 1, 1, 0.8) 50%,\n\t\t\t\tvar(--aaaaa)\n\t\t\t);\n\t\t}\n\t",
+										"raw": "\n\t\t.class {\n\t\t\t/* 100 columns: stays on one line */\n\t\t\tbackground: linear-gradient(0deg, rgba(0, 0, 0, 0.8) 0%, rgba(1, 1, 1, 0.8) 50%, var(--aaaa));\n\t\t\t/* 101 columns: the arguments break */\n\t\t\tbackground: linear-gradient(\n\t\t\t\t0deg,\n\t\t\t\trgba(0, 0, 0, 0.8) 0%,\n\t\t\t\trgba(1, 1, 1, 0.8) 50%,\n\t\t\t\tvar(--aaaaa)\n\t\t\t);\n\t\t}\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 418,
+							"end": 419,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 425,
+				"end": 427,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 427,
+				"end": 805,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 18,
+						"column": 1,
+						"character": 428
+					},
+					"end": {
+						"line": 18,
+						"column": 4,
+						"character": 431
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 432,
+							"end": 434,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 434,
+							"end": 798,
+							"name": "section",
+							"name_loc": {
+								"start": {
+									"line": 19,
+									"column": 2,
+									"character": 435
+								},
+								"end": {
+									"line": 19,
+									"column": 9,
+									"character": 442
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 443,
+										"end": 446,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 446,
+										"end": 786,
+										"name": "style",
+										"name_loc": {
+											"start": {
+												"line": 20,
+												"column": 3,
+												"character": 447
+											},
+											"end": {
+												"line": 20,
+												"column": 8,
+												"character": 452
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"start": 453,
+													"end": 778,
+													"type": "Text",
+													"data": "\n\t\t\t.class {\n\t\t\t\t/* 100 columns: stays on one line */\n\t\t\t\tbackground: linear-gradient(0deg, rgba(0, 0, 0, 0.8) 0%, rgba(1, 1, 1, 0.8) 50%, var(--aa));\n\t\t\t\t/* 101 columns: the arguments break */\n\t\t\t\tbackground: linear-gradient(\n\t\t\t\t\t0deg,\n\t\t\t\t\trgba(0, 0, 0, 0.8) 0%,\n\t\t\t\t\trgba(1, 1, 1, 0.8) 50%,\n\t\t\t\t\tvar(--aaa)\n\t\t\t\t);\n\t\t\t}\n\t\t",
+													"raw": "\n\t\t\t.class {\n\t\t\t\t/* 100 columns: stays on one line */\n\t\t\t\tbackground: linear-gradient(0deg, rgba(0, 0, 0, 0.8) 0%, rgba(1, 1, 1, 0.8) 50%, var(--aa));\n\t\t\t\t/* 101 columns: the arguments break */\n\t\t\t\tbackground: linear-gradient(\n\t\t\t\t\t0deg,\n\t\t\t\t\trgba(0, 0, 0, 0.8) 0%,\n\t\t\t\t\trgba(1, 1, 1, 0.8) 50%,\n\t\t\t\t\tvar(--aaa)\n\t\t\t\t);\n\t\t\t}\n\t\t"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 786,
+										"end": 788,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 798,
+							"end": 799,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

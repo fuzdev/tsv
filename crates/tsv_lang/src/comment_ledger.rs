@@ -67,13 +67,12 @@
 //! nothing to register and nothing to record.
 //!
 //! State is keyed on the **source text's identity** (address + length), not a push/pop
-//! scope. A Svelte host and its embedded `<script>`/`<style>` islands all carry
-//! host-absolute spans over one source, so they share a key and merge into one ledger; a
-//! nested `<style>` *element* inside the template is re-parsed against its own extracted
-//! content string (island-relative spans) and gets its own key, so its offsets can't
-//! collide with the host's. Keys are valid only while the sources are alive —
-//! [`take_comment_ledger`] drains after each document, so a later file's source reusing
-//! an address can't inherit stale entries.
+//! scope. A Svelte host and its embedded `<script>`/`<style>` islands — the top-level
+//! sections and the elements nested in markup alike — all carry host-absolute spans over one
+//! source, so they share a key and merge into one ledger; a second document formatted on the
+//! same thread gets its own key, so its offsets can't collide with the first's. Keys are
+//! valid only while the sources are alive — [`take_comment_ledger`] drains after each
+//! document, so a later file's source reusing an address can't inherit stale entries.
 
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -306,12 +305,11 @@ pub fn record_verbatim_range(source: &str, start: u32, end: u32) {
 /// only ever drains) never pays to collect them.
 ///
 /// Spans are byte offsets over `source`. Scoping to `document_key(source)` is what keeps them
-/// in one coordinate space **by construction**: the host and its top-level
-/// `<script>`/`<style>` islands all register host-absolute spans under the host's key and are
-/// returned; a nested `<style>` *element* re-parses island-relative under its own key (see the
-/// module docs) and is structurally excluded — so an island-relative span can never be
-/// mistaken for a host offset. Pass the exact binding the format entry registered against, so
-/// the key matches by pointer identity.
+/// in one coordinate space **by construction**: the host and every `<script>`/`<style>`
+/// island in it register host-absolute spans under the host's key and are returned, while any
+/// other document's spans sit under its own key and are structurally excluded — so an offset
+/// into another source can never be mistaken for a host offset. Pass the exact binding the
+/// format entry registered against, so the key matches by pointer identity.
 #[must_use]
 pub fn parsed_comment_spans(source: &str) -> Vec<Span> {
     if !comment_check_enabled() {
@@ -331,11 +329,11 @@ pub fn parsed_comment_spans(source: &str) -> Vec<Span> {
 /// draining** it — the content twin of [`parsed_comment_spans`].
 ///
 /// Unlike the span accessor this is deliberately **not** scoped to a document key: a text
-/// carries no offset, so the collision the span scoping guards against (an island-relative
-/// offset mistaken for a host one) cannot arise, and returning every document's comments is
-/// what lets a caller compare the whole comment *content* of one format against another — a
-/// drop or a mangle in *any* island (the host `<script>`, a nested `<style>` element) then
-/// shows up in the difference. The gap-injection audit's self-verify uses exactly that: the
+/// carries no offset, so the collision the span scoping guards against (an offset into one
+/// source mistaken for an offset into another) cannot arise, and returning every document's
+/// comments is what lets a caller compare the whole comment *content* of one format against
+/// another — a drop or a mangle in *any* document registered on the thread then shows up in
+/// the difference. The gap-injection audit's self-verify uses exactly that: the
 /// multiset of contents in a format's input vs its output decides whether a ledger finding is
 /// a real loss or an instrument gap. Read before [`take_comment_ledger`], which discards the
 /// entries.
@@ -645,8 +643,8 @@ mod tests {
 
     #[test]
     fn two_sources_keep_separate_span_namespaces() {
-        // A nested `<style>` element re-parses its content standalone: island-relative
-        // spans that would collide with the host's if the ledger were one flat map.
+        // Two documents on one thread: same-valued spans that would collide if the ledger
+        // were one flat map.
         let host = String::from("// a\nx;\n");
         let island = String::from("// b\ny;\n");
         let host_comments = [line_comment(0, 4)];
@@ -716,11 +714,11 @@ mod tests {
 
     #[test]
     fn parsed_comment_spans_scopes_to_the_host_key() {
-        // A nested `<style>` element re-parses island-relative under its own key; its spans
-        // must NOT leak into the host's — an island-relative offset could otherwise coincide
-        // with a host code offset and drop a legit injection site. Both sources register a
-        // comment at the SAME-valued span (0, 4) under DIFFERENT keys, so returning one span
-        // proves the accessor filters by key, not by value.
+        // Another document's spans must NOT leak into the host's — an offset into that
+        // source could otherwise coincide with a host code offset and drop a legit injection
+        // site. Both sources register a comment at the SAME-valued span (0, 4) under
+        // DIFFERENT keys, so returning one span proves the accessor filters by key, not by
+        // value.
         let host = String::from("// h\nx;\n");
         let island = String::from("// i\ny;\n");
         let host_comments = [line_comment(0, 4)];

@@ -413,11 +413,10 @@ the short version:
   ([atrule_prelude_after_sibling](../tests/fixtures/css/tokens/comments/atrule_prelude_after_sibling/)),
   both fixed-point outputs no other gate could reach; the cost measured about +16% sites and
   +8–12% CPU over `tests/fixtures`, and with both fixed the region yields no shape over the
-  fixtures or the real-code corpus. Switching it on is the queued follow-up. Only the
-  **top-level** `<style>` qualifies — its island registers host-absolute spans under the
-  host's ledger key; a nested `<style>` *element* re-parses island-relative, and probing one
-  first needs the bystander mapping to carry the finding's `DocumentKey` (the TODO in
-  `gap_audit.rs`). What stays outside the model regardless is the declaration-value comment
+  fixtures or the real-code corpus. Switching it on is the queued follow-up. Every `<style>`
+  island qualifies alike — the top-level section and an element nested in markup both
+  register host-absolute spans under the host's ledger key. What stays outside the model
+  regardless is the declaration-value comment
   the ledger cannot see at all — the census, not the ledger, covers that surface.
   A **foreign-language `<script>` body** (a `lang`/`type` outside the JS/TS family) is a
   different case: it is excluded on purpose rather than deferred, because the printer

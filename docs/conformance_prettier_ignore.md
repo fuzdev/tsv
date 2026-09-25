@@ -912,6 +912,17 @@ directive owns its line. A `${`→expression gap is the one host with no such de
 `//` there must break, so both tools move it to its own line, and only tsv's first pass
 normalizes before the second freezes the (already normalized) result.
 
+The floor measures a line from where the **document** starts, and a Svelte `<script>` or
+`<style>` body is its own document (as it is to prettier): a directive glued to the open tag
+(`<script>// prettier-ignore`) starts its line and freezes, at the top level and nested in
+markup alike, and so does one with only spaces before it at the start of a JS/TS file — see
+[directives.md §Placement](./directives.md#placement). A directive trailing an opening `{`
+inside the body stays inert as above. Pinned by
+[open_tag_script](../tests/fixtures/svelte/syntax/prettier_ignore/open_tag_script/),
+[open_tag_script_block_comment](../tests/fixtures/svelte/syntax/prettier_ignore/open_tag_script_block_comment/),
+[open_tag_style](../tests/fixtures/svelte/syntax/prettier_ignore/open_tag_style/) and
+[prettier_ignore_file_start](../tests/fixtures/typescript/syntax/comments/prettier_ignore_file_start/).
+
 **A spelling that a layout collapse can disarm is the rule's own business.** Two of these
 hosts pulled an own-line **block** comment onto the value's line — the template interpolation
 keyed its separator on the comment's kind alone, and a computed key took its flat layout for

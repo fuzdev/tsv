@@ -775,21 +775,11 @@ fn audit_file(
                 let attribution_offset = if injected {
                     offset
                 } else {
-                    // TODO: island-relative-span hazard. This maps `f.span` back as if it were
-                    // host-absolute over `source`, but a finding's span is in the coordinate space
-                    // of the DOCUMENT it was registered against. A nested <script>/<style> ELEMENT
-                    // is re-parsed against its own extracted content string, so an island finding's
-                    // span is ISLAND-relative — mapping it across the splice would yield a bogus
-                    // seed offset with `victim_map_fallbacks` staying 0, a SILENT mis-attribution.
-                    // Safe TODAY only because `code_regions` injects host-only, so no island
-                    // finding can arise. The top-level `<style>` block is NOT such an island:
-                    // its stylesheet parses against the host source and registers under the
-                    // host's key (host-absolute spans), so naming `Root::css`'s content span
-                    // (see `audit::sites::code_regions`'s TODO) keeps this mapping sound. Naming
-                    // a NESTED `<style>` element's raw content would open the hole and MUST fix
-                    // this first: thread the finding's `DocumentKey` (host source identity)
-                    // through `CommentFinding` so the mapping can scope to the host key — as
-                    // `comment_ledger::parsed_comment_spans` already does — or fall back.
+                    // This maps `f.span` back as host-absolute over `source`. Sound because a
+                    // finding's span is in the coordinate space of the document it was
+                    // registered against, and every island of a Svelte host — the top-level
+                    // sections and the `<script>` / `<style>` elements nested in markup alike —
+                    // parses against the host source and registers under the host's key.
                     match victim_seed_offset(&source, offset, text.len(), victim_start) {
                         Some(seed_offset) => seed_offset,
                         None => {

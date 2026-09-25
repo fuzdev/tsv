@@ -200,6 +200,14 @@ pub struct Printer<'a> {
     /// directive (~all of them) skips the per-node range scan + directive-string match
     /// entirely — each entry reads this flag before any span arithmetic behind it.
     pub(crate) has_format_ignore: bool,
+    /// Where the document this printer prints begins: 0 for a whole file, the island's
+    /// first byte for a `<script>` body embedded in a Svelte host and spanned against it
+    /// (the program's own span start, set by the program builders in `lib.rs`). The one
+    /// reader is the format-ignore placement floor (`tsv_lang::directive_alone_on_line`):
+    /// the island is its own document there, so a directive with nothing but whitespace
+    /// between it and this position opens a line, whatever the host has before it on the
+    /// physical one. Every other printer (a template `{…}` island) keeps 0.
+    pub(crate) program_start: u32,
     /// The document's line table (`tsv_lang::printing::LineTable` — a bounded scan of
     /// the source, its on-demand table as the fallback) — the *layout* table.
     ///
@@ -612,6 +620,7 @@ impl<'a> Printer<'a> {
             comments: inputs.comments,
             has_owned_comments: inputs.has_owned_comments,
             has_format_ignore: inputs.has_format_ignore,
+            program_start: 0,
             layout_line_breaks: inputs.line_table,
             // Normal path: comment classification shares the one real table. The
             // canonical path re-points `layout_line_breaks` at an empty table but

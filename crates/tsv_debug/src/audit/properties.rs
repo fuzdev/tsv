@@ -1741,8 +1741,9 @@ mod ledger {
             }
             Ok(Ok(output)) => {
                 // Pass `src` itself, so `document_key(src)` matches the host document by pointer
-                // identity and the spans are strictly host-absolute (a nested `<style>` island
-                // registers under its own key and is excluded — see `parsed_comment_spans`).
+                // identity and the spans are strictly host-absolute (every island — the
+                // top-level sections and the `<script>` / `<style>` elements nested in markup —
+                // registers under the host's key; see `parsed_comment_spans`).
                 let comment_spans = comment_ledger::parsed_comment_spans(src);
                 let ledger = comment_ledger::take_comment_ledger();
                 if ledger.findings.is_empty() {

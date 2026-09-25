@@ -75,6 +75,10 @@ const INTENTIONAL_TS: &[(&str, &str)] = &[
         "typescript/syntax/comments/format_ignore_prettier_divergence",
         "format-convertible (the directive works the same embedded), but kept .ts on purpose to pin the standalone tsv_ts + prettier-typescript-parser path for the format-ignore directive — the Svelte-embedded coverage lives in svelte/syntax/format_ignore/",
     ),
+    (
+        "typescript/syntax/comments/prettier_ignore_file_start",
+        "byte-0 feature in its `unformatted_spaces` variant: a directive with only spaces between it and the FILE's start opens a line. Embedded, the same bytes sit after the `<script>` tag — a different placement, pinned by svelte/syntax/prettier_ignore/open_tag_script",
+    ),
 ];
 
 /// Look up a fixture in `INTENTIONAL_TS` by relative-path suffix.

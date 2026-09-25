@@ -57,6 +57,15 @@ exceptions:
   (`let v: /* format-ignore */ {…}`) — is an ordinary comment: the surrounding
   code formats normally.
 
+A Svelte `<script>` or `<style>` body is its own document to this rule, as it is to
+prettier, which formats the body as its own text: the tag ahead of it on the physical line
+does not count, so a directive the author glued to the tag (`<script>// format-ignore`)
+opens a line and freezes the statement below it, at the top level and nested in markup
+alike. Likewise only spaces or tabs between a directive and the start of a file leave it
+alone on its line — but not a leading byte-order mark, which still counts as text ahead of the
+directive, so in a file that begins `\uFEFF// prettier-ignore` the directive is inert (prettier
+honors it).
+
 The formatter keeps an honored directive alone on its line: a comment written ahead of it
 never glues onto it, even where only a comma stood between them
 (`b⏎/* t */,⏎// format-ignore⏎c` prints `b,⏎/* t */⏎// format-ignore⏎c`).

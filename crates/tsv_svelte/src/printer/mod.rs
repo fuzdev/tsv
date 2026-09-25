@@ -282,6 +282,19 @@ impl HeadLayout {
     }
 }
 
+/// The open fragment build [`Printer::enter_fragment`] returns: restores
+/// [`Printer::fragment_depth`] to its outer value when dropped.
+pub(crate) struct FragmentScope<'p> {
+    depth: &'p Cell<usize>,
+    outer: usize,
+}
+
+impl Drop for FragmentScope<'_> {
+    fn drop(&mut self) {
+        self.depth.set(self.outer);
+    }
+}
+
 /// Printer state for building output
 pub(crate) struct Printer<'a> {
     /// Output buffer
@@ -325,6 +338,21 @@ pub(crate) struct Printer<'a> {
     /// restores the previous value on the way out (so nested contexts reset
     /// correctly).
     block_dangle_allowed: Cell<bool>,
+    /// How many fragments' children are being built right now — the root fragment counts
+    /// one, each container body inside it one more. Every container's body is indented one
+    /// level past the container (the uniform "each container adds a level" model — element
+    /// and component bodies, every block section, special elements), so while a fragment's
+    /// children are being built this is the indent level their bodies render at, which is
+    /// what a nested `<style>`'s CSS — written, not built as a doc — must be formatted at
+    /// ([`Printer::body_indent_level`]). Maintained in ONE place, the three fragment
+    /// builders every child list goes through ([`Printer::enter_fragment`]), never at the
+    /// indent sites, so a new container cannot forget it.
+    fragment_depth: Cell<usize>,
+    /// The CSS printer's boundary-whitespace precondition over this whole document
+    /// (`tsv_css::HostBoundaryScan`), taken on the first `<style>` island that asks and
+    /// shared by every other — one whole-source scan per component, however many nested
+    /// `<style>` elements it holds. [`Printer::css_host_scan`] is the one reader.
+    css_host_scan_cache: Cell<Option<tsv_css::HostBoundaryScan>>,
     /// Span starts of control-flow blocks the root fragment marked as part of a **single-line
     /// inline run** (`{x}{#if c}…{/if}` with no newline). The unified
     /// [`Printer::build_nodes_doc_multiline`] builds these in inline context (long body
@@ -400,6 +428,8 @@ impl<'a> Printer<'a> {
             has_format_ignore,
             line_breaks,
             block_dangle_allowed: Cell::new(true),
+            fragment_depth: Cell::new(0),
+            css_host_scan_cache: Cell::new(None),
             root_inline_run_block_starts: RefCell::new(FxHashSet::default()),
             comment_free_gap: CommentFreeWindow::new(comments),
         }
@@ -433,6 +463,37 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(crate) fn set_block_dangle_allowed(&self, allowed: bool) -> bool {
         self.block_dangle_allowed.replace(allowed)
+    }
+
+    /// Open one fragment's child build for [`Printer::fragment_depth`]; the depth returns to
+    /// its previous value when the guard drops, on every exit path. Called at the top of the
+    /// three fragment builders (`build_nodes_doc_trimmed`, `build_container_content_doc`,
+    /// `build_whitespace_sensitive_content_doc`) and nowhere else.
+    pub(crate) fn enter_fragment(&self) -> FragmentScope<'_> {
+        let outer = self.fragment_depth.get();
+        self.fragment_depth.set(outer + 1);
+        FragmentScope {
+            depth: &self.fragment_depth,
+            outer,
+        }
+    }
+
+    /// The indent level at which the body of an element being built right now renders: one
+    /// past the element's own, which is its parent fragment's depth. See
+    /// [`Printer::fragment_depth`].
+    pub(crate) fn body_indent_level(&self) -> usize {
+        self.indent_level + self.fragment_depth.get()
+    }
+
+    /// This document's [`tsv_css::HostBoundaryScan`], scanned on first use — see
+    /// [`Printer::css_host_scan_cache`].
+    pub(crate) fn css_host_scan(&self) -> tsv_css::HostBoundaryScan {
+        if let Some(scan) = self.css_host_scan_cache.get() {
+            return scan;
+        }
+        let scan = tsv_css::HostBoundaryScan::of(self.source);
+        self.css_host_scan_cache.set(Some(scan));
+        scan
     }
 
     /// Write a string to the buffer
@@ -1306,7 +1367,13 @@ impl<'a> Printer<'a> {
     /// Carries the document-level `has_format_ignore` gate, so a directive-free component
     /// (≈ every component) pays one predicted branch instead of the content compare.
     pub(in crate::printer) fn is_honored_directive(&self, c: &Comment) -> bool {
-        self.has_format_ignore && is_honored_format_ignore(self.source, c)
+        // The document start is 0, the component's own: every JS comment this printer asks
+        // about sits in a template island — an expression tag, an attribute or directive
+        // value, a block head, `{@const}` — which always has markup or its own `{` ahead of
+        // it on its line, so no floor past the host's start could change an answer. (A
+        // `<script>` body's directives are its program's, asked by `tsv_ts` from the
+        // program's own start.)
+        self.has_format_ignore && is_honored_format_ignore(self.source, c, 0)
     }
 
     /// Check if the last non-whitespace fragment node before `target_start` is

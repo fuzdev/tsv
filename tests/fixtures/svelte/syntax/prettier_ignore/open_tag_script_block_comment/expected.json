@@ -1,0 +1,129 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 58,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " prettier-ignore ",
+			"start": 10,
+			"end": 31,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 22
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 57,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 48,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 33,
+					"end": 47,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 15
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 41,
+							"end": 46,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 9
+								},
+								"end": {
+									"line": 3,
+									"column": 14
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 41,
+								"end": 42,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 9
+									},
+									"end": {
+										"line": 3,
+										"column": 10
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 45,
+								"end": 46,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 13
+									},
+									"end": {
+										"line": 3,
+										"column": 14
+									}
+								},
+								"value": 2,
+								"raw": "2"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " prettier-ignore ",
+							"start": 10,
+							"end": 31
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 373,
+	"end": 554,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -386,6 +386,95 @@
 									}
 								]
 							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 372,
+				"end": 374,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 374,
+				"end": 442,
+				"data": " blank lines between declarations and between rules are kept "
+			},
+			{
+				"type": "Text",
+				"start": 442,
+				"end": 443,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 443,
+				"end": 553,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 32,
+						"column": 1,
+						"character": 444
+					},
+					"end": {
+						"line": 32,
+						"column": 4,
+						"character": 447
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 448,
+							"end": 450,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 450,
+							"end": 546,
+							"name": "style",
+							"name_loc": {
+								"start": {
+									"line": 33,
+									"column": 2,
+									"character": 451
+								},
+								"end": {
+									"line": 33,
+									"column": 7,
+									"character": 456
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 457,
+										"end": 538,
+										"type": "Text",
+										"data": "\n\t\t.class1 {\n\t\t\tcolor: red;\n\n\t\t\tmargin: 0;\n\t\t}\n\n\t\t.class2 {\n\t\t\tcolor: blue;\n\t\t}\n\t",
+										"raw": "\n\t\t.class1 {\n\t\t\tcolor: red;\n\n\t\t\tmargin: 0;\n\t\t}\n\n\t\t.class2 {\n\t\t\tcolor: blue;\n\t\t}\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 546,
+							"end": 547,
+							"raw": "\n",
+							"data": "\n"
 						}
 					]
 				}

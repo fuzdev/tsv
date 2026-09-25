@@ -142,6 +142,7 @@ impl<'a> Printer<'a> {
                 self.source(),
                 self.line_table(),
                 embed,
+                self.css_host_scan(),
                 self.d(),
             );
 
