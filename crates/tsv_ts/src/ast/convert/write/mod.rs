@@ -851,6 +851,20 @@ pub(super) fn write_return_type_field(
     }
 }
 
+/// Emit `,"expression":false,"generator":<bool>,"async":<bool>` — a non-arrow
+/// function's three flags (`expression` is only ever `true` on an arrow). The
+/// constant `expression` field, the `generator` field and the `async` key fold
+/// into one literal per `generator` value.
+#[inline]
+pub(super) fn write_function_flags_fields(w: &mut JsonWriter, generator: bool, r#async: bool) {
+    w.raw_pick(
+        generator,
+        b",\"expression\":false,\"generator\":true,\"async\":",
+        b",\"expression\":false,\"generator\":false,\"async\":",
+    );
+    w.bool(r#async);
+}
+
 /// Emit `,"importKind":"type"|"value"`. `"type"` is always written; `"value"` is
 /// omitted under vanilla acorn (Svelte non-`lang="ts"` context, see
 /// `Ctx::vanilla_acorn`) and written under acorn-typescript. Each emitting arm

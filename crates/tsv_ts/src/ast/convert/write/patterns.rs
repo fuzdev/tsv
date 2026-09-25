@@ -72,8 +72,7 @@ pub(super) fn write_template_element(
         internal::TemplateCooked::Decoded(decoded) => w.string(decoded),
         internal::TemplateCooked::Invalid => w.null(),
     }
-    w.raw("},\"tail\":");
-    w.bool(element.tail);
+    w.raw_pick(element.tail, b"},\"tail\":true", b"},\"tail\":false");
     close_node(w, "TemplateElement", adjusted_span, ctx);
 }
 
@@ -125,13 +124,27 @@ pub(super) fn write_rest_element(
 /// `value` first everywhere.
 pub(super) fn write_property(w: &mut JsonWriter, prop: &internal::Property<'_>, ctx: &Ctx<'_>) {
     node_header(w, "Property", prop.span, ctx);
-    w.raw(",\"method\":");
-    w.bool(prop.method);
-    w.raw(",\"shorthand\":");
-    w.bool(prop.shorthand);
-    w.raw(",\"computed\":");
-    w.bool(prop.computed);
-    w.raw(",\"key\":");
+    // `method` and `computed` are nearly always `false`, so the common shape is
+    // one literal per `shorthand` value, the four keys folded in.
+    if prop.method || prop.computed {
+        w.raw_pick(prop.method, b",\"method\":true", b",\"method\":false");
+        w.raw_pick(
+            prop.shorthand,
+            b",\"shorthand\":true",
+            b",\"shorthand\":false",
+        );
+        w.raw_pick(
+            prop.computed,
+            b",\"computed\":true,\"key\":",
+            b",\"computed\":false,\"key\":",
+        );
+    } else {
+        w.raw_pick(
+            prop.shorthand,
+            b",\"method\":false,\"shorthand\":true,\"computed\":false,\"key\":",
+            b",\"method\":false,\"shorthand\":false,\"computed\":false,\"key\":",
+        );
+    }
     write_expression(w, prop.key, ctx);
     let getset = !matches!(prop.kind, internal::PropertyKind::Init);
     let generic_method = prop.method

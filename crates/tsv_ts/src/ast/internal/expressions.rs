@@ -479,7 +479,6 @@ impl UnaryOperator {
 pub struct UnaryExpression<'arena> {
     pub operator: UnaryOperator,
     pub argument: &'arena Expression<'arena>,
-    pub prefix: bool, // always true for now (prefix operators)
     pub span: Span,
 }
 

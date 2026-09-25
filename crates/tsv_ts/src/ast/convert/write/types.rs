@@ -4,11 +4,11 @@ use super::super::super::internal;
 use super::declarations::write_type_parameter;
 use super::expressions::{write_expression, write_expressions};
 use super::patterns::write_template_element;
-use super::write_name;
 use super::{
-    Ctx, JsonWriter, close_node, node_header, write_array, write_bare_node, write_identifier_parts,
-    write_identifier_plain, write_literal, write_or_null, write_type_annotation_field,
-    write_type_arguments_field, write_type_parameters_field,
+    Ctx, JsonWriter, close_node, node_header, write_array, write_bare_node,
+    write_function_flags_fields, write_identifier_parts, write_identifier_plain, write_literal,
+    write_name, write_or_null, write_type_annotation_field, write_type_arguments_field,
+    write_type_parameters_field,
 };
 use internal::TSKeywordKind;
 
@@ -308,9 +308,8 @@ fn write_literal_type(w: &mut JsonWriter, lit: &internal::TSLiteralType<'_>, ctx
             node_header(w, "UnaryExpression", unary.span, ctx);
             w.raw(",\"operator\":");
             w.token(unary.operator.as_str());
-            w.raw(",\"prefix\":");
-            w.bool(unary.prefix);
-            w.raw(",\"argument\":");
+            // Constant: acorn's `UnaryExpression` is always prefix.
+            w.raw_fixed(b",\"prefix\":true,\"argument\":");
             write_literal(w, arg_lit, ctx);
             // Close the inner `UnaryExpression`, then the `TSLiteralType`.
             close_node(w, "UnaryExpression", unary.span, ctx);
@@ -389,11 +388,15 @@ fn write_type_element(w: &mut JsonWriter, elem: &internal::TSTypeElement<'_>, ct
             // and the signature is neither computed nor readonly.
             let is_new_key = matches!(&p.key.kind, internal::ExpressionKind::Identifier(id)
                 if id.name(ctx.source) == "new");
-            if !(!p.computed && !p.readonly && is_new_key) {
-                w.raw(",\"computed\":");
-                w.bool(p.computed);
+            if !p.computed && !p.readonly && is_new_key {
+                w.raw(",\"key\":");
+            } else {
+                w.raw_pick(
+                    p.computed,
+                    b",\"computed\":true,\"key\":",
+                    b",\"computed\":false,\"key\":",
+                );
             }
-            w.raw(",\"key\":");
             write_expression(w, &p.key, ctx);
             if p.optional {
                 w.raw(",\"optional\":true");
@@ -584,10 +587,7 @@ pub(super) fn write_declare_function(
     }
     w.raw(",\"id\":");
     write_identifier_plain(w, &func.id, ctx);
-    w.raw(",\"expression\":false,\"generator\":");
-    w.bool(func.generator);
-    w.raw(",\"async\":");
-    w.bool(func.r#async);
+    write_function_flags_fields(w, func.generator, func.r#async);
     write_type_parameters_field(w, func.type_parameters.as_ref(), ctx);
     w.raw(",\"params\":");
     write_expressions(w, func.params, ctx);

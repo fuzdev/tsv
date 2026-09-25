@@ -2310,7 +2310,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             Expression::from_unary_expression(UnaryExpression {
                 operator,
                 argument: parsed,
-                prefix: true,
                 span: Span::new(start as u32, end),
             }),
         ))
@@ -2342,7 +2341,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             Expression::from_unary_expression(UnaryExpression {
                 operator,
                 argument: parsed,
-                prefix: true,
                 span: Span::new(start as u32, end),
             }),
         ))
