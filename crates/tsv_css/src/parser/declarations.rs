@@ -335,7 +335,8 @@ pub(crate) fn parse_declaration<'arena>(
     // whitespace, so the value is empty regardless of spacing. The empty value parses to
     // an empty identifier and prints as a single space (`--a: ;`), the form
     // css-variables-1 mandates for serialization. Non-custom empty values stay an error.
-    if facts.is_empty && !has_value_comment && !property.starts_with("--") {
+    let is_custom_property = property.starts_with("--");
+    if facts.is_empty && !has_value_comment && !is_custom_property {
         return Err(parser.error_msg_at("Empty CSS value", start));
     }
 
@@ -358,12 +359,15 @@ pub(crate) fn parse_declaration<'arena>(
     };
 
     // Custom properties (--*) with unusual values (e.g., leading comma) preserve raw value
-    // Normal custom property values are still parsed for proper formatting
-    let raw_value = source_relative_span.extract(parser.source());
-    let trimmed_value = raw_value.trim();
-
-    let is_custom_property = property.starts_with("--");
-    let value = if is_custom_property && trimmed_value.starts_with(',') {
+    // Normal custom property values are still parsed for proper formatting. Only a custom
+    // property reads its raw text here, so only it pays the extract; a leading-comma test
+    // needs the leading trim alone.
+    let value = if is_custom_property
+        && source_relative_span
+            .extract(parser.source())
+            .trim_start()
+            .starts_with(',')
+    {
         // Leading comma is unusual syntax - preserve as raw identifier
         // (text recovered verbatim from `span` at print time)
         CssValue::Identifier { span: value_span }
