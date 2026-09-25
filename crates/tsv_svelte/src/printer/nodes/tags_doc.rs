@@ -6,8 +6,8 @@
 use crate::ast::internal;
 use crate::printer::{CommentRun, HeadExpr, HeadLayout, Printer};
 use tsv_lang::Span;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::doc::{DocBuf, GroupId};
 use tsv_lang::source_scan::TriviaProfile;
 use tsv_ts::{Expression, ExpressionKind};
 
@@ -265,13 +265,14 @@ impl<'a> Printer<'a> {
             // to: a run-final `//` ends `init_doc` with a `hardline`, so `will_break` above
             // claims that init and this arm is unreachable for it. Only a trailing BLOCK
             // comment reaches here, and a block asks the closer for no break at all.
+            let marker = d.group_with_id(d.indent(d.line()));
             d.concat(&[
                 d.text(prefix),
                 id_doc,
                 d.text(" ="),
-                d.group_with_id(d.indent(d.line()), GroupId::Assignment),
+                marker.doc(),
                 d.line_suffix_boundary(),
-                d.indent_if_break(init_doc, GroupId::Assignment),
+                d.indent_if_break(init_doc, marker),
                 close,
             ])
         }

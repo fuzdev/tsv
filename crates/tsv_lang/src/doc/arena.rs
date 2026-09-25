@@ -14,6 +14,7 @@
 //! - Bulk deallocation
 
 use std::cell::{Cell, RefCell};
+use std::num::NonZeroU32;
 
 use smallvec::SmallVec;
 
@@ -31,8 +32,8 @@ use super::chain_share::ChainShareStore;
 #[cfg(feature = "swallow_check")]
 use super::swallow::swallow_check_enabled;
 use super::types::{
-    CachedWidth, DocContext, DocText, GroupId, LineKind, Mode, PoolSpan,
-    TEXT_WIDTH_FIRST_LINE_MASK, TEXT_WIDTH_NEWLINE_FLAG,
+    CachedWidth, DocContext, DocText, LineKind, Mode, PoolSpan, TEXT_WIDTH_FIRST_LINE_MASK,
+    TEXT_WIDTH_NEWLINE_FLAG,
 };
 
 /// Which **prettier operation** a line-flattening walk is emulating.
@@ -67,6 +68,41 @@ impl DocId {
     #[inline]
     pub const fn index(self) -> usize {
         self.0 as usize
+    }
+}
+
+/// A keyed group's identity — prettier's per-instance group id (`Symbol("…")`): the group
+/// node's own [`DocId`], so two groups built by the same printer arm are two ids, and a
+/// reader keyed on one can never read the other's mode.
+///
+/// Minted only by [`DocArena::group_with_id`] / [`DocArena::group_with_id_break`], which
+/// allocate the group it names; [`Self::doc`] is the node to place in the tree, and the
+/// readers ([`DocArena::if_break_with_id`], [`DocArena::indent_if_break`]) take the id.
+/// Held as `index + 1` so `Option<GroupId>` is four bytes and a keyed `IfBreak` stays
+/// within [`DocNode`]'s size.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct GroupId(NonZeroU32);
+
+impl GroupId {
+    /// The id of the group node at `doc`. Called once per keyed group, at build time — the
+    /// render keys its map on the bare [`DocId`] and never mints an id.
+    #[inline]
+    fn of(doc: DocId) -> Self {
+        // A `DocId` is a `nodes.len()` taken as `u32` at allocation, so `u32::MAX` would
+        // need four billion nodes; the check is one predictable branch per keyed group.
+        #[expect(clippy::expect_used)]
+        let raw = doc
+            .0
+            .checked_add(1)
+            .and_then(NonZeroU32::new)
+            .expect("a keyed group's DocId is below u32::MAX");
+        Self(raw)
+    }
+
+    /// The group node this id names — the doc to place in the tree.
+    #[inline]
+    pub const fn doc(self) -> DocId {
+        DocId(self.0.get() - 1)
     }
 }
 
@@ -179,17 +215,20 @@ pub enum DocNode {
     /// When `expanded_states` is non-empty, this is a "conditional group" that tries
     /// multiple alternative layouts. `contents` is `state[0]`, `expanded_states` contains
     /// state[1..].
+    ///
+    /// `keyed` marks a group some reader keys on ([`GroupId`] — the group's own node): the
+    /// render records its resolved mode under that id for the readers to find.
     Group {
         contents: DocId,
         expanded_states: ChildRange,
-        id: Option<GroupId>,
+        keyed: bool,
         should_break: bool,
     },
 
     /// Conditional rendering based on whether a group breaks.
     ///
     /// `group_id == None` keys on the immediately enclosing group (the common
-    /// case). `group_id == Some(id)` keys on a specific group's resolved mode
+    /// case). `group_id == Some(id)` keys on one specific group's resolved mode
     /// (like `IndentIfBreak`), so the conditional can react to a group it is not
     /// nested inside — e.g. a block-tag head's `}` dangling after its head group.
     IfBreak {
@@ -198,7 +237,7 @@ pub enum DocNode {
         group_id: Option<GroupId>,
     },
 
-    /// Conditionally indent based on whether a specific group broke
+    /// Conditionally indent based on whether one specific group broke.
     IndentIfBreak { contents: DocId, group_id: GroupId },
 
     /// Sequence of docs - rendered one after another
@@ -1390,9 +1429,22 @@ pub struct DocArena {
     /// legitimate pair overwrites, so only the hold-without-probe miswire is caught.
     #[cfg(debug_assertions)]
     flow_probe_fresh: Cell<bool>,
-    /// The mode each id-bearing group resolved to, one bit per [`GroupId`] (set = broke) —
-    /// prettier's `groupModeMap`, one map for the whole render. An unresolved group and a
-    /// flat one read the same (flat), so one bit per id is the whole map.
+    /// The mode each keyed group resolved to, per group INSTANCE ([`GroupId`], the group's
+    /// own node) — prettier's `groupModeMap`, one map for the whole render. Recorded in
+    /// resolution order as `(group, broke)`, keyed on the group's bare [`DocId`]; a reader
+    /// searches from the newest entry. An id with no entry (a group not yet resolved in
+    /// this render) reads flat — prettier's `fits` default (`groupModeMap[id] ||
+    /// MODE_FLAT`); prettier's printer instead prints NEITHER arm of an `ifBreak` for an
+    /// unresolved id and drops an `indentIfBreak`'s contents. No real input reaches a miss:
+    /// every reader renders after the group it keys on.
+    ///
+    /// Per instance, not per kind: a reader keyed on one group must not take the mode of
+    /// another group of the same shape resolved between them — a curried chain nested in
+    /// an outer chain's parameter default or body resolves after the outer chain's heads
+    /// and before the outer's body indent / callee `)` reads them. The newest-first search
+    /// is short in practice because a reader sits close behind its group (the fluid
+    /// assignment marker's `indent_if_break` is its very next command), and a group
+    /// rendered twice in one render reads its latest resolution, as prettier's map does.
     ///
     /// It lives on the arena, not on a render's policy, because a render is not one loop:
     /// every fill item and every line-suffix flush renders through a nested sub-render,
@@ -1401,10 +1453,10 @@ pub struct DocArena {
     /// indent). A map scoped to one loop would read every keyed group in a sub-render as flat.
     ///
     /// Owned by the top-level render, which clears it on entry
-    /// ([`Self::clear_keyed_groups`]). Written only by the render loop when it resolves an
-    /// id-bearing group; `arena_fits` never reads or writes it (a fits walk measures a
-    /// keyed conditional as flat).
-    keyed_group_breaks: Cell<u8>,
+    /// ([`Self::clear_keyed_groups`]). Written only by the render loop when it resolves a
+    /// keyed group; `arena_fits` never reads or writes it (a fits walk measures a keyed
+    /// conditional as flat).
+    keyed_group_modes: RefCell<Vec<(DocId, bool)>>,
     /// Diagnostic side-set: indices of text nodes that are line comments,
     /// recorded by `line_comment_text_pooled` only while the swallow check is
     /// enabled (empty and untouched otherwise). Appended in `alloc` order, so
@@ -1564,7 +1616,7 @@ impl DocArena {
             flow_probe_broke: Cell::new(false),
             #[cfg(debug_assertions)]
             flow_probe_fresh: Cell::new(false),
-            keyed_group_breaks: Cell::new(0),
+            keyed_group_modes: RefCell::new(Vec::new()),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
             #[cfg(feature = "comment_check")]
@@ -1623,7 +1675,7 @@ impl DocArena {
             flow_probe_broke: Cell::new(false),
             #[cfg(debug_assertions)]
             flow_probe_fresh: Cell::new(false),
-            keyed_group_breaks: Cell::new(0),
+            keyed_group_modes: RefCell::new(Vec::new()),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
             #[cfg(feature = "comment_check")]
@@ -2476,7 +2528,7 @@ impl DocArena {
         self.alloc(DocNode::Group {
             contents: doc,
             expanded_states: ChildRange::EMPTY,
-            id: None,
+            keyed: false,
             should_break: false,
         })
     }
@@ -2486,19 +2538,17 @@ impl DocArena {
         self.alloc(DocNode::Group {
             contents: doc,
             expanded_states: ChildRange::EMPTY,
-            id: None,
+            keyed: false,
             should_break: true,
         })
     }
 
-    /// Create a group with an ID for tracking whether it broke.
-    pub fn group_with_id(&self, doc: DocId, id: GroupId) -> DocId {
-        self.alloc(DocNode::Group {
-            contents: doc,
-            expanded_states: ChildRange::EMPTY,
-            id: Some(id),
-            should_break: false,
-        })
+    /// Create a keyed group — prettier's `group(…, { id })` — and return its id, whose
+    /// [`GroupId::doc`] is the node to place in the tree. Readers built with the id
+    /// ([`Self::if_break_with_id`], [`Self::indent_if_break`]) read the mode THIS group
+    /// resolved to, whatever other keyed groups render between the two.
+    pub fn group_with_id(&self, doc: DocId) -> GroupId {
+        self.group_with_id_break(doc, false)
     }
 
     /// [`Self::group_with_id`] whose break mode is decided by the caller rather than by
@@ -2506,13 +2556,13 @@ impl DocArena {
     /// together whenever some other doc reads the decision through
     /// [`Self::indent_if_break`]: a caller that emitted [`Self::group_break`] instead would
     /// break the group but leave the reader unable to see it.
-    pub fn group_with_id_break(&self, doc: DocId, id: GroupId, should_break: bool) -> DocId {
-        self.alloc(DocNode::Group {
+    pub fn group_with_id_break(&self, doc: DocId, should_break: bool) -> GroupId {
+        GroupId::of(self.alloc(DocNode::Group {
             contents: doc,
             expanded_states: ChildRange::EMPTY,
-            id: Some(id),
+            keyed: true,
             should_break,
-        })
+        }))
     }
 
     /// Create a conditional group that tries multiple alternative layouts.
@@ -2528,7 +2578,7 @@ impl DocArena {
         self.alloc(DocNode::Group {
             contents: first,
             expanded_states: expanded,
-            id: None,
+            keyed: false,
             should_break: false,
         })
     }
@@ -2573,14 +2623,14 @@ impl DocArena {
         })
     }
 
-    /// Conditional rendering based on whether a specific group broke.
+    /// Conditional rendering based on whether one specific group broke.
     ///
     /// Unlike `if_break`, which keys on the immediately enclosing group, this
-    /// keys on `group_id`'s resolved mode — so it can sit outside the group it
-    /// reacts to (e.g. a block-tag head's `}` after its head group). During
-    /// `fits()` the keyed group is treated as unresolved (flat), so trailing
-    /// text after the conditional is still counted toward the group's own break
-    /// decision (the `}` stays in the head's width).
+    /// keys on the resolved mode of the group `group_id` names — so it can sit
+    /// outside the group it reacts to (e.g. a block-tag head's `}` after its head
+    /// group). During `fits()` the keyed group is treated as unresolved (flat), so
+    /// trailing text after the conditional is still counted toward the group's own
+    /// break decision (the `}` stays in the head's width).
     pub fn if_break_with_id(&self, break_doc: DocId, flat_doc: DocId, group_id: GroupId) -> DocId {
         self.alloc(DocNode::IfBreak {
             break_doc,
@@ -2589,7 +2639,7 @@ impl DocArena {
         })
     }
 
-    /// Conditionally indent based on whether a specific group broke.
+    /// Conditionally indent based on whether the group `group_id` names broke.
     pub fn indent_if_break(&self, doc: DocId, group_id: GroupId) -> DocId {
         self.alloc(DocNode::IndentIfBreak {
             contents: doc,
@@ -2848,38 +2898,31 @@ impl DocArena {
     /// included, is gone before anything reads it.
     #[inline]
     pub(super) fn clear_keyed_groups(&self) {
-        self.keyed_group_breaks.set(0);
+        self.keyed_group_modes.borrow_mut().clear();
     }
 
-    /// Record the mode an id-bearing group resolved to. Last write wins: a [`GroupId`] is
-    /// one slot per render, not one per group, so a reader sees the most recent resolution
-    /// of its id. That is its own group's only where no group of the same id can sit
-    /// between the group and its reader: `BlockHead` (the head's contents are a TS
-    /// expression, which holds no block head), `BlockKey` (its own id for exactly that
-    /// reason), and the after-operator markers (`Assignment` and the two type-parameter
-    /// ids, whose `indent_if_break` is entered right after its marker). **Not**
-    /// `ArrowChain`: a curried chain nested between a chain's heads group and a reader
-    /// keyed on it (a chain in the body read before an immediately-invoked callee's
-    /// closing `)`, or in a parameter default of a call-argument chain) overwrites the
-    /// outer chain's resolution, and the outer reader takes the inner chain's mode.
-    // TODO: key the map per group instance (e.g. by the group's `DocId`) rather than per
-    // `GroupId` variant, so a nested same-id group cannot overwrite an enclosing one's mode.
+    /// Record the mode the keyed group at `group` resolved to — prettier's
+    /// `groupModeMap[doc.id] = mode`, keyed on the group instance. Appended, never
+    /// overwritten in place: [`Self::keyed_group_broke`] reads the newest entry for an id,
+    /// so a group rendered twice reads its latest resolution.
     #[inline]
-    pub(super) fn record_keyed_group(&self, id: GroupId, mode: Mode) {
-        let bit = id.keyed_bit();
-        let breaks = self.keyed_group_breaks.get();
-        self.keyed_group_breaks.set(if mode == Mode::Break {
-            breaks | bit
-        } else {
-            breaks & !bit
-        });
+    pub(super) fn record_keyed_group(&self, group: DocId, mode: Mode) {
+        self.keyed_group_modes
+            .borrow_mut()
+            .push((group, mode == Mode::Break));
     }
 
-    /// Whether the group keyed `id` broke, in the current render. An unresolved group
-    /// reads as flat.
+    /// Whether the group `id` names broke, in the current render. A group not yet
+    /// resolved in this render reads as flat.
     #[inline]
     pub(super) fn keyed_group_broke(&self, id: GroupId) -> bool {
-        self.keyed_group_breaks.get() & id.keyed_bit() != 0
+        let group = id.doc();
+        self.keyed_group_modes
+            .borrow()
+            .iter()
+            .rev()
+            .find(|&&(entry, _)| entry == group)
+            .is_some_and(|&(_, broke)| broke)
     }
 
     //
@@ -3512,7 +3555,6 @@ impl DocArena {
             Group {
                 contents: DocId,
                 expanded_states: ChildRange,
-                id: Option<GroupId>,
                 should_break: bool,
             },
             IfBreakFlat(DocId),
@@ -3545,15 +3587,19 @@ impl DocArena {
                 DocNode::Dedent(inner) => Info::Dedent(*inner),
                 DocNode::AlignRoot { n, contents } => Info::AlignRoot(*n, *contents),
                 DocNode::Align { n, contents } => Info::Align(*n, *contents),
+                // A copied group is a new instance, so it is never keyed: at every caller a
+                // keyed group's readers sit in the same flattened subtree as the group (a
+                // chain's heads and its body indent / callee `)`, a head group and its
+                // dangle), and flatten away below — to the flat arm / the bare contents —
+                // so nothing is left to key on the copy.
                 DocNode::Group {
                     contents,
                     expanded_states,
-                    id: group_id,
                     should_break,
+                    ..
                 } => Info::Group {
                     contents: *contents,
                     expanded_states: *expanded_states,
-                    id: *group_id,
                     should_break: *should_break,
                 },
                 DocNode::IfBreak { flat_doc, .. } => Info::IfBreakFlat(*flat_doc),
@@ -3609,7 +3655,6 @@ impl DocArena {
             Info::Group {
                 contents,
                 expanded_states,
-                id: group_id,
                 should_break,
             } => {
                 let flat_contents = self.flatten_lines_impl(contents, mode);
@@ -3627,7 +3672,7 @@ impl DocArena {
                     return self.alloc(DocNode::Group {
                         contents: flat_contents,
                         expanded_states: ChildRange::EMPTY,
-                        id: group_id,
+                        keyed: false,
                         should_break,
                     });
                 }
@@ -3635,7 +3680,7 @@ impl DocArena {
                     self.alloc(DocNode::Group {
                         contents: flat_contents,
                         expanded_states, // Keep as-is
-                        id: group_id,
+                        keyed: false,
                         should_break,
                     })
                 } else {
@@ -3655,7 +3700,7 @@ impl DocArena {
                     self.alloc(DocNode::Group {
                         contents: flat_contents,
                         expanded_states: flat_states,
-                        id: group_id,
+                        keyed: false,
                         should_break,
                     })
                 }

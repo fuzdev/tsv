@@ -1,0 +1,1886 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 788,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A curried chain as a callee keeps its parens closed around a hugging or block body",
+			"start": 10,
+			"end": 95,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " that stays on the last head's line, however a chain nested in that body broke",
+			"start": 97,
+			"end": 177,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Object, array and block bodies, each holding a chain whose default breaks it",
+			"start": 180,
+			"end": 259,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Two chains nested in the body, in either order: one breaks, one stays inline, and",
+			"start": 501,
+			"end": 585,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " neither decides the enclosing chain's `)`",
+			"start": 587,
+			"end": 631,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 1
+				},
+				"end": {
+					"line": 30,
+					"column": 45
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 787,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 778,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 43,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 261,
+					"end": 331,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 261,
+						"end": 330,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 1
+							},
+							"end": {
+								"line": 12,
+								"column": 6
+							}
+						},
+						"callee": {
+							"type": "ArrowFunctionExpression",
+							"start": 262,
+							"end": 327,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 2
+								},
+								"end": {
+									"line": 12,
+									"column": 3
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 263,
+									"end": 264,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 3
+										},
+										"end": {
+											"line": 6,
+											"column": 4
+										}
+									},
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "ArrowFunctionExpression",
+								"start": 269,
+								"end": 327,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 9
+									},
+									"end": {
+										"line": 12,
+										"column": 3
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 270,
+										"end": 271,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 10
+											},
+											"end": {
+												"line": 6,
+												"column": 11
+											}
+										},
+										"name": "b"
+									}
+								],
+								"body": {
+									"type": "ObjectExpression",
+									"start": 277,
+									"end": 326,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 17
+										},
+										"end": {
+											"line": 12,
+											"column": 2
+										}
+									},
+									"properties": [
+										{
+											"type": "Property",
+											"start": 281,
+											"end": 323,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 2
+												},
+												"end": {
+													"line": 11,
+													"column": 3
+												}
+											},
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 281,
+												"end": 282,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 2
+													},
+													"end": {
+														"line": 7,
+														"column": 3
+													}
+												},
+												"name": "k"
+											},
+											"value": {
+												"type": "CallExpression",
+												"start": 284,
+												"end": 323,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 5
+													},
+													"end": {
+														"line": 11,
+														"column": 3
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 284,
+													"end": 286,
+													"loc": {
+														"start": {
+															"line": 7,
+															"column": 5
+														},
+														"end": {
+															"line": 7,
+															"column": 7
+														}
+													},
+													"name": "fn"
+												},
+												"arguments": [
+													{
+														"type": "ArrowFunctionExpression",
+														"start": 291,
+														"end": 319,
+														"loc": {
+															"start": {
+																"line": 8,
+																"column": 3
+															},
+															"end": {
+																"line": 10,
+																"column": 6
+															}
+														},
+														"id": null,
+														"expression": true,
+														"generator": false,
+														"async": false,
+														"params": [
+															{
+																"type": "AssignmentPattern",
+																"start": 292,
+																"end": 297,
+																"loc": {
+																	"start": {
+																		"line": 8,
+																		"column": 4
+																	},
+																	"end": {
+																		"line": 8,
+																		"column": 9
+																	}
+																},
+																"left": {
+																	"type": "Identifier",
+																	"start": 292,
+																	"end": 293,
+																	"loc": {
+																		"start": {
+																			"line": 8,
+																			"column": 4
+																		},
+																		"end": {
+																			"line": 8,
+																			"column": 5
+																		}
+																	},
+																	"name": "x"
+																},
+																"right": {
+																	"type": "Literal",
+																	"start": 296,
+																	"end": 297,
+																	"loc": {
+																		"start": {
+																			"line": 8,
+																			"column": 8
+																		},
+																		"end": {
+																			"line": 8,
+																			"column": 9
+																		}
+																	},
+																	"value": 1,
+																	"raw": "1"
+																}
+															}
+														],
+														"body": {
+															"type": "ArrowFunctionExpression",
+															"start": 306,
+															"end": 319,
+															"loc": {
+																"start": {
+																	"line": 9,
+																	"column": 4
+																},
+																"end": {
+																	"line": 10,
+																	"column": 6
+																}
+															},
+															"id": null,
+															"expression": true,
+															"generator": false,
+															"async": false,
+															"params": [
+																{
+																	"type": "Identifier",
+																	"start": 307,
+																	"end": 308,
+																	"loc": {
+																		"start": {
+																			"line": 9,
+																			"column": 5
+																		},
+																		"end": {
+																			"line": 9,
+																			"column": 6
+																		}
+																	},
+																	"name": "y"
+																}
+															],
+															"body": {
+																"type": "Identifier",
+																"start": 318,
+																"end": 319,
+																"loc": {
+																	"start": {
+																		"line": 10,
+																		"column": 5
+																	},
+																	"end": {
+																		"line": 10,
+																		"column": 6
+																	}
+																},
+																"name": "z"
+															}
+														}
+													}
+												],
+												"optional": false
+											},
+											"kind": "init"
+										}
+									]
+								}
+							}
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A curried chain as a callee keeps its parens closed around a hugging or block body",
+							"start": 10,
+							"end": 95
+						},
+						{
+							"type": "Line",
+							"value": " that stays on the last head's line, however a chain nested in that body broke",
+							"start": 97,
+							"end": 177
+						},
+						{
+							"type": "Line",
+							"value": " Object, array and block bodies, each holding a chain whose default breaks it",
+							"start": 180,
+							"end": 259
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 333,
+					"end": 385,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 333,
+						"end": 384,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 1
+							},
+							"end": {
+								"line": 17,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "ArrowFunctionExpression",
+							"start": 334,
+							"end": 381,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 2
+								},
+								"end": {
+									"line": 17,
+									"column": 2
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 335,
+									"end": 336,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 3
+										},
+										"end": {
+											"line": 13,
+											"column": 4
+										}
+									},
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "ArrowFunctionExpression",
+								"start": 341,
+								"end": 381,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 9
+									},
+									"end": {
+										"line": 17,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 342,
+										"end": 343,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 10
+											},
+											"end": {
+												"line": 13,
+												"column": 11
+											}
+										},
+										"name": "b"
+									}
+								],
+								"body": {
+									"type": "ArrayExpression",
+									"start": 348,
+									"end": 381,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 16
+										},
+										"end": {
+											"line": 17,
+											"column": 2
+										}
+									},
+									"elements": [
+										{
+											"type": "ArrowFunctionExpression",
+											"start": 352,
+											"end": 378,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 2
+												},
+												"end": {
+													"line": 16,
+													"column": 5
+												}
+											},
+											"id": null,
+											"expression": true,
+											"generator": false,
+											"async": false,
+											"params": [
+												{
+													"type": "AssignmentPattern",
+													"start": 353,
+													"end": 358,
+													"loc": {
+														"start": {
+															"line": 14,
+															"column": 3
+														},
+														"end": {
+															"line": 14,
+															"column": 8
+														}
+													},
+													"left": {
+														"type": "Identifier",
+														"start": 353,
+														"end": 354,
+														"loc": {
+															"start": {
+																"line": 14,
+																"column": 3
+															},
+															"end": {
+																"line": 14,
+																"column": 4
+															}
+														},
+														"name": "x"
+													},
+													"right": {
+														"type": "Literal",
+														"start": 357,
+														"end": 358,
+														"loc": {
+															"start": {
+																"line": 14,
+																"column": 7
+															},
+															"end": {
+																"line": 14,
+																"column": 8
+															}
+														},
+														"value": 1,
+														"raw": "1"
+													}
+												}
+											],
+											"body": {
+												"type": "ArrowFunctionExpression",
+												"start": 366,
+												"end": 378,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 3
+													},
+													"end": {
+														"line": 16,
+														"column": 5
+													}
+												},
+												"id": null,
+												"expression": true,
+												"generator": false,
+												"async": false,
+												"params": [
+													{
+														"type": "Identifier",
+														"start": 367,
+														"end": 368,
+														"loc": {
+															"start": {
+																"line": 15,
+																"column": 4
+															},
+															"end": {
+																"line": 15,
+																"column": 5
+															}
+														},
+														"name": "y"
+													}
+												],
+												"body": {
+													"type": "Identifier",
+													"start": 377,
+													"end": 378,
+													"loc": {
+														"start": {
+															"line": 16,
+															"column": 4
+														},
+														"end": {
+															"line": 16,
+															"column": 5
+														}
+													},
+													"name": "z"
+												}
+											}
+										}
+									]
+								}
+							}
+						},
+						"arguments": [],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 387,
+					"end": 440,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 387,
+						"end": 439,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 1
+							},
+							"end": {
+								"line": 22,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "ArrowFunctionExpression",
+							"start": 388,
+							"end": 436,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 2
+								},
+								"end": {
+									"line": 22,
+									"column": 2
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 389,
+									"end": 390,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 3
+										},
+										"end": {
+											"line": 18,
+											"column": 4
+										}
+									},
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "ArrowFunctionExpression",
+								"start": 395,
+								"end": 436,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 9
+									},
+									"end": {
+										"line": 22,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 396,
+										"end": 397,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 10
+											},
+											"end": {
+												"line": 18,
+												"column": 11
+											}
+										},
+										"name": "b"
+									}
+								],
+								"body": {
+									"type": "BlockStatement",
+									"start": 402,
+									"end": 436,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 16
+										},
+										"end": {
+											"line": 22,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 406,
+											"end": 433,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 2
+												},
+												"end": {
+													"line": 21,
+													"column": 6
+												}
+											},
+											"expression": {
+												"type": "ArrowFunctionExpression",
+												"start": 406,
+												"end": 432,
+												"loc": {
+													"start": {
+														"line": 19,
+														"column": 2
+													},
+													"end": {
+														"line": 21,
+														"column": 5
+													}
+												},
+												"id": null,
+												"expression": true,
+												"generator": false,
+												"async": false,
+												"params": [
+													{
+														"type": "AssignmentPattern",
+														"start": 407,
+														"end": 412,
+														"loc": {
+															"start": {
+																"line": 19,
+																"column": 3
+															},
+															"end": {
+																"line": 19,
+																"column": 8
+															}
+														},
+														"left": {
+															"type": "Identifier",
+															"start": 407,
+															"end": 408,
+															"loc": {
+																"start": {
+																	"line": 19,
+																	"column": 3
+																},
+																"end": {
+																	"line": 19,
+																	"column": 4
+																}
+															},
+															"name": "x"
+														},
+														"right": {
+															"type": "Literal",
+															"start": 411,
+															"end": 412,
+															"loc": {
+																"start": {
+																	"line": 19,
+																	"column": 7
+																},
+																"end": {
+																	"line": 19,
+																	"column": 8
+																}
+															},
+															"value": 1,
+															"raw": "1"
+														}
+													}
+												],
+												"body": {
+													"type": "ArrowFunctionExpression",
+													"start": 420,
+													"end": 432,
+													"loc": {
+														"start": {
+															"line": 20,
+															"column": 3
+														},
+														"end": {
+															"line": 21,
+															"column": 5
+														}
+													},
+													"id": null,
+													"expression": true,
+													"generator": false,
+													"async": false,
+													"params": [
+														{
+															"type": "Identifier",
+															"start": 421,
+															"end": 422,
+															"loc": {
+																"start": {
+																	"line": 20,
+																	"column": 4
+																},
+																"end": {
+																	"line": 20,
+																	"column": 5
+																}
+															},
+															"name": "y"
+														}
+													],
+													"body": {
+														"type": "Identifier",
+														"start": 431,
+														"end": 432,
+														"loc": {
+															"start": {
+																"line": 21,
+																"column": 4
+															},
+															"end": {
+																"line": 21,
+																"column": 5
+															}
+														},
+														"name": "z"
+													}
+												}
+											}
+										}
+									]
+								}
+							}
+						},
+						"arguments": [],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 442,
+					"end": 498,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 442,
+						"end": 497,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 1
+							},
+							"end": {
+								"line": 27,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "ArrowFunctionExpression",
+							"start": 447,
+							"end": 494,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 6
+								},
+								"end": {
+									"line": 27,
+									"column": 2
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 448,
+									"end": 449,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 7
+										},
+										"end": {
+											"line": 23,
+											"column": 8
+										}
+									},
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "ArrowFunctionExpression",
+								"start": 454,
+								"end": 494,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 13
+									},
+									"end": {
+										"line": 27,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 455,
+										"end": 456,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 14
+											},
+											"end": {
+												"line": 23,
+												"column": 15
+											}
+										},
+										"name": "b"
+									}
+								],
+								"body": {
+									"type": "ArrayExpression",
+									"start": 461,
+									"end": 494,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 20
+										},
+										"end": {
+											"line": 27,
+											"column": 2
+										}
+									},
+									"elements": [
+										{
+											"type": "ArrowFunctionExpression",
+											"start": 465,
+											"end": 491,
+											"loc": {
+												"start": {
+													"line": 24,
+													"column": 2
+												},
+												"end": {
+													"line": 26,
+													"column": 5
+												}
+											},
+											"id": null,
+											"expression": true,
+											"generator": false,
+											"async": false,
+											"params": [
+												{
+													"type": "AssignmentPattern",
+													"start": 466,
+													"end": 471,
+													"loc": {
+														"start": {
+															"line": 24,
+															"column": 3
+														},
+														"end": {
+															"line": 24,
+															"column": 8
+														}
+													},
+													"left": {
+														"type": "Identifier",
+														"start": 466,
+														"end": 467,
+														"loc": {
+															"start": {
+																"line": 24,
+																"column": 3
+															},
+															"end": {
+																"line": 24,
+																"column": 4
+															}
+														},
+														"name": "x"
+													},
+													"right": {
+														"type": "Literal",
+														"start": 470,
+														"end": 471,
+														"loc": {
+															"start": {
+																"line": 24,
+																"column": 7
+															},
+															"end": {
+																"line": 24,
+																"column": 8
+															}
+														},
+														"value": 1,
+														"raw": "1"
+													}
+												}
+											],
+											"body": {
+												"type": "ArrowFunctionExpression",
+												"start": 479,
+												"end": 491,
+												"loc": {
+													"start": {
+														"line": 25,
+														"column": 3
+													},
+													"end": {
+														"line": 26,
+														"column": 5
+													}
+												},
+												"id": null,
+												"expression": true,
+												"generator": false,
+												"async": false,
+												"params": [
+													{
+														"type": "Identifier",
+														"start": 480,
+														"end": 481,
+														"loc": {
+															"start": {
+																"line": 25,
+																"column": 4
+															},
+															"end": {
+																"line": 25,
+																"column": 5
+															}
+														},
+														"name": "y"
+													}
+												],
+												"body": {
+													"type": "Identifier",
+													"start": 490,
+													"end": 491,
+													"loc": {
+														"start": {
+															"line": 26,
+															"column": 4
+														},
+														"end": {
+															"line": 26,
+															"column": 5
+														}
+													},
+													"name": "z"
+												}
+											}
+										}
+									]
+								}
+							}
+						},
+						"arguments": []
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 633,
+					"end": 704,
+					"loc": {
+						"start": {
+							"line": 31,
+							"column": 1
+						},
+						"end": {
+							"line": 36,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 633,
+						"end": 703,
+						"loc": {
+							"start": {
+								"line": 31,
+								"column": 1
+							},
+							"end": {
+								"line": 36,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "ArrowFunctionExpression",
+							"start": 634,
+							"end": 700,
+							"loc": {
+								"start": {
+									"line": 31,
+									"column": 2
+								},
+								"end": {
+									"line": 36,
+									"column": 2
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 635,
+									"end": 636,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 3
+										},
+										"end": {
+											"line": 31,
+											"column": 4
+										}
+									},
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "ArrowFunctionExpression",
+								"start": 641,
+								"end": 700,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 9
+									},
+									"end": {
+										"line": 36,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 642,
+										"end": 643,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 10
+											},
+											"end": {
+												"line": 31,
+												"column": 11
+											}
+										},
+										"name": "b"
+									}
+								],
+								"body": {
+									"type": "ArrayExpression",
+									"start": 648,
+									"end": 700,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 16
+										},
+										"end": {
+											"line": 36,
+											"column": 2
+										}
+									},
+									"elements": [
+										{
+											"type": "ArrowFunctionExpression",
+											"start": 652,
+											"end": 678,
+											"loc": {
+												"start": {
+													"line": 32,
+													"column": 2
+												},
+												"end": {
+													"line": 34,
+													"column": 5
+												}
+											},
+											"id": null,
+											"expression": true,
+											"generator": false,
+											"async": false,
+											"params": [
+												{
+													"type": "AssignmentPattern",
+													"start": 653,
+													"end": 658,
+													"loc": {
+														"start": {
+															"line": 32,
+															"column": 3
+														},
+														"end": {
+															"line": 32,
+															"column": 8
+														}
+													},
+													"left": {
+														"type": "Identifier",
+														"start": 653,
+														"end": 654,
+														"loc": {
+															"start": {
+																"line": 32,
+																"column": 3
+															},
+															"end": {
+																"line": 32,
+																"column": 4
+															}
+														},
+														"name": "x"
+													},
+													"right": {
+														"type": "Literal",
+														"start": 657,
+														"end": 658,
+														"loc": {
+															"start": {
+																"line": 32,
+																"column": 7
+															},
+															"end": {
+																"line": 32,
+																"column": 8
+															}
+														},
+														"value": 1,
+														"raw": "1"
+													}
+												}
+											],
+											"body": {
+												"type": "ArrowFunctionExpression",
+												"start": 666,
+												"end": 678,
+												"loc": {
+													"start": {
+														"line": 33,
+														"column": 3
+													},
+													"end": {
+														"line": 34,
+														"column": 5
+													}
+												},
+												"id": null,
+												"expression": true,
+												"generator": false,
+												"async": false,
+												"params": [
+													{
+														"type": "Identifier",
+														"start": 667,
+														"end": 668,
+														"loc": {
+															"start": {
+																"line": 33,
+																"column": 4
+															},
+															"end": {
+																"line": 33,
+																"column": 5
+															}
+														},
+														"name": "y"
+													}
+												],
+												"body": {
+													"type": "Identifier",
+													"start": 677,
+													"end": 678,
+													"loc": {
+														"start": {
+															"line": 34,
+															"column": 4
+														},
+														"end": {
+															"line": 34,
+															"column": 5
+														}
+													},
+													"name": "z"
+												}
+											}
+										},
+										{
+											"type": "ArrowFunctionExpression",
+											"start": 682,
+											"end": 697,
+											"loc": {
+												"start": {
+													"line": 35,
+													"column": 2
+												},
+												"end": {
+													"line": 35,
+													"column": 17
+												}
+											},
+											"id": null,
+											"expression": true,
+											"generator": false,
+											"async": false,
+											"params": [
+												{
+													"type": "Identifier",
+													"start": 683,
+													"end": 684,
+													"loc": {
+														"start": {
+															"line": 35,
+															"column": 3
+														},
+														"end": {
+															"line": 35,
+															"column": 4
+														}
+													},
+													"name": "c"
+												}
+											],
+											"body": {
+												"type": "ArrowFunctionExpression",
+												"start": 689,
+												"end": 697,
+												"loc": {
+													"start": {
+														"line": 35,
+														"column": 9
+													},
+													"end": {
+														"line": 35,
+														"column": 17
+													}
+												},
+												"id": null,
+												"expression": true,
+												"generator": false,
+												"async": false,
+												"params": [
+													{
+														"type": "Identifier",
+														"start": 690,
+														"end": 691,
+														"loc": {
+															"start": {
+																"line": 35,
+																"column": 10
+															},
+															"end": {
+																"line": 35,
+																"column": 11
+															}
+														},
+														"name": "d"
+													}
+												],
+												"body": {
+													"type": "Identifier",
+													"start": 696,
+													"end": 697,
+													"loc": {
+														"start": {
+															"line": 35,
+															"column": 16
+														},
+														"end": {
+															"line": 35,
+															"column": 17
+														}
+													},
+													"name": "e"
+												}
+											}
+										}
+									]
+								}
+							}
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Two chains nested in the body, in either order: one breaks, one stays inline, and",
+							"start": 501,
+							"end": 585
+						},
+						{
+							"type": "Line",
+							"value": " neither decides the enclosing chain's `)`",
+							"start": 587,
+							"end": 631
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 706,
+					"end": 777,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 1
+						},
+						"end": {
+							"line": 42,
+							"column": 6
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 706,
+						"end": 776,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 1
+							},
+							"end": {
+								"line": 42,
+								"column": 5
+							}
+						},
+						"callee": {
+							"type": "ArrowFunctionExpression",
+							"start": 707,
+							"end": 773,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 2
+								},
+								"end": {
+									"line": 42,
+									"column": 2
+								}
+							},
+							"id": null,
+							"expression": true,
+							"generator": false,
+							"async": false,
+							"params": [
+								{
+									"type": "Identifier",
+									"start": 708,
+									"end": 709,
+									"loc": {
+										"start": {
+											"line": 37,
+											"column": 3
+										},
+										"end": {
+											"line": 37,
+											"column": 4
+										}
+									},
+									"name": "a"
+								}
+							],
+							"body": {
+								"type": "ArrowFunctionExpression",
+								"start": 714,
+								"end": 773,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 9
+									},
+									"end": {
+										"line": 42,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 715,
+										"end": 716,
+										"loc": {
+											"start": {
+												"line": 37,
+												"column": 10
+											},
+											"end": {
+												"line": 37,
+												"column": 11
+											}
+										},
+										"name": "b"
+									}
+								],
+								"body": {
+									"type": "ArrayExpression",
+									"start": 721,
+									"end": 773,
+									"loc": {
+										"start": {
+											"line": 37,
+											"column": 16
+										},
+										"end": {
+											"line": 42,
+											"column": 2
+										}
+									},
+									"elements": [
+										{
+											"type": "ArrowFunctionExpression",
+											"start": 725,
+											"end": 740,
+											"loc": {
+												"start": {
+													"line": 38,
+													"column": 2
+												},
+												"end": {
+													"line": 38,
+													"column": 17
+												}
+											},
+											"id": null,
+											"expression": true,
+											"generator": false,
+											"async": false,
+											"params": [
+												{
+													"type": "Identifier",
+													"start": 726,
+													"end": 727,
+													"loc": {
+														"start": {
+															"line": 38,
+															"column": 3
+														},
+														"end": {
+															"line": 38,
+															"column": 4
+														}
+													},
+													"name": "c"
+												}
+											],
+											"body": {
+												"type": "ArrowFunctionExpression",
+												"start": 732,
+												"end": 740,
+												"loc": {
+													"start": {
+														"line": 38,
+														"column": 9
+													},
+													"end": {
+														"line": 38,
+														"column": 17
+													}
+												},
+												"id": null,
+												"expression": true,
+												"generator": false,
+												"async": false,
+												"params": [
+													{
+														"type": "Identifier",
+														"start": 733,
+														"end": 734,
+														"loc": {
+															"start": {
+																"line": 38,
+																"column": 10
+															},
+															"end": {
+																"line": 38,
+																"column": 11
+															}
+														},
+														"name": "d"
+													}
+												],
+												"body": {
+													"type": "Identifier",
+													"start": 739,
+													"end": 740,
+													"loc": {
+														"start": {
+															"line": 38,
+															"column": 16
+														},
+														"end": {
+															"line": 38,
+															"column": 17
+														}
+													},
+													"name": "e"
+												}
+											}
+										},
+										{
+											"type": "ArrowFunctionExpression",
+											"start": 744,
+											"end": 770,
+											"loc": {
+												"start": {
+													"line": 39,
+													"column": 2
+												},
+												"end": {
+													"line": 41,
+													"column": 5
+												}
+											},
+											"id": null,
+											"expression": true,
+											"generator": false,
+											"async": false,
+											"params": [
+												{
+													"type": "AssignmentPattern",
+													"start": 745,
+													"end": 750,
+													"loc": {
+														"start": {
+															"line": 39,
+															"column": 3
+														},
+														"end": {
+															"line": 39,
+															"column": 8
+														}
+													},
+													"left": {
+														"type": "Identifier",
+														"start": 745,
+														"end": 746,
+														"loc": {
+															"start": {
+																"line": 39,
+																"column": 3
+															},
+															"end": {
+																"line": 39,
+																"column": 4
+															}
+														},
+														"name": "x"
+													},
+													"right": {
+														"type": "Literal",
+														"start": 749,
+														"end": 750,
+														"loc": {
+															"start": {
+																"line": 39,
+																"column": 7
+															},
+															"end": {
+																"line": 39,
+																"column": 8
+															}
+														},
+														"value": 1,
+														"raw": "1"
+													}
+												}
+											],
+											"body": {
+												"type": "ArrowFunctionExpression",
+												"start": 758,
+												"end": 770,
+												"loc": {
+													"start": {
+														"line": 40,
+														"column": 3
+													},
+													"end": {
+														"line": 41,
+														"column": 5
+													}
+												},
+												"id": null,
+												"expression": true,
+												"generator": false,
+												"async": false,
+												"params": [
+													{
+														"type": "Identifier",
+														"start": 759,
+														"end": 760,
+														"loc": {
+															"start": {
+																"line": 40,
+																"column": 4
+															},
+															"end": {
+																"line": 40,
+																"column": 5
+															}
+														},
+														"name": "y"
+													}
+												],
+												"body": {
+													"type": "Identifier",
+													"start": 769,
+													"end": 770,
+													"loc": {
+														"start": {
+															"line": 41,
+															"column": 4
+														},
+														"end": {
+															"line": 41,
+															"column": 5
+														}
+													},
+													"name": "z"
+												}
+											}
+										}
+									]
+								}
+							}
+						},
+						"arguments": [],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
