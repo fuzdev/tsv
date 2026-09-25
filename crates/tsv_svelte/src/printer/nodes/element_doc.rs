@@ -35,7 +35,7 @@ pub(super) enum BoundaryMode {
 /// Element layout classification for doc building
 ///
 /// Determines which doc structure to use based on element type and content.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub(super) enum ElementLayout {
     /// Void element: `<br>`, `<img>`, etc. - no closing tag
     Void,
@@ -292,7 +292,10 @@ impl ThisClaim {
 /// [`Self::SourceBreaks`] decision is one tsv's **own output** rewrites, since converging an
 /// authoring to block-style adds or removes exactly those newlines. A layout keyed on it can
 /// therefore be re-decided on the next pass; a layout keyed on [`Self::Structural`] cannot.
-/// [`Printer::handle_separator_text_child`]'s sibling-newline flow rule is the consumer.
+/// [`Printer::handle_separator_text_child`]'s sibling-newline flow rule is one consumer; the G2
+/// glued-run dangle's receive test ([`PreparedElement::can_receive_gt`]) is the other, and
+/// it admits every [`Self::SourceBreaks`] decision — the one multiline cause its own output can
+/// produce.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum MultilineCause {
     /// Not multiline: the content collapses to one line, and width alone decides the layout.
@@ -332,6 +335,51 @@ pub(super) struct ElementContext {
     /// value forces the same break, and a `style:` value's whitespace-only part is a break the
     /// printer emits where the source holds only a newline.
     pub(super) has_multiline_attr: bool,
+}
+
+/// An element whose tag is classified, attribute docs built and layout resolved — everything
+/// [`Printer::build_element_doc`] derives before it builds anything that depends on the layout
+/// (the children, the tags). Carried whole so a caller that must decide a role before building
+/// (the G2 glued run) prepares each element once and builds only the arm it takes.
+pub(super) struct PreparedElement<'e> {
+    pub(super) class: TagClass,
+    pub(super) parts: ElementParts<'e>,
+    pub(super) ctx: ElementContext,
+    pub(super) attr_docs: DocBuf,
+    pub(super) layout: ElementLayout,
+}
+
+impl PreparedElement<'_> {
+    /// Whether the element can SHED its closing `>` to a following sibling (the axis-3
+    /// sibling-`>` dangle): the flat hug-both `Soft` layout, the single shape with one trailing
+    /// `>` that splits off cleanly.
+    ///
+    /// Soft alone qualifies (Hug's glued boundaries already collapse to it): a one-sided-newline
+    /// or render-free boundary trims to the same glued form, so without the dangle
+    /// `format(newline authoring)` would emit the glued no-dangle form, which the next pass reads
+    /// as Hug and dangles — a non-idempotent 2-cycle (`authoring_audit`'s hard bucket). Multiline
+    /// (Hard) and void/empty/self-closing forms keep their own `>`.
+    pub(super) fn can_shed_gt(&self) -> bool {
+        matches!(self.layout, ElementLayout::WithContent(BoundaryMode::Soft))
+    }
+
+    /// Whether the element can RECEIVE a preceding glued sibling's shed `>` (G2): Soft, or
+    /// multiline only because of its own authored line breaks ([`MultilineCause::SourceBreaks`]).
+    ///
+    /// G2 eligibility must not read a signal the dangle's own output rewrites. A receiver whose
+    /// opening tag wraps prints its content block-style (`>⏎\t{b}⏎</i>`), which is byte-for-byte
+    /// the both-boundary-newline authoring — so the next pass reads that receiver as
+    /// `SourceBreaks`. Were receiving Soft-only, that pass would find the pair ineligible and
+    /// un-dangle it: an F1 2-cycle for every receiver whose content is not text (text stays Soft
+    /// through the prose gate). A [`MultilineCause::Structural`] receiver (a block child) is
+    /// multiline however it is written, so it stays out and keeps the `>` intact; so do the
+    /// void / empty / self-closing layouts, which have no content to lay out. Receiving only: a
+    /// multiline receiver never sheds its own `>` ([`Self::can_shed_gt`]).
+    pub(super) fn can_receive_gt(&self) -> bool {
+        self.can_shed_gt()
+            || (matches!(self.layout, ElementLayout::WithContent(BoundaryMode::Hard))
+                && self.ctx.multiline == MultilineCause::SourceBreaks)
+    }
 }
 
 /// Which raw-text element a `<script>` / `<style>` body belongs to.
@@ -485,15 +533,66 @@ impl<'a> Printer<'a> {
         // Phase 2: Compute layout
         let layout = self.compute_element_layout(&parts, &ctx);
 
-        // Phase 3: Build doc based on layout
+        // Phase 3: Build doc based on layout. Built from locals rather than a
+        // `PreparedElement`: this is every element's path, and moving the attr buffer into a
+        // struct measurably costs it; only the glued run needs the prepared form.
+        self.build_element_layout_doc(element, class, &parts, &ctx, &attr_docs, layout)
+    }
+
+    /// Phases 1-2 of [`Self::build_element_doc`] for an element whose tag is already classified
+    /// and whose attribute docs are already built: its parts, analysis and layout.
+    fn prepare_element<'e>(
+        &self,
+        element: &'e internal::Element<'e>,
+        class: TagClass,
+        attr_docs: DocBuf,
+    ) -> PreparedElement<'e> {
+        let parts = self.element_parts(element, class);
+        let ctx = self.analyze_element(&parts, &attr_docs);
+        let layout = self.compute_element_layout(&parts, &ctx);
+        PreparedElement {
+            class,
+            parts,
+            ctx,
+            attr_docs,
+            layout,
+        }
+    }
+
+    /// [`Self::build_element_doc`]'s ordinary doc for a [`PreparedElement`].
+    pub(super) fn build_prepared_element_doc(
+        &self,
+        element: &internal::Element<'_>,
+        prepared: &PreparedElement<'_>,
+    ) -> DocId {
+        let PreparedElement {
+            class,
+            parts,
+            ctx,
+            attr_docs,
+            layout,
+        } = prepared;
+        self.build_element_layout_doc(element, *class, parts, ctx, attr_docs, *layout)
+    }
+
+    /// Phase 3 of [`Self::build_element_doc`]: the element's ordinary doc, built from its layout.
+    fn build_element_layout_doc(
+        &self,
+        element: &internal::Element<'_>,
+        class: TagClass,
+        parts: &ElementParts<'_>,
+        ctx: &ElementContext,
+        attr_docs: &[DocId],
+        layout: ElementLayout,
+    ) -> DocId {
         match layout {
             ElementLayout::Void | ElementLayout::SelfClosing => {
                 // DOCTYPE uses > (no self-closing slash) — it's a declaration, not an element
-                self.build_void_element_doc(&parts, &attr_docs, class.is_declaration)
+                self.build_void_element_doc(parts, attr_docs, class.is_declaration)
             }
             ElementLayout::Empty => {
                 let opening_tag =
-                    self.build_opening_tag(parts.name, &attr_docs, ctx.has_multiline_attr);
+                    self.build_opening_tag(parts.name, attr_docs, ctx.has_multiline_attr);
                 self.build_empty_element_doc(
                     element,
                     opening_tag,
@@ -502,7 +601,7 @@ impl<'a> Printer<'a> {
                 )
             }
             ElementLayout::WithContent(boundary) => {
-                self.build_content_element_doc(&parts, &ctx, &attr_docs, boundary)
+                self.build_content_element_doc(parts, ctx, attr_docs, boundary)
             }
         }
     }
@@ -512,37 +611,25 @@ impl<'a> Printer<'a> {
     /// `>`) only when the element uses the flat hug-both content layout — the single shape
     /// where splitting the `>` off is render-safe and well-defined. Returns `None`
     /// otherwise so the caller keeps the element (and its `>`) intact. The caller emits the
-    /// `>` itself (see `build_expanding_construct`'s `gt_prefix`).
+    /// `>` itself (see `build_expanding_construct`'s `gt_prefix`). A glued run's members build
+    /// through [`Self::build_glued_run_element_doc`] instead, which also threads a received `>`.
     pub(super) fn build_inline_element_omit_close_gt(
         &self,
         element: &internal::Element<'_>,
     ) -> Option<DocId> {
-        self.build_inline_element_sibling_gt(element, true, None)
+        let (parts, ctx, attr_docs, children_doc) = self.prepare_soft_sibling_element(element)?;
+        Some(self.build_collapsible_element_doc(&parts, &ctx, &attr_docs, children_doc, true, None))
     }
 
-    /// Shared eligibility + setup for the two axis-3 sibling-`>` roles — the element→element/block
-    /// follower ([`Self::build_inline_element_sibling_gt`]) and the glued-text follower
-    /// ([`Self::build_inline_element_close_gt_dangle`]). Classifies the tag, builds its attrs /
-    /// parts / context, and confirms the flat hug-both (`Soft`) content layout — the single shape
-    /// with one trailing `>` we can cleanly split off. Returns `(parts, ctx, attr_docs,
-    /// children_doc)`; `None` for any non-Soft shape (the callers then keep the element and its `>`
-    /// intact).
-    ///
-    /// `children_doc` is the trimmed inline shape `build_content_element_doc`'s Soft arm builds, so
-    /// a dangled element renders its content identically to its undangled form (incl. trimming a
-    /// render-free boundary space — `<span>text </span>{#each…}` must dangle like the glued form).
-    ///
-    /// Special-content elements (raw `<script>`/`<style>`, frozen `<template>`, whitespace-sensitive
-    /// `<pre>`/`<textarea>`) never participate — their closing tags aren't the simple hug-both shape.
-    /// Soft alone qualifies (Hug's glued boundaries already collapse to it): a one-sided-newline or
-    /// render-free boundary trims to the same glued form, so without the dangle `format(newline
-    /// authoring)` would emit the glued no-dangle form, which the next pass reads as Hug and dangles —
-    /// a non-idempotent 2-cycle (`authoring_audit`'s hard bucket). Multiline (Hard) and
-    /// void/empty/self-closing forms keep their `>`.
-    fn prepare_soft_sibling_element<'e>(
+    /// Shared setup for every axis-3 sibling-`>` role: classifies the tag, builds its attrs and
+    /// resolves its layout ([`PreparedElement`]). `None` for the special-content elements (raw
+    /// `<script>`/`<style>`, frozen `<template>`, whitespace-sensitive `<pre>`/`<textarea>`),
+    /// which never participate — their closing tags aren't the simple shape a `>` can move in.
+    /// Children are not built here: each role builds them once, for the arm it takes.
+    pub(super) fn prepare_sibling_element<'e>(
         &self,
         element: &'e internal::Element<'e>,
-    ) -> Option<(ElementParts<'e>, ElementContext, DocBuf, DocId)> {
+    ) -> Option<PreparedElement<'e>> {
         let class = self.classify_tag(element);
         if class.raw_text.is_some()
             || class.is_ws_sensitive
@@ -562,44 +649,80 @@ impl<'a> Printer<'a> {
                 is_html,
             )
             .docs;
-        let parts = self.element_parts(element, class);
-        let ctx = self.analyze_element(&parts, &attr_docs);
-        match self.compute_element_layout(&parts, &ctx) {
-            ElementLayout::WithContent(BoundaryMode::Soft) => {
-                let children_doc =
-                    self.build_nodes_doc_trimmed(element.fragment.nodes, MultilineCause::None);
-                Some((parts, ctx, attr_docs, children_doc))
-            }
-            _ => None,
-        }
+        Some(self.prepare_element(element, class, attr_docs))
     }
 
-    /// Shared body for the axis-3 element sibling-`>` roles, composable so one element can play
-    /// **both** at once inside a glued run (`build_glued_element_run`): it **sheds** its closing
-    /// `>` to the following sibling (`external_close = true`) and/or **receives** a preceding
-    /// sibling's `>` as a leading `if_break` inside its attrs group (`gt_prefix = Some`) — a mid-run
-    /// element does both. `None` for any non-Soft shape (the boundary stays an intact `>`).
-    pub(super) fn build_inline_element_sibling_gt(
+    /// Shared eligibility + setup for the roles that split an element's OWN closing `>` off — the
+    /// element→block follower ([`Self::build_inline_element_omit_close_gt`]) and the
+    /// glued-text follower ([`Self::build_inline_element_close_gt_dangle`]) — which confirms the
+    /// flat hug-both (`Soft`) content layout ([`PreparedElement::can_shed_gt`]). Returns
+    /// `(parts, ctx, attr_docs, children_doc)`; `None` for any non-Soft shape (the callers then
+    /// keep the element and its `>` intact).
+    fn prepare_soft_sibling_element<'e>(
+        &self,
+        element: &'e internal::Element<'e>,
+    ) -> Option<(ElementParts<'e>, ElementContext, DocBuf, DocId)> {
+        let prepared = self.prepare_sibling_element(element)?;
+        if !prepared.can_shed_gt() {
+            return None;
+        }
+        let children_doc = self.build_soft_sibling_children_doc(element);
+        Some((
+            prepared.parts,
+            prepared.ctx,
+            prepared.attr_docs,
+            children_doc,
+        ))
+    }
+
+    /// The children of a Soft sibling-`>` element: the trimmed inline shape
+    /// `build_content_element_doc`'s Soft arm builds, so a dangled element renders its content
+    /// identically to its undangled form (incl. trimming a render-free boundary space —
+    /// `<span>text </span>{#each…}` must dangle like the glued form).
+    fn build_soft_sibling_children_doc(&self, element: &internal::Element<'_>) -> DocId {
+        self.build_nodes_doc_trimmed(element.fragment.nodes, MultilineCause::None)
+    }
+
+    /// Build one member of a glued element run (`build_glued_element_run`) that plays a G2 role,
+    /// from its [`PreparedElement`]: it **sheds** its closing `>` to the following sibling
+    /// (`sheds`) and/or **receives** a preceding sibling's `>` (`gt_prefix = Some`). A shedder is
+    /// always Soft ([`PreparedElement::can_shed_gt`]) and builds the collapsible layout; a
+    /// receiver that cannot shed is the multiline one ([`PreparedElement::can_receive_gt`]) and
+    /// builds the multiline layout with the `>` threaded into its opening tag and its own closing
+    /// `>` intact. The children are built once, for the arm taken.
+    pub(super) fn build_glued_run_element_doc(
         &self,
         element: &internal::Element<'_>,
-        external_close: bool,
+        prepared: &PreparedElement<'_>,
+        sheds: bool,
         gt_prefix: Option<DocId>,
-    ) -> Option<DocId> {
-        let (parts, ctx, attr_docs, children_doc) = self.prepare_soft_sibling_element(element)?;
-        Some(self.build_collapsible_element_doc(
-            &parts,
-            &ctx,
-            &attr_docs,
-            children_doc,
-            external_close,
-            gt_prefix,
-        ))
+    ) -> DocId {
+        let PreparedElement {
+            parts,
+            ctx,
+            attr_docs,
+            ..
+        } = prepared;
+        if prepared.can_shed_gt() {
+            let children_doc = self.build_soft_sibling_children_doc(element);
+            return self.build_collapsible_element_doc(
+                parts,
+                ctx,
+                attr_docs,
+                children_doc,
+                sheds,
+                gt_prefix,
+            );
+        }
+        debug_assert!(!sheds && gt_prefix.is_some() && prepared.can_receive_gt());
+        let children_doc = self.build_content_children_doc(parts, ctx, BoundaryMode::Hard);
+        self.build_multiline_element_doc(parts, ctx, attr_docs, children_doc, gt_prefix)
     }
 
     /// Build a glued-both inline element as the closing-`>` dangle onto glued following text —
     /// the axis-3 sibling-`>` dangle generalized from an element/block follower to a **text**
     /// follower (see fragment_doc's `try_build_glued_both_text_dangle`). Returns `Some` only for
-    /// the flat hug-both (`Soft`) shape, mirroring [`Self::build_inline_element_sibling_gt`]'s
+    /// the flat hug-both (`Soft`) shape, mirroring [`Self::build_inline_element_omit_close_gt`]'s
     /// eligibility; `None` keeps the element intact so the caller falls back to the normal path.
     ///
     /// A three-state `conditional_group` — the renderer picks the first whose flat first line fits:
@@ -748,35 +871,7 @@ impl<'a> Printer<'a> {
         attr_docs: &[DocId],
         boundary: BoundaryMode,
     ) -> DocId {
-        let d = self.d();
-        let nodes = parts.nodes;
-
-        // Build the children doc EXACTLY ONCE, in the variant the resolved boundary arm
-        // actually uses (rebuilding per arm recursed into children that ALSO rebuilt, making
-        // deeply nested inline content O(2^depth) — see the build-fanout audit). Boundary
-        // whitespace is always trimmed: it is render-free under Svelte 5 (`clean_nodes` trims
-        // every fragment edge at compile), so no element kind keeps it. Only the multiline-ness
-        // varies — `Hard` is exactly the multiline case.
-        //
-        // A whitespace-collapsing container lays its children out one-per-line with the
-        // inter-sibling whitespace trimmed (render-free — the compiler removes it). Its multiline
-        // decision is forced (see `analyze_element`), so `boundary` is always `Hard` here and this
-        // content flows into the multiline arm below.
-        //
-        // The multiline arm carries the *cause* (see [`MultilineCause`]), not just the fact:
-        // `Hard` derived from the content's own authored newlines is a layout the next pass can
-        // re-decide, which the sibling-newline flow rule has to know. `boundary` stays the source
-        // of the multiline-ness itself, so a `Soft` boundary builds the inline arm as before.
-        let children_doc = if parts.collapses_child_ws {
-            self.build_container_content_doc(nodes)
-        } else {
-            let cause = if boundary == BoundaryMode::Hard {
-                ctx.multiline
-            } else {
-                MultilineCause::None
-            };
-            self.build_nodes_doc_trimmed(nodes, cause)
-        };
+        let children_doc = self.build_content_children_doc(parts, ctx, boundary);
 
         // Soft boundaries: collapse when the element fits, break block-style when it doesn't.
         //
@@ -798,15 +893,70 @@ impl<'a> Printer<'a> {
             );
         }
 
-        // Full multiline. `children_doc` was built once above as the multiline shape
-        // (`build_nodes_doc_multiline` == `build_nodes_doc_trimmed(nodes, true, breakable,
-        // true)`); rebuilding here per level is what made deeply-nested content O(2^depth).
-        let opening_tag = self.build_opening_tag(parts.name, attr_docs, ctx.has_multiline_attr);
-        let indent_inner = d.indent_hardline(children_doc);
+        self.build_multiline_element_doc(parts, ctx, attr_docs, children_doc, None)
+    }
+
+    /// Build an element's children doc EXACTLY ONCE, in the variant the resolved boundary arm
+    /// actually uses (rebuilding per arm recursed into children that ALSO rebuilt, making deeply
+    /// nested inline content O(2^depth) — see the build-fanout audit). Boundary whitespace is
+    /// always trimmed: it is render-free under Svelte 5 (`clean_nodes` trims every fragment edge
+    /// at compile), so no element kind keeps it. Only the multiline-ness varies — `Hard` is
+    /// exactly the multiline case.
+    ///
+    /// A whitespace-collapsing container lays its children out one-per-line with the
+    /// inter-sibling whitespace trimmed (render-free — the compiler removes it). Its multiline
+    /// decision is forced (see `analyze_element`), so `boundary` is always `Hard` there.
+    ///
+    /// The multiline arm carries the *cause* (see [`MultilineCause`]), not just the fact: `Hard`
+    /// derived from the content's own authored newlines is a layout the next pass can re-decide,
+    /// which the sibling-newline flow rule has to know. `boundary` stays the source of the
+    /// multiline-ness itself, so a `Soft` boundary builds the inline shape.
+    fn build_content_children_doc(
+        &self,
+        parts: &ElementParts<'_>,
+        ctx: &ElementContext,
+        boundary: BoundaryMode,
+    ) -> DocId {
+        if parts.collapses_child_ws {
+            self.build_container_content_doc(parts.nodes)
+        } else {
+            let cause = if boundary == BoundaryMode::Hard {
+                ctx.multiline
+            } else {
+                MultilineCause::None
+            };
+            self.build_nodes_doc_trimmed(parts.nodes, cause)
+        }
+    }
+
+    /// Build the full multiline (`Hard`) content layout: both tags intact, the content (built once
+    /// by [`Self::build_content_children_doc`] as the multiline shape) on its own indented lines.
+    ///
+    /// `gt_prefix` (Some) is a preceding glued element's shed `>`, threaded into the opening tag's
+    /// attrs group — the G2 sibling-`>` dangle onto a multiline receiver
+    /// ([`Self::build_glued_run_element_doc`]).
+    fn build_multiline_element_doc(
+        &self,
+        parts: &ElementParts<'_>,
+        ctx: &ElementContext,
+        attr_docs: &[DocId],
+        children_doc: DocId,
+        gt_prefix: Option<DocId>,
+    ) -> DocId {
+        let d = self.d();
+        let opening_tag = match gt_prefix {
+            Some(gt) => self.build_opening_tag_with_gt_prefix(
+                parts.name,
+                attr_docs,
+                ctx.has_multiline_attr,
+                gt,
+            ),
+            None => self.build_opening_tag(parts.name, attr_docs, ctx.has_multiline_attr),
+        };
         d.concat(&[
             opening_tag,
             d.text(">"),
-            indent_inner,
+            d.indent_hardline(children_doc),
             d.hardline(),
             self.end_tag(parts.name),
         ])

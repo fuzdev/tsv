@@ -98,6 +98,16 @@ fn gen_svelte_block_sibling(depth: usize) -> String {
     format!("{opens}x{closes}\n")
 }
 
+/// Nested glued inline-element runs (`<b>a</b><i><b>a</b><i>…x…</i></i>`) — the G2 glued-run
+/// builder (`build_glued_element_run`), which decides every member's shed / receive role before
+/// building any of them. Deciding a role by building the member's whole doc (children included)
+/// and discarding it, then building it again, doubles the work at every nesting level.
+fn gen_svelte_glued_run(depth: usize) -> String {
+    let opens = "<b>a</b><i>".repeat(depth);
+    let closes = "</i>".repeat(depth);
+    format!("{opens}x{closes}\n")
+}
+
 /// A member chain whose call argument is itself the inner chain — the axis the
 /// chain printer rebuilds once per `conditional_group` candidate state. Input
 /// grows linearly in depth; the buggy build is exponential.
@@ -541,6 +551,12 @@ const CONSTRUCTS: &[Construct] = &[
         parser: ParserType::Svelte,
         generate: gen_svelte_block_sibling,
         depths: &[3, 6, 9],
+    },
+    Construct {
+        name: "svelte_glued_run",
+        parser: ParserType::Svelte,
+        generate: gen_svelte_glued_run,
+        depths: &[4, 8, 12],
     },
     Construct {
         name: "ts_call_chain",

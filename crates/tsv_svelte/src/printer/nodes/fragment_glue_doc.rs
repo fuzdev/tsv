@@ -7,6 +7,7 @@
 // runs, comment-prefixed units). The sibling walk in `fragment_doc.rs`
 // dispatches into these at each glued boundary it meets.
 
+use super::element_doc::PreparedElement;
 use super::helpers::is_control_flow_block;
 use crate::ast::internal::{self, FragmentNode, is_collapsible_ws_char};
 use crate::printer::Printer;
@@ -449,22 +450,35 @@ impl<'a> Printer<'a> {
     ///   this whole concat flat (`welded_atom` returns `None` for a plain concat → the
     ///   whole thing), so a wide element anywhere in the run pulls the *entire* run to a fresh line
     ///   rather than stranding an opening tag after a space.
-    /// - **per-pair sibling-`>` dangle (G2)**: each adjacent pair whose BOTH elements are
-    ///   Soft-eligible sheds the first's closing `>` onto the second's line (`</span⏎><a⏎…`); the
-    ///   receiver renders it as a leading `if_break` inside its attrs group, so it hugs when the
-    ///   attrs fit and dangles when they wrap. A mid-run element both receives (from its left) and
-    ///   sheds (to its right).
+    /// - **per-pair sibling-`>` dangle (G2)**: each adjacent pair whose first element can SHED and
+    ///   whose second can RECEIVE hands the first's closing `>` to the second (`</span⏎><a⏎…`);
+    ///   the receiver renders it as a leading `if_break` inside its attrs group, so it hugs when
+    ///   the attrs fit and dangles when they wrap. A mid-run element can both receive (from its
+    ///   left) and shed (to its right).
     ///
-    /// Eligibility is a per-element property (a flat hug-both `Soft` layout), computed up front for
-    /// every element because a pair's shed decision needs BOTH neighbours' eligibility — a shed
-    /// whose receiver turned out ineligible would strand the `>`. Against an ineligible neighbour
-    /// the boundary stays an intact `>` (the element renders its ordinary doc), so nothing is ever
-    /// lost. The `>` moves only *inside* a closing tag, so every reparse is byte-identical —
-    /// render-safe.
+    /// Eligibility is per element and per role, computed up front for every element because a
+    /// pair's shed decision needs BOTH neighbours — a shed whose receiver turned out ineligible
+    /// would strand the `>`:
+    ///
+    /// - **shed**: the flat hug-both `Soft` layout, the one shape whose trailing `>` splits off
+    ///   ([`PreparedElement::can_shed_gt`]);
+    /// - **receive**: `Soft`, OR multiline only because of the element's own authored line breaks
+    ///   ([`PreparedElement::can_receive_gt`]). G2 eligibility must not read a signal the
+    ///   dangle's own output rewrites: a receiver whose attrs wrap prints its content block-style,
+    ///   which the next pass reads as exactly that authored-newline layout, so a Soft-only receive
+    ///   test would un-dangle the pair it just dangled. A structurally multiline receiver (a block
+    ///   child) stays out.
+    ///
+    /// Each element is prepared ONCE ([`Printer::prepare_sibling_element`]: tag, attrs, layout),
+    /// both roles are read off that layout, and only the arm actually taken builds the children.
+    ///
+    /// Against an ineligible neighbour the boundary stays an intact `>` (the element renders its
+    /// ordinary doc), so nothing is ever lost. The `>` moves only *inside* a closing tag, so every
+    /// reparse is byte-identical — render-safe.
     ///
     /// `shed_last`: the run's LAST element sheds its `>` too — to a glued following control-flow
     /// block, which always receives (the element→block dangle, [`Self::build_unit_omit_close_gt`]).
-    /// `None` then if that element is ineligible: a run whose tail keeps its `>` is not the unit
+    /// `None` then if that element cannot shed: a run whose tail keeps its `>` is not the unit
     /// the caller asked for, and it keeps the run it already pushed.
     fn build_glued_element_run(
         &self,
@@ -475,7 +489,7 @@ impl<'a> Printer<'a> {
     ) -> Option<DocId> {
         let d = self.d();
         let mut els: SmallVec<[&internal::Element<'_>; 8]> = SmallVec::new();
-        let mut eligible: SmallVec<[bool; 8]> = SmallVec::new();
+        let mut prepared: SmallVec<[Option<PreparedElement<'_>>; 8]> = SmallVec::new();
         for node in &nodes[start..=end] {
             let FragmentNode::Element(el) = node else {
                 return None;
@@ -483,29 +497,41 @@ impl<'a> Printer<'a> {
             if self.is_block_fragment_node(node) {
                 return None;
             }
-            eligible.push(self.build_inline_element_omit_close_gt(el).is_some());
+            prepared.push(self.prepare_sibling_element(el));
             els.push(el);
         }
+        let can_shed = |i: usize| {
+            prepared[i]
+                .as_ref()
+                .is_some_and(PreparedElement::can_shed_gt)
+        };
+        let can_receive = |i: usize| {
+            prepared[i]
+                .as_ref()
+                .is_some_and(PreparedElement::can_receive_gt)
+        };
         let n = els.len();
-        if shed_last && !eligible[n - 1] {
+        if shed_last && !can_shed(n - 1) {
             return None;
         }
         let mut parts: SmallVec<[DocId; 8]> = SmallVec::new();
         for idx in 0..n {
             let sheds = if idx + 1 < n {
-                eligible[idx] && eligible[idx + 1]
+                can_shed(idx) && can_receive(idx + 1)
             } else {
                 shed_last
             };
-            let receives = idx > 0 && eligible[idx] && eligible[idx - 1];
-            let doc = if sheds || receives {
-                let gt = if receives { Some(d.text(">")) } else { None };
-                // `sheds || receives` implies `eligible[idx]`, so this is `Some`: the two
-                // mid-run spellings name it directly, and the tail's `shed_last` is reached only
-                // past the `eligible[n - 1]` guard above.
-                self.build_inline_element_sibling_gt(els[idx], sheds, gt)?
-            } else {
-                self.build_fragment_node_doc(&nodes[start + idx])?
+            let receives = idx > 0 && can_shed(idx - 1) && can_receive(idx);
+            let doc = match &prepared[idx] {
+                // `sheds || receives` implies the element is prepared: a mid-run shed needs
+                // `can_shed(idx)`, the tail's `shed_last` is guarded above, and a receive needs
+                // `can_receive(idx)`.
+                Some(p) if sheds || receives => {
+                    let gt = if receives { Some(d.text(">")) } else { None };
+                    self.build_glued_run_element_doc(els[idx], p, sheds, gt)
+                }
+                Some(p) => self.build_prepared_element_doc(els[idx], p),
+                None => self.build_fragment_node_doc(&nodes[start + idx])?,
             };
             parts.push(doc);
         }
