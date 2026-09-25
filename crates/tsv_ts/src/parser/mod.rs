@@ -201,10 +201,8 @@ pub struct Parser<'a, 'arena> {
     /// stored in place so `advance()` has the lexer write it directly
     /// (`self.lexer.next_token_into(&mut self.current)`) with no intermediate
     /// `Token` scattered into separate scalar fields. Every other writer assigns a
-    /// whole token — the bootstrap, the peek-cache consume, the cold re-lexes
-    /// (`drain_comments`, the regex relex, template continuation, the `>=`-family
-    /// re-lex of a compound-token split) and `rewind`'s checkpoint restore — except
-    /// the `>>` / `>>>` / `<<` splits, which narrow it in place (`start` + `kind`).
+    /// whole token, except the `>>` / `>>>` / `<<` splits, which narrow it in place
+    /// (`start` + `kind`).
     /// The rare decoded value rides out-of-band in `current_decoded` (escape paths
     /// only), mirroring the lexer's split.
     current: Token,
@@ -619,9 +617,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Write the lexed token straight into the current slot — `next_token_into`
             // writes through `&mut self.current` (disjoint from `&mut self.lexer`), so no
             // intermediate `Token` is returned through a stack slot, reloaded and
-            // re-scattered here. The by-value `next_token` is left to the bootstrap, the cold
-            // re-lexes (`drain_comments`, the regex relex, the compound-token split) and
-            // `peek_kind`.
+            // re-scattered here.
             self.lexer.next_token_into(&mut self.current)?;
             self.current_decoded = self.decoded_to_arena();
             self.had_line_terminator = self.lexer.had_line_terminator();

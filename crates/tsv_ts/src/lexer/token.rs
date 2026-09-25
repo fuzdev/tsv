@@ -487,13 +487,9 @@ impl fmt::Display for TokenKind {
 //
 // This follows the "single source of truth" principle from docs/architecture.md:
 // "Raw strings are NEVER duplicated in the AST" - applies to tokens too (pre-AST).
-// A 16-byte POD with no heap-owning field. The hot advance path has the lexer write
-// it straight into the parser's current-token slot (`next_token_into`); the size does
-// not buy a register return, since a by-value `Result<Token, ParseError>` from
-// `next_token` is a round trip through a slot in the caller's frame that the parser
-// would then reload and re-scatter — the round trip `next_token_into` elides. Every
-// other token (bootstrap, cold re-lexes, the `peek_kind` lookahead) comes back by
-// value. Left non-`Copy` so `TokenKind` can stay non-`Copy` and avoid a
+// A 16-byte POD with no heap-owning field, lexed in place on the parser's hot advance
+// path (`Lexer::next_token_into`) and by value everywhere else (`Lexer::next_token`).
+// Left non-`Copy` so `TokenKind` can stay non-`Copy` and avoid a
 // `trivially_copy_pass_by_ref` cascade on the many `&TokenKind` params; moving an
 // 8-byte `TokenKind` field is just as cheap.
 #[derive(Debug, Clone)]

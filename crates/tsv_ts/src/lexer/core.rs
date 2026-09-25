@@ -1056,10 +1056,7 @@ impl<'a> Lexer<'a> {
     /// punctuation/operator paths; the identifier/number/string/template/hashbang
     /// scanners and the error paths write `dst` (or propagate the error) via an
     /// early `return`. [`Lexer::next_token`] is the thin by-value wrapper every
-    /// other caller takes: the parser's bootstrap, its `peek_kind` lookahead, and
-    /// its cold re-lexes (the comment drain, the regex relex, and the
-    /// compound-token split through [`Lexer::seek_and_next_token`]), and
-    /// `debug_token_stream`.
+    /// other caller takes.
     ///
     /// The error path is lifted into host coordinates here, at the producer
     /// ([`Lexer::host_err`]); the scan itself works in — and reports in — the lexer's own.

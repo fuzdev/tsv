@@ -22,9 +22,7 @@ pub(crate) struct CssParser<'a, 'arena> {
     source: &'a str,
     lexer: Lexer<'a>,
     /// The current token. A fresh lex in [`advance`](Self::advance) has the lexer write it
-    /// in place (`Lexer::next_token_into`); every other writer assigns a whole token — the
-    /// bootstrap, `advance`'s consume of a cached lookahead, the boundary re-read
-    /// (`Lexer::token_at`) and [`seat_at_terminator`](Self::seat_at_terminator). Read
+    /// in place (`Lexer::next_token_into`); every other writer assigns a whole token. Read
     /// through [`current_kind`](Self::current_kind), [`current_start`](Self::current_start)
     /// and [`current_end`](Self::current_end), the last two widening its `u32` offsets to the
     /// `usize` every `source` index takes.
@@ -562,9 +560,9 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     }
 
     /// A temporary lexer seated at the current token's end, with the source it reads from —
-    /// the seam both `peek_past_*` lookaheads spell, so parser state (the `peek` slot
-    /// included) is untouched.
-    fn lookahead_lexer(&self) -> (&'a str, Lexer<'a>) {
+    /// the seam the `peek_past_*` lookaheads and the selector compound scan spell, so parser
+    /// state (the `peek` slot included) is untouched.
+    pub(in crate::parser) fn lookahead_lexer(&self) -> (&'a str, Lexer<'a>) {
         let remaining = &self.source()[self.current_end()..];
         let lexer = Lexer::at_offset(remaining, self.base_offset + self.current_end());
         (remaining, lexer)
