@@ -10,8 +10,8 @@
 use crate::ast::internal::{self, Fragment, FragmentNode};
 use crate::printer::{HeadExpr, Printer};
 use smallvec::smallvec;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::doc::{DocBuf, GroupId};
 
 use super::element_doc::MultilineCause;
 use super::helpers::each_expr_comment_end;
@@ -177,18 +177,16 @@ enum HeadCloser {
 }
 
 impl HeadCloser {
-    /// Everything this head contributes, as one row per variant: the **token** it dangles,
-    /// the **group id** the dangle's `if_break` reads (distinct per head — see
-    /// [`GroupId::BlockKey`] for why sharing one is unsafe), and the **clause** that rides
-    /// between the content and that token.
+    /// Everything this head contributes, as one row per variant: the **token** it dangles
+    /// and the **clause** that rides between the content and that token.
     ///
-    /// One table rather than three parallel `match self` accessors: the caller wants all
-    /// three at once, and a third head is then a single line instead of three edits that
-    /// could disagree about which head is which.
-    fn parts(self) -> (&'static str, GroupId, Option<DocId>) {
+    /// One table rather than two parallel `match self` accessors: the caller wants both at
+    /// once, and a third head is then a single line instead of two edits that could
+    /// disagree about which head is which.
+    fn parts(self) -> (&'static str, Option<DocId>) {
         match self {
-            Self::BlockTag(clause) => ("}", GroupId::BlockHead, clause),
-            Self::EachKey => (")", GroupId::BlockKey, None),
+            Self::BlockTag(clause) => ("}", clause),
+            Self::EachKey => (")", None),
         }
     }
 }
@@ -343,15 +341,15 @@ impl<'a> Printer<'a> {
         } = head;
         let hug = ends_at_base_closer(expr) && !layout.opens_own_line();
         let open_doc = self.head_open_doc(open, layout.opens_own_line());
-        let (close_text, group_id, clause) = closer.parts();
+        let (close_text, clause) = closer.parts();
         let close = d.text(close_text);
         if ends_with_line_comment {
             // The trailing line comment leaves the break to whatever follows it, so the
             // clause + closer drop themselves to the next line at base indent — no dangle/hug
-            // break beyond that. Still group the expression on the wrapping path so the
-            // body-expand keyed to this group sees the (comment-forced) break.
+            // break beyond that. Still group the expression on the wrapping path, as the
+            // dangling arm below does.
             let head = if can_wrap {
-                d.group_with_id(expr_doc, group_id)
+                d.group(expr_doc)
             } else {
                 expr_doc
             };
@@ -361,18 +359,13 @@ impl<'a> Printer<'a> {
             };
         }
         if can_wrap {
-            // Key the breakable expression to this head's group. The group's `fits()`
-            // counts the trailing clause + closer (they sit in rest-commands / resolve
-            // flat during the fits test), so the head breaks at the right boundary;
-            // reading anything keyed to `BlockHead` immediately after the group resolves
-            // keeps that id nesting-safe (the key takes its own id — see
-            // [`GroupId::BlockKey`] — because it does NOT get that read order).
-            let grouped = d.group_with_id(expr_doc, group_id);
             if hug {
                 // The expression renders ending with `)` on its own line at base (a
                 // single call whose args wrapped). Per the layout rule, don't break a
                 // line that starts with `)` — the clause + closer continue on it
                 // (`) as item}`, `)}`, and a key's `))}`), in both the flat and broken head.
+                // Nothing reads the group's mode, so it is a plain group.
+                let grouped = d.group(expr_doc);
                 match clause {
                     Some(c) => {
                         let space = d.text(" ");
@@ -385,6 +378,13 @@ impl<'a> Printer<'a> {
                 // own line at the tag's base indent when the head wraps (`expr⏎as item}`,
                 // `expr⏎}`, a key's `expr⏎)`); when it fits they hug inline
                 // (`expr as item}`).
+                //
+                // The dangle keys on the expression's own group. That group's `fits()`
+                // counts the trailing clause + closer (they sit in rest-commands / resolve
+                // flat during the fits test), so the head breaks at the right boundary. The
+                // id is this group's own, so an `{#each}` key's group, resolved inside the
+                // head's clause, never answers for the head (nor the head for the key).
+                let head_group = d.group_with_id(expr_doc);
                 let hardline = d.hardline();
                 let (break_tail, flat_tail) = match clause {
                     Some(c) => {
@@ -393,8 +393,8 @@ impl<'a> Printer<'a> {
                     }
                     None => (hardline, d.empty()),
                 };
-                let dangle = d.if_break_with_id(break_tail, flat_tail, group_id);
-                d.concat(&[open_doc, grouped, dangle, close])
+                let dangle = d.if_break_with_id(break_tail, flat_tail, head_group);
+                d.concat(&[open_doc, head_group.doc(), dangle, close])
             }
         } else {
             match clause {
@@ -411,8 +411,8 @@ impl<'a> Printer<'a> {
     /// is inline-authored, expanding the body + `{/tag}` onto their own lines when the
     /// head goes multiline.
     ///
-    /// `head_doc` is the opening tag through its `}` (including the `BlockHead`
-    /// head-wrap group + dangle); `body_doc` / `close` are the inline body and the
+    /// `head_doc` is the opening tag through its `}` (including the keyed head-wrap
+    /// group + dangle); `body_doc` / `close` are the inline body and the
     /// `{/tag}` close.
     ///
     /// A `conditional_group` chooses in one pass among (1) fully inline, (2) flat head +
@@ -609,7 +609,7 @@ impl<'a> Printer<'a> {
         while let Some(a) = alt {
             if let Some(else_if) = Self::get_flattenable_else_if(a) {
                 // Build the else-if head with wrapping enabled so it can dangle within the
-                // expanded form; in the inline form `BlockHead` resolves flat (no dangle).
+                // expanded form; in the inline form its head group resolves flat (no dangle).
                 let head_expr = self.build_else_if_expr_doc(else_if, true);
                 let head = self.build_block_head(
                     ELSE_IF_BLOCK_OPEN,
@@ -1415,7 +1415,7 @@ impl<'a> Printer<'a> {
     ///
     /// Uses same inline/multiline pattern as if blocks. Opening tag uses group() for
     /// parameter wrapping when they exceed print width. Takes no context: the head wraps by
-    /// its own width (its `BlockHead` group), and the body-drop is likewise decided by
+    /// its own width (its opening-tag group), and the body-drop is likewise decided by
     /// **width** (the `conditional_group` in `build_expanding_block`) — never by whether the
     /// head may wrap, which would let a render-free boundary select the layout (see
     /// `fragment_inline_authored`).
@@ -1464,29 +1464,26 @@ impl<'a> Printer<'a> {
         // The parameter list gets its OWN group so it breaks independently of the
         // type-parameter group (mirroring a real function signature, where `<…>` and
         // `(…)` are sibling groups): a long generic list can wrap while short params stay
-        // inline on the closing `>(…)}` line, and vice-versa. The outer `BlockHead` group
+        // inline on the closing `>(…)}` line, and vice-versa. The opening-tag group below
         // still governs the head as a whole.
         let params_doc = d.group(params_inner);
 
-        // Opening tag `{#snippet name<T>(params)}`. Key the group to `BlockHead` so the
-        // body can expand when the params wrap (below).
+        // Opening tag `{#snippet name<T>(params)}`, one group, so the body can expand when
+        // the params wrap (below).
         //   When fits: {#snippet name(a, b, c)}
         //   When wraps: {#snippet name(\n\ta,\n\tb,\n\tc\n)}
-        let opening_doc = d.group_with_id(
-            d.concat(&[
-                d.text("{#snippet "),
-                // The snippet name, verbatim from the identifier expression's span.
-                d.source_span(block.expression.span(), self.source),
-                type_params_part,
-                params_doc,
-                d.text("}"),
-            ]),
-            GroupId::BlockHead,
-        );
+        let opening_doc = d.group(d.concat(&[
+            d.text("{#snippet "),
+            // The snippet name, verbatim from the identifier expression's span.
+            d.source_span(block.expression.span(), self.source),
+            type_params_part,
+            params_doc,
+            d.text("}"),
+        ]));
 
         // Inline-authored body (boundary-trimmed): expand the body + `{/snippet}` onto
         // their own lines when the construct overflows (params wrap, or head + body
-        // exceeds width) — uniformly, including paramless snippets. Keyed to the
+        // exceeds width) — uniformly, including paramless snippets. Measured against the
         // opening group above.
         if is_inline {
             let body_doc = self.build_section_body_doc(&block.body);

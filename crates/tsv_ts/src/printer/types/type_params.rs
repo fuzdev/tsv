@@ -16,9 +16,17 @@ use crate::printer::layout::{bracketed_list_body, fluid_after_operator};
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
-use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
+
+/// Which keyword→value slot of a type parameter a value fills: the `extends` constraint or
+/// the `=` default. The two share one builder and differ in one rule — a conditional
+/// constraint keeps its clarity parens, a conditional default does not.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TypeParamSlot {
+    Constraint,
+    Default,
+}
 
 impl<'a> Printer<'a> {
     //
@@ -316,7 +324,7 @@ impl<'a> Printer<'a> {
                 "extends",
                 " extends",
                 &head,
-                GroupId::TypeParameterConstraint,
+                TypeParamSlot::Constraint,
             );
             prev_end = constraint.span().end;
         }
@@ -350,7 +358,7 @@ impl<'a> Printer<'a> {
                 "=",
                 " =",
                 &head,
-                GroupId::TypeParameterDefault,
+                TypeParamSlot::Default,
             );
             prev_end = default.span().end;
         }
@@ -384,16 +392,16 @@ impl<'a> Printer<'a> {
         keyword: &'static str,
         spaced_keyword: &'static str,
         head: &KeywordValueHead<'_>,
-        group_id: GroupId,
+        slot: TypeParamSlot,
     ) {
         let d = self.d();
         if let Some((gap_start, keyword_pos)) = line_gap {
             let mut tail: DocBuf = smallvec![d.text(keyword)];
-            self.append_keyword_value(&mut tail, head, group_id);
+            self.append_keyword_value(&mut tail, head, slot);
             parts.push(self.build_continuation_indent(gap_start, keyword_pos, d.concat(&tail)));
         } else {
             parts.push(d.text(spaced_keyword));
-            self.append_keyword_value(parts, head, group_id);
+            self.append_keyword_value(parts, head, slot);
         }
     }
 
@@ -444,9 +452,10 @@ impl<'a> Printer<'a> {
     /// No comments, otherwise: break after the keyword and indent when the value
     /// overflows (`extends\n  Long`), hugging object-like types (`extends {`).
     ///
-    /// `group_id` ties the after-keyword line break to `indent_if_break` so the
-    /// value is indented exactly when that break fires — Prettier's
-    /// `printTypeParameter` pattern.
+    /// `slot` says which of the two it is: a conditional CONSTRAINT keeps its clarity
+    /// parens, a default does not. The after-keyword break ties to the value's
+    /// `indent_if_break` ([`fluid_after_operator`]) so the value is indented exactly when
+    /// that break fires — Prettier's `printTypeParameter` pattern.
     ///
     /// `head` is the shared keyword→value resolution ([`Printer::keyword_value_head`]):
     /// the gap window both the gates and the emitters use, the freeze verdict, and the
@@ -463,14 +472,14 @@ impl<'a> Printer<'a> {
         &self,
         parts: &mut DocBuf,
         head: &KeywordValueHead<'_>,
-        group_id: GroupId,
+        slot: TypeParamSlot,
     ) {
         let d = self.d();
         // The clarity-paren rule this site adds to the head protocol, read by both
         // directive arms below and spelled again on the ordinary path: a *conditional*
         // CONSTRAINT keeps the parens it requires (the `=` default position strips them —
         // see the ordinary path's own note for why the grammar, not taste, decides it).
-        let member_parens: TypeParenRule = if group_id == GroupId::TypeParameterConstraint {
+        let member_parens: TypeParenRule = if slot == TypeParamSlot::Constraint {
             |_, t| matches!(t, TSType::Conditional(_))
         } else {
             |_, _| false
@@ -539,7 +548,7 @@ impl<'a> Printer<'a> {
         let conditional_constraint = matches!(
             unwrap_parenthesized(head.value_type),
             TSType::Conditional(_)
-        ) && group_id == GroupId::TypeParameterConstraint
+        ) && slot == TypeParamSlot::Constraint
             && !self.paren_retains_for_trailing_run(head.child);
         if conditional_constraint {
             // The author's own shell (if any) is stripped, so this arm owns its three
@@ -667,11 +676,7 @@ impl<'a> Printer<'a> {
         // Other types: break after the keyword and indent when the value would
         // overflow. The group holds only the line, so an object-like type still
         // hugs the keyword (`extends {`) while a plain type wraps and indents.
-        parts.push(fluid_after_operator(
-            d,
-            self.build_type_doc(value_type),
-            group_id,
-        ));
+        parts.push(fluid_after_operator(d, self.build_type_doc(value_type)));
     }
 
     //

@@ -708,7 +708,7 @@ impl RenderPolicy for TopLevelPolicy {
 ///
 /// Everything else is the top-level render's. A keyed group resolved inside a
 /// fill item is recorded in, and a keyed conditional read from, the one map the
-/// top-level render owns (`DocArena::keyed_group_breaks`), and a fill nested in
+/// top-level render owns (`DocArena::keyed_group_modes`), and a fill nested in
 /// the item sees the sub-render's own pending commands as its lookahead — the rest
 /// of the item, which is as far as any fits question inside a fill item can see.
 struct SingleDocPolicy {
@@ -751,7 +751,7 @@ impl RenderPolicy for SingleDocPolicy {
 /// (under the `swallow_check` feature) hosts the line-comment swallow
 /// diagnostic. The loop itself is [`render_doc_core`].
 ///
-/// The keyed-group map (`DocArena::keyed_group_breaks`) is cleared here on entry, and
+/// The keyed-group map (`DocArena::keyed_group_modes`) is cleared here on entry, and
 /// everything this render then runs — the loop, every fill-item and line-suffix
 /// sub-render nested in it, the final flush — shares the one map, as prettier's
 /// `printDocToString` shares one `groupModeMap`. The clear is the whole lifecycle
@@ -1012,12 +1012,13 @@ fn render_doc_core<P: RenderPolicy>(
             DocNode::Group {
                 contents,
                 expanded_states,
-                id,
+                keyed,
                 should_break,
             } => {
+                let group = cmd.doc;
                 let contents = *contents;
                 let expanded_states = *expanded_states;
-                let id = *id;
+                let keyed = *keyed;
                 let should_break = *should_break;
 
                 if !policy.tracking_suffix() {
@@ -1123,8 +1124,8 @@ fn render_doc_core<P: RenderPolicy>(
                     (Mode::from_fits(fits), contents)
                 };
 
-                if let Some(id) = id {
-                    arena.record_keyed_group(id, chosen_mode);
+                if keyed {
+                    arena.record_keyed_group(group, chosen_mode);
                 }
                 cmd = cmd.with_mode(chosen_mode, chosen_doc);
                 continue;

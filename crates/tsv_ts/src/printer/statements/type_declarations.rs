@@ -21,8 +21,8 @@ use crate::printer::{
 };
 use smallvec::smallvec;
 use tsv_lang::Span;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::doc::{DocBuf, GroupId};
 use tsv_lang::source_scan::find_char_skipping_comments;
 
 /// Check if a type is "generic" - i.e., has type parameters.
@@ -539,14 +539,14 @@ impl<'a> Printer<'a> {
             // value) asks nothing here and is right as it stands: its value starts on the
             // `=` line, so its own continuation is a level in either way.
 
-            // Every `fluid` marker in this function ties to the one assignment group.
+            // Each `fluid` marker keys its value's indent on itself.
             // Un-indented on the continuation path: both the marker's `indent(line)` and
             // the value's `indent_if_break` are the level already spent.
             let fluid = |rhs: DocId| -> DocId {
                 if lead_space {
-                    fluid_after_operator(d, rhs, GroupId::Assignment)
+                    fluid_after_operator(d, rhs)
                 } else {
-                    fluid_after_operator_unindented(d, rhs, GroupId::Assignment)
+                    fluid_after_operator_unindented(d, rhs)
                 }
             };
             // Break-after-operator. Still grouped on the continuation path, so a value

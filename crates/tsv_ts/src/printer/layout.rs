@@ -22,7 +22,6 @@
 //! `type-parameters.js` (`printTypeParameter`), and `union-type.js`
 //! (`shouldIndentUnionType`).
 
-use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::{DocArena, DocId};
 
 /// Bracketed list body: `open` + indented `inner` + `close`. Width-decided
@@ -62,18 +61,14 @@ pub(in crate::printer) fn hang_after_operator(d: &DocArena, content: DocId) -> D
 ///
 /// `value` stays outside the marker group, so its own forced breaks do not
 /// force the after-operator break — object-like values hug the operator and
-/// expand internally. `group_id` ties the conditional indent to this specific
-/// marker; it must stay distinct across nested contexts (assignment vs type
-/// parameter), so it is always a parameter.
-pub(in crate::printer) fn fluid_after_operator(
-    d: &DocArena,
-    value: DocId,
-    group_id: GroupId,
-) -> DocId {
+/// expand internally. The conditional indent is keyed on this marker instance, so a
+/// fluid layout nested in `value` never answers for it.
+pub(in crate::printer) fn fluid_after_operator(d: &DocArena, value: DocId) -> DocId {
+    let marker = d.group_with_id(d.indent(d.line()));
     d.concat(&[
-        d.group_with_id(d.indent(d.line()), group_id),
+        marker.doc(),
         d.line_suffix_boundary(),
-        d.indent_if_break(value, group_id),
+        d.indent_if_break(value, marker),
     ])
 }
 
@@ -99,15 +94,8 @@ pub(in crate::printer) fn hang_after_operator_unindented(d: &DocArena, content: 
 
 /// The un-indented twin of [`fluid_after_operator`] — see
 /// [`hang_after_operator_unindented`] for when to reach for one. Both of the original's
-/// indents go: the marker group's and the value's conditional one.
-pub(in crate::printer) fn fluid_after_operator_unindented(
-    d: &DocArena,
-    value: DocId,
-    group_id: GroupId,
-) -> DocId {
-    d.concat(&[
-        d.group_with_id(d.line(), group_id),
-        d.line_suffix_boundary(),
-        value,
-    ])
+/// indents go: the marker group's and the value's conditional one — so nothing reads
+/// the marker's mode, and it is a plain group.
+pub(in crate::printer) fn fluid_after_operator_unindented(d: &DocArena, value: DocId) -> DocId {
+    d.concat(&[d.group(d.line()), d.line_suffix_boundary(), value])
 }

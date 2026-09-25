@@ -27,7 +27,6 @@ use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::types::helpers::unwrap_parenthesized;
 use tsv_lang::PRINT_WIDTH;
 use tsv_lang::Span;
-use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::{DocArena, DocId};
 
 /// Prettier's heuristic for "short" property keys.
@@ -1329,7 +1328,7 @@ impl<'a> Printer<'a> {
                 d.group(d.concat(&[
                     d.group(left_doc),
                     operator,
-                    fluid_after_operator(d, right_doc_with_comments, GroupId::Assignment),
+                    fluid_after_operator(d, right_doc_with_comments),
                 ]))
             }
         }

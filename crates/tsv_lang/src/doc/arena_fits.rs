@@ -248,6 +248,22 @@ pub(super) fn arena_fits_with_lookahead(
                     // hypothetical fits test, is still unresolved → treat as flat.
                     // This keeps trailing text (e.g. a block head's `}`) counted in
                     // the keyed group's own width so it breaks at the right boundary.
+                    // TODO: prettier's `fits` reads `groupModeMap[groupId] || MODE_FLAT`,
+                    // so a conditional keyed on a group the render ALREADY resolved
+                    // measures that group's mode: a curried callee whose heads broke
+                    // (`((a…) => (b…) => (c…) => fn(x…))()`) measures its own `)` on a line
+                    // of its own when the body's call asks whether its argument fits, so
+                    // prettier keeps an argument flat that tsv breaks. Reading
+                    // `arena.keyed_group_broke(id)` here fixes that case but is NOT the fix
+                    // on its own: an owner group is recorded when it RESOLVES, before its
+                    // contents render, so a group nested INSIDE a keyed Svelte block head
+                    // (or `{#each}` key) group sees the owner's dangle in its rest commands
+                    // keyed on the already-recorded Break, measures its hardline as the end
+                    // of the line, and "fits" — the head never wraps (`{#if a && … && r⏎}`).
+                    // Prettier reads the owner's mode there too, but prettier-plugin-svelte
+                    // never wraps a head, so it never meets the case. A real fix reads the
+                    // map only for an owner whose contents have finished rendering, or
+                    // exempts the head/key dangles.
                     let chosen = if group_id.is_none() && current_mode == Mode::Break {
                         *break_doc
                     } else {

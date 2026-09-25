@@ -32,7 +32,8 @@ pub mod swallow;
 mod types;
 
 // Types
-pub use types::{CachedWidth, DocContext, DocText, GroupId, LineKind, Mode, PoolSpan};
+pub use arena::GroupId;
+pub use types::{CachedWidth, DocContext, DocText, LineKind, Mode, PoolSpan};
 
 /// Run `$copy` under a `match` on `$len` that names each short length in
 /// `[$($k),*]` as its own arm.
@@ -1811,13 +1812,10 @@ mod arena_tests {
     /// its `line` when it does not fit, a keyed `if_break` marks it, and a keyed
     /// `indent_if_break` indents a following hardline only when it broke.
     fn keyed_fill_item(a: &DocArena) -> DocId {
-        let head = a.group_with_id(
-            a.concat(&[a.text("aaaa"), a.line(), a.text("bbbb")]),
-            GroupId::BlockHead,
-        );
-        let dangle = a.if_break_with_id(a.text("!"), a.text("."), GroupId::BlockHead);
-        let body = a.indent_if_break(a.concat(&[a.hardline(), a.text("c")]), GroupId::BlockHead);
-        a.concat(&[head, dangle, body])
+        let head = a.group_with_id(a.concat(&[a.text("aaaa"), a.line(), a.text("bbbb")]));
+        let dangle = a.if_break_with_id(a.text("!"), a.text("."), head);
+        let body = a.indent_if_break(a.concat(&[a.hardline(), a.text("c")]), head);
+        a.concat(&[head.doc(), dangle, body])
     }
 
     #[test]
@@ -1836,9 +1834,32 @@ mod arena_tests {
         let a = DocArena::new();
         let broken = a.fill(&[keyed_fill_item(&a), a.line(), a.text("tail")]);
         assert_eq!(render_pw_spaces(&a, broken, 6), "aaaa\nbbbb!\n  c\ntail");
-        // A later render starts from a cleared map, so its conditional with no group of
-        // its own reads flat, however the previous render resolved that id.
-        let reader = a.if_break_with_id(a.text("!"), a.text("."), GroupId::BlockHead);
+        // A later render starts from a cleared map, so a conditional keyed on a group this
+        // render never resolves reads flat, however a previous render resolved that group.
+        let head = a.group_with_id(a.concat(&[a.text("aaaa"), a.line(), a.text("bbbb")]));
+        assert_eq!(render_pw_spaces(&a, head.doc(), 6), "aaaa\nbbbb");
+        let reader = a.if_break_with_id(a.text("!"), a.text("."), head);
         assert_eq!(render_pw_spaces(&a, reader, 6), ".");
+    }
+
+    /// A keyed reader reads ITS group's mode when another keyed group resolves between the
+    /// two — nested in the group's contents, or a sibling ahead of the reader — in both
+    /// directions (a broken group past a flat one, a flat one past a broken one).
+    #[test]
+    fn test_keyed_reader_reads_its_own_group_past_another() {
+        let a = DocArena::new();
+        let reader = |id| a.if_break_with_id(a.text("B"), a.text("F"), id);
+
+        // Nested in the contents: the outer group breaks, the inner one stays flat.
+        let inner = a.group_with_id(a.text("i"));
+        let outer = a.group_with_id_break(a.concat(&[a.text("o"), inner.doc()]), true);
+        let doc = a.concat(&[outer.doc(), reader(outer), reader(inner)]);
+        assert_eq!(render_pw_spaces(&a, doc, 100), "oiBF");
+
+        // A sibling ahead of the reader: the first group stays flat, the second breaks.
+        let first = a.group_with_id(a.text("a"));
+        let second = a.group_with_id_break(a.text("b"), true);
+        let doc = a.concat(&[first.doc(), second.doc(), reader(first), reader(second)]);
+        assert_eq!(render_pw_spaces(&a, doc, 100), "abFB");
     }
 }

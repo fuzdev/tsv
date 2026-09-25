@@ -15,8 +15,8 @@ use crate::printer::{
 use smallvec::smallvec;
 use std::cell::LazyCell;
 use tsv_lang::Span;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
-use tsv_lang::doc::{DocBuf, GroupId};
 
 /// Build the fluid assignment layout: break after `=` only when the full line
 /// exceeds print_width. Uses indentIfBreak so the RHS is evaluated independently.
@@ -25,11 +25,7 @@ use tsv_lang::doc::{DocBuf, GroupId};
 /// Wrapped in its own group so the marker's fits() evaluation doesn't see
 /// trailing elements like ";" that would cause incorrect breaking.
 fn build_fluid_assignment_doc(d: &DocArena, id_doc: DocId, init_doc: DocId) -> DocId {
-    d.group(d.concat(&[
-        id_doc,
-        d.text(" ="),
-        fluid_after_operator(d, init_doc, GroupId::Assignment),
-    ]))
+    d.group(d.concat(&[id_doc, d.text(" ="), fluid_after_operator(d, init_doc)]))
 }
 
 /// One declarator's `=` and what sits around it — the spans

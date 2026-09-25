@@ -1844,7 +1844,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a flattened curried arrow chain: the signature heads
-    /// (`(a) => (b) => …`) form a breakable group keyed on `GroupId::ArrowChain`,
+    /// (`(a) => (b) => …`) form a breakable keyed group ([`GroupId`]),
     /// so they stay on one line when they fit and break otherwise. The terminal
     /// arrow's `=>` is emitted after the group so the body hugs the last head; a
     /// hugging body (object/array/template/block) stays inline, others hang on
@@ -1942,11 +1942,14 @@ impl<'a> Printer<'a> {
         // builder at all — see `should_use_arrow_chain_layout`.
         let should_break_chain = crate::printer::arrow_chain_should_break(head);
 
-        // The heads group is keyed on `GroupId::ArrowChain`; its shape depends on
+        // The heads group is keyed — its own instance, so a chain nested in a parameter
+        // default or in the body never answers for this one; its shape depends on
         // the parent context. Either way the terminal `=>` + body are emitted
         // after the group (below), and `indent_if_break` ties the body's indent
-        // to this group's break decision.
-        let heads = match context {
+        // to this group's break decision. The hung assignment shape is the one arm
+        // nothing reads (no body indent, no callee `)`), so it alone is unkeyed.
+        let keyed = |id: GroupId| (id.doc(), Some(id));
+        let (heads, heads_id) = match context {
             // Assignment-RHS: the inner group joins ALL heads with ` =>` + line so
             // they stay on one line when they fit and each drop to their own line
             // otherwise; the outer group wraps `indent([softline, inner])`, so
@@ -1960,14 +1963,14 @@ impl<'a> Printer<'a> {
                     Some(run) => d.concat(&[d.softline(), run, inner]),
                     None => d.concat(&[d.softline(), inner]),
                 };
-                d.group_with_id(d.indent(led), GroupId::ArrowChain)
+                keyed(d.group_with_id(d.indent(led)))
             }
             // The assignment shape under a seam that already broke and indented: the
             // joined heads alone. The body below takes no `indent_if_break` either — it
             // already stands inside the seam's indent with the heads.
-            ArrowChainContext::AssignmentRhsHung => d.group_with_id(
-                join_arrow_chain_heads(d, &sig_docs, &gap_tails),
-                GroupId::ArrowChain,
+            ArrowChainContext::AssignmentRhsHung => (
+                d.group(join_arrow_chain_heads(d, &sig_docs, &gap_tails)),
+                None,
             ),
             // Callee: the assignment shape's joined heads under one indent, behind a
             // leading softline that opens the callee's parens — prettier's
@@ -1981,15 +1984,14 @@ impl<'a> Printer<'a> {
                 } else {
                     d.group(joined)
                 };
-                d.group_with_id_break(
+                keyed(d.group_with_id_break(
                     d.indent(d.concat(&[d.softline(), inner])),
-                    GroupId::ArrowChain,
                     !self.arrow_chain_body_stays_on_head_line(
                         terminal,
                         terminal_gap_start,
                         should_break_chain,
                     ),
-                )
+                ))
             }
             // Call-arg/binaryish: progressive indent. The first head stays on the
             // current line; the rest indent one level and each drop to their own
@@ -2021,7 +2023,7 @@ impl<'a> Printer<'a> {
                 // Prettier's `shouldBreak: shouldBreakChain` on the same group. Only this
                 // arm passes it: `AssignmentRhs` never sees a triggering chain (see
                 // `should_use_arrow_chain_layout`, where the assignment site owns the break).
-                d.group_with_id_break(heads_doc, GroupId::ArrowChain, should_break_chain)
+                keyed(d.group_with_id_break(heads_doc, should_break_chain))
             }
         };
 
@@ -2252,15 +2254,15 @@ impl<'a> Printer<'a> {
         // short — while the nested heads group makes its own break decision.
         // A callee's parens close on their own line when the heads broke — prettier's
         // `ifBreak(softline, "", { groupId: chainGroupId })`.
-        let close = if context == ArrowChainContext::Callee {
-            d.if_break_with_id(d.softline(), d.empty(), GroupId::ArrowChain)
-        } else {
-            d.empty()
+        let close = match heads_id {
+            Some(id) if context == ArrowChainContext::Callee => {
+                d.if_break_with_id(d.softline(), d.empty(), id)
+            }
+            _ => d.empty(),
         };
-        let body_part = if context == ArrowChainContext::AssignmentRhsHung {
-            body_part
-        } else {
-            d.indent_if_break(body_part, GroupId::ArrowChain)
+        let body_part = match heads_id {
+            Some(id) => d.indent_if_break(body_part, id),
+            None => body_part,
         };
         d.group(d.concat(&[heads, d.text(" =>"), body_part, close]))
     }
