@@ -154,14 +154,16 @@ compound, `/* c */ <NBSP> :hover` a descendant), and a line break carried inside
 printer's text is one the doc renderer neither indents after nor counts — the anchor lands
 at column 0. The run's ASCII head against a regenerated line or separator, and
 its edge against a delimiter it may touch (`(`, `,`, `)`, `]`), are the printer's. The rule
-holds at every CLAIMED juncture; an at-rule prelude the parser cannot structure (`@layer`,
-`@page`, a condition prelude whose head holds ASCII after a member) is printed verbatim, raw
-whitespace included. This is prettier's answer wherever prettier keeps the run. Prettier
+holds at every CLAIMED juncture. A prelude the parser reads verbatim (`@layer`, `@page`,
+`@keyframes`, a condition prelude it cannot structure) keeps its INTERIOR as written, raw
+whitespace included, exactly as the member-free spelling does; its two ends — which
+`parseCss` trims away — are gaps like any other. This is prettier's answer wherever prettier
+keeps the run. Prettier
 also drops the run outright at many junctures — inside a `[` (`[<NBSP>a]` → `[a]`), the
 property→colon gap (`top <NBSP>: 0` → `top: 0`), a compound break after a non-name
 (`*<NBSP>c` → `* c`), a rule's pre-`{` gap behind a comment (`a /* c */ <NBSP> {` →
-`a /* c */ {`), a `selector()` argument, a `@custom-selector` head, among others — and
-wherever it does, tsv keeps the character: a content difference tsv will not copy.
+`a /* c */ {`), a `selector()` argument's tail behind a comment, a `@custom-selector` head, among others — and
+wherever it drops or relocates the run, tsv keeps the character in place: a content difference tsv will not copy.
 
 `<NEL>` (U+0085) is `White_Space` to Rust and **not** JS `\s`, so it is whitespace to neither
 and `parseCss` rejects it wherever a name is read — tsv's lexer still reads it as whitespace
@@ -196,10 +198,16 @@ member of the class proves nothing about the other four.
 
 **The printer restores at every selector juncture, at every rebuilt block-child head** — a
 declaration's property, an at-rule's `@`, a comment's `/*` — **in the property→colon gap on
-either side of a comment, at a block's tail before its `}`, and at every gap of a
-`@supports` / `@container` condition prelude.** Known positions that drop the run: the
-stylesheet's own trailing whitespace (the outermost gap has no following construct, and a
-Svelte `<style>` host trims the island's tail before writing it), and an at-rule prelude whose selector list the printer structures with no boundary claim (`@scope`, `@custom-selector`), where the parser steps a run no emitter puts back. Two members of the class
+either side of a comment, at a block's tail before its `}`, at every gap of a
+`@supports` / `@container` condition prelude, at both ends of every at-rule prelude, at every
+structural gap of an `@scope` prelude and in its clauses, at `@custom-selector`'s gaps, at an
+`@import` prelude's value gaps, and in a media query list's entries.** A prelude's gaps are
+not `allow_whitespace()` junctures to `parseCss`, which reads the prelude raw and trims it;
+they are the prelude READER's, which steps a run where the lexer read it as an identifier no
+production starts with (or rejected `@scope <NBSP> (.a)` outright), and every such step has
+its claim. The one known position that drops the run: the stylesheet's own trailing
+whitespace (the outermost gap has no following construct, and a Svelte `<style>` host trims
+the island's tail before writing it). Two members of the class
 are also LINE TERMINATORS to tsv's shared line table (`<LS>`, `<PS>`), so preserving one
 beside a regenerated newline read as a blank line on the next pass; the CSS printer's
 blank-line question confirms the table's answer against a class that stops at `<LF>` /

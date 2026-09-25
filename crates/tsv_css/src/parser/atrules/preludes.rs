@@ -2,6 +2,7 @@ use super::{CssParser, is_boolean_operator_keyword};
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use crate::parser::selectors::{parse_complex_selector_list, parse_forgiving_selector_list};
+use crate::whitespace::{Comments, Edge, holds_boundary_member, spell_run};
 use tsv_lang::{ParseError, Span};
 
 /// Whether the current token is a CSS `<function-token>` — an identifier
@@ -51,11 +52,11 @@ fn parse_selector_argument<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     arg_start: usize,
     comments_len: usize,
-) -> Result<Option<&'arena [ComplexSelector<'arena>]>, ParseError> {
+) -> Result<Option<SelectorList<'arena>>, ParseError> {
     if let Ok(list) = parse_complex_selector_list(parser)
         && parser.check(TokenKind::RightParen)
     {
-        return Ok(Some(list.selectors));
+        return Ok(Some(list));
     }
     parser.rewind_to(arg_start, comments_len)?;
     Ok(None)
@@ -87,22 +88,51 @@ fn needs_separator_before(prev: Option<TokenKind>, trailing_spaces: usize) -> bo
 /// to cover it — a trailing `(a) /* c */` gap is inside the prelude the printer
 /// re-emits from. Hence the loop, in one place rather than at each gap.
 ///
+/// ⚠️ **The gap steps the boundary class**, not ASCII whitespace alone: a non-ASCII space
+/// here (`@supports <NBSP> (a: b)`, `(a: b) and <NBSP> (c: d)`) is one the lexer reads as
+/// the head of an identifier, and an identifier the reader cannot start a part with — so
+/// an ASCII skip sent the whole prelude to the verbatim path, its condition no longer read
+/// at all. The run is the author's, and the printer claims it back from the gap
+/// (`Printer::build_condition_query_doc`), the same partition every boundary claim keeps.
+///
 /// `run` collects the gap's comments as it goes — the query cannot yet know whether
 /// a part will follow to bind them, and one that never does keeps them (see
 /// [`ConditionQuery::trailing_operators`]). A part that does binds them, and the query
-/// loop clears the buffer.
+/// loop clears the buffer. A gap that holds a boundary MEMBER goes into it as one item,
+/// spelled in place (`crate::whitespace::spell_run`), so a run between two operators
+/// (`and <NBSP> or`) rides the connector run's text with the comments around it.
 fn skip_gap_registering_comments(
     parser: &mut CssParser<'_, '_>,
     end: &mut usize,
     run: &mut OperatorRun,
 ) -> Result<(), ParseError> {
-    parser.skip_whitespace()?;
+    let gap_start = parser.current_start();
+    let mark = run.text.len();
+    parser.skip_boundary_whitespace()?;
     while parser.check(TokenKind::Comment) {
         parser.register_current_comment();
-        run.push_comment(parser.current_value());
+        run.push_comment(
+            parser.current_value(),
+            parser.span_pos(parser.current_end()),
+        );
         *end = parser.base_offset() + parser.current_end();
         parser.advance()?;
-        parser.skip_whitespace()?;
+        parser.skip_boundary_whitespace()?;
+    }
+    let gap_end = parser.current_start();
+    if holds_boundary_member(parser.source(), gap_start, gap_end) {
+        // Both edges as the author wrote them: a run glued to the word after it (`<NBSP>or`)
+        // is one identifier with it to css-syntax-3, so the run text must not space them.
+        let spelled = spell_run(
+            parser.source(),
+            gap_start,
+            gap_end,
+            false,
+            (Edge::Presence, Edge::Presence),
+            Comments::Carried,
+        );
+        run.text.truncate(mark);
+        run.push_gap(&spelled, parser.span_pos(gap_end));
     }
     Ok(())
 }
@@ -115,7 +145,7 @@ fn skip_gap_registering_comments(
 ///
 /// The buffer answers **two** questions off one walk, which is why they share it: the
 /// operator run a following part binds ([`Self::connector_run`], which becomes that
-/// part's `connector_run`) and the one no part ever comes for ([`Self::finish`], which
+/// part's `ConnectorRun`) and the one no part ever comes for ([`Self::finish`], which
 /// becomes the query's `trailing_operators`). They differ only in their bounds — the
 /// bound run stops at the first and last *operator*, so the comments on either side of
 /// it stay the printer's to claim, while the unbound one is the whole gap, there being
@@ -139,6 +169,13 @@ struct OperatorRun {
     /// The comment registry's length when the run began, to truncate back to if it does
     /// end up claiming its comments.
     comments_len: usize,
+    /// Where the last item collected ends in the document — the far end of an unbound run,
+    /// which the query's span has to reach (its words are the prelude's, and the printer's
+    /// tail claim starts after them).
+    source_end: u32,
+    /// Whether the last item was a boundary run the author glued to whatever comes next, so
+    /// the next word joins it with no space (`<NBSP>or`, one identifier to css-syntax-3).
+    glued_to_next: bool,
 }
 
 /// Where a bound run sits in [`OperatorRun::text`], and what the comment registry owes it.
@@ -151,6 +188,8 @@ struct OperatorBounds {
     /// The registry's length when the **first** operator landed, to truncate back to when a
     /// later one proves the comments since then are inside the run's own text.
     comments_len: usize,
+    /// The same bounds in the document: the first operator's start through the last one's end.
+    source: Span,
 }
 
 impl OperatorRun {
@@ -160,12 +199,39 @@ impl OperatorRun {
             text: String::new(),
             operators: None,
             comments_len,
+            source_end: 0,
+            glued_to_next: false,
         }
     }
 
-    /// Collect a gap comment — not yet a run, since a part may still bind it.
-    fn push_comment(&mut self, comment: &str) {
+    /// Collect a gap comment — not yet a run, since a part may still bind it. `end` is where
+    /// it ends in the document.
+    fn push_comment(&mut self, comment: &str, end: u32) {
         self.push_word(comment);
+        self.source_end = end;
+    }
+
+    /// Collect a gap holding a boundary run, already spelled with its comments in place and
+    /// the author's separation on both edges (a leading and a trailing space where they wrote
+    /// one) — one item, like a comment. `end` is where the gap ends in the document.
+    ///
+    /// Its own edges ARE its separators: it takes no joining space ahead of it (its leading
+    /// one says whether the author separated it from the word before), and hands the next
+    /// word a glued join where the author glued it (`glued_to_next`). At the run's head there
+    /// is no word to separate from, so a leading space is dropped.
+    fn push_gap(&mut self, spelled: &str, end: u32) {
+        let spelled = if self.text.is_empty() {
+            spelled.trim_start_matches(' ')
+        } else {
+            spelled
+        };
+        let (body, glued) = match spelled.strip_suffix(' ') {
+            Some(body) => (body, false),
+            None => (spelled, true),
+        };
+        self.text.push_str(body);
+        self.glued_to_next = glued;
+        self.source_end = end;
     }
 
     /// Collect an operator, which is what makes the buffer a run.
@@ -180,17 +246,27 @@ impl OperatorRun {
     /// drops the answer leaves a comment for two emitters to print, and the double print is
     /// invisible to every fixed-point gate.
     #[must_use]
-    fn push_operator(&mut self, operator: &str, comments_len: usize) -> Option<usize> {
+    fn push_operator(
+        &mut self,
+        operator: &str,
+        comments_len: usize,
+        source: Span,
+    ) -> Option<usize> {
         // Read before the push: `None` here is exactly "this is the run's first operator".
         let unregister_to = self.operators.as_ref().map(|bounds| bounds.comments_len);
         let start = self.push_word(operator);
+        self.source_end = source.end;
         match &mut self.operators {
-            Some(bounds) => bounds.end = self.text.len(),
+            Some(bounds) => {
+                bounds.end = self.text.len();
+                bounds.source.end = source.end;
+            }
             None => {
                 self.operators = Some(OperatorBounds {
                     start,
                     end: self.text.len(),
                     comments_len,
+                    source,
                 });
             }
         }
@@ -199,9 +275,10 @@ impl OperatorRun {
 
     /// Push a word and report where it landed in `text`.
     fn push_word(&mut self, word: &str) -> usize {
-        if !self.text.is_empty() {
+        if !self.text.is_empty() && !self.glued_to_next {
             self.text.push(' ');
         }
+        self.glued_to_next = false;
         let start = self.text.len();
         self.text.push_str(word);
         start
@@ -214,10 +291,10 @@ impl OperatorRun {
     /// before the first (`(a: b) /* c */ and (c: d)`) or after the last (`and /* c */
     /// (c: d)`) is one the printer's own gap sweep claims onto its authored side of the
     /// separator, so the run must not swallow it.
-    fn connector_run(&self) -> Option<&str> {
+    fn connector_run(&self) -> Option<(&str, Span)> {
         self.operators
             .as_ref()
-            .map(|bounds| &self.text[bounds.start..bounds.end])
+            .map(|bounds| (&self.text[bounds.start..bounds.end], bounds.source))
     }
 
     /// A part bound everything collected so far: its connector run rides the part and the
@@ -228,6 +305,7 @@ impl OperatorRun {
         self.text.clear();
         self.operators = None;
         self.comments_len = comments_len;
+        self.glued_to_next = false;
     }
 
     /// The run's text and the comment-registry length to truncate back to, or `None` when
@@ -235,10 +313,10 @@ impl OperatorRun {
     ///
     /// The whole buffer, comments on both ends included: no part is coming to claim them,
     /// so the run is the only carrier they have.
-    fn finish(&self) -> Option<(&str, usize)> {
+    fn finish(&self) -> Option<(&str, usize, u32)> {
         self.operators
             .as_ref()
-            .map(|_| (self.text.as_str(), self.comments_len))
+            .map(|_| (self.text.as_str(), self.comments_len, self.source_end))
     }
 }
 
@@ -305,12 +383,16 @@ pub(super) fn parse_condition_query<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     reader: ConditionReader,
 ) -> Result<(ConditionQuery<'arena>, Span), ParseError> {
+    // The prelude's head, when it opens on a boundary run: stepped before the span begins,
+    // like the ASCII whitespace the at-rule already stepped, so the span starts where the
+    // canonical (trimmed) prelude does. The printer claims the run from the name's end.
+    parser.skip_boundary_whitespace()?;
     let start = parser.base_offset() + parser.current_start();
     let mut parts = parser.bvec();
     let mut current_connector: Option<ConditionConnector> = None;
     let mut end_pos = start;
     // What the loop has consumed since the last part — the connector run a part binds
-    // (`ConditionPart::connector_run`, whose source text and case the printer preserves),
+    // (`ConditionPart::connector`, whose source text and case the printer preserves),
     // or, if none ever comes, `ConditionQuery::trailing_operators`.
     let mut run = OperatorRun::new(parser.comments.len());
 
@@ -320,7 +402,7 @@ pub(super) fn parse_condition_query<'arena>(
 
         // Check for `and`/`or` connector. CSS grammar keywords are ASCII
         // case-insensitive (CSS Syntax 3), so `AND`/`Or` connect like `and`; the
-        // enum normalizes for logic but the run's source text is kept in `connector_run`
+        // enum normalizes for logic but the run's source text is kept in `ConnectorRun::text`
         // and preserved by the printer (matching prettier).
         if parser.check(TokenKind::Identifier) {
             let ident = parser.current_identifier();
@@ -338,8 +420,12 @@ pub(super) fn parse_condition_query<'arena>(
                 // LAST operator — the one whose kind the printer splits the gap's
                 // comments around — while the run itself keeps every word.
                 current_connector = Some(conn);
+                let source = Span {
+                    start: parser.span_pos(parser.current_start()),
+                    end: parser.span_pos(parser.current_end()),
+                };
                 if let Some(comments_len) =
-                    run.push_operator(parser.current_value(), parser.comments.len())
+                    run.push_operator(parser.current_value(), parser.comments.len(), source)
                 {
                     parser.comments.truncate(comments_len);
                 }
@@ -355,15 +441,17 @@ pub(super) fn parse_condition_query<'arena>(
         }
 
         // The run this part binds, allocated once here rather than per operator.
-        let connector_run: Option<&'arena str> =
-            run.connector_run().map(|text| parser.alloc_str_in(text));
-        match parse_condition_part(
-            parser,
-            current_connector.take(),
-            connector_run,
-            end_pos,
-            reader,
-        )? {
+        let connector =
+            current_connector
+                .take()
+                .zip(run.connector_run())
+                .map(|(kind, (text, span))| ConnectorRun {
+                    kind,
+                    text: parser.alloc_str_in(text),
+                    span,
+                });
+        let part_start = parser.span_pos(parser.current_start());
+        match parse_condition_part(parser, connector, end_pos, reader)? {
             ConditionPartOutcome::Parsed { part, end, .. } => {
                 end_pos = end;
                 run.bind(parser.comments.len());
@@ -378,7 +466,13 @@ pub(super) fn parse_condition_query<'arena>(
                 if let Some(consumed) = consumed {
                     // No part is coming, so `finish` truncates the registry past this
                     // anyway; honored all the same, so one rule holds at every call.
-                    if let Some(comments_len) = run.push_operator(consumed, parser.comments.len()) {
+                    let source = Span {
+                        start: part_start,
+                        end: end as u32,
+                    };
+                    if let Some(comments_len) =
+                        run.push_operator(consumed, parser.comments.len(), source)
+                    {
                         parser.comments.truncate(comments_len);
                     }
                 }
@@ -392,8 +486,11 @@ pub(super) fn parse_condition_query<'arena>(
     // registered on the way in, when a part might still have bound them; they ride the
     // run's own text now, so drop the registrations or both would print it — the pair
     // `CssParser::rewind_to` keeps together, for the same reason.
-    let trailing_operators = run.finish().map(|(text, comments_len)| {
+    // The span reaches the run's last item, a boundary run after its last word included, so
+    // the printer's tail claim — which starts at the span's end — can never print it twice.
+    let trailing_operators = run.finish().map(|(text, comments_len, source_end)| {
         parser.comments.truncate(comments_len);
+        end_pos = end_pos.max(source_end as usize);
         parser.alloc_str_in(text)
     });
 
@@ -440,8 +537,7 @@ enum ConditionPartOutcome<'arena> {
 /// in the outcome.
 fn parse_condition_part<'arena>(
     parser: &mut CssParser<'_, 'arena>,
-    connector: Option<ConditionConnector>,
-    connector_run: Option<&'arena str>,
+    connector: Option<ConnectorRun<'arena>>,
     mut end_pos: usize,
     reader: ConditionReader,
 ) -> Result<ConditionPartOutcome<'arena>, ParseError> {
@@ -470,26 +566,46 @@ fn parse_condition_part<'arena>(
         let ident = parser.current_identifier();
         if ident.eq_ignore_ascii_case("not") {
             part_buf.push_str(parser.current_value());
-            trailing_spaces = 0;
             // Widen over the keyword before consuming it: a `not` whose operand never
             // arrives is handed back to the query with this end (`NotAPart`), and the
             // query's span has to reach it.
             end_pos = parser.base_offset() + parser.current_end();
             parser.advance()?;
-            parser.skip_whitespace()?;
-            // Include comments after `not` in content (e.g., `not /* comment */ (...)`)
-            // These go in the part buffer rather than being registered, since they're
-            // inside the condition part's span
+            // The gap after `not` is inside the part, so it rides the part's own text.
+            // Comments go in the buffer rather than being registered, since they're inside
+            // the condition part's span (e.g., `not /* comment */ (...)`). A boundary run
+            // is stepped like the query's own gaps (`skip_gap_registering_comments`) and
+            // spelled back in place, its comments with it: the gap holds nothing the
+            // printer could reach from outside the part.
+            let gap_start = parser.current_start();
+            let not_end = part_buf.len();
+            parser.skip_boundary_whitespace()?;
             while parser.check(TokenKind::Comment) {
                 part_buf.push(' ');
                 part_buf.push_str(parser.current_value());
-                trailing_spaces = 0;
                 end_pos = parser.base_offset() + parser.current_end();
                 parser.advance()?;
-                parser.skip_whitespace()?;
+                parser.skip_boundary_whitespace()?;
             }
-            part_buf.push(' ');
-            trailing_spaces += 1;
+            let gap_end = parser.current_start();
+            if holds_boundary_member(parser.source(), gap_start, gap_end) {
+                part_buf.truncate(not_end);
+                // `not` is a NAME, so the run behind it takes a space whatever the author
+                // wrote (`not<NBSP>` would be one identifier); against what follows it
+                // keeps the author's glue (`not <NBSP>(a: b)`).
+                part_buf.push_str(&spell_run(
+                    parser.source(),
+                    gap_start,
+                    gap_end,
+                    false,
+                    (Edge::Space, Edge::Presence),
+                    Comments::Carried,
+                ));
+                trailing_spaces = usize::from(part_buf.ends_with(' '));
+            } else {
+                part_buf.push(' ');
+                trailing_spaces = 1;
+            }
         }
     }
 
@@ -547,15 +663,20 @@ fn parse_condition_part<'arena>(
         if opening_selector_args && parser.check(TokenKind::LeftParen) {
             part_buf.push('(');
             trailing_spaces = 0;
+            let paren_start = parser.span_pos(parser.current_start());
             parser.advance()?; // consume '('
             let arg_start = parser.current_start();
             let comments_len = parser.comments.len();
-            if let Some(selectors) = parse_selector_argument(parser, arg_start, comments_len)? {
+            if let Some(list) = parse_selector_argument(parser, arg_start, comments_len)? {
                 if !part_buf.is_empty() {
                     segments.push(ConditionSegment::Text(parser.alloc_str_in(&part_buf)));
                     part_buf.clear();
                 }
-                segments.push(ConditionSegment::Selectors(selectors));
+                let paren = Span {
+                    start: paren_start,
+                    end: parser.span_pos(parser.current_end()),
+                };
+                segments.push(ConditionSegment::Selectors { list, paren });
                 // Seated on the closing `)`; the `(` it matches was consumed above,
                 // so the two cancel and `paren_depth` never saw either.
                 part_buf.push(')');
@@ -785,7 +906,6 @@ fn parse_condition_part<'arena>(
         .all(|segment| matches!(segment, ConditionSegment::Text(text) if text.is_empty()));
     let part = (!is_empty).then(|| ConditionPart {
         connector,
-        connector_run,
         segments: segments.into_bump_slice(),
         span: Span {
             start: part_start,
@@ -826,7 +946,7 @@ pub(super) fn parse_supports_function_condition<'arena>(
         part,
         end,
         closed: true,
-    } = parse_condition_part(parser, None, None, start, ConditionReader::Value)?
+    } = parse_condition_part(parser, None, start, ConditionReader::Value)?
     else {
         return Ok(None);
     };
@@ -863,6 +983,11 @@ pub(super) fn parse_supports_function_condition<'arena>(
 pub(super) fn parse_container_prelude<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<(Option<&'arena str>, ConditionQuery<'arena>, Span), ParseError> {
+    // A boundary run at the prelude's head is stepped before the name is read — it is no
+    // name (`@container <NBSP> x (…)`) — and before the span begins, so the span opens on the
+    // name, where the printer reads it from (`prelude.start + name.len()`). The printer claims
+    // the run from the at-rule name's end.
+    parser.skip_boundary_whitespace()?;
     let start = parser.span_pos(parser.current_start());
 
     // Check for optional container name: an identifier before the first '(' that
@@ -877,7 +1002,9 @@ pub(super) fn parse_container_prelude<'arena>(
         // Copy into the arena only on the path that stores the name as a node.
         let name = parser.alloc_str_in(parser.current_value());
         parser.advance()?;
-        parser.skip_whitespace()?;
+        // The name→condition gap is the query's first gap, so it steps the boundary class
+        // too (`skip_gap_registering_comments`); the printer claims the run from the name.
+        parser.skip_boundary_whitespace()?;
         Some(name)
     } else {
         None
@@ -911,9 +1038,12 @@ fn parse_scope_clause<'arena>(
 ) -> Result<ScopeClause<'arena>, ParseError> {
     let paren_start = parser.span_pos(parser.current_start());
     parser.advance()?; // consume '('
-    parser.skip_whitespace_registering_comments()?; // leading comment
+    // Both gaps inside the parens step the boundary class (the list's own start and its
+    // compound break step it too); the printer claims a run at either end back
+    // (`Printer::build_paren_selector_list_inner`).
+    parser.skip_boundary_whitespace_registering_comments()?; // leading comment
     let list = parse_forgiving_selector_list(parser)?;
-    parser.skip_whitespace_registering_comments()?; // trailing comment
+    parser.skip_boundary_whitespace_registering_comments()?; // trailing comment
     if !parser.check(TokenKind::RightParen) {
         return Err(parser.error_expected_after("')'", what));
     }
@@ -951,7 +1081,13 @@ pub(super) fn parse_scope_prelude<'arena>(
     // name skip in `parse_atrule` is a plain skip that stops at a comment, so a leading
     // comment is the current token on entry. Capturing `start` *after* this keeps it out
     // of the wire prelude (extracted from `span`), matching parseCss, which drops it.
-    parser.skip_whitespace_registering_comments()?;
+    //
+    // Every structural gap of the prelude — this one, between the clauses, after `to`, and
+    // before the block — steps the BOUNDARY class, not ASCII whitespace alone: a run there
+    // (`@scope <NBSP> (.a)`) is one the lexer reads as an identifier, which no clause starts
+    // with, so an ASCII skip rejected a prelude `parseCss` stores as it stands. The printer
+    // claims each gap back (`Printer::write_scope_prelude`).
+    parser.skip_boundary_whitespace_registering_comments()?;
     let start = parser.span_pos(parser.current_start());
     // Widens to each clause's closing `)`; stays at `start` when no clause is present.
     let mut end = start;
@@ -961,7 +1097,7 @@ pub(super) fn parse_scope_prelude<'arena>(
     let root = if parser.check(TokenKind::LeftParen) {
         let clause = parse_scope_clause(parser, "@scope root selectors")?;
         end = clause.paren.end;
-        parser.skip_whitespace_registering_comments()?; // between-clause / pre-`{` comment
+        parser.skip_boundary_whitespace_registering_comments()?; // between-clause / pre-`{` gap
         Some(clause)
     } else {
         None
@@ -971,21 +1107,22 @@ pub(super) fn parse_scope_prelude<'arena>(
     // case-insensitive grammar keyword (lowercased at the printer's ` to ` literal); its
     // span lets the printer tell a between-clause comment (before `to`) from an after-`to`
     // one. The after-`to` and pre-`{` gaps register comments the same way.
-    let limit = if parser.check(TokenKind::Identifier)
-        && parser.current_identifier().eq_ignore_ascii_case("to")
-    {
+    let limit = if let Some(to_len) = scope_to_keyword_len(parser) {
+        let to_start = parser.current_start();
         let to_span = Span {
-            start: parser.span_pos(parser.current_start()),
-            end: parser.span_pos(parser.current_end()),
+            start: parser.span_pos(to_start),
+            end: parser.span_pos(to_start + to_len),
         };
-        parser.advance()?; // consume "to"
-        parser.skip_whitespace_registering_comments()?; // after-`to` comment
+        // Consume `to` — up to a run glued to it, which ends the keyword where `parseCss`'s
+        // JS-`\s` reading ends it, and is left standing for the gap's skip below.
+        parser.advance_from(to_start + to_len)?;
+        parser.skip_boundary_whitespace_registering_comments()?; // after-`to` gap
         if !parser.check(TokenKind::LeftParen) {
             return Err(parser.error_expected_after("'('", "'to' in @scope prelude"));
         }
         let clause = parse_scope_clause(parser, "@scope limit selectors")?;
         end = clause.paren.end;
-        parser.skip_whitespace_registering_comments()?; // pre-`{` comment
+        parser.skip_boundary_whitespace_registering_comments()?; // pre-`{` gap
         Some(ScopeLimit { to_span, clause })
     } else {
         None
@@ -996,6 +1133,27 @@ pub(super) fn parse_scope_prelude<'arena>(
         limit,
         span: Span { start, end },
     })
+}
+
+/// The byte length of the `@scope` limit clause's `to` keyword at the current token, or `None`
+/// when the token is not one.
+///
+/// `to` is ASCII case-insensitive, and it ends where a boundary run begins: `to<NBSP>` is one
+/// identifier to the lexer (and to css-syntax-3, which reads the run as identifier content),
+/// but the keyword the prelude reader is looking for is the `to` ahead of the run, which
+/// `parseCss` stores in its raw prelude either way. Reading it there is what keeps
+/// `(.a) to<NBSP>(.b)` a limit clause — the printer spells the run back glued to the keyword,
+/// as authored. The split is `whitespace::boundary_split_offset`, the attribute value's.
+fn scope_to_keyword_len(parser: &CssParser<'_, '_>) -> Option<usize> {
+    if !parser.check(TokenKind::Identifier) {
+        return None;
+    }
+    if parser.current_identifier().eq_ignore_ascii_case("to") {
+        return Some(parser.current_end() - parser.current_start());
+    }
+    let text = &parser.source()[parser.current_start()..parser.current_end()];
+    let split = crate::whitespace::boundary_split_offset(text)?;
+    text[..split].eq_ignore_ascii_case("to").then_some(split)
 }
 
 /// Parse a `@custom-selector` prelude into a `PreludeValue::CustomSelector`, or fall back
@@ -1054,8 +1212,11 @@ fn parse_custom_selector_head_and_list<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<Option<(Span, SelectorList<'arena>)>, ParseError> {
     // Leading gap: `@custom-selector /* c */ :--a` (the shared name skip in `parse_atrule`
-    // is a plain whitespace skip, so a leading comment is the current token on entry).
-    parser.skip_whitespace_registering_comments()?;
+    // is a plain whitespace skip, so a leading comment is the current token on entry). It
+    // steps the boundary class like every structural prelude gap, or a run there
+    // (`@custom-selector <NBSP> :--a`) is an identifier where the `:` is due and the prelude
+    // falls to the verbatim path; the printer claims it back.
+    parser.skip_boundary_whitespace_registering_comments()?;
 
     // `:` glued to a `--`-led identifier. The lexer emits the two as separate tokens, so
     // the glue is the ident starting at the colon's end. The `--` test reads the DECODED
@@ -1145,8 +1306,12 @@ pub(super) fn parse_import_prelude<'arena>(
 
     // Register a leading comment between `@import` and the first value (e.g.
     // `@import /* c */ url(...)`). Svelte strips it from the prelude string; the printer
-    // reconstructs it from `self.comments`.
-    parser.skip_whitespace_registering_comments()?;
+    // reconstructs it from `self.comments`. This gap, and each one between the head's values
+    // below, steps the boundary class: a run there (`@import <NBSP> 'a.css'`) is an
+    // identifier to the lexer, and read as one it opened the verbatim tail — the head's
+    // string or url then never normalized. The printer claims the run back
+    // (`Printer::write_import_gap_comments`).
+    parser.skip_boundary_whitespace_registering_comments()?;
 
     if parser.at_prelude_end() {
         // Nothing but whitespace and comments (`@import;`, `@import /* c */;`): no token
@@ -1223,7 +1388,7 @@ pub(super) fn parse_import_prelude<'arena>(
 
     // The structured head: `url()` / `layer()` / `supports()` (any function) and the bare
     // `layer` keyword. The first token that is neither starts the tail.
-    parser.skip_whitespace_registering_comments()?;
+    parser.skip_boundary_whitespace_registering_comments()?;
     while !parser.at_prelude_end() {
         if is_function_token(parser) {
             values.push(parse_function_value(parser)?);
@@ -1242,7 +1407,7 @@ pub(super) fn parse_import_prelude<'arena>(
         } else {
             break;
         }
-        parser.skip_whitespace_registering_comments()?;
+        parser.skip_boundary_whitespace_registering_comments()?;
     }
 
     // The tail: everything from here to the prelude end, verbatim, with its original

@@ -33,9 +33,10 @@ use std::borrow::Cow;
 use std::fmt::Write;
 
 use super::Printer;
-use super::boundary_ws::{Edge, closer_pos, skip_gap_trivia};
+use super::boundary_ws::{closer_pos, skip_gap_trivia};
 use super::value_normalization;
 use crate::ast::internal;
+use crate::whitespace::Edge;
 use crate::whitespace::is_ascii_boundary_whitespace;
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -61,18 +62,6 @@ impl<'a> Printer<'a> {
             internal::Combinator::SubsequentSibling => "~ ",
             internal::Combinator::Column => "|| ",
         }
-    }
-
-    /// The comments between a selector's end (`start`) and the comma after it, joined as
-    /// `/*…*/` text — the ones that trail the previous selector.
-    fn comments_before_comma(&self, start: u32, comma: u32) -> String {
-        self.comment_blocks_in_range(start, comma)
-    }
-
-    /// The comments between a comma and the selector after it (`end`), joined as `/*…*/`
-    /// text — the ones that lead the next selector.
-    fn comments_after_comma(&self, comma: u32, end: u32) -> String {
-        self.comment_blocks_in_range(comma, end)
     }
 
     //
@@ -126,8 +115,9 @@ impl<'a> Printer<'a> {
     ///
     /// `paren_span` is the clause's full `(…)` span (end one past `)`, the pseudo-arg
     /// convention). Comments leading or trailing the selector list but inside the parens
-    /// (`@scope (/* c */ .a)`) sit outside `list.span`, so they interleave here via
-    /// `wrap_args_gap_comments` — the same wrapping `:is()`'s argument gaps use.
+    /// (`@scope (/* c */ .a)`) sit outside `list.span`, and so does a boundary run at either
+    /// end (`@scope (.a <NBSP>)`), so both are claimed here by
+    /// [`Self::build_paren_selector_list_inner`] — the builder `:is()`'s argument uses.
     pub(super) fn print_selector_list_nested(
         &mut self,
         list: &internal::SelectorList<'_>,
@@ -137,15 +127,58 @@ impl<'a> Printer<'a> {
             return;
         }
         let d = self.d();
-        let mut inner = self.build_nested_selector_list_doc(list);
-        if let Some(paren_span) = paren_span {
-            inner = self.wrap_args_gap_comments(inner, paren_span, list.span);
-        }
+        let inner = match paren_span {
+            Some(paren_span) => self.build_paren_selector_list_inner(list, paren_span),
+            None => self.build_nested_selector_list_doc(list),
+        };
         // The caller already wrote `(`; emit `softline inner` indented, then a
         // trailing softline so the closing `)` (written by the caller) lands at the
         // base level when broken. Reserve `) {`-ish via a 3-col suffix.
         let doc = d.group(d.concat(&[d.indent(d.concat(&[d.softline(), inner])), d.softline()]));
         self.write_arena_doc_with_suffix(doc, 3);
+    }
+
+    /// The contents of a selector list in PARENS — a pseudo-class's argument list (`:is()`,
+    /// `:where()`, `:has()`, …) or an `@scope` clause — with every gap between the parens and
+    /// the list claimed: `paren` is the `(…)` span (end one past the `)`).
+    ///
+    /// One builder for every such list, because the gaps are one juncture kind: the parser
+    /// steps a boundary run at the list's start and at its `)` in both places, and a claim
+    /// made at one of them and not the other is the bug spelled once (`@scope (.a <NBSP>)` lost
+    /// its run while `:is(a <NBSP>)` kept it).
+    ///
+    /// - The LEAD gap, which only the container can claim whole: the list's first compound
+    ///   reaches the run CONTIGUOUS with its name by scanning back (`:is(<NBSP>b)`), but it has
+    ///   no floor to sweep forward from, so a member a comment strands after the `(` is
+    ///   invisible to it (`:is(<NBSP>/* c */ a)`). Claimed BEFORE the list is built, so its
+    ///   first anchor stands down.
+    /// - The run between the last selector and the `)` — see `spell_gap_items`. The edge
+    ///   ahead of it is what keeps the last selector's own name off it (`:is(a <NBSP>)`
+    ///   re-parsed as `:is(a<NBSP>)`).
+    ///
+    /// The comments inside the parens but outside the list (`:is(/* lead */ .a /* trail */)`)
+    /// are interleaved on each side the two claims did not already print in place.
+    pub(super) fn build_paren_selector_list_inner(
+        &self,
+        list: &internal::SelectorList<'_>,
+        paren: Span,
+    ) -> DocId {
+        let d = self.d();
+        let lead = self.claim_lead_gap(paren.start, first_anchor(list), Edge::Flush);
+        let inner = self.build_nested_selector_list_doc(list);
+        let kept = self.spell_gap_before_closer(list.span.end, paren, self.list_run_edge(list));
+        let inner = self.wrap_args_gap_comments(
+            inner,
+            paren,
+            list.span,
+            (lead.is_some(), !kept.is_empty()),
+        );
+        let lead = lead.unwrap_or_default();
+        if kept.is_empty() && lead.is_empty() {
+            inner
+        } else {
+            d.concat(&[d.text_pooled(&lead), inner, d.text_pooled(&kept)])
+        }
     }
 
     /// Build a doc for a selector list joined by `,`-`line` — the nested/forgiving
@@ -203,7 +236,8 @@ impl<'a> Printer<'a> {
                 // would report its comments printed twice.
                 let kept = self.pre_comma_boundary_ws(prev, complex.span.start);
                 if kept.is_empty() {
-                    let before = self.comments_before_comma(prev.span.end, comma);
+                    // The comments trailing the previous selector.
+                    let before = self.comment_blocks_in_range(prev.span.end, comma);
                     if !before.is_empty() {
                         parts.push(d.text(" "));
                         parts.push(d.text_pooled(&before));
@@ -219,7 +253,8 @@ impl<'a> Printer<'a> {
                 match self.claim_lead_gap(comma + 1, complex.span.start, Edge::Flush) {
                     Some(lead) => parts.push(d.text_pooled(&lead)),
                     None => {
-                        let after = self.comments_after_comma(comma, complex.span.start);
+                        // The comments leading the next selector.
+                        let after = self.comment_blocks_in_range(comma, complex.span.start);
                         if !after.is_empty() {
                             parts.push(d.text_pooled(&after));
                             parts.push(d.text(" "));
@@ -515,7 +550,7 @@ impl<'a> Printer<'a> {
             of: Cow::Borrowed(" of "),
             comments_after: self.comment_blocks_in_range(value_span.end, selectors.span.start),
         };
-        if !self.holds_boundary_ws || !self.gap_holds_member(value_span.end, selectors.span.start) {
+        if !self.gap_holds_member(value_span.end, selectors.span.start) {
             return plain(head);
         }
         let of_start = skip_gap_trivia(self.source, value_span.end, selectors.span.start);
@@ -630,10 +665,8 @@ impl<'a> Printer<'a> {
                         parts.push(d.text(" "));
                     }
                     // A gap holding a member is the run claim's whole, comments in place.
-                    if let Some(cs) = rel.combinator_span
-                        && !self.gap_holds_member(prev_end, cs.start)
-                    {
-                        let before = self.comment_blocks_in_range(prev_end, cs.start);
+                    if let Some(cs) = rel.combinator_span {
+                        let before = self.comment_blocks_unless_claimed(prev_end, cs.start);
                         if !before.is_empty() {
                             parts.push(d.text_pooled(&before));
                             parts.push(d.text(" "));
@@ -674,10 +707,8 @@ impl<'a> Printer<'a> {
                     }
                     // …unless the gap holds a member: the first compound's claim then prints
                     // it whole, its comments in place (`gap_boundary_ws`, floored at `cs.end`).
-                    if let Some(cs) = rel.combinator_span
-                        && !self.gap_holds_member(cs.end, first_start)
-                    {
-                        let after = self.comment_blocks_in_range(cs.end, first_start);
+                    if let Some(cs) = rel.combinator_span {
+                        let after = self.comment_blocks_unless_claimed(cs.end, first_start);
                         if !after.is_empty() {
                             parts.push(d.text_pooled(&after));
                             parts.push(d.text(" "));
@@ -769,13 +800,7 @@ impl<'a> Printer<'a> {
         // compound's `gap_boundary_ws` for the side ahead of it, `push_combinator_boundary_ws`
         // for the side ahead of an explicit symbol. Only a member-free side keeps the comment
         // spelling here.
-        let comments = |from: u32, to: u32| {
-            if self.gap_holds_member(from, to) {
-                String::new()
-            } else {
-                self.comment_blocks_in_range(from, to)
-            }
-        };
+        let comments = |from: u32, to: u32| self.comment_blocks_unless_claimed(from, to);
         match combinator {
             internal::Combinator::Descendant => {
                 let gap = comments(gap_start, gap_end);
@@ -1567,38 +1592,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match args {
             internal::PseudoClassArgs::SelectorList { selectors, span } => {
-                // The lead gap, which only this arm can claim whole: the inner list's first
-                // compound reaches the run CONTIGUOUS with its name by scanning back
-                // (`:is(<NBSP>b)`), but it has no floor to sweep forward from, so a member a
-                // comment strands after the `(` is invisible to it (`:is(<NBSP>/* c */ a)`).
-                // Claimed BEFORE the list is built, so its first anchor stands down.
-                let lead = self.claim_lead_gap(span.start, first_anchor(selectors), Edge::Flush);
-                let inner = self.build_nested_selector_list_doc(selectors);
-                // A run the parser skipped between the last selector and the `)` — see
-                // `spell_gap_items`. `span.end` is past the `)`, so the gap stops one byte
-                // short of it, and the edge ahead of it is what keeps the last selector's
-                // own name off it (`:is(a <NBSP>)` re-parsed as `:is(a<NBSP>)`).
-                let kept = self.spell_gap_before_closer(
-                    selectors.span.end,
-                    *span,
-                    self.list_run_edge(selectors),
-                );
-                // Interleave the leading/trailing comments that sit inside the parens but
-                // outside the inner list span (`:is(/* lead */ .a /* trail */)`) — on each
-                // side the two claims above did not already print in place.
-                let inner = self.wrap_args_gap_comments_unclaimed(
-                    inner,
-                    *span,
-                    selectors.span,
-                    (lead.is_some(), !kept.is_empty()),
-                );
-                let lead = lead.unwrap_or_default();
-                let inner = if kept.is_empty() && lead.is_empty() {
-                    inner
-                } else {
-                    d.concat(&[d.text_pooled(&lead), inner, d.text_pooled(&kept)])
-                };
-                self.wrap_pseudo_args(inner)
+                self.wrap_pseudo_args(self.build_paren_selector_list_inner(selectors, *span))
             }
             internal::PseudoClassArgs::Nth {
                 value,
@@ -1618,14 +1612,7 @@ impl<'a> Printer<'a> {
                 // boundary member, which `normalize_an_plus_b` would otherwise drop with the
                 // rest of the gap (`:nth-child(<NBSP>2n)`): then the gap's claim prints it
                 // whole, comments in place (`spell_gap_items`).
-                let comments_unless_claimed = |from: u32, to: u32| {
-                    if self.gap_holds_member(from, to) {
-                        String::new()
-                    } else {
-                        self.comment_blocks_in_range(from, to)
-                    }
-                };
-                let leading = comments_unless_claimed(span.start, value_span.start);
+                let leading = self.comment_blocks_unless_claimed(span.start, value_span.start);
                 let kept_leading =
                     self.spell_gap_items(span.start, value_span.start, Edge::Flush, Edge::Presence);
                 let normalized = if kept_leading.is_empty() {
@@ -1635,7 +1622,7 @@ impl<'a> Printer<'a> {
                 };
                 match of_selector {
                     None => {
-                        let trailing = comments_unless_claimed(value_span.end, span.end);
+                        let trailing = self.comment_blocks_unless_claimed(value_span.end, span.end);
                         // …nor the run the `)` gap skipped (`:nth-child(2n<NBSP>)`), flush
                         // against the `)`. `span.end` IS the `)` here (the Nth span ends
                         // before it, unlike the other arms' — see `wrap_args_gap_comments`),
@@ -1675,7 +1662,8 @@ impl<'a> Printer<'a> {
                             &comments_after,
                             "",
                         );
-                        let trailing = comments_unless_claimed(selectors.span.end, span.end);
+                        let trailing =
+                            self.comment_blocks_unless_claimed(selectors.span.end, span.end);
                         // The run the `)` gap skipped after `S` (`of .b <NBSP>)`), flush against
                         // the `)` behind the separator its last name needs — the same claim the
                         // SelectorList arm makes; `S` is a nested list with no other emitter.
@@ -1728,7 +1716,7 @@ impl<'a> Printer<'a> {
                     *span,
                     self.name_run_edge(run_span.end),
                 );
-                let inner = self.wrap_args_gap_comments_unclaimed(
+                let inner = self.wrap_args_gap_comments(
                     run,
                     *span,
                     run_span,
@@ -1752,13 +1740,10 @@ impl<'a> Printer<'a> {
     /// the `)` position. `Nth` can't share this helper: its `span` is instead the
     /// Svelte-matching public-AST node span (it ends *before* the `)`, and convert
     /// reads it verbatim — see `convert_pseudo_class_args`), so it interleaves inline.
-    fn wrap_args_gap_comments(&self, inner: DocId, args_span: Span, content_span: Span) -> DocId {
-        self.wrap_args_gap_comments_unclaimed(inner, args_span, content_span, (false, false))
-    }
-
-    /// [`Self::wrap_args_gap_comments`] with each side's comments left out where a boundary
-    /// claim has already printed that gap whole, in place (`claimed` is `(lead, tail)`).
-    fn wrap_args_gap_comments_unclaimed(
+    ///
+    /// Each side's comments are left out where a boundary claim has already printed that gap
+    /// whole, in place (`claimed` is `(lead, tail)`).
+    fn wrap_args_gap_comments(
         &self,
         inner: DocId,
         args_span: Span,
@@ -2037,7 +2022,7 @@ impl<'a> Printer<'a> {
 
 /// Where a selector list's first selector begins — the anchor whose lead gap a container
 /// claims ([`Printer::claim_lead_gap`]).
-fn first_anchor(list: &internal::SelectorList<'_>) -> u32 {
+pub(super) fn first_anchor(list: &internal::SelectorList<'_>) -> u32 {
     list.selectors
         .first()
         .map_or(list.span.start, |complex| complex.span.start)

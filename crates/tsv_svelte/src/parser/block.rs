@@ -306,10 +306,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // keyword, so `{#if(x)}` / `{:else if(x)}` are rejected.
         let expr_str = if is_elseif {
             // {:else if expr} - skip "else", whitespace, "if", whitespace
-            let Some(after_else) = expr_content.strip_prefix("else") else {
-                return Err(self.error_expected_at("`else`", tag_content_start));
-            };
-            let after_else = after_else.trim_start_matches(is_svelte_ws);
+            let after_else = self
+                .strip_dispatched_keyword(expr_content, "else", tag_content_start)?
+                .trim_start_matches(is_svelte_ws);
             self.strip_block_keyword(after_else, "if", tag_content_start)?
                 .trim_start_matches(is_svelte_ws)
         } else {
@@ -363,9 +362,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 // answer this: it stops the run at the first char that is neither
                 // alphabetic nor a SPACE, so a U+0085 (whitespace to Rust, not to JS `\s`)
                 // ended the run at `else` and was then silently dropped.
-                let Some(after_else) = else_tag_content.strip_prefix("else") else {
-                    return Err(self.error_expected_at("`else`", else_tag_start));
-                };
+                let after_else =
+                    self.strip_dispatched_keyword(else_tag_content, "else", else_tag_start)?;
                 self.reject_trailing_tag_content(after_else, else_tag_start + "else".len())?;
                 let else_content = self.parse_block_children(&["if"], else_content_start)?;
                 self.reject_duplicate_else()?;
@@ -559,9 +557,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // that is neither alphabetic nor `is_svelte_ws`, so `{:else!}` and `{:else<NEL>}`
             // both reduce to `else`, pass the `== "else"` test above, and the trailing bytes
             // were then dropped from the output rather than rejected.
-            let Some(after_else) = else_tag_content.strip_prefix("else") else {
-                return Err(self.error_expected_at("`else`", else_tag_start));
-            };
+            let after_else =
+                self.strip_dispatched_keyword(else_tag_content, "else", else_tag_start)?;
             self.reject_trailing_tag_content(after_else, else_tag_start + "else".len())?;
             let fallback_content = self.parse_block_children(&["each"], else_content_start)?;
             self.reject_duplicate_else()?;
@@ -1089,17 +1086,27 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         keyword: &str,
         keyword_start: usize,
     ) -> Result<&'a str, ParseError> {
-        // Every caller dispatched on this keyword at `keyword_start`, so a miss is an error
-        // rather than a reason to read the whole tag as the value: that fallback is how
-        // `{: then}` bound a value named `then`.
-        let Some(rest) = content.strip_prefix(keyword) else {
-            return Err(self.error_expected_at(&format!("`{keyword}`"), keyword_start));
-        };
+        let rest = self.strip_dispatched_keyword(content, keyword, keyword_start)?;
         if rest.is_empty() || rest.starts_with(is_svelte_ws) {
             Ok(rest)
         } else {
             Err(self.error_expected_at(&format!("whitespace after `{keyword}`"), keyword_start))
         }
+    }
+
+    /// Strip the `keyword` the caller dispatched on at `keyword_start` off the head of
+    /// `content`, or reject. Every caller already read that keyword there, so a miss is an
+    /// error rather than a reason to read the whole tag as what follows the keyword: that
+    /// fallback is how `{: then}` bound a value named `then`.
+    fn strip_dispatched_keyword(
+        &self,
+        content: &'a str,
+        keyword: &str,
+        keyword_start: usize,
+    ) -> Result<&'a str, ParseError> {
+        content
+            .strip_prefix(keyword)
+            .ok_or_else(|| self.error_expected_at(&format!("`{keyword}`"), keyword_start))
     }
 
     /// Like `strip_keyword_value`, but the value is mandatory: the keyword

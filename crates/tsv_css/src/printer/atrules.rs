@@ -21,13 +21,14 @@
 use std::borrow::Cow;
 
 use super::Printer;
-use super::boundary_ws::Edge;
+use super::boundary_ws::closer_pos;
+use super::selectors::first_anchor;
 use super::value_normalization;
 use super::value_normalization::ValueReader;
 use crate::ast::internal;
+use crate::whitespace::Edge;
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, DocContext, arena::DocId};
-use tsv_lang::source_scan;
 use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 
 /// Whether `atom` is a media-query `and`/`or` connector (ASCII case-insensitive per
@@ -83,7 +84,11 @@ struct MediaQueryList<'a> {
 fn media_query_list(content: &str) -> MediaQueryList<'_> {
     let parts = value_normalization::split_args_by_comma(content);
     let ends_with_comma = value_normalization::has_closing_comma(content, &parts);
-    let entries: Vec<&str> = parts.into_iter().map(str::trim).collect();
+    // CSS whitespace only, escape-aware (`escapes::trim_css`): a non-ASCII space at an
+    // entry's edge is the entry's own content — `print<NBSP>` is one identifier to
+    // css-syntax-3, and the run beside a comma is the author's — where a Unicode `str::trim`
+    // deleted it from every entry but the list's only one.
+    let entries: Vec<&str> = parts.into_iter().map(crate::escapes::trim_css).collect();
     let closing_comma = ends_with_comma && entries.last().is_some_and(|entry| entry.is_empty());
     let text = if ends_with_comma && !closing_comma {
         // Deleting it leaves the same entries, so it is padding. The trim is
@@ -97,6 +102,26 @@ fn media_query_list(content: &str) -> MediaQueryList<'_> {
         entries,
         closing_comma,
     }
+}
+
+/// Where an at-rule's prelude region ends: its block's `{`, or its statement's `;` — the far
+/// end of the gap after the prelude's last token.
+fn prelude_region_end(atrule: &internal::CssAtrule<'_>) -> u32 {
+    atrule
+        .block
+        .as_ref()
+        .map_or_else(|| closer_pos(atrule.span), |block| block.span.start)
+}
+
+/// What one side of a condition query's gap holds for the printer
+/// (`Printer::condition_gap_side`).
+enum GapSide {
+    /// A boundary run, spelled with the gap's comments in place — the claim's own edges
+    /// already decided, so the caller adds no separator of its own on those sides.
+    Claimed(String),
+    /// No run: the gap's comments, single-spaced (empty when there are none), which the
+    /// caller pads as its seam's comment spelling says.
+    Comments(String),
 }
 
 /// A `@supports`/`@container` condition prelude. The two differ only in that
@@ -219,11 +244,9 @@ impl<'a> Printer<'a> {
                     prev_end = value.span().end;
                 }
                 // Trailing comments between the last value and the `;` (e.g.
-                // `@import 'a.css' /* c */;`).
-                for comment in self.comments_to_emit_between(prev_end, atrule.span.end) {
-                    self.write(" ");
-                    self.print_css_comment(comment);
-                }
+                // `@import 'a.css' /* c */;`) — or the gap claimed whole, flush against the
+                // `;`, where it holds a boundary run (`@import 'a.css' <NBSP>;`).
+                self.write_prelude_gap(prev_end, prelude_region_end(atrule), Edge::Flush);
             }
             internal::PreludeValue::Raw { content, span } if !content.is_empty() => {
                 // `content` is already verbatim (internal whitespace + comments preserved,
@@ -499,7 +522,7 @@ impl<'a> Printer<'a> {
         }
 
         self.write(" ");
-        self.print_condition_query(kind, condition, atrule.block.is_some(), Some(span));
+        self.print_condition_query(kind, condition, atrule, span);
     }
 
     /// Format an `@supports`/`@container` condition prelude (doc-first).
@@ -519,8 +542,8 @@ impl<'a> Printer<'a> {
         &mut self,
         kind: ConditionKind<'_>,
         condition: &internal::ConditionQuery<'_>,
-        has_block: bool,
-        prelude_span: Option<Span>,
+        atrule: &internal::CssAtrule<'_>,
+        prelude_span: Span,
     ) {
         // The partless prelude is `write_condition_prelude`'s, this function's one caller
         // — it owns the name→prelude separator too, for the same reason. Everything below
@@ -529,23 +552,41 @@ impl<'a> Printer<'a> {
             !condition.parts.is_empty(),
             "a partless condition prelude is write_condition_prelude's to print"
         );
-        // Print optional name prefix (for @container)
+        // Where the first part's gap begins: the at-rule name's end, or the container name's.
+        // The prelude's span opens past a boundary run at its head (the reader steps it before
+        // the span begins, like the canonical trim), so the gap is measured from the name,
+        // never from the span — ahead of a container name it is a gap of its own, claimed here.
         let name_end_pos = if let Some(n) = kind.name() {
+            let kept = self.spell_gap_items(
+                atrule.name_span.end,
+                prelude_span.start,
+                Edge::Flush,
+                Edge::Presence,
+            );
+            if !kept.is_empty() {
+                self.write(&kept);
+            }
             self.write(n);
             // Separate the name from its condition.
             self.write(" ");
-            // Find where the name ends in source (name length from prelude start)
-            prelude_span.map(|s| s.start + n.len() as u32)
+            // The name opens the span, so it ends `n.len()` past the span's start.
+            prelude_span.start + n.len() as u32
         } else {
-            prelude_span.map(|s| s.start)
+            atrule.name_span.end
         };
+        // The tail gap's far end: the block's `{`, or the statement's `;`.
+        let region_end = prelude_region_end(atrule);
 
-        let suffix_width = if has_block { " {".len() } else { 0 };
+        let suffix_width = if atrule.block.is_some() {
+            " {".len()
+        } else {
+            0
+        };
         let doc = self.build_condition_query_doc(
             kind,
             condition,
             name_end_pos,
-            prelude_span,
+            (prelude_span, region_end),
             suffix_width,
         );
         self.write_arena_doc_with_suffix(doc, suffix_width);
@@ -633,10 +674,12 @@ impl<'a> Printer<'a> {
             }
             // The selector printer's own comma seam, so a comment beside a list comma
             // (`selector(.a, /* c */ .b)`) partitions the gap exactly as it does in a
-            // rule's selector list; `breakable = false` joins with a literal space, and
-            // `remove_lines` keeps the argument on the prelude's line either way.
-            internal::ConditionSegment::Selectors(selectors) => {
-                d.remove_lines(self.build_comma_list_doc(selectors, false))
+            // rule's selector list, and the gaps between the parens and the list claimed as
+            // a pseudo-class's argument list claims them (a boundary run at either end —
+            // `selector(a <NBSP>)` — included); `remove_lines` keeps the argument on the
+            // prelude's line.
+            internal::ConditionSegment::Selectors { list, paren } => {
+                d.remove_lines(self.build_paren_selector_list_inner(list, *paren))
             }
         }
     }
@@ -650,6 +693,11 @@ impl<'a> Printer<'a> {
     /// ` {`/`;` is reserved via the fill's `trailing_reserve` so the boundary breaks at
     /// print width.
     ///
+    /// Every gap of the query — ahead of each part, split at the part's connector run into
+    /// the side before the run and the side after it, and the tail after the last part — is
+    /// read by [`Self::condition_gap_side`]: its comments, or, where it holds a boundary run,
+    /// its items spelled in place (`printer/boundary_ws.rs` §Who claims where).
+    ///
     /// ⚠️ **The two arms differ in their BREAK POINTS and in nothing else**, and every bug
     /// this builder has had came of one arm quietly answering a shared question its own way
     /// (the single-part arm printed no connector at all while its twin did). The head is
@@ -660,8 +708,8 @@ impl<'a> Printer<'a> {
         &self,
         kind: ConditionKind<'_>,
         condition: &internal::ConditionQuery<'_>,
-        name_end_pos: Option<u32>,
-        prelude_span: Option<Span>,
+        name_end_pos: u32,
+        (prelude_span, region_end): (Span, u32),
         suffix_width: usize,
     ) -> DocId {
         let d = self.d();
@@ -675,55 +723,31 @@ impl<'a> Printer<'a> {
             d.concat(&segments)
         };
 
-        // The gap between the optional name and the first part: its comments, the first
-        // part's own connector run, and the boundary run
-        // (`Self::condition_part_head_ws`), which lands flush against the part after them
-        // all, like every other claim.
-        //
-        // ⚠️ That gap can hold a **connector run** — the first part's own, since a
-        // connector with no operand on its LEFT still binds the part on its right
-        // (`@supports and (a: b)`, `@container name and (a: b)`). It is emitted here for
-        // the same reason the separator below emits an interior one, and the gap's
-        // comments split around it the same way: the whole question is one question, and
-        // an arm that answers only "which comments" drops the run's words silently.
+        // The first part's head: the gap between the name and the part — its connector run
+        // included, since a connector with no operand on its LEFT still binds the part on
+        // its right (`@supports and (a: b)`, `@container name and (a: b)`). Split at that
+        // run like every later gap, so its comments and runs stay on their authored side.
         let leading_first = |part: &internal::ConditionPart<'_>| -> DocId {
-            let (before, after) = name_end_pos
-                .map(|start| {
-                    self.extract_comments_split_by_connector(start, part.span.start, part.connector)
-                })
-                .unwrap_or_default();
-            let kept = name_end_pos
-                .map(|start| self.condition_part_head_ws(start, part))
-                .unwrap_or_default();
             let mut head = DocBuf::new();
-            for piece in [
-                before.as_str(),
-                part.connector_run.unwrap_or_default(),
-                after.as_str(),
-            ] {
-                if piece.is_empty() {
-                    continue;
-                }
-                if !head.is_empty() {
+            match part.connector {
+                None => self.push_condition_gap_ahead(&mut head, name_end_pos, part.span.start),
+                Some(connector) => {
+                    // Against the connector the claim keeps the author's separation, like every
+                    // side below: a run glued to its FRONT (`<NBSP>and`) is one identifier to
+                    // css-syntax-3, and a space here would split it into a run and a keyword.
+                    self.push_condition_gap_ahead(&mut head, name_end_pos, connector.span.start);
+                    head.push(d.text_pooled(connector.text));
+                    // ⚠️ The space is the NAME SEPARATOR, not decoration: a connector is an
+                    // identifier, and `read_identifier` takes every code point at or above
+                    // U+00A0 as content, so a boundary run emitted flush after one re-parses as
+                    // the single name `and<NBSP>` — a prelude that then falls to the raw path,
+                    // its condition unreadable, and a fixed point either way.
+                    // `printer/boundary_ws.rs` §How a claim is spelled states the rule for the
+                    // family this juncture joined.
                     head.push(d.text(" "));
+                    // The claim ends as the author did against the part: spaced or glued.
+                    self.push_condition_gap_ahead(&mut head, connector.span.end, part.span.start);
                 }
-                head.push(d.text_pooled(piece));
-            }
-            if head.is_empty() {
-                if kept.is_empty() {
-                    return content_doc(part);
-                }
-                return d.concat(&[d.text_pooled(&kept), content_doc(part)]);
-            }
-            // ⚠️ The space is the NAME SEPARATOR, not decoration: a connector is an
-            // identifier, and `read_identifier` takes every code point at or above U+00A0 as
-            // content, so a boundary run emitted flush after one re-parses as the single name
-            // `and<NBSP>` — a prelude that then falls to the raw path, its condition
-            // unreadable, and a fixed point either way. `printer/boundary_ws.rs` §Where a
-            // claim is emitted states the rule for the family this juncture joined.
-            head.push(d.text(" "));
-            if !kept.is_empty() {
-                head.push(d.text_pooled(&kept));
             }
             head.push(content_doc(part));
             d.concat(&head)
@@ -740,7 +764,7 @@ impl<'a> Printer<'a> {
                 return d.text("");
             };
             let head = leading_first(first);
-            return match self.condition_tail_doc(first, prelude_span, condition) {
+            return match self.condition_tail_doc(first, prelude_span, region_end, condition) {
                 Some(tail) => d.concat(&[head, tail]),
                 None => head,
             };
@@ -753,39 +777,76 @@ impl<'a> Printer<'a> {
                 fill_parts.push(leading_first(part));
                 continue;
             }
-            // Separator: ` <before-comments>? <connector> line`. The connector and any
-            // pre-connector comment stay on the previous line; the `line` breaks before
-            // the content. Post-connector comments lead the content on the next line.
-            let (before, after) = self.extract_comments_split_by_connector(
-                parts[i - 1].span.end,
-                part.span.start,
-                part.connector,
-            );
+            // Separator: ` <before-gap>? <connector> line`. The connector and whatever stood
+            // before it stay on the previous line; the `line` breaks before the content, and
+            // whatever stood after the connector leads the content on the next line.
+            //
+            // A claimed side keeps the author's separation on BOTH its edges — spaced or glued to
+            // the previous part, and to whatever follows it: a run glued to a connector's front
+            // (`<NBSP>and`) or to a part's (`<PS>selector(…)`) is one identifier with it to
+            // css-syntax-3, so no separator may be written between them.
+            let gap_start = parts[i - 1].span.end;
+            let before_end = part.connector.map_or(part.span.start, |c| c.span.start);
             let mut sep = DocBuf::new();
-            if !before.is_empty() {
-                sep.push(d.text(" "));
-                sep.push(d.text_pooled(&before));
+            let mut chunk = DocBuf::new();
+            let before =
+                self.condition_gap_side(gap_start, before_end, Edge::Presence, Edge::Presence);
+            if let Some(connector) = part.connector {
+                match before {
+                    GapSide::Claimed(kept) => sep.push(d.text_pooled(&kept)),
+                    GapSide::Comments(comments) if comments.is_empty() => sep.push(d.text(" ")),
+                    GapSide::Comments(comments) => {
+                        sep.push(d.text(" "));
+                        sep.push(d.text_pooled(&comments));
+                        sep.push(d.text(" "));
+                    }
+                }
+                // Emit the connector run's source text (`AND` stays `AND`), preserved like
+                // prettier.
+                sep.push(d.text_pooled(connector.text));
+                sep.push(d.line());
+            } else {
+                match before {
+                    // With no connector the claim is the whole gap between two parts, and the
+                    // break goes where the author separated: before the part when they spaced
+                    // the run from it, else after the previous part (the run then leads the
+                    // part on the next line, glued to it), else nowhere.
+                    GapSide::Claimed(kept) => {
+                        if let Some(spaced) = kept.strip_suffix(' ') {
+                            sep.push(d.text_pooled(spaced));
+                            sep.push(d.line());
+                        } else if let Some(glued) = kept.strip_prefix(' ') {
+                            sep.push(d.line());
+                            chunk.push(d.text_pooled(glued));
+                        } else {
+                            // Glued at both ends: the previous part, the run and this part are
+                            // one token run to css-syntax-3 (`(a: b)<NBSP>selector(` holds the
+                            // function token `<NBSP>selector(`), so they must not become two fill
+                            // items at all — the fill breaks at EVERY item boundary it has to,
+                            // whatever the separator holds. They extend the previous item.
+                            if let Some(previous) = fill_parts.pop() {
+                                fill_parts.push(d.concat(&[
+                                    previous,
+                                    d.text_pooled(&kept),
+                                    content_doc(part),
+                                ]));
+                                continue;
+                            }
+                            sep.push(d.text_pooled(&kept));
+                        }
+                    }
+                    GapSide::Comments(comments) if comments.is_empty() => sep.push(d.line()),
+                    GapSide::Comments(comments) => {
+                        sep.push(d.text(" "));
+                        sep.push(d.text_pooled(&comments));
+                        sep.push(d.line());
+                    }
+                }
             }
-            // Emit the connector run's source text (`AND` stays `AND`), preserved like
-            // prettier. `connector_run` is `Some` whenever `connector` is.
-            if let Some(conn_run) = part.connector_run {
-                sep.push(d.text(" "));
-                sep.push(d.text_pooled(conn_run));
-            }
-            sep.push(d.line());
             fill_parts.push(d.concat(&sep));
 
-            let mut chunk = DocBuf::new();
-            if !after.is_empty() {
-                chunk.push(d.text_pooled(&after));
-                chunk.push(d.text(" "));
-            }
-            // This part's own head run, exactly as `leading_first` claims the first part's —
-            // bounded at the part's span so it can never reach back over the connector, whose
-            // side of the gap rides out in the separator above.
-            let kept = self.condition_part_head_ws(part.span.start, part);
-            if !kept.is_empty() {
-                chunk.push(d.text_pooled(&kept));
+            if let Some(connector) = part.connector {
+                self.push_condition_gap_ahead(&mut chunk, connector.span.end, part.span.start);
             }
             chunk.push(content_doc(part));
             fill_parts.push(d.concat(&chunk));
@@ -795,7 +856,7 @@ impl<'a> Printer<'a> {
         // in the single-part arm above.
         if let Some(tail) = parts
             .last()
-            .and_then(|last| self.condition_tail_doc(last, prelude_span, condition))
+            .and_then(|last| self.condition_tail_doc(last, prelude_span, region_end, condition))
             && let Some(last_chunk) = fill_parts.pop()
         {
             fill_parts.push(d.concat(&[last_chunk, tail]));
@@ -806,9 +867,43 @@ impl<'a> Printer<'a> {
         d.indent(fill)
     }
 
-    /// The query's own tail, to append to whatever printed its LAST part: the comments
-    /// standing between that part and the end of the prelude, then the run of operators with
-    /// no operand ([`Self::trailing_operators_doc`]).
+    /// One side of a condition query's gap — `[from, to)` — read the one way every gap of
+    /// the query is: where it holds a boundary MEMBER, its items spelled in place
+    /// ([`Self::spell_gap_items`], which then prints the gap's comments too), and otherwise
+    /// its comments, single-spaced, for the caller to pad.
+    ///
+    /// The condition prelude's claim (`printer/boundary_ws.rs` §Who claims where). The parser
+    /// steps a run at every one of these gaps (`skip_gap_registering_comments`), so each is a
+    /// place the run has to come back out; `lead` and `trail` are the gap's edges, which only
+    /// the caller knows.
+    fn condition_gap_side(&self, from: u32, to: u32, lead: Edge, trail: Edge) -> GapSide {
+        if self.gap_holds_member(from, to) {
+            GapSide::Claimed(self.spell_gap_items(from, to, lead, trail))
+        } else {
+            GapSide::Comments(self.comment_blocks_in_range(from, to))
+        }
+    }
+
+    /// Push the condition gap `[from, to)` onto `docs` AHEAD of what follows it — a part, or
+    /// the connector run that binds one ([`Self::condition_gap_side`]): claimed flush on its
+    /// left and with the author's separation against what follows, or its comments with the
+    /// one space that separates them from it.
+    fn push_condition_gap_ahead(&self, docs: &mut DocBuf, from: u32, to: u32) {
+        let d = self.d();
+        match self.condition_gap_side(from, to, Edge::Flush, Edge::Presence) {
+            GapSide::Claimed(kept) => docs.push(d.text_pooled(&kept)),
+            GapSide::Comments(comments) if comments.is_empty() => {}
+            GapSide::Comments(comments) => {
+                docs.push(d.text_pooled(&comments));
+                docs.push(d.text(" "));
+            }
+        }
+    }
+
+    /// The query's own tail, to append to whatever printed its LAST part: the run of
+    /// operators with no operand ([`Self::trailing_operators_doc`]), then the gap standing
+    /// between the query and the end of the prelude — its comments, or its items where it
+    /// holds a boundary run.
     ///
     /// One emitter because [`Self::build_condition_query_doc`]'s two arms ask the same two
     /// questions of the same stretch, and an arm that answers one of them its own way is
@@ -816,24 +911,36 @@ impl<'a> Printer<'a> {
     /// no connector at all while its twin did. The two arms differ in where the tail LANDS (a
     /// concat, or the fill's last chunk), which is all they should differ in.
     ///
+    /// The gap starts where the query's text ends: the last part, or — when the query ends on
+    /// an unbound operator run — the run, whose own text carries everything the reader
+    /// collected up to its last item and whose end the query's span reaches. Its far end is
+    /// the block's `{` or the statement's `;` (`region_end`).
+    ///
     /// `None` when the query has neither, so a caller need not concat an empty doc.
     fn condition_tail_doc(
         &self,
         last: &internal::ConditionPart<'_>,
-        prelude_span: Option<Span>,
+        prelude_span: Span,
+        region_end: u32,
         condition: &internal::ConditionQuery<'_>,
     ) -> Option<DocId> {
         let d = self.d();
         let mut tail = DocBuf::new();
-        if let Some(span) = prelude_span {
-            let trailing = self.comment_blocks_in_range(last.span.end, span.end);
-            if !trailing.is_empty() {
-                tail.push(d.text(" "));
-                tail.push(d.text_pooled(&trailing));
-            }
-        }
+        let gap_start = if condition.trailing_operators.is_some() {
+            prelude_span.end.max(last.span.end)
+        } else {
+            last.span.end
+        };
         if let Some(operators) = self.trailing_operators_doc(condition) {
             tail.push(operators);
+        }
+        match self.condition_gap_side(gap_start, region_end, Edge::Presence, Edge::Flush) {
+            GapSide::Claimed(kept) => tail.push(d.text_pooled(&kept)),
+            GapSide::Comments(comments) if comments.is_empty() => {}
+            GapSide::Comments(comments) => {
+                tail.push(d.text(" "));
+                tail.push(d.text_pooled(&comments));
+            }
         }
         (!tail.is_empty()).then(|| d.concat(&tail))
     }
@@ -846,86 +953,13 @@ impl<'a> Printer<'a> {
     /// same reason on the text path — a connector is a break point only where it joins
     /// two segments.
     ///
-    /// It can never collide with the trailing-comment claim beside it. A comment inside
-    /// the run is carried *by* the run (the parser un-registers it there), so whenever
-    /// this is `Some`, the `comment_blocks_in_range` sweep over the same stretch found
-    /// nothing.
+    /// It can never collide with the tail gap's claim beside it. A comment inside the run
+    /// is carried *by* the run (the parser un-registers it there), and the gap the claim
+    /// reads starts where the run ends.
     fn trailing_operators_doc(&self, condition: &internal::ConditionQuery<'_>) -> Option<DocId> {
         let trailing_operators = condition.trailing_operators?;
         let d = self.d();
         Some(d.concat(&[d.text(" "), d.text_pooled(trailing_operators)]))
-    }
-
-    /// The boundary-whitespace run at a condition part's head — the ONE gap of a condition
-    /// prelude the printer regenerates rather than carrying inside a part's own text
-    /// (`@supports <NBSP>(a: b)`, `@container name <NBSP>(…)`), so the ONE gap that owes a
-    /// claim (`printer/boundary_ws.rs` §Who claims where).
-    ///
-    /// The sweep reaches PAST the part's own span start: a condition part opens on whatever
-    /// token the lexer produced, and a boundary run at the head of the prelude IS that token
-    /// (`@supports <NBSP>(a: b)` opens the part on the run, not on the `(`). So it runs from
-    /// `gap_start` to the part's first real byte, which `skip_gap_trivia` finds with the
-    /// boundary class the parser skipped by — one range covering both the gap before the part
-    /// and the trivia inside it.
-    ///
-    /// `gap_start` is the caller's, and the two callers differ deliberately: the first part
-    /// sweeps from the name's end (there being no previous part), every later one from its own
-    /// span start, so it can never reach back over the connector whose side of the gap rides
-    /// out in the separator.
-    fn condition_part_head_ws(&self, gap_start: u32, part: &internal::ConditionPart<'_>) -> String {
-        self.spell_gap(
-            gap_start,
-            super::boundary_ws::skip_gap_trivia(self.source, part.span.start, part.span.end),
-            Edge::Flush,
-            Edge::Flush,
-        )
-    }
-
-    /// Extract comments from a source range, split around the connector keyword.
-    ///
-    /// Returns (comments_before_connector, comments_after_connector); for
-    /// `/* a */ and /* b */` → (`/* a */`, `/* b */`). The connector is located
-    /// comment-aware via `find_keyword_ascii_case_insensitive` (CSS trivia profile),
-    /// so a `and`/`or` buried in a comment (`/* x and y */ and …`) doesn't move the
-    /// split into the comment — which would drop it (a straddling comment is in
-    /// neither half-range). The match is ASCII case-insensitive because the parser
-    /// accepts uppercase connectors (`AND`/`Or`), which CSS Syntax 3 makes valid.
-    /// With no connector (or none found) the whole run goes before. Delegates the
-    /// binning + join to the shared `split_comments_at`.
-    ///
-    /// ⚠️ The gap may hold a **run** of operators (`(a: b) and or (c: d)`), and this
-    /// scans for the *first* spelling of `connector` — the run's LAST kind — so the
-    /// position it splits at can be any operator of the run, not reliably the last.
-    /// It bins every registered comment correctly all the same, and the reason is the
-    /// parser's, not this scan's: a comment *inside* the run rides
-    /// `ConditionPart::connector_run`'s own text and gives up its registration, so the
-    /// only comments left to bin sit before the run's first word or after its last —
-    /// on whichever side of the split point that puts them, which for those two is the
-    /// same side either way. Don't "improve" this into a last-occurrence scan without
-    /// that fact: it is what makes the whole family correct, not the choice of
-    /// occurrence.
-    fn extract_comments_split_by_connector(
-        &self,
-        start: u32,
-        end: u32,
-        connector: Option<internal::ConditionConnector>,
-    ) -> (String, String) {
-        let connector_keyword = match connector {
-            Some(internal::ConditionConnector::And) => "and",
-            Some(internal::ConditionConnector::Or) => "or",
-            None => return self.split_comments_at(start, end, None),
-        };
-
-        let connector_pos = source_scan::find_keyword_ascii_case_insensitive(
-            self.source.as_bytes(),
-            start as usize,
-            end as usize,
-            connector_keyword.as_bytes(),
-            source_scan::TriviaProfile::CSS,
-        )
-        .map(|pos| pos as u32);
-
-        self.split_comments_at(start, end, connector_pos)
     }
 
     /// Reconstruct comments sitting in an `@import` prelude gap (before a value).
@@ -946,6 +980,12 @@ impl<'a> Printer<'a> {
     /// (`supports(a) /* c */, screen`). A comma with no prelude value before it is a
     /// different position and keeps the at-keyword's separator (`@media , screen`);
     /// gluing there would read as an at-rule named `@media,`.
+    ///
+    /// A gap holding a boundary run the parser stepped (`@import <NBSP> 'a.css'`,
+    /// `'a.css' <NBSP> screen`) is claimed whole instead, its comments in place
+    /// ([`Self::spell_gap_items`]): the author's separation kept against the value before it
+    /// and the one after it (flush against a comma-led value), where padding the comments
+    /// would space one off a member it was glued to.
     fn write_import_gap_comments(
         &mut self,
         start: u32,
@@ -953,6 +993,22 @@ impl<'a> Printer<'a> {
         needs_separator: bool,
         glue_next: bool,
     ) {
+        if self.gap_holds_member(start, end) {
+            // The first value's gap follows the ` ` the prelude writer put after `@import`.
+            let lead = if needs_separator {
+                Edge::Presence
+            } else {
+                Edge::Flush
+            };
+            let trail = if glue_next {
+                Edge::Flush
+            } else {
+                Edge::Presence
+            };
+            let kept = self.spell_gap_items(start, end, lead, trail);
+            self.write(&kept);
+            return;
+        }
         let comments: Vec<_> = self.comments_to_emit_between(start, end).collect();
         if comments.is_empty() {
             if needs_separator && !glue_next {
@@ -986,42 +1042,50 @@ impl<'a> Printer<'a> {
     /// leading (`@scope /* c */ (.a)`), between the root `)` and `to`, between `to` and the
     /// limit `(`, and after the last `)` before the block `{` — re-emit their comments here
     /// too, normalized to a single space on each side (prettier freezes the source spacing;
-    /// a cataloged divergence — see conformance_prettier_css.md §CSS: Comments).
+    /// a cataloged divergence — see conformance_prettier_css.md §CSS: Comments), and each
+    /// claims a boundary run the parser stepped there ([`Self::write_prelude_gap`]).
     fn write_scope_prelude(
         &mut self,
         root: Option<&internal::ScopeClause<'_>>,
         limit: Option<&internal::ScopeLimit<'_>>,
         atrule: &internal::CssAtrule<'_>,
     ) {
-        // Right bound of the pre-`{` gap. A block-less `@scope` isn't valid CSS,
-        // but fall back to the rule's `;` end so the range stays well-formed.
-        let block_start = atrule
-            .block
-            .as_ref()
-            .map_or(atrule.span.end, |b| b.span.start);
+        // Right bound of the pre-`{` gap: the block's `{`, or the `;` of a block-less
+        // `@scope` (not valid CSS, but accepted like any prelude).
+        let block_start = prelude_region_end(atrule);
+        // Each gap ahead of a `(` or `to` keeps the author's separation from it when a claim
+        // prints it (`write_prelude_gap`), so the literal after it writes no space of its own;
+        // the gap before the terminator is flush against it, the block opener spacing itself.
+        let before_token = Edge::Presence;
+        let before_end = Edge::Flush;
 
-        // Leading gap: the first structural token after `@scope` is the root `(`,
-        // else `to`, else the block `{`. Its left bound is the `@` — no comment can
-        // sit inside the `@scope` at-keyword token, so it never double-counts an
-        // in-paren comment.
+        // Leading gap: the first structural token after `@scope` is the root `(`, else `to`,
+        // else the block `{`. Its left bound is the at-rule name's end.
         let first_start = root
             .map(|r| r.paren.start)
             .or_else(|| limit.map(|l| l.to_span.start))
             .unwrap_or(block_start);
-        self.write_prelude_gap_comments(atrule.span.start, first_start);
+        let lead_edge = if first_start == block_start {
+            before_end
+        } else {
+            before_token
+        };
+        let mut claimed = self.write_prelude_gap(atrule.name_span.end, first_start, lead_edge);
 
         if let Some(root) = root {
-            self.write_scope_clause(root);
+            self.write_scope_clause(root, !claimed);
         }
         if let Some(limit) = limit {
             // Between-clause gap: root `)` → `to` (only when a root precedes it).
             if let Some(root) = root {
-                self.write_prelude_gap_comments(root.paren.end, limit.to_span.start);
+                claimed = self.write_prelude_gap(root.paren.end, limit.to_span.start, before_token);
             }
-            self.write(" to");
-            // After-`to` gap: `to` → limit `(`.
-            self.write_prelude_gap_comments(limit.to_span.end, limit.clause.paren.start);
-            self.write_scope_clause(&limit.clause);
+            self.write(if claimed { "to" } else { " to" });
+            // After-`to` gap: `to` → limit `(`. A run glued to `to` stays glued (the prelude
+            // reader splits the keyword off it — `scope_to_keyword_len`).
+            claimed =
+                self.write_prelude_gap(limit.to_span.end, limit.clause.paren.start, before_token);
+            self.write_scope_clause(&limit.clause, !claimed);
         }
         // Pre-`{` gap: after the last clause's `)` (only when a clause exists — a
         // bare `@scope /* c */ {` comment is the leading gap above).
@@ -1029,7 +1093,7 @@ impl<'a> Printer<'a> {
             .map(|l| l.clause.paren.end)
             .or_else(|| root.map(|r| r.paren.end))
         {
-            self.write_prelude_gap_comments(last_end, block_start);
+            self.write_prelude_gap(last_end, block_start, before_end);
         }
     }
 
@@ -1048,7 +1112,7 @@ impl<'a> Printer<'a> {
     ///
     /// Gap comments: the leading gap (`@custom-selector /* c */ :--a`) and the trailing
     /// one (`h2 /* c */;`) sit outside the group and write through
-    /// `write_prelude_gap_comments`; the name→list gap (`:--a /* c */ h1`) is inside it,
+    /// `write_prelude_gap`; the name→list gap (`:--a /* c */ h1`) is inside it,
     /// ahead of the `line`, so a broken list keeps the comment on the name's line.
     /// Prettier drops every one of them — a cataloged divergence
     /// (conformance_prettier_css.md §CSS: Comments).
@@ -1061,52 +1125,95 @@ impl<'a> Printer<'a> {
     ) {
         // Leading gap: from the at-rule name's end — the `@custom-selector` token can hold
         // no comment, so this never reaches into the name — to the `:--name`.
-        self.write_prelude_gap_comments(atrule.name_span.end, name.start);
+        let claimed = self.write_prelude_gap(atrule.name_span.end, name.start, Edge::Presence);
 
         let d = self.d();
         let mut parts = DocBuf::new();
         parts.push(d.text_pooled(name.extract(self.source)));
-        let gap = self.comment_blocks_in_range(name.end, list.span.start);
-        if !gap.is_empty() {
-            parts.push(d.text(" "));
-            parts.push(d.text_pooled(&gap));
+        // The name→list gap is this prelude's to claim, as a pseudo-argument's `(` claims its
+        // list's lead: the list's first selector is not told the name bounds it, so its own
+        // backward scan would reach into the NAME, which a run glued to it is part of, and
+        // print that run a second time (`:--x<NBSP> a` → `:--x<NBSP> <NBSP> a`, growing every
+        // pass). So the anchor stands down whatever the gap holds.
+        let anchor = first_anchor(list);
+        self.claimed_lead.set(Some(anchor));
+        let kept = self.spell_gap_items(name.end, anchor, Edge::Presence, Edge::Presence);
+        if kept.is_empty() {
+            let gap = self.comment_blocks_in_range(name.end, list.span.start);
+            if !gap.is_empty() {
+                parts.push(d.text(" "));
+                parts.push(d.text_pooled(&gap));
+            }
+            parts.push(d.line());
+        } else if let Some(before_list) = kept.strip_suffix(' ') {
+            // A run in the gap is spelled with the author's separation on both sides, and the
+            // break the group may take is one of the spaces that separation wrote — the one
+            // before the list where there is one, so the gap stays on the name's line, as its
+            // comments do; the one after the name otherwise (`:--x <NBSP>a`, glued to the
+            // list). A gap glued at both ends (`:--x<NBSP>/* c */<NBSP>a`) has no space to
+            // break at, and is none of the group's.
+            parts.push(d.text_pooled(before_list));
+            parts.push(d.line());
+        } else if let Some(after_name) = kept.strip_prefix(' ') {
+            parts.push(d.line());
+            parts.push(d.text_pooled(after_name));
+        } else {
+            parts.push(d.text_pooled(&kept));
         }
-        parts.push(d.line());
         parts.push(self.build_comma_list_doc(list.selectors, true));
         let doc = d.group(d.indent(d.concat(&parts)));
 
         // The terminator follows the group on its last line: `;` for the statement form,
         // ` {` for a block (not `@custom-selector` grammar, but accepted like any prelude).
         let suffix_width = if atrule.block.is_some() { 2 } else { 1 };
-        self.write(" ");
+        if !claimed {
+            self.write(" ");
+        }
         self.write_arena_doc_with_suffix(doc, suffix_width);
 
         // Trailing gap: after the list, before the `;` / `{` (the prelude span's end).
-        self.write_prelude_gap_comments(list.span.end, span.end);
+        self.write_prelude_gap(list.span.end, span.end, Edge::Flush);
     }
 
-    /// Emit any block comments in `[start, end]` as ` /* … */` — a single leading
-    /// space, then the comment(s) joined single-spaced (`comment_blocks_in_range`).
+    /// Emit a structural at-rule prelude gap `[start, end)` — the out-of-paren `@scope` gaps
+    /// (leading / between the clauses / after `to` / pre-`{`), the `@custom-selector`
+    /// leading / trailing gaps, and an `@import` prelude's tail before its `;` — and report
+    /// whether a boundary claim printed it.
     ///
-    /// The out-of-paren `@scope` prelude gaps (leading / between the clauses / after
-    /// `to` / pre-`{`) and the `@custom-selector` leading / trailing gaps call this at
-    /// each authored position; prettier preserves the comment with the source spacing
-    /// (`@scope`) or drops it (`@custom-selector`), tsv normalizes to single spaces. A gap
-    /// with no comment writes nothing — the neighboring ` (`/` to`/` {` literals already
-    /// carry the separator.
-    fn write_prelude_gap_comments(&mut self, start: u32, end: u32) {
+    /// Where the gap holds a boundary MEMBER the parser stepped (`@scope <NBSP> (.a)`,
+    /// `(.a) to <NBSP> (.b)`), the gap is claimed whole, its comments in place
+    /// ([`Self::spell_gap_items`]): the author's separation kept against the token before it
+    /// (spaced from a name or a `)`, glued where they glued it — `to<NBSP>`), and on its far
+    /// side as `trail` says — [`Edge::Presence`] ahead of a `(` or `to`, whose literal then
+    /// writes no space of its own (`true`), [`Edge::Flush`] ahead of the `;` / `{`. Prettier
+    /// drops the run at some of these and keeps it at others; tsv keeps it at all of them.
+    ///
+    /// Otherwise the gap's block comments print as ` /* … */` — a single leading space, then
+    /// the comment(s) joined single-spaced (`comment_blocks_in_range`); prettier preserves
+    /// the comment with the source spacing (`@scope`) or drops it (`@custom-selector`), tsv
+    /// normalizes to single spaces. A gap with no comment writes nothing — the neighboring
+    /// ` (`/` to`/` {` literals already carry the separator.
+    fn write_prelude_gap(&mut self, start: u32, end: u32, trail: Edge) -> bool {
+        if self.gap_holds_member(start, end) {
+            let kept = self.spell_gap_items(start, end, Edge::Presence, trail);
+            self.write(&kept);
+            return true;
+        }
         let text = self.comment_blocks_in_range(start, end);
         if !text.is_empty() {
             self.write(" ");
             self.write(&text);
         }
+        false
     }
 
     /// Emit one `@scope` clause — ` (<selector-list>)` — interleaving any comment inside
     /// the parens (leading/trailing the list) via the clause's `paren` span, the same
     /// wrapping the `:is()` args use. The printer twin of the parser's `parse_scope_clause`.
-    fn write_scope_clause(&mut self, clause: &internal::ScopeClause<'_>) {
-        self.write(" (");
+    /// `spaced` is false where a boundary claim before it already spelled the author's
+    /// separation (`write_prelude_gap`).
+    fn write_scope_clause(&mut self, clause: &internal::ScopeClause<'_>, spaced: bool) {
+        self.write(if spaced { " (" } else { "(" });
         self.print_selector_list_nested(&clause.list, Some(clause.paren));
         self.write(")");
     }

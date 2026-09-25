@@ -91,7 +91,7 @@ pub struct CssRule<'arena> {
 //   - Proper formatting with correct precedence
 
 /// Selector list - comma-separated selectors
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct SelectorList<'arena> {
     pub selectors: &'arena [ComplexSelector<'arena>],
     pub span: Span,
@@ -860,38 +860,60 @@ pub struct ConditionQuery<'arena> {
 pub enum ConditionSegment<'arena> {
     /// Normalized condition text (`(display: `, `selector(`, `)`, …).
     Text(&'arena str),
-    /// A `selector()` argument, parsed as the selectors it is.
-    Selectors(&'arena [ComplexSelector<'arena>]),
+    /// A `selector()` argument, parsed as the selectors it is, with the function's `(…)` span
+    /// (end one past the `)`, the pseudo-argument convention) — the bounds of the gaps between
+    /// the parens and the list, where the printer claims a boundary run the parser stepped
+    /// (`selector(a <NBSP>)`) as it does in a pseudo-class's argument list.
+    Selectors {
+        list: SelectorList<'arena>,
+        paren: Span,
+    },
 }
 
 /// A single part of a `ConditionQuery` (one `(prop: val)` term, optionally
 /// `not`-prefixed or function-style like `selector(...)`).
 #[derive(Debug, Clone)]
 pub struct ConditionPart<'arena> {
-    /// The **last** connector before this part (None for first part). Normalized to
-    /// the `And`/`Or` enum for logic (comment-split, presence); the source text of
-    /// the whole run it ends is carried separately in `connector_run` for output.
-    pub connector: Option<ConditionConnector>,
-    /// The run of connectors this part binds to, verbatim from source — the words
-    /// from the first through the last, single-space joined, with any comments
-    /// *between* them carried along in source order.
-    ///
-    /// Usually one word (`and`/`AND`/`Or`/…), emitted by the printer so the author's
-    /// case is preserved (matching prettier). A grammar-legal query has exactly one,
-    /// but the reader is permissive and `parseCss` keeps every word of a run
-    /// (`(a: b) and or (c: d)`), so dropping all but the last would be content loss.
-    /// A comment inside the run is **un-registered** when the run claims it (the
-    /// `rewind_to` pairing) — the run's own text prints it, and a registration would
-    /// have the printer's gap sweep print it a second time. Comments *outside* the
-    /// run (before its first word, after its last) stay registered and are claimed by
-    /// that sweep, which is what keeps them on their authored side of the run.
-    /// `Some` iff `connector` is `Some`.
-    pub connector_run: Option<&'arena str>,
+    /// The run of connectors this part binds to (None for a first part with no leading
+    /// connector).
+    pub connector: Option<ConnectorRun<'arena>>,
     /// The condition content (e.g., `(display: grid)` or `not (color: red)`) as a
     /// run of segments — one `Text` segment unless the part holds a `selector()`
     /// argument. A leading `not` keeps its source case (preserved like the
     /// connectors).
     pub segments: &'arena [ConditionSegment<'arena>],
+    /// From the part's first token to its last — never over the gap ahead of it, which the
+    /// query reader steps (whitespace, a boundary run, comments) before the part begins.
+    pub span: Span,
+}
+
+/// The run of connectors (`and`/`or`) a `ConditionPart` binds to: its last connector's kind,
+/// its text, and where it sits.
+///
+/// One value because the three are meaningless apart — a kind with no text, or a span for a
+/// run that never landed, are states a part must not be able to hold.
+#[derive(Debug, Clone, Copy)]
+pub struct ConnectorRun<'arena> {
+    /// The **last** connector of the run, normalized to the `And`/`Or` enum for logic (which
+    /// side of it the gap's comments split to).
+    pub kind: ConditionConnector,
+    /// The run verbatim from source — the words from the first through the last,
+    /// single-space joined, with whatever stood *between* them (comments, a boundary run)
+    /// carried along in source order.
+    ///
+    /// Usually one word (`and`/`AND`/`Or`/…), emitted by the printer so the author's case
+    /// is preserved (matching prettier). A grammar-legal query has exactly one, but the
+    /// reader is permissive and `parseCss` keeps every word of a run
+    /// (`(a: b) and or (c: d)`), so dropping all but the last would be content loss. A
+    /// comment inside the run is **un-registered** when the run claims it (the `rewind_to`
+    /// pairing) — the run's own text prints it, and a registration would have the printer's
+    /// gap sweep print it a second time. Comments *outside* the run (before its first word,
+    /// after its last) stay registered and are claimed by that sweep, which is what keeps
+    /// them on their authored side of the run.
+    pub text: &'arena str,
+    /// From the run's first word to its last: the bound that splits the gap between two
+    /// parts into the side before the run and the side after it, each of which the printer
+    /// claims on its own.
     pub span: Span,
 }
 

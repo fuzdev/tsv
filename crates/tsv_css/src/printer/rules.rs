@@ -15,8 +15,8 @@
 //! `print_css_block_children` (see `mod.rs`), also used by at-rule blocks.
 
 use super::Printer;
-use super::boundary_ws::Edge;
 use crate::ast::internal;
+use crate::whitespace::Edge;
 
 impl<'a> Printer<'a> {
     /// Format a CSS rule (selector + declarations block)
