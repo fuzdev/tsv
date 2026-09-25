@@ -71,9 +71,9 @@ pub(crate) struct ChildNamespace {
 /// base-list membership, OR `<a>`/`<title>` when the nearest RegularElement
 /// ancestor is svg — approximated by `inherited` (the namespace the element sits
 /// in, i.e. its parent context's namespace), which the compiler already threads.
-/// Intercepting `a`/`title` before the base list also sidesteps `tsv_html`'s stale
-/// `"title"` `SVG_ELEMENTS` entry (Svelte's base list omits it, so a bare `<title>`
-/// at html scope must NOT be svg).
+/// Intercepting `a`/`title` before the base list also sidesteps the stale `"title"`
+/// entry in `tsv_html`'s SVG set (`SVG_NAMES`; Svelte's base list omits it, so a bare
+/// `<title>` at html scope must NOT be svg).
 ///
 /// Non-circular: `<a>`/`<title>`'s svg-ness keys on the INHERITED namespace (the
 /// fragment's parent), never on the fragment being classified. A `<title>`/`<a>`
@@ -97,6 +97,11 @@ pub(crate) fn element_is_mathml(name: &str) -> bool {
 
 /// `(is_svg, is_mathml)` for a regular element in a fragment whose inherited
 /// namespace is `inherited` (the ancestor signal for the `<a>`/`<title>` rule).
+///
+/// Never inlined: one caller is the recursive namespace walk ([`check_node`]), which recurses
+/// once per level of block nesting, and the membership `match`es behind the two predicates would
+/// spill into that frame.
+#[inline(never)]
 fn element_flags(env: &EmitEnv<'_, '_>, el: &Element<'_>, inherited: Namespace) -> (bool, bool) {
     let name = el.name(env.source);
     (element_is_svg(name, inherited), element_is_mathml(name))

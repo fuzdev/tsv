@@ -176,6 +176,38 @@ pub(super) struct OpeningTagEnd {
     pub(super) after_gt: usize,
 }
 
+/// How an element's children may end without the element's own `</tag>` — HTML5 implicit tag
+/// closing, which only HTML `RegularElement`s take part in (Svelte gates it on
+/// `parent.type === 'RegularElement'`).
+///
+/// One byte, held by [`SvelteParser::parse_children`] across every child — a frame paid once
+/// per level of element nesting. It settles whether the element has a row in the optional-end-tag
+/// table once, so an element without one never looks the table up per child; an element with one
+/// looks its row up again at each child's opening tag (see
+/// [`SvelteParser::next_open_tag_closes`] for why the row itself is not carried).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ImplicitClose {
+    /// Components and special elements (`svelte:*`, `slot`, …): only their own `</tag>` closes
+    /// them, and a mismatched close is an error.
+    Never,
+    /// An HTML element: an ancestor's `</other>` also closes it, where it stands.
+    AtAncestorClose,
+    /// An HTML element with a row in the optional-end-tag table (`<li>`, `<p>`, table parts,
+    /// …): an opening tag among the row's triggers also closes it.
+    AlsoAtNextTag,
+}
+
+impl ImplicitClose {
+    /// The regime for an HTML element named `tag_name`.
+    fn for_html_element(tag_name: &str) -> Self {
+        if tsv_html::optional_end_tag(tag_name).is_some() {
+            Self::AlsoAtNextTag
+        } else {
+            Self::AtAncestorClose
+        }
+    }
+}
+
 /// What the `this` attribute of a special element bound to, if it was there at all.
 ///
 /// The two tags accept different forms — `<svelte:element>` takes either (`this="div"` and
@@ -289,14 +321,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         }
 
         // Regular element or component. The tag name is span-identity
-        // (`source[name_span]`), so nothing to intern here.
-        let kind = if is_component_name(tag_name) {
-            ElementKind::Component
-        } else {
-            ElementKind::Html
-        };
+        // (`source[name_span]`), so nothing to intern here. The name's classification is
+        // computed once, here, for the element to store; the body also reads the element kind
+        // and the void test from it.
+        let facts = TagFacts::compute(tag_name);
 
-        self.parse_regular_element_body(start, tag_name, kind, name_span)
+        self.parse_regular_element_body(start, tag_name, facts, name_span)
     }
 
     /// Consume what closes an opening tag: the optional self-closing `/`, then the required
@@ -326,7 +356,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         start: usize,
         tag_name: &'a str,
-        kind: ElementKind,
+        facts: TagFacts,
         name_span: Span,
     ) -> Result<ParsedElement<'arena>, ParseError> {
         // Parse attributes
@@ -337,7 +367,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Resolve this element's children and end offset. The four content regimes differ
         // only in how they produce `(nodes, end)`; the element is assembled once below.
         let (nodes, end): (&'arena [FragmentNode<'arena>], u32) =
-            if tsv_html::is_void_element(tag_name) || opening.self_closing {
+            if facts.is_void() || opening.self_closing {
                 // Void and self-closing elements have no children or closing tag
                 // (classification lives in tsv_html, shared with the printer).
                 (&[], opening.after_gt as u32)
@@ -361,27 +391,32 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 // components and `svelte:*` keep the strict explicit-close requirement.
                 // `parse_children` resolves `end` — past this element's `</tag>` (explicit
                 // close) or at the `<` that implicitly closed it.
-                let is_html = matches!(kind, ElementKind::Html);
+                let is_html = facts.element_kind() == ElementKind::Html;
                 // Enter this element's ancestor context: a RegularElement/Component resets head
                 // context (mirrors Svelte's `parent_is_head`), and a RegularElement carrying
                 // `shadowrootmode` turns on shadow-root-template context for its subtree
                 // (`parent_is_shadowroot_template`).
                 let in_shadow = self.in_shadowroot_template
                     || (is_html && self.attrs_have_shadowrootmode(&attributes));
+                let implicit_close = if is_html {
+                    ImplicitClose::for_html_element(tag_name)
+                } else {
+                    ImplicitClose::Never
+                };
                 let (child_nodes, end) = self.parse_children_in_context(
                     false,
                     in_shadow,
                     tag_name,
                     opening.after_gt,
                     start,
-                    is_html,
+                    implicit_close,
                 )?;
                 (child_nodes.into_bump_slice(), end)
             };
 
         Ok(ParsedElement::Element(Element {
-            kind,
-            facts: TagFacts::compute(tag_name),
+            kind: facts.element_kind(),
+            facts,
             attributes: attributes.into_bump_slice(),
             fragment: Fragment { nodes },
             span: Span {
@@ -416,7 +451,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             (&[], opening.after_gt as u32)
         } else {
             // Parse children. Special elements (`svelte:*`, `slot`, …) are not HTML
-            // RegularElements, so they never auto-close (`is_html = false`) — a
+            // RegularElements, so they never auto-close (`ImplicitClose::Never`) — a
             // mismatched close falls to `parse_closing_tag`'s strict error.
             //
             // Ancestor context: `<svelte:head>` turns head context on; every other special
@@ -430,7 +465,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 tag.tag_name(),
                 opening.after_gt,
                 start,
-                false,
+                ImplicitClose::Never,
             )?;
             (child_nodes.into_bump_slice(), end)
         };
@@ -589,13 +624,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         tag_name: &str,
         opening_tag_end: usize,
         start: usize,
-        is_html: bool,
+        implicit_close: ImplicitClose,
     ) -> Result<(BumpVec<'arena, FragmentNode<'arena>>, u32), ParseError> {
         let saved_head = self.in_svelte_head;
         let saved_shadow = self.in_shadowroot_template;
         self.in_svelte_head = in_svelte_head;
         self.in_shadowroot_template = in_shadowroot_template;
-        let result = self.parse_children(tag_name, opening_tag_end, start, is_html);
+        let result = self.parse_children(tag_name, opening_tag_end, start, implicit_close);
         self.in_svelte_head = saved_head;
         self.in_shadowroot_template = saved_shadow;
         result
@@ -607,15 +642,16 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// HTML5 implicit tag closing, the offset of the `<` that triggered the implicit
     /// close (an ancestor's `</other>` or an auto-closing sibling `<next>`, left
     /// unconsumed for the caller's caller to re-read — matching Svelte's
-    /// `parent.end = start`). `is_html` enables the auto-close rules: only HTML
-    /// `RegularElement`s participate (see the callers). Callers that establish an ancestor
-    /// context (head / shadowroot-template) should go through [`Self::parse_children_in_context`].
+    /// `parent.end = start`). `implicit_close` says which of those implicit closes
+    /// apply: only HTML `RegularElement`s participate (see [`ImplicitClose`]). Callers
+    /// that establish an ancestor context (head / shadowroot-template) should go through
+    /// [`Self::parse_children_in_context`].
     fn parse_children(
         &mut self,
         tag_name: &str,
         opening_tag_end: usize,
         start: usize,
-        is_html: bool,
+        implicit_close: ImplicitClose,
     ) -> Result<(BumpVec<'arena, FragmentNode<'arena>>, u32), ParseError> {
         let mut child_nodes = self.bvec();
         let mut last_end = opening_tag_end;
@@ -643,7 +679,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     // element's mismatched close is an ancestor's → leave it, so it
                     // unwinds to the matching ancestor (or errors at the root if none
                     // matches). A non-HTML parent takes the strict mismatch error.
-                    let end = if is_html && !self.is_closing_tag_for(tag_name) {
+                    let end = if implicit_close != ImplicitClose::Never
+                        && !self.is_closing_tag_for(tag_name)
+                    {
                         self.current_start() as u32
                     } else {
                         self.parse_closing_tag(tag_name)?
@@ -651,10 +689,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     return Ok((child_nodes, end));
                 }
                 // An opening tag `<next>` that the optional-end-tag table says closes
-                // this element — leave it for the parent to adopt as a sibling.
-                if is_html
-                    && let Some(next_name) = self.peek_open_tag_name()?
-                    && tsv_html::closing_tag_omitted(tag_name, Some(next_name))
+                // this element — leave it for the parent to adopt as a sibling. Only an element
+                // with a row in the table asks (most have none, so most children skip the peeked
+                // name and the lookup), and skipping changes nothing: `is_next_token` above has
+                // already filled the peek slot, so the read is side-effect-free and cannot fail.
+                if implicit_close == ImplicitClose::AlsoAtNextTag
+                    && self.next_open_tag_closes(tag_name)?
                 {
                     return Ok((child_nodes, self.current_start() as u32));
                 }
@@ -686,6 +726,23 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 ));
             }
         }
+    }
+
+    /// Whether the opening tag at the current `<` implicitly closes the element `tag_name` —
+    /// its name is one of the triggers in `tag_name`'s row of the optional-end-tag table. Only
+    /// asked for an element that has a row ([`ImplicitClose::AlsoAtNextTag`]), so the lookup
+    /// here always finds one.
+    ///
+    /// The row is looked up again rather than carried in [`ImplicitClose`]: passing it in would
+    /// hand this call a loop-invariant byte argument, whose widened copy the compiler keeps in a
+    /// stack slot of its own in that recursive frame, where `tag_name` is already held. Outlined
+    /// so the trigger `match` and the peeked name hold no stack slot there either.
+    #[inline(never)]
+    fn next_open_tag_closes(&mut self, tag_name: &str) -> Result<bool, ParseError> {
+        let Some(next_name) = self.peek_open_tag_name()? else {
+            return Ok(false);
+        };
+        Ok(tsv_html::optional_end_tag(tag_name).is_some_and(|row| row.is_closed_by(next_name)))
     }
 
     /// The "Unclosed element" error for `parse_children`, outlined so the `format!` of the

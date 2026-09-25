@@ -10,13 +10,11 @@
 // - Svelte void elements: node_modules/svelte/src/utils.js:16-41
 // - prettier-plugin-svelte: isInlineElement = !isBlockElement (negation, no positive list)
 //
-// Performance: each set is a `phf::Set` (compile-time perfect hash, no runtime init) behind a
-// shape pre-filter — see `element_set!`.
-
-use phf::phf_map;
+// Performance: each set is a `match` over its names behind a shape pre-filter — see
+// `element_set!`.
 
 /// The shape every name in one element set shares: a length range, and, per first letter, the
-/// set of lengths a name starting with it can have. Enough to reject a tag before hashing it.
+/// set of lengths a name starting with it can have. Enough to reject a tag before comparing it.
 struct Shape {
     /// `len_mask[c - b'a']` has bit `n` set iff some name starts with `c` and is `n` bytes long.
     len_mask: [u32; 26],
@@ -58,12 +56,13 @@ const fn shape_of(names: &[&'static str]) -> Shape {
 }
 
 /// Whether `tag_name` could be in the set this shape came from. A `false` is decisive — the name
-/// is not a member, and the hash is skipped. A `true` proves nothing and the caller still probes.
+/// is not a member, and the membership `match` is skipped. A `true` proves nothing and the caller
+/// still probes.
 ///
 /// This is the whole point: on real markup almost every probe is a **miss** — a `<div>` is asked
 /// whether it is void (it is not) and whether it is foreign (twice: SVG, then MathML), and every
 /// component (`<Button>`) is asked all three. Those questions are answered here, by a length
-/// compare and one table load, instead of by a perfect hash over the name's bytes.
+/// compare and one table load, instead of by comparing the name against the set's members.
 #[inline]
 fn shape_admits(shape: &Shape, tag_name: &str) -> bool {
     let bytes = tag_name.as_bytes();
@@ -80,18 +79,25 @@ fn shape_admits(shape: &Shape, tag_name: &str) -> bool {
     shape.len_mask[(first - b'a') as usize] & (1 << len) != 0
 }
 
-/// Declare an element set once: the `phf::Set` that answers membership, the `Shape` that fronts
-/// it, and the name slice both are built from — plus an exhaustive test grading the filtered
-/// lookup against a plain scan of that same list.
+/// Declare an element set once: the membership function (a `match` over the names), the `Shape`
+/// that fronts it, and the name slice the shape is built from — plus an exhaustive test grading
+/// the filtered lookup against a plain scan of that same list.
+///
+/// A `match` rather than a perfect hash: after the shape filter, the names a probe can still be
+/// are a few short strings, which a length switch and a few word compares answer outright, where
+/// a hash reads every byte of the name through SipHash before it can compare anything.
 ///
 /// The test is not a formality. A pre-filter is invisible when it is right and invisible when it
 /// is *wrong in the rejecting direction*: it would simply start answering "not an element" for a
 /// real one, and the formatter would go on emitting perfectly valid — differently laid out —
 /// markup. Keep it green; it is the only thing that can fail.
 macro_rules! element_set {
-    ($set:ident, $shape:ident, $names:ident, $doc:literal, [$($name:literal),* $(,)?]) => {
+    ($contains:ident, $shape:ident, $names:ident, $doc:literal, [$($name:literal),* $(,)?]) => {
         #[doc = $doc]
-        static $set: phf::Set<&'static str> = phf::phf_set! { $($name),* };
+        #[inline]
+        fn $contains(tag_name: &str) -> bool {
+            matches!(tag_name, $($name)|*)
+        }
         /// The same list, as a slice — the source both `$shape` and the equivalence test read.
         const $names: &[&'static str] = &[$($name),*];
         const $shape: Shape = shape_of($names);
@@ -99,7 +105,7 @@ macro_rules! element_set {
 }
 
 element_set! {
-    BLOCK_ELEMENTS,
+    block_set_contains,
     BLOCK_SHAPE,
     BLOCK_NAMES,
     "Block elements for formatting purposes.\n\n\
@@ -123,7 +129,7 @@ element_set! {
 }
 
 element_set! {
-    VOID_ELEMENTS,
+    void_set_contains,
     VOID_SHAPE,
     VOID_NAMES,
     "Void (self-closing) elements — Svelte's `VOID_ELEMENT_NAMES`.\n\n\
@@ -137,7 +143,7 @@ element_set! {
 }
 
 element_set! {
-    SVG_ELEMENTS,
+    svg_set_contains,
     SVG_SHAPE,
     SVG_NAMES,
     "SVG elements — synced with Svelte's `utils.js` `SVG_ELEMENTS`.",
@@ -159,7 +165,7 @@ element_set! {
 }
 
 element_set! {
-    MATHML_ELEMENTS,
+    mathml_set_contains,
     MATHML_SHAPE,
     MATHML_NAMES,
     "MathML elements — synced with Svelte's `utils.js` (MathML Core).",
@@ -177,7 +183,7 @@ element_set! {
 /// Examples: `<div>`, `<p>`, `<section>`
 #[inline]
 pub fn is_block_element(tag_name: &str) -> bool {
-    shape_admits(&BLOCK_SHAPE, tag_name) && BLOCK_ELEMENTS.contains(tag_name)
+    shape_admits(&BLOCK_SHAPE, tag_name) && block_set_contains(tag_name)
 }
 
 /// Check if an HTML element is void (self-closing)
@@ -188,7 +194,7 @@ pub fn is_block_element(tag_name: &str) -> bool {
 pub fn is_void_element(tag_name: &str) -> bool {
     // `!doctype` is the one case-insensitive member and the one that does not fit the shape (it
     // opens on `!`), so it sits outside the set and is matched on its own.
-    (shape_admits(&VOID_SHAPE, tag_name) && VOID_ELEMENTS.contains(tag_name))
+    (shape_admits(&VOID_SHAPE, tag_name) && void_set_contains(tag_name))
         || tag_name.eq_ignore_ascii_case("!doctype")
 }
 
@@ -235,13 +241,13 @@ pub fn collapses_child_whitespace(tag_name: &str) -> bool {
 /// Check if an element is an SVG element
 #[inline]
 pub fn is_svg_element(tag_name: &str) -> bool {
-    shape_admits(&SVG_SHAPE, tag_name) && SVG_ELEMENTS.contains(tag_name)
+    shape_admits(&SVG_SHAPE, tag_name) && svg_set_contains(tag_name)
 }
 
 /// Check if an element is a MathML element
 #[inline]
 pub fn is_mathml_element(tag_name: &str) -> bool {
-    shape_admits(&MATHML_SHAPE, tag_name) && MATHML_ELEMENTS.contains(tag_name)
+    shape_admits(&MATHML_SHAPE, tag_name) && mathml_set_contains(tag_name)
 }
 
 /// Check if an element is foreign content (SVG or MathML)
@@ -271,6 +277,62 @@ pub fn is_pcen_char(c: char) -> bool {
             | '\u{F900}'..='\u{FDCF}' | '\u{FDF0}'..='\u{FFFD}' | '\u{10000}'..='\u{EFFFF}')
 }
 
+/// Declare the optional-end-tag table once: [`optional_end_tag`], a `match` over the keys, and
+/// [`OptionalEndTag::is_closed_by`], a `match` per key over its triggers — plus, for the tests,
+/// the same table as a plain slice to grade both against.
+///
+/// A `match` rather than a perfect hash: the keys and triggers are a few short names, which a
+/// length switch and a few word compares answer outright, where a hash reads every byte of the
+/// name through SipHash before it can compare anything.
+macro_rules! optional_end_tags {
+    ($($variant:ident: $key:literal => [$($trigger:literal),+ $(,)?]),+ $(,)?) => {
+        /// Which row of the table an [`OptionalEndTag`] is — one variant per key.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        enum OptionalEndTagKey {
+            $($variant),+
+        }
+
+        /// The table's row for `tag_name`: whether `tag_name` is an element whose end tag HTML
+        /// lets the author omit, and if so which following tags omit it. `None` for every other
+        /// element, which never auto-closes.
+        ///
+        /// Exact and case-sensitive, like the element sets: tag names arrive as authored.
+        #[inline]
+        pub fn optional_end_tag(tag_name: &str) -> Option<OptionalEndTag> {
+            Some(OptionalEndTag(match tag_name {
+                $($key => OptionalEndTagKey::$variant,)+
+                _ => return None,
+            }))
+        }
+
+        impl OptionalEndTag {
+            /// Whether `next`, as the next opening tag in the markup, implicitly closes this
+            /// element — one of the key's listed triggers.
+            #[inline]
+            pub fn is_closed_by(self, next: &str) -> bool {
+                match self.0 {
+                    $(OptionalEndTagKey::$variant => matches!(next, $($trigger)|+),)+
+                }
+            }
+        }
+
+        /// The table as a plain slice — what the equivalence test grades both lookups against.
+        #[cfg(test)]
+        const OPTIONAL_END_TAG_TABLE: &[(&str, &[&str])] = &[$(($key, &[$($trigger),+])),+];
+    };
+}
+
+/// An element whose end tag HTML lets the author omit (auto-close) when a particular following
+/// tag or the end of its parent arrives — a row of the optional-end-tag table, found by
+/// [`optional_end_tag`].
+///
+/// Mirrors Svelte's `closing_tag_omitted(current, next)`: `current` auto-closes when it has a row
+/// and `next` is either absent (the end of the parent's content / EOF — having a row at all) or
+/// one of its listed triggers ([`is_closed_by`](Self::is_closed_by)). Split in two so a parser
+/// can ask the first half once per element and the second once per child.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OptionalEndTag(OptionalEndTagKey);
+
 // Elements whose end tag HTML lets you omit when a particular sibling or parent
 // boundary follows — the WHATWG optional-end-tag subset Svelte's parser implements
 // (../svelte/packages/svelte/src/html-tree-validation.js `autoclosing_children`,
@@ -279,50 +341,32 @@ pub fn is_pcen_char(c: char) -> bool {
 // Each entry lists the "next" tag names that force the key element to auto-close.
 // Svelte's source splits these into `direct` (immediate child) and `descendant`
 // (any descendant) variants, but that split only affects the *validation* error
-// wording — `closing_tag_omitted` treats both as one membership test — so the two
+// wording — Svelte's `closing_tag_omitted` treats both as one membership test — so the two
 // are flattened here into a single trigger list per element.
 //
 // Scope: this is only the *parse-time* auto-close half. Svelte's validation-side
 // table (`disallowed_children` + `is_tag_valid_with_parent`/`_ancestor`, which do
 // need the direct/descendant/`reset_by`/`only` distinctions) belongs to a future
 // diagnostics layer and is a separate port from the same source file.
-static AUTOCLOSING_NEXT_TAGS: phf::Map<&'static str, &'static [&'static str]> = phf_map! {
-    "li" => &["li"],
-    "dt" => &["dt", "dd"],
-    "dd" => &["dt", "dd"],
-    "p" => &[
+optional_end_tags! {
+    Li: "li" => ["li"],
+    Dt: "dt" => ["dt", "dd"],
+    Dd: "dd" => ["dt", "dd"],
+    P: "p" => [
         "address", "article", "aside", "blockquote", "div", "dl", "fieldset",
         "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hgroup",
         "hr", "main", "menu", "nav", "ol", "p", "pre", "section", "table", "ul",
     ],
-    "rt" => &["rt", "rp"],
-    "rp" => &["rt", "rp"],
-    "optgroup" => &["optgroup"],
-    "option" => &["option", "optgroup"],
-    "thead" => &["tbody", "tfoot"],
-    "tbody" => &["tbody", "tfoot"],
-    "tfoot" => &["tbody"],
-    "tr" => &["tr", "tbody"],
-    "td" => &["td", "th", "tr"],
-    "th" => &["td", "th", "tr"],
-};
-
-/// Whether `current`'s end tag is implicitly omitted (auto-closed) when `next`
-/// follows as the next tag in the markup.
-///
-/// Mirrors Svelte's `closing_tag_omitted(current, next)`: `current` auto-closes
-/// when it is in the optional-end-tag table and `next` is either absent (the end
-/// of the parent's content / EOF, modeled as `None`) or one of its listed triggers.
-/// Elements outside the table never auto-close.
-#[inline]
-pub fn closing_tag_omitted(current: &str, next: Option<&str>) -> bool {
-    match AUTOCLOSING_NEXT_TAGS.get(current) {
-        Some(triggers) => match next {
-            None => true,
-            Some(next) => triggers.contains(&next),
-        },
-        None => false,
-    }
+    Rt: "rt" => ["rt", "rp"],
+    Rp: "rp" => ["rt", "rp"],
+    Optgroup: "optgroup" => ["optgroup"],
+    OptionEl: "option" => ["option", "optgroup"],
+    Thead: "thead" => ["tbody", "tfoot"],
+    Tbody: "tbody" => ["tbody", "tfoot"],
+    Tfoot: "tfoot" => ["tbody"],
+    Tr: "tr" => ["tr", "tbody"],
+    Td: "td" => ["td", "th", "tr"],
+    Th: "th" => ["td", "th", "tr"],
 }
 
 #[cfg(test)]
@@ -336,7 +380,8 @@ mod tests {
     ///
     /// The alphabet covers every arm: real members, near-misses one byte off, the first-letter and
     /// length gates, the case gate (a Svelte **component** is exactly an uppercase-initial tag, and
-    /// it must be rejected by shape, never by hash), and the non-ASCII and empty inputs.
+    /// it must be rejected by shape, never by the membership `match`), and the non-ASCII and empty
+    /// inputs.
     #[test]
     fn shape_filter_agrees_with_a_plain_scan() {
         let probes: Vec<String> = BLOCK_NAMES
@@ -406,8 +451,8 @@ mod tests {
         }
     }
 
-    /// The filter may only ever *reject*: every real member must survive it, or the hash behind it
-    /// is unreachable and the element silently stops being classified.
+    /// The filter may only ever *reject*: every real member must survive it, or the `match` behind
+    /// it is unreachable and the element silently stops being classified.
     #[test]
     fn shape_admits_every_member_of_its_own_set() {
         for (shape, names) in [
@@ -436,7 +481,7 @@ mod tests {
         assert!(!is_block_element("td"));
         // Foreign roots are intentionally absent (handled separately).
         assert!(!is_block_element("svg"));
-        // phf membership is exact: tag names arrive lowercased.
+        // Membership is exact: tag names arrive lowercased.
         assert!(!is_block_element("DIV"));
     }
 
@@ -511,6 +556,70 @@ mod tests {
         assert!(is_foreign_element("circle"));
         assert!(is_foreign_element("math"));
         assert!(!is_foreign_element("div"));
+    }
+
+    /// Svelte's `closing_tag_omitted(current, next)`, composed from the two halves the way a
+    /// caller asks them: a row for `current`, then `next` absent or among its triggers.
+    fn closing_tag_omitted(current: &str, next: Option<&str>) -> bool {
+        optional_end_tag(current).is_some_and(|row| next.is_none_or(|next| row.is_closed_by(next)))
+    }
+
+    /// Grade both `match`es against a plain scan of the table they were generated from, over
+    /// every (current, next) pair of a probe alphabet: every key and every trigger, each cased
+    /// three ways and one byte off in both directions, plus names from the element sets (`<p>`'s
+    /// triggers are a near-copy of the block set, so a block name missing from them is the
+    /// likeliest slip) and the empty and non-ASCII inputs. Lookups are exact: a case variant is a
+    /// different name, never a member.
+    #[test]
+    fn optional_end_tag_agrees_with_a_plain_scan() {
+        let mut probes: Vec<String> = OPTIONAL_END_TAG_TABLE
+            .iter()
+            .flat_map(|(key, triggers)| std::iter::once(key).chain(triggers.iter()))
+            .chain(BLOCK_NAMES)
+            .chain(VOID_NAMES)
+            .flat_map(|name| {
+                [
+                    (*name).to_string(),
+                    name.to_uppercase(),
+                    format!("{}{}", &name[..1].to_uppercase(), &name[1..]),
+                    format!("{name}x"),
+                    name[..name.len() - 1].to_string(),
+                    format!("x{name}"),
+                ]
+            })
+            .chain(
+                [
+                    "", "span", "Li", "LI", "td ", " td", "é", "tbodyé", "!doctype", "Button",
+                ]
+                .iter()
+                .map(|s| (*s).to_string()),
+            )
+            .collect();
+        probes.sort();
+        probes.dedup();
+
+        let mut cases = 0usize;
+        for current in &probes {
+            let row = OPTIONAL_END_TAG_TABLE
+                .iter()
+                .find(|(key, _)| *key == current.as_str());
+            assert_eq!(
+                optional_end_tag(current).is_some(),
+                row.is_some(),
+                "optional_end_tag disagrees with the table on {current:?}"
+            );
+            for next in &probes {
+                let expected = row.is_some_and(|(_, triggers)| triggers.contains(&next.as_str()));
+                assert_eq!(
+                    optional_end_tag(current).is_some_and(|row| row.is_closed_by(next)),
+                    expected,
+                    "is_closed_by disagrees with the table on {current:?} then {next:?}"
+                );
+                cases += 1;
+            }
+        }
+        // Every key and every trigger is a probe, so the table's whole content is graded.
+        assert!(cases > 10_000, "probe alphabet shrank: {cases} cases");
     }
 
     #[test]
