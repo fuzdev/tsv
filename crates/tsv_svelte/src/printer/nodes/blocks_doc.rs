@@ -158,8 +158,8 @@ fn ends_at_base_closer(expr: &tsv_ts::Expression<'_>) -> bool {
     }
 }
 
-/// Which head [`Printer::build_block_head`] is assembling — the token it dangles, the group
-/// its `if_break` keys on, and (for a block tag) the clause that rides ahead of the token.
+/// Which head [`Printer::build_block_head`] is assembling — the token it dangles and (for a
+/// block tag) the clause that rides ahead of it.
 ///
 /// Two heads take this exact shape, and they are one function because the closer rule is one
 /// rule: the head wraps ⇒ the closer drops to the tag's base indent, unless the content's own
@@ -346,8 +346,8 @@ impl<'a> Printer<'a> {
         if ends_with_line_comment {
             // The trailing line comment leaves the break to whatever follows it, so the
             // clause + closer drop themselves to the next line at base indent — no dangle/hug
-            // break beyond that. Still group the expression on the wrapping path, as the
-            // dangling arm below does.
+            // break beyond that. Still group the expression on the wrapping path, so it breaks
+            // by its own width rather than following the enclosing mode.
             let head = if can_wrap {
                 d.group(expr_doc)
             } else {
@@ -449,7 +449,7 @@ impl<'a> Printer<'a> {
     /// ahead of a block that unconditionally renders multiline (`⏎>{#…}`). `None` leaves
     /// the doc untouched. The width-decided placements — hug, dangle + inline, dangle +
     /// expand — are `build_expanding_construct`'s own; see the axis-3 sibling-`>` dangle in
-    /// `build_inline_element_omit_close_gt`.
+    /// `build_gt_dangle_element_doc`.
     fn fold_gt(&self, gt_prefix: Option<DocId>, body: DocId) -> DocId {
         let d = self.d();
         match gt_prefix {

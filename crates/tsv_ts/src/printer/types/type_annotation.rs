@@ -9,9 +9,9 @@ use super::helpers::{TypeParenRule, type_args_should_wrap_for_return_type, unwra
 use super::{CommentSpacing, Printer, ShiftRescan, TrailingBlock, UnionValueDoc};
 use crate::ast::internal::{self, TSType};
 use crate::printer::ignore::RoutedScope;
-use crate::printer::layout::hang_after_operator;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
+use tsv_lang::doc::after_operator::hang_after_operator;
 use tsv_lang::doc::arena::DocId;
 
 /// Which pair, if any, an annotation's **position** requires around its type — over and

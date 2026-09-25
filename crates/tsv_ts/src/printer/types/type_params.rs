@@ -12,10 +12,11 @@ use crate::ast::internal::{
     self, TSType, TSTypeParameter, TSTypeParameterDeclaration, TSTypeParameterModifier,
 };
 use crate::printer::ignore::RoutedScope;
-use crate::printer::layout::{bracketed_list_body, fluid_after_operator};
+use crate::printer::layout::bracketed_list_body;
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
+use tsv_lang::doc::after_operator::fluid_after_operator;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 
@@ -26,6 +27,17 @@ use tsv_lang::source_scan::find_char_skipping_comments;
 enum TypeParamSlot {
     Constraint,
     Default,
+}
+
+impl TypeParamSlot {
+    /// The slot's keyword, bare and with its leading space — one literal each way, so the
+    /// inline arm keeps a single text node.
+    const fn keywords(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Constraint => ("extends", " extends"),
+            Self::Default => ("=", " ="),
+        }
+    }
 }
 
 impl<'a> Printer<'a> {
@@ -321,8 +333,6 @@ impl<'a> Printer<'a> {
             self.push_keyword_value_or_continuation(
                 &mut parts,
                 line_gap,
-                "extends",
-                " extends",
                 &head,
                 TypeParamSlot::Constraint,
             );
@@ -355,8 +365,6 @@ impl<'a> Printer<'a> {
             self.push_keyword_value_or_continuation(
                 &mut parts,
                 line_gap,
-                "=",
-                " =",
                 &head,
                 TypeParamSlot::Default,
             );
@@ -382,19 +390,16 @@ impl<'a> Printer<'a> {
     /// [`Self::route_pre_keyword_gap`] deferred a line-comment gap, the gap's comment
     /// run with the whole `<keyword> <value>` tail dropped to a continuation line one
     /// indent level in (the uniform forced-continuation indent,
-    /// `build_continuation_indent`). `keyword`/`spaced_keyword` are the same literal
-    /// with and without the leading space, so the inline arm keeps its single text
-    /// node.
+    /// `build_continuation_indent`); the keyword is the slot's ([`TypeParamSlot::keywords`]).
     fn push_keyword_value_or_continuation(
         &self,
         parts: &mut DocBuf,
         line_gap: Option<(u32, u32)>,
-        keyword: &'static str,
-        spaced_keyword: &'static str,
         head: &KeywordValueHead<'_>,
         slot: TypeParamSlot,
     ) {
         let d = self.d();
+        let (keyword, spaced_keyword) = slot.keywords();
         if let Some((gap_start, keyword_pos)) = line_gap {
             let mut tail: DocBuf = smallvec![d.text(keyword)];
             self.append_keyword_value(&mut tail, head, slot);

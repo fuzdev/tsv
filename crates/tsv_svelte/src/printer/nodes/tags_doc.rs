@@ -7,6 +7,7 @@ use crate::ast::internal;
 use crate::printer::{CommentRun, HeadExpr, HeadLayout, Printer};
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
+use tsv_lang::doc::after_operator::fluid_after_operator;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::TriviaProfile;
 use tsv_ts::{Expression, ExpressionKind};
@@ -234,7 +235,7 @@ impl<'a> Printer<'a> {
             // forced internal break (e.g. a conditional whose binary test carries
             // a trailing line comment), matching prettier and our own TS
             // assignment printer.
-            // Prettier ref: shouldBreakAfterOperator (assignment.js:196-259)
+            // Prettier ref: `shouldBreakAfterOperator` (assignment.js)
             let rhs = d.concat(&[d.line(), init_doc]);
             let rhs_indented = d.indent(rhs);
             let assignment = d.group(d.concat(&[d.text(" ="), rhs_indented, close]));
@@ -258,21 +259,18 @@ impl<'a> Printer<'a> {
             // print width. Uses indentIfBreak so the RHS is evaluated
             // independently — e.g., a ternary with identifier test stays
             // on the same line as `=` while its branches break below.
-            // Prettier ref: "fluid" layout (assignment.js:59-67)
+            // Prettier ref: `chooseLayout`'s "fluid" layout (assignment.js).
             //
             // `indent_if_break` is the one indent here, and it is CONDITIONAL, so a
             // `closer_owns_break` dedent — which is not — could not serve it. It never has
             // to: a run-final `//` ends `init_doc` with a `hardline`, so `will_break` above
             // claims that init and this arm is unreachable for it. Only a trailing BLOCK
             // comment reaches here, and a block asks the closer for no break at all.
-            let marker = d.group_with_id(d.indent(d.line()));
             d.concat(&[
                 d.text(prefix),
                 id_doc,
                 d.text(" ="),
-                marker.doc(),
-                d.line_suffix_boundary(),
-                d.indent_if_break(init_doc, marker),
+                fluid_after_operator(d, init_doc),
                 close,
             ])
         }
@@ -315,19 +313,20 @@ impl<'a> Printer<'a> {
     /// Matches prettier's `shouldBreakAfterOperator` for the expression types
     /// that appear in @const tags, delegating to tsv_ts's predicates so the
     /// rules can't drift from our own assignment printer.
-    /// Prettier ref: assignment.js:196-226
+    /// Prettier ref: `shouldBreakAfterOperator` (assignment.js)
     fn const_should_break_after_op(expr: &Expression<'_>) -> bool {
         match &expr.kind {
             // Binary expressions break after `=`, UNLESS it's a logical expression
             // with an inlinable RHS (non-empty object/array). In that case, the
             // RHS handles its own expansion: `= item || { ... }` not `=\n  item || {}`
-            // Prettier ref: assignment.js:199 `isBinaryish && !shouldInlineLogicalExpression`
+            // Prettier ref: `shouldBreakAfterOperator`'s
+            // `isBinaryish && !shouldInlineLogicalExpression`
             ExpressionKind::BinaryExpression(bin) => !tsv_ts::should_inline_logical_expression(bin),
             ExpressionKind::SequenceExpression(_) => true,
             // Conditionals break only when the test is binary (and not inline
             // logical); simple identifier tests (e.g., `cond ? a : b`) use fluid
             // layout. False for every other expression type.
-            // Prettier ref: assignment.js:216-219
+            // Prettier ref: `shouldBreakAfterOperator`'s conditional arm (assignment.js)
             _ => tsv_ts::conditional_should_break_after_op(expr),
         }
     }

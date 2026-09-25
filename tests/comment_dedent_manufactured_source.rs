@@ -15,7 +15,7 @@
 //! - `read/context.js`'s `read_pattern` blanks it the same way, drops its first space and
 //!   puts a `(` at the end (`(pattern = 1)`);
 //! - `read/context.js`'s `read_type_annotation` blanks it and writes `_ as ` over the five
-//!   bytes at its end;
+//!   UTF-16 code units ending at the colon;
 //! - `state/tag.js`'s `{#snippet}` head blanks only the NON-whitespace (`replace(/\S/g, ' ')`),
 //!   so the author's own tab survives and everything after it becomes spaces.
 //!
@@ -474,6 +474,10 @@ fn a_block_annotations_line_is_the_as_inserts_own() {
     );
 }
 
+/// The component every `_ as `-window test below opens with: a script, then a block whose
+/// body holds the annotated binding.
+const HEAD: &str = "<script lang=\"ts\">\n\tlet xs = [1];\n</script>\n{#if xs}\n";
+
 /// The `_ as ` insert **overwrites** the five code units it covers (the four before the colon,
 /// and the colon), so a newline the author wrote in that window is gone before acorn ever sees
 /// it — and the comment's line then opens back on the line the window began on, whose
@@ -487,7 +491,6 @@ fn a_block_annotations_line_is_the_as_inserts_own() {
 /// (`tests/acorn_loc_line_terminators.rs`), one question over.
 #[test]
 fn the_as_insert_swallows_a_newline_before_the_colon() {
-    const HEAD: &str = "<script lang=\"ts\">\n\tlet xs = [1];\n</script>\n{#if xs}\n";
     assert_eq!(
         comment_value(&format!(
             "{HEAD}\t{{#each xs as\n\t x: /* a1\n\t a2 */ number}}{{x}}{{/each}}\n{{/if}}\n"
@@ -518,7 +521,6 @@ fn the_as_insert_swallows_a_newline_before_the_colon() {
 /// coincide.
 #[test]
 fn the_as_insert_window_is_five_code_units() {
-    const HEAD: &str = "<script lang=\"ts\">\n\tlet xs = [1];\n</script>\n{#if xs}\n";
     // the ASCII control first, so a failure below is the non-ASCII case's alone
     assert_eq!(
         comment_value(&format!(
@@ -538,7 +540,6 @@ fn the_as_insert_window_is_five_code_units() {
 /// character must still parse, and dedent as the code-unit window does.
 #[test]
 fn the_as_insert_window_opening_mid_character_still_parses() {
-    const HEAD: &str = "<script lang=\"ts\">\n\tlet xs = [1];\n</script>\n{#if xs}\n";
     assert_eq!(
         comment_value(&format!(
             "{HEAD}\t{{#each xs as éé\n: /* a1\n\t a2 */ number}}{{éé}}{{/each}}\n{{/if}}\n"
@@ -557,7 +558,6 @@ fn the_as_insert_window_opening_mid_character_still_parses() {
 /// two ways to be four units and more than four bytes; `abcd` is the ASCII null control.
 #[test]
 fn a_binding_four_code_units_wide_keeps_the_newline_before_the_window() {
-    const HEAD: &str = "<script lang=\"ts\">\n\tlet xs = [1];\n</script>\n{#if xs}\n";
     // one comparison over all three, so a failure shows every binding's answer at once
     let values: Vec<(&str, String)> = ["abcd", "éééé", "𝑎𝑎"]
         .into_iter()
@@ -584,7 +584,6 @@ fn a_binding_four_code_units_wide_keeps_the_newline_before_the_window() {
 /// The newline is inside the window either way, so the answer is the swallowed line's.
 #[test]
 fn a_window_opening_between_a_surrogate_pair_still_dedents() {
-    const HEAD: &str = "<script lang=\"ts\">\n\tlet xs = [1];\n</script>\n{#if xs}\n";
     assert_eq!(
         comment_value(&format!(
             "{HEAD}\t{{#each xs as 𝑎é\n\t: /* a1\n\t a2 */ number}}{{𝑎é}}{{/each}}\n{{/if}}\n"

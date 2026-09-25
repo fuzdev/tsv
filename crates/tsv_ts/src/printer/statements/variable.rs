@@ -3,7 +3,6 @@
 use super::Printer;
 use crate::ast::internal::{self, Expression, ExpressionKind};
 use crate::printer::expressions::functions::HeadForcedChainLead;
-use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::statements::TerminatorGap;
 use crate::printer::{
     CommentFilter, CommentSpacing, CommentVec, ContinuationValue, LeadingGlue, ParenContext,
@@ -16,6 +15,7 @@ use smallvec::smallvec;
 use std::cell::LazyCell;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
+use tsv_lang::doc::after_operator::{fluid_after_operator, hang_after_operator};
 use tsv_lang::doc::arena::{DocArena, DocId};
 
 /// Build the fluid assignment layout: break after `=` only when the full line

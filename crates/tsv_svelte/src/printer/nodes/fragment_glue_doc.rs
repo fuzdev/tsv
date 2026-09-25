@@ -7,9 +7,9 @@
 // runs, comment-prefixed units). The sibling walk in `fragment_doc.rs`
 // dispatches into these at each glued boundary it meets.
 
-use super::element_doc::PreparedElement;
+use super::element_doc::{BoundaryMode, PreparedElement};
 use super::helpers::is_control_flow_block;
-use crate::ast::internal::{self, FragmentNode, is_collapsible_ws_char};
+use crate::ast::internal::{FragmentNode, is_collapsible_ws_char};
 use crate::printer::Printer;
 use smallvec::SmallVec;
 use tsv_lang::doc::arena::DocId;
@@ -115,7 +115,7 @@ impl<'a> Printer<'a> {
     ///
     /// Asked BEFORE the element is built, at the push of the unit it ends, so the element is
     /// built once, already in the form the block needs. Building it as an ordinary child and
-    /// rebuilding it once the block turns up doubled the work at every level of a nest whose
+    /// again once the block turns up would double the work at every level of a nest whose
     /// shedders each hold the next (`<b><i>…{#if}…{/if}</i></b>{#if}…`), O(2^depth).
     ///
     /// The dangle keys on the rendered layout, not on how the block's body is authored — so
@@ -128,8 +128,7 @@ impl<'a> Printer<'a> {
     ///   onto its own line (`⏎>` prefix), applied on the non-expanding tails by `dangle_gt`.
     ///
     /// Both happen inside the single `build_block_node_doc_with_gt` build — the block is
-    /// built **once**, with the `>` threaded in, so a nested chain of dangles stays linear
-    /// (an earlier two-build probe-then-rebuild was O(2^depth) in nesting).
+    /// built **once**, with the `>` threaded in, so a nested chain of dangles stays linear.
     ///
     /// Applies to the four rendering block heads (`{#if}` / `{#each}` / `{#key}` /
     /// `{#await}`) — and to the one `{#snippet}` shape that still reaches the control-flow
@@ -144,9 +143,9 @@ impl<'a> Printer<'a> {
     /// its body drops is width's decision in `build_expanding_construct`, so the dangle is a
     /// one-pass fixed point in both.
     ///
-    /// `multiline` is the fragment walk's own arm, which decides whether the own-line
-    /// declaration arm comes first. A `true` here is a promise the walk keeps: the block is the
-    /// next node it visits, and it reaches the dangle arm, which emits the `>`.
+    /// `multiline` is the fragment walk's own arm, which decides whether an own-line declaration
+    /// takes its line — a snippet that does is declined here. On `true` the block is the next
+    /// node the walk visits, and its first dispatch arm emits the `>`.
     fn block_sibling_takes_gt(
         &self,
         nodes: &[FragmentNode<'_>],
@@ -166,7 +165,8 @@ impl<'a> Printer<'a> {
 
     /// Build the inline child at `nodes[i]` as the fragment walk pushes it: a lone element with
     /// its closing `>` handed to a glued following block when that block takes it
-    /// ([`Self::block_sibling_takes_gt`], [`Printer::build_inline_element_omit_close_gt`]),
+    /// ([`Self::block_sibling_takes_gt`]) and the element can shed it
+    /// ([`PreparedElement::gt_dangle_boundary`], [`Printer::build_gt_dangle_element_doc`]),
     /// else the node's ordinary doc. `None` when the node builds nothing.
     pub(super) fn build_inline_unit(
         &self,
@@ -177,12 +177,21 @@ impl<'a> Printer<'a> {
         let node = nodes.get(i)?;
         if let FragmentNode::Element(element) = node
             && self.block_sibling_takes_gt(nodes, i, multiline)
-            && let Some(doc) = self.build_inline_element_omit_close_gt(element)
+            && let Some(prepared) = self.prepare_sibling_element(element)
         {
-            return Some(InlineUnit {
-                doc,
-                end: i,
-                sheds_gt: true,
+            // Prepared once either way: an element that cannot shed builds its ordinary doc
+            // from the same preparation rather than classifying and building its attrs again.
+            return Some(match prepared.gt_dangle_boundary() {
+                Some(boundary) => InlineUnit {
+                    doc: self.build_gt_dangle_element_doc(&prepared, boundary, true, None),
+                    end: i,
+                    sheds_gt: true,
+                },
+                None => InlineUnit {
+                    doc: self.build_prepared_element_doc(&prepared),
+                    end: i,
+                    sheds_gt: false,
+                },
             });
         }
         Some(InlineUnit {
@@ -277,22 +286,11 @@ impl<'a> Printer<'a> {
         if end == i {
             return None;
         }
-        // A tail that cannot shed keeps its `>`: `build_glued_element_run` refuses the shed before
-        // building any member's children, so the plain build below is the only one that does.
-        if self.block_sibling_takes_gt(trimmed_nodes, end, multiline)
-            && let Some(doc) = self.build_glued_element_run(trimmed_nodes, i, end, true)
-        {
-            return Some(InlineUnit {
-                doc,
-                end,
-                sheds_gt: true,
-            });
-        }
-        Some(InlineUnit {
-            doc: self.build_glued_element_run(trimmed_nodes, i, end, false)?,
-            end,
-            sheds_gt: false,
-        })
+        // A tail that cannot shed keeps its `>`: the run decides that off its own preparation.
+        let shed_requested = self.block_sibling_takes_gt(trimmed_nodes, end, multiline);
+        let (doc, sheds_gt) =
+            self.build_glued_element_run(trimmed_nodes, i, end, shed_requested)?;
+        Some(InlineUnit { doc, end, sheds_gt })
     }
 
     /// If `nodes[i]` **begins** a byte-glued run of one or more HTML comments, return the index of
@@ -471,7 +469,7 @@ impl<'a> Printer<'a> {
     ///   wrap. A mid-run element can both receive (from its left) and shed (to its right).
     ///
     /// Eligibility is per element and the same for both roles
-    /// ([`PreparedElement::gt_dangle_eligible`]: `Soft`, or multiline only because of the
+    /// ([`PreparedElement::gt_dangle_boundary`]: `Soft`, or multiline only because of the
     /// element's own authored line breaks). It is computed up front for every element because a
     /// pair's shed decision needs BOTH neighbours — a shed whose receiver turned out ineligible
     /// would strand the `>`. The dangle must not read a signal its own output rewrites: either
@@ -486,20 +484,19 @@ impl<'a> Printer<'a> {
     /// ordinary doc), so nothing is ever lost. The `>` moves only *inside* a closing tag, so every
     /// reparse is byte-identical — render-safe.
     ///
-    /// `shed_last`: the run's LAST element sheds its `>` too — to a glued following control-flow
-    /// block, which always receives (the element→block dangle, [`Self::block_sibling_takes_gt`]).
-    /// `None` then if that element is not eligible, before any member's children are built: a run
-    /// whose tail keeps its `>` is not the unit the caller asked for, and it builds the plain run
-    /// instead.
+    /// `shed_requested`: the run's LAST element sheds its `>` too — to a glued following
+    /// control-flow block, which always receives (the element→block dangle,
+    /// [`Self::block_sibling_takes_gt`]) — when that element is eligible; the returned flag says
+    /// whether it did, so a tail that keeps its `>` builds the plain run from the same
+    /// preparation.
     fn build_glued_element_run(
         &self,
         nodes: &[FragmentNode<'_>],
         start: usize,
         end: usize,
-        shed_last: bool,
-    ) -> Option<DocId> {
+        shed_requested: bool,
+    ) -> Option<(DocId, bool)> {
         let d = self.d();
-        let mut els: SmallVec<[&internal::Element<'_>; 8]> = SmallVec::new();
         let mut prepared: SmallVec<[Option<PreparedElement<'_>>; 8]> = SmallVec::new();
         for node in &nodes[start..=end] {
             let FragmentNode::Element(el) = node else {
@@ -509,17 +506,16 @@ impl<'a> Printer<'a> {
                 return None;
             }
             prepared.push(self.prepare_sibling_element(el));
-            els.push(el);
         }
-        let eligible = |i: usize| {
-            prepared[i]
-                .as_ref()
-                .is_some_and(PreparedElement::gt_dangle_eligible)
-        };
-        let n = els.len();
-        if shed_last && !eligible(n - 1) {
-            return None;
-        }
+        // Each member's dangle boundary, `Some` exactly when it is prepared and eligible — so a
+        // role read off it always has a content layout to build.
+        let boundaries: SmallVec<[Option<BoundaryMode>; 8]> = prepared
+            .iter()
+            .map(|p| p.as_ref().and_then(PreparedElement::gt_dangle_boundary))
+            .collect();
+        let eligible = |i: usize| boundaries[i].is_some();
+        let n = prepared.len();
+        let shed_last = shed_requested && eligible(n - 1);
         let mut parts: SmallVec<[DocId; 8]> = SmallVec::new();
         for idx in 0..n {
             let sheds = if idx + 1 < n {
@@ -528,19 +524,16 @@ impl<'a> Printer<'a> {
                 shed_last
             };
             let receives = idx > 0 && eligible(idx - 1) && eligible(idx);
-            let doc = match &prepared[idx] {
-                // `sheds || receives` implies the element is prepared and eligible: a mid-run
-                // shed or a receive reads `eligible(idx)`, and the tail's `shed_last` is guarded
-                // above.
-                Some(p) if sheds || receives => {
+            let doc = match (&prepared[idx], boundaries[idx]) {
+                (Some(p), Some(boundary)) if sheds || receives => {
                     let gt = if receives { Some(d.text(">")) } else { None };
-                    self.build_gt_dangle_element_doc(els[idx], p, sheds, gt)
+                    self.build_gt_dangle_element_doc(p, boundary, sheds, gt)
                 }
-                Some(p) => self.build_prepared_element_doc(els[idx], p),
-                None => self.build_fragment_node_doc(&nodes[start + idx])?,
+                (Some(p), _) => self.build_prepared_element_doc(p),
+                (None, _) => self.build_fragment_node_doc(&nodes[start + idx])?,
             };
             parts.push(doc);
         }
-        Some(d.concat(&parts))
+        Some((d.concat(&parts), shed_last))
     }
 }

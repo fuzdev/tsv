@@ -3,10 +3,6 @@
 
 use super::{Printer, build_entity_name_doc, is_effectively_empty_body};
 use crate::ast::internal::{self, TSType};
-use crate::printer::layout::{
-    fluid_after_operator, fluid_after_operator_unindented, hang_after_operator,
-    hang_after_operator_unindented,
-};
 use crate::printer::statements::function::FunctionHeadModifier;
 use crate::printer::types::helpers::{
     type_needs_parens_for_array_element, type_needs_parens_for_indexed_access_object,
@@ -22,6 +18,10 @@ use crate::printer::{
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
+use tsv_lang::doc::after_operator::{
+    fluid_after_operator, fluid_after_operator_unindented, hang_after_operator,
+    hang_after_operator_unindented,
+};
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 
@@ -539,7 +539,6 @@ impl<'a> Printer<'a> {
             // value) asks nothing here and is right as it stands: its value starts on the
             // `=` line, so its own continuation is a level in either way.
 
-            // Each `fluid` marker keys its value's indent on itself.
             // Un-indented on the continuation path: both the marker's `indent(line)` and
             // the value's `indent_if_break` are the level already spent.
             let fluid = |rhs: DocId| -> DocId {

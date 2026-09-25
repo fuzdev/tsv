@@ -16,7 +16,6 @@ use crate::printer::expressions::assignment::{
     is_curried_arrow_chain, is_curried_arrow_chain_that_breaks,
 };
 use crate::printer::expressions::operators::SeqLayout;
-use crate::printer::layout::hang_after_operator;
 use crate::printer::needs_parens::leftmost_no_lookahead;
 use crate::printer::statements::function::FunctionHeadModifier;
 use crate::printer::types::helpers::is_huggable_type;
@@ -26,6 +25,7 @@ use crate::printer::{
 };
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
+use tsv_lang::doc::after_operator::hang_after_operator;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::doc::{DocBuf, GroupId};
 use tsv_lang::source_scan::has_newline_before_position;

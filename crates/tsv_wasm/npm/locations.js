@@ -49,8 +49,8 @@
  * `loc.end` also stops at its closing bracket though its `end` runs over the annotation.
  * Both are exact functions of the binding, so the reconstruction applies them — but they need
  * the *tree* to find the binding, which is why a Svelte `loc_of` takes the span-only `ast`
- * (see `create_locator`) and throws without it, rather than answer one node differently from
- * `reconstruct`.
+ * (see `create_locator`) and throws without it, rather than give one node a line or column
+ * different from `reconstruct`.
  *
  * **Why refuse rather than carry what is missing.** The span-only wire could ship the
  * per-parse origins that make the two-line-class case derivable — a few dozen bytes per
@@ -60,7 +60,10 @@
  * the full terminator class, and Svelte prepares acorn's input three different ways across
  * five readers. That model moves when either upstream moves, nothing in `deno task check`
  * would grade the JS copy against the Rust one, and the documents it buys back hold a lone CR,
- * U+2028 or U+2029. Parsing those with `loc` is the better answer.
+ * U+2028 or U+2029. Parsing those with `loc` is the better answer. The block-binding
+ * annotation above is the one model carried here anyway, and it is a different kind of model:
+ * a fixed five-unit window that follows from the binding alone, not a per-parse origin — and
+ * the canonical rows of `scripts/test_npm.ts` grade it against Svelte's own wire.
  *
  * **Svelte is otherwise approximate** — reconstruct where you have the source, but be
  * aware of two deliberate divergences from Svelte's own wire (this module does NOT
@@ -161,25 +164,6 @@ function rule_for(language) {
  * acorn seed is the identity and a single LF table reproduces the whole Svelte wire.
  */
 const ECMASCRIPT_ONLY_TERMINATOR = /\r(?!\n)|[\u2028\u2029]/;
-
-/**
- * Refuse a reconstruction, naming why.
- *
- * The refusal states one fact — the span-only wire records a node's offsets but not which
- * acorn parse produced them — behind a stable marker, `cannot reconstruct \`loc\``, a caller
- * (or a test) can match on; the varying half is the cause, and the remedy is always the same.
- *
- * @param {string} cause - what the source or tree holds, as a clause.
- * @returns {never}
- */
-function refuse(cause) {
-	throw new Error(
-		'tsv: cannot reconstruct `loc` for this Svelte document because ' +
-			cause +
-			', and the span-only wire does not record which acorn parse a node came from. ' +
-			'Parse this document with locations (the default) instead.'
-	);
-}
 
 /**
  * Line-start offsets (UTF-16 units); the rightmost start `<=` an offset gives its
@@ -411,15 +395,28 @@ function stamp_character_locs(node, starts, source) {
 		case 'SnippetBlock':
 			stamp_name_shaped_loc(node.expression, starts);
 			return;
+	}
+	for (const pattern of block_binding_patterns(node)) stamp_name_shaped_loc(pattern, starts);
+}
+
+/**
+ * The binding patterns a Svelte node declares in a block-binding slot — the patterns Svelte
+ * reads with its own `read_pattern` (and a trailing `: T` with `read_type_annotation`):
+ * `{#each … as p}`, `{:then p}` / `{:catch p}`, `{@const p = …}`. Empty for any other node;
+ * an absent slot yields `undefined`, which every consumer skips.
+ * @param {any} node
+ * @returns {any[]}
+ */
+function block_binding_patterns(node) {
+	switch (node.type) {
 		case 'EachBlock':
-			stamp_name_shaped_loc(node.context, starts);
-			return;
+			return [node.context];
 		case 'AwaitBlock':
-			stamp_name_shaped_loc(node.value, starts);
-			stamp_name_shaped_loc(node.error, starts);
-			return;
+			return [node.value, node.error];
 		case 'ConstTag':
-			for (const d of node.declaration?.declarations ?? []) stamp_name_shaped_loc(d?.id, starts);
+			return (node.declaration?.declarations ?? []).map((d) => d?.id);
+		default:
+			return [];
 	}
 }
 
@@ -517,6 +514,12 @@ function stamp_in_tag_comment_locs(comments, elements, starts, source) {
 const TEMPLATE_WHITESPACE = /\s/;
 
 /**
+ * The synthetic text `read_type_annotation` writes over the code units ending at a block
+ * binding's colon (the Rust side's `AcornPrefixText::AS_INSERT`).
+ */
+const AS_INSERT = '_ as ';
+
+/**
  * @typedef {object} BindingAnnotation
  * @property {any} pattern - the binding pattern the annotation hangs off.
  * @property {number} close - the destructure pattern's real end (its annotation's
@@ -560,18 +563,8 @@ const TEMPLATE_WHITESPACE = /\s/;
  * @mutates out - one entry appended per annotated binding that needs one.
  */
 function push_binding_annotations(node, starts, source, out) {
-	switch (node.type) {
-		case 'EachBlock':
-			push_binding_annotation(node.context, starts, source, out);
-			return;
-		case 'AwaitBlock':
-			push_binding_annotation(node.value, starts, source, out);
-			push_binding_annotation(node.error, starts, source, out);
-			return;
-		case 'ConstTag':
-			for (const d of node.declaration?.declarations ?? []) {
-				push_binding_annotation(d?.id, starts, source, out);
-			}
+	for (const pattern of block_binding_patterns(node)) {
+		push_binding_annotation(pattern, starts, source, out);
 	}
 }
 
@@ -591,7 +584,8 @@ function push_binding_annotation(pattern, starts, source, out) {
 	let colon = annotation.start;
 	while (colon < source.length && TEMPLATE_WHITESPACE.test(source[colon])) colon++;
 	if (source[colon] !== ':') return;
-	const window_start = Math.max(0, colon - 4);
+	// the rewrite's first unit: `_ as ` overwrites the units ending at the colon
+	const window_start = Math.max(0, colon + 1 - AS_INSERT.length);
 	let erased = 0;
 	for (let i = window_start; i < colon; i++) if (source.charCodeAt(i) === LF) erased++;
 	const destructure = pattern.type === 'ObjectPattern' || pattern.type === 'ArrayPattern';
@@ -816,9 +810,13 @@ export function create_locator(source, opts) {
 	// never the caller's `source` directly — a Svelte BOM is not in the wire's coordinates.
 	const text = indexed_text(source, language);
 	if (language === 'svelte' && ECMASCRIPT_ONLY_TERMINATOR.test(text)) {
-		refuse(
-			'the source contains a lone CR, U+2028, or U+2029, so its acorn-parsed nodes carry ' +
-				'a different line count from the rest of the document'
+		// "cannot reconstruct `loc`" is the stable marker a caller (or a test) matches on
+		throw new Error(
+			'tsv: cannot reconstruct `loc` for this Svelte document because the source contains ' +
+				'a lone CR, U+2028, or U+2029, so its acorn-parsed nodes carry a different line ' +
+				'count from the rest of the document, and the span-only wire does not record ' +
+				'which acorn parse a node came from. Parse this document with locations (the ' +
+				'default) instead.'
 		);
 	}
 	const starts = build_line_starts(text, rule_for(language));

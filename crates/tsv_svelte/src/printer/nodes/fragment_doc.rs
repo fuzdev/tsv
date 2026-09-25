@@ -54,12 +54,10 @@ pub(super) enum LeadBoundary {
     /// the two passes agree. The block arm spells its own answer the same way
     /// ([`Printer::handle_block_child`]'s `sep()`).
     ///
-    /// ⚠️ This used to be every run-ending follower's lead — a comment, a `{@debug}` — on the
-    /// argument that such a follower owns no fill to be measured with, so the wrap would keep it
-    /// on a content line the multiline arm then broke: pass 2 re-splitting what pass 1 packed.
-    /// That cycle was the multiline arm's bare `line` disagreeing with this arm's wrap, not a
-    /// property of the follower; both arms now defer to [`Self::Spaced`], and the hazard is gone
-    /// with the disagreement.
+    /// ⚠️ It is NOT a run-ending follower's lead (a comment, a `{@debug}`), though such a
+    /// follower owns no fill to be measured with: those take [`Self::Spaced`] in both arms. A
+    /// bare `line` in the multiline arm against this arm's wrap is a two-pass cycle — pass 2
+    /// re-splitting what pass 1 packed — so the two arms must give one answer.
     SpacedBare,
     /// Byte-glued to the sibling before it: there is no boundary space to honor, and the doc is
     /// instead **marked** as the continuation of a welded run (`glued_lead` + `glued_atom`). The
@@ -182,19 +180,18 @@ impl<'a> Printer<'a> {
     /// it — see conformance_prettier_svelte.md §Svelte: Inline content block-style.
     ///
     /// # Parameters
-    /// - `cause`: the convergence mode — [`MultilineCause::None`] is the legacy inline arm;
-    ///   anything else is the element multiline arm (`compute_multiline_cause`). Multiline turns on
-    ///   the ported prettier-plugin-svelte printChildren handling that the legacy inline callers
-    ///   don't need (and would be churned by): block children via `handle_block_child` +
+    /// - `cause`: the convergence mode — [`MultilineCause::None`] is the inline arm; anything
+    ///   else is the multiline arm (`compute_multiline_cause`, or `Structural` from
+    ///   [`Self::build_nodes_doc_multiline`] for block bodies, the root and special elements).
+    ///   Multiline turns on the ported prettier-plugin-svelte printChildren handling that the
+    ///   inline callers don't need (and would be churned by): block children via `handle_block_child` +
     ///   `forceBreakContent`; `printWhitespace` (a whitespace-only text at a non-HTML-element
     ///   boundary becomes a hardline/blank/bare-line); the `splitTextToDocs` leading-linebreak rule
     ///   (content text with a leading newline emits a hardline rather than folding into the prev
     ///   element); and the first/last whitespace-only boundary deferring to the parent's
-    ///   leading/trailing break (emit nothing) instead of the inline single space. The legacy
-    ///   callers pass `None` and stay byte-identical. (Path 1, `build_nodes_doc_multiline`, still
-    ///   serves block bodies / root / special elements — its reroute onto this path + deletion is
-    ///   the remaining Slice-2/3 work.) The `Structural` / `SourceBreaks` split is read only by the
-    ///   sibling-newline flow rule in [`Self::handle_text_child`].
+    ///   leading/trailing break (emit nothing) instead of the inline single space. The
+    ///   `Structural` / `SourceBreaks` split is read only by the sibling-newline flow rule in
+    ///   [`Self::handle_text_child`].
     pub(super) fn build_nodes_doc_trimmed(
         &self,
         nodes: &[FragmentNode<'_>],
@@ -248,7 +245,7 @@ impl<'a> Printer<'a> {
         // its tail elements are skipped, so the build is O(run length), not the O(run length²) a
         // rebuild-at-each-element would cost on a long glued run (generated per-token `<span>`s).
         let mut glued_run_consumed_until = 0usize;
-        // Running `has_preceding_breakable` flag (see `build_nodes_doc`): OR-in the prior node
+        // Running `has_preceding_breakable` flag: OR-in the prior node
         // once per iteration rather than re-scanning `trimmed_nodes[..i]` at its use site below (a
         // root inline-run block's inline build). Reading `trimmed_nodes[i - 1]` at the top keeps
         // the flag equal to `trimmed_nodes[..i]` through the `continue`s (format-ignore,
@@ -266,12 +263,6 @@ impl<'a> Printer<'a> {
         // Taken at the top of every visited iteration, so it names the PREVIOUS visited
         // iteration's push and nothing older.
         let mut pending_gt = false;
-        // A shed `>` owed to the node visited last that its dangle arm did not take — set when
-        // the owed node is visited and cleared by the arm, then checked at the next visit and
-        // after the walk. It locks the predicate to the walk's arm order: a `>` the push decided
-        // to shed must reach the dangle arm (not the own-line declaration arm, a freeze or a
-        // skipped run), or the output drops it.
-        let mut unpaid_gt = false;
         // Index of the node the most recently VISITED iteration began its unit at — usually the
         // head of the previously pushed sibling doc, but a visit that pushes nothing (a
         // whitespace-only text) claims it too. Handed to the next visited node as
@@ -295,10 +286,7 @@ impl<'a> Printer<'a> {
             if i < glued_run_consumed_until {
                 continue;
             }
-            debug_assert!(!unpaid_gt, "a shed `>` was not emitted by the dangle arm");
             let prev_sheds_gt = std::mem::take(&mut pending_gt);
-            // A shed `>` is owed to exactly this node: the dangle arm below must take it.
-            unpaid_gt = prev_sheds_gt;
             // Hand the PREVIOUS visited index forward and claim this one. Every sibling doc is
             // built at its unit's HEAD (a glued element run and a comment-prefixed element are both
             // consume-ahead, their tails skipped by the `continue` above), so the previous visited
@@ -352,7 +340,7 @@ impl<'a> Printer<'a> {
             // Collapse a run of consecutive whitespace-only text nodes (left adjacent by
             // extracted `<script>`/`<style>` sections at the root — the parser never merges them):
             // the first node of the run emits the structural break, the rest would double it.
-            // Mirrors the blank-collapsing the retired `emit_lines` did. Only in `multiline` mode;
+            // Only in `multiline` mode;
             // the inline callers never see adjacent whitespace-only nodes.
             if multiline
                 && i > 0
@@ -380,6 +368,39 @@ impl<'a> Printer<'a> {
                 held: prev_text_held,
             } = std::mem::take(&mut deferred);
 
+            if prev_sheds_gt {
+                // Axis-3 sibling-`>` dangle, in BOTH arms: a control-flow block (`{#if}` /
+                // `{#each}` / `{#await}` / `{#key}`, and a `{#snippet}` glued to content on both
+                // sides) directly following an inline-element sibling (no whitespace between)
+                // takes that element's closing `>` onto the block-head line (`</span⏎>{#if…}`) — a
+                // deliberate tsv divergence (block-tag wrapping). The element's unit was already
+                // pushed as the previous child WITHOUT its `>` — the push decided the dangle
+                // (`block_sibling_takes_gt`) so the unit is built once — and the block built here
+                // owns the `>`.
+                //
+                // The inline arm needs it as much as the multiline one: it serves an inline
+                // parent (a component, an inline element) whose content an `{#await}` or a
+                // both-sides-glued `{#snippet}` does not force multiline, so the parent breaks
+                // only when the block's own layout breaks it — and the next pass reads that
+                // output's boundary newlines as `MultilineCause::SourceBreaks` and prints it
+                // through the multiline arm. The dangle is layout-keyed, so a block that stays
+                // inline keeps the `>` hugged.
+                //
+                // First among the dispatch arms, so the owed `>` is paid by construction: no arm
+                // above it can claim a control-flow block glued to an element (a freeze arms only
+                // at a directive comment, which never heads a shedding unit), and
+                // `block_sibling_takes_gt` has already declined the own-line `{#snippet}` the
+                // declaration arm below would take. Glued to the element: no whitespace node stands
+                // between them, so no separator can have deferred to this block.
+                debug_assert!(!prev_text_ws);
+                let block_doc = self.build_block_node_doc_with_gt(node, self.d().text(">"));
+                debug_assert!(block_doc.is_some(), "a `>` was shed to a non-block");
+                // A control-flow block always builds; were it not one, the `>` is paid hugged —
+                // `</b` + `>` is the plain end tag — rather than dropped.
+                child_docs.push(block_doc.unwrap_or_else(|| self.d().text(">")));
+                continue;
+            }
+
             if matches!(node, FragmentNode::Text(_)) {
                 self.handle_text_child(
                     trimmed_nodes,
@@ -397,10 +418,9 @@ impl<'a> Printer<'a> {
             } else if multiline && self.is_block_element_node(node) {
                 // Block element (div, p, block component): own-line via softlines +
                 // forceBreakContent — prettier-plugin-svelte's handleBlockChild. Gated on
-                // `multiline` — the convergence path (the multiline element arm) is the only
-                // caller that opts in; the legacy non-multiline callers keep routing blocks
-                // through the inline arm until the element-arm reroute lands (it is
-                // currently parked on a corpus parity gap, tracked in internal notes).
+                // `multiline`: the inline arm routes a block element through the inline path.
+                // TODO: route the inline arm's block elements here too, once that holds corpus
+                // parity.
                 self.handle_block_child(
                     trimmed_nodes,
                     i,
@@ -416,37 +436,6 @@ impl<'a> Printer<'a> {
                 // same the control-flow arm would produce); a snippet glued to content on
                 // both sides does not own a line and keeps the control-flow path below.
                 self.handle_own_line_tag(trimmed_nodes, i, &mut child_docs);
-            } else if prev_sheds_gt
-                && let Some(block_doc) = self.build_block_node_doc_with_gt(node, self.d().text(">"))
-            {
-                // Axis-3 sibling-`>` dangle, in BOTH arms: a control-flow block (`{#if}` /
-                // `{#each}` / `{#await}` / `{#key}`, and a `{#snippet}` glued to content on both
-                // sides) directly following an inline-element sibling (no whitespace between)
-                // sheds that element's closing `>` onto the block-head line (`</span⏎>{#if…}`) — a
-                // deliberate tsv divergence (block-tag wrapping). The element's unit was already
-                // pushed as the previous child WITHOUT its `>` — the push decided the dangle
-                // (`block_sibling_takes_gt`) so the unit is built once — and the block built here
-                // now owns the `>`. A control-flow block always builds, so the `>` is never dropped.
-                //
-                // The inline arm needs it as much as the multiline one: it serves an inline
-                // parent (a component, an inline element) whose content an `{#await}` or a
-                // both-sides-glued `{#snippet}` does not force multiline, so the parent breaks
-                // only when the block's own layout breaks it — and the next pass reads that
-                // output's boundary newlines as `MultilineCause::SourceBreaks` and prints it
-                // through the multiline arm. The dangle is layout-keyed, so a block that stays
-                // inline keeps the `>` hugged.
-                //
-                // Placed after the own-line-declaration arm, so a `{#snippet}` that owns its line
-                // in the multiline arm still takes it there (`block_sibling_takes_gt` declines
-                // that snippet for the same reason); the block-element arm above takes only
-                // elements, and no arm below takes a control-flow block before the final one, so
-                // the move changes nothing but which arm serves the inline dangle.
-                //
-                // Glued to the element: no whitespace node stands between them, so no separator
-                // can have deferred to this block.
-                debug_assert!(!prev_text_ws);
-                unpaid_gt = false;
-                child_docs.push(block_doc);
             } else if multiline && is_control_flow_block(node) {
                 // Control-flow block in the convergence path, no dangle. A block the root marked
                 // as part of a SINGLE-LINE inline run builds in inline context (its long body
@@ -610,10 +599,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        debug_assert!(
-            !unpaid_gt && !pending_gt,
-            "a shed `>` was not emitted by the dangle arm"
-        );
+        debug_assert!(!pending_gt, "a `>` was shed with no block after it");
         // `concat` short-circuits the empty case to `empty()`.
         d.concat(&child_docs)
     }
@@ -753,8 +739,9 @@ impl<'a> Printer<'a> {
     /// separator instead. The fourth is the default display's: a **block element** owns its own
     /// line ([`Self::owns_own_line`]), so the boundary beside it is a break whatever the author
     /// wrote, and whitespace at a block-level boundary is not rendered under the default display
-    /// of a block box (a closed `<dialog>` or a nested `<style>` / `<script>` renders no box, the
-    /// known exceptions). Anything else is content and glues.
+    /// of a block box (a closed `<dialog>` or a nested `<style>` / `<script>` renders no box, and
+    /// the compiler hoists the four global `svelte:*` elements out of the fragment — the known
+    /// exceptions). Anything else is content and glues.
     ///
     /// The block-element answer is what keeps the declaration's own line a one-pass fixed point:
     /// the layout must not read a signal its own output rewrites. Counted as glued content, a
@@ -805,7 +792,7 @@ impl<'a> Printer<'a> {
     /// The one question both emitters ask of a neighbour: *did that node already supply the break
     /// between us?* Asking it as two separate predicates is how a node that already owns its line
     /// picks up a second break — the failure mode this whole path keeps returning to.
-    pub(super) fn owns_own_line(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+    fn owns_own_line(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
         self.is_block_element_node(&nodes[i]) || self.is_own_line_declaration(nodes, i)
     }
 
@@ -820,8 +807,9 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if a node is a format-ignore comment — the directive that pins the next node's
-    /// raw source instead of formatting it. Single recognition point for the three
-    /// `build_nodes_doc_*` accumulation loops.
+    /// raw source instead of formatting it. Single recognition point for the two
+    /// accumulation loops ([`Self::build_nodes_doc_trimmed`],
+    /// [`Self::build_container_content_doc`]) and the glued-comment run scan.
     ///
     // Recognition lives in `tsv_lang::is_format_ignore_directive` — the single source of
     // truth for the directive set, shared across all three language printers.
@@ -831,7 +819,7 @@ impl<'a> Printer<'a> {
 
     /// Build the verbatim doc for a format-ignored node, or `None` when the node is
     /// whitespace-only text to skip — the pin then carries to the next real node.
-    /// Shared leading step of the three `build_nodes_doc_*` accumulation loops; each
+    /// Shared leading step of the two accumulation loops; each
     /// caller owns its sink and clears `format_ignore_next` only when this returns `Some`.
     ///
     /// Takes the span rather than deriving it, because both callers need it for the gap
@@ -953,9 +941,9 @@ impl<'a> Printer<'a> {
         if !multiline {
             // Inline: every spelling of this gap renders as the one collapsed space, and a
             // collapsible `line` IS that space — the doc every other inline sibling boundary
-            // takes. Emitting nothing here deleted it, which is a rendered space the source
-            // HAS: the mirror of inventing one, and the reason this arm is no longer gated on
-            // the container's multiline-ness at all.
+            // takes. Emitting nothing here would delete it, a rendered space the source HAS —
+            // the mirror of inventing one — which is why this arm is not gated on the
+            // container's multiline-ness.
             child_docs.push(d.line());
             return;
         }
@@ -986,7 +974,7 @@ impl<'a> Printer<'a> {
     /// ([`LeadBoundary`], whose variants carry each case's contract).
     ///
     /// Shared by the single-element path, the glued-element-run path and the comment-prefixed-unit
-    /// path in `build_nodes_doc`, so a trimmed boundary space is never dropped before a byte-glued
+    /// path in [`Self::build_nodes_doc_trimmed`], so a trimmed boundary space is never dropped before a byte-glued
     /// run (`</span>` ` ` `<br/><br/>`).
     ///
     /// ⚠️ How many entries a push spends is the LEAD's business, not one per call
@@ -1216,10 +1204,9 @@ impl<'a> Printer<'a> {
     ///
     /// ⚠️ **Always asked BESIDE `breaks_inline_run`, never instead of it.** It is deliberately
     /// only the half its sibling misses: asked alone it answers `false` for a whitespace-only
-    /// separator carrying a blank, which is the commonest spelling of all. It used to carry that
-    /// arm too, restating its sibling's answer verbatim — a false equation between two predicates
-    /// that made every call a double evaluation and every non-text node two dead ones, and that
-    /// invited exactly the misuse this name now rules out.
+    /// separator carrying a blank, which is the commonest spelling of all. It does not restate
+    /// its sibling's answer: a copy of that arm here would be a false equation between two
+    /// predicates, evaluating every call twice.
     ///
     /// ⚠️ A blank **interior** to a text (`text1⏎⏎text2` in one node) is NOT one: a run is a
     /// partition of nodes and cannot be split inside one, so such a blank bounds nothing and the
@@ -1360,7 +1347,7 @@ impl<'a> Printer<'a> {
     /// newline does still decide and which is preserved — so the convergence target is the
     /// multiline form, never a collapsed one-liner. See
     /// [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
-    pub(super) fn sibling_newline_flows(&self, node: &FragmentNode<'_>) -> bool {
+    fn sibling_newline_flows(&self, node: &FragmentNode<'_>) -> bool {
         match node {
             // A tag has fixed width and no structure to protect — always flows.
             FragmentNode::ExpressionTag(_)
@@ -1955,11 +1942,7 @@ impl<'a> Printer<'a> {
     /// Dispatch a control-flow block, threading a preceding sibling's split-off closing `>`
     /// (`gt`) into its expanding layout (in-multiline context, no preceding breakable — the
     /// dangle path forces both). See `build_control_flow_block_doc` and the caller's gate.
-    pub(super) fn build_block_node_doc_with_gt(
-        &self,
-        node: &FragmentNode<'_>,
-        gt: DocId,
-    ) -> Option<DocId> {
+    fn build_block_node_doc_with_gt(&self, node: &FragmentNode<'_>, gt: DocId) -> Option<DocId> {
         self.build_control_flow_block_doc(node, true, false, Some(gt))
     }
 

@@ -278,7 +278,7 @@ re-exports the functions from index.js/browser.js/index.d.ts (directly, with no
 init guard — it never touches WASM). Its correctness is gated by the package Node
 tests (`scripts/test_npm.ts`); at corpus scale,
 `benches/js/diagnostics/no_locations_parity.ts` proves the reconstruction *rules*
-(deliberately re-derived, so a transcription slip in the shipped helper shows) while
+(its own re-derived transcription — it never imports the shipped helper) while
 `benches/js/diagnostics/reconstruct_vs_materialize.ts` is the diagnostic that runs
 the shipped helper itself.
 

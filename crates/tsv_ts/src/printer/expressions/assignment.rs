@@ -23,10 +23,10 @@ use crate::printer::conditional_should_break_after_op;
 use crate::printer::expressions::functions::HeadForcedChainLead;
 use crate::printer::expressions::literals::format_string_literal_from_ast;
 use crate::printer::is_string_literal;
-use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::types::helpers::unwrap_parenthesized;
 use tsv_lang::PRINT_WIDTH;
 use tsv_lang::Span;
+use tsv_lang::doc::after_operator::{fluid_after_operator, hang_after_operator};
 use tsv_lang::doc::arena::{DocArena, DocId};
 
 /// Prettier's heuristic for "short" property keys.

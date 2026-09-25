@@ -245,7 +245,7 @@ pub(super) fn arena_fits_with_lookahead(
                     group_id,
                 } => {
                     // A group-id if_break keys on a group that, during this
-                    // hypothetical fits test, is still unresolved → treat as flat.
+                    // hypothetical fits test, may still be unresolved → measured flat.
                     // This keeps trailing text (e.g. a block head's `}`) counted in
                     // the keyed group's own width so it breaks at the right boundary.
                     // TODO: prettier's `fits` reads `groupModeMap[groupId] || MODE_FLAT`,

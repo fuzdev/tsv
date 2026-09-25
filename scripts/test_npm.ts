@@ -602,9 +602,9 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 });
 
 // Locations helper (locations.js, re-exported from index.js) — reconstruct the
-// per-node `loc` a `no-locations` wire drops, from `start`/`end` + source. Its
-// correctness is also gated by benches/js/diagnostics/no_locations_parity.ts at
-// corpus scale; these assert the shipped package export works end-to-end.
+// per-node `loc` a `no-locations` wire drops, from `start`/`end` + source. These
+// assert the shipped package export end-to-end; at corpus scale the diagnostic
+// benches/js/diagnostics/reconstruct_vs_materialize.ts runs it too.
 describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => {
 	it('reconstruct_locations is EXACT for TypeScript (equals the full wire)', () => {
 		const ts = 'const x = 1;\nconst y = 2;\n';
@@ -726,7 +726,7 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 	// A block binding's `: T` is read by Svelte's SECOND acorn parse, over a template whose
 	// five code units ending at the colon are overwritten with `_ as ` — so a newline in the
 	// four units before the colon is never counted, while one further back survives. Each
-	// row's expectation is canonical Svelte 5.57.0's `loc` for the annotation's first type
+	// row's expectation is the pinned canonical Svelte (`sidecar.ts`)'s `loc` for the annotation's first type
 	// reference, written down rather than read off tsv's own wire; `shifted` says whether it
 	// differs from the plain LF line table, so both directions stay under test.
 	it("places a block binding's `: T` where Svelte's second acorn parse does", () => {
@@ -843,7 +843,7 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 
 	// A comment inside a shifted annotation is moved with it — and is listed twice on the
 	// wire: attached under the annotation, and in the root `comments` list, which a walk
-	// reaches outside every block. Each row's expectation is canonical Svelte 5.57.0's for
+	// reaches outside every block. Each row's expectation is the pinned canonical Svelte (`sidecar.ts`)'s for
 	// the root copy; the last is the unshifted control.
 	it("places a comment inside a block binding's `: T` where Svelte's second acorn parse does", () => {
 		const head = '<script lang="ts">let xs: any; let p: any;</script>\n';
@@ -918,15 +918,15 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 			const before = text.slice(0, offset);
 			return { line: before.split('\n').length, column: offset - (before.lastIndexOf('\n') + 1) };
 		};
-		const has_seeded_annotation = (node: any, text: string, inside = false): boolean => {
-			if (Array.isArray(node)) return node.some((x) => has_seeded_annotation(x, text, inside));
+		const wire_moved_an_annotation = (node: any, text: string, inside = false): boolean => {
+			if (Array.isArray(node)) return node.some((x) => wire_moved_an_annotation(x, text, inside));
 			if (!node || typeof node !== 'object') return false;
 			const here = inside || (node.type === 'TSTypeAnnotation' && !('loc' in node));
 			if (here && node.loc && !deep_equal_json(node.loc.start, plain_loc_at(text, node.start))) {
 				return true;
 			}
 			return Object.keys(node).some(
-				(k) => k !== 'loc' && k !== 'name_loc' && has_seeded_annotation(node[k], text, here)
+				(k) => k !== 'loc' && k !== 'name_loc' && wire_moved_an_annotation(node[k], text, here)
 			);
 		};
 		// every node with numeric `start`/`end`, in walk order
@@ -1048,7 +1048,7 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 			scanned++;
 			// Svelte's offsets index the BOM-less string (its `parse` strips a leading BOM)
 			const text = source.charCodeAt(0) === 0xfeff ? source.slice(1) : source;
-			if (has_seeded_annotation(full, text)) seeded_annotation_docs++;
+			if (wire_moved_an_annotation(full, text)) seeded_annotation_docs++;
 			// the per-node entry point, asked before `reconstruct` mutates the same tree
 			const locator = node_entry.create_locator(source, { ast: span_only });
 			const nodes = spanned(span_only);

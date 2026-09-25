@@ -714,10 +714,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ///
     /// Svelte reads it with a second parse over `blanked_prefix + "_ as " +
     /// rest`, entered at `a = parser.index - "_ as ".length` with `parser.index`
-    /// just past the `:` — so acorn seeds on the four UTF-16 code units before the
-    /// colon and starts lexing real source again one past it. Those five units (the
-    /// colon's included) are the ones the synthetic `_ as ` overwrites, which is why
-    /// `origin` may sit mid-token: the seed only reads the source *behind* it.
+    /// just past the `:` — so acorn is entered at the first of the five UTF-16
+    /// code units ending at the colon, and starts lexing real source again one
+    /// past it. Those five units (the colon's included) are the ones the
+    /// synthetic `_ as ` overwrites, which is why `origin` may sit mid-token: the
+    /// seed only reads the source *behind* it.
     ///
     /// The window is counted in **code units**, because Svelte indexes a JS string:
     /// behind a non-ASCII binding it reaches more than five bytes back, and it may
@@ -754,7 +755,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// the first non-whitespace byte: `<script>` content, which `read_script`
     /// reaches by lexing from offset 0 (so its leading whitespace is acorn's to
     /// count), and a block pattern's trailing `: T`, whose parse starts on
-    /// Svelte's synthetic `_ as `, over the four code units before the colon.
+    /// Svelte's synthetic `_ as `, over the five code units ending at the colon.
     ///
     /// `lex_start` is the first byte of the component acorn lexes for real;
     /// `origin` is acorn's `startPos`; `end` is one past the slice the sub-parse
