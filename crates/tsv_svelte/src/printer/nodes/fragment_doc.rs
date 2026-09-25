@@ -110,32 +110,6 @@ struct PendingFreeze {
     gap: Option<usize>,
 }
 
-/// The inline unit the sibling loop pushed as ONE child doc, carried forward one iteration so the
-/// element→block sibling-`>` dangle can REBUILD it: a lone inline element, a glued element run, or
-/// either behind a glued HTML-comment prefix. Every other way a unit is pushed — a text fill, a
-/// frozen slice, a comment, a block — leaves the loop's slot `None`, and the dangle keeps its
-/// hands off (rebuilding a frozen element would reformat what the directive pinned).
-///
-/// The dangle replaces the pushed doc wholesale, so the unit must name what to undo, not just what
-/// to rebuild — hence three fields rather than an index:
-///
-/// - `head` is where the unit's source range BEGINS, which is where its doc was built (a
-///   consume-ahead unit's tail indices are skipped, so `i - 1` would name a run's tail element and
-///   say nothing about the unit).
-/// - `docs_len` is the `child_docs` length BEFORE the push — a mark to truncate back to, not a
-///   count of one. A [`LeadBoundary`] is free to spend more than one entry
-///   ([`LeadBoundary::SpacedBare`] pushes the separator beside the doc), so a `pop()` would strand
-///   the separator of any lead that did: silent doc-list corruption, the same class as the dropped
-///   run this rebuild exists to fix.
-/// - `lead` is the boundary the unit was pushed under, re-applied to the rebuilt unit: a `Spaced` /
-///   `Glued` lead is folded INTO the pushed doc, so a bare swap would lose it.
-#[derive(Clone, Copy)]
-struct PushedUnit {
-    head: usize,
-    docs_len: usize,
-    lead: LeadBoundary,
-}
-
 /// Whether `raw` begins with a linebreak, ignoring leading horizontal whitespace — prettier's
 /// `startsWithLinebreak` (`^([\t\f\r ]*\n)`) with the form feed dropped, since a form feed is
 /// content rather than skippable whitespace ([`is_collapsible_ws`]). Used by the block-child
@@ -286,11 +260,18 @@ impl<'a> Printer<'a> {
         // across exactly one iteration: the run's own indices are skipped via
         // `glued_run_consumed_until`, so the very next node visited is the text that takes it.
         let mut pending_glued_prefix: Option<(DocId, usize)> = None;
-        // The inline unit the previous iteration pushed as ONE child doc ([`PushedUnit`], whose
-        // doc carries what each field is for). Taken at the top of every visited iteration, so it
-        // names the entries the PREVIOUS visited iteration added and nothing older; the block arm
-        // truncates back to its mark and re-pushes the rebuilt unit under the same lead.
-        let mut pushed_unit: Option<PushedUnit> = None;
+        // Whether the unit the previous visited iteration pushed was built without its last
+        // closing `>`, which the glued control-flow block visited next takes
+        // (`block_sibling_takes_gt`, decided before the unit was built so it is built once).
+        // Taken at the top of every visited iteration, so it names the PREVIOUS visited
+        // iteration's push and nothing older.
+        let mut pending_gt = false;
+        // A shed `>` owed to the node visited last that its dangle arm did not take — set when
+        // the owed node is visited and cleared by the arm, then checked at the next visit and
+        // after the walk. It locks the predicate to the walk's arm order: a `>` the push decided
+        // to shed must reach the dangle arm (not the own-line declaration arm, a freeze or a
+        // skipped run), or the output drops it.
+        let mut unpaid_gt = false;
         // Index of the node the most recently VISITED iteration began its unit at — usually the
         // head of the previously pushed sibling doc, but a visit that pushes nothing (a
         // whitespace-only text) claims it too. Handed to the next visited node as
@@ -314,7 +295,10 @@ impl<'a> Printer<'a> {
             if i < glued_run_consumed_until {
                 continue;
             }
-            let prev_unit = pushed_unit.take();
+            debug_assert!(!unpaid_gt, "a shed `>` was not emitted by the dangle arm");
+            let prev_sheds_gt = std::mem::take(&mut pending_gt);
+            // A shed `>` is owed to exactly this node: the dangle arm below must take it.
+            unpaid_gt = prev_sheds_gt;
             // Hand the PREVIOUS visited index forward and claim this one. Every sibling doc is
             // built at its unit's HEAD (a glued element run and a comment-prefixed element are both
             // consume-ahead, their tails skipped by the `continue` above), so the previous visited
@@ -432,19 +416,17 @@ impl<'a> Printer<'a> {
                 // same the control-flow arm would produce); a snippet glued to content on
                 // both sides does not own a line and keeps the control-flow path below.
                 self.handle_own_line_tag(trimmed_nodes, i, &mut child_docs);
-            } else if is_control_flow_block(node)
-                && let Some(unit) = prev_unit
-                && let Some((element_doc, block_doc)) =
-                    self.try_block_sibling_gt_dangle(trimmed_nodes, i, unit.head)
+            } else if prev_sheds_gt
+                && let Some(block_doc) = self.build_block_node_doc_with_gt(node, self.d().text(">"))
             {
                 // Axis-3 sibling-`>` dangle, in BOTH arms: a control-flow block (`{#if}` /
                 // `{#each}` / `{#await}` / `{#key}`, and a `{#snippet}` glued to content on both
                 // sides) directly following an inline-element sibling (no whitespace between)
                 // sheds that element's closing `>` onto the block-head line (`</span⏎>{#if…}`) — a
                 // deliberate tsv divergence (block-tag wrapping). The element's unit was already
-                // pushed as the previous child: pop it, re-push the unit rebuilt with its last `>`
-                // split off (under the lead it was pushed with), and append the block that now
-                // owns the `>`.
+                // pushed as the previous child WITHOUT its `>` — the push decided the dangle
+                // (`block_sibling_takes_gt`) so the unit is built once — and the block built here
+                // now owns the `>`. A control-flow block always builds, so the `>` is never dropped.
                 //
                 // The inline arm needs it as much as the multiline one: it serves an inline
                 // parent (a component, an inline element) whose content an `{#await}` or a
@@ -455,17 +437,15 @@ impl<'a> Printer<'a> {
                 // inline keeps the `>` hugged.
                 //
                 // Placed after the own-line-declaration arm, so a `{#snippet}` that owns its line
-                // in the multiline arm still takes it there; the block-element arm above takes
-                // only elements, and no arm below takes a control-flow block before the final one,
-                // so the move changes nothing but which arm serves the inline dangle.
+                // in the multiline arm still takes it there (`block_sibling_takes_gt` declines
+                // that snippet for the same reason); the block-element arm above takes only
+                // elements, and no arm below takes a control-flow block before the final one, so
+                // the move changes nothing but which arm serves the inline dangle.
                 //
                 // Glued to the element: no whitespace node stands between them, so no separator
                 // can have deferred to this block.
                 debug_assert!(!prev_text_ws);
-                // Back to the mark the unit's push started at — its lead may have spent more than
-                // one entry — then re-push the rebuilt unit under that same lead.
-                child_docs.truncate(unit.docs_len);
-                self.push_inline_child_doc(&mut child_docs, element_doc, unit.lead);
+                unpaid_gt = false;
                 child_docs.push(block_doc);
             } else if multiline && is_control_flow_block(node) {
                 // Control-flow block in the convergence path, no dangle. A block the root marked
@@ -523,38 +503,26 @@ impl<'a> Printer<'a> {
                 // measurement sees the whole run as a unit — it moves to a fresh line together rather
                 // than dangling an opening tag after a space (any single element short enough to fit
                 // after the text can't rescue a wide LATER element in the run) — and each adjacent
-                // Soft pair sheds its `>` onto the next tag's line. Built once at the head; the tail
+                // eligible pair sheds its `>` onto the next tag's line. Built once at the head; the tail
                 // elements are skipped via `glued_run_consumed_until`.
-                else if let Some((run_doc, run_end)) =
-                    self.try_build_glued_element_run(trimmed_nodes, i)
+                else if let Some(unit) =
+                    self.try_build_glued_element_run(trimmed_nodes, i, multiline)
                 {
                     // Honor a trimmed boundary space from the previous text node exactly as
                     // the single-element path does — the run leads with `group([line, …])` so
                     // an inter-sibling space before a glued run (`</span>` ` ` `<br/><br/>`)
                     // renders (a space when it fits, a break when the fill wraps) rather than
                     // being dropped.
-                    let docs_len = child_docs.len();
-                    self.push_inline_child_doc(&mut child_docs, run_doc, lead);
-                    glued_run_consumed_until = run_end + 1;
-                    pushed_unit = Some(PushedUnit {
-                        head: i,
-                        docs_len,
-                        lead,
-                    });
-                } else if let Some(node_doc) = self.build_fragment_node_doc(node) {
-                    let docs_len = child_docs.len();
-                    self.push_inline_child_doc(&mut child_docs, node_doc, lead);
-                    if matches!(node, FragmentNode::Element(_)) {
-                        pushed_unit = Some(PushedUnit {
-                            head: i,
-                            docs_len,
-                            lead,
-                        });
-                    }
+                    self.push_inline_child_doc(&mut child_docs, unit.doc, lead);
+                    glued_run_consumed_until = unit.end + 1;
+                    pending_gt = unit.sheds_gt;
+                } else if let Some(unit) = self.build_inline_unit(trimmed_nodes, i, multiline) {
+                    self.push_inline_child_doc(&mut child_docs, unit.doc, lead);
+                    pending_gt = unit.sheds_gt;
                 }
             } else if !freeze.armed
-                && let Some((unit_doc, run_end)) =
-                    self.try_build_glued_comment_prefixed_element(trimmed_nodes, i)
+                && let Some(unit) =
+                    self.try_build_glued_comment_prefixed_element(trimmed_nodes, i, multiline)
             {
                 // Glued comment prefix (`<!--c--><a…>`): the comment(s) are the element's prefix,
                 // so build comments + element as ONE concat here (at the head comment) and skip the
@@ -572,14 +540,9 @@ impl<'a> Printer<'a> {
                 } else {
                     LeadBoundary::Plain
                 };
-                let docs_len = child_docs.len();
-                self.push_inline_child_doc(&mut child_docs, unit_doc, lead);
-                glued_run_consumed_until = run_end + 1;
-                pushed_unit = Some(PushedUnit {
-                    head: i,
-                    docs_len,
-                    lead,
-                });
+                self.push_inline_child_doc(&mut child_docs, unit.doc, lead);
+                glued_run_consumed_until = unit.end + 1;
+                pending_gt = unit.sheds_gt;
             } else if !freeze.armed
                 && !prev_text_ws
                 && let Some((prefix, text_idx)) =
@@ -647,6 +610,10 @@ impl<'a> Printer<'a> {
             }
         }
 
+        debug_assert!(
+            !unpaid_gt && !pending_gt,
+            "a shed `>` was not emitted by the dangle arm"
+        );
         // `concat` short-circuits the empty case to `empty()`.
         d.concat(&child_docs)
     }
@@ -1012,9 +979,9 @@ impl<'a> Printer<'a> {
     /// run (`</span>` ` ` `<br/><br/>`).
     ///
     /// ⚠️ How many entries a push spends is the LEAD's business, not one per call
-    /// ([`LeadBoundary::SpacedBare`] pushes the separator beside the doc). A caller that means to
-    /// UNDO a push therefore records `child_docs.len()` beforehand and truncates back to it
-    /// ([`PushedUnit`]) — a `pop()` reads as "one doc" and strands the rest.
+    /// ([`LeadBoundary::SpacedBare`] pushes the separator beside the doc), so a push is never
+    /// "one entry": code that reads or undoes the last push by position (a `pop()`) strands the
+    /// rest.
     fn push_inline_child_doc(&self, child_docs: &mut DocBuf, node_doc: DocId, lead: LeadBoundary) {
         match lead {
             LeadBoundary::Spaced => {

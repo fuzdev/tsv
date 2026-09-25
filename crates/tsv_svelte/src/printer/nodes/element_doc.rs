@@ -292,10 +292,10 @@ impl ThisClaim {
 /// [`Self::SourceBreaks`] decision is one tsv's **own output** rewrites, since converging an
 /// authoring to block-style adds or removes exactly those newlines. A layout keyed on it can
 /// therefore be re-decided on the next pass; a layout keyed on [`Self::Structural`] cannot.
-/// [`Printer::handle_separator_text_child`]'s sibling-newline flow rule is one consumer; the G2
-/// glued-run dangle's receive test ([`PreparedElement::can_receive_gt`]) is the other, and
-/// it admits every [`Self::SourceBreaks`] decision — the one multiline cause its own output can
-/// produce.
+/// [`Printer::handle_separator_text_child`]'s sibling-newline flow rule is one consumer; the
+/// sibling-`>` dangle's eligibility test ([`PreparedElement::gt_dangle_eligible`]) is the other,
+/// and it admits every [`Self::SourceBreaks`] decision — the one multiline cause its own output
+/// can produce.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum MultilineCause {
     /// Not multiline: the content collapses to one line, and width alone decides the layout.
@@ -350,35 +350,39 @@ pub(super) struct PreparedElement<'e> {
 }
 
 impl PreparedElement<'_> {
-    /// Whether the element can SHED its closing `>` to a following sibling (the axis-3
-    /// sibling-`>` dangle): the flat hug-both `Soft` layout, the single shape with one trailing
-    /// `>` that splits off cleanly.
+    /// Whether the element takes part in the axis-3 sibling-`>` dangle, in either role: it can
+    /// **shed** its closing `>` to a glued following sibling (the next element of a glued run, or
+    /// a control-flow block) and **receive** a glued preceding element's shed `>` into its
+    /// opening tag.
     ///
-    /// Soft alone qualifies (Hug's glued boundaries already collapse to it): a one-sided-newline
-    /// or render-free boundary trims to the same glued form, so without the dangle
-    /// `format(newline authoring)` would emit the glued no-dangle form, which the next pass reads
-    /// as Hug and dangles — a non-idempotent 2-cycle (`authoring_audit`'s hard bucket). Multiline
-    /// (Hard) and void/empty/self-closing forms keep their own `>`.
-    pub(super) fn can_shed_gt(&self) -> bool {
-        matches!(self.layout, ElementLayout::WithContent(BoundaryMode::Soft))
+    /// Both roles admit the same layouts, and the line is drawn by *cause*: the flat hug-both
+    /// `Soft` layout, and the multiline layout when the element is multiline only because of its
+    /// own authored line breaks ([`MultilineCause::SourceBreaks`]). The dangle must not read a
+    /// signal its own output rewrites. An element in either role whose content does not fit lays
+    /// that content out block-style (a receiver because its opening tag wraps, a shedder because
+    /// its own line is full), and block-style content is byte-for-byte the both-boundary-newline
+    /// authoring, which the next pass reads as `SourceBreaks`. A role that turned that element
+    /// away would be re-decided on the next pass (the pair un-dangles, or a shedder that now keeps
+    /// its `>` reprints `</b⏎>{#if c}` as `</b>{#if c}`), a two-pass layout either way.
+    ///
+    /// [`MultilineCause::Structural`] (a block child) is a cause the dangle's output never
+    /// produces, so a structurally multiline element keeps its `>` in both roles
+    /// (`</a>{#each …}`). So do the void / empty / self-closing layouts, which have no content
+    /// between their tags.
+    pub(super) fn gt_dangle_eligible(&self) -> bool {
+        match self.layout {
+            ElementLayout::WithContent(BoundaryMode::Soft) => true,
+            ElementLayout::WithContent(BoundaryMode::Hard) => {
+                self.ctx.multiline == MultilineCause::SourceBreaks
+            }
+            _ => false,
+        }
     }
 
-    /// Whether the element can RECEIVE a preceding glued sibling's shed `>` (G2): Soft, or
-    /// multiline only because of its own authored line breaks ([`MultilineCause::SourceBreaks`]).
-    ///
-    /// G2 eligibility must not read a signal the dangle's own output rewrites. A receiver whose
-    /// opening tag wraps prints its content block-style (`>⏎\t{b}⏎</i>`), which is byte-for-byte
-    /// the both-boundary-newline authoring — so the next pass reads that receiver as
-    /// `SourceBreaks`. Were receiving Soft-only, that pass would find the pair ineligible and
-    /// un-dangle it: an F1 2-cycle for every receiver whose content is not text (text stays Soft
-    /// through the prose gate). A [`MultilineCause::Structural`] receiver (a block child) is
-    /// multiline however it is written, so it stays out and keeps the `>` intact; so do the
-    /// void / empty / self-closing layouts, which have no content to lay out. Receiving only: a
-    /// multiline receiver never sheds its own `>` ([`Self::can_shed_gt`]).
-    pub(super) fn can_receive_gt(&self) -> bool {
-        self.can_shed_gt()
-            || (matches!(self.layout, ElementLayout::WithContent(BoundaryMode::Hard))
-                && self.ctx.multiline == MultilineCause::SourceBreaks)
+    /// Whether the element uses the flat hug-both (`Soft`) content layout — collapsed onto its
+    /// tag line when it fits, block-style when it does not.
+    pub(super) fn is_soft(&self) -> bool {
+        matches!(self.layout, ElementLayout::WithContent(BoundaryMode::Soft))
     }
 }
 
@@ -607,18 +611,21 @@ impl<'a> Printer<'a> {
     }
 
     /// Build an inline content element that hands its trailing closing `>` to a following
-    /// sibling (the axis-3 sibling-`>` dangle). Returns `Some(doc)` ending in `</tag` (no
-    /// `>`) only when the element uses the flat hug-both content layout — the single shape
-    /// where splitting the `>` off is render-safe and well-defined. Returns `None`
-    /// otherwise so the caller keeps the element (and its `>`) intact. The caller emits the
-    /// `>` itself (see `build_expanding_construct`'s `gt_prefix`). A glued run's members build
-    /// through [`Self::build_glued_run_element_doc`] instead, which also threads a received `>`.
+    /// control-flow block (the axis-3 sibling-`>` dangle). Returns `Some(doc)` ending in `</tag`
+    /// (no `>`) when the element takes part in the dangle
+    /// ([`PreparedElement::gt_dangle_eligible`]); `None` otherwise, so the caller keeps the
+    /// element (and its `>`) intact. The caller emits the `>` itself (see
+    /// `build_expanding_construct`'s `gt_prefix`). A glued run's members build through
+    /// [`Self::build_gt_dangle_element_doc`] directly, which also threads a received `>`.
     pub(super) fn build_inline_element_omit_close_gt(
         &self,
         element: &internal::Element<'_>,
     ) -> Option<DocId> {
-        let (parts, ctx, attr_docs, children_doc) = self.prepare_soft_sibling_element(element)?;
-        Some(self.build_collapsible_element_doc(&parts, &ctx, &attr_docs, children_doc, true, None))
+        let prepared = self.prepare_sibling_element(element)?;
+        if !prepared.gt_dangle_eligible() {
+            return None;
+        }
+        Some(self.build_gt_dangle_element_doc(element, &prepared, true, None))
     }
 
     /// Shared setup for every axis-3 sibling-`>` role: classifies the tag, builds its attrs and
@@ -652,18 +659,16 @@ impl<'a> Printer<'a> {
         Some(self.prepare_element(element, class, attr_docs))
     }
 
-    /// Shared eligibility + setup for the roles that split an element's OWN closing `>` off — the
-    /// element→block follower ([`Self::build_inline_element_omit_close_gt`]) and the
-    /// glued-text follower ([`Self::build_inline_element_close_gt_dangle`]) — which confirms the
-    /// flat hug-both (`Soft`) content layout ([`PreparedElement::can_shed_gt`]). Returns
-    /// `(parts, ctx, attr_docs, children_doc)`; `None` for any non-Soft shape (the callers then
-    /// keep the element and its `>` intact).
+    /// Eligibility + setup for the glued-text follower
+    /// ([`Self::build_inline_element_close_gt_dangle`]), whose three states all read the flat
+    /// hug-both (`Soft`) content layout. Returns `(parts, ctx, attr_docs, children_doc)`; `None`
+    /// for any other shape (the caller then keeps the element and its `>` intact).
     fn prepare_soft_sibling_element<'e>(
         &self,
         element: &'e internal::Element<'e>,
     ) -> Option<(ElementParts<'e>, ElementContext, DocBuf, DocId)> {
         let prepared = self.prepare_sibling_element(element)?;
-        if !prepared.can_shed_gt() {
+        if !prepared.is_soft() {
             return None;
         }
         let children_doc = self.build_soft_sibling_children_doc(element);
@@ -683,14 +688,15 @@ impl<'a> Printer<'a> {
         self.build_nodes_doc_trimmed(element.fragment.nodes, MultilineCause::None)
     }
 
-    /// Build one member of a glued element run (`build_glued_element_run`) that plays a G2 role,
-    /// from its [`PreparedElement`]: it **sheds** its closing `>` to the following sibling
-    /// (`sheds`) and/or **receives** a preceding sibling's `>` (`gt_prefix = Some`). A shedder is
-    /// always Soft ([`PreparedElement::can_shed_gt`]) and builds the collapsible layout; a
-    /// receiver that cannot shed is the multiline one ([`PreparedElement::can_receive_gt`]) and
-    /// builds the multiline layout with the `>` threaded into its opening tag and its own closing
-    /// `>` intact. The children are built once, for the arm taken.
-    pub(super) fn build_glued_run_element_doc(
+    /// Build an element that plays a sibling-`>` dangle role
+    /// ([`PreparedElement::gt_dangle_eligible`]), from its [`PreparedElement`]: it **sheds** its
+    /// closing `>` to the following sibling (`sheds`) and/or **receives** a preceding sibling's
+    /// `>` (`gt_prefix = Some`). A `Soft` element builds the collapsible layout, a multiline one
+    /// the multiline layout, each with the received `>` threaded into its opening tag. Either way
+    /// a shed drops the `>` alone: the closing tag keeps its own line whenever the content has
+    /// one, so the element is block-style exactly as when it keeps its `>`. The children are
+    /// built once, for the arm taken.
+    pub(super) fn build_gt_dangle_element_doc(
         &self,
         element: &internal::Element<'_>,
         prepared: &PreparedElement<'_>,
@@ -703,27 +709,43 @@ impl<'a> Printer<'a> {
             attr_docs,
             ..
         } = prepared;
-        if prepared.can_shed_gt() {
-            let children_doc = self.build_soft_sibling_children_doc(element);
-            return self.build_collapsible_element_doc(
-                parts,
-                ctx,
-                attr_docs,
-                children_doc,
-                sheds,
-                gt_prefix,
-            );
+        // A Structural-Hard element reaches the Hard arm too, so the cause is checked here.
+        debug_assert!(prepared.gt_dangle_eligible());
+        match prepared.layout {
+            ElementLayout::WithContent(BoundaryMode::Soft) => {
+                let children_doc = self.build_soft_sibling_children_doc(element);
+                self.build_collapsible_element_doc(
+                    parts,
+                    ctx,
+                    attr_docs,
+                    children_doc,
+                    sheds,
+                    gt_prefix,
+                )
+            }
+            ElementLayout::WithContent(BoundaryMode::Hard) => {
+                let children_doc = self.build_content_children_doc(parts, ctx, BoundaryMode::Hard);
+                self.build_multiline_element_doc(
+                    parts,
+                    ctx,
+                    attr_docs,
+                    children_doc,
+                    sheds,
+                    gt_prefix,
+                )
+            }
+            #[expect(clippy::unreachable)] // callers ask `gt_dangle_eligible`: content layouts only
+            _ => unreachable!("a sibling-`>` role needs a content layout"),
         }
-        debug_assert!(!sheds && gt_prefix.is_some() && prepared.can_receive_gt());
-        let children_doc = self.build_content_children_doc(parts, ctx, BoundaryMode::Hard);
-        self.build_multiline_element_doc(parts, ctx, attr_docs, children_doc, gt_prefix)
     }
 
     /// Build a glued-both inline element as the closing-`>` dangle onto glued following text —
     /// the axis-3 sibling-`>` dangle generalized from an element/block follower to a **text**
     /// follower (see fragment_doc's `try_build_glued_both_text_dangle`). Returns `Some` only for
-    /// the flat hug-both (`Soft`) shape, mirroring [`Self::build_inline_element_omit_close_gt`]'s
-    /// eligibility; `None` keeps the element intact so the caller falls back to the normal path.
+    /// the flat hug-both (`Soft`) shape, the one all three states below lay out; `None` keeps the
+    /// element intact so the caller falls back to the normal path. Narrower than the element and
+    /// block followers ([`PreparedElement::gt_dangle_eligible`]): a multiline element never
+    /// takes the inline or dangle state, so there is no role for it to play here.
     ///
     /// A three-state `conditional_group` — the renderer picks the first whose flat first line fits:
     /// 1. **inline** `<span>content</span>` — the element fits fully on the line;
@@ -893,7 +915,7 @@ impl<'a> Printer<'a> {
             );
         }
 
-        self.build_multiline_element_doc(parts, ctx, attr_docs, children_doc, None)
+        self.build_multiline_element_doc(parts, ctx, attr_docs, children_doc, false, None)
     }
 
     /// Build an element's children doc EXACTLY ONCE, in the variant the resolved boundary arm
@@ -933,14 +955,15 @@ impl<'a> Printer<'a> {
     /// by [`Self::build_content_children_doc`] as the multiline shape) on its own indented lines.
     ///
     /// `gt_prefix` (Some) is a preceding glued element's shed `>`, threaded into the opening tag's
-    /// attrs group — the G2 sibling-`>` dangle onto a multiline receiver
-    /// ([`Self::build_glued_run_element_doc`]).
+    /// attrs group, and `external_close` omits the element's own closing `>` (a shed): the
+    /// sibling-`>` dangle's roles for a multiline element ([`Self::build_gt_dangle_element_doc`]).
     fn build_multiline_element_doc(
         &self,
         parts: &ElementParts<'_>,
         ctx: &ElementContext,
         attr_docs: &[DocId],
         children_doc: DocId,
+        external_close: bool,
         gt_prefix: Option<DocId>,
     ) -> DocId {
         let d = self.d();
@@ -958,7 +981,11 @@ impl<'a> Printer<'a> {
             d.text(">"),
             d.indent_hardline(children_doc),
             d.hardline(),
-            self.end_tag(parts.name),
+            if external_close {
+                d.concat(&[d.text("</"), parts.name])
+            } else {
+                self.end_tag(parts.name)
+            },
         ])
     }
 
@@ -973,11 +1000,13 @@ impl<'a> Printer<'a> {
     /// already resolves the boundary to `Hard` in [`Printer::compute_element_layout`], so it never
     /// reaches this builder.
     ///
-    /// When `external_close` is true the element's own trailing closing `>` (and the boundary
-    /// break before it) is omitted — the caller emits the `>` elsewhere. This powers the axis-3
-    /// sibling-`>` dangle: an inline element directly followed by an expanding block renders as
-    /// `</tag` and hands its `>` to the block so it can dangle onto the block-head line. See
-    /// [`Printer::build_inline_element_omit_close_gt`].
+    /// When `external_close` is true the element's own closing `>` is omitted — the caller emits
+    /// it elsewhere. This powers the axis-3 sibling-`>` dangle: an inline element directly
+    /// followed by a glued element or a block renders as `</tag` and hands its `>` on, so it can
+    /// dangle onto the follower's line. Only the `>` goes: the boundary break before `</tag`
+    /// stays, so when the content drops to its own line the closing tag takes one too and the
+    /// element is block-style (`⏎\tx⏎</b` then the `>`), never the closing tag hugging the
+    /// content line. See [`Printer::build_inline_element_omit_close_gt`].
     fn build_collapsible_element_doc(
         &self,
         parts: &ElementParts<'_>,
@@ -1008,19 +1037,18 @@ impl<'a> Printer<'a> {
             None => self.build_opening_tag(parts.name, attr_docs, ctx.has_multiline_attr),
         };
 
-        // External close: the trailing `>` and its preceding boundary break are emitted elsewhere,
-        // so both collapse to nothing here.
-        let (trailing, close_gt) = if external_close {
-            (d.empty(), d.empty())
+        // External close: the trailing `>` is emitted elsewhere, so it collapses to nothing here.
+        let close_gt = if external_close {
+            d.empty()
         } else {
-            (d.softline(), d.text(">"))
+            d.text(">")
         };
         let body = d.indent(d.concat(&[d.softline(), children_doc]));
         d.group(d.concat(&[
             opening,
             d.text(">"),
             body,
-            trailing,
+            d.softline(),
             d.text("</"),
             parts.name,
             close_gt,

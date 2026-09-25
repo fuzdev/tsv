@@ -90,8 +90,9 @@ fn gen_svelte_await(depth: usize) -> String {
 }
 
 /// An inline element immediately followed (no whitespace) by a control-flow block —
-/// the sibling-`>` dangle path (`try_block_sibling_gt_dangle`), which probe-builds
-/// the block for a `will_break` test and then rebuilds it folded with the `>`.
+/// the sibling-`>` dangle path (`block_sibling_takes_gt`), which must build the block once,
+/// with the `>` threaded in: probing it for a `will_break` test and rebuilding it folded with the
+/// `>` doubles the work per level.
 fn gen_svelte_block_sibling(depth: usize) -> String {
     let opens = "<span>t</span>{#if c}".repeat(depth);
     let closes = "{/if}".repeat(depth);
@@ -106,6 +107,33 @@ fn gen_svelte_glued_run(depth: usize) -> String {
     let opens = "<b>a</b><i>".repeat(depth);
     let closes = "</i>".repeat(depth);
     format!("{opens}x{closes}\n")
+}
+
+/// An inline element that sheds its `>` onto a glued control-flow block, nested inside an inline
+/// wrapper that holds a block of its own (`<b><i>…{#if c}x{/if}</i></b>{#if c}x{/if}`), so the
+/// wrapper is structurally multiline and each level's shedder sits in the one below — the
+/// element→block dangle (`block_sibling_takes_gt`), which must decide the dangle before it
+/// builds the element. Building the element as the fragment loop's ordinary child, then again
+/// with its `>` split off once the block turns up, doubles the work at every level.
+fn gen_svelte_block_dangle_nest(depth: usize) -> String {
+    let mut s = String::from("t");
+    for _ in 0..depth {
+        s = format!("<b><i>{s}{{#if c}}x{{/if}}</i></b>{{#if c}}x{{/if}}");
+    }
+    s.push('\n');
+    s
+}
+
+/// [`gen_svelte_block_dangle_nest`] authored on its own lines — the shape tsv prints it in. Each
+/// shedder is then multiline by its authored line breaks, which sheds its `>` exactly as the
+/// compact form's width-broken shedder does, so a re-format walks the same dangle path.
+fn gen_svelte_block_dangle_nest_multiline(depth: usize) -> String {
+    let mut s = String::from("t");
+    for _ in 0..depth {
+        s = format!("<b>\n<i>\n{s}{{#if c}}\nx\n{{/if}}\n</i>\n</b>{{#if c}}\nx\n{{/if}}");
+    }
+    s.push('\n');
+    s
 }
 
 /// A member chain whose call argument is itself the inner chain — the axis the
@@ -556,6 +584,18 @@ const CONSTRUCTS: &[Construct] = &[
         name: "svelte_glued_run",
         parser: ParserType::Svelte,
         generate: gen_svelte_glued_run,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "svelte_block_dangle_nest",
+        parser: ParserType::Svelte,
+        generate: gen_svelte_block_dangle_nest,
+        depths: &[4, 8, 12],
+    },
+    Construct {
+        name: "svelte_block_dangle_nest_multiline",
+        parser: ParserType::Svelte,
+        generate: gen_svelte_block_dangle_nest_multiline,
         depths: &[4, 8, 12],
     },
     Construct {

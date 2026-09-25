@@ -102,7 +102,7 @@ pub(super) fn is_inline_content(node: &FragmentNode<'_>) -> bool {
 /// `<div>{#await p}x{/await}</div>` stays inline, matching prettier), unlike if/each/key
 /// (`has_any_expanding_blocks`). After a preceding **breakable** sibling it does: forcing a
 /// block parent multiline there puts the sibling and the block on the parent's own lines, so
-/// the inline-element closing-`>` dangle (`try_block_sibling_gt_dangle`) and a block-element
+/// the inline-element closing-`>` dangle (`block_sibling_takes_gt`) and a block-element
 /// sibling's own-line separation resolve in one pass (the parent break itself is a cataloged
 /// divergence — prettier keeps the short construct inline). A non-breakable preceding sibling
 /// (plain text, a comment) gets no force — it would only diverge from prettier — so such
