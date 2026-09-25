@@ -196,12 +196,12 @@ fn the_dedent_reads_the_source_acorn_was_handed() {
             "{#snippet s(a = /*\n\t c1 */ 1)}{/snippet}\n",
             "\n\t c1 ",
         ),
-        // `read_type_annotation` enters five bytes BEHIND the type, splicing its `_ as ` OVER
-        // those bytes rather than between them — so the dedent's line walk, which runs over
-        // the synthetic string, cannot see a `\n` inside that window. All four rows carry the
-        // same tab-indented body, and the last two are the pair that shows the run is really
-        // measured: the head is unbroken, so acorn sees the seven blanked columns ahead of the
-        // splice, and a body line carrying exactly those seven loses them.
+        // `read_type_annotation` enters four code units BEHIND the colon, splicing its `_ as `
+        // OVER those units and the colon rather than between them — so the dedent's line walk,
+        // which runs over the synthetic string, cannot see a `\n` inside that window. All four
+        // rows carry the same tab-indented body, and the last two are the pair that shows the
+        // run is really measured: the head is unbroken, so acorn sees the seven blanked columns
+        // ahead of the splice, and a body line carrying exactly those seven loses them.
         //
         // (Each needs the `lang="ts"` script: `parser.ts` is what makes canonical read a
         // `{@const}` annotation at all, and without it there is no oracle for these rows.)
@@ -354,9 +354,9 @@ fn the_dedent_reads_the_document_once_the_line_opens_in_real_text() {
 /// This is the discriminating shape, and building one takes care: the obvious two-comment
 /// case has both runs strip NOTHING, so it passes under a per-island lookup too. Here the
 /// pattern's blanked prefix is **eight** columns (to the `{` on line 2, less the one blank
-/// `read_pattern` deletes) and the annotation's is **thirteen** (to five bytes behind the
-/// `:` on line 3), and each comment's body line carries exactly its own — so a single answer
-/// for the island leaves one of the two standing.
+/// `read_pattern` deletes) and the annotation's is **thirteen** (to where the `_ as ` insert
+/// begins, four code units before the `:` on line 3), and each comment's body line carries
+/// exactly its own — so a single answer for the island leaves one of the two standing.
 #[test]
 fn an_islands_two_parses_are_resolved_separately() {
     assert_eq!(
@@ -460,8 +460,9 @@ fn a_snippet_prelude_blanks_per_code_unit_too() {
     );
 }
 
-/// `read_type_annotation` blanks the prefix and writes `_ as ` over its last five bytes, so
-/// the run acorn measured is spaces up to the insert — never the `\t` the line opens with.
+/// `read_type_annotation` blanks the prefix and writes `_ as ` over the five code units ending
+/// at the colon, so the run acorn measured is spaces up to the insert — never the `\t` the
+/// line opens with.
 #[test]
 fn a_block_annotations_line_is_the_as_inserts_own() {
     assert_eq!(
@@ -473,15 +474,16 @@ fn a_block_annotations_line_is_the_as_inserts_own() {
     );
 }
 
-/// The `_ as ` insert **overwrites** the five bytes it covers, so a newline the author wrote
-/// between a binding and its colon is gone before acorn ever sees it — and the comment's line
-/// then opens back on the *binding's* line, whose indentation is what comes off.
+/// The `_ as ` insert **overwrites** the five code units it covers (the four before the colon,
+/// and the colon), so a newline the author wrote in that window is gone before acorn ever sees
+/// it — and the comment's line then opens back on the line the window began on, whose
+/// indentation is what comes off.
 ///
-/// The two spellings below put the newline at each end of that five-byte window. The glued
+/// The two spellings below put the newline at each end of that five-unit window. The glued
 /// spelling above is the null control: with the colon against the binding there is no newline
 /// for the insert to swallow, and the two line starts agree.
 ///
-/// This is the same five bytes that make an annotation's own line SEED non-identity
+/// This is the same five code units that make an annotation's own line SEED non-identity
 /// (`tests/acorn_loc_line_terminators.rs`), one question over.
 #[test]
 fn the_as_insert_swallows_a_newline_before_the_colon() {
@@ -495,6 +497,97 @@ fn the_as_insert_swallows_a_newline_before_the_colon() {
     assert_eq!(
         comment_value(&format!(
             "{HEAD}\t{{#each xs as x\n\t: /* a1\n\t a2 */ number}}{{x}}{{/each}}\n{{/if}}\n"
+        )),
+        " a1\n\t a2 "
+    );
+}
+
+/// The window the `_ as ` insert overwrites is five UTF-16 **code units**, not five bytes:
+/// Svelte slices a JS string. Behind a non-ASCII binding the two disagree about where the
+/// window opens — and so about whether the newline ahead of it was swallowed and where the
+/// comment's line begins.
+///
+/// - `as⏎\téé:` — the newline is four units before the colon (`\n`, `\t`, `é`, `é`), so
+///   the insert swallows it and the line opens back before `\t{#each`, a blanked run no
+///   continuation line matches; nothing comes off. Four bytes back reaches only the two
+///   `é`s and leaves the newline standing.
+/// - `éé⏎:` — the window opens on the space before `éé`; four bytes back is the middle of
+///   the first `é`, which is no position in the source at all.
+///
+/// `ab⏎\t:` (an ASCII spelling of the second) is the null control, where units and bytes
+/// coincide.
+#[test]
+fn the_as_insert_window_is_five_code_units() {
+    const HEAD: &str = "<script lang=\"ts\">\n\tlet xs = [1];\n</script>\n{#if xs}\n";
+    // the ASCII control first, so a failure below is the non-ASCII case's alone
+    assert_eq!(
+        comment_value(&format!(
+            "{HEAD}\t{{#each xs as ab\n\t: /* a1\n\t a2 */ number}}{{ab}}{{/each}}\n{{/if}}\n"
+        )),
+        " a1\n\t a2 "
+    );
+    assert_eq!(
+        comment_value(&format!(
+            "{HEAD}\t{{#each xs as\n\téé: /* a1\n\t a2 */ number}}{{éé}}{{/each}}\n{{/if}}\n"
+        )),
+        " a1\n\t a2 "
+    );
+}
+
+/// The second bullet above, on its own: a window whose byte reading would open inside a
+/// character must still parse, and dedent as the code-unit window does.
+#[test]
+fn the_as_insert_window_opening_mid_character_still_parses() {
+    const HEAD: &str = "<script lang=\"ts\">\n\tlet xs = [1];\n</script>\n{#if xs}\n";
+    assert_eq!(
+        comment_value(&format!(
+            "{HEAD}\t{{#each xs as éé\n: /* a1\n\t a2 */ number}}{{éé}}{{/each}}\n{{/if}}\n"
+        )),
+        " a1\n\t a2 "
+    );
+}
+
+/// The opposite direction: a binding four code units wide FILLS the window, so the newline
+/// ahead of it survives and the line opens on the binding's own `\t` — blanked to one space,
+/// which then comes off the first line of the value. Counted in bytes, the window reaches
+/// back into the binding and the blanked run grows past anything a line of the value opens
+/// with, so nothing comes off.
+///
+/// `éééé` (two bytes each) and `𝑎𝑎` (an astral pair, two units and four bytes each) are the
+/// two ways to be four units and more than four bytes; `abcd` is the ASCII null control.
+#[test]
+fn a_binding_four_code_units_wide_keeps_the_newline_before_the_window() {
+    const HEAD: &str = "<script lang=\"ts\">\n\tlet xs = [1];\n</script>\n{#if xs}\n";
+    // one comparison over all three, so a failure shows every binding's answer at once
+    let values: Vec<(&str, String)> = ["abcd", "éééé", "𝑎𝑎"]
+        .into_iter()
+        .map(|binding| {
+            let src = format!(
+                "{HEAD}\t{{#each xs as\n\t{binding}: /* a1\n\t a2 */ number}}\
+                 {{{binding}}}{{/each}}\n{{/if}}\n"
+            );
+            (binding, comment_value(&src))
+        })
+        .collect();
+    assert_eq!(
+        values,
+        [
+            ("abcd", "a1\n\t a2 ".to_owned()),
+            ("éééé", "a1\n\t a2 ".to_owned()),
+            ("𝑎𝑎", "a1\n\t a2 ".to_owned())
+        ]
+    );
+}
+
+/// A guard for the code-unit reading itself: behind `𝑎é⏎\t:` the window's first unit is the
+/// LOW half of `𝑎`'s surrogate pair — a code-unit position with no byte offset of its own.
+/// The newline is inside the window either way, so the answer is the swallowed line's.
+#[test]
+fn a_window_opening_between_a_surrogate_pair_still_dedents() {
+    const HEAD: &str = "<script lang=\"ts\">\n\tlet xs = [1];\n</script>\n{#if xs}\n";
+    assert_eq!(
+        comment_value(&format!(
+            "{HEAD}\t{{#each xs as 𝑎é\n\t: /* a1\n\t a2 */ number}}{{𝑎é}}{{/each}}\n{{/if}}\n"
         )),
         " a1\n\t a2 "
     );

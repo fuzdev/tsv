@@ -56,8 +56,8 @@ under canonical's own walk.
 `a5` is a multi-line block comment inside the annotation, and it pins the other
 thing `read_type_annotation`'s synthetic source decides. acorn's `onComment`
 dedents such a comment by the `[ \t]` run opening its line **in the string acorn
-was given** — and that string is the template blanked to spaces up to five bytes
-behind the type, with `_ as ` spliced over those five. So the tab opening `a5`'s
+was given** — and that string is the template blanked to spaces, with `_ as ` overwriting
+the five UTF-16 code units ending at the colon. So the tab opening `a5`'s
 line is not indentation acorn can see (it is a blanked space, and the run before
 it ends at the `_`), and the comment's `value` keeps its tab where reading the
 document would have stripped it.

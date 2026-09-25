@@ -89,14 +89,19 @@ pub struct AcornRegion {
 
 impl AcornRegion {
     /// This parse's preparation as the writers ask for it — the kind plus the offset its
-    /// manufactured bytes run out at, which is `origin`: Svelte's own slicing is what put
-    /// the boundary there, so the two cannot drift.
+    /// manufactured bytes run out at. That is `origin` wherever Svelte splices its text
+    /// between document bytes: its own slicing put the boundary there, so the two cannot
+    /// drift. Under `BlankedThenAs` it is `lex_start` instead, one past the colon, because the
+    /// `_ as ` overwrites the document up to there — and `lex_start` is exact where `origin`
+    /// can only name the character a surrogate-split window opens in.
     #[inline]
     pub(crate) fn acorn_prefix(self) -> AcornPrefix {
-        if self.prefix == AcornPrefixText::Document {
-            AcornPrefix::DOCUMENT
-        } else {
-            AcornPrefix::manufactured(self.prefix, self.origin)
+        match self.prefix {
+            AcornPrefixText::Document => AcornPrefix::DOCUMENT,
+            AcornPrefixText::BlankedThenAs => {
+                AcornPrefix::manufactured(self.prefix, self.lex_start)
+            }
+            _ => AcornPrefix::manufactured(self.prefix, self.origin),
         }
     }
 

@@ -198,14 +198,14 @@ fn a_declaration_tag_counts_the_prefix_under_the_ecmascript_class() {
     );
 }
 
-/// A block binding's trailing `: T` is a **second** acorn parse, and Svelte enters it five
-/// bytes behind the colon on a synthetic `_ as ` that **overwrites** them
-/// (`read_type_annotation`). So a newline the author wrote between the binding and its colon
-/// is erased before acorn ever sees it, and the annotation's nodes stay on the *binding's*
-/// line — `number` below is authored on line 7 and reported on line 6.
+/// A block binding's trailing `: T` is a **second** acorn parse, over a template whose five
+/// code units ending at the colon Svelte **overwrites** with a synthetic `_ as `
+/// (`read_type_annotation`). So a newline the author wrote in the four units before the colon
+/// is erased before acorn ever sees it, and the annotation's nodes sit that many lines higher
+/// — `number` below is authored on line 7 and reported on line 6.
 ///
 /// This is the one region whose seed is non-identity for a reason that has nothing to do
-/// with the two line **classes**: a plain `\n` inside that five-byte window is enough, and
+/// with the two line **classes**: a plain `\n` inside that five-unit window is enough, and
 /// it is the only region whose parse `origin` sits behind where it starts lexing. So the
 /// answer must not depend on whether the document *also* carries a lone CR / `<LS>` /
 /// `<PS>` — which is exactly the pair asserted here, since a gate keyed on the line classes
@@ -228,6 +228,74 @@ fn an_annotation_seed_survives_a_newline_the_as_insert_overwrites() {
         line_of(&one_class_only, PATH),
         6,
         "with no second line class"
+    );
+}
+
+/// The `loc.start` of the one node whose path ends in `suffix`, as `(line, column)`.
+fn start_of(src: &str, suffix: &str) -> (u64, u64) {
+    fn find(node: &Value, path: &str, suffix: &str, out: &mut Vec<(u64, u64)>) {
+        match node {
+            Value::Object(fields) => {
+                let ty = fields.get("type").and_then(Value::as_str).unwrap_or("?");
+                if format!("{path}.{ty}").ends_with(suffix)
+                    && let Some(start) = fields.get("loc").and_then(|loc| loc.get("start"))
+                {
+                    let at = |key: &str| start.get(key).and_then(Value::as_u64);
+                    if let (Some(line), Some(column)) = (at("line"), at("column")) {
+                        out.push((line, column));
+                    }
+                }
+                for (key, value) in fields {
+                    find(value, &format!("{path}.{key}"), suffix, out);
+                }
+            }
+            Value::Array(items) => {
+                for (i, item) in items.iter().enumerate() {
+                    find(item, &format!("{path}[{i}]"), suffix, out);
+                }
+            }
+            _ => {}
+        }
+    }
+    let arena = bumpalo::Bump::new();
+    let ast = tsv_svelte::parse(src, &arena).expect("parser should accept the component");
+    let json = tsv_debug::json::wire_value(&tsv_svelte::convert_ast_json_bytes(&ast, src));
+    let mut hits = Vec::new();
+    find(&json, "", suffix, &mut hits);
+    assert_eq!(
+        hits.len(),
+        1,
+        "{suffix:?} should name one node, found {hits:?}"
+    );
+    hits[0]
+}
+
+/// A `\r\n` the `_ as ` window SPLITS: in `as\r\nééé:` the four code units before the colon
+/// are `\n`, `é`, `é`, `é`, so the `\n` is overwritten while its `\r` falls in the blanked
+/// prefix and becomes a space — acorn sees no break at all, and `T` stays on the `as` line,
+/// its column measured from that line's start. Counted in bytes the window holds only the
+/// `é`s, and the break stands. `as éé\r\n:` is the control: the window takes the whole pair
+/// either way.
+#[test]
+fn an_as_insert_window_splitting_a_crlf_swallows_the_break() {
+    const PATH: &str = ".context.typeAnnotation.typeAnnotation.TSTypeReference";
+    let head = "<script lang=\"ts\">\n\tlet xs: any;\n\tlet p: any;\n</script>\n";
+    // the control first, so a failure below is the split case's alone
+    assert_eq!(
+        start_of(
+            &format!("{head}{{#each xs as éé\r\n: T}}{{éé}}{{/each}}\n"),
+            PATH
+        ),
+        (5, 19),
+        "the whole CRLF inside the window"
+    );
+    assert_eq!(
+        start_of(
+            &format!("{head}{{#each xs as\r\nééé: T}}{{ééé}}{{/each}}\n"),
+            PATH
+        ),
+        (5, 19),
+        "the window splitting the CRLF"
     );
 }
 

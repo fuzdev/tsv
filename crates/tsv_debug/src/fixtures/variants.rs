@@ -39,8 +39,9 @@ pub fn unformatted_ours_suffix<'a>(filename: &'a str, input_ext: &str) -> Option
 /// The pin makes the non-divergence parse claim (P4) about THAT variant: the canonical
 /// parser's AST of the variant, which tsv's parse must reproduce byte-strict. It exists
 /// for a parse fact only a non-fixed-point authoring can carry — a leading BOM with nothing
-/// load-bearing behind it, which the format side strips, so no `input.*` can hold one under
-/// F1 — and is opt-in per variant:
+/// load-bearing behind it, which the format side strips, or a newline inside a region the
+/// canonical parser overwrites (Svelte's `_ as ` annotation window), which tsv's formatter
+/// always removes, so no `input.*` can hold one under F1 — and is opt-in per variant:
 /// nothing grades a variant's parse until its pin is present.
 const EXPECTED_VARIANT_PREFIX: &str = "expected_";
 

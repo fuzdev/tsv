@@ -723,15 +723,170 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 		);
 	});
 
+	// A block binding's `: T` is read by Svelte's SECOND acorn parse, over a template whose
+	// five code units ending at the colon are overwritten with `_ as ` — so a newline in the
+	// four units before the colon is never counted, while one further back survives. Each
+	// row's expectation is canonical Svelte 5.57.0's `loc` for the annotation's first type
+	// reference, written down rather than read off tsv's own wire; `shifted` says whether it
+	// differs from the plain LF line table, so both directions stay under test.
+	it("places a block binding's `: T` where Svelte's second acorn parse does", () => {
+		const head = '<script lang="ts">let xs: any; let p: any;</script>\n';
+		const rows: Array<[string, [number, number], boolean]> = [
+			[`${head}{#each xs as e\n: T}{e}{/each}\n`, [2, 17], true],
+			// the newline at the window's far edge, then one unit past it
+			[`${head}{#each xs as e\n   : T}{e}{/each}\n`, [2, 20], true],
+			[`${head}{#each xs as e\n    : T}{e}{/each}\n`, [3, 6], false],
+			[`${head}{#each xs as e\n        : T}{e}{/each}\n`, [3, 10], false],
+			// the window reaches back past the binding itself
+			[`${head}{#each xs as\ne: T}{e}{/each}\n`, [2, 16], true],
+			[`${head}{#each xs as\n  ab: T}{ab}{/each}\n`, [3, 6], false],
+			[`${head}{#each xs as\n\n\ne: T}{e}{/each}\n`, [2, 18], true],
+			// a destructure binding, whose own closing line is inside the window
+			[`${head}{#each xs as [\na\n]: T}{a}{/each}\n`, [2, 20], true],
+			[`${head}{#each xs as {\n\ta,\n\tb\n}: T}{a}{b}{/each}\n`, [4, 6], true],
+			[`${head}{#each xs as e\r\n: T}{e}{/each}\r\n`, [2, 18], true],
+			[`﻿${head}{#each xs as e\n: T}{e}{/each}\n`, [2, 17], true],
+			[`${head}{#await p then v\n: T}{v}{/await}\n`, [2, 19], true],
+			[`${head}{#await p}x{:catch err\n: T}{err}{/await}\n`, [2, 25], true],
+			[`${head}{#if 1}{@const a\n: T = 1}{a}{/if}\n`, [2, 19], true],
+			[`${head}{#if 1}{@const\na: T = 1}{a}{/if}\n`, [2, 18], true],
+			// a reference below the colon's line keeps its own column, one line up
+			[`${head}{#each xs as e\n: {\n\tx: A;\n\ty: B\n}}{e}{/each}\n`, [3, 4], true],
+			[`${head}{#each xs as e : T}{e}{/each}\n`, [2, 17], false],
+			// the window is five UTF-16 code units: behind non-ASCII text it reaches more
+			// than five bytes back, and an astral character counts two units
+			[`${head}{#each xs as\néé: T}{éé}{/each}\n`, [2, 17], true],
+			[`${head}{#each xs as\n中中: T}{中中}{/each}\n`, [2, 17], true],
+			[`${head}{#each xs as\n\u{1d44e}: T}{\u{1d44e}}{/each}\n`, [2, 17], true],
+			[`${head}{#each xs as\n\u{1d44e}\u{1d44e}: T}{\u{1d44e}\u{1d44e}}{/each}\n`, [3, 6], false],
+			// a window opening between the halves of a surrogate pair
+			[`${head}{#each xs as \u{1d44e}é\n\t: T}{\u{1d44e}é}{/each}\n`, [2, 20], true],
+			[`${head}{#each xs as e\n\u3000\u3000: T}{e}{/each}\n`, [2, 19], true],
+			[`${head}{#each xs as [\ne\n]\u00a0\n: T}{e}{/each}\n`, [3, 7], true],
+			// a window splitting a CRLF: the `\r` is blanked, the `\n` overwritten
+			[`${head}{#each xs as\r\nééé: T}{ééé}{/each}\n`, [2, 19], true],
+			[`${head}{#await p then\néé: T}{éé}{/await}\n`, [2, 19], true],
+			[`${head}{#if 1}{@const\n中中: T = 1}{中中}{/if}\n`, [2, 19], true]
+		];
+		const first_type_reference = (node: any): any => {
+			if (Array.isArray(node)) {
+				for (const x of node) {
+					const found = first_type_reference(x);
+					if (found) return found;
+				}
+				return null;
+			}
+			if (!node || typeof node !== 'object') return null;
+			if (node.type === 'TSTypeReference') return node;
+			for (const k of Object.keys(node)) {
+				if (k === 'loc' || k === 'name_loc') continue;
+				const found = first_type_reference(node[k]);
+				if (found) return found;
+			}
+			return null;
+		};
+		for (const [source, [line, column], shifted] of rows) {
+			const label = JSON.stringify(source.slice(source.indexOf('</script>') + 10));
+			// Svelte's offsets index the BOM-less string
+			const text = source.charCodeAt(0) === 0xfeff ? source.slice(1) : source;
+			const full_ref = first_type_reference(node_entry.parse_svelte(source));
+			assert.deepEqual(full_ref.loc.start, { line, column }, `${label}: tsv's full wire`);
+			const before = text.slice(0, full_ref.start);
+			const plain = {
+				line: before.split('\n').length,
+				column: full_ref.start - (before.lastIndexOf('\n') + 1)
+			};
+			assert.equal(
+				plain.line !== line || plain.column !== column,
+				shifted,
+				`${label}: the row ${shifted ? 'must' : 'must not'} differ from the plain line table`
+			);
+			const span_only = node_entry.parse_svelte(source, { locations: false });
+			const locator = node_entry.create_locator(source, { ast: span_only });
+			assert.deepEqual(
+				locator.loc_of(first_type_reference(span_only)),
+				full_ref.loc,
+				`${label}: create_locator(...).loc_of`
+			);
+			const recon = node_entry.reconstruct_locations(span_only, source);
+			assert.deepEqual(first_type_reference(recon).loc, full_ref.loc, `${label}: reconstruct`);
+		}
+
+		// A destructure binding's `end` runs over its annotation, but its `loc.end` still
+		// names the closing bracket — here on its own line, clear of the `+1`-column quirk.
+		const each = `${head}{#each xs as [\na\n]: T}{a}{/each}\n`;
+		const context = (root: any): any =>
+			root.fragment.nodes.find((n: any) => n.type === 'EachBlock').context;
+		const each_span_only = node_entry.parse_svelte(each, { locations: false });
+		assert.deepEqual(context(node_entry.parse_svelte(each)).loc.end, { line: 4, column: 1 });
+		assert.deepEqual(
+			node_entry.create_locator(each, { ast: each_span_only }).loc_of(context(each_span_only)).end,
+			{ line: 4, column: 1 }
+		);
+		assert.deepEqual(context(node_entry.reconstruct_locations(each_span_only, each)).loc.end, {
+			line: 4,
+			column: 1
+		});
+
+		// Without the tree a Svelte `loc_of` cannot tell an annotation's node from any other,
+		// so it refuses rather than answer differently from `reconstruct`.
+		const plain_span_only = node_entry.parse_svelte(each, { locations: false });
+		assert.throws(
+			() => node_entry.create_locator(each, { language: 'svelte' }).loc_of(plain_span_only),
+			/needs the span-only tree/
+		);
+		assert.throws(
+			() => node_entry.loc_of(plain_span_only, each, { language: 'svelte' }),
+			/needs the span-only tree/
+		);
+	});
+
+	// A comment inside a shifted annotation is moved with it — and is listed twice on the
+	// wire: attached under the annotation, and in the root `comments` list, which a walk
+	// reaches outside every block. Each row's expectation is canonical Svelte 5.57.0's for
+	// the root copy; the last is the unshifted control.
+	it("places a comment inside a block binding's `: T` where Svelte's second acorn parse does", () => {
+		const head = '<script lang="ts">let xs: any; let p: any;</script>\n';
+		const rows: Array<[string, [number, number], string, boolean]> = [
+			[`${head}{#each xs as e\n: /* c */ T}{e}{/each}\n`, [2, 17], ' c ', true],
+			[`${head}{#each xs as\néé: /* a\n\t b */ T}{éé}{/each}\n`, [2, 17], ' a\n\t b ', true],
+			[`${head}{#each xs as e\n: // c\nT}{e}{/each}\n`, [2, 17], ' c', true],
+			[`${head}{#await p then\n\u{1d44e}: /* c */ T}{\u{1d44e}}{/await}\n`, [2, 19], ' c ', true],
+			[`${head}{#if 1}{@const\n中中: /* c */ T = 1}{中中}{/if}\n`, [2, 19], ' c ', true],
+			[`${head}{#each xs as e: /* c */ T}{e}{/each}\n`, [2, 16], ' c ', false]
+		];
+		for (const [source, [line, column], value, shifted] of rows) {
+			const label = JSON.stringify(source.slice(source.indexOf('</script>') + 10));
+			const full = node_entry.parse_svelte(source).comments[0];
+			assert.deepEqual(full.loc.start, { line, column }, `${label}: tsv's full wire`);
+			assert.equal(full.value, value, `${label}: tsv's full wire value`);
+			const before = source.slice(0, full.start);
+			const plain_line = before.split('\n').length;
+			const plain_column = full.start - (before.lastIndexOf('\n') + 1);
+			assert.equal(plain_line !== line || plain_column !== column, shifted, label);
+			const span_only = node_entry.parse_svelte(source, { locations: false });
+			assert.deepEqual(
+				node_entry.create_locator(source, { ast: span_only }).loc_of(span_only.comments[0]),
+				full.loc,
+				`${label}: create_locator(...).loc_of`
+			);
+			const recon = node_entry.reconstruct_locations(span_only, source);
+			assert.deepEqual(recon.comments[0].loc, full.loc, `${label}: reconstruct`);
+		}
+	});
+
 	// The hand-written case above pins the shapes a reader can follow; this one drives
 	// the SAME helper over every `.svelte` fixture in the repo, so the tables it carries
 	// (`NAME_LOC_KINDS`, the character-bearing shapes) are graded against what the writer
 	// actually emits rather than against a remembered list. Every mismatch must fall into
-	// one of the two documented Svelte divergences — anything else fails.
+	// one of the two documented Svelte divergences, and every refusal must be the documented
+	// two-line-class one — anything else fails. `create_locator(...).loc_of` is graded against
+	// the same reconstruction node for node, so the two entry points cannot drift apart.
 	//
 	// Self-oracle by construction: it grades `reconstruct(no-loc) == full wire`, so it
 	// proves reconstruction fidelity, NOT conformance to Svelte. The conformance oracle is
-	// `deno task corpus:compare:parse` plus the root Rust span tests.
+	// `deno task corpus:compare:parse` plus the root Rust span tests (and the canonical rows
+	// in the test above).
 	it('reconstructs every .svelte fixture, or refuses it for two line classes', () => {
 		const roots = [join(repo_root, 'tests/fixtures'), join(repo_root, 'tests/fixtures_compile')];
 		const files: Array<string> = [];
@@ -750,13 +905,94 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 		let character_locs = 0;
 		let scanned = 0;
 		let refused = 0;
+		let seeded_annotation_docs = 0;
+		let loc_of_checked = 0;
 
-		const compare = (recon: any, full: any, file: string): void => {
+		// Whether the FULL wire places a block binding's annotation somewhere the plain LF line
+		// table does not — derived from the wire alone, never from the helper's own rule, so it
+		// counts the documents that exercise the helper's correction without restating it. A
+		// block binding's `: T` is the one `TSTypeAnnotation` Svelte builds by hand (no `loc`,
+		// where every acorn-built one has one); a node under it whose `loc.start` disagrees with
+		// its plain line/column is one Svelte's second acorn parse moved.
+		const plain_loc_at = (text: string, offset: number) => {
+			const before = text.slice(0, offset);
+			return { line: before.split('\n').length, column: offset - (before.lastIndexOf('\n') + 1) };
+		};
+		const has_seeded_annotation = (node: any, text: string, inside = false): boolean => {
+			if (Array.isArray(node)) return node.some((x) => has_seeded_annotation(x, text, inside));
+			if (!node || typeof node !== 'object') return false;
+			const here = inside || (node.type === 'TSTypeAnnotation' && !('loc' in node));
+			if (here && node.loc && !deep_equal_json(node.loc.start, plain_loc_at(text, node.start))) {
+				return true;
+			}
+			return Object.keys(node).some(
+				(k) => k !== 'loc' && k !== 'name_loc' && has_seeded_annotation(node[k], text, here)
+			);
+		};
+		// every node with numeric `start`/`end`, in walk order
+		const spanned = (node: any, out: Array<any> = []): Array<any> => {
+			if (Array.isArray(node)) {
+				for (const x of node) spanned(x, out);
+			} else if (node && typeof node === 'object') {
+				if (typeof node.start === 'number' && typeof node.end === 'number') out.push(node);
+				for (const k of Object.keys(node)) {
+					if (k !== 'loc' && k !== 'name_loc') spanned(node[k], out);
+				}
+			}
+			return out;
+		};
+		// documented quirk 2, the destructure-pattern synthetic-`(` column shift: one endpoint
+		// read one column late on its own line — graded per endpoint, so a `start` inside the
+		// quirk cannot mask an `end` outside it, and granted only inside a block binding
+		// (`in_binding` below), the one parse that carries it
+		const point_matches = (recon_point: any, full_point: any): boolean =>
+			deep_equal_json(recon_point, full_point) ||
+			(recon_point?.line === full_point.line && full_point.column - recon_point?.column === 1);
+		// the block-binding patterns `read_pattern` parses under its synthetic `(` — the `{#each}`
+		// context, the `{:then}` / `{:catch}` values and the `{@const}` declarator's `id` — of
+		// one document, gathered before `compare` walks it
+		const binding_patterns = (node: any, out: Set<any> = new Set()): Set<any> => {
+			if (Array.isArray(node)) {
+				for (const x of node) binding_patterns(x, out);
+			} else if (node && typeof node === 'object') {
+				if (node.type === 'EachBlock') out.add(node.context);
+				if (node.type === 'AwaitBlock') {
+					out.add(node.value);
+					out.add(node.error);
+				}
+				if (node.type === 'ConstTag') {
+					for (const d of node.declaration?.declarations ?? []) out.add(d?.id);
+				}
+				for (const k of Object.keys(node)) {
+					if (k !== 'loc' && k !== 'name_loc') binding_patterns(node[k], out);
+				}
+			}
+			return out;
+		};
+		let patterns: Set<any> = new Set();
+		// the same parse's comments sit in the root `comments` list, not under the pattern, so
+		// they are placed by span: inside a pattern, short of its annotation
+		const in_pattern_span = (comment: any): boolean => {
+			for (const p of patterns) {
+				if (!p || typeof p.start !== 'number') continue;
+				const end = p.typeAnnotation ? p.typeAnnotation.start : p.end;
+				if (comment.start >= p.start && comment.end <= end) return true;
+			}
+			return false;
+		};
+
+		// `in_binding`: inside a block-binding pattern, short of its `typeAnnotation` — which a
+		// different acorn parse reads, under no synthetic `(`
+		const compare = (recon: any, full: any, file: string, in_binding = false): void => {
 			if (Array.isArray(full)) {
-				full.forEach((x, i) => compare(recon?.[i], x, file));
+				full.forEach((x, i) => compare(recon?.[i], x, file, in_binding));
 				return;
 			}
 			if (!full || typeof full !== 'object') return;
+			const binding =
+				in_binding ||
+				patterns.has(full) ||
+				((full.type === 'Block' || full.type === 'Line') && in_pattern_span(full));
 			if (full.name_loc) {
 				compared++;
 				if (!deep_equal_json(recon?.name_loc, full.name_loc)) {
@@ -770,10 +1006,10 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 				if (!deep_equal_json(recon?.loc, full.loc)) {
 					// documented quirk 1: Svelte's `<script>`/`<style>` tag-position override
 					const script_program = full.type === 'Program';
-					// documented quirk 2: the destructure-pattern synthetic-`(` column shift
 					const destructure_shift =
-						recon?.loc?.start?.line === full.loc.start.line &&
-						full.loc.start.column - (recon?.loc?.start?.column ?? 0) === 1;
+						binding &&
+						point_matches(recon?.loc?.start, full.loc.start) &&
+						point_matches(recon?.loc?.end, full.loc.end);
 					if (!script_program && !destructure_shift) {
 						findings.push(`${file}: loc on ${full.type}@${full.start}`);
 					}
@@ -781,7 +1017,7 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 			}
 			for (const k of Object.keys(full)) {
 				if (k === 'loc' || k === 'name_loc') continue;
-				compare(recon?.[k], full[k], file);
+				compare(recon?.[k], full[k], file, binding && k !== 'typeAnnotation');
 			}
 		};
 
@@ -804,18 +1040,44 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 				refused++;
 				assert.throws(
 					() => node_entry.reconstruct_locations(span_only, source, { language: 'svelte' }),
-					/cannot reconstruct `loc`/,
+					/cannot reconstruct `loc`.*lone CR, U\+2028, or U\+2029/,
 					`${file.slice(repo_root.length + 1)}: expected the two-line-class refusal`
 				);
 				continue;
 			}
 			scanned++;
+			// Svelte's offsets index the BOM-less string (its `parse` strips a leading BOM)
+			const text = source.charCodeAt(0) === 0xfeff ? source.slice(1) : source;
+			if (has_seeded_annotation(full, text)) seeded_annotation_docs++;
+			// the per-node entry point, asked before `reconstruct` mutates the same tree
+			const locator = node_entry.create_locator(source, { ast: span_only });
+			const nodes = spanned(span_only);
+			const answers = nodes.map((n) => locator.loc_of(n));
+			// unguarded: a refusal the two-line-class check above did not predict fails the test
 			const recon = node_entry.reconstruct_locations(span_only, source, { language: 'svelte' });
-			compare(recon, full, file.slice(repo_root.length + 1));
+			const rel = file.slice(repo_root.length + 1);
+			patterns = binding_patterns(full);
+			compare(recon, full, rel);
+			nodes.forEach((n, i) => {
+				loc_of_checked++;
+				const { start, end } = n.loc;
+				const plain = {
+					start: { line: start.line, column: start.column },
+					end: { line: end.line, column: end.column }
+				};
+				if (!deep_equal_json(answers[i], plain)) {
+					findings.push(`${rel}: loc_of disagrees with reconstruct on ${n.type}@${n.start}`);
+				}
+			});
 		}
 
 		assert.ok(scanned > 500, `expected to parse most fixtures, parsed ${scanned}`);
 		assert.ok(refused > 0, 'expected the fixture corpus to hold a two-line-class source');
+		assert.ok(
+			seeded_annotation_docs > 0,
+			"expected the fixture corpus to hold a block binding whose `: T` Svelte's second parse moved"
+		);
+		assert.ok(loc_of_checked > compared, `expected loc_of on every node, asked ${loc_of_checked}`);
 		assert.ok(compared > 10_000, `expected a broad comparison, made ${compared}`);
 		assert.ok(character_locs > 0, 'expected some character-bearing locs (in-tag comments)');
 		assert.deepEqual(findings.slice(0, 10), [], `${findings.length} undocumented mismatches`);

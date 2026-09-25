@@ -590,7 +590,7 @@ See [Development Philosophy](#development-philosophy-test-driven-development-wit
 sibling makes a precise, validated claim — `expected_ours.json` / `expected_svelte.json`
 (parser divergence), `expected_<stem>.json` (a sibling variant `<stem>.*`'s parse pin: the
 canonical AST of a form no `input.*` can hold under F1 — a leading BOM with nothing
-load-bearing behind it),
+load-bearing behind it, or a newline inside a region the canonical parser overwrites),
 `output_prettier.*` / `prettier_variant_*` / `variant_*` /
 `divergent_variant_*` / `prettier_intermediate_*` / `prettier_intermediate_to_variant_*` /
 `prettier_intermediate_to_divergent_variant_*` /
@@ -625,7 +625,7 @@ and validation rules (F/S/R/D): ./docs/fixture_overview.md.
 - **Prettier never converges (no oracle)**: Add `prettier_nonconvergent.txt` + README (requires `_prettier_divergence` suffix; excludes all prettier-claim files)
 - **Prettier rejects/throws on input (no oracle)**: Add `prettier_rejects.txt` (trimmed content = expected-error substring) + README (requires `_prettier_divergence` suffix; excludes all prettier-claim files; mutually exclusive with `prettier_nonconvergent.txt`)
 - **tsv over-rejects but canonical accepts**: Add `tsv_rejects.txt` (trimmed content = expected tsv-error substring) + `expected_svelte.json` + README (requires `_svelte_divergence` suffix; no `expected.json`/`expected_ours.json`; excludes all format-claim files, `input_invalid_*`, and the prettier no-oracle markers)
-- **The parse fact lives only in a form `input.*` can't hold** (a leading BOM with nothing load-bearing behind it — the format side strips it, so F1 forbids it): pin a variant instead — an empty `expected_<stem>.json` beside the variant `<stem>.*`, filled by `fixtures:update:parsed` (P4/S24; the in-tree case is each `bom_prettier_divergence`'s `expected_prettier_variant_bom.json`)
+- **The parse fact lives only in a form `input.*` can't hold** (a leading BOM with nothing load-bearing behind it — the format side strips it, so F1 forbids it — or a newline inside a region the canonical parser overwrites, Svelte's `_ as ` annotation window, which tsv's formatter always removes — prettier keeps some, e.g. `{@const a1⏎: T}` as written): pin a variant instead — an empty `expected_<stem>.json` beside the variant `<stem>.*`, filled by `fixtures:update:parsed` (P4/S24; the in-tree cases are each `bom_prettier_divergence`'s `expected_prettier_variant_bom.json` `svelte/blocks/binding_annotation_multibyte`'s two `expected_unformatted_*.json`, and `svelte/blocks/each/context_annotation_comment_prettier_divergence`'s `expected_unformatted_ours_colon_newline.json`)
 - **Both differ**: Use `_svelte_prettier_divergence` suffix
 
 ## Debug Tooling

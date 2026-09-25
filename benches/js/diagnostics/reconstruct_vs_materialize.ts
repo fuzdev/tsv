@@ -95,22 +95,24 @@ for (const language of ['typescript', 'svelte'] as Language[]) {
 	let sanity_done = false;
 	for (const f of selected) {
 		const src = f.content;
-		// Skip files either path rejects (keep A and B measuring the same set).
+		// One locator per file (line table built once) — the "consumer holds a
+		// locator" model, matching the probe's prebuilt-table B path.
+		let locator: ReturnType<typeof create_locator>;
+		let probe: Record<string, unknown>;
+		// Skip files either path rejects, and those the helper refuses (a Svelte source with
+		// a lone CR, U+2028 or U+2029), so A and B measure the same set. The untimed
+		// reconstruct is what surfaces a refusal here rather than inside B's timing loop.
 		try {
 			native.parse(src, language);
-			native.parse_no_locations(src, language);
+			probe = native.parse_no_locations(src, language) as Record<string, unknown>;
+			locator = create_locator(src, { language });
+			locator.reconstruct(probe);
 		} catch {
 			continue;
 		}
 
-		// One locator per file (line table built once) — the "consumer holds a
-		// locator" model, matching the probe's prebuilt-table B path.
-		const locator = create_locator(src, { language });
-
 		// Sanity (first file per language): reconstruct must actually add `loc`.
 		if (!sanity_done) {
-			const probe = native.parse_no_locations(src, language) as Record<string, unknown>;
-			locator.reconstruct(probe);
 			if (!probe.loc) throw new Error(`reconstruct added no loc for ${language} (${f.path})`);
 			sanity_done = true;
 		}
