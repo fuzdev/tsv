@@ -1,0 +1,478 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 574,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 167,
+				"data": "\n\tA control-flow block beside a global `svelte:*` element is content, like a text: with the\n\ttext on the other side glued too, the element stays on their line.\n"
+			},
+			{
+				"type": "Text",
+				"start": 167,
+				"end": 169,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 169,
+				"end": 196,
+				"data": " an if block before "
+			},
+			{
+				"type": "Text",
+				"start": 196,
+				"end": 197,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 197,
+				"end": 217,
+				"test": {
+					"type": "Identifier",
+					"start": 202,
+					"end": 206,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 5
+						},
+						"end": {
+							"line": 7,
+							"column": 9
+						}
+					},
+					"name": "cond"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 207,
+							"end": 212,
+							"raw": "text1",
+							"data": "text1"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "SvelteWindow",
+				"start": 217,
+				"end": 245,
+				"name": "svelte:window",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 21,
+						"character": 218
+					},
+					"end": {
+						"line": 7,
+						"column": 34,
+						"character": 231
+					}
+				},
+				"attributes": [
+					{
+						"start": 232,
+						"end": 242,
+						"type": "OnDirective",
+						"name": "x",
+						"name_loc": {
+							"start": {
+								"line": 7,
+								"column": 35,
+								"character": 232
+							},
+							"end": {
+								"line": 7,
+								"column": 39,
+								"character": 236
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 238,
+							"end": 241,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 41
+								},
+								"end": {
+									"line": 7,
+									"column": 44
+								}
+							},
+							"name": "fn1"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 245,
+				"end": 252,
+				"raw": "text2\n\n",
+				"data": "text2\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 252,
+				"end": 280,
+				"data": " an each block after "
+			},
+			{
+				"type": "Text",
+				"start": 280,
+				"end": 286,
+				"raw": "\ntext3",
+				"data": "\ntext3"
+			},
+			{
+				"type": "SvelteDocument",
+				"start": 286,
+				"end": 316,
+				"name": "svelte:document",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 6,
+						"character": 287
+					},
+					"end": {
+						"line": 10,
+						"column": 21,
+						"character": 302
+					}
+				},
+				"attributes": [
+					{
+						"start": 303,
+						"end": 313,
+						"type": "OnDirective",
+						"name": "x",
+						"name_loc": {
+							"start": {
+								"line": 10,
+								"column": 22,
+								"character": 303
+							},
+							"end": {
+								"line": 10,
+								"column": 26,
+								"character": 307
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 309,
+							"end": 312,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 28
+								},
+								"end": {
+									"line": 10,
+									"column": 31
+								}
+							},
+							"name": "fn2"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "EachBlock",
+				"start": 316,
+				"end": 350,
+				"expression": {
+					"type": "Identifier",
+					"start": 323,
+					"end": 328,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 42
+						},
+						"end": {
+							"line": 10,
+							"column": 47
+						}
+					},
+					"name": "items"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 337,
+							"end": 343,
+							"expression": {
+								"type": "Identifier",
+								"start": 338,
+								"end": 342,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 57
+									},
+									"end": {
+										"line": 10,
+										"column": 61
+									}
+								},
+								"name": "item"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 332,
+					"end": 336,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 51,
+							"character": 332
+						},
+						"end": {
+							"line": 10,
+							"column": 55,
+							"character": 336
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 350,
+				"end": 352,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 352,
+				"end": 379,
+				"data": " a key block before "
+			},
+			{
+				"type": "Text",
+				"start": 379,
+				"end": 380,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "KeyBlock",
+				"start": 380,
+				"end": 402,
+				"expression": {
+					"type": "Identifier",
+					"start": 386,
+					"end": 390,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 6
+						},
+						"end": {
+							"line": 13,
+							"column": 10
+						}
+					},
+					"name": "expr"
+				},
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 391,
+							"end": 396,
+							"raw": "text4",
+							"data": "text4"
+						}
+					]
+				}
+			},
+			{
+				"type": "SvelteBody",
+				"start": 402,
+				"end": 428,
+				"name": "svelte:body",
+				"name_loc": {
+					"start": {
+						"line": 13,
+						"column": 23,
+						"character": 403
+					},
+					"end": {
+						"line": 13,
+						"column": 34,
+						"character": 414
+					}
+				},
+				"attributes": [
+					{
+						"start": 415,
+						"end": 425,
+						"type": "OnDirective",
+						"name": "x",
+						"name_loc": {
+							"start": {
+								"line": 13,
+								"column": 35,
+								"character": 415
+							},
+							"end": {
+								"line": 13,
+								"column": 39,
+								"character": 419
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 421,
+							"end": 424,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 41
+								},
+								"end": {
+									"line": 13,
+									"column": 44
+								}
+							},
+							"name": "fn3"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 428,
+				"end": 435,
+				"raw": "text5\n\n",
+				"data": "text5\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 435,
+				"end": 498,
+				"data": " a comment after, glued, with the text on the next line "
+			},
+			{
+				"type": "Text",
+				"start": 498,
+				"end": 504,
+				"raw": "\ntext6",
+				"data": "\ntext6"
+			},
+			{
+				"type": "SvelteHead",
+				"start": 504,
+				"end": 551,
+				"name": "svelte:head",
+				"name_loc": {
+					"start": {
+						"line": 16,
+						"column": 6,
+						"character": 505
+					},
+					"end": {
+						"line": 16,
+						"column": 17,
+						"character": 516
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "TitleElement",
+							"start": 517,
+							"end": 537,
+							"name": "title",
+							"name_loc": {
+								"start": {
+									"line": 16,
+									"column": 19,
+									"character": 518
+								},
+								"end": {
+									"line": 16,
+									"column": 24,
+									"character": 523
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 524,
+										"end": 529,
+										"raw": "text7",
+										"data": "text7"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Comment",
+				"start": 551,
+				"end": 567,
+				"data": " comment "
+			},
+			{
+				"type": "Text",
+				"start": 567,
+				"end": 573,
+				"raw": "\ntext8",
+				"data": "\ntext8"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

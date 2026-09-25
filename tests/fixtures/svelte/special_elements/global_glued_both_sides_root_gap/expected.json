@@ -1,0 +1,455 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 548,
+		"end": 586,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 557,
+					"end": 558,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 557,
+							"end": 558,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "p",
+											"start": 557,
+											"end": 558
+										}
+									],
+									"start": 557,
+									"end": 558
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 559,
+					"end": 577,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 563,
+							"end": 573,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 557,
+				"end": 577
+			}
+		],
+		"comments": [],
+		"content": {
+			"start": 555,
+			"end": 578,
+			"styles": "\n\tp {\n\t\tcolor: red;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 587,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 24,
+				"end": 26,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Text",
+				"start": 56,
+				"end": 58,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 58,
+				"end": 328,
+				"data": "\n\tA <script>, <style> or <svelte:options> between a global `svelte:*` element and its glued\n\tneighbour is lifted out of the fragment before the whitespace rules run, so the text around it\n\tis adjacent to the compiler: the element stays glued to it on both sides.\n"
+			},
+			{
+				"type": "Text",
+				"start": 328,
+				"end": 330,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 330,
+				"end": 360,
+				"data": " the script's position "
+			},
+			{
+				"type": "Text",
+				"start": 360,
+				"end": 366,
+				"raw": "\ntext1",
+				"data": "\ntext1"
+			},
+			{
+				"type": "SvelteWindow",
+				"start": 366,
+				"end": 394,
+				"name": "svelte:window",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 6,
+						"character": 367
+					},
+					"end": {
+						"line": 14,
+						"column": 19,
+						"character": 380
+					}
+				},
+				"attributes": [
+					{
+						"start": 381,
+						"end": 391,
+						"type": "OnDirective",
+						"name": "x",
+						"name_loc": {
+							"start": {
+								"line": 14,
+								"column": 20,
+								"character": 381
+							},
+							"end": {
+								"line": 14,
+								"column": 24,
+								"character": 385
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 387,
+							"end": 390,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 26
+								},
+								"end": {
+									"line": 14,
+									"column": 29
+								}
+							},
+							"name": "fn1"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 394,
+				"end": 401,
+				"raw": "text2\n\n",
+				"data": "text2\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 401,
+				"end": 437,
+				"data": " the svelte:options position "
+			},
+			{
+				"type": "Text",
+				"start": 437,
+				"end": 443,
+				"raw": "\ntext3",
+				"data": "\ntext3"
+			},
+			{
+				"type": "SvelteDocument",
+				"start": 443,
+				"end": 473,
+				"name": "svelte:document",
+				"name_loc": {
+					"start": {
+						"line": 17,
+						"column": 6,
+						"character": 444
+					},
+					"end": {
+						"line": 17,
+						"column": 21,
+						"character": 459
+					}
+				},
+				"attributes": [
+					{
+						"start": 460,
+						"end": 470,
+						"type": "OnDirective",
+						"name": "x",
+						"name_loc": {
+							"start": {
+								"line": 17,
+								"column": 22,
+								"character": 460
+							},
+							"end": {
+								"line": 17,
+								"column": 26,
+								"character": 464
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 466,
+							"end": 469,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 28
+								},
+								"end": {
+									"line": 17,
+									"column": 31
+								}
+							},
+							"name": "fn2"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 473,
+				"end": 480,
+				"raw": "text4\n\n",
+				"data": "text4\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 480,
+				"end": 509,
+				"data": " the style's position "
+			},
+			{
+				"type": "Text",
+				"start": 509,
+				"end": 515,
+				"raw": "\ntext5",
+				"data": "\ntext5"
+			},
+			{
+				"type": "SvelteBody",
+				"start": 515,
+				"end": 541,
+				"name": "svelte:body",
+				"name_loc": {
+					"start": {
+						"line": 20,
+						"column": 6,
+						"character": 516
+					},
+					"end": {
+						"line": 20,
+						"column": 17,
+						"character": 527
+					}
+				},
+				"attributes": [
+					{
+						"start": 528,
+						"end": 538,
+						"type": "OnDirective",
+						"name": "x",
+						"name_loc": {
+							"start": {
+								"line": 20,
+								"column": 18,
+								"character": 528
+							},
+							"end": {
+								"line": 20,
+								"column": 22,
+								"character": 532
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 534,
+							"end": 537,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 24
+								},
+								"end": {
+									"line": 20,
+									"column": 27
+								}
+							},
+							"name": "fn3"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 541,
+				"end": 548,
+				"raw": "text6\n\n",
+				"data": "text6\n\n"
+			}
+		]
+	},
+	"options": {
+		"start": 0,
+		"end": 24,
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 16,
+				"end": 21,
+				"name": "runes",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 16,
+						"character": 16
+					},
+					"end": {
+						"line": 1,
+						"column": 21,
+						"character": 21
+					}
+				},
+				"value": true
+			}
+		],
+		"runes": true
+	},
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 26,
+		"end": 56,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 34,
+			"end": 47,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 0
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 36,
+					"end": 46,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 11
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 40,
+							"end": 45,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 5
+								},
+								"end": {
+									"line": 4,
+									"column": 10
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 40,
+								"end": 41,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 5
+									},
+									"end": {
+										"line": 4,
+										"column": 6
+									}
+								},
+								"name": "s"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 44,
+								"end": 45,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 9
+									},
+									"end": {
+										"line": 4,
+										"column": 10
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

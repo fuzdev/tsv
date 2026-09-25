@@ -1,0 +1,540 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 647,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 280,
+				"data": "\n\tA hoisted neighbour is not content, so the glue is asked past it: each global `svelte:*`\n\telement below is glued to text on both sides through a declaration tag, a `{@debug}` or a\n\t`{#snippet}`, and the whole run stays on the text's line, the hoisted neighbour included.\n"
+			},
+			{
+				"type": "Text",
+				"start": 280,
+				"end": 282,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 282,
+				"end": 315,
+				"data": " a declaration tag before "
+			},
+			{
+				"type": "Text",
+				"start": 315,
+				"end": 321,
+				"raw": "\ntext1",
+				"data": "\ntext1"
+			},
+			{
+				"type": "DeclarationTag",
+				"start": 321,
+				"end": 334,
+				"declaration": {
+					"type": "VariableDeclaration",
+					"start": 322,
+					"end": 333,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 6
+						},
+						"end": {
+							"line": 8,
+							"column": 17
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 328,
+							"end": 333,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 12
+								},
+								"end": {
+									"line": 8,
+									"column": 17
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 328,
+								"end": 329,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 12
+									},
+									"end": {
+										"line": 8,
+										"column": 13
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 332,
+								"end": 333,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 16
+									},
+									"end": {
+										"line": 8,
+										"column": 17
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "const"
+				}
+			},
+			{
+				"type": "SvelteWindow",
+				"start": 334,
+				"end": 362,
+				"name": "svelte:window",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 19,
+						"character": 335
+					},
+					"end": {
+						"line": 8,
+						"column": 32,
+						"character": 348
+					}
+				},
+				"attributes": [
+					{
+						"start": 349,
+						"end": 359,
+						"type": "OnDirective",
+						"name": "x",
+						"name_loc": {
+							"start": {
+								"line": 8,
+								"column": 33,
+								"character": 349
+							},
+							"end": {
+								"line": 8,
+								"column": 37,
+								"character": 353
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 355,
+							"end": 358,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 39
+								},
+								"end": {
+									"line": 8,
+									"column": 42
+								}
+							},
+							"name": "fn1"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 362,
+				"end": 369,
+				"raw": "text2\n\n",
+				"data": "text2\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 369,
+				"end": 401,
+				"data": " a declaration tag after "
+			},
+			{
+				"type": "Text",
+				"start": 401,
+				"end": 407,
+				"raw": "\ntext3",
+				"data": "\ntext3"
+			},
+			{
+				"type": "SvelteDocument",
+				"start": 407,
+				"end": 437,
+				"name": "svelte:document",
+				"name_loc": {
+					"start": {
+						"line": 11,
+						"column": 6,
+						"character": 408
+					},
+					"end": {
+						"line": 11,
+						"column": 21,
+						"character": 423
+					}
+				},
+				"attributes": [
+					{
+						"start": 424,
+						"end": 434,
+						"type": "OnDirective",
+						"name": "x",
+						"name_loc": {
+							"start": {
+								"line": 11,
+								"column": 22,
+								"character": 424
+							},
+							"end": {
+								"line": 11,
+								"column": 26,
+								"character": 428
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 430,
+							"end": 433,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 28
+								},
+								"end": {
+									"line": 11,
+									"column": 31
+								}
+							},
+							"name": "fn2"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "DeclarationTag",
+				"start": 437,
+				"end": 448,
+				"declaration": {
+					"type": "VariableDeclaration",
+					"start": 438,
+					"end": 447,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 36
+						},
+						"end": {
+							"line": 11,
+							"column": 45
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 442,
+							"end": 447,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 40
+								},
+								"end": {
+									"line": 11,
+									"column": 45
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 442,
+								"end": 443,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 40
+									},
+									"end": {
+										"line": 11,
+										"column": 41
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 446,
+								"end": 447,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 44
+									},
+									"end": {
+										"line": 11,
+										"column": 45
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"kind": "let"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 448,
+				"end": 455,
+				"raw": "text4\n\n",
+				"data": "text4\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 455,
+				"end": 482,
+				"data": " a debug tag before "
+			},
+			{
+				"type": "Text",
+				"start": 482,
+				"end": 488,
+				"raw": "\ntext5",
+				"data": "\ntext5"
+			},
+			{
+				"type": "DebugTag",
+				"start": 488,
+				"end": 498,
+				"identifiers": [
+					{
+						"type": "Identifier",
+						"start": 496,
+						"end": 497,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 13
+							},
+							"end": {
+								"line": 14,
+								"column": 14
+							}
+						},
+						"name": "a"
+					}
+				]
+			},
+			{
+				"type": "SvelteBody",
+				"start": 498,
+				"end": 524,
+				"name": "svelte:body",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 16,
+						"character": 499
+					},
+					"end": {
+						"line": 14,
+						"column": 27,
+						"character": 510
+					}
+				},
+				"attributes": [
+					{
+						"start": 511,
+						"end": 521,
+						"type": "OnDirective",
+						"name": "x",
+						"name_loc": {
+							"start": {
+								"line": 14,
+								"column": 28,
+								"character": 511
+							},
+							"end": {
+								"line": 14,
+								"column": 32,
+								"character": 515
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 517,
+							"end": 520,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 34
+								},
+								"end": {
+									"line": 14,
+									"column": 37
+								}
+							},
+							"name": "fn3"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 524,
+				"end": 531,
+				"raw": "text6\n\n",
+				"data": "text6\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 531,
+				"end": 556,
+				"data": " a snippet before "
+			},
+			{
+				"type": "Text",
+				"start": 556,
+				"end": 562,
+				"raw": "\ntext7",
+				"data": "\ntext7"
+			},
+			{
+				"type": "SnippetBlock",
+				"start": 562,
+				"end": 593,
+				"expression": {
+					"type": "Identifier",
+					"name": "fn4",
+					"start": 572,
+					"end": 575,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 15,
+							"character": 572
+						},
+						"end": {
+							"line": 17,
+							"column": 18,
+							"character": 575
+						}
+					}
+				},
+				"parameters": [],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 578,
+							"end": 583,
+							"raw": "text8",
+							"data": "text8"
+						}
+					]
+				}
+			},
+			{
+				"type": "SvelteHead",
+				"start": 593,
+				"end": 640,
+				"name": "svelte:head",
+				"name_loc": {
+					"start": {
+						"line": 17,
+						"column": 37,
+						"character": 594
+					},
+					"end": {
+						"line": 17,
+						"column": 48,
+						"character": 605
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "TitleElement",
+							"start": 606,
+							"end": 626,
+							"name": "title",
+							"name_loc": {
+								"start": {
+									"line": 17,
+									"column": 50,
+									"character": 607
+								},
+								"end": {
+									"line": 17,
+									"column": 55,
+									"character": 612
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 613,
+										"end": 618,
+										"raw": "text9",
+										"data": "text9"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 640,
+				"end": 646,
+				"raw": "text10",
+				"data": "text10"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

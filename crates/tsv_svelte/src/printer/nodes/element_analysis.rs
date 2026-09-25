@@ -254,10 +254,7 @@ impl<'a> Printer<'a> {
         // question rather than overlap it: `breaks_inline_run` owns the whitespace-only spelling
         // of a blank (and every non-text node that ends a run), `text_edge_blank` the spelling
         // folded into a content text's edge, which is the half the first cannot see.
-        if run
-            .iter()
-            .any(|n| self.breaks_inline_run(n) || self.text_edge_blank(n))
-        {
+        if (0..run.len()).any(|i| self.breaks_inline_run(run, i) || self.text_edge_blank(&run[i])) {
             return false;
         }
 

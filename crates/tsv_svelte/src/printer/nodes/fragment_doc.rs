@@ -415,7 +415,7 @@ impl<'a> Printer<'a> {
                     &mut child_docs,
                     &mut deferred,
                 );
-            } else if multiline && self.is_block_element_node(node) {
+            } else if multiline && self.is_block_element_at(trimmed_nodes, i) {
                 // Block element (div, p, block component): own-line via softlines +
                 // forceBreakContent — prettier-plugin-svelte's handleBlockChild. Gated on
                 // `multiline`: the inline arm routes a block element through the inline path.
@@ -711,8 +711,8 @@ impl<'a> Printer<'a> {
         // (Both bounds can hold at once — the separator is then the only node the rules see, and
         // the arbitrary pick below still answers `false` on the hoist test below, whichever side
         // it picked: with no content in the fragment, both of them are hoisted.)
-        let before = i.checked_sub(1).and_then(|j| nodes.get(j));
-        let after = nodes.get(i + 1);
+        let before = i.checked_sub(1);
+        let after = Some(i + 1).filter(|j| *j < nodes.len());
         let (hoisted, content) = if trailing_edge {
             (after, before)
         } else {
@@ -721,9 +721,9 @@ impl<'a> Printer<'a> {
         let (Some(hoisted), Some(content)) = (hoisted, content) else {
             return false;
         };
-        matches!(hoisted, FragmentNode::DebugTag(_))
-            && !content.is_hoisted_from_fragment()
-            && self.sibling_newline_flows(content)
+        matches!(nodes[hoisted], FragmentNode::DebugTag(_))
+            && !nodes[content].is_hoisted_from_fragment()
+            && self.sibling_newline_flows(nodes, content)
     }
 
     /// Whether the node at `i` is glued to the nearest **content** before (`prev`) or after
@@ -733,15 +733,20 @@ impl<'a> Printer<'a> {
     /// Four things make a neighbour not-content. Three are the compiler's own answer: a
     /// **hoisted** sibling vanishes from those rules, so the scan steps over it (a run of
     /// `{@const}`s is not glued to itself — stepping over hoisted neighbours can only end at a
-    /// text, whose edges answer, or at the fragment edge, which is not content); a
+    /// text, whose edges answer, or at the fragment edge, which is not content). "Hoisted" is the
+    /// compiler's WHOLE list here ([`internal::FragmentNode::is_compiler_hoisted`]), the four
+    /// global `svelte:*` elements included — the trim readers' narrower set leaves them out for a
+    /// layout reason that is no answer to this question, and asking it made the scan stop at a
+    /// global element as at a block one, so `a{const x = 1}<svelte:window />b` split around both.
+    /// Further: a
     /// **whitespace-only** text is the separator, not the content; and a content **text** counts
     /// only when its facing edge carries no collapsible whitespace, since that whitespace is the
     /// separator instead. The fourth is the default display's: a **block element** owns its own
     /// line ([`Self::owns_own_line`]), so the boundary beside it is a break whatever the author
     /// wrote, and whitespace at a block-level boundary is not rendered under the default display
-    /// of a block box (a closed `<dialog>` or a nested `<style>` / `<script>` renders no box, and
-    /// the compiler hoists the four global `svelte:*` elements out of the fragment — the known
-    /// exceptions). Anything else is content and glues.
+    /// of a block box (a closed `<dialog>` or a nested `<style>` / `<script>` renders no box — the
+    /// known exception; the four global `svelte:*` elements, block-classified too, never reach
+    /// this arm, since the hoist arm above steps over them). Anything else is content and glues.
     ///
     /// The block-element answer is what keeps the declaration's own line a one-pass fixed point:
     /// the layout must not read a signal its own output rewrites. Counted as glued content, a
@@ -779,7 +784,7 @@ impl<'a> Printer<'a> {
                         Self::text_glued_before(raw)
                     };
                 }
-                n if n.is_hoisted_from_fragment() => cur = j,
+                n if n.is_compiler_hoisted() => cur = j,
                 n if self.is_block_element_node(n) => return false,
                 _ => return true,
             }
@@ -793,7 +798,52 @@ impl<'a> Printer<'a> {
     /// between us?* Asking it as two separate predicates is how a node that already owns its line
     /// picks up a second break — the failure mode this whole path keeps returning to.
     fn owns_own_line(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
-        self.is_block_element_node(&nodes[i]) || self.is_own_line_declaration(nodes, i)
+        self.is_block_element_at(nodes, i) || self.is_own_line_declaration(nodes, i)
+    }
+
+    /// Whether the node at `i` is a [global](internal::SpecialElementKind::is_global) `svelte:*`
+    /// element — `<svelte:window>` / `<svelte:document>` / `<svelte:body>` / `<svelte:head>` —
+    /// **glued to content on both sides**, and so lays out as a glued inline element rather than
+    /// taking its own line.
+    ///
+    /// Those four are block-classified, and anywhere else a line of their own is free: the
+    /// compiler hoists them out of the fragment before its whitespace rules run
+    /// ([`internal::FragmentNode::is_compiler_hoisted`]), so a break on one side merges with the
+    /// whitespace — or the fragment edge — on the other into the render that was already there.
+    /// Glued on BOTH sides it is not: the two neighbours meet directly (`a<svelte:window />b`
+    /// renders `ab`), and a break on either side renders a space between them — the standing
+    /// "a glued boundary is never split" rule, which bounds this one exactly as it bounds a
+    /// declaration's own line ([`Self::is_own_line_declaration`]).
+    ///
+    /// ⚠️ **The one spelling of that exception.** Every reader that asks "does this sibling own a
+    /// block line?" of a node it holds by POSITION asks [`Self::is_block_element_at`] (and a
+    /// flow reader [`Self::is_inline_el_or_comp_at`]), which consult this — a reader that asked
+    /// the node-only [`Self::is_block_element_node`] would give the element its line back on one
+    /// side of the seam and split the glued boundary the rest of the walk kept.
+    pub(super) fn is_glued_global_element(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+        matches!(&nodes[i], FragmentNode::SpecialElement(se) if se.kind.is_global())
+            && self.glued_to_content(nodes, i, true)
+            && self.glued_to_content(nodes, i, false)
+    }
+
+    /// [`Self::is_block_element_node`] asked of the node at `i` in its sibling list — the same
+    /// answer, except for a [global element glued on both sides](Self::is_glued_global_element),
+    /// which does not own a block line there.
+    pub(super) fn is_block_element_at(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+        self.is_block_element_node(&nodes[i]) && !self.is_glued_global_element(nodes, i)
+    }
+
+    /// [`Self::is_block_fragment_node`] asked of the node at `i` in its sibling list — see
+    /// [`Self::is_block_element_at`].
+    pub(super) fn is_block_fragment_at(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+        self.is_block_fragment_node(&nodes[i]) && !self.is_glued_global_element(nodes, i)
+    }
+
+    /// [`Self::is_inline_el_or_comp`] asked of the node at `i` in its sibling list: also true for
+    /// a [global element glued on both sides](Self::is_glued_global_element), which flows as an
+    /// inline element does.
+    pub(super) fn is_inline_el_or_comp_at(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+        self.is_inline_el_or_comp(&nodes[i]) || self.is_glued_global_element(nodes, i)
     }
 
     /// Whether `nodes` holds a declaration that owns its line — the fragment then cannot
@@ -1011,21 +1061,23 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Whether `node` ends the inline run it sits in — anything that owns its own line (a block
-    /// element, a control-flow block, a comment: the `sibling_newline_flows` complement) or an
-    /// authored blank line. A whitespace-only node with a single newline is a *separator within*
-    /// the run, and a content text is run content, so neither breaks it.
+    /// Whether the node at `nodes[i]` ends the inline run it sits in — anything that owns its own
+    /// line (a block element, a control-flow block, a comment: the `sibling_newline_flows`
+    /// complement, asked by position so a global `svelte:*` element glued on both sides counts as
+    /// the inline element it lays out as) or an authored blank line. A whitespace-only node with a
+    /// single newline is a *separator within* the run, and a content text is run content, so
+    /// neither breaks it.
     ///
     /// ⚠️ The two `Text` arms must stay **ahead** of the delegation, not fold into it.
     /// [`Self::sibling_newline_flows`] deliberately does not model `Text` (its `_ => false` arm
     /// is about neighbours it never sees), so delegating a content text would read back as
     /// "breaks the run" and cut every run at its own prose — the one thing the run exists to
     /// find.
-    pub(super) fn breaks_inline_run(&self, node: &FragmentNode<'_>) -> bool {
-        match node {
+    pub(super) fn breaks_inline_run(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+        match &nodes[i] {
             FragmentNode::Text(t) if t.is_collapsible_ws_only => t.newline_count >= 2,
             FragmentNode::Text(_) => false,
-            _ => !self.sibling_newline_flows(node),
+            _ => !self.sibling_newline_flows(nodes, i),
         }
     }
 
@@ -1147,7 +1199,7 @@ impl<'a> Printer<'a> {
     /// `max` advances the cursor past it, so the caller cannot stall on it.
     fn scan_inline_run(&self, nodes: &[FragmentNode<'_>], start: usize) -> (usize, usize) {
         let mut end = start;
-        while end < nodes.len() && !self.breaks_inline_run(&nodes[end]) {
+        while end < nodes.len() && !self.breaks_inline_run(nodes, end) {
             // An authored blank line bounds the run wherever the parser put it. Between two
             // non-text siblings it is a whitespace-only node `breaks_inline_run` sees; beside a
             // text it is folded into that text's edge whitespace, so the text itself must end
@@ -1286,8 +1338,10 @@ impl<'a> Printer<'a> {
         })
     }
 
-    /// Whether a **single-newline** separator beside `node` may collapse to a plain space — the
-    /// neighbour question of the sibling-newline flow rule, asked of the NEWLINE spelling alone.
+    /// Whether a **single-newline** separator beside the node at `nodes[i]` may collapse to a plain
+    /// space — the neighbour question of the sibling-newline flow rule, asked of the NEWLINE
+    /// spelling alone. Asked by position, since a global `svelte:*` element answers it as the
+    /// inline element it lays out as when glued on both sides (`Self::is_block_element_at`).
     /// A **space** never asks it: a space before a tag, an inline element or a component is that
     /// follower's own per-width wrap whatever stands before it (`<!-- c --> <span>x</span>` and
     /// `<!-- c --> {x}` hug alike — `inline_adjacent_component_space`,
@@ -1347,7 +1401,8 @@ impl<'a> Printer<'a> {
     /// newline does still decide and which is preserved — so the convergence target is the
     /// multiline form, never a collapsed one-liner. See
     /// [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
-    fn sibling_newline_flows(&self, node: &FragmentNode<'_>) -> bool {
+    fn sibling_newline_flows(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+        let node = &nodes[i];
         match node {
             // A tag has fixed width and no structure to protect — always flows.
             FragmentNode::ExpressionTag(_)
@@ -1358,9 +1413,11 @@ impl<'a> Printer<'a> {
             // it is deliberately narrower than `TagFacts::is_void` — the other void elements
             // render inline.
             FragmentNode::Element(el) if el.facts.is_line_break() => false,
-            // An inline element/component flows; a block one owns its line.
+            // An inline element/component flows; a block one owns its line — asked by position,
+            // so a global `svelte:*` element glued to content on both sides flows as the inline
+            // element it lays out as (`is_glued_global_element`).
             FragmentNode::Element(_) | FragmentNode::SpecialElement(_) => {
-                !self.is_block_element_node(node)
+                !self.is_block_element_at(nodes, i)
             }
             // Everything else keeps its authored line — the exclusions the doc comment argues
             // for: a `Comment` (its position is authorship) and a control-flow block (its width
@@ -1370,16 +1427,20 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// [`Self::sibling_newline_flows`] asked of a neighbour that may not exist — a fragment edge
-    /// answers `false`, since a boundary with no sibling on the other side is the parent's and has
-    /// already been trimmed.
+    /// [`Self::sibling_newline_flows`] asked of a neighbour index that may not exist — a fragment
+    /// edge answers `false`, since a boundary with no sibling on the other side is the parent's and
+    /// has already been trimmed.
     ///
     /// Every reader of the flow rule goes through here. It is one `is_some_and` and it earns its
     /// name for that reason: the rule is consulted at four places across two files, and the whole
     /// bug class in this vein is those readers quietly disagreeing about it.
     #[inline]
-    pub(super) fn neighbour_newline_flows(&self, node: Option<&FragmentNode<'_>>) -> bool {
-        node.is_some_and(|n| self.sibling_newline_flows(n))
+    pub(super) fn neighbour_newline_flows(
+        &self,
+        nodes: &[FragmentNode<'_>],
+        neighbour: Option<usize>,
+    ) -> bool {
+        neighbour.is_some_and(|j| self.sibling_newline_flows(nodes, j))
     }
 
     /// The flow rule asked of **one side** of a content text's boundary run — the leading and
@@ -1408,12 +1469,13 @@ impl<'a> Printer<'a> {
         newlines: usize,
         run_has_prose: bool,
         separator_like_text: bool,
-        neighbour: Option<&FragmentNode<'_>>,
+        nodes: &[FragmentNode<'_>],
+        neighbour: Option<usize>,
     ) -> bool {
         newlines == 1
             && run_has_prose
             && !separator_like_text
-            && self.neighbour_newline_flows(neighbour)
+            && self.neighbour_newline_flows(nodes, neighbour)
     }
 
     /// Whether this text node is a **separator** wearing content's clothing: every character it
@@ -1758,7 +1820,7 @@ impl<'a> Printer<'a> {
             .iter()
             .filter(|n| !n.is_whitespace_only_text())
             .count();
-        (non_ws_count > 1 && nodes.iter().any(|n| self.is_block_fragment_node(n)))
+        (non_ws_count > 1 && (0..nodes.len()).any(|i| self.is_block_fragment_at(nodes, i)))
             || self.has_own_line_declaration(nodes)
             || self.content_holds_interior_blank(nodes)
     }
@@ -1778,7 +1840,9 @@ impl<'a> Printer<'a> {
             Some(FragmentNode::Element(el)) => {
                 el.kind != internal::ElementKind::Component && !self.is_block_element(el)
             }
-            Some(node @ FragmentNode::SpecialElement(_)) => !self.is_block_fragment_node(node),
+            Some(FragmentNode::SpecialElement(_)) => {
+                !self.is_block_fragment_at(trimmed_nodes, i + 1)
+            }
             _ => false,
         }
     }
