@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 664,
+	"end": 641,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 333,
-				"data": " await after an expression-tag sibling at the 100/101 boundary: the {x} marks breakable content so the } stays hugged (no head dangle), but the body still drops at 101. At 100 the whole construct stays inline. Prettier hugs the } and breaks the component internally (prettier_variant_hug). No inline-element > to dangle here. "
+				"end": 302,
+				"data": " await after an expression-tag sibling at the 100/101 boundary: the head is short and stays on one line, but the body still drops at 101. At 100 the whole construct stays inline. Prettier hugs the } and breaks the component internally (prettier_variant_hug). No inline-element > to dangle here. "
 			},
 			{
 				"type": "Text",
-				"start": 333,
-				"end": 334,
+				"start": 302,
+				"end": 303,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 334,
-				"end": 663,
+				"start": 303,
+				"end": 640,
 				"name": "div",
 				"name_loc": {
 					"start": {
 						"line": 2,
 						"column": 1,
-						"character": 335
+						"character": 304
 					},
 					"end": {
 						"line": 2,
 						"column": 4,
-						"character": 338
+						"character": 307
 					}
 				},
 				"attributes": [],
@@ -43,32 +43,32 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 339,
-							"end": 341,
+							"start": 308,
+							"end": 310,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "Comment",
-							"start": 341,
-							"end": 382,
+							"start": 310,
+							"end": 351,
 							"data": " inline form == 100: stays inline "
 						},
 						{
 							"type": "Text",
-							"start": 382,
-							"end": 384,
+							"start": 351,
+							"end": 353,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 384,
-							"end": 387,
+							"start": 353,
+							"end": 356,
 							"expression": {
 								"type": "Identifier",
-								"start": 385,
-								"end": 386,
+								"start": 354,
+								"end": 355,
 								"loc": {
 									"start": {
 										"line": 4,
@@ -84,12 +84,12 @@
 						},
 						{
 							"type": "AwaitBlock",
-							"start": 387,
-							"end": 482,
+							"start": 356,
+							"end": 451,
 							"expression": {
 								"type": "Identifier",
-								"start": 395,
-								"end": 402,
+								"start": 364,
+								"end": 371,
 								"loc": {
 									"start": {
 										"line": 4,
@@ -105,18 +105,18 @@
 							"value": {
 								"type": "Identifier",
 								"name": "value",
-								"start": 408,
-								"end": 413,
+								"start": 377,
+								"end": 382,
 								"loc": {
 									"start": {
 										"line": 4,
 										"column": 25,
-										"character": 408
+										"character": 377
 									},
 									"end": {
 										"line": 4,
 										"column": 30,
-										"character": 413
+										"character": 382
 									}
 								}
 							},
@@ -127,47 +127,47 @@
 								"nodes": [
 									{
 										"type": "Component",
-										"start": 414,
-										"end": 474,
+										"start": 383,
+										"end": 443,
 										"name": "Comp",
 										"name_loc": {
 											"start": {
 												"line": 4,
 												"column": 32,
-												"character": 415
+												"character": 384
 											},
 											"end": {
 												"line": 4,
 												"column": 36,
-												"character": 419
+												"character": 388
 											}
 										},
 										"attributes": [
 											{
 												"type": "Attribute",
-												"start": 420,
-												"end": 434,
+												"start": 389,
+												"end": 403,
 												"name": "prop1",
 												"name_loc": {
 													"start": {
 														"line": 4,
 														"column": 37,
-														"character": 420
+														"character": 389
 													},
 													"end": {
 														"line": 4,
 														"column": 42,
-														"character": 425
+														"character": 394
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 426,
-													"end": 434,
+													"start": 395,
+													"end": 403,
 													"expression": {
 														"type": "Identifier",
-														"start": 427,
-														"end": 433,
+														"start": 396,
+														"end": 402,
 														"loc": {
 															"start": {
 																"line": 4,
@@ -184,29 +184,29 @@
 											},
 											{
 												"type": "Attribute",
-												"start": 435,
-												"end": 449,
+												"start": 404,
+												"end": 418,
 												"name": "prop2",
 												"name_loc": {
 													"start": {
 														"line": 4,
 														"column": 52,
-														"character": 435
+														"character": 404
 													},
 													"end": {
 														"line": 4,
 														"column": 57,
-														"character": 440
+														"character": 409
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 441,
-													"end": 449,
+													"start": 410,
+													"end": 418,
 													"expression": {
 														"type": "Identifier",
-														"start": 442,
-														"end": 448,
+														"start": 411,
+														"end": 417,
 														"loc": {
 															"start": {
 																"line": 4,
@@ -223,29 +223,29 @@
 											},
 											{
 												"type": "Attribute",
-												"start": 450,
-												"end": 471,
+												"start": 419,
+												"end": 440,
 												"name": "prop3",
 												"name_loc": {
 													"start": {
 														"line": 4,
 														"column": 67,
-														"character": 450
+														"character": 419
 													},
 													"end": {
 														"line": 4,
 														"column": 72,
-														"character": 455
+														"character": 424
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 456,
-													"end": 471,
+													"start": 425,
+													"end": 440,
 													"expression": {
 														"type": "Identifier",
-														"start": 457,
-														"end": 470,
+														"start": 426,
+														"end": 439,
 														"loc": {
 															"start": {
 																"line": 4,
@@ -272,32 +272,32 @@
 						},
 						{
 							"type": "Text",
-							"start": 482,
-							"end": 485,
+							"start": 451,
+							"end": 454,
 							"raw": "\n\n\t",
 							"data": "\n\n\t"
 						},
 						{
 							"type": "Comment",
-							"start": 485,
-							"end": 550,
-							"data": " inline form == 101: body drops, } stays hugged after {x} "
+							"start": 454,
+							"end": 527,
+							"data": " inline form == 101: body drops, the short head stays on one line "
 						},
 						{
 							"type": "Text",
-							"start": 550,
-							"end": 552,
+							"start": 527,
+							"end": 529,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 552,
-							"end": 555,
+							"start": 529,
+							"end": 532,
 							"expression": {
 								"type": "Identifier",
-								"start": 553,
-								"end": 554,
+								"start": 530,
+								"end": 531,
 								"loc": {
 									"start": {
 										"line": 7,
@@ -313,12 +313,12 @@
 						},
 						{
 							"type": "AwaitBlock",
-							"start": 555,
-							"end": 656,
+							"start": 532,
+							"end": 633,
 							"expression": {
 								"type": "Identifier",
-								"start": 563,
-								"end": 570,
+								"start": 540,
+								"end": 547,
 								"loc": {
 									"start": {
 										"line": 7,
@@ -334,18 +334,18 @@
 							"value": {
 								"type": "Identifier",
 								"name": "value",
-								"start": 576,
-								"end": 581,
+								"start": 553,
+								"end": 558,
 								"loc": {
 									"start": {
 										"line": 7,
 										"column": 25,
-										"character": 576
+										"character": 553
 									},
 									"end": {
 										"line": 7,
 										"column": 30,
-										"character": 581
+										"character": 558
 									}
 								}
 							},
@@ -356,54 +356,54 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 582,
-										"end": 585,
+										"start": 559,
+										"end": 562,
 										"raw": "\n\t\t",
 										"data": "\n\t\t"
 									},
 									{
 										"type": "Component",
-										"start": 585,
-										"end": 646,
+										"start": 562,
+										"end": 623,
 										"name": "Comp",
 										"name_loc": {
 											"start": {
 												"line": 8,
 												"column": 3,
-												"character": 586
+												"character": 563
 											},
 											"end": {
 												"line": 8,
 												"column": 7,
-												"character": 590
+												"character": 567
 											}
 										},
 										"attributes": [
 											{
 												"type": "Attribute",
-												"start": 591,
-												"end": 605,
+												"start": 568,
+												"end": 582,
 												"name": "prop1",
 												"name_loc": {
 													"start": {
 														"line": 8,
 														"column": 8,
-														"character": 591
+														"character": 568
 													},
 													"end": {
 														"line": 8,
 														"column": 13,
-														"character": 596
+														"character": 573
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 597,
-													"end": 605,
+													"start": 574,
+													"end": 582,
 													"expression": {
 														"type": "Identifier",
-														"start": 598,
-														"end": 604,
+														"start": 575,
+														"end": 581,
 														"loc": {
 															"start": {
 																"line": 8,
@@ -420,29 +420,29 @@
 											},
 											{
 												"type": "Attribute",
-												"start": 606,
-												"end": 620,
+												"start": 583,
+												"end": 597,
 												"name": "prop2",
 												"name_loc": {
 													"start": {
 														"line": 8,
 														"column": 23,
-														"character": 606
+														"character": 583
 													},
 													"end": {
 														"line": 8,
 														"column": 28,
-														"character": 611
+														"character": 588
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 612,
-													"end": 620,
+													"start": 589,
+													"end": 597,
 													"expression": {
 														"type": "Identifier",
-														"start": 613,
-														"end": 619,
+														"start": 590,
+														"end": 596,
 														"loc": {
 															"start": {
 																"line": 8,
@@ -459,29 +459,29 @@
 											},
 											{
 												"type": "Attribute",
-												"start": 621,
-												"end": 643,
+												"start": 598,
+												"end": 620,
 												"name": "prop3",
 												"name_loc": {
 													"start": {
 														"line": 8,
 														"column": 38,
-														"character": 621
+														"character": 598
 													},
 													"end": {
 														"line": 8,
 														"column": 43,
-														"character": 626
+														"character": 603
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 627,
-													"end": 643,
+													"start": 604,
+													"end": 620,
 													"expression": {
 														"type": "Identifier",
-														"start": 628,
-														"end": 642,
+														"start": 605,
+														"end": 619,
 														"loc": {
 															"start": {
 																"line": 8,
@@ -504,8 +504,8 @@
 									},
 									{
 										"type": "Text",
-										"start": 646,
-										"end": 648,
+										"start": 623,
+										"end": 625,
 										"raw": "\n\t",
 										"data": "\n\t"
 									}
@@ -515,8 +515,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 656,
-							"end": 657,
+							"start": 633,
+							"end": 634,
 							"raw": "\n",
 							"data": "\n"
 						}

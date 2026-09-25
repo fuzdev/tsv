@@ -100,16 +100,17 @@ pub(super) fn is_inline_content(node: &FragmentNode<'_>) -> bool {
 ///
 /// `{#await}` doesn't force its parent multiline on its own (a lone
 /// `<div>{#await p}x{/await}</div>` stays inline, matching prettier), unlike if/each/key
-/// (`has_any_expanding_blocks`). It needs a force only when a preceding **breakable**
-/// sibling *suppresses* the body-drop: there, forcing the parent multiline lets the
-/// body-drop (`can_wrap`), the inline-element closing-`>` dangle
-/// (`try_block_sibling_gt_dangle`), and a block-element sibling's own-line separation all
-/// resolve in one pass. A non-breakable preceding sibling (plain text, a comment) does
-/// **not** suppress the body-drop — await already drops on its own — so forcing
-/// there only diverges from prettier (which keeps the short construct inline); such
-/// siblings are skipped. (Block elements are `Element`, hence breakable, so their
-/// separation still fires.) The force is also gated on `kind.is_block()` at the call site,
-/// so it only applies to block-element parents.
+/// (`has_any_expanding_blocks`). After a preceding **breakable** sibling it does: forcing a
+/// block parent multiline there puts the sibling and the block on the parent's own lines, so
+/// the inline-element closing-`>` dangle (`try_block_sibling_gt_dangle`) and a block-element
+/// sibling's own-line separation resolve in one pass (the parent break itself is a cataloged
+/// divergence — prettier keeps the short construct inline). A non-breakable preceding sibling
+/// (plain text, a comment) gets no force — it would only diverge from prettier — so such
+/// siblings are skipped. (Block elements are `Element`, hence breakable, so their separation
+/// still fires.) The force is also gated on `kind.is_block()` at the call site, so it only
+/// applies to block-element parents: an inline parent (a component, an inline element) keeps
+/// its content in the inline arm of `build_nodes_doc_trimmed`, which resolves the same dangle
+/// and head wrap once the block's own layout breaks the parent.
 ///
 /// A `{#snippet}` mostly precedes this check now: one that owns its line already forced
 /// the parent multiline (`Printer::has_own_line_declaration`, asked first at the call
