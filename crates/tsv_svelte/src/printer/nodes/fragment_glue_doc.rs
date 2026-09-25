@@ -14,6 +14,18 @@ use crate::printer::Printer;
 use smallvec::SmallVec;
 use tsv_lang::doc::arena::DocId;
 
+/// An inline unit the fragment walk pushes as ONE child doc: a lone element, a glued element run,
+/// or either behind a glued comment prefix.
+pub(super) struct InlineUnit {
+    pub(super) doc: DocId,
+    /// The last index the unit covers (its head is where it was built).
+    pub(super) end: usize,
+    /// Whether the unit's last element was built without its closing `>`, which the glued
+    /// control-flow block after it takes ([`Printer::block_sibling_takes_gt`]). The walk must then
+    /// emit that `>` with the block, the next node it visits.
+    pub(super) sheds_gt: bool,
+}
+
 impl<'a> Printer<'a> {
     /// Whether two fragment nodes are **byte-glued** — no source between them (`a`'s end is `b`'s
     /// start). The adjacency test behind the "glued run" *layout* questions (the
@@ -92,14 +104,19 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Axis-3 sibling-`>` dangle: when a control-flow block directly follows (no
-    /// whitespace) an inline-element sibling, build the element without its closing `>`
-    /// and hand that `>` to the block so it dangles onto the block-head line when the
-    /// block renders multiline — or when the hugged block-head line would overflow, where
-    /// the `>` dangles and the block stays inline on the fresh line. Returns
-    /// `(element_without_gt, block_with_gt)`, or `None` to keep the pair hugged. The `>`
-    /// only moves *into* the closing tag (`</tag⏎>{#…}`), injecting no render-significant
-    /// whitespace.
+    /// Axis-3 sibling-`>` dangle: whether the control-flow block right after `nodes[last]` takes
+    /// that element's closing `>` — a block directly following (no whitespace) an inline-element
+    /// sibling, which the fragment walk will serve through its dangle arm. The element is then
+    /// built without its `>` ([`Self::build_inline_unit`]) and the block with it threaded in
+    /// ([`Self::build_block_node_doc_with_gt`]), so the `>` dangles onto the block-head line when
+    /// the block renders multiline — or when the hugged block-head line would overflow, where the
+    /// `>` dangles and the block stays inline on the fresh line. The `>` only moves *into* the
+    /// closing tag (`</tag⏎>{#…}`), injecting no render-significant whitespace.
+    ///
+    /// Asked BEFORE the element is built, at the push of the unit it ends, so the element is
+    /// built once, already in the form the block needs. Building it as an ordinary child and
+    /// rebuilding it once the block turns up doubled the work at every level of a nest whose
+    /// shedders each hold the next (`<b><i>…{#if}…{/if}</i></b>{#if}…`), O(2^depth).
     ///
     /// The dangle keys on the rendered layout, not on how the block's body is authored — so
     /// it is a fixed point on its own output (the dangled form's own-line body would
@@ -116,105 +133,73 @@ impl<'a> Printer<'a> {
     ///
     /// Applies to the four rendering block heads (`{#if}` / `{#each}` / `{#key}` /
     /// `{#await}`) — and to the one `{#snippet}` shape that still reaches the control-flow
-    /// arm, a snippet glued to content on BOTH sides (an own-line snippet takes its line
-    /// via [`Self::is_own_line_declaration`] before this can fire, and forces its parent
-    /// multiline). One caller serves both arms of `build_nodes_doc_trimmed`: the multiline
-    /// arm — which a block parent takes once a control-flow block follows a sibling
-    /// (`has_control_flow_after_sibling` → `compute_multiline_cause`) — and the inline arm,
-    /// which an inline parent (a component, an inline element) takes for an `{#await}` or a
-    /// both-sides-glued `{#snippet}`, neither of which forces it multiline. Either way the
-    /// block builds in multiline context, and whether its body drops is width's decision in
-    /// `build_expanding_construct`, so the dangle is a one-pass fixed point in both.
+    /// arm, a snippet glued to content on BOTH sides: an own-line snippet takes its line
+    /// via [`Self::is_own_line_declaration`] in the arm ahead of the dangle's, so it is excluded
+    /// here too (and forces its parent multiline). One caller serves both arms of
+    /// `build_nodes_doc_trimmed`: the multiline arm — which a block parent takes once a
+    /// control-flow block follows a sibling (`has_control_flow_after_sibling` →
+    /// `compute_multiline_cause`) — and the inline arm, which an inline parent (a component, an
+    /// inline element) takes for an `{#await}` or a both-sides-glued `{#snippet}`, neither of
+    /// which forces it multiline. Either way the block builds in multiline context, and whether
+    /// its body drops is width's decision in `build_expanding_construct`, so the dangle is a
+    /// one-pass fixed point in both.
     ///
-    /// `unit_head` is the index the previously pushed sibling doc BEGINS at — the element itself,
-    /// or the head of the glued unit it ends (a glued element run, a glued comment prefix, or
-    /// both: `<!--c--><span>a</span><span>b</span>{#if…}`). The whole unit is rebuilt with only
-    /// its LAST closing `>` split off ([`Self::build_unit_omit_close_gt`]), because the caller
-    /// replaces the pushed doc wholesale: rebuilding the last element alone dropped every earlier
-    /// member of the unit from the output — a silent content loss no as-authored gate reached.
-    pub(super) fn try_block_sibling_gt_dangle(
-        &self,
-        trimmed_nodes: &[FragmentNode<'_>],
-        i: usize,
-        unit_head: usize,
-    ) -> Option<(DocId, DocId)> {
-        let block = trimmed_nodes.get(i)?;
-        if !is_control_flow_block(block) {
-            return None;
-        }
-        let last = i.checked_sub(1)?;
-        let prev = trimmed_nodes.get(last)?;
-        if !matches!(prev, FragmentNode::Element(_)) {
-            return None;
-        }
-        // Inline element, directly adjacent (no whitespace between it and the block).
-        if self.is_block_fragment_node(prev) || !Self::byte_glued(prev, block) {
-            return None;
-        }
-        let element_doc = self.build_unit_omit_close_gt(trimmed_nodes, unit_head, last)?;
-        let gt = self.d().text(">");
-        // Build the block exactly once with the `>` threaded in: the expanding path folds
-        // it into the inline-vs-multiline `conditional_group` (hug inline, dangle when the
-        // block expands); the non-expanding tails dangle it via `dangle_gt` when they break.
-        // (An earlier form built the block twice — a throwaway no-`gt` probe to test
-        // `will_break`, then a rebuild — which made nested dangles O(2^depth).)
-        let block_doc = self.build_block_node_doc_with_gt(block, gt)?;
-        Some((element_doc, block_doc))
-    }
-
-    /// Rebuild the inline unit `nodes[head..=last]` — the doc a previous iteration pushed as ONE
-    /// child — with the LAST element's closing `>` split off, for the element→block dangle
-    /// ([`Self::try_block_sibling_gt_dangle`]). The unit is one of the shapes
-    /// `build_nodes_doc_trimmed` pushes at its head and skips the tail of: a lone element
-    /// (`head == last`), a glued element run, or either behind a glued HTML-comment prefix. Every
-    /// member but the last is rebuilt exactly as it was pushed; `None` when the last element is
-    /// not the flat hug-both shape whose `>` can be split (the caller then keeps the pushed unit
-    /// and hugs the block), or when the range is not a unit this printer pushes.
-    fn build_unit_omit_close_gt(
+    /// `multiline` is the fragment walk's own arm, which decides whether the own-line
+    /// declaration arm comes first. A `true` here is a promise the walk keeps: the block is the
+    /// next node it visits, and it reaches the dangle arm, which emits the `>`.
+    fn block_sibling_takes_gt(
         &self,
         nodes: &[FragmentNode<'_>],
-        head: usize,
         last: usize,
-    ) -> Option<DocId> {
-        // A glued comment prefix, if the unit has one, ends at its element.
-        let elem_head = if matches!(nodes.get(head)?, FragmentNode::Comment(_)) {
-            self.glued_comment_run_element(nodes, head)?
-        } else {
-            head
+        multiline: bool,
+    ) -> bool {
+        let (Some(prev), Some(block)) = (nodes.get(last), nodes.get(last + 1)) else {
+            return false;
         };
-        if elem_head > last {
-            return None;
-        }
-        let elem_doc = if elem_head == last {
-            let FragmentNode::Element(element) = &nodes[last] else {
-                return None;
-            };
-            self.build_inline_element_omit_close_gt(element)?
-        } else {
-            self.build_glued_element_run(nodes, elem_head, last, true)?
-        };
-        if elem_head == head {
-            return Some(elem_doc);
-        }
-        let prefix = self.build_glued_comment_run_doc(nodes, head, elem_head)?;
-        Some(self.d().concat(&[prefix, elem_doc]))
+        is_control_flow_block(block)
+            && matches!(prev, FragmentNode::Element(_))
+            // Inline element, directly adjacent (no whitespace between it and the block).
+            && !self.is_block_fragment_node(prev)
+            && Self::byte_glued(prev, block)
+            && !(multiline && self.is_own_line_declaration(nodes, last + 1))
     }
 
-    /// The element→element analog of [`Self::try_block_sibling_gt_dangle`] ("G2"), generalized from
-    /// a pair to a maximal glued RUN: when `nodes[i]` HEADS a run of 2+ byte-glued inline elements,
-    /// build the whole run as one concat (see [`Self::build_glued_element_run`]) and return
-    /// `(run_doc, run_end)` — the last index the run covers, so the caller can skip the tail.
-    /// `None` when `nodes[i]` is not an inline element or has no glued inline-element follower (the
-    /// caller handles it as an ordinary inline child). Detecting at the head and skipping the tail
-    /// keeps the build O(run length); a walk-back-and-rebuild at each element would be O(length²).
+    /// Build the inline child at `nodes[i]` as the fragment walk pushes it: a lone element with
+    /// its closing `>` handed to a glued following block when that block takes it
+    /// ([`Self::block_sibling_takes_gt`], [`Printer::build_inline_element_omit_close_gt`]),
+    /// else the node's ordinary doc. `None` when the node builds nothing.
+    pub(super) fn build_inline_unit(
+        &self,
+        nodes: &[FragmentNode<'_>],
+        i: usize,
+        multiline: bool,
+    ) -> Option<InlineUnit> {
+        let node = nodes.get(i)?;
+        if let FragmentNode::Element(element) = node
+            && self.block_sibling_takes_gt(nodes, i, multiline)
+            && let Some(doc) = self.build_inline_element_omit_close_gt(element)
+        {
+            return Some(InlineUnit {
+                doc,
+                end: i,
+                sheds_gt: true,
+            });
+        }
+        Some(InlineUnit {
+            doc: self.build_fragment_node_doc(node)?,
+            end: i,
+            sheds_gt: false,
+        })
+    }
+
     /// The closing-`>` dangle onto glued following TEXT: when the inline element at `i` is
     /// byte-glued to content text on **both** sides — no whitespace either side, so the
     /// break-before rule cannot fire — build it as
     /// [`Printer::build_inline_element_close_gt_dangle`], the three-state group that dangles the
     /// closing `>` onto the following text's line when that fits and block-styles otherwise. The
     /// text-follower analog of the element→element run ([`Self::try_build_glued_element_run`]) and
-    /// the element→block dangle ([`Self::try_block_sibling_gt_dangle`]). `None` unless the
-    /// glued-both-text shape holds and the element is the eligible flat hug-both form.
+    /// the element→block dangle ([`Self::block_sibling_takes_gt`]). `None` unless the
+    /// glued-both-text shape holds and the element is the flat hug-both (`Soft`) form.
     pub(super) fn try_build_glued_both_text_dangle(
         &self,
         nodes: &[FragmentNode<'_>],
@@ -257,11 +242,21 @@ impl<'a> Printer<'a> {
         self.build_inline_element_close_gt_dangle(element)
     }
 
+    /// The element→element analog of [`Self::block_sibling_takes_gt`] ("G2"), generalized from
+    /// a pair to a maximal glued RUN: when `nodes[i]` HEADS a run of 2+ byte-glued inline elements,
+    /// build the whole run as one concat (see [`Self::build_glued_element_run`]) — the unit's
+    /// `end` is the last index the run covers, so the caller can skip the tail. When a glued
+    /// following block takes the run's last `>` ([`Self::block_sibling_takes_gt`]), the run is
+    /// built with it split off (`sheds_gt`), once. `None` when `nodes[i]` is not an inline element
+    /// or has no glued inline-element follower (the caller handles it as an ordinary inline
+    /// child). Detecting at the head and skipping the tail keeps the build O(run length); a
+    /// walk-back-and-rebuild at each element would be O(length²).
     pub(super) fn try_build_glued_element_run(
         &self,
         trimmed_nodes: &[FragmentNode<'_>],
         i: usize,
-    ) -> Option<(DocId, usize)> {
+        multiline: bool,
+    ) -> Option<InlineUnit> {
         let node = trimmed_nodes.get(i)?;
         if !matches!(node, FragmentNode::Element(_)) || self.is_block_fragment_node(node) {
             return None;
@@ -282,8 +277,22 @@ impl<'a> Printer<'a> {
         if end == i {
             return None;
         }
-        let run_doc = self.build_glued_element_run(trimmed_nodes, i, end, false)?;
-        Some((run_doc, end))
+        // A tail that cannot shed keeps its `>`: `build_glued_element_run` refuses the shed before
+        // building any member's children, so the plain build below is the only one that does.
+        if self.block_sibling_takes_gt(trimmed_nodes, end, multiline)
+            && let Some(doc) = self.build_glued_element_run(trimmed_nodes, i, end, true)
+        {
+            return Some(InlineUnit {
+                doc,
+                end,
+                sheds_gt: true,
+            });
+        }
+        Some(InlineUnit {
+            doc: self.build_glued_element_run(trimmed_nodes, i, end, false)?,
+            end,
+            sheds_gt: false,
+        })
     }
 
     /// If `nodes[i]` **begins** a byte-glued run of one or more HTML comments, return the index of
@@ -397,27 +406,33 @@ impl<'a> Printer<'a> {
     }
 
     /// When `nodes[i]` heads a glued HTML-comment run ending in an inline element
-    /// ([`Self::glued_comment_run_element`]), build the comments + the element as ONE concat and
-    /// return `(unit_doc, end)` — the last index the unit covers, so the caller skips the tail via
+    /// ([`Self::glued_comment_run_element`]), build the comments + the element as ONE concat —
+    /// the unit's `end` is the last index it covers, so the caller skips the tail via
     /// `glued_run_consumed_until`. The comment prefix travels with the element: because the unit is
     /// a plain concat, the preceding text's break-before-flow measurement sees the whole thing flat
     /// (`welded_atom` → `None`), so a wide element pulls its comment prefix to the fresh
     /// line together rather than dangling the opening tag after a space. The element may itself head
     /// a glued-element run (G2) — reuse [`Self::try_build_glued_element_run`] there — else it is an
-    /// ordinary inline child. `None` when `nodes[i]` is not a glued-comment prefix.
+    /// ordinary inline child ([`Self::build_inline_unit`]); either way its last `>` goes to a glued
+    /// following block that takes it (`sheds_gt`). `None` when `nodes[i]` is not a glued-comment
+    /// prefix.
     pub(super) fn try_build_glued_comment_prefixed_element(
         &self,
         nodes: &[FragmentNode<'_>],
         i: usize,
-    ) -> Option<(DocId, usize)> {
+        multiline: bool,
+    ) -> Option<InlineUnit> {
         let elem_idx = self.glued_comment_run_element(nodes, i)?;
         // Build the element (or the glued-element run it heads), then prepend the comment docs.
-        let (elem_doc, end) = match self.try_build_glued_element_run(nodes, elem_idx) {
-            Some((run_doc, run_end)) => (run_doc, run_end),
-            None => (self.build_fragment_node_doc(&nodes[elem_idx])?, elem_idx),
+        let unit = match self.try_build_glued_element_run(nodes, elem_idx, multiline) {
+            Some(unit) => unit,
+            None => self.build_inline_unit(nodes, elem_idx, multiline)?,
         };
         let prefix = self.build_glued_comment_run_doc(nodes, i, elem_idx)?;
-        Some((self.d().concat(&[prefix, elem_doc]), end))
+        Some(InlineUnit {
+            doc: self.d().concat(&[prefix, unit.doc]),
+            ..unit
+        })
     }
 
     /// When `nodes[i]` heads a glued HTML-comment run ending in a content TEXT
@@ -450,36 +465,32 @@ impl<'a> Printer<'a> {
     ///   this whole concat flat (`welded_atom` returns `None` for a plain concat → the
     ///   whole thing), so a wide element anywhere in the run pulls the *entire* run to a fresh line
     ///   rather than stranding an opening tag after a space.
-    /// - **per-pair sibling-`>` dangle (G2)**: each adjacent pair whose first element can SHED and
-    ///   whose second can RECEIVE hands the first's closing `>` to the second (`</span⏎><a⏎…`);
-    ///   the receiver renders it as a leading `if_break` inside its attrs group, so it hugs when
-    ///   the attrs fit and dangles when they wrap. A mid-run element can both receive (from its
-    ///   left) and shed (to its right).
+    /// - **per-pair sibling-`>` dangle (G2)**: each adjacent pair of eligible elements hands the
+    ///   first's closing `>` to the second (`</span⏎><a⏎…`); the receiver renders it as a leading
+    ///   `if_break` inside its attrs group, so it hugs when the attrs fit and dangles when they
+    ///   wrap. A mid-run element can both receive (from its left) and shed (to its right).
     ///
-    /// Eligibility is per element and per role, computed up front for every element because a
+    /// Eligibility is per element and the same for both roles
+    /// ([`PreparedElement::gt_dangle_eligible`]: `Soft`, or multiline only because of the
+    /// element's own authored line breaks). It is computed up front for every element because a
     /// pair's shed decision needs BOTH neighbours — a shed whose receiver turned out ineligible
-    /// would strand the `>`:
-    ///
-    /// - **shed**: the flat hug-both `Soft` layout, the one shape whose trailing `>` splits off
-    ///   ([`PreparedElement::can_shed_gt`]);
-    /// - **receive**: `Soft`, OR multiline only because of the element's own authored line breaks
-    ///   ([`PreparedElement::can_receive_gt`]). G2 eligibility must not read a signal the
-    ///   dangle's own output rewrites: a receiver whose attrs wrap prints its content block-style,
-    ///   which the next pass reads as exactly that authored-newline layout, so a Soft-only receive
-    ///   test would un-dangle the pair it just dangled. A structurally multiline receiver (a block
-    ///   child) stays out.
+    /// would strand the `>`. The dangle must not read a signal its own output rewrites: either
+    /// role's element prints its content block-style once it does not fit, which the next pass
+    /// reads as exactly that authored-newline layout, so a test that turned it away would undo
+    /// the pair it just dangled. A structurally multiline element (a block child) stays out.
     ///
     /// Each element is prepared ONCE ([`Printer::prepare_sibling_element`]: tag, attrs, layout),
-    /// both roles are read off that layout, and only the arm actually taken builds the children.
+    /// eligibility is read off that layout, and only the arm actually taken builds the children.
     ///
     /// Against an ineligible neighbour the boundary stays an intact `>` (the element renders its
     /// ordinary doc), so nothing is ever lost. The `>` moves only *inside* a closing tag, so every
     /// reparse is byte-identical — render-safe.
     ///
     /// `shed_last`: the run's LAST element sheds its `>` too — to a glued following control-flow
-    /// block, which always receives (the element→block dangle, [`Self::build_unit_omit_close_gt`]).
-    /// `None` then if that element cannot shed: a run whose tail keeps its `>` is not the unit
-    /// the caller asked for, and it keeps the run it already pushed.
+    /// block, which always receives (the element→block dangle, [`Self::block_sibling_takes_gt`]).
+    /// `None` then if that element is not eligible, before any member's children are built: a run
+    /// whose tail keeps its `>` is not the unit the caller asked for, and it builds the plain run
+    /// instead.
     fn build_glued_element_run(
         &self,
         nodes: &[FragmentNode<'_>],
@@ -500,35 +511,30 @@ impl<'a> Printer<'a> {
             prepared.push(self.prepare_sibling_element(el));
             els.push(el);
         }
-        let can_shed = |i: usize| {
+        let eligible = |i: usize| {
             prepared[i]
                 .as_ref()
-                .is_some_and(PreparedElement::can_shed_gt)
-        };
-        let can_receive = |i: usize| {
-            prepared[i]
-                .as_ref()
-                .is_some_and(PreparedElement::can_receive_gt)
+                .is_some_and(PreparedElement::gt_dangle_eligible)
         };
         let n = els.len();
-        if shed_last && !can_shed(n - 1) {
+        if shed_last && !eligible(n - 1) {
             return None;
         }
         let mut parts: SmallVec<[DocId; 8]> = SmallVec::new();
         for idx in 0..n {
             let sheds = if idx + 1 < n {
-                can_shed(idx) && can_receive(idx + 1)
+                eligible(idx) && eligible(idx + 1)
             } else {
                 shed_last
             };
-            let receives = idx > 0 && can_shed(idx - 1) && can_receive(idx);
+            let receives = idx > 0 && eligible(idx - 1) && eligible(idx);
             let doc = match &prepared[idx] {
-                // `sheds || receives` implies the element is prepared: a mid-run shed needs
-                // `can_shed(idx)`, the tail's `shed_last` is guarded above, and a receive needs
-                // `can_receive(idx)`.
+                // `sheds || receives` implies the element is prepared and eligible: a mid-run
+                // shed or a receive reads `eligible(idx)`, and the tail's `shed_last` is guarded
+                // above.
                 Some(p) if sheds || receives => {
                     let gt = if receives { Some(d.text(">")) } else { None };
-                    self.build_glued_run_element_doc(els[idx], p, sheds, gt)
+                    self.build_gt_dangle_element_doc(els[idx], p, sheds, gt)
                 }
                 Some(p) => self.build_prepared_element_doc(els[idx], p),
                 None => self.build_fragment_node_doc(&nodes[start + idx])?,
