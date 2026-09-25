@@ -267,21 +267,16 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// Byte length of the boundary whitespace run at the head of the current token, or `0`.
     ///
     /// The non-consuming half of [`skip_boundary_whitespace`](Self::skip_boundary_whitespace),
-    /// split out so that loop reads as "measure the run, then step it" rather than doing both
-    /// in one expression. The compound chain loop in `parser/selectors.rs` is the other
-    /// caller: `read_selector` runs `allow_comment_or_whitespace` after **every** simple
-    /// selector, so a run standing here ends the compound, and that loop needs the
-    /// measurement without the step (the step is `parse_combinator`'s, which turns the same
-    /// run into the descendant combinator that replaces the break).
+    /// split out so its step loop reads as "measure the run, then step it" rather than doing
+    /// both in one expression. Two other readers take the measurement without the step:
+    /// [`step_boundary_trivia_registering_comments`](Self::step_boundary_trivia_registering_comments),
+    /// which reports whether a run was among what it skipped, and the compound chain loop in
+    /// `parser/selectors.rs` — `read_selector` runs `allow_comment_or_whitespace` after
+    /// **every** simple selector, so a run standing there ends the compound, and the step is
+    /// `parse_combinator`'s, which turns the same run into the descendant combinator that
+    /// replaces the break.
     pub(in crate::parser) fn boundary_run_len(&self) -> usize {
-        if self.current_kind() != TokenKind::Identifier {
-            return 0;
-        }
-        // Every member of the class is non-ASCII, so an ASCII head byte settles this before
-        // the `str` range index below (two char-boundary checks) and before any decode. Asked
-        // of every IDENTIFIER token at every juncture — the densest token in a stylesheet —
-        // where the answer is `0` in every document that holds no member at all.
-        if self.source.as_bytes()[self.current_start()].is_ascii() {
+        if !self.at_non_ascii_identifier() {
             return 0;
         }
         crate::whitespace::boundary_prefix_len(
@@ -347,7 +342,47 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// rejects; correcting that means giving a declaration's property and value their own raw
     /// readers, since `<NEL>` is content there. Tracked with that family — see
     /// [`tests/css_boundary_whitespace.rs`](../../../../tests/css_boundary_whitespace.rs).
+    ///
+    /// Inline where it provably answers nothing: the head asks only whether the current token
+    /// could open a run at all ([`may_open_boundary_run`](Self::may_open_boundary_run)), and
+    /// off any token that could not, the loop's first pass changes no state — its
+    /// `skip_whitespace` steps nothing off a non-whitespace token and `boundary_run_len` is `0`
+    /// off anything but a non-ASCII-headed identifier. Most asks land on a token that is
+    /// neither, and those pay a compare or two instead of a call into the loop.
+    #[inline]
     pub(in crate::parser) fn skip_boundary_whitespace(&mut self) -> Result<(), ParseError> {
+        if !self.may_open_boundary_run() {
+            return Ok(());
+        }
+        self.step_boundary_run()
+    }
+
+    /// Whether the current token could open a boundary run: a whitespace token, or an
+    /// identifier whose head byte is non-ASCII — the only tokens
+    /// [`skip_boundary_whitespace`](Self::skip_boundary_whitespace)'s step loop can move off.
+    #[inline]
+    fn may_open_boundary_run(&self) -> bool {
+        self.check(TokenKind::Whitespace) || self.at_non_ascii_identifier()
+    }
+
+    /// Whether the current token is an identifier whose head byte is non-ASCII — the only
+    /// token [`boundary_run_len`](Self::boundary_run_len) measures a run in.
+    ///
+    /// Every member of the run's class is non-ASCII, so an ASCII head byte settles the
+    /// question before the `str` range index in [`boundary_run_len`](Self::boundary_run_len)
+    /// (two char-boundary checks) and before any decode. Asked of every IDENTIFIER token at
+    /// every juncture — the densest token in a stylesheet — where the answer is `false` in
+    /// every document that holds no member at all.
+    #[inline]
+    fn at_non_ascii_identifier(&self) -> bool {
+        self.check(TokenKind::Identifier)
+            && !self.source.as_bytes()[self.current_start()].is_ascii()
+    }
+
+    /// The step loop behind [`skip_boundary_whitespace`](Self::skip_boundary_whitespace)'s
+    /// inline head, reached only once the current token could open a run.
+    #[inline(never)]
+    fn step_boundary_run(&mut self) -> Result<(), ParseError> {
         loop {
             self.skip_whitespace()?;
             let run = self.boundary_run_len();
@@ -396,9 +431,27 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// answers, and the right one for the caller that asks it (the attribute selector's
     /// name→`|` gap): the run is `allow_whitespace()` material there too, so `[svg <NBSP>|a]`
     /// separates a `<wq-name>`'s components exactly as `[svg |a]` does.
+    ///
+    /// Inline where it answers nothing, like `skip_boundary_whitespace`: a token that could
+    /// open no boundary run ([`may_open_boundary_run`](Self::may_open_boundary_run)) and is not
+    /// a comment is where the loop's first pass sees no whitespace, steps nothing and returns,
+    /// so the head answers `false` before the call into the outlined loop.
+    #[inline]
     pub(in crate::parser) fn skip_boundary_whitespace_registering_comments(
         &mut self,
     ) -> Result<bool, ParseError> {
+        if !self.may_open_boundary_run() && !self.check(TokenKind::Comment) {
+            return Ok(false);
+        }
+        self.step_boundary_trivia_registering_comments()
+    }
+
+    /// The loop behind
+    /// [`skip_boundary_whitespace_registering_comments`](Self::skip_boundary_whitespace_registering_comments)'s
+    /// inline head, reached only once the current token could open a boundary run or is a
+    /// comment.
+    #[inline(never)]
+    fn step_boundary_trivia_registering_comments(&mut self) -> Result<bool, ParseError> {
         let mut saw_whitespace = false;
         loop {
             saw_whitespace |= self.check(TokenKind::Whitespace) || self.boundary_run_len() > 0;
@@ -431,6 +484,13 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             return Err(err);
         }
         Ok(slot.kind)
+    }
+
+    /// [`peek_kind`](Self::peek_kind), kept out of line — for a caller inlined into a frame
+    /// that recursion stacks, where the lex `peek_kind` inlines would grow that frame.
+    #[inline(never)]
+    pub(crate) fn peek_kind_outlined(&mut self) -> Result<TokenKind, ParseError> {
+        self.peek_kind()
     }
 
     /// Peek past a run of `/* */` comments — and **only** comments — to the next
@@ -717,7 +777,23 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// comments — their disposition (register vs. push as a block child) is context-specific
     /// and stays with each call site, which is precisely why the boundary run has to be
     /// stepped *here*, before that site's comment arm, rather than after it.
+    ///
+    /// Inline where it answers nothing, like `skip_boundary_whitespace`: a token that could
+    /// open no boundary run ([`may_open_boundary_run`](Self::may_open_boundary_run)) and is not
+    /// a `<` leaves the boundary skip nothing to step and the marker loop nothing to match, so
+    /// the head returns before the call into the outlined loop.
+    #[inline]
     pub(crate) fn skip_html_comment_markers(&mut self) -> Result<(), ParseError> {
+        if !self.may_open_boundary_run() && !self.check(TokenKind::LessThan) {
+            return Ok(());
+        }
+        self.step_html_comment_markers()
+    }
+
+    /// The loop behind [`skip_html_comment_markers`](Self::skip_html_comment_markers)'s inline
+    /// head, reached only once the current token could open a boundary run or a marker.
+    #[inline(never)]
+    fn step_html_comment_markers(&mut self) -> Result<(), ParseError> {
         self.skip_boundary_whitespace()?;
         while self.check(TokenKind::LessThan)
             && self.source[self.current_start()..].starts_with("<!--")
