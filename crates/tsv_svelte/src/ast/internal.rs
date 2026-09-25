@@ -835,8 +835,25 @@ impl<'arena> SpecialElementKind<'arena> {
     ///
     /// Inline elements: `slot`, `svelte:element`, `svelte:component`, `svelte:self`,
     /// `svelte:fragment`, `svelte:boundary`, `title` — these render content inline.
+    ///
+    /// The set is exactly the [global](Self::is_global) kinds. Being block-classified is the
+    /// printer's layout default for them, not a fact about the render: the compiler hoists them
+    /// out of their fragment, so one glued to content on both sides lays out inline instead
+    /// (`Printer::is_glued_global_element`).
     #[inline]
     pub const fn is_block(&self) -> bool {
+        self.is_global()
+    }
+
+    /// Whether this is one of the four **global** elements — `svelte:head` / `svelte:window` /
+    /// `svelte:body` / `svelte:document` — which bind to a global object, render nothing where
+    /// they are written, and are root-only in Svelte (`svelte_meta_invalid_placement`).
+    ///
+    /// The compiler's `clean_nodes` **hoists** exactly these kinds out of their fragment before
+    /// its whitespace rules run, alongside the tags [`FragmentNode::is_hoisted_from_fragment`]
+    /// lists — see [`FragmentNode::is_compiler_hoisted`] for the full list.
+    #[inline]
+    pub const fn is_global(&self) -> bool {
         matches!(
             self,
             Self::SvelteHead | Self::SvelteWindow | Self::SvelteBody | Self::SvelteDocument
@@ -1074,7 +1091,11 @@ impl<'arena> FragmentNode<'arena> {
     /// pass re-breaks it, forever (a real F1 2-cycle the fuzz gate caught). Their own line is
     /// the better form — a `<svelte:head>` welded to its neighbour would be the alternative —
     /// so the printer keeps the break and declines the trim. The four are excluded HERE rather
-    /// than at each reader, so the two rules cannot re-collide at a new call site.
+    /// than at each reader, so the two rules cannot re-collide at a new call site. The one
+    /// question they DO answer as hoisted is the glue scan's — "what is the nearest content
+    /// beside me?" — which asks the compiler's whole list, [`FragmentNode::is_compiler_hoisted`],
+    /// instead of this one: a glued boundary is never split, and the compiler's glue runs
+    /// through these four exactly as through a `{@const}`.
     ///
     /// ⚠️ **The hoist licenses two different things, and only one of them is this trim.** The break
     /// beside a hoisted node is render-free for the same reason its edge run is, so trimming the
@@ -1087,8 +1108,9 @@ impl<'arena> FragmentNode<'arena> {
     ///
     /// So the five kinds stay in this ONE set even though they split on layout: every reader here
     /// is asking the compiler's question ("does this node stand between the content and the
-    /// fragment edge?"), and the answer is the same for all five — including for the glue scan
-    /// behind `is_own_line_declaration`, where a hoisted neighbour is not content.
+    /// fragment edge?"), and the answer is the same for all five. (The glue scan behind
+    /// `is_own_line_declaration` asks a different question and reads the compiler's whole list,
+    /// [`FragmentNode::is_compiler_hoisted`], which includes these five.)
     ///
     /// The layout split does make [`FragmentNode::content_bounds`] *redundant* for a declaration —
     /// the whole fixture suite stays green with those kinds treated as content there, because the
@@ -1108,6 +1130,24 @@ impl<'arena> FragmentNode<'arena> {
             }
             _ => false,
         }
+    }
+
+    /// Whether the compiler hoists this node out of its fragment — `clean_nodes`' `hoisted` list
+    /// in FULL: [`FragmentNode::is_hoisted_from_fragment`]'s tags and `<title>`, plus the four
+    /// [global](SpecialElementKind::is_global) `svelte:*` elements that set leaves out.
+    ///
+    /// ⚠️ **For the glue scans only** (`Printer::glued_to_content`). Two nodes the compiler's
+    /// whitespace rules see as neighbours once the hoisted ones are gone are glued exactly when
+    /// no whitespace stands between them, whatever was hoisted from between: `a<svelte:window
+    /// />b` renders `ab`, so breaking either side of the element renders a space — a glued
+    /// boundary is never split. That question has to see the whole list. The **trim** readers
+    /// ([`FragmentNode::content_bounds`] and the edge-separator test) must not: they ask the
+    /// narrower set, whose doc says why a fragment-edge trim beside a global element is an F1
+    /// 2-cycle.
+    #[inline]
+    pub fn is_compiler_hoisted(&self) -> bool {
+        self.is_hoisted_from_fragment()
+            || matches!(self, FragmentNode::SpecialElement(se) if se.kind.is_global())
     }
 
     /// The index range of `nodes` that the whitespace rules see — the first and last node that

@@ -1,0 +1,371 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 672,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 318,
+				"data": "\n\tThe glue is asked of the nearest CONTENT on each side. A hoisted neighbour is not content, so a\n\trun of global `svelte:*` elements is glued to the text at both of its ends; a component is\n\tcontent; and a comment counts as content, as it does for declaration tags. Each element stays\n\ton its neighbours' line.\n"
+			},
+			{
+				"type": "Text",
+				"start": 318,
+				"end": 320,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 320,
+				"end": 371,
+				"data": " a run of two, text on both ends of the run "
+			},
+			{
+				"type": "Text",
+				"start": 371,
+				"end": 377,
+				"raw": "\ntext1",
+				"data": "\ntext1"
+			},
+			{
+				"type": "SvelteWindow",
+				"start": 377,
+				"end": 410,
+				"name": "svelte:window",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 6,
+						"character": 378
+					},
+					"end": {
+						"line": 9,
+						"column": 19,
+						"character": 391
+					}
+				},
+				"attributes": [
+					{
+						"start": 392,
+						"end": 407,
+						"type": "OnDirective",
+						"name": "resize",
+						"name_loc": {
+							"start": {
+								"line": 9,
+								"column": 20,
+								"character": 392
+							},
+							"end": {
+								"line": 9,
+								"column": 29,
+								"character": 401
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 403,
+							"end": 406,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 31
+								},
+								"end": {
+									"line": 9,
+									"column": 34
+								}
+							},
+							"name": "fn1"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "SvelteBody",
+				"start": 410,
+				"end": 445,
+				"name": "svelte:body",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 39,
+						"character": 411
+					},
+					"end": {
+						"line": 9,
+						"column": 50,
+						"character": 422
+					}
+				},
+				"attributes": [
+					{
+						"start": 423,
+						"end": 442,
+						"type": "OnDirective",
+						"name": "mouseenter",
+						"name_loc": {
+							"start": {
+								"line": 9,
+								"column": 51,
+								"character": 423
+							},
+							"end": {
+								"line": 9,
+								"column": 64,
+								"character": 436
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 438,
+							"end": 441,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 66
+								},
+								"end": {
+									"line": 9,
+									"column": 69
+								}
+							},
+							"name": "fn2"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 445,
+				"end": 452,
+				"raw": "text2\n\n",
+				"data": "text2\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 452,
+				"end": 485,
+				"data": " components on both sides "
+			},
+			{
+				"type": "Text",
+				"start": 485,
+				"end": 486,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 486,
+				"end": 495,
+				"name": "Comp1",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 1,
+						"character": 487
+					},
+					"end": {
+						"line": 12,
+						"column": 6,
+						"character": 492
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "SvelteDocument",
+				"start": 495,
+				"end": 540,
+				"name": "svelte:document",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 10,
+						"character": 496
+					},
+					"end": {
+						"line": 12,
+						"column": 25,
+						"character": 511
+					}
+				},
+				"attributes": [
+					{
+						"start": 512,
+						"end": 537,
+						"type": "OnDirective",
+						"name": "visibilitychange",
+						"name_loc": {
+							"start": {
+								"line": 12,
+								"column": 26,
+								"character": 512
+							},
+							"end": {
+								"line": 12,
+								"column": 45,
+								"character": 531
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 533,
+							"end": 536,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 47
+								},
+								"end": {
+									"line": 12,
+									"column": 50
+								}
+							},
+							"name": "fn3"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Component",
+				"start": 540,
+				"end": 549,
+				"name": "Comp2",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 55,
+						"character": 541
+					},
+					"end": {
+						"line": 12,
+						"column": 60,
+						"character": 546
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 549,
+				"end": 551,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 551,
+				"end": 597,
+				"data": " a comment on one side, text beyond it "
+			},
+			{
+				"type": "Text",
+				"start": 597,
+				"end": 603,
+				"raw": "\ntext3",
+				"data": "\ntext3"
+			},
+			{
+				"type": "SvelteHead",
+				"start": 603,
+				"end": 650,
+				"name": "svelte:head",
+				"name_loc": {
+					"start": {
+						"line": 15,
+						"column": 6,
+						"character": 604
+					},
+					"end": {
+						"line": 15,
+						"column": 17,
+						"character": 615
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "TitleElement",
+							"start": 616,
+							"end": 636,
+							"name": "title",
+							"name_loc": {
+								"start": {
+									"line": 15,
+									"column": 19,
+									"character": 617
+								},
+								"end": {
+									"line": 15,
+									"column": 24,
+									"character": 622
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 623,
+										"end": 628,
+										"raw": "text4",
+										"data": "text4"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Comment",
+				"start": 650,
+				"end": 666,
+				"data": " comment "
+			},
+			{
+				"type": "Text",
+				"start": 666,
+				"end": 671,
+				"raw": "text5",
+				"data": "text5"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

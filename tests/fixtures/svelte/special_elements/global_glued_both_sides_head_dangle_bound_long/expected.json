@@ -1,0 +1,167 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 390,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 281,
+				"data": "\n\tA `<svelte:head>` with content, glued to text on both sides, at the widest that still takes\n\tthe closing-`>` dangle: the dangle line is exactly 100 wide. One character more and the\n\tcontent goes block-style instead (global_glued_both_sides_wide_long_prettier_divergence).\n"
+			},
+			{
+				"type": "Text",
+				"start": 281,
+				"end": 287,
+				"raw": "\ntext1",
+				"data": "\ntext1"
+			},
+			{
+				"type": "SvelteHead",
+				"start": 287,
+				"end": 384,
+				"name": "svelte:head",
+				"name_loc": {
+					"start": {
+						"line": 6,
+						"column": 6,
+						"character": 288
+					},
+					"end": {
+						"line": 6,
+						"column": 17,
+						"character": 299
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "TitleElement",
+							"start": 300,
+							"end": 320,
+							"name": "title",
+							"name_loc": {
+								"start": {
+									"line": 6,
+									"column": 19,
+									"character": 301
+								},
+								"end": {
+									"line": 6,
+									"column": 24,
+									"character": 306
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 307,
+										"end": 312,
+										"raw": "text2",
+										"data": "text2"
+									}
+								]
+							}
+						},
+						{
+							"type": "RegularElement",
+							"start": 320,
+							"end": 369,
+							"name": "meta",
+							"name_loc": {
+								"start": {
+									"line": 6,
+									"column": 39,
+									"character": 321
+								},
+								"end": {
+									"line": 6,
+									"column": 43,
+									"character": 325
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 326,
+									"end": 339,
+									"name": "name",
+									"name_loc": {
+										"start": {
+											"line": 6,
+											"column": 44,
+											"character": 326
+										},
+										"end": {
+											"line": 6,
+											"column": 48,
+											"character": 330
+										}
+									},
+									"value": [
+										{
+											"start": 332,
+											"end": 338,
+											"type": "Text",
+											"raw": "value1",
+											"data": "value1"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 340,
+									"end": 366,
+									"name": "content",
+									"name_loc": {
+										"start": {
+											"line": 6,
+											"column": 58,
+											"character": 340
+										},
+										"end": {
+											"line": 6,
+											"column": 65,
+											"character": 347
+										}
+									},
+									"value": [
+										{
+											"start": 349,
+											"end": 365,
+											"type": "Text",
+											"raw": "value2value2valu",
+											"data": "value2value2valu"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 384,
+				"end": 389,
+				"raw": "text3",
+				"data": "text3"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

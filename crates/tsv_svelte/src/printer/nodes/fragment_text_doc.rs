@@ -205,8 +205,10 @@ impl<'a> Printer<'a> {
         let multiline = cause.is_multiline();
         // Sibling-kind facts, derived from the node's position in `trimmed_nodes` — this
         // handler's set; the content path derives its own overlapping one.
-        let prev_node = i.checked_sub(1).map(|j| &trimmed_nodes[j]);
-        let next_node = trimmed_nodes.get(i + 1);
+        let prev_idx = i.checked_sub(1);
+        let next_idx = Some(i + 1).filter(|j| *j < trimmed_nodes.len());
+        let prev_node = prev_idx.map(|j| &trimmed_nodes[j]);
+        let next_node = next_idx.map(|j| &trimmed_nodes[j]);
         let prev_is_tag = prev_node.is_some_and(Self::is_tag_node);
         // AN AUTHORED NEWLINE BEFORE AN INLINE SIBLING FOLLOWS THE PREDECESSOR'S RENDERED
         // LAYOUT — the sibling twin of the text-tail rule in `handle_content_text_child`, and
@@ -277,13 +279,13 @@ impl<'a> Printer<'a> {
         // inline-sibling wrap at the whitespace-only separator, in either multiline arm. See
         // [`Self::next_is_component`].
         let next_is_component = self.next_is_component(trimmed_nodes, i);
-        let next_is_block_el = next_node.is_some_and(|n| self.is_block_element_node(n));
+        let next_is_block_el = next_idx.is_some_and(|j| self.is_block_element_at(trimmed_nodes, j));
         // Whether the *previous* sibling is a block element — prettier trims a boundary
         // whitespace adjacent to a block but does NOT then wrap the next inline element in
         // `group([line, el])` (`handleWhitespaceOfPrevTextNode = !isBlockElement(prevNode)`),
         // because the block's own `handle_block_child` already supplies the break; wrapping
         // would add a stray leading space after that break.
-        let prev_is_block_el = prev_node.is_some_and(|n| self.is_block_element_node(n));
+        let prev_is_block_el = prev_idx.is_some_and(|j| self.is_block_element_at(trimmed_nodes, j));
 
         // A HOISTED neighbour makes this separator a fragment EDGE run rather than an
         // inter-sibling one — the same question `handle_content_text_child` asks of a content
@@ -352,8 +354,8 @@ impl<'a> Printer<'a> {
         // separator flows only when both neighbours flow AND the run holds prose
         // (`separator_flows`, read by the multiline arm alone — the only place a newline is a
         // hardline question). A SPACE-spelled separator never asks it: see `tag_space_wraps`.
-        let neighbours_flow =
-            self.neighbour_newline_flows(prev_node) && self.neighbour_newline_flows(next_node);
+        let neighbours_flow = self.neighbour_newline_flows(trimmed_nodes, prev_idx)
+            && self.neighbour_newline_flows(trimmed_nodes, next_idx);
         let separator_flows = run_has_prose && neighbours_flow;
         // A SPACE before a tag is the tag's own per-width wrap — `group([line, tag])`, the same
         // wrap an inline element or component takes at that boundary — whatever the run holds
@@ -412,7 +414,7 @@ impl<'a> Printer<'a> {
             if text.newline_count == 1
                 && !prev_is_tag
                 && (next_is_inline_el || next_is_component || next_is_tag)
-                && self.neighbour_newline_flows(prev_node)
+                && self.neighbour_newline_flows(trimmed_nodes, prev_idx)
             {
                 arm_hold(child_docs, deferred);
             }
@@ -587,8 +589,10 @@ impl<'a> Printer<'a> {
         let multiline = cause.is_multiline();
         // Sibling-kind facts, derived from the node's position in `trimmed_nodes` — this
         // handler's set; the separator path derives its own overlapping one.
-        let prev_node = i.checked_sub(1).map(|j| &trimmed_nodes[j]);
-        let next_node = trimmed_nodes.get(i + 1);
+        let prev_idx = i.checked_sub(1);
+        let next_idx = Some(i + 1).filter(|j| *j < trimmed_nodes.len());
+        let prev_node = prev_idx.map(|j| &trimmed_nodes[j]);
+        let next_node = next_idx.map(|j| &trimmed_nodes[j]);
         // A declaration tag on either side owns its own line ([`Self::is_own_line_declaration`]),
         // and the run between it and this text is render-free — the tag hoists out of the fragment,
         // so that run is an edge run whichever side of the tag it sits on. This text therefore
@@ -606,7 +610,7 @@ impl<'a> Printer<'a> {
         // `group([line, el])` (`handleWhitespaceOfPrevTextNode = !isBlockElement(prevNode)`),
         // because the block's own `handle_block_child` already supplies the break; wrapping
         // would add a stray leading space after that break.
-        let prev_is_block_el = prev_node.is_some_and(|n| self.is_block_element_node(n));
+        let prev_is_block_el = prev_idx.is_some_and(|j| self.is_block_element_at(trimmed_nodes, j));
 
         let d = self.d();
 
@@ -644,14 +648,14 @@ impl<'a> Printer<'a> {
         // break in front of it, so a trailing space before it is spent on that break at EVERY
         // position of this text — the deferred-trim arm below — never kept as the fill's own
         // `line`. See that arm.
-        let next_is_block_el = next_node.is_some_and(|n| self.is_block_element_node(n));
+        let next_is_block_el = next_idx.is_some_and(|j| self.is_block_element_at(trimmed_nodes, j));
         // Whether the next sibling is a flowing inline element OR component (the
         // Fill-idempotency boundary). Text before such a node ends its fill with a trailing
         // `line` so the boundary breaks per width inside the fill (keeping the run idempotent),
         // rather than a `group([line, node])` whose all-or-nothing break flip-flops across
         // passes.
-        let next_is_flow =
-            next_node.is_some_and(|n| self.is_inline_el_or_comp(n)) || comment_glued_next_flow;
+        let next_is_flow = next_idx.is_some_and(|j| self.is_inline_el_or_comp_at(trimmed_nodes, j))
+            || comment_glued_next_flow;
         // The two flow-follower kinds answer every boundary question below identically — the
         // trailing-`line` decision and both halves of `break_before_wide_flow` — so the union is
         // named once. Which member of a welded unit crosses the width cannot matter, and how far
@@ -714,7 +718,8 @@ impl<'a> Printer<'a> {
             leading_newlines,
             run_has_prose,
             separator_like_text,
-            prev_node,
+            trimmed_nodes,
+            prev_idx,
         );
         if multiline && prev_owns_line {
             // After a declaration tag's own line: trim the render-free run rather than printing a
@@ -1005,7 +1010,8 @@ impl<'a> Printer<'a> {
             trailing_ws_newlines,
             run_has_prose,
             separator_like_text,
-            next_node,
+            trimmed_nodes,
+            next_idx,
         );
         if multiline && next_owns_line {
             // Mirror of the leading arm: the tag below supplies the line, so this run is trimmed

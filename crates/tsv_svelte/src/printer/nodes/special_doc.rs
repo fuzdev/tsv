@@ -11,8 +11,8 @@ use crate::printer::Printer;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
 use super::element_doc::{
-    AttrGaps, AttrListEmission, ElementAttrsDoc, ElementContext, ElementKind, ElementLayout,
-    ElementParts, ThisClaim,
+    AttrGaps, AttrListEmission, BoundaryMode, ElementAttrsDoc, ElementContext, ElementKind,
+    ElementLayout, ElementParts, ThisClaim,
 };
 
 impl<'a> Printer<'a> {
@@ -53,7 +53,33 @@ impl<'a> Printer<'a> {
             );
         }
 
-        let parts = ElementParts {
+        let parts = Self::special_element_parts(element, name);
+        let ctx = self.analyze_element(&parts, &attr_docs);
+
+        match self.compute_element_layout(&parts, &ctx) {
+            // Identical shape to a regular element's `<tag … />` — `is_declaration: false`
+            // (`<!DOCTYPE>` is not a `svelte:*` tag).
+            ElementLayout::Void | ElementLayout::SelfClosing => {
+                self.build_void_element_doc(&parts, &attr_docs, false)
+            }
+            ElementLayout::Empty => {
+                self.build_special_empty_doc(element, tag_name, &attr_docs, &ctx)
+            }
+            ElementLayout::WithContent(boundary) => {
+                self.build_content_element_doc(&parts, &ctx, &attr_docs, boundary, false, None)
+            }
+        }
+    }
+
+    /// The [`ElementParts`] a special element runs the shared element pipeline with — one
+    /// definition for [`Self::build_special_element_doc`] and
+    /// [`Self::build_special_close_gt_dangle`], so the two cannot disagree about the element
+    /// they lay out.
+    fn special_element_parts<'e>(
+        element: &'e internal::SpecialElement<'e>,
+        name: DocId,
+    ) -> ElementParts<'e> {
+        ElementParts {
             name,
             // Every special element is block-kind. `ElementKind::Inline` means *HTML inline flow
             // content*, whose content-boundary whitespace is preserved as a space
@@ -75,22 +101,35 @@ impl<'a> Printer<'a> {
             collapses_child_ws: false,
             nodes: element.fragment.nodes,
             span: element.span,
-        };
-        let ctx = self.analyze_element(&parts, &attr_docs);
-
-        match self.compute_element_layout(&parts, &ctx) {
-            // Identical shape to a regular element's `<tag … />` — `is_declaration: false`
-            // (`<!DOCTYPE>` is not a `svelte:*` tag).
-            ElementLayout::Void | ElementLayout::SelfClosing => {
-                self.build_void_element_doc(&parts, &attr_docs, false)
-            }
-            ElementLayout::Empty => {
-                self.build_special_empty_doc(element, tag_name, &attr_docs, &ctx)
-            }
-            ElementLayout::WithContent(boundary) => {
-                self.build_content_element_doc(&parts, &ctx, &attr_docs, boundary, false, None)
-            }
         }
+    }
+
+    /// The closing-`>` dangle onto glued following text for a
+    /// [global](SpecialElementKind::is_global) `svelte:*` element glued to text on both sides —
+    /// the same three-state layout
+    /// (`Printer::build_close_gt_dangle_doc`: inline, `</svelte:head⏎>`, block-style) an inline
+    /// element in that position takes (`Printer::build_inline_element_close_gt_dangle`), since the
+    /// compiler hoists the element and its two neighbours meet directly. `None` unless the element
+    /// lays out with the flat hug-both (`Soft`) content, the one shape all three states read; the
+    /// caller then builds its ordinary doc.
+    pub(super) fn build_special_close_gt_dangle(
+        &self,
+        element: &internal::SpecialElement<'_>,
+    ) -> Option<DocId> {
+        if element.kind.preserves_content_whitespace() {
+            return None;
+        }
+        let name = self.d().text(element.kind.tag_name());
+        let attr_docs = self
+            .build_special_element_attrs_doc(element, self.d().line())
+            .docs;
+        let parts = Self::special_element_parts(element, name);
+        let ctx = self.analyze_element(&parts, &attr_docs);
+        matches!(
+            self.compute_element_layout(&parts, &ctx),
+            ElementLayout::WithContent(BoundaryMode::Soft)
+        )
+        .then(|| self.build_close_gt_dangle_doc(&parts, &ctx, &attr_docs))
     }
 
     /// Build `<title>…</title>` for a **head** `<title>`, whose content prints verbatim.

@@ -1,0 +1,185 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 284,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 93,
+				"data": " non-collapsible and multibyte text glued on both sides keeps the element on its line "
+			},
+			{
+				"type": "Text",
+				"start": 93,
+				"end": 95,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 95,
+				"end": 154,
+				"data": " an entity-encoded non-breaking space on both sides "
+			},
+			{
+				"type": "Text",
+				"start": 154,
+				"end": 166,
+				"raw": "\ntext1&nbsp;",
+				"data": "\ntext1 "
+			},
+			{
+				"type": "SvelteWindow",
+				"start": 166,
+				"end": 194,
+				"name": "svelte:window",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 12,
+						"character": 167
+					},
+					"end": {
+						"line": 4,
+						"column": 25,
+						"character": 180
+					}
+				},
+				"attributes": [
+					{
+						"start": 181,
+						"end": 191,
+						"type": "OnDirective",
+						"name": "x",
+						"name_loc": {
+							"start": {
+								"line": 4,
+								"column": 26,
+								"character": 181
+							},
+							"end": {
+								"line": 4,
+								"column": 30,
+								"character": 185
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 187,
+							"end": 190,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 32
+								},
+								"end": {
+									"line": 4,
+									"column": 35
+								}
+							},
+							"name": "fn1"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 194,
+				"end": 207,
+				"raw": "&nbsp;text2\n\n",
+				"data": " text2\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 207,
+				"end": 250,
+				"data": " multibyte characters on both sides "
+			},
+			{
+				"type": "Text",
+				"start": 250,
+				"end": 252,
+				"raw": "\né",
+				"data": "\né"
+			},
+			{
+				"type": "SvelteDocument",
+				"start": 252,
+				"end": 282,
+				"name": "svelte:document",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 2,
+						"character": 253
+					},
+					"end": {
+						"line": 7,
+						"column": 17,
+						"character": 268
+					}
+				},
+				"attributes": [
+					{
+						"start": 269,
+						"end": 279,
+						"type": "OnDirective",
+						"name": "x",
+						"name_loc": {
+							"start": {
+								"line": 7,
+								"column": 18,
+								"character": 269
+							},
+							"end": {
+								"line": 7,
+								"column": 22,
+								"character": 273
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 275,
+							"end": 278,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 24
+								},
+								"end": {
+									"line": 7,
+									"column": 27
+								}
+							},
+							"name": "fn2"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 282,
+				"end": 283,
+				"raw": "漢",
+				"data": "漢"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

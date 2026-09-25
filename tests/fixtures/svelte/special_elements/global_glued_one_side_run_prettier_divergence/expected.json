@@ -1,0 +1,221 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 326,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 203,
+				"data": "\n\tGlobal `svelte:*` elements glued to text on one side only: a run of two with whitespace between\n\tits elements, and a `<svelte:head>`. Nothing is glued on both sides, so each takes its own line.\n"
+			},
+			{
+				"type": "Text",
+				"start": 203,
+				"end": 210,
+				"raw": "\ntext1\n",
+				"data": "\ntext1\n"
+			},
+			{
+				"type": "SvelteWindow",
+				"start": 210,
+				"end": 238,
+				"name": "svelte:window",
+				"name_loc": {
+					"start": {
+						"line": 6,
+						"column": 1,
+						"character": 211
+					},
+					"end": {
+						"line": 6,
+						"column": 14,
+						"character": 224
+					}
+				},
+				"attributes": [
+					{
+						"start": 225,
+						"end": 235,
+						"type": "OnDirective",
+						"name": "x",
+						"name_loc": {
+							"start": {
+								"line": 6,
+								"column": 15,
+								"character": 225
+							},
+							"end": {
+								"line": 6,
+								"column": 19,
+								"character": 229
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 231,
+							"end": 234,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 21
+								},
+								"end": {
+									"line": 6,
+									"column": 24
+								}
+							},
+							"name": "fn1"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 238,
+				"end": 239,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteBody",
+				"start": 239,
+				"end": 265,
+				"name": "svelte:body",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 240
+					},
+					"end": {
+						"line": 7,
+						"column": 12,
+						"character": 251
+					}
+				},
+				"attributes": [
+					{
+						"start": 252,
+						"end": 262,
+						"type": "OnDirective",
+						"name": "x",
+						"name_loc": {
+							"start": {
+								"line": 7,
+								"column": 13,
+								"character": 252
+							},
+							"end": {
+								"line": 7,
+								"column": 17,
+								"character": 256
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 258,
+							"end": 261,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 19
+								},
+								"end": {
+									"line": 7,
+									"column": 22
+								}
+							},
+							"name": "fn2"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 265,
+				"end": 272,
+				"raw": "\ntext2\n",
+				"data": "\ntext2\n"
+			},
+			{
+				"type": "SvelteHead",
+				"start": 272,
+				"end": 319,
+				"name": "svelte:head",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 1,
+						"character": 273
+					},
+					"end": {
+						"line": 9,
+						"column": 12,
+						"character": 284
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "TitleElement",
+							"start": 285,
+							"end": 305,
+							"name": "title",
+							"name_loc": {
+								"start": {
+									"line": 9,
+									"column": 14,
+									"character": 286
+								},
+								"end": {
+									"line": 9,
+									"column": 19,
+									"character": 291
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 292,
+										"end": 297,
+										"raw": "text3",
+										"data": "text3"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 319,
+				"end": 325,
+				"raw": "\ntext4",
+				"data": "\ntext4"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -696,12 +696,20 @@ impl<'a> Printer<'a> {
         let prepared = self
             .prepare_sibling_element(element)
             .filter(PreparedElement::is_soft)?;
-        let PreparedElement {
-            parts,
-            ctx,
-            attr_docs,
-            ..
-        } = &prepared;
+        Some(self.build_close_gt_dangle_doc(&prepared.parts, &prepared.ctx, &prepared.attr_docs))
+    }
+
+    /// The three-state closing-`>` dangle of [`Self::build_inline_element_close_gt_dangle`], built
+    /// from an element's analyzed parts — shared with the glued global `svelte:*` element
+    /// (`Printer::build_special_close_gt_dangle`), which runs the same pipeline from a
+    /// `SpecialElement`. The caller has already checked the layout is the flat hug-both (`Soft`)
+    /// one all three states read.
+    pub(super) fn build_close_gt_dangle_doc(
+        &self,
+        parts: &ElementParts<'_>,
+        ctx: &ElementContext,
+        attr_docs: &[DocId],
+    ) -> DocId {
         let children_doc = self.build_content_children_doc(parts, ctx, BoundaryMode::Soft);
         let d = self.d();
         let name = parts.name;
@@ -711,7 +719,7 @@ impl<'a> Printer<'a> {
         let dangle_state = d.concat(&[head, d.hardline(), d.text(">")]);
         let block_state =
             self.build_collapsible_element_doc(parts, ctx, attr_docs, children_doc, false, None);
-        Some(d.conditional_group(&[inline_state, dangle_state, block_state]))
+        d.conditional_group(&[inline_state, dangle_state, block_state])
     }
 
     /// Build doc for void or self-closing element

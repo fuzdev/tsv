@@ -215,12 +215,14 @@ impl<'a> Printer<'a> {
         i: usize,
     ) -> Option<DocId> {
         let node = nodes.get(i)?;
-        // Inline element only — a block `<div>` reaching this arm goes multiline, never dangles.
-        let FragmentNode::Element(element) = node else {
-            return None;
-        };
-        if self.is_block_fragment_node(node) {
-            return None;
+        // An inline element, or a global `svelte:*` element glued to content on both sides —
+        // which the compiler hoists, so it lays out as a glued inline element does
+        // ([`Self::is_glued_global_element`]). A block `<div>` reaching this arm goes multiline,
+        // never dangles; every other special element keeps its ordinary layout.
+        match node {
+            FragmentNode::Element(_) if !self.is_block_fragment_node(node) => {}
+            FragmentNode::SpecialElement(_) if self.is_glued_global_element(nodes, i) => {}
+            _ => return None,
         }
         // glued-before: the previous node is content text byte-glued with no trailing whitespace
         // (a trailing space would be a break-before boundary, handled elsewhere). Symmetric with the
@@ -248,7 +250,11 @@ impl<'a> Printer<'a> {
         {
             return None;
         }
-        self.build_inline_element_close_gt_dangle(element)
+        match node {
+            FragmentNode::Element(element) => self.build_inline_element_close_gt_dangle(element),
+            FragmentNode::SpecialElement(element) => self.build_special_close_gt_dangle(element),
+            _ => None,
+        }
     }
 
     /// The element→element analog of [`Self::block_sibling_takes_gt`] ("G2"), generalized from
@@ -355,7 +361,7 @@ impl<'a> Printer<'a> {
         i: usize,
     ) -> Option<usize> {
         let end = self.glued_comment_run_end(nodes, i)?;
-        self.is_inline_el_or_comp(&nodes[end]).then_some(end)
+        self.is_inline_el_or_comp_at(nodes, end).then_some(end)
     }
 
     /// The [`Self::glued_comment_run_end`] run that ends at a **content text**

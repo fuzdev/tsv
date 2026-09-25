@@ -1,0 +1,167 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 285,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 181,
+				"data": "\n\tA `<svelte:head>` with content, glued to text on both sides, at 101 wide: the closing `>`\n\tdangles onto the following text's line, and both glued boundaries stay unbroken.\n"
+			},
+			{
+				"type": "Text",
+				"start": 181,
+				"end": 187,
+				"raw": "\ntext1",
+				"data": "\ntext1"
+			},
+			{
+				"type": "SvelteHead",
+				"start": 187,
+				"end": 279,
+				"name": "svelte:head",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 6,
+						"character": 188
+					},
+					"end": {
+						"line": 5,
+						"column": 17,
+						"character": 199
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "TitleElement",
+							"start": 200,
+							"end": 220,
+							"name": "title",
+							"name_loc": {
+								"start": {
+									"line": 5,
+									"column": 19,
+									"character": 201
+								},
+								"end": {
+									"line": 5,
+									"column": 24,
+									"character": 206
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 207,
+										"end": 212,
+										"raw": "text2",
+										"data": "text2"
+									}
+								]
+							}
+						},
+						{
+							"type": "RegularElement",
+							"start": 220,
+							"end": 264,
+							"name": "meta",
+							"name_loc": {
+								"start": {
+									"line": 5,
+									"column": 39,
+									"character": 221
+								},
+								"end": {
+									"line": 5,
+									"column": 43,
+									"character": 225
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 226,
+									"end": 239,
+									"name": "name",
+									"name_loc": {
+										"start": {
+											"line": 5,
+											"column": 44,
+											"character": 226
+										},
+										"end": {
+											"line": 5,
+											"column": 48,
+											"character": 230
+										}
+									},
+									"value": [
+										{
+											"start": 232,
+											"end": 238,
+											"type": "Text",
+											"raw": "value1",
+											"data": "value1"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 240,
+									"end": 261,
+									"name": "content",
+									"name_loc": {
+										"start": {
+											"line": 5,
+											"column": 58,
+											"character": 240
+										},
+										"end": {
+											"line": 5,
+											"column": 65,
+											"character": 247
+										}
+									},
+									"value": [
+										{
+											"start": 249,
+											"end": 260,
+											"type": "Text",
+											"raw": "value2value",
+											"data": "value2value"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 279,
+				"end": 284,
+				"raw": "text3",
+				"data": "text3"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
