@@ -116,14 +116,78 @@ fn an_elseif_after_an_else_names_the_pair() {
 }
 
 /// The guard is scoped to the `{:else}` family: any other continuation at that position is
-/// left to the unclosed-block error, because canonical rejects those too and the verdict
-/// already matches. A stray guard here would be an over-rejection wearing a clause name.
+/// the block's misplaced-continuation error, which canonical raises too. A stray guard here
+/// would be an over-rejection wearing a clause name.
 #[test]
 fn a_foreign_continuation_after_an_else_is_not_a_clause_error() {
     let error = parse_error("{#if a}1{:else}2{:catch e}3{/if}")
         .unwrap_or_else(|| "<parsed successfully>".to_owned());
     assert!(
-        !error.contains("clause") && error.contains("Unclosed {#if} block"),
-        "expected the unclosed-block error, got: {error}"
+        !error.contains("clause") && error.contains("Expected token {:else} or {:else if}"),
+        "expected the misplaced-continuation error, got: {error}"
     );
+}
+
+/// A continuation the block does not take is reported AT the continuation, in canonical's
+/// words — `next` (`1-parse/state/tag.js`) dispatches on the block it lands in. A keyword
+/// written after a space (`{: else}`) is one of these: canonical eats the keyword straight
+/// after the `:`, so the space leaves no keyword to take.
+#[test]
+fn a_misplaced_continuation_names_what_the_block_takes() {
+    for (source, message, at) in [
+        (
+            "{#if a}x{: else}y{/if}",
+            "Expected token {:else} or {:else if}",
+            "{: else}",
+        ),
+        (
+            "{#if a}x{:foo}y{/if}",
+            "Expected token {:else} or {:else if}",
+            "{:foo}",
+        ),
+        (
+            "{#if a}x{:elseif b}y{/if}",
+            "'elseif' should be 'else if'",
+            "{:elseif",
+        ),
+        (
+            "{#each xs as x}x{:then}y{/each}",
+            "Expected token {:else}",
+            "{:then}",
+        ),
+        (
+            "{#each xs as x}x{: else}y{/each}",
+            "Expected token {:else}",
+            "{: else}",
+        ),
+        (
+            "{#await p}x{: then}y{/await}",
+            "Expected token {:then ...} or {:catch ...}",
+            "{: then}",
+        ),
+        (
+            "{#await p}x{:else}y{/await}",
+            "Expected token {:then ...} or {:catch ...}",
+            "{:else}",
+        ),
+        (
+            "{#key a}x{:else}y{/key}",
+            "{:...} block is invalid at this position",
+            "{:else}",
+        ),
+        (
+            "{#snippet f()}x{:else}y{/snippet}",
+            "{:...} block is invalid at this position",
+            "{:else}",
+        ),
+    ] {
+        assert_rejected_with(source, message);
+        let arena = bumpalo::Bump::new();
+        let error = tsv_svelte::parse(source, &arena).expect_err(source);
+        assert_eq!(
+            error.position(),
+            source.find(at),
+            "{source:?} should report at {at:?}"
+        );
+    }
 }

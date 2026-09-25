@@ -306,10 +306,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // keyword, so `{#if(x)}` / `{:else if(x)}` are rejected.
         let expr_str = if is_elseif {
             // {:else if expr} - skip "else", whitespace, "if", whitespace
-            let after_else = expr_content
-                .strip_prefix("else")
-                .unwrap_or(expr_content)
-                .trim_start_matches(is_svelte_ws);
+            let Some(after_else) = expr_content.strip_prefix("else") else {
+                return Err(self.error_expected_at("`else`", tag_content_start));
+            };
+            let after_else = after_else.trim_start_matches(is_svelte_ws);
             self.strip_block_keyword(after_else, "if", tag_content_start)?
                 .trim_start_matches(is_svelte_ws)
         } else {
@@ -363,7 +363,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 // answer this: it stops the run at the first char that is neither
                 // alphabetic nor a SPACE, so a U+0085 (whitespace to Rust, not to JS `\s`)
                 // ended the run at `else` and was then silently dropped.
-                let after_else = &else_tag_content["else".len()..];
+                let Some(after_else) = else_tag_content.strip_prefix("else") else {
+                    return Err(self.error_expected_at("`else`", else_tag_start));
+                };
                 self.reject_trailing_tag_content(after_else, else_tag_start + "else".len())?;
                 let else_content = self.parse_block_children(&["if"], else_content_start)?;
                 self.reject_duplicate_else()?;
@@ -557,7 +559,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // that is neither alphabetic nor `is_svelte_ws`, so `{:else!}` and `{:else<NEL>}`
             // both reduce to `else`, pass the `== "else"` test above, and the trailing bytes
             // were then dropped from the output rather than rejected.
-            let after_else = &else_tag_content["else".len()..];
+            let Some(after_else) = else_tag_content.strip_prefix("else") else {
+                return Err(self.error_expected_at("`else`", else_tag_start));
+            };
             self.reject_trailing_tag_content(after_else, else_tag_start + "else".len())?;
             let fallback_content = self.parse_block_children(&["each"], else_content_start)?;
             self.reject_duplicate_else()?;
@@ -998,15 +1002,19 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ) -> Result<(Option<Fragment<'arena>>, Option<&'arena Expression<'arena>>), ParseError> {
         let tag_start = self.current_end;
         let (tag_content, content_start) = self.scan_block_tag_content(tag_start)?;
-        let binding_str = self
-            .strip_keyword_value(tag_content, keyword, tag_start)?
-            .trim_matches(is_svelte_ws);
-
-        let binding = if !binding_str.is_empty() {
-            let offset = tag_start + subslice_offset(tag_content, binding_str);
-            Some(self.parse_await_value_pattern(binding_str, offset)?)
-        } else {
+        // The value is absent only when the `}` follows the keyword directly (`{:then}`).
+        // Canonical's `next` tries `eat('}')` first and otherwise commits to a pattern
+        // (`require_whitespace` + `read_pattern`), so ANY text after the keyword — a
+        // whitespace-only run included (`{:then }`, `{:catch⏎}`) — must read as one, and an
+        // empty pattern is `expected_pattern`. Trimming first made `{:then }` a valueless
+        // `{:then}`. The opening shorthand is the other rule: `{#await p then }` is valid
+        // (its `/\s*}/y` test), which `strip_head_keyword_or_final` owns.
+        let rest = self.strip_keyword_value(tag_content, keyword, tag_start)?;
+        let binding = if rest.is_empty() {
             None
+        } else {
+            let offset = tag_start + subslice_offset(tag_content, rest);
+            Some(self.parse_await_value_pattern(rest, offset)?)
         };
 
         let fragment = self.parse_block_children(stop_keywords, content_start)?;
@@ -1025,19 +1033,30 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Read the continuation keyword-run at `pos` — the alphabetic-and-space run
-    /// after `{:`, trimmed. Unlike `keyword_at` this keeps internal spaces so the
-    /// two-word `else if` survives; callers compare against `"else"`, `"else if"`,
-    /// `"catch"`, etc. Trailing content makes the run miss every keyword (e.g.
+    /// after `{:`, trailing whitespace trimmed. Unlike `keyword_at` this keeps internal
+    /// spaces so the two-word `else if` survives; callers compare against `"else"`,
+    /// `"else if"`, `"catch"`, etc. Trailing content makes the run miss every keyword (e.g.
     /// `{:else garbage}` yields `"else garbage"`, which is neither `else` nor
     /// `else if`), so it is left unconsumed and surfaces as an error.
+    ///
+    /// A run that opens with whitespace names **no** keyword (`""`). Canonical's `next`
+    /// (`1-parse/state/tag.js`) eats the keyword immediately after the `:` — the only
+    /// whitespace it allows is between the `{` and the `:` — so `{: then}` and `{: else}`
+    /// are `expected_token`. Trimming the front here instead handed every continuation
+    /// reader a tag whose content opens with whitespace: `{: then}` then bound a value
+    /// NAMED `then`, and `{:<NBSP><U+3000>else}` sliced `else` off a byte offset inside a
+    /// multi-byte space and panicked.
     fn continuation_keyword_at(&self, pos: usize) -> &'a str {
         let remaining = &self.source[pos..];
+        if remaining.starts_with(is_svelte_ws) {
+            return "";
+        }
         let end = remaining
             .find(|c: char| !c.is_alphabetic() && !is_svelte_ws(c))
             .unwrap_or(remaining.len());
-        // [`is_svelte_ws`] on BOTH the cut and the trim, and they must stay the same class:
-        // the cut decides which characters are inside the run, so a trim answering a
-        // different question would either leave a member in or take a non-member out.
+        // [`is_svelte_ws`] on the leading test, the cut and the trim, and they must stay the
+        // same class: the cut decides which characters are inside the run, so a trim answering
+        // a different question would either leave a member in or take a non-member out.
         //
         // ⚠️ A cut of `c != ' '` — a LITERAL SPACE — would make this the narrowest
         // whitespace class in the parser and break the two-word `{:else if}` in both
@@ -1054,7 +1073,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // which disagrees with JS `\s` in both directions (it has U+0085 NEL, it lacks
         // U+FEFF). NEL must stay OUTSIDE the run so it reads as trailing junk, exactly as
         // canonical treats it.
-        remaining[..end].trim_matches(is_svelte_ws)
+        remaining[..end].trim_end_matches(is_svelte_ws)
     }
 
     /// Strip a leading block/tag keyword, enforcing the whitespace Svelte
@@ -1062,15 +1081,20 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// absent (`{:then}` → `Ok("")`), but a value jammed against the keyword
     /// (`{:then(v)}`, `{:thenx}`) is rejected — matching the canonical parser,
     /// which emits `expected_whitespace`. Any whitespace counts (space, tab,
-    /// newline), so the returned remainder is left untrimmed; callers trim it and
-    /// recover span offsets with `subslice_offset`.
+    /// newline), so the returned remainder is left untrimmed; callers read it as their
+    /// grammar needs and recover span offsets with `subslice_offset`.
     fn strip_keyword_value(
         &self,
         content: &'a str,
         keyword: &str,
         keyword_start: usize,
     ) -> Result<&'a str, ParseError> {
-        let rest = content.strip_prefix(keyword).unwrap_or(content);
+        // Every caller dispatched on this keyword at `keyword_start`, so a miss is an error
+        // rather than a reason to read the whole tag as the value: that fallback is how
+        // `{: then}` bound a value named `then`.
+        let Some(rest) = content.strip_prefix(keyword) else {
+            return Err(self.error_expected_at(&format!("`{keyword}`"), keyword_start));
+        };
         if rest.is_empty() || rest.starts_with(is_svelte_ws) {
             Ok(rest)
         } else {
@@ -1150,6 +1174,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         expected: &str,
         block_start: usize,
     ) -> Result<usize, ParseError> {
+        // A `{:…}` still standing here is one this block's reader did not take — a keyword
+        // the block has no clause for (`{#each}…{:then}`), or one written after a space
+        // (`{: else}`). Canonical's `next` rejects it at the continuation, not at the block.
+        if self.check(TokenKind::BlockContinue) {
+            return Err(self.error_misplaced_continuation(expected));
+        }
+
         // Unclosed block: Svelte requires a matching `{/expected}`.
         if !self.check(TokenKind::BlockClose) {
             return Err(self.error_unclosed_at(&format!("{{#{expected}}} block"), block_start));
@@ -1171,6 +1202,35 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         )?;
 
         Ok(after_close)
+    }
+
+    /// The error for a `{:…}` continuation the `expected` block does not take, at the
+    /// continuation — canonical's `next` (`1-parse/state/tag.js`), which dispatches on the
+    /// block the continuation lands in: the clause list the block does take (`{#if}`,
+    /// `{#each}`, `{#await}`, each an `expected_token`), `block_invalid_elseif` for the
+    /// welded `{:elseif}`, and `block_invalid_continuation_placement` for a block with no
+    /// continuations at all (`{#key}`, `{#snippet}`).
+    fn error_misplaced_continuation(&self, expected: &str) -> ParseError {
+        // The `{:…}` braces are spelled by `clause`, so no literal reads as a format argument.
+        let clause = |keyword: &str| format!("{{:{keyword}}}");
+        let message = match expected {
+            "if" if self.source[self.current_end..].starts_with("elseif") => {
+                "'elseif' should be 'else if'".to_owned()
+            }
+            "if" => format!("Expected token {} or {}", clause("else"), clause("else if")),
+            "each" => format!("Expected token {}", clause("else")),
+            "await" => format!(
+                "Expected token {} or {}",
+                clause("then ..."),
+                clause("catch ...")
+            ),
+            _ => format!(
+                "{} block is invalid at this position (did you forget to close the preceding \
+                 element or block?)",
+                clause("...")
+            ),
+        };
+        self.error_msg_at(&message, self.current_start)
     }
 
     /// Parse a key block: {#key expression}...{/key}
