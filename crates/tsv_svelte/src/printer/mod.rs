@@ -30,6 +30,7 @@ use crate::ast::internal::{self, FragmentNode};
 use nodes::AttrGaps;
 use smallvec::SmallVec;
 use std::cell::{Cell, RefCell};
+use std::fmt::Write as _;
 use std::ops::{Index, IndexMut};
 use tsv_lang::FxHashSet;
 use tsv_lang::doc::DocBuf;
@@ -1216,7 +1217,7 @@ pub(crate) fn format_svelte_in(
     arena: &DocArena,
 ) -> String {
     let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
-    format_root(root, source, line_breaks, arena)
+    format_root(root, source, line_breaks, arena, TailRespell::Allow)
 }
 
 /// [`format_svelte_in`] over a document the caller folded ahead of the parse: the line
@@ -1227,17 +1228,31 @@ pub(crate) fn format_svelte_folded_in(
     arena: &DocArena,
 ) -> String {
     let line_breaks = LineBreaks::of_folded(folded, arena.take_line_breaks_scratch());
-    format_root(root, folded.text(), line_breaks, arena)
+    format_root(root, folded.text(), line_breaks, arena, TailRespell::Allow)
 }
 
-/// The shared body of the two: register the document's comments, build the printer on
-/// its line table, print the root, and write a BOM ahead of a leading content U+FEFF
-/// (`tsv_lang::printing::encode_leading_zwnbsp`).
+/// Whether [`format_root`] may respell the template tail ([`format_respelled_tail`]).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TailRespell {
+    /// The entry points: respell when `Printer::template_tail_respell` asks for it.
+    Allow,
+    /// The respelled source: its tail ends in the reference's `;`, so it never asks again.
+    Respelled,
+    /// The respelled source did not parse, so the original prints unrespelled.
+    Declined,
+}
+
+/// The shared body of the two: build the printer on its line table, register the
+/// document's comments, print the root, and write a BOM ahead of a leading content U+FEFF
+/// (`tsv_lang::printing::encode_leading_zwnbsp`) — or, for a document whose template tail
+/// the reorder would expose to the parse's end-of-document trim, format the respelled source
+/// instead ([`format_respelled_tail`]).
 fn format_root<'a>(
     root: &internal::Root<'_>,
     source: &'a str,
     line_breaks: LineBreaks<'a>,
     arena: &'a DocArena,
+    tail: TailRespell,
 ) -> String {
     // The printer's comment VIEW (`tsv_lang::merge_nestled_block_comments`). Two facts are
     // this array's own: it serves both this printer and every TEMPLATE island it constructs
@@ -1247,6 +1262,37 @@ fn format_root<'a>(
     // rule is a JS-parse postprocess and its own Svelte printer drops those outright, so
     // there is no oracle for them either way.
     let comments = tsv_lang::merge_nestled_block_comments(source, &root.comments);
+
+    // The template printer deliberately leaves `EmbedContext::printer_owns_line` at its
+    // default: after an island's closing `}` the rest of the line is this printer's markup,
+    // so a `//` an island defers past its own doc would come out as page text. What carries
+    // that to every island is the FIELD's default polarity, not a spread convention — the
+    // recipes rebase on two different bases (`..self.embed` for the heads, a fresh
+    // `EmbedContext::default()` in `build_unprefixed_value_doc`), and only both being false
+    // makes them agree. `<script>` claims ownership by name instead (`script_style.rs`).
+    let printer = Printer::with_line_breaks(
+        arena,
+        source,
+        &comments,
+        EmbedContext::default(),
+        line_breaks,
+    );
+
+    // Asked ahead of everything the print does, the ledger included: a document whose
+    // template tail must be respelled is formatted from the respelled source instead.
+    match tail {
+        TailRespell::Allow => {
+            if let Some((at, ch)) = printer.template_tail_respell(root) {
+                drop(printer.into_string()); // parks the line-break scratch
+                return format_respelled_tail(root, source, at, ch, arena);
+            }
+        }
+        TailRespell::Respelled => debug_assert!(
+            printer.template_tail_respell(root).is_none(),
+            "a respelled template tail must not ask to be respelled again"
+        ),
+        TailRespell::Declined => {}
+    }
 
     // The print-once comment ledger's expectation for this document (diagnostic; see
     // `tsv_lang::comment_ledger`). `Root.comments` is the `<script>` + template-expression
@@ -1263,23 +1309,61 @@ fn format_root<'a>(
         tsv_lang::comment_ledger::register_parsed_spans(source, html_comment_spans);
     }
 
-    // The template printer deliberately leaves `EmbedContext::printer_owns_line` at its
-    // default: after an island's closing `}` the rest of the line is this printer's markup,
-    // so a `//` an island defers past its own doc would come out as page text. What carries
-    // that to every island is the FIELD's default polarity, not a spread convention — the
-    // recipes rebase on two different bases (`..self.embed` for the heads, a fresh
-    // `EmbedContext::default()` in `build_unprefixed_value_doc`), and only both being false
-    // makes them agree. `<script>` claims ownership by name instead (`script_style.rs`).
-    let mut printer = Printer::with_line_breaks(
-        arena,
-        source,
-        &comments,
-        EmbedContext::default(),
-        line_breaks,
-    );
+    print_document(printer, root)
+}
+
+/// Print `root` through `printer` and write a BOM ahead of a leading content U+FEFF
+/// (`tsv_lang::printing::encode_leading_zwnbsp`).
+fn print_document(mut printer: Printer<'_>, root: &internal::Root<'_>) -> String {
     printer.print_root(root);
     // A content U+FEFF at output byte 0 needs a BOM ahead of it, or the next read strips it.
     tsv_lang::printing::encode_leading_zwnbsp(printer.into_string())
+}
+
+/// Format `source` with its character at byte `at` (`ch`, the template's last content
+/// character — see `Printer::template_tail_respell`) spelled as an uppercase-hex character
+/// reference (`&#xA0;`).
+///
+/// The respell is made in the SOURCE, ahead of the parse, so the layout measures the text the
+/// output holds: the reference is wider than the character, and a line filled around the raw
+/// character and substituted afterwards could overrun the print width and re-wrap on the next
+/// pass. The respelled source renders the same (Svelte decodes the reference back to `ch`, and
+/// at `at` the character was not yet at the end of the document), and the respelled text ends in
+/// `;`, so the second format never asks again.
+///
+/// The respelled source differs from a source that parsed only by a character reference in
+/// template text, so the one way its parse can fail is the size limit (`ParseError`'s
+/// `FileTooLarge`), which the few added bytes can cross. The original is then printed
+/// unrespelled.
+fn format_respelled_tail(
+    root: &internal::Root<'_>,
+    source: &str,
+    at: usize,
+    ch: char,
+    arena: &DocArena,
+) -> String {
+    let mut respelled = String::with_capacity(source.len() + 10);
+    respelled.push_str(&source[..at]);
+    let _ = write!(respelled, "&#x{:X};", u32::from(ch));
+    respelled.push_str(&source[at + ch.len_utf8()..]);
+
+    let bump = bumpalo::Bump::new();
+    match crate::parse(&respelled, &bump) {
+        Ok(respelled_root) => {
+            let line_breaks = LineBreaks::new(&respelled, arena.take_line_breaks_scratch());
+            format_root(
+                &respelled_root,
+                &respelled,
+                line_breaks,
+                arena,
+                TailRespell::Respelled,
+            )
+        }
+        Err(_) => {
+            let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
+            format_root(root, source, line_breaks, arena, TailRespell::Declined)
+        }
+    }
 }
 
 /// Collect the spans of every `<!-- -->` (`FragmentNode::Comment`) in a fragment, recursing
@@ -1643,23 +1727,12 @@ impl<'a> Printer<'a> {
         true
     }
 
-    /// Format a Svelte Root node
-    ///
-    /// Orchestrates formatting of the four main sections of a .svelte file:
-    /// 1. Module script: `<script context="module">`
-    /// 2. Instance script: `<script>`
-    /// 3. Template: The HTML/Svelte template
-    /// 4. Style: `<style>`
-    ///
-    /// Sections are ordered canonically and separated by blank lines.
-    /// Comments travel with the section they immediately precede in source order — and a
-    /// `#endregion` marker directly after a section travels below it
-    /// ([`Self::region_end_trails`]).
-    pub(crate) fn print_root(&mut self, root: &internal::Root<'_>) {
-        // Classify fragment comments by the section they travel with. A region-end trail
-        // candidate is confirmed against the classification (the plugin's precedence — see
-        // `region_end_trails`); each candidate names one section and each section at most one
-        // candidate, so a confirmed trail is written exactly once.
+    /// The fragment comments each hoisted section carries with it through the reorder: the
+    /// run written directly above it, and its region-end trail. A region-end trail candidate is
+    /// confirmed against the classification (the plugin's precedence — see
+    /// [`Self::region_end_trails`]); each candidate names one section and each section at most
+    /// one candidate, so a confirmed trail is written exactly once.
+    fn hoisted_comments(&self, root: &internal::Root<'_>) -> HoistedComments {
         let trails = self.region_end_trails(root);
         let mut sections = HoistedComments::default();
 
@@ -1678,6 +1751,83 @@ impl<'a> Printer<'a> {
                 }
             }
         }
+        sections
+    }
+
+    /// The character to respell as a reference so the template's last text survives the
+    /// reorder, as `(byte offset in the source, character)` — or `None`, the common case.
+    ///
+    /// Svelte's `parse` trims the END of the document with JavaScript's `trimEnd()`, whose class
+    /// holds characters its compiler renders everywhere else
+    /// ([`crate::whitespace::is_end_trimmed_content`]) — U+00A0, U+FEFF, U+2028, the form feed.
+    /// At the end of the source they are already gone (the parse dropped them), so a text node
+    /// ending in one was followed by something. When that something is a hoisted section (or a
+    /// comment travelling with one) and no `<style>` prints after the template, the canonical
+    /// reorder makes the text the document's end, and the next read would delete its last
+    /// character — a render change. Spelled as a character reference it decodes to the same text,
+    /// and its `;` is what the trim stops at.
+    ///
+    /// Read off the parsed text node (its own `raw`, trailing collapsible whitespace aside),
+    /// never off source bytes past it. A `prettier-ignore`-frozen node answers the same: the
+    /// move is tsv's, so the respell completes it.
+    fn template_tail_respell(&self, root: &internal::Root<'_>) -> Option<(usize, char)> {
+        if root.css.is_some() {
+            return None;
+        }
+        let nodes = &root.fragment.nodes;
+        let mut tail = None;
+        for (i, node) in nodes.iter().enumerate().rev() {
+            match node {
+                FragmentNode::Text(t) if t.is_collapsible_ws_only => {}
+                FragmentNode::Comment(_) => {}
+                FragmentNode::Text(t) => {
+                    tail = Some((i, t));
+                    break;
+                }
+                _ => return None,
+            }
+        }
+        let (idx, text) = tail?;
+        let content = internal::trim_end_collapsible_ws(text.raw(self.source));
+        let ch = content.chars().next_back()?;
+        if !crate::whitespace::is_end_trimmed_content(ch) {
+            return None;
+        }
+        // A comment after the text either travels with a hoisted section (and prints above the
+        // template) or stays in the template, where it ends the document instead of the text.
+        let is_comment = |i: usize| matches!(nodes[i], FragmentNode::Comment(_));
+        if (idx + 1..nodes.len()).any(is_comment) {
+            let sections = self.hoisted_comments(root);
+            let travels = |i: usize| {
+                sections
+                    .0
+                    .iter()
+                    .any(|s| s.leading.contains(&i) || s.trail == Some(i))
+            };
+            if (idx + 1..nodes.len()).any(|i| is_comment(i) && !travels(i)) {
+                return None;
+            }
+        }
+        Some((
+            text.raw_span.start as usize + content.len() - ch.len_utf8(),
+            ch,
+        ))
+    }
+
+    /// Format a Svelte Root node
+    ///
+    /// Orchestrates formatting of the four main sections of a .svelte file:
+    /// 1. Module script: `<script context="module">`
+    /// 2. Instance script: `<script>`
+    /// 3. Template: The HTML/Svelte template
+    /// 4. Style: `<style>`
+    ///
+    /// Sections are ordered canonically and separated by blank lines.
+    /// Comments travel with the section they immediately precede in source order — and a
+    /// `#endregion` marker directly after a section travels below it
+    /// ([`Self::region_end_trails`]).
+    pub(crate) fn print_root(&mut self, root: &internal::Root<'_>) {
+        let sections = self.hoisted_comments(root);
 
         // Sections are lifted off the fragment and printed at canonical positions, but a
         // `format-ignore` range's verbatim slice is raw source and would re-emit any that sits

@@ -20,6 +20,7 @@ For a whole-construct freeze the `prettier-ignore` family matches prettier (both
 - comment beside a hoisted section **inside** a range — ◆design_choice — [range_interior_comment](../tests/fixtures/svelte/syntax/prettier_ignore/range_interior_comment_prettier_divergence/)
 - glued nodes **inside** a range (byte-verbatim vs prettier's inter-node re-layout) — ◆design_choice — [range_glued](../tests/fixtures/svelte/syntax/prettier_ignore/range_glued_prettier_divergence/)
 - the gap in front of a frozen **text** node, where prettier never converges — ◆content_preservation — [directive_gap_text](../tests/fixtures/svelte/syntax/prettier_ignore/directive_gap_text_prettier_divergence/)
+- a frozen **text** node the section reorder leaves at the end of the document — ◆content_preservation — [template_tail_ignore](../tests/fixtures/svelte/script/ordering/template_tail_ignore_prettier_divergence/)
 
 **The gap in front of a frozen node is the author's, and it is printed once.** A directive and
 the node it freezes are separated by whatever the author wrote there, and that gap reaches the
@@ -37,6 +38,17 @@ the author's slice, so the gap grows by a line on every pass. Prettier has that 
 The frozen slice's **trailing** run goes wherever the boundary after it is the printer's — the
 fragment's own close, a follower that owns its line, a whitespace-collapsing container — and stays
 where the follower would print nothing beside a slice that already ends in a break.
+
+**A frozen text the reorder moves to the end of the document keeps its render, not its last
+byte.** When a `<script>` or `<svelte:options>` followed the frozen text in the source and no
+`<style>` follows the template, the canonical reorder makes that text the end of the output, where
+Svelte's `parse` trims a trailing U+00A0, U+FEFF, form feed or other JavaScript-only whitespace
+character that renders anywhere else. The move is tsv's, not the author's, so tsv completes it
+losslessly: the frozen node's last character is written as a character reference (`&#xA0;`), the
+same respell an unfrozen text gets
+([conformance_prettier_svelte.md §Svelte: Root section ordering](./conformance_prettier_svelte.md#svelte-root-section-ordering)).
+Every other byte of the slice is the author's. Prettier keeps the raw character and loses it on
+its next pass ([template_tail_ignore](../tests/fixtures/svelte/script/ordering/template_tail_ignore_prettier_divergence/)).
 
 ⚠️ **The gap is never invented either.** A directive the author **glued** to the node it freezes
 stays glued: there is no whitespace at that boundary, so a break there injects a rendered space
