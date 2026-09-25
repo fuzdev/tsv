@@ -15,33 +15,9 @@ use super::render_config::RenderPurpose;
 use super::specialize_short_len;
 #[cfg(feature = "swallow_check")]
 use super::swallow::{self, SwallowTracker};
-use super::types::{CachedWidth, DocContext, GroupId, LineKind, Mode, resolve_text};
+use super::types::{CachedWidth, DocContext, LineKind, Mode, resolve_text};
 #[cfg(feature = "comment_check")]
 use crate::comment_ledger;
-
-/// The mode each id-bearing group resolved to, as a total map over the closed
-/// [`GroupId`] enum. Backed by a fixed inline array indexed by `id as usize`, so
-/// it never allocates (the `HashMap` it replaces allocated a table on every
-/// render that resolved at least one keyed group). `None` = not yet resolved,
-/// read as flat — identical to `HashMap::get` returning `None`. Writes are
-/// last-write-wins, matching the `HashMap` (a `GroupId` variant shared across
-/// nested groups resolves before its reader, per the variant docs).
-#[derive(Default)]
-struct GroupModeMap {
-    slots: [Option<Mode>; GroupId::COUNT],
-}
-
-impl GroupModeMap {
-    #[inline]
-    fn insert(&mut self, id: GroupId, mode: Mode) {
-        self.slots[id as usize] = Some(mode);
-    }
-
-    #[inline]
-    fn get(&self, id: GroupId) -> Option<Mode> {
-        self.slots[id as usize]
-    }
-}
 
 //
 // Shared rendering helpers
@@ -498,25 +474,6 @@ fn flush_suffix_ahead_of_multiline_text(
     }
 }
 
-/// Process an IndentIfBreak node.
-#[inline]
-fn process_indent_if_break(
-    contents: DocId,
-    group_id: GroupId,
-    group_mode_map: Option<&GroupModeMap>,
-    cmd: ArenaCommand,
-) -> ArenaCommand {
-    let group_mode = group_mode_map
-        .and_then(|map| map.get(group_id))
-        .unwrap_or(Mode::Flat);
-
-    if group_mode == Mode::Break {
-        cmd.indented(contents)
-    } else {
-        cmd.with_doc(contents)
-    }
-}
-
 //
 // Public API
 //
@@ -705,18 +662,6 @@ trait RenderPolicy {
     /// special case (the suffix was already measured where it was queued).
     fn tracking_suffix(&self) -> bool;
 
-    /// The keyed-group mode map, when this renderer resolves keyed groups
-    /// (top-level only). `None` makes an id-keyed `IfBreak`/`IndentIfBreak`
-    /// read its group as unresolved → flat.
-    fn group_mode_map(&self) -> Option<&GroupModeMap>;
-
-    /// Record a keyed group's chosen mode (no-op without a map).
-    fn record_group_mode(&mut self, id: Option<GroupId>, mode: Mode);
-
-    /// The pending-command lookahead a `WithContext`-wrapped fill sees: the
-    /// real command stack at top level, nothing in the single-doc sub-render.
-    fn with_context_fill_rest<'a>(&self, commands: &'a [ArenaCommand]) -> &'a [ArenaCommand];
-
     // Opt-in swallow diagnostic hooks (`swallow_check` feature). Both policies carry
     // them: a swallow is a property of the physical output line, and the sub-renders
     // append to the same line as the main loop, so every renderer drives the one
@@ -727,12 +672,10 @@ trait RenderPolicy {
     fn swallow_on_text(&mut self, is_line_comment: bool, text: &str, output: &str);
 }
 
-/// Policy for [`render_doc_iterative`]: resolves keyed groups into a
-/// [`GroupModeMap`], always defers line suffixes, honors conditional-group
-/// `should_break`, hands fills the real pending-command lookahead, and (under
-/// the `swallow_check` feature) hosts the line-comment swallow diagnostic.
+/// Policy for [`render_doc_iterative`]: always defers line suffixes, honors
+/// conditional-group `should_break`, and (under the `swallow_check` feature) hosts
+/// the line-comment swallow diagnostic.
 struct TopLevelPolicy {
-    group_mode_map: GroupModeMap,
     #[cfg(feature = "swallow_check")]
     swallow: SwallowTracker,
 }
@@ -743,23 +686,6 @@ impl RenderPolicy for TopLevelPolicy {
     #[inline]
     fn tracking_suffix(&self) -> bool {
         true
-    }
-
-    #[inline]
-    fn group_mode_map(&self) -> Option<&GroupModeMap> {
-        Some(&self.group_mode_map)
-    }
-
-    #[inline]
-    fn record_group_mode(&mut self, id: Option<GroupId>, mode: Mode) {
-        if let Some(group_id) = id {
-            self.group_mode_map.insert(group_id, mode);
-        }
-    }
-
-    #[inline]
-    fn with_context_fill_rest<'a>(&self, commands: &'a [ArenaCommand]) -> &'a [ArenaCommand] {
-        commands
     }
 
     #[cfg(feature = "swallow_check")]
@@ -776,13 +702,15 @@ impl RenderPolicy for TopLevelPolicy {
 }
 
 /// Policy for [`render_single_doc_inner`] (fill segments and line-suffix
-/// flush): no keyed-group map (keyed groups read as unresolved → flat), suffix
-/// tracking only when the caller supplied a buffer, no conditional-group
-/// `should_break` shortcut (preserved drift — see
-/// [`RenderPolicy::CONDITIONAL_GROUP_HONORS_SHOULD_BREAK`]), and fills see no
-/// pending-command lookahead through `WithContext`.
-// TODO: a fill item renders here with no group-mode map, so a keyed `if_break` inside it (a
-// Svelte block head's `}` dangle, `GroupId::BlockHead`) reads flat even when its group broke.
+/// flush): suffix tracking only when the caller supplied a buffer, and no
+/// conditional-group `should_break` shortcut (preserved drift — see
+/// [`RenderPolicy::CONDITIONAL_GROUP_HONORS_SHOULD_BREAK`]).
+///
+/// Everything else is the top-level render's. A keyed group resolved inside a
+/// fill item is recorded in, and a keyed conditional read from, the one map the
+/// top-level render owns (`DocArena::keyed_group_breaks`), and a fill nested in
+/// the item sees the sub-render's own pending commands as its lookahead — the rest
+/// of the item, which is as far as any fits question inside a fill item can see.
 struct SingleDocPolicy {
     tracking_suffix: bool,
     /// Joins the enclosing render's swallow state machine — see
@@ -797,19 +725,6 @@ impl RenderPolicy for SingleDocPolicy {
     #[inline]
     fn tracking_suffix(&self) -> bool {
         self.tracking_suffix
-    }
-
-    #[inline]
-    fn group_mode_map(&self) -> Option<&GroupModeMap> {
-        None
-    }
-
-    #[inline]
-    fn record_group_mode(&mut self, _id: Option<GroupId>, _mode: Mode) {}
-
-    #[inline]
-    fn with_context_fill_rest<'a>(&self, _commands: &'a [ArenaCommand]) -> &'a [ArenaCommand] {
-        &[]
     }
 
     // A sub-render appends to the same physical output line as the main loop, so it
@@ -831,10 +746,19 @@ impl RenderPolicy for SingleDocPolicy {
 }
 
 /// Command-stack-based rendering with look-ahead — the top-level renderer
-/// behind every `arena_print_doc*` entry point. Resolves keyed groups, defers
-/// `line_suffix` content (flushed at line breaks and once at the end), and
+/// behind every `arena_print_doc*` entry point. Owns the render's keyed-group map,
+/// defers `line_suffix` content (flushed at line breaks and once at the end), and
 /// (under the `swallow_check` feature) hosts the line-comment swallow
 /// diagnostic. The loop itself is [`render_doc_core`].
+///
+/// The keyed-group map (`DocArena::keyed_group_breaks`) is cleared here on entry, and
+/// everything this render then runs — the loop, every fill-item and line-suffix
+/// sub-render nested in it, the final flush — shares the one map, as prettier's
+/// `printDocToString` shares one `groupModeMap`. The clear is the whole lifecycle
+/// because nothing else can interleave: a second top-level render on this arena while
+/// this one runs would panic taking the top-level command stack this render holds
+/// borrowed (`DocArena::borrow_top_render_stack`), the loop never calls back into a
+/// printer, and `arena_fits` neither reads nor writes the map.
 fn render_doc_iterative(
     ctx: &RenderCtx<'_>,
     doc: DocId,
@@ -847,7 +771,6 @@ fn render_doc_iterative(
     // enabled flag once per render and is inert when disabled. Compiled out
     // entirely without the feature. See `crate::doc::swallow`.
     let mut policy = TopLevelPolicy {
-        group_mode_map: GroupModeMap::default(),
         #[cfg(feature = "swallow_check")]
         swallow: SwallowTracker::begin_render(),
     };
@@ -858,6 +781,7 @@ fn render_doc_iterative(
     let mut commands = arena.borrow_top_render_stack();
     let mut line_suffix = arena.borrow_line_suffix_scratch();
     let mut should_remeasure = false;
+    arena.clear_keyed_groups();
 
     render_doc_core(
         ctx,
@@ -1199,7 +1123,9 @@ fn render_doc_core<P: RenderPolicy>(
                     (Mode::from_fits(fits), contents)
                 };
 
-                policy.record_group_mode(id, chosen_mode);
+                if let Some(id) = id {
+                    arena.record_keyed_group(id, chosen_mode);
+                }
                 cmd = cmd.with_mode(chosen_mode, chosen_doc);
                 continue;
             }
@@ -1209,17 +1135,11 @@ fn render_doc_core<P: RenderPolicy>(
                 flat_doc,
                 group_id,
             } => {
-                // Without a group map (the single-doc sub-renders), a keyed
-                // if_break treats its group as unresolved → flat, matching how
-                // IndentIfBreak defaults below.
+                // A keyed if_break reads the render's one keyed-group map, in the
+                // top-level loop and in every sub-render alike; an unresolved group
+                // reads as flat.
                 let broke = match group_id {
-                    Some(gid) => {
-                        policy
-                            .group_mode_map()
-                            .and_then(|map| map.get(*gid))
-                            .unwrap_or(Mode::Flat)
-                            == Mode::Break
-                    }
+                    Some(gid) => arena.keyed_group_broke(*gid),
                     None => cmd.mode() == Mode::Break,
                 };
                 let chosen = if broke { *break_doc } else { *flat_doc };
@@ -1229,8 +1149,11 @@ fn render_doc_core<P: RenderPolicy>(
 
             DocNode::IndentIfBreak { contents, group_id } => {
                 let contents = *contents;
-                let group_id = *group_id;
-                cmd = process_indent_if_break(contents, group_id, policy.group_mode_map(), cmd);
+                cmd = if arena.keyed_group_broke(*group_id) {
+                    cmd.indented(contents)
+                } else {
+                    cmd.with_doc(contents)
+                };
                 continue;
             }
 
@@ -1303,7 +1226,7 @@ fn render_doc_core<P: RenderPolicy>(
                             pos,
                             cmd.indent(),
                             &context,
-                            policy.with_context_fill_rest(commands),
+                            commands,
                             !line_suffix.is_empty(),
                             should_remeasure,
                         );

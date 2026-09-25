@@ -43,12 +43,37 @@ pub enum GroupId {
 }
 
 impl GroupId {
-    /// Number of variants. Sizes the renderer's inline `[Option<Mode>; COUNT]`
-    /// group-mode map (indexed by `id as usize`), which replaces a per-render
-    /// `HashMap`. Keep in sync when adding a variant — a stale (too-small) value
-    /// would index out of bounds, caught immediately by the fixture suite.
-    pub(crate) const COUNT: usize = 7;
+    /// This id's bit in the render's keyed-group map, one bit per variant in a `u8`
+    /// (`DocArena::keyed_group_breaks`): the discriminant, shifted. Deliberately not an
+    /// exhaustive `match` — spelled as one (per-arm constants, or one shared shift) it
+    /// measured +0.03 to +0.1% `instructions:u` across the render, where the bare shift is
+    /// free. The exhaustive check below is what holds the width instead.
+    #[inline]
+    pub(crate) const fn keyed_bit(self) -> u8 {
+        1 << (self as u8)
+    }
 }
+
+// Every variant's bit must fit the `u8` map. One exhaustive list: each arm computes its own
+// variant's bit in an inline `const` block, and a `const` block is evaluated at compile time
+// whether or not its arm ever runs — so naming a new variant here (which the exhaustive match
+// forces) is what checks it, and a bit past the word is a compile-time shift overflow.
+// `keyed_bit` itself stays the bare shift.
+const _: () = {
+    const fn keyed_bit_checked(id: GroupId) -> u8 {
+        match id {
+            GroupId::Assignment => const { GroupId::Assignment.keyed_bit() },
+            GroupId::TypeParameterConstraint => {
+                const { GroupId::TypeParameterConstraint.keyed_bit() }
+            }
+            GroupId::TypeParameterDefault => const { GroupId::TypeParameterDefault.keyed_bit() },
+            GroupId::ArrowChain => const { GroupId::ArrowChain.keyed_bit() },
+            GroupId::BlockHead => const { GroupId::BlockHead.keyed_bit() },
+            GroupId::BlockKey => const { GroupId::BlockKey.keyed_bit() },
+        }
+    }
+    keyed_bit_checked(GroupId::Assignment);
+};
 
 /// Context for doc rendering - provides hints about trailing punctuation
 /// that affect how content is rendered.

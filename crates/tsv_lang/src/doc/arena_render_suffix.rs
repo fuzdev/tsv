@@ -22,7 +22,7 @@
 //! token. Whether two deferred comments share an output line is a layout fact only this
 //! module has.
 
-use super::arena::{ArenaCommand, DocId, DocNode, LineSuffixBuf};
+use super::arena::{ArenaCommand, DocArena, DocId, DocNode, LineSuffixBuf};
 use super::arena_render::{RenderCtx, render_line_break, render_single_doc_inner};
 use super::types::{LineKind, Mode, resolve_text};
 
@@ -229,6 +229,7 @@ enum EdgeEmission<'a> {
 
 /// The arena storage a suffix-run walk reads.
 struct DocStore<'a> {
+    arena: &'a DocArena,
     nodes: &'a [DocNode],
     children: &'a [DocId],
     pool: &'a str,
@@ -248,6 +249,7 @@ fn with_doc_store<R>(ctx: &RenderCtx<'_>, f: impl FnOnce(&DocStore<'_>) -> R) ->
     let children = ctx.arena.borrow_children();
     let pool = ctx.arena.borrow_text_pool();
     f(&DocStore {
+        arena: ctx.arena,
         nodes: &nodes,
         children: &children,
         pool: &pool,
@@ -275,15 +277,19 @@ impl<'a> DocStore<'a> {
                 (LineKind::Soft, Mode::Flat) => None,
             },
             DocNode::MultilineText { .. } => Some(EdgeEmission::Opaque),
-            // Resolved exactly as the flush's own sub-render resolves it: that render
-            // carries no group-mode map, so a keyed conditional reads its group as
-            // unresolved → flat, and an unkeyed one keys on the mode it is rendered in.
+            // Resolved exactly as the flush's own sub-render resolves it: a keyed
+            // conditional reads the render's keyed-group map (the flush records nothing
+            // into it, so it reads what the flush read), and an unkeyed one keys on the
+            // mode it is rendered in.
             DocNode::IfBreak {
                 break_doc,
                 flat_doc,
                 group_id,
             } => {
-                let broke = group_id.is_none() && mode == Mode::Break;
+                let broke = match group_id {
+                    Some(id) => self.arena.keyed_group_broke(*id),
+                    None => mode == Mode::Break,
+                };
                 self.edge_emission(if broke { *break_doc } else { *flat_doc }, mode, edge)
             }
             DocNode::Indent(inner) | DocNode::Dedent(inner) | DocNode::LineSuffix(inner) => {
