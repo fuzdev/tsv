@@ -18,7 +18,15 @@ breaks, and alignment; everything else in the file is formatted normally.
 terminators: a format run folds every `<CR>` in its input to `<LF>` before it
 parses (the same fold, in the same place, that prettier and the HTML and CSS
 tokenizers do), so a frozen region in a CRLF file comes out LF-terminated like
-the rest of it. Nothing else inside the region moves.
+the rest of it.
+
+It is also verbatim about the construct, not about where the construct ends up.
+A frozen Svelte template text that the section reorder moves to the very end of
+the file — a `<script>` or `<svelte:options>` followed it, and no `<style>`
+follows the template — would lose a trailing non-breaking space, U+FEFF, form
+feed or other character that Svelte's parser trims from the end of a file and
+renders anywhere else. That one character is written as a character reference
+(`&#xA0;`), which renders the same. Nothing else inside the region moves.
 
 ```svelte
 <script lang="ts">

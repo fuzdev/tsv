@@ -895,6 +895,10 @@ selector).
 - Svelte — [leading_zwnbsp](../tests/fixtures/svelte/syntax/whitespace/leading_zwnbsp_prettier_divergence/)
 - CSS — [leading_zwnbsp](../tests/fixtures/css/tokens/whitespace/leading_zwnbsp_prettier_divergence/)
 
+A content U+FEFF the section reorder moves to the **end** of a Svelte document instead is
+protected by a character reference, not a BOM — see
+[conformance_prettier_svelte.md §Svelte: Root section ordering](./conformance_prettier_svelte.md#svelte-root-section-ordering).
+
 ---
 
 ## Tooling

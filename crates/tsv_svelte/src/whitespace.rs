@@ -10,6 +10,11 @@
 //! | does this END A TOKEN / separate a keyword? (parse) | [`is_svelte_ws`] — JS `\s` | parser, lexer, and any printer read that MIRRORS one |
 //! | may a formatter add, drop or respell this without changing what RENDERS? | [`is_collapsible_ws`](crate::ast::internal::is_collapsible_ws) — `[ \t\n\r]` | printer text/fill |
 //!
+//! A third question is the DIFFERENCE of the two: which characters does the parse delete at the
+//! very end of the document (`template.trimEnd()`, JS `\s`) that the compiler renders
+//! everywhere else? [`is_end_trimmed_content`] answers it, for the one printer read that asks —
+//! the template text the section reorder leaves at the end of the output.
+//!
 //! ⚠️ **Rust's own whitespace is neither, and reaching for it is the recurring bug.**
 //! `str::trim*`, `str::split_whitespace` and `char::is_whitespace` are Unicode `White_Space`,
 //! which disagrees with JS `\s` in BOTH directions — it **lacks U+FEFF** and **adds U+0085
@@ -187,9 +192,52 @@ pub(crate) fn brace_interior_start(source: &str, brace_pos: usize) -> usize {
     skip_svelte_ws(source, brace_pos + 1)
 }
 
+/// Whether `c` is template **content** that Svelte's `parse` deletes when it ends the document.
+///
+/// The parser reads `template.trimEnd()`, and JavaScript's trim class is ECMAScript `WhiteSpace`
+/// plus `LineTerminator` ([`is_svelte_ws`], JS `\s`). The compiler's own whitespace, the one
+/// that decides what renders, is only `[ \t\r\n]`
+/// ([`is_collapsible_ws_char`](crate::ast::internal::is_collapsible_ws_char)) — so the
+/// difference is a set of characters that render as text anywhere but at the very end of the
+/// source: `<VT>`, `<FF>`, U+00A0, U+FEFF, the other `Zs` spaces, U+2028 and U+2029. Not Rust's
+/// `char::is_whitespace`, which lacks U+FEFF and adds U+0085; and nothing in the C1 range, which
+/// Svelte's character-reference decoder remaps through windows-1252, is ever a member.
+pub(crate) fn is_end_trimmed_content(c: char) -> bool {
+    is_svelte_ws(c) && !crate::ast::internal::is_collapsible_ws_char(c)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Every ECMAScript `WhiteSpace` + `LineTerminator` code point (the class `trimEnd()`
+    /// strips), split by whether Svelte's compiler renders it.
+    #[test]
+    fn end_trimmed_content_is_the_trim_class_minus_collapsible_whitespace() {
+        let collapsible = ['\t', '\n', '\r', ' '];
+        let content = [
+            '\u{b}', '\u{c}', '\u{a0}', '\u{1680}', '\u{2000}', '\u{2001}', '\u{2002}', '\u{2003}',
+            '\u{2004}', '\u{2005}', '\u{2006}', '\u{2007}', '\u{2008}', '\u{2009}', '\u{200a}',
+            '\u{2028}', '\u{2029}', '\u{202f}', '\u{205f}', '\u{3000}', '\u{feff}',
+        ];
+        assert_eq!(collapsible.len() + content.len(), 25);
+        for c in collapsible {
+            assert!(!is_end_trimmed_content(c), "{c:?}");
+        }
+        for c in content {
+            assert!(is_end_trimmed_content(c), "{c:?}");
+        }
+        // Rust's `White_Space` adds NEL; U+180E left `Zs` in Unicode 6.3; U+200B is `Cf`.
+        for c in ['\u{85}', '\u{180e}', '\u{200b}', 'a', ';'] {
+            assert!(!is_end_trimmed_content(c), "{c:?}");
+        }
+        // Exhaustive: exactly the 21 content characters, and no C1 control among them.
+        let members: Vec<char> = (0..=0x10_ffff_u32)
+            .filter_map(char::from_u32)
+            .filter(|&c| is_end_trimmed_content(c))
+            .collect();
+        assert_eq!(members, content);
+    }
 
     /// `char_at`'s two branches must agree with a plain decode at every code point — the
     /// ASCII branch skips the decoder entirely, so a divergence there would mis-scan silently.

@@ -1,0 +1,121 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 218,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 115,
+				"end": 217,
+				"raw": "\n\nword word word word word word word word word word word word word word word word word word abcd&#xA0;",
+				"data": "\n\nword word word word word word word word word word word word word word word word word word abcd "
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " with its last character respelled as &#xA0;, the text is exactly 100 chars: one line",
+			"start": 10,
+			"end": 97,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 88
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 115,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 106,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 99,
+					"end": 105,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 103,
+							"end": 104,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 5
+								},
+								"end": {
+									"line": 3,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 103,
+								"end": 104,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 5
+									},
+									"end": {
+										"line": 3,
+										"column": 6
+									}
+								},
+								"name": "a"
+							},
+							"init": null
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " with its last character respelled as &#xA0;, the text is exactly 100 chars: one line",
+							"start": 10,
+							"end": 97
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
