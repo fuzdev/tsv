@@ -218,8 +218,10 @@ pub struct Lexer<'a> {
     /// The start offsets of the last two identifier-or-keyword tokens whose raw bytes
     /// were NOT plain one-column ASCII — a byte at or above `0x80` somewhere in the
     /// token — most recent first, `u32::MAX` (no token starts there) while unset.
-    /// Written only by [`Lexer::scan_identifier_into`], and only on the two branches
-    /// that consume a non-ASCII char, so the hot path of that walk records nothing.
+    /// Written only by the identifier scan's general reader ([`Lexer::scan_identifier_into`]
+    /// and [`Lexer::scan_identifier_tail`]), and only on the two branches that consume a
+    /// non-ASCII char, so the common identifier's path
+    /// ([`Lexer::scan_ascii_identifier_into`]) records nothing.
     /// Three names in 483,358 take those branches on a real corpus; carrying the same
     /// fact as a per-identifier `bool` instead — seeded, kept live across the scan
     /// loop, stored, and saved past the parser's lookahead — measured **+0.47%** of a
@@ -526,19 +528,83 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// Scan an identifier that may contain unicode escapes.
+    /// Lex the identifier-or-keyword token opened by the ASCII `IdentifierStart` byte at
+    /// `start` (`a-z A-Z _ $`) into `*dst` — the whole path of the common identifier.
+    ///
+    /// A table walk takes the ASCII `IdentifierPart` run (`[a-zA-Z0-9_$]`); its stop byte
+    /// then settles the name: at end of input, or on an ASCII byte other than `\`, the
+    /// name ends at the run, escape-free (nothing to decode — the dispatch cleared
+    /// `has_decoded` before it got here), and one keyword lookup over its bytes gives the
+    /// kind. Only a `\` or a non-ASCII byte can continue it, and those go to the cold
+    /// [`Lexer::continue_ascii_identifier_into`]; when that byte turns out not to continue
+    /// the name either (`if\x`, `return` + NBSP), the name is still the ASCII run and is
+    /// finished here, keyword lookup included — so the reserved-word compare tree is
+    /// reached from this one place, and inlines into the dispatch with the
+    /// letter-and-length pre-filter. (Outlining the compare tree behind the inline
+    /// pre-filter measured slower: the pre-filter admits most names, and each admitted
+    /// name then paid a call.) The path relies on the plain `#[inline]` being honored:
+    /// it inlines into the dispatch, and a call here is the first thing to check if the
+    /// dispatch grows.
+    #[inline]
+    fn scan_ascii_identifier_into(&mut self, start: usize, dst: &mut Token) {
+        let bytes = self.bytes;
+        let mut end = start + 1;
+        while end < bytes.len() && is_ascii_id_continue(bytes[end]) {
+            end += 1;
+        }
+        if bytes
+            .get(end)
+            .is_some_and(|&stop| stop >= 0x80 || stop == b'\\')
+            && self.continue_ascii_identifier_into(start, end, dst)
+        {
+            return;
+        }
+        self.position = end;
+        *dst = Token {
+            kind: match keyword_at(bytes, start, end - start) {
+                Some(kw) => TokenKind::Keyword(kw),
+                None => TokenKind::Identifier,
+            },
+            start: start as u32,
+            end: end as u32,
+        };
+    }
+
+    /// [`Lexer::scan_ascii_identifier_into`]'s general reader, for an ASCII run
+    /// `start..end` whose stop byte is a `\` or a non-ASCII byte. When that byte continues
+    /// the name (a unicode escape decoding to an `IdentifierPart`, or a non-ASCII
+    /// `IdentifierPart` char), reads the rest of it through
+    /// [`Lexer::scan_identifier_tail`], writes the token and returns `true`; otherwise
+    /// returns `false` with the cursor at `end`, leaving the caller to finish the ASCII
+    /// name.
+    #[cold]
+    #[inline(never)]
+    fn continue_ascii_identifier_into(
+        &mut self,
+        start: usize,
+        end: usize,
+        dst: &mut Token,
+    ) -> bool {
+        self.set_position(end);
+        let decoded = self.scan_identifier_tail(start, None);
+        if self.position == end {
+            return false;
+        }
+        self.finish_general_identifier_into(start, decoded, dst);
+        true
+    }
+
+    /// Scan an identifier that begins with a unicode escape or a non-ASCII
+    /// `IdentifierStart` char — the dispatch's two identifier arms other than the ASCII
+    /// one ([`Lexer::scan_ascii_identifier_into`]).
     ///
     /// ECMAScript allows unicode escapes in identifiers:
     /// - `\u0066oo` → identifier `foo`
     /// - `\u{41}` → identifier `A`
     /// - `b\u0061r` → identifier `bar`
     ///
-    /// The decoded name is returned in the token's `decoded` field when escapes are present.
-    /// Prettier normalizes these to their decoded form.
-    ///
-    /// Escape-free identifiers (the overwhelmingly common case) take a byte-level
-    /// ASCII fast path and never allocate: `decoded` materializes lazily on the
-    /// first escape, recovering the literal prefix from the source slice.
+    /// The decoded name is parked in the lexer's `decode_scratch` when escapes are present
+    /// (read back through `decoded_str`). Prettier normalizes these to their decoded form.
     fn scan_identifier_into(
         &mut self,
         first_char: char,
@@ -547,11 +613,7 @@ impl<'a> Lexer<'a> {
         let start = self.position;
         // None until an actual escape is decoded; `decoded.is_some()` ⇔ has-escapes.
         let mut decoded: Option<String> = None;
-        // Whether the raw token is plain ASCII is recorded on the two branches below
-        // that consume a non-ASCII char (`note_nonplain_ident`), and nowhere else: the
-        // hot path carries no flag, no register and no store for it.
 
-        // Handle first character (already validated as valid identifier start)
         if first_char == '\\' {
             // First char is a unicode escape
             if let Some((ch, len)) = try_decode_unicode_escape(self.bytes, self.position) {
@@ -570,29 +632,31 @@ impl<'a> Lexer<'a> {
                 return Err(lex_err("Invalid unicode escape in identifier", start));
             }
         } else {
+            // A non-ASCII start char: the raw token is not plain ASCII.
             self.advance();
-
-            // ASCII fast path: tight byte loop over `[a-zA-Z0-9_$]` (the ASCII
-            // subset of IdentifierPart), then resync the cursor once.
-            // Bails to the general loop on the first non-ASCII byte or `\`.
-            if first_char.is_ascii() {
-                let bytes = self.bytes;
-                let mut pos = self.position;
-                while pos < bytes.len() && is_ascii_id_continue(bytes[pos]) {
-                    pos += 1;
-                }
-                if pos != self.position {
-                    self.set_position(pos);
-                }
-            } else {
-                // A non-ASCII start char: the raw token is not plain ASCII.
-                self.note_nonplain_ident(start);
-            }
+            self.note_nonplain_ident(start);
         }
 
-        // Continue scanning identifier characters (including escapes). After the
-        // fast path this also serves as the terminator check — the first iteration
-        // breaks unless the identifier continues with a non-ASCII char or escape.
+        let decoded = self.scan_identifier_tail(start, decoded);
+        self.finish_general_identifier_into(start, decoded, dst);
+        Ok(())
+    }
+
+    /// The general identifier loop: consume `IdentifierPart` chars and unicode escapes from
+    /// the cursor, for the identifier that began at `start`, and return its decoded name —
+    /// `decoded` as passed, extended by every char read, or materialized from the literal
+    /// prefix `start..` at the first escape (`None` while no escape has been read).
+    ///
+    /// Whether the raw token is plain ASCII is recorded on the one branch here that
+    /// consumes a non-ASCII char (`note_nonplain_ident`) — the other is
+    /// [`Lexer::scan_identifier_into`]'s non-ASCII start — so the common identifier's
+    /// path, [`Lexer::scan_ascii_identifier_into`], carries no flag, no register and no
+    /// store for it.
+    fn scan_identifier_tail(
+        &mut self,
+        start: usize,
+        mut decoded: Option<String>,
+    ) -> Option<String> {
         loop {
             match self.cur_byte() {
                 Some(b'\\') => {
@@ -614,12 +678,10 @@ impl<'a> Lexer<'a> {
                         break;
                     }
                 }
-                // ASCII byte (the overwhelmingly common case): after the fast path this
-                // is almost always the terminator, so settle it from the byte LUT alone —
-                // no char decode, no cross-crate Unicode `is_id_continue` dispatch. The
-                // LUT equals `is_id_continue` on ASCII (the same equivalence the fast path
-                // above relies on), so this stays exact. The escape path (decoded is
-                // `Some`) re-consumes ASCII identifier parts through here too.
+                // ASCII byte: settle it from the byte LUT alone — no char decode, no
+                // cross-crate Unicode `is_id_continue` dispatch. The LUT equals
+                // `is_id_continue` on ASCII, so this stays exact. After an escape has
+                // materialized the decoded buffer, ASCII identifier parts are pushed here.
                 Some(b) if b < 0x80 => {
                     if is_ascii_id_continue(b) {
                         if let Some(d) = &mut decoded {
@@ -645,37 +707,36 @@ impl<'a> Lexer<'a> {
                 None => break,
             }
         }
+        decoded
+    }
 
-        // Check if it's a keyword (only if no escapes - escaped keywords are identifiers;
-        // without escapes the source slice IS the name, so no decoded buffer is needed).
-        // SWAR recognition over the identifier's raw bytes (no `&str` reslice, no
-        // hashing — SWAR covers every reserved word length); see `keyword_at`.
-        let kind = if decoded.is_none() {
-            match keyword_at(self.bytes, start, self.position - start) {
-                Some(kw) => TokenKind::Keyword(kw),
-                None => TokenKind::Identifier,
-            }
-        } else {
-            // Escaped identifiers are never keywords: `\u0063lass` is identifier "class", not keyword
-            TokenKind::Identifier
-        };
-
+    /// Write the identifier `start..self.position` read by the general reader into
+    /// `*dst`, parking a decoded name in the lexer's scratch. Always an
+    /// `Identifier`, never a keyword: an escaped spelling of a reserved word is an
+    /// identifier (`\u0063lass` is the identifier `class`), and an unescaped name that
+    /// reached the general reader holds a non-ASCII char, which no reserved word does.
+    /// (The one general-reader name that CAN be a keyword — an ASCII run whose `\` or
+    /// non-ASCII stop byte does not continue it — is finished by
+    /// [`Lexer::scan_ascii_identifier_into`].)
+    fn finish_general_identifier_into(
+        &mut self,
+        start: usize,
+        decoded: Option<String>,
+        dst: &mut Token,
+    ) {
         // Escaped identifiers are near-zero in real code; funnel the rare local
-        // buffer into the parked scratch so `decoded_str` reads it uniformly.
-        match decoded {
-            Some(s) => {
-                self.decode_scratch.clear();
-                self.decode_scratch.push_str(&s);
-                self.has_decoded = true;
-            }
-            None => self.has_decoded = false,
+        // buffer into the parked scratch so `decoded_str` reads it uniformly. The
+        // dispatch cleared `has_decoded` for the escape-free name.
+        if let Some(s) = decoded {
+            self.decode_scratch.clear();
+            self.decode_scratch.push_str(&s);
+            self.has_decoded = true;
         }
         *dst = Token {
-            kind,
+            kind: TokenKind::Identifier,
             start: start as u32,
             end: self.position as u32,
         };
-        Ok(())
     }
 
     /// Scan digits matching a predicate, validating numeric separators (`_`).
@@ -1082,6 +1143,15 @@ impl<'a> Lexer<'a> {
                 start: start as u32,
                 end: start as u32,
             },
+            // ECMAScript identifiers: start with ID_Start, _, or $; continue with ID_Continue or $
+            // Note: _ is in ID_Continue but not ID_Start, so we check it explicitly for start
+            // Identifiers may contain unicode escapes: \u0066oo → foo, b\u0061r → bar
+            // Tested ahead of every other byte arm, the identifier being the most common
+            // token: none of the arms it precedes matches an ASCII `IdentifierStart` byte.
+            Some(b) if is_ascii_id_start(b) => {
+                self.scan_ascii_identifier_into(start, dst);
+                return Ok(());
+            }
             Some(b';') => {
                 self.advance();
                 self.make_token(TokenKind::Semicolon, start)
@@ -1116,10 +1186,6 @@ impl<'a> Lexer<'a> {
                 }
             }
             Some(b) if b.is_ascii_digit() => return self.scan_number_into(start, b, dst),
-            // ECMAScript identifiers: start with ID_Start, _, or $; continue with ID_Continue or $
-            // Note: _ is in ID_Continue but not ID_Start, so we check it explicitly for start
-            // Identifiers may contain unicode escapes: \u0066oo → foo, b\u0061r → bar
-            Some(b) if is_ascii_id_start(b) => return self.scan_identifier_into(b as char, dst),
             // Unicode escape at start of identifier: \u0066oo → foo
             Some(b'\\') => {
                 // Check if this is a valid unicode escape that decodes to an identifier start
@@ -1816,6 +1882,7 @@ impl<'a> Lexer<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lexer::token::KEYWORDS;
 
     // The byte-cursor fast path and the identifier-scan terminator arm both decide
     // ASCII identifier bytes from the `[bool; 256]` LUTs instead of decoding a char
@@ -1864,5 +1931,260 @@ mod tests {
         // And the loose class is genuinely loose, which is what the callers' resume
         // arm exists for.
         assert!(!is_es_line_terminator_at("\u{2014}".as_bytes(), 0));
+    }
+
+    /// The identifier ECMAScript reads at byte 0 of `src`, restated from the grammar's
+    /// primitives alone (`is_id_start` / `is_id_continue`, the one escape decoder, and the
+    /// `KEYWORDS` oracle) with none of the lexer's byte fast paths: the token kind, its end,
+    /// the decoded name when an escape was read, and whether its raw bytes are plain ASCII.
+    fn model_identifier(src: &str) -> (TokenKind, usize, Option<String>, bool) {
+        let bytes = src.as_bytes();
+        let mut decoded = None;
+        let mut end = if bytes[0] == b'\\' {
+            let (ch, len) = try_decode_unicode_escape(bytes, 0).expect("an escape-led case");
+            assert!(
+                is_id_start(ch),
+                "an escape-led case must start an identifier"
+            );
+            decoded = Some(String::from(ch));
+            len
+        } else {
+            let ch = src.chars().next().expect("a non-empty case");
+            assert!(is_id_start(ch), "a case must start an identifier");
+            ch.len_utf8()
+        };
+        loop {
+            if bytes.get(end) == Some(&b'\\') {
+                match try_decode_unicode_escape(bytes, end) {
+                    Some((ch, len)) if is_id_continue(ch) => {
+                        decoded
+                            .get_or_insert_with(|| src[..end].to_string())
+                            .push(ch);
+                        end += len;
+                    }
+                    _ => break,
+                }
+            } else {
+                match src[end..].chars().next() {
+                    Some(ch) if is_id_continue(ch) => {
+                        if let Some(d) = &mut decoded {
+                            d.push(ch);
+                        }
+                        end += ch.len_utf8();
+                    }
+                    _ => break,
+                }
+            }
+        }
+        let kind = match decoded {
+            Some(_) => TokenKind::Identifier,
+            None => KEYWORDS
+                .iter()
+                .find(|(kw, _)| *kw == &src[..end])
+                .map_or(TokenKind::Identifier, |&(_, kw)| TokenKind::Keyword(kw)),
+        };
+        (kind, end, decoded, src[..end].is_ascii())
+    }
+
+    /// Lex `src` through the public `next_token` and check its first token, and the lexer
+    /// state that token leaves, against [`model_identifier`] — once at byte 0 and once
+    /// behind a `; ` prefix, whose token is lexed first and asserted to be the `;`, so a
+    /// scan that reads from the source's start rather than the token's is caught too.
+    #[track_caller]
+    fn assert_identifier_matches_model(src: &str) {
+        const PREFIX: &str = "; ";
+        let (kind, len, decoded, plain) = model_identifier(src);
+        for prefix in ["", PREFIX] {
+            let source = format!("{prefix}{src}");
+            let start = prefix.len();
+            let end = start + len;
+            let mut lexer = Lexer::at_offset(&source, 0);
+            if !prefix.is_empty() {
+                let semicolon = lexer.next_token().expect("the prefix lexes");
+                assert_eq!(semicolon.kind, TokenKind::Semicolon, "prefix of {source:?}");
+            }
+            let token = lexer
+                .next_token()
+                .unwrap_or_else(|e| panic!("{source:?} failed to lex: {e}"));
+            assert_eq!(
+                (token.kind, token.start, token.end),
+                (kind.clone(), start as u32, end as u32),
+                "token of {source:?}"
+            );
+            assert_eq!(lexer.position, end, "cursor after {source:?}");
+            assert_eq!(
+                lexer.decoded_str(),
+                decoded.as_deref(),
+                "decoded name of {source:?}"
+            );
+            assert_eq!(
+                lexer.ident_is_plain_ascii(start as u32),
+                plain,
+                "plain-ASCII record of {source:?}"
+            );
+        }
+    }
+
+    /// A character for every byte that can follow an identifier's first run, for the
+    /// exhaustive identifier sweep: every ASCII byte, then code points under each valid UTF-8
+    /// lead byte `0xC2..=0xF4` — all of the two-byte range, a stride through the three- and
+    /// four-byte ranges, and the code points the identifier and whitespace rules single out
+    /// (ZWNJ / ZWJ continue a name; NBSP, U+FEFF, U+2028 / U+2029 end one). No other byte
+    /// can follow an ASCII byte in a `&str`: `0x80..=0xBF` are continuation bytes and
+    /// `0xC0`, `0xC1`, `0xF5..=0xFF` never occur.
+    fn identifier_followers() -> Vec<String> {
+        let mut out: Vec<String> = (0u8..0x80).map(|b| char::from(b).to_string()).collect();
+        let strided = (0x80..0x800)
+            .chain((0x800..0x1_0000).step_by(61))
+            .chain((0x1_0000..0x11_0000).step_by(1021));
+        let special = [
+            0x200C, 0x200D, 0x00A0, 0xFEFF, 0x2028, 0x2029, 0x3000, 0x1680, 0x0301, 0x00B7, 0x2118,
+            0x309B, 0x0085, 0x2014, 0xFFFF, 0x10_FFFF,
+        ];
+        out.extend(
+            strided
+                .chain(special)
+                .filter_map(char::from_u32)
+                .map(String::from),
+        );
+        out
+    }
+
+    /// The common identifier — an ASCII run ended by any ASCII byte but `\` — is read by a
+    /// fast path that settles the name at the run's stop byte without the general reader;
+    /// everything else (an escape, a non-ASCII continuation, a `\` or non-ASCII byte that
+    /// does NOT continue the name) goes on to the general reader. Both halves must agree
+    /// with the grammar on every stop, and no corpus holds most of them, so every ASCII
+    /// identifier start is lexed with three bodies (none, one byte, five bytes), followed by
+    /// every character of [`identifier_followers`], then by end of input or by a tail that
+    /// an escape or a continuation could run into.
+    #[test]
+    fn every_ascii_led_identifier_stop_matches_the_grammar() {
+        let followers = identifier_followers();
+        let tails = ["", "x", " ", "u0061", "u{62}", "u0020", "u00", "u{110000}"];
+        let mut cases = 0_u32;
+        for first in (0u8..0x80).filter(|&b| is_ascii_id_start(b)) {
+            for body in ["", "b", "b9$_Z"] {
+                let head = format!("{}{body}", char::from(first));
+                assert_identifier_matches_model(&head);
+                cases += 1;
+                for follower in &followers {
+                    // An escape tail is only interesting after a `\`.
+                    let tails: &[&str] = if follower == "\\" {
+                        &tails
+                    } else {
+                        &tails[..2]
+                    };
+                    for tail in tails {
+                        assert_identifier_matches_model(&format!("{head}{follower}{tail}"));
+                        cases += 1;
+                    }
+                }
+            }
+        }
+        assert!(
+            cases > 500_000,
+            "the identifier sweep collapsed to {cases} cases"
+        );
+    }
+
+    /// Every reserved word, and its near misses one byte short and one byte long, followed
+    /// by every character of [`identifier_followers`]: the stop byte is settled on the fast
+    /// path when it is an ASCII byte other than `\`, and by the cold general reader when it
+    /// is a `\` or non-ASCII; a stop that does not continue the name comes back to the fast
+    /// path's one keyword lookup (`if\x` is the keyword `if`; `return` + NBSP is the keyword
+    /// `return`). Every verdict must match the `KEYWORDS` oracle.
+    #[test]
+    fn every_keyword_stop_matches_the_oracle() {
+        let followers = identifier_followers();
+        let mut cases = 0_u32;
+        for &(kw, _) in KEYWORDS {
+            for word in [
+                kw.to_string(),
+                kw[..kw.len() - 1].to_string(),
+                format!("{kw}s"),
+            ] {
+                for follower in &followers {
+                    let tails: &[&str] = if follower == "\\" {
+                        &["", "x", "u0061", "u0020"]
+                    } else {
+                        &["", "x"]
+                    };
+                    for tail in tails {
+                        assert_identifier_matches_model(&format!("{word}{follower}{tail}"));
+                        cases += 1;
+                    }
+                }
+            }
+        }
+        assert!(
+            cases > 100_000,
+            "the keyword sweep collapsed to {cases} cases"
+        );
+    }
+
+    /// The identifier arms the fast path does not take — an escape-led name and a
+    /// non-ASCII-led one — and the shapes the sweeps name only in passing.
+    #[test]
+    fn identifier_special_cases_match_the_grammar() {
+        for src in [
+            "ab",
+            "if\\x",
+            "if\\u0061",
+            "i\\u0066",
+            "\\u0069f",
+            "aé",
+            "a\u{200C}b",
+            "a\u{200D}b",
+            "return\u{00A0}x",
+            "return\u{2028}x",
+            "return\u{FEFF}x",
+            "returné",
+            "$a",
+            "_a",
+            "$",
+            "_",
+            "é",
+            "éa",
+            "é\\u0061",
+            "\\u0061",
+            "\\u{61}bc",
+            "\\u0061\\u0062",
+            "\u{2118}x",
+        ] {
+            assert_identifier_matches_model(src);
+        }
+        // An escaped name leaves its decoded value in the scratch; the plain name after it
+        // must not read it back — the dispatch clears the flag for every token, and the
+        // common identifier's path relies on that rather than clearing it itself.
+        for (src, first_end, second) in [("\\u0061 b", 6, 7..8), ("a\\u0062 c", 7, 8..9)] {
+            let mut lexer = Lexer::at_offset(src, 0);
+            let first = lexer.next_token().expect("the escaped name lexes");
+            assert_eq!((first.kind, first.end), (TokenKind::Identifier, first_end));
+            assert!(
+                lexer.decoded_str().is_some(),
+                "{src:?}: the escape is decoded"
+            );
+            let plain = lexer.next_token().expect("the plain name lexes");
+            assert_eq!(
+                (plain.kind, plain.start, plain.end),
+                (TokenKind::Identifier, second.start, second.end),
+                "{src:?}"
+            );
+            assert_eq!(
+                lexer.decoded_str(),
+                None,
+                "{src:?}: the plain name decodes nothing"
+            );
+        }
+        // `#private` is a `#` token and then the name.
+        let mut lexer = Lexer::at_offset("#private", 0);
+        let hash = lexer.next_token().expect("`#` lexes");
+        assert_eq!((hash.kind, hash.start, hash.end), (TokenKind::Hash, 0, 1));
+        let name = lexer.next_token().expect("the private name lexes");
+        assert_eq!(
+            (name.kind, name.start, name.end),
+            (model_identifier("private").0, 1, 8)
+        );
     }
 }
