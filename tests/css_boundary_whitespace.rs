@@ -507,7 +507,9 @@ fn a_js_whitespace_code_point_is_identifier_content_where_no_skip_precedes_it() 
 /// rejected outright. Dropping `<NEL>` from the lexer's class in isolation would fix the
 /// selector half and turn the property half from a silent drop into a **new over-rejection**,
 /// which is the wrong trade to make ahead of the raw readers. Both halves are pinned here so
-/// closing that family has to come back and re-pin them together. See
+/// closing that family has to come back and re-pin them together. The format-ignore freeze
+/// shares the gap: a `<NEL>` ahead of a frozen node is kept only when the document holds a
+/// JS-`\s` member (the `holds_boundary_ws` precondition), and dropped otherwise. See
 /// [conformance_svelte.md §CSS Parser Scope & Error Model](../docs/conformance_svelte.md).
 #[test]
 fn next_line_is_a_tracked_gap_in_both_directions() {
@@ -2758,4 +2760,141 @@ fn a_member_on_one_side_of_of_keeps_the_comment_on_the_other() {
         failures.len(),
         failures.join("\n")
     );
+}
+
+/// A format-ignore directive freezes the node behind it FROM THE RUN: the slice starts at the
+/// first member of the boundary run contiguous with the node, so the run survives byte for
+/// byte — the author's tabs and line breaks inside it included — while the ASCII whitespace
+/// ahead of it is regenerated as indentation, as ahead of any node. The freeze replaces the
+/// printer that would otherwise claim the run (a rule's first compound, a declaration's or an
+/// at-rule's rebuilt head), so the run is the slice's: `<ZWNBSP>a` is a different selector
+/// from `a` to a browser. Every freeze site — the stylesheet's own children, a rule body, an
+/// at-rule body — is reached, in a Svelte `<style>` and a standalone stylesheet, under both
+/// directive spellings.
+#[test]
+fn a_frozen_node_keeps_the_run_in_front_of_it_byte_for_byte() {
+    // (label, template, frozen node) — `{D}` the directive, `{T}` the run.
+    const FROZEN_JUNCTURES: [(&str, &str, &str); 8] = [
+        ("the stylesheet's first rule", "{D}\n{T}a  {}\n", "a  {}"),
+        (
+            "a stylesheet rule after another",
+            "b {\n\tcolor: red;\n}\n{D}\n{T}a  , c {}\n",
+            "a  , c {}",
+        ),
+        (
+            "a stylesheet at-rule",
+            "{D}\n{T}@media  x {}\n",
+            "@media  x {}",
+        ),
+        ("a rule in a rule", "b {\n\t{D}\n\t{T}a  {}\n}\n", "a  {}"),
+        (
+            "an at-rule in a rule",
+            "b {\n\t{D}\n\t{T}@media  x {}\n}\n",
+            "@media  x {}",
+        ),
+        (
+            "an at-rule in an at-rule body",
+            "@media x {\n\t{D}\n\t{T}@supports  (a: b) {}\n}\n",
+            "@supports  (a: b) {}",
+        ),
+        (
+            "a declaration in a rule",
+            "b {\n\t{D}\n\t{T}color  :  red;\n}\n",
+            "color  :  red",
+        ),
+        (
+            "a declaration in an at-rule body",
+            "@font-face {\n\t{D}\n\t{T}font-family  :  a;\n}\n",
+            "font-family  :  a",
+        ),
+    ];
+    for (label, template, node) in FROZEN_JUNCTURES {
+        for directive in ["/* prettier-ignore */", "/* format-ignore */"] {
+            for (member_label, ch) in JS_WHITESPACE_AT_OR_ABOVE_A0 {
+                // (authored run, the run as the slice keeps it)
+                for (run, kept) in [
+                    (ch.to_owned(), ch.to_owned()),
+                    (format!("{ch} "), format!("{ch} ")),
+                    (format!("{ch}\t{ch}"), format!("{ch}\t{ch}")),
+                    (format!("{ch}\n"), format!("{ch}\n")),
+                    (format!("{ch}\n\n"), format!("{ch}\n\n")),
+                    (format!("   {ch}"), ch.to_owned()),
+                ] {
+                    let css = template.replace("{D}", directive).replace("{T}", &run);
+                    let frozen = format!("{kept}{node}");
+                    for (host, out) in [
+                        (
+                            "css",
+                            tsv_css::format_str(&css).expect("stylesheet should format"),
+                        ),
+                        (
+                            "svelte",
+                            tsv_svelte::format_str(&component(&format!("<style>\n{css}</style>")))
+                                .expect("component should format"),
+                        ),
+                    ] {
+                        let context = format!(
+                            "{host} {label}, {directive}, {member_label} run {run:?}: got {out:?}"
+                        );
+                        let at = out.find(&frozen).unwrap_or_else(|| {
+                            panic!("{context}: the frozen slice starts at the run's first member")
+                        });
+                        let line_start = out[..at].rfind('\n').map_or(0, |i| i + 1);
+                        assert!(
+                            out[line_start..at].bytes().all(|b| b == b'\t'),
+                            "{context}: only regenerated indentation stands ahead of the run"
+                        );
+                        assert_eq!(
+                            out.matches(ch).count(),
+                            run.matches(ch).count(),
+                            "{context}: every member survives, none is emitted twice"
+                        );
+                        let again = match host {
+                            "css" => tsv_css::format_str(&out),
+                            _ => tsv_svelte::format_str(&out),
+                        }
+                        .expect("output should re-format");
+                        assert_eq!(again, out, "{context}: formatting must be a fixed point");
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// The freeze's standalone spellings, byte for byte through every CSS entry point: the plain
+/// `.css` case, a leading byte-order mark ahead of the directive (stripped by policy — the
+/// content `U+FEFF` behind the directive is not a BOM, and stays), and the tool-neutral
+/// `format-ignore` spelling.
+#[test]
+fn a_frozen_stylesheet_node_keeps_its_leading_zwnbsp() {
+    use tsv_cli::cli::format_source::format_source;
+    use tsv_cli::cli::input::ParserType;
+    for (label, source, expected) in [
+        (
+            "prettier-ignore",
+            "/* prettier-ignore */\n\u{feff}a  {}\n",
+            "/* prettier-ignore */\n\u{feff}a  {}\n",
+        ),
+        (
+            "a BOM ahead of the directive",
+            "\u{feff}/* prettier-ignore */\n\u{feff}a  {}\n",
+            "/* prettier-ignore */\n\u{feff}a  {}\n",
+        ),
+        (
+            "format-ignore",
+            "/* format-ignore */\n\u{feff}a  {}\n",
+            "/* format-ignore */\n\u{feff}a  {}\n",
+        ),
+    ] {
+        let via_cli = format_source(source, ParserType::Css).expect("format_source");
+        let via_str = tsv_css::format_str(source).expect("format_str");
+        assert_eq!(via_cli, expected, "{label}: format_source");
+        assert_eq!(via_str, expected, "{label}: tsv_css::format_str");
+        assert_eq!(
+            format_source(&via_cli, ParserType::Css).expect("re-format"),
+            via_cli,
+            "{label}: formatting must be a fixed point"
+        );
+    }
 }

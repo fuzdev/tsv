@@ -1,0 +1,793 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 66,
+		"end": 705,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 99,
+					"end": 100,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 99,
+							"end": 100,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "b",
+											"start": 99,
+											"end": 100
+										}
+									],
+									"start": 99,
+									"end": 100
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 102,
+					"end": 104,
+					"children": []
+				},
+				"start": 99,
+				"end": 104
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 107,
+					"end": 114,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 107,
+							"end": 114,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 107,
+											"end": 114
+										}
+									],
+									"start": 107,
+									"end": 114
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 115,
+					"end": 133,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 119,
+							"end": 129,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 107,
+				"end": 133
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 160,
+					"end": 178,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 160,
+							"end": 167,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class2",
+											"start": 160,
+											"end": 167
+										}
+									],
+									"start": 160,
+									"end": 167
+								}
+							]
+						},
+						{
+							"type": "ComplexSelector",
+							"start": 171,
+							"end": 178,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class3",
+											"start": 171,
+											"end": 178
+										}
+									],
+									"start": 171,
+									"end": 178
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 179,
+					"end": 181,
+					"children": []
+				},
+				"start": 160,
+				"end": 181
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 210,
+					"end": 211,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 210,
+							"end": 211,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "c",
+											"start": 210,
+											"end": 211
+										}
+									],
+									"start": 210,
+									"end": 211
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 213,
+					"end": 215,
+					"children": []
+				},
+				"start": 210,
+				"end": 215
+			},
+			{
+				"type": "Atrule",
+				"start": 242,
+				"end": 259,
+				"name": "media",
+				"prelude": "screen",
+				"block": {
+					"type": "Block",
+					"start": 257,
+					"end": 259,
+					"children": []
+				}
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 288,
+					"end": 289,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 288,
+							"end": 289,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "f",
+											"start": 288,
+											"end": 289
+										}
+									],
+									"start": 288,
+									"end": 289
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 291,
+					"end": 293,
+					"children": []
+				},
+				"start": 288,
+				"end": 293
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 323,
+					"end": 324,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 323,
+							"end": 324,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "g",
+											"start": 323,
+											"end": 324
+										}
+									],
+									"start": 323,
+									"end": 324
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 326,
+					"end": 328,
+					"children": []
+				},
+				"start": 323,
+				"end": 328
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 357,
+					"end": 358,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 357,
+							"end": 358,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "i",
+											"start": 357,
+											"end": 358
+										}
+									],
+									"start": 357,
+									"end": 358
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 360,
+					"end": 362,
+					"children": []
+				},
+				"start": 357,
+				"end": 362
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 388,
+					"end": 389,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 388,
+							"end": 389,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "j",
+											"start": 388,
+											"end": 389
+										}
+									],
+									"start": 388,
+									"end": 389
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 391,
+					"end": 393,
+					"children": []
+				},
+				"start": 388,
+				"end": 393
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 397,
+					"end": 398,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 397,
+							"end": 398,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "k",
+											"start": 397,
+											"end": 398
+										}
+									],
+									"start": 397,
+									"end": 398
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 399,
+					"end": 403,
+					"children": []
+				},
+				"start": 397,
+				"end": 403
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 406,
+					"end": 413,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 406,
+							"end": 413,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class4",
+											"start": 406,
+											"end": 413
+										}
+									],
+									"start": 406,
+									"end": 413
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 414,
+					"end": 585,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 443,
+							"end": 456,
+							"property": "color",
+							"value": "red"
+						},
+						{
+							"type": "Declaration",
+							"start": 461,
+							"end": 467,
+							"property": "top",
+							"value": "0"
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 497,
+								"end": 498,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 497,
+										"end": 498,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "d",
+														"start": 497,
+														"end": 498
+													}
+												],
+												"start": 497,
+												"end": 498
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 500,
+								"end": 502,
+								"children": []
+							},
+							"start": 497,
+							"end": 502
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 533,
+								"end": 534,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 533,
+										"end": 534,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "h",
+														"start": 533,
+														"end": 534
+													}
+												],
+												"start": 533,
+												"end": 534
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 536,
+								"end": 538,
+								"children": []
+							},
+							"start": 533,
+							"end": 538
+						},
+						{
+							"type": "Atrule",
+							"start": 566,
+							"end": 582,
+							"name": "media",
+							"prelude": "print",
+							"block": {
+								"type": "Block",
+								"start": 580,
+								"end": 582,
+								"children": []
+							}
+						}
+					]
+				},
+				"start": 406,
+				"end": 585
+			},
+			{
+				"type": "Atrule",
+				"start": 588,
+				"end": 696,
+				"name": "media",
+				"prelude": "print",
+				"block": {
+					"type": "Block",
+					"start": 601,
+					"end": 696,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 631,
+								"end": 632,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 631,
+										"end": 632,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "e",
+														"start": 631,
+														"end": 632
+													}
+												],
+												"start": 631,
+												"end": 632
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 634,
+								"end": 636,
+								"children": []
+							},
+							"start": 631,
+							"end": 636
+						},
+						{
+							"type": "Atrule",
+							"start": 664,
+							"end": 693,
+							"name": "supports",
+							"prelude": "(display: grid)",
+							"block": {
+								"type": "Block",
+								"start": 691,
+								"end": 693,
+								"children": []
+							}
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 75,
+				"end": 96
+			},
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 136,
+				"end": 157
+			},
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 184,
+				"end": 205
+			},
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 218,
+				"end": 239
+			},
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 262,
+				"end": 283
+			},
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 296,
+				"end": 317
+			},
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 331,
+				"end": 352
+			},
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 365,
+				"end": 386
+			},
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 418,
+				"end": 439
+			},
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 471,
+				"end": 492
+			},
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 505,
+				"end": 526
+			},
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 541,
+				"end": 562
+			},
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 605,
+				"end": 626
+			},
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 639,
+				"end": 660
+			}
+		],
+		"content": {
+			"start": 73,
+			"end": 697,
+			"styles": "\n\t/* prettier-ignore */\n\t﻿b  {}\n\n\t.class1 {\n\t\tcolor: red;\n\t}\n\n\t/* prettier-ignore */\n\t .class2  , .class3 {}\n\n\t/* prettier-ignore */\n\n\t﻿ c  {}\n\n\t/* prettier-ignore */\n\t　@media  screen {}\n\n\t/* prettier-ignore */\n\t﻿\n\tf  {}\n\n\t/* prettier-ignore */\n\t \n\n\tg  {}\n\n\t/* prettier-ignore */\n\t﻿\t i  {}\n\n\t/* prettier-ignore */\n\tj  {}\n\t﻿ k {\n\t}\n\n\t.class4 {\n\t\t/* prettier-ignore */\n\t\t﻿color  :  red;\n\t\t﻿top: 0;\n\t\t/* prettier-ignore */\n\t\t﻿ d  {}\n\t\t/* prettier-ignore */\n\t\t﻿\n\t\th  {}\n\t\t/* prettier-ignore */\n\t\t﻿@media  print {}\n\t}\n\n\t@media print {\n\t\t/* prettier-ignore */\n\n\t\t e  {}\n\t\t/* prettier-ignore */\n\t\t @supports  (display: grid) {}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 706,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 64,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 5,
+							"end": 7,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 7,
+							"end": 57,
+							"name": "style",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 2,
+									"character": 8
+								},
+								"end": {
+									"line": 2,
+									"column": 7,
+									"character": 13
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 14,
+										"end": 49,
+										"type": "Text",
+										"data": "\n\t\t/* prettier-ignore */\n\t\t﻿a  {}\n\t",
+										"raw": "\n\t\t/* prettier-ignore */\n\t\t﻿a  {}\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 57,
+							"end": 58,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 64,
+				"end": 66,
+				"raw": "\n\n",
+				"data": "\n\n"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

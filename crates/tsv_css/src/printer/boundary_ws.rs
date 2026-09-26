@@ -106,6 +106,7 @@
 // | a declaration's property→colon gap | `extract_property_name`, through [`boundary_run_spelling`] |
 // | a block child's rebuilt head (declaration / at-rule / comment) | [`Printer::write_head_boundary_ws`] |
 // | a block's tail before `}` | [`Printer::write_block_tail_boundary_ws`] |
+// | a format-ignored block (or stylesheet) child's head | the frozen slice itself, from the run's first member ([`Printer::frozen_slice_span`]) |
 // | a condition prelude's gaps: its head, each side of a part's connector run, its tail | `Printer::condition_gap_side` (`build_condition_query_doc`, `condition_tail_doc`); the head ahead of a container name in `print_condition_query` |
 // | a condition part's `not` gap, and an operator run's interior | the parser, spelled into the part's / run's text (`parse_condition_part`, `skip_gap_registering_comments`) |
 // | a selector list in parens: a pseudo-argument list, an `@scope` clause, a `selector()` argument | `build_paren_selector_list_inner` (the lead through `claim_lead_gap`) |
@@ -541,6 +542,39 @@ impl<'a> Printer<'a> {
         if !kept.is_empty() {
             self.write(&kept);
         }
+    }
+
+    /// The source a format-ignore directive freezes for the block child (or stylesheet
+    /// child) spanning `span`: the node, extended back to the first member of the boundary
+    /// run contiguous with its start — `span` itself when no member stands there.
+    ///
+    /// The freeze replaces the printer that would have claimed that run (a rule's first
+    /// compound, a declaration's or an at-rule's rebuilt head), so the run is the slice's or
+    /// nobody's. It is the slice's because css-syntax-3, whose whitespace is ASCII only, reads
+    /// every member as part of the node — `<ZWNBSP>a` is the type selector `<ZWNBSP>a` and
+    /// `<ZWNBSP>color` an unknown property — and prettier, whose postcss whitespace is ASCII
+    /// too, freezes from the same byte for every JS-`\s` member (ASCII whitespace ahead of it
+    /// aside), the author's tabs and line breaks inside the run included. The ASCII whitespace
+    /// AHEAD of the first member stays the printer's to regenerate as indentation, as it is
+    /// ahead of any node. A comment ends the run: one between the run and the node is the
+    /// directive's neighbour, printed by the comment seam, with the run before it claimed by
+    /// that comment's own head.
+    ///
+    /// Unfloored for the reason [`Self::write_head_boundary_ws`] is: the backward scan
+    /// settles at a comment's `*/` at the latest, since a directive always precedes the node.
+    pub(crate) fn frozen_slice_span(&self, span: Span) -> Span {
+        if !self.holds_boundary_ws {
+            return span;
+        }
+        let (run_start, holds_member) = self.boundary_run(0, span.start);
+        if !holds_member {
+            return span;
+        }
+        let run = &self.source[run_start as usize..span.start as usize];
+        let first_member = run
+            .find(|c: char| !crate::whitespace::is_ascii_boundary_whitespace(c))
+            .map_or(span.start, |offset| run_start + offset as u32);
+        Span::new(first_member, span.end)
     }
 
     /// Emit the boundary run a block's own TAIL juncture skipped, flush against the `}`
