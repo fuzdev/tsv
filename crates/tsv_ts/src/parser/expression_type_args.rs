@@ -171,7 +171,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// first token after `<`. [`type_keyword_at`] classifies the identifier-shaped heads
     /// ahead of the byte dispatch, since the identifier arm would otherwise claim them:
     /// - Type keywords: an atom (`<string>`, `<never>`), `this`, or an operator
-    ///   (`<keyof T>`, `<typeof x>` — [`type_operator_commits`])
+    ///   (`<keyof T>`, `<typeof x>` — [`type_operator_grade`])
     /// - Identifiers: `<T>`, `<Ns.Type>`, `<T | U>`, `<T, U>`
     /// - Function types: `<(x: T) => R>`, `<() => R>`, `<<T>(v: T) => void>`
     /// - Parenthesized types: `<(A | B) & C>`, `<(() => void) | null>`
@@ -211,11 +211,46 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 }
 
 /// Whether the type-argument HEAD at `pos` — the first significant byte past a `<` —
-/// opens a type-argument list, dispatching on that byte. Split out of
-/// [`Parser::is_type_arguments_start`] because the `(` arm re-enters it: under
-/// [`TypeArgScan::Relex`] a paren shell the printer strips is not in the graded form, so
-/// the head question is asked again of its CONTENT.
+/// opens a type-argument list. Split out of [`Parser::is_type_arguments_start`] because
+/// the head is graded a second way too: as a union or intersection MEMBER, which is the
+/// same question asked of an operand further into the list
+/// ([`type_operand_follow_commits`]).
 fn type_arg_head_commits(bytes: &[u8], pos: usize, scan: TypeArgScan) -> bool {
+    type_arg_head_grade(bytes, pos, scan).commits(bytes, scan)
+}
+
+/// What grading a type operand's HEAD settles: either the verdict on the whole list, or
+/// where the operand ENDS, leaving the token after it to [`type_operand_follow_commits`].
+///
+/// The split is what lets that filter walk a union or intersection member by member in a
+/// loop rather than by recursion: a member's head is graded here, and the filter goes on
+/// from the member's end. A list of a million members is one frame deep.
+#[derive(Clone, Copy)]
+enum HeadGrade {
+    /// A complete operand ends at this offset (ahead of any trivia); what follows it
+    /// decides.
+    Operand(usize),
+    /// The head decided the list outright — a function type that commits, a head no type
+    /// can have, or an arm whose answer is the closing-`>` scan.
+    Decided(bool),
+}
+
+impl HeadGrade {
+    /// The verdict on the list: a decided head's own, or the follow filter's past the
+    /// operand's end.
+    fn commits(self, bytes: &[u8], scan: TypeArgScan) -> bool {
+        match self {
+            HeadGrade::Operand(end) => type_operand_follow_commits(bytes, end, scan),
+            HeadGrade::Decided(verdict) => verdict,
+        }
+    }
+}
+
+/// Grade the type-argument head at `pos`, dispatching on its first byte — the body of
+/// [`type_arg_head_commits`], stopping short of the follow token. The `(` arm re-enters it:
+/// under [`TypeArgScan::Relex`] a paren shell the printer strips is not in the graded form,
+/// so the head question is asked again of its CONTENT.
+fn type_arg_head_grade(bytes: &[u8], pos: usize, scan: TypeArgScan) -> HeadGrade {
     // Type keywords come ahead of the byte dispatch — every one is also
     // identifier-shaped, so the identifier arm below would otherwise claim them.
     match type_keyword_at(bytes, pos) {
@@ -237,7 +272,7 @@ fn type_arg_head_commits(bytes: &[u8], pos: usize, scan: TypeArgScan) -> bool {
         Some(TypeKeywordKind::This) => {
             let after_this = skip_whitespace_and_comments(bytes, pos + b"this".len());
             if bytes.get(after_this) == Some(&b'.') {
-                return false;
+                return HeadGrade::Decided(false);
             }
             return check_identifier_type_arg_pattern(bytes, pos, scan);
         }
@@ -245,9 +280,9 @@ fn type_arg_head_commits(bytes: &[u8], pos: usize, scan: TypeArgScan) -> bool {
         // A type-operator keyword is keyword-then-operand: the follow token is its
         // operand, so the follow-token filter's `_ => false` default would reject
         // `f<typeof x>()` and `f<keyof U>()`. Each operator asks its own
-        // operand-shape question instead — see `type_operator_commits`.
+        // operand-shape question instead — see `type_operator_grade`.
         Some(TypeKeywordKind::Operator(op)) => {
-            return type_operator_commits(bytes, op, pos, scan);
+            return type_operator_grade(bytes, op, pos, scan);
         }
 
         None => {}
@@ -320,12 +355,13 @@ fn type_arg_head_commits(bytes: &[u8], pos: usize, scan: TypeArgScan) -> bool {
                 || paren_starts_modified_parameter_list(bytes, pos))
                 && paren_list_then_arrow(bytes, pos)
             {
-                true
+                HeadGrade::Decided(true)
             } else if scan.reads_source_as_written() {
-                paren_type_head_close(bytes, pos)
-                    .is_some_and(|close| type_operand_follow_commits(bytes, close + 1, scan))
+                paren_type_head_close(bytes, pos).map_or(HeadGrade::Decided(false), |close| {
+                    HeadGrade::Operand(close + 1)
+                })
             } else {
-                type_arg_head_commits(bytes, skip_whitespace_and_comments(bytes, pos + 1), scan)
+                type_arg_head_grade(bytes, skip_whitespace_and_comments(bytes, pos + 1), scan)
             }
         }
 
@@ -335,14 +371,14 @@ fn type_arg_head_commits(bytes: &[u8], pos: usize, scan: TypeArgScan) -> bool {
         // parse oracle, has no such type, so admitting it at [`TypeArgScan::Parse`] would
         // move a PARSE off the drop-in contract. `!=` / `!==` are operators, never a mark.
         b'!' if !scan.reads_source_as_written() && bytes.get(pos + 1) != Some(&b'=') => {
-            type_arg_head_commits(bytes, skip_whitespace_and_comments(bytes, pos + 1), scan)
+            type_arg_head_grade(bytes, skip_whitespace_and_comments(bytes, pos + 1), scan)
         }
 
         // A second `<` — the tail of a `<<` shift token, or a spaced
         // `< <` — can only open a generic function type
         // (`f<<T>(v: T) => void>()`); shift chains (`a << b > c`) never
         // match its `>`-then-`(` shape.
-        b'<' => is_generic_function_type_start(bytes, pos + 1),
+        b'<' => HeadGrade::Decided(is_generic_function_type_start(bytes, pos + 1)),
 
         // Object/tuple literal types — but `{`/`[` equally start object and array
         // *value* literals, so `x < {a: 1}` is a comparison. Skip the balanced group, then
@@ -362,20 +398,19 @@ fn type_arg_head_commits(bytes: &[u8], pos: usize, scan: TypeArgScan) -> bool {
         // follows, and tsv reads `x < { ...s } >⏎c` as a type-argument list and then REJECTS
         // it — where acorn and tsc both read the comparison chain.
         b'{' | b'[' => matching_delimiter_close(bytes, pos)
-            .is_some_and(|close| type_operand_follow_commits(bytes, close + 1, scan)),
+            .map_or(HeadGrade::Decided(false), |close| {
+                HeadGrade::Operand(close + 1)
+            }),
 
         // String literal types — the same follow-token question after the literal:
         // `f<'a' | 'b'>()` commits, `x < 'a' + 'b' > (t, u)` stays a comparison.
         b'\'' | b'"' => skip_trivia(bytes, pos, bytes.len(), TriviaProfile::JS)
-            .is_some_and(|after| type_operand_follow_commits(bytes, after, scan)),
+            .map_or(HeadGrade::Decided(false), HeadGrade::Operand),
 
         // Template literal types — skipped interpolation-aware (the opaque
         // quote-to-quote trivia scan would mis-pair backticks across a nested
         // `` `${`x`}` ``), then the same follow-token question.
-        b'`' => {
-            let after = skip_template_literal(bytes, pos, bytes.len());
-            type_operand_follow_commits(bytes, after, scan)
-        }
+        b'`' => HeadGrade::Operand(skip_template_literal(bytes, pos, bytes.len())),
 
         // Numeric literal types: `<42>`, `<-1>`, `<.5>` — but `x < 42` is a
         // comparison, so the literal alone decides nothing. Skip it (sign and a
@@ -389,8 +424,12 @@ fn type_arg_head_commits(bytes: &[u8], pos: usize, scan: TypeArgScan) -> bool {
         // The head class is [`numeric_literal_starts_at`], shared with the index and
         // operand sites so a literal cannot be admitted at one and refused at another.
         _ if numeric_literal_starts_at(bytes, pos) => {
-            let after = skip_signed_numeric_literal(bytes, pos, scan);
-            after > pos && type_operand_follow_commits(bytes, after, scan)
+            let after = skip_signed_numeric_literal(bytes, pos);
+            if after > pos {
+                HeadGrade::Operand(after)
+            } else {
+                HeadGrade::Decided(false)
+            }
         }
 
         // A leading `|`/`&` on the first union/intersection member
@@ -399,10 +438,10 @@ fn type_arg_head_commits(bytes: &[u8], pos: usize, scan: TypeArgScan) -> bool {
         // start an expression, so a `<` followed by one is never a comparison;
         // the closing-`>` + follow-token scan still runs, as in every other arm,
         // so an unterminated `<` stays unclaimed.
-        b'|' | b'&' => scan_for_closing_angle_bracket(bytes, pos, scan),
+        b'|' | b'&' => HeadGrade::Decided(scan_for_closing_angle_bracket(bytes, pos, scan)),
 
         // Not a recognized type argument start
-        _ => false,
+        _ => HeadGrade::Decided(false),
     }
 }
 
@@ -1002,22 +1041,22 @@ fn assignment_operator_end(bytes: &[u8], pos: usize) -> Option<usize> {
 /// `p < keyof.a > (t, u)` as a comparison on the VALUE `keyof.a` and `p < keyof > (t, u)`
 /// as one on the value `keyof`. All four contextual operators are ordinary names there;
 /// the reserved `typeof`'s no-operand shapes are errors in both readings.
-fn type_operator_commits(
+fn type_operator_grade(
     bytes: &[u8],
     op: TypeOperator,
     kw_start: usize,
     scan: TypeArgScan,
-) -> bool {
+) -> HeadGrade {
     let after_kw = skip_whitespace_and_comments(bytes, skip_identifier(bytes, kw_start));
 
     match op {
         // acorn speculatively parses ANY type operand (`p < keyof - 1 > `t`` and
         // `p < unique [0] > (t, u)` are instantiations), so once an operand can start,
         // only the closing-`>` scan decides.
-        TypeOperator::Keyof | TypeOperator::Unique => {
+        TypeOperator::Keyof | TypeOperator::Unique => HeadGrade::Decided(
             can_start_type_operand(bytes, after_kw)
-                && scan_for_closing_angle_bracket(bytes, kw_start, scan)
-        }
+                && scan_for_closing_angle_bracket(bytes, kw_start, scan),
+        ),
 
         // The operand is an entity name (`x`, `Ns.x`) or an `import('m')` head with a
         // member tail, and nothing else (`p < typeof 1 > (t, u)` and
@@ -1027,7 +1066,7 @@ fn type_operator_commits(
         // comparison while `f<typeof x>()` commits.
         TypeOperator::Typeof => {
             if !identifier_starts_at(bytes, after_kw) {
-                return false;
+                return HeadGrade::Decided(false);
             }
             let head_end = skip_identifier(bytes, after_kw);
             let after_head = if is_word_at(bytes, after_kw, b"import") {
@@ -1035,7 +1074,7 @@ fn type_operator_commits(
                 if bytes.get(paren) == Some(&b'(') {
                     match matching_delimiter_close(bytes, paren) {
                         Some(close) => close + 1,
-                        None => return false,
+                        None => return HeadGrade::Decided(false),
                     }
                 } else {
                     head_end
@@ -1043,7 +1082,7 @@ fn type_operator_commits(
             } else {
                 head_end
             };
-            type_operand_follow_commits(bytes, skip_qualified_tail(bytes, after_head), scan)
+            HeadGrade::Operand(skip_qualified_tail(bytes, after_head))
         }
 
         // The operand is a lone binding identifier (never qualified). Skip it and ask the
@@ -1051,28 +1090,62 @@ fn type_operator_commits(
         // (`f<infer T extends U ? A : B>()`), while `p < infer - 1 > `t`` — no identifier
         // at all — is a comparison on the value `infer`.
         TypeOperator::Infer => {
-            identifier_starts_at(bytes, after_kw)
-                && type_operand_follow_commits(bytes, skip_identifier(bytes, after_kw), scan)
+            if identifier_starts_at(bytes, after_kw) {
+                HeadGrade::Operand(skip_identifier(bytes, after_kw))
+            } else {
+                HeadGrade::Decided(false)
+            }
         }
 
         // The operand is an array/tuple type: an element type reference (`readonly T[]`,
-        // `readonly Ns.T[]`) or a tuple literal (`readonly [T, U]`); a parenthesized
-        // operand is a call in a comparison to acorn (`p < readonly (x) > (t, u)`), and a
-        // literal one is no type at all. Skip the operand and ask the shared follow filter
-        // — its indexed arm is what tells `readonly zz[] ? q : r` (a comparison) from
-        // `f<readonly zz[]>()`.
+        // `readonly Ns.T[]`), a tuple literal (`readonly [T, U]`), or a parenthesized
+        // element type whose postfix run ends in an array suffix `[]` (`readonly (A | B)[]`).
+        // Otherwise a parenthesized operand is no array or tuple, so acorn-typescript
+        // refuses the type and reads a call in a comparison (`p < readonly (x) > (t, u)`,
+        // `a < readonly (d)[e] > (f)`); a literal operand is no type at all. Skip the
+        // operand and ask the shared follow filter — its indexed arm is what tells
+        // `readonly zz[] ? q : r` (a comparison) from `f<readonly zz[]>()`.
         TypeOperator::Readonly => {
             let after_head = if identifier_starts_at(bytes, after_kw) {
                 skip_qualified_tail(bytes, skip_identifier(bytes, after_kw))
             } else if bytes.get(after_kw) == Some(&b'[') {
                 match matching_delimiter_close(bytes, after_kw) {
                     Some(close) => close + 1,
-                    None => return false,
+                    None => return HeadGrade::Decided(false),
                 }
+            } else if bytes.get(after_kw) == Some(&b'(') {
+                let Some(close) = paren_type_head_close(bytes, after_kw) else {
+                    return HeadGrade::Decided(false);
+                };
+                // The same-line postfix run after the `)` must END in an empty `[]`: only
+                // then is the operand an array type. `readonly (d)[e]` is an indexed access,
+                // which acorn-typescript refuses under `readonly`, reading the call
+                // `readonly(d)[e]` in a comparison instead; `readonly (d)[e][]` is an array.
+                // The run's indices are left for the follow filter to grade, from `close + 1`.
+                let mut end = close + 1;
+                let mut ends_in_array_suffix = false;
+                loop {
+                    let open = skip_whitespace_and_comments(bytes, end);
+                    if bytes.get(open) != Some(&b'[')
+                        || has_line_terminator_between(bytes, end, open)
+                    {
+                        break;
+                    }
+                    let Some(group_close) = matching_delimiter_close(bytes, open) else {
+                        return HeadGrade::Decided(false);
+                    };
+                    ends_in_array_suffix =
+                        skip_whitespace_and_comments(bytes, open + 1) == group_close;
+                    end = group_close + 1;
+                }
+                if !ends_in_array_suffix {
+                    return HeadGrade::Decided(false);
+                }
+                close + 1
             } else {
-                return false;
+                return HeadGrade::Decided(false);
             };
-            type_operand_follow_commits(bytes, after_head, scan)
+            HeadGrade::Operand(after_head)
         }
     }
 }
@@ -1089,7 +1162,7 @@ fn type_operator_commits(
 /// Otherwise the leading word is a type reference: after scanning the full
 /// qualified name (e.g., `Ns.Type.Sub`), the shared follow-token filter
 /// [`type_operand_follow_commits`] decides.
-fn check_identifier_type_arg_pattern(bytes: &[u8], pos: usize, scan: TypeArgScan) -> bool {
+fn check_identifier_type_arg_pattern(bytes: &[u8], pos: usize, scan: TypeArgScan) -> HeadGrade {
     // The leading identifier's end is located once and reused by the keyword
     // dispatch below and by the qualified-name loop's first step.
     let end = skip_identifier(bytes, pos);
@@ -1098,35 +1171,37 @@ fn check_identifier_type_arg_pattern(bytes: &[u8], pos: usize, scan: TypeArgScan
     // a valid type (scan decides); `new`/`abstract new` require the construct
     // shape so `f<new B()>(x)` and `a < new B() > (c)` stay comparisons.
     match &bytes[pos..end] {
-        b"import" => return scan_for_closing_angle_bracket(bytes, pos, scan),
+        b"import" => return HeadGrade::Decided(scan_for_closing_angle_bracket(bytes, pos, scan)),
         b"new" => {
-            return is_construct_type_start(bytes, pos)
-                && scan_for_closing_angle_bracket(bytes, pos, scan);
+            return HeadGrade::Decided(
+                is_construct_type_start(bytes, pos)
+                    && scan_for_closing_angle_bracket(bytes, pos, scan),
+            );
         }
         b"abstract" => {
             let after = skip_whitespace_and_comments(bytes, end);
             if is_construct_type_start(bytes, after)
                 && scan_for_closing_angle_bracket(bytes, pos, scan)
             {
-                return true;
+                return HeadGrade::Decided(true);
             }
             // A bare `abstract` is an ordinary type reference — fall through.
         }
         // A class EXPRESSION, never a type reference: without this the heritage clause's
         // `extends` reads as a constraint and commits (`a < class extends B {} > (t, u)`).
         b"class" if class_expression_follows(bytes, skip_whitespace_and_comments(bytes, end)) => {
-            return false;
+            return HeadGrade::Decided(false);
         }
         _ => {}
     }
 
     // Skip any qualified parts past the leading identifier (already located as
-    // `end`, e.g. `Namespace.Type.SubType`), then ask the shared follow filter.
-    type_operand_follow_commits(bytes, skip_qualified_tail(bytes, end), scan)
+    // `end`, e.g. `Namespace.Type.SubType`); the shared follow filter decides from there.
+    HeadGrade::Operand(skip_qualified_tail(bytes, end))
 }
 
 /// Whether the first significant token at/after `after_operand` can CONTINUE a
-/// type-argument list past a complete first operand — the follow-token filter every
+/// type-argument list past a complete operand — the follow-token filter every
 /// operand-headed arm of [`Parser::is_type_arguments_start`] shares: the identifier
 /// arm asks it past the qualified name, the atom-keyword, literal (`{…}`, `[…]`,
 /// string, template, numeric) and parenthesized-group arms past their operand. One
@@ -1140,73 +1215,121 @@ fn check_identifier_type_arg_pattern(bytes: &[u8], pos: usize, scan: TypeArgScan
 /// acorn) even though a template tag / `(` does not start an expression and would
 /// otherwise let the closing-`>` scan commit.
 ///
+/// Two tokens CONTINUE the operand rather than settle the list, and the filter walks on
+/// past each in a loop — a list of any length is one frame deep:
+///
+/// - an **index** `[…]`, whose `]` completes the operand again, so the token after it is
+///   this same question (with one token taken out: an indexed access takes no type
+///   arguments of its own, so a `<` after the `]` is the comparison operator —
+///   `f<A[K]<C>>(x)` is `f < A[K] < C >> x` to tsc and acorn-typescript alike);
+/// - a union or intersection **member** after `|` / `&`. tsc parses every argument with
+///   `parseType` (`parseTypeArgumentsInExpression`), and a member whose first token no type
+///   starts with ends the union there, so the list is closed by something other than `>`
+///   and read as a comparison. (A member that STARTS as a type and fails inside is
+///   recovered and claimed instead — the one case the grade here cannot follow; see
+///   [`BodyGrade`].) So the member is graded by the head dispatch the first operand was
+///   ([`type_arg_head_grade`]), and the filter goes on from the member's end:
+///   `f<A[K] | B>(x)` and `f<A | B[K] | C>(x)` commit, while in `a < b[c] | d() > (e)`
+///   and `a < b[c] | d + 1 > (e)` the member is an expression, so the `<` is a
+///   comparison whatever follows the would-be closing `>`.
+///
 /// The operand's own end moves under [`TypeArgScan::Relex`]: what the printed form does not
 /// hold between the operand and this token is stepped over first
 /// ([`skip_relex_operand_suffixes`]).
 fn type_operand_follow_commits(bytes: &[u8], after_operand: usize, scan: TypeArgScan) -> bool {
-    let pos = skip_relex_operand_suffixes(
-        bytes,
-        skip_whitespace_and_comments(bytes, after_operand),
-        scan,
-    );
-    if pos >= bytes.len() {
-        return false;
-    }
-
-    match bytes[pos] {
-        // `||` and `&&` are logical operators, NOT type operators (`a || b`, not args)
-        b'|' | b'&' if pos + 1 < bytes.len() && bytes[pos + 1] == bytes[pos] => false,
-
-        // After the operand: `>` closes the list, `<` opens a nested one (`<A<B>>`),
-        // and `,` `|` `&` separate args. Each is confirmed by scanning
-        // for the matching `>` — which rejects a trailing identifier, so `a < b > c`
-        // and `a < b < c` stay comparisons. (`,` `|` `&` are neutral to the scan, so
-        // starting at `pos` is equivalent to starting past the separator.)
-        b'>' | b'<' | b',' | b'|' | b'&' => scan_for_closing_angle_bracket(bytes, pos, scan),
-
-        // Indexed type vs array access: `T[K]` vs `arr[0]`. Confirmed by the same
-        // closing-`>` scan as the arms above — `T[K]` shaped bytes are equally a
-        // member access on a comparison's right operand, so only the matching `>`
-        // (and its follow token) tells them apart: `f(a < B[c], d)` and
-        // `a < B[c] > d` stay comparisons, `f<A[B], C>(x)` is an instantiation.
-        //
-        // A `[` past a line terminator is no index at all: the type grammar takes its
-        // postfix operators on the operand's own line (tsc and acorn-typescript alike — the
-        // loop in each is named in `docs/conformance_prettier_ts.md` §Relational chain
-        // type-argument parens), and so does [`Parser::parse_type`]. Committing to
-        // type arguments here would hand that parser a `<B⏎[c]>` it stops reading at
-        // `B` — `a <⏎B // c⏎[c] >⏎d` is the comparison the same bytes on one line are.
-        //
-        // That break is exactly what the PRINTER folds away, which is why the
-        // [`TypeArgScan::Relex`] reading passes the gate: `fn<A⏎[T]>(t, u)` parses as a
-        // comparison chain and prints as `fn < A[T] > (t, u)`, whose region is a
-        // type-argument list. See [`TypeArgScan`].
-        b'[' => {
-            !(scan.reads_source_as_written()
-                && has_line_terminator_between(bytes, after_operand, pos))
-                && check_indexed_type_pattern(bytes, pos, scan)
-                && scan_for_closing_angle_bracket(bytes, pos, scan)
+    let mut after_operand = after_operand;
+    // Whether the operand just walked ends on an index's `]`.
+    let mut indexed = false;
+    loop {
+        let pos = skip_relex_operand_suffixes(
+            bytes,
+            skip_whitespace_and_comments(bytes, after_operand),
+            scan,
+        );
+        if pos >= bytes.len() {
+            return false;
         }
 
-        // Type constraint: `T extends U`. Whole-word — an identifier that merely
-        // starts with `extends` is an ordinary operand (`a < b` ⏎ `extendsFoo()`,
-        // where ASI ends the statement) — and confirmed by the closing-`>` scan
-        // like every sibling arm.
-        b'e' if is_word_at(bytes, pos, b"extends") => {
-            scan_for_closing_angle_bracket(bytes, pos, scan)
-        }
+        match bytes[pos] {
+            // `||` and `&&` are logical operators, NOT type operators (`a || b`, not args)
+            b'|' | b'&' if pos + 1 < bytes.len() && bytes[pos + 1] == bytes[pos] => {
+                return false;
+            }
 
-        _ => false,
+            // An indexed access takes no type arguments (see above).
+            b'<' if indexed => return false,
+
+            // After the operand: `>` closes the list, `<` opens a nested one (`<A<B>>`),
+            // and `,` separates args. Each is confirmed by scanning for the matching `>` —
+            // which rejects a trailing identifier, so `a < b > c` and `a < b < c` stay
+            // comparisons. (`,` is neutral to the scan, so starting at `pos` is
+            // equivalent to starting past the separator.)
+            b'>' | b'<' | b',' => return scan_for_closing_angle_bracket(bytes, pos, scan),
+
+            // A union or intersection member, graded as a type (see above).
+            b'|' | b'&' => {
+                match type_arg_head_grade(bytes, skip_whitespace_and_comments(bytes, pos + 1), scan)
+                {
+                    HeadGrade::Operand(end) => {
+                        after_operand = end;
+                        indexed = false;
+                    }
+                    HeadGrade::Decided(verdict) => return verdict,
+                }
+            }
+
+            // Indexed type vs array access: `T[K]` vs `arr[0]`. The index is graded as a
+            // type ([`check_indexed_type_pattern`]), and past its `]` the walk goes on —
+            // `T[K]` shaped bytes are equally a member access on a comparison's right
+            // operand, so only what follows tells them apart: `f(a < B[c], d)`,
+            // `a < B[c] > d` and `a < b[c] | d() > (e)` stay comparisons, `f<A[B], C>(x)`
+            // and `f<A[K] | B>(x)` are instantiations.
+            //
+            // A `[` past a line terminator is no index at all: the type grammar takes its
+            // postfix operators on the operand's own line (tsc and acorn-typescript alike —
+            // the loop in each is named in `docs/conformance_prettier_ts.md` §Relational
+            // chain type-argument parens), and so does [`Parser::parse_type`]. Committing to
+            // type arguments here would hand that parser a `<B⏎[c]>` it stops reading at
+            // `B` — `a <⏎B // c⏎[c] >⏎d` is the comparison the same bytes on one line are.
+            //
+            // That break is exactly what the PRINTER folds away, which is why the
+            // [`TypeArgScan::Relex`] reading passes the gate: `fn<A⏎[T]>(t, u)` parses as a
+            // comparison chain and prints as `fn < A[T] > (t, u)`, whose region is a
+            // type-argument list. See [`TypeArgScan`].
+            b'[' => {
+                if (scan.reads_source_as_written()
+                    && has_line_terminator_between(bytes, after_operand, pos))
+                    || !check_indexed_type_pattern(bytes, pos, scan)
+                {
+                    return false;
+                }
+                let Some(close) = matching_delimiter_close(bytes, pos) else {
+                    return false;
+                };
+                after_operand = close + 1;
+                indexed = true;
+            }
+
+            // Type constraint: `T extends U`. Whole-word — an identifier that merely
+            // starts with `extends` is an ordinary operand (`a < b` ⏎ `extendsFoo()`,
+            // where ASI ends the statement) — and confirmed by the closing-`>` scan
+            // like every sibling arm.
+            b'e' if is_word_at(bytes, pos, b"extends") => {
+                return scan_for_closing_angle_bracket(bytes, pos, scan);
+            }
+
+            _ => return false,
+        }
     }
 }
 
 /// Whether the `[` at `pos` can open an indexed-access type rather than an array
-/// index. A pre-filter only: every shape that stays grammatical both ways is handed
-/// to the caller's closing-`>` scan, which arbitrates.
+/// index — a question about the index ALONE: what follows its `]` is the caller's
+/// ([`type_operand_follow_commits`]).
 ///
 /// - `T[]`, `T["key"]`, `T[keyof U]`, `T[typeof x]`: indexed type
 /// - `T[| A | B]`, `T[& A & B]`: a leading union/intersection bar opens only a type
-/// - `T[K]`, `T[0]`, `T[-1]` followed by `>`, `,`, or another `[`: indexed type
+/// - `T[K]`, `T[0]`, `T[-1]`: indexed type
 /// - `T[A | B]`, `T[0 | 1]`, `T[A[B]]`, `T[A.B]`, `T[A<B>]`,
 ///   `T[A extends B ? C : D]`: the index is itself a type, so the scan decides
 /// - `T[(A | B)[]]`, `T[(A)]`: a paren shell around any of the above
@@ -1255,7 +1378,7 @@ fn index_operand_is_type(bytes: &[u8], inside: usize, closer: u8, scan: TypeArgS
         // answered twice (`f<.5>()` and `f<A[.5]>()` are both instantiations to
         // acorn, and only this arm sees the second).
         _ if numeric_literal_starts_at(bytes, inside) => {
-            let after_number = skip_signed_numeric_literal(bytes, inside, scan);
+            let after_number = skip_signed_numeric_literal(bytes, inside);
             // No literal starts here at all (`-b`) — a unary negation, so the index is
             // an expression. Guarding on this is what stops the `-` from swallowing an
             // identifier and landing on the same `]` a real literal ends at.
@@ -1301,7 +1424,7 @@ fn index_operand_is_type(bytes: &[u8], inside: usize, closer: u8, scan: TypeArgS
 /// continue a type, so the line is a conditional to acorn); an **operator** is
 /// keyword-then-operand, where that filter's `_ => false` default would reject
 /// `f<typeof x>()`, so its arm asks a per-operator operand question instead (see
-/// [`type_operator_commits`]).
+/// [`type_operator_grade`]).
 ///
 /// The whole-word test is [`is_word_at`], the same one every other keyword lookahead
 /// asks. A hand-rolled boundary gets two character classes wrong in the same
@@ -1360,14 +1483,14 @@ enum TypeKeywordKind {
     /// re-derivation [`TypeOperator`] exists to avoid.
     This,
     /// A keyword-then-operand type head — the follow token is its operand, so the
-    /// identifier filter's `_ => false` default cannot apply; [`type_operator_commits`]
+    /// identifier filter's `_ => false` default cannot apply; [`type_operator_grade`]
     /// asks the operand-shape question this operator answers to.
     Operator(TypeOperator),
 }
 
 /// The five keyword-then-operand type heads. Carried by [`TypeKeywordKind::Operator`]
 /// rather than re-derived from the keyword's first byte, so the operand-class dispatch in
-/// [`type_operator_commits`] is exhaustive: the byte form needed `u`-initial operators to
+/// [`type_operator_grade`] is exhaustive: the byte form needed `u`-initial operators to
 /// be only `unique` (`unknown`/`undefined` being atoms) and gave `readonly` the catch-all
 /// arm, which a sixth operator would have joined silently.
 #[derive(Clone, Copy)]
@@ -1481,27 +1604,11 @@ fn continues_as_type(bytes: &[u8], operand_end: usize, closer: u8, scan: TypeArg
                 // (`(A | B)[]`, `(A)`), graded from the `)` as the operand's end.
                 return continues_as_type(bytes, after_operand + 1, b']', scan);
             }
-            // Past the index's own `]`, the relexing reading steps over what the printed
-            // form does not hold between the operand and the token that settles it: a `)`
-            // closing a shell the printer strips (`(a < B[c]) > d` prints as
-            // `a < B[c] > d`) and a non-null `!`, which is a type to tsc and to no one
-            // else (`a < B[c]! > d`). See [`TypeArgScan`].
-            let after_close = skip_relex_operand_suffixes(
-                bytes,
-                skip_whitespace_and_comments(bytes, after_operand + 1),
-                scan,
-            );
-            // Type args end with `>`, continue with `,`, or chain another index group
-            // (`T[K][J]`, on the same line) — the caller's closing-`>` scan arbitrates
-            // all three
-            match bytes.get(after_close) {
-                Some(b'>' | b',') => true,
-                Some(b'[') => {
-                    !(scan.reads_source_as_written()
-                        && has_line_terminator_between(bytes, after_operand + 1, after_close))
-                }
-                _ => false,
-            }
+            // The index's own `]`: the index is a type. What follows the `]` — a `>`, a
+            // `,`, a union or intersection member, a conditional's `extends`, another index —
+            // is the question every complete operand answers, asked by the caller
+            // ([`type_operand_follow_commits`]).
+            true
         }
         // `||` and `&&` are logical operators, so the index is an expression — only the
         // single `|`/`&` are type operators (as in the caller's own arm). Likewise `<<` is
@@ -1560,18 +1667,26 @@ fn skip_relex_operand_suffixes(bytes: &[u8], mut pos: usize, scan: TypeArgScan) 
 /// wrapper over [`skip_numeric_literal`], reporting "nothing skipped" (the position it was
 /// given) where no literal begins, exactly as that function does.
 ///
-/// Under [`TypeArgScan::Relex`] it tolerates trivia between the sign and the digits — one of
-/// the printer moves [`TypeArgScan`] enumerates: `fn<-⏎⏎1>(t)` is a comparison chain, whose
-/// printed form is `fn < -1 > t` — one literal type in the region, and a `<` that would
-/// re-lex. Grading the source bytes there instead takes two passes to reach the pair, which
-/// a blank-injection run reads as a non-idempotency.
+/// It tolerates trivia between the sign and the digits, because the type grammar does: a
+/// literal type's `-` is a token of its own in tsc and acorn-typescript alike, so
+/// `f<- 1>(x)`, `f<A | -⏎1>(x)` and `f<A | - /* c */ 1>(x)` are generic calls to both. The
+/// printed form glues the two (`fn < -1 > t`), so both readings must also agree to read a
+/// spaced sign as the literal it prints as, or the pair a comparison needs is reached one
+/// pass late.
+///
+/// A literal type takes ONE sign. What follows the first must be the digits (or a `.` that
+/// opens them); a second sign is no literal, so `a < - -1 > (c)` and `f<--1>(x)` skip
+/// nothing here and stay the expressions they are to the grammar.
 #[inline]
-fn skip_signed_numeric_literal(bytes: &[u8], pos: usize, scan: TypeArgScan) -> usize {
+fn skip_signed_numeric_literal(bytes: &[u8], pos: usize) -> usize {
     let end = skip_numeric_literal(bytes, pos);
-    if end > pos || scan.reads_source_as_written() || bytes.get(pos) != Some(&b'-') {
+    if end > pos || bytes.get(pos) != Some(&b'-') {
         return end;
     }
     let after_sign = skip_whitespace_and_comments(bytes, pos + 1);
+    if !matches!(bytes.get(after_sign), Some(b'0'..=b'9' | b'.')) {
+        return pos;
+    }
     let end = skip_numeric_literal(bytes, after_sign);
     if end > after_sign { end } else { pos }
 }
