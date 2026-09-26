@@ -1,0 +1,118 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 79,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 33,
+					"end": 34,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 33,
+							"end": 34,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 33,
+											"end": 34
+										}
+									],
+									"start": 33,
+									"end": 34
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 36,
+					"end": 38,
+					"children": []
+				},
+				"start": 33,
+				"end": 38
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 65,
+					"end": 66,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 65,
+							"end": 66,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "b",
+											"start": 65,
+											"end": 66
+										}
+									],
+									"start": 65,
+									"end": 66
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 68,
+					"end": 70,
+					"children": []
+				},
+				"start": 65,
+				"end": 70
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 9,
+				"end": 30
+			},
+			{
+				"type": "CSSComment",
+				"value": " prettier-ignore ",
+				"start": 41,
+				"end": 62
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 71,
+			"styles": "\n\t/* prettier-ignore */\n\t a  {}\n\n\t/* prettier-ignore */\n\t b  {}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 80,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -637,7 +637,7 @@ impl<'a> Printer<'a> {
 
             // format-ignore: emit raw source instead of formatting
             if has_ignore {
-                self.write_verbatim_span(node.span());
+                self.write_verbatim_span(self.frozen_slice_span(node.span()));
             } else {
                 self.print_css_node(node);
             }
@@ -1049,7 +1049,7 @@ impl<'a> Printer<'a> {
                 CssBlockChild::Rule(rule) => {
                     self.write_indent();
                     if std::mem::take(&mut format_ignore_next) {
-                        self.write_verbatim_span(rule.span);
+                        self.write_verbatim_span(self.frozen_slice_span(rule.span));
                     } else {
                         self.print_css_rule(rule);
                     }
@@ -1060,7 +1060,7 @@ impl<'a> Printer<'a> {
                 CssBlockChild::Atrule(atrule) => {
                     self.write_indent();
                     if std::mem::take(&mut format_ignore_next) {
-                        self.write_verbatim_span(atrule.span);
+                        self.write_verbatim_span(self.frozen_slice_span(atrule.span));
                     } else {
                         self.print_css_atrule(atrule);
                     }
