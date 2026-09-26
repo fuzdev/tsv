@@ -61,11 +61,12 @@
 //! already uses. Written directly, a burst pays `Vec`'s append protocol per
 //! fragment *and* re-loads the buffer's pointer, length and capacity after
 //! every integer, because `JsonWriter::u32` is deliberately `inline(never)`
-//! (a size constraint — see its comment). A run stops at its first
-//! `w.string(…)`: escaping is dynamic, so the value cannot be staged. Staging
-//! these four is `instructions:u` **−1.64%** on the wire path over 1,695 real
-//! components, cycles **−0.84 pts** and wall **−0.89 pts** against a layout
-//! null.
+//! (a size constraint — see its comment). A run stops at its first dynamic
+//! string — a `w.string(…)`, or a name field ([`write_element_name_field`],
+//! [`write_scanned_name_field`], which write their own key): its length is
+//! dynamic, so the value cannot be staged. Staging these four is
+//! `instructions:u` **−1.64%** on the wire path over 1,695 real components,
+//! cycles **−0.84 pts** and wall **−0.89 pts** against a layout null.
 //!
 //! **Four, because a run is earned by frequency.** Those bursts emit 4.6–14.1
 //! times per KB of source, and each staged emitter is *inlined at its site* —
@@ -827,13 +828,66 @@ fn write_name_loc_field(w: &mut JsonWriter, span: Span, ctx: &Ctx<'_>) {
     w.stage_flush();
 }
 
+/// The `,"name":` key a Svelte node's name follows.
+const NAME_KEY: &[u8; 8] = b",\"name\":";
+
+/// Emit an element's `,"name":` field.
+///
+/// A `RegularElement`'s name is escape-free by the grammar the parser admits it under, so
+/// it is written as the key and the quoted slice in one fixed-width append
+/// ([`JsonWriter::string_escape_free_led`]), with no escape scan. The element parser's name
+/// gate (`is_valid_tag_name`) admits a name that is not component-shaped only as a valid
+/// element name: an ASCII letter followed by ASCII letters and digits and a `-`-led
+/// custom-element tail of `PCENChar`s, a `![a-zA-Z]+` declaration, or an ASCII
+/// `prefix:local` name — and no character of those is a `"`, a `\` or a control. A
+/// component name — a name with no `:` whose lead is uppercase or that holds a `.` — is read
+/// to whitespace, `/` or `>`, so it CAN hold one (`<A\b/>`), and is scanned
+/// ([`write_scanned_name_field`]).
+///
+/// `inline(never)`: one out-of-line copy of the window write, whose arms leave by tail
+/// call, so it saves no register.
+#[inline(never)]
+fn write_element_name_field(w: &mut JsonWriter, elem: &internal::Element<'_>, ctx: &Ctx<'_>) {
+    let name = name_bytes(elem.name_span, ctx);
+    match elem.kind {
+        internal::ElementKind::Html => w.string_escape_free_led(NAME_KEY, name),
+        internal::ElementKind::Component => write_scanned_name_field(w, name),
+    }
+}
+
+/// A `,"name":` field for a name no grammar vouches for — an attribute's, a component's:
+/// the escape scan, then the key and the quoted name as one fixed-width append when it
+/// comes back clean ([`JsonWriter::string_led`]).
+///
+/// `inline(never)`: one shared copy of the scan and the window write for its two callers
+/// (the attribute and the component name), whose arms leave by tail call.
+#[inline(never)]
+fn write_scanned_name_field(w: &mut JsonWriter, name: &[u8]) {
+    w.string_led(NAME_KEY, name);
+}
+
+/// The source bytes of a name span, without the char-boundary checks a `&str` slice pays:
+/// a name span covers whole characters, which debug builds assert. ⚠️ Invariant, not a
+/// check: in release a span that split a character would be copied into the wire as invalid
+/// UTF-8 where the `&str` slice would have panicked — every name span is a lexed run's, so
+/// none does.
+#[inline]
+fn name_bytes<'s>(span: Span, ctx: &Ctx<'s>) -> &'s [u8] {
+    debug_assert!(
+        ctx.source.is_char_boundary(span.start as usize)
+            && ctx.source.is_char_boundary(span.end as usize),
+        "a name span covers whole characters"
+    );
+    &ctx.source.as_bytes()[span.range()]
+}
+
 /// Emits a `RegularElement` (HTML) or `Component` node.
 fn write_element(w: &mut JsonWriter, elem: &internal::Element<'_>, ctx: &Ctx<'_>) {
     let node_type = match elem.kind {
         internal::ElementKind::Component => "Component",
         internal::ElementKind::Html => "RegularElement",
     };
-    // Staged burst; ends at the dynamic `name` (module doc, Staged runs).
+    // Staged burst; ends before the `name` field (module doc, Staged runs).
     w.stage_begin();
     w.stage_raw("{\"type\":\"");
     w.stage_short(node_type);
@@ -841,9 +895,8 @@ fn write_element(w: &mut JsonWriter, elem: &internal::Element<'_>, ctx: &Ctx<'_>
     w.stage_u32(ctx.pos(elem.span.start));
     w.stage_raw(",\"end\":");
     w.stage_u32(ctx.pos(elem.span.end));
-    w.stage_raw(",\"name\":");
     w.stage_flush();
-    w.string(elem.name(ctx.source));
+    write_element_name_field(w, elem, ctx);
     if ctx.emit_loc {
         write_name_loc_field(w, elem.name_span, ctx);
     }
@@ -1489,15 +1542,14 @@ fn write_attribute_node(w: &mut JsonWriter, node: &internal::AttributeNode<'_>, 
 
 /// Emits an `Attribute` node.
 fn write_attribute(w: &mut JsonWriter, attr: &internal::Attribute<'_>, ctx: &Ctx<'_>) {
-    // Staged burst; ends at the dynamic `name` (module doc, Staged runs).
+    // Staged burst; ends before the `name` field (module doc, Staged runs).
     w.stage_begin();
     w.stage_raw("{\"type\":\"Attribute\",\"start\":");
     w.stage_u32(ctx.pos(attr.span.start));
     w.stage_raw(",\"end\":");
     w.stage_u32(ctx.pos(attr.span.end));
-    w.stage_raw(",\"name\":");
     w.stage_flush();
-    w.string(attr.name(ctx.source));
+    write_scanned_name_field(w, name_bytes(attr.name_span, ctx));
     if ctx.emit_loc {
         write_name_loc_field(w, attr.name_span, ctx);
     }

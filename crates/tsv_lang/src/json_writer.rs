@@ -1071,6 +1071,40 @@ impl JsonWriter {
         self.buf.push(b'"');
     }
 
+    /// [`JsonWriter::string`] behind the constant fragment `lead` — byte-identical
+    /// to `raw(lead)` then `string` — for a dynamic string written behind a fixed
+    /// key that the caller cannot vouch for: the prescan runs here, inline, and a
+    /// clean answer takes [`JsonWriter::string_escape_free_led`]'s one
+    /// fixed-width append, key included, where `string` would copy the string
+    /// through a libc `memcpy` call after an outlined call of its own.
+    ///
+    /// For a name field whose grammar admits an escaped byte but whose real
+    /// values rarely hold one — a Svelte attribute or component name. The bytes are
+    /// taken as a slice, so the caller's source slice needs no char-boundary
+    /// checks; it must still be whole UTF-8, which debug builds assert.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    pub fn string_led<const K: usize>(&mut self, lead: &[u8; K], bytes: &[u8]) {
+        debug_assert!(
+            core::str::from_utf8(bytes).is_ok(),
+            "string_led takes UTF-8: {:?}",
+            String::from_utf8_lossy(bytes)
+        );
+        if needs_escape(bytes) {
+            self.string_led_escaped(lead, bytes);
+            return;
+        }
+        self.string_escape_free_led(lead, bytes);
+    }
+
+    /// [`JsonWriter::string_led`]'s escaping arm, out of line: a name that needs
+    /// an escape is rare.
+    #[inline(never)]
+    fn string_led_escaped<const K: usize>(&mut self, lead: &[u8; K], bytes: &[u8]) {
+        self.raw_fixed(lead);
+        self.string_escaped(bytes);
+    }
+
     /// [`JsonWriter::string`]'s escaping arm: `bytes` quoted, with every byte
     /// `serde_json` escapes written the way `serde_json` writes it — the seven
     /// two-byte short forms, `\u00XX` with lowercase hex for every other
@@ -1545,6 +1579,49 @@ mod tests {
         grade(b"", &clean);
         grade(b",\"name\":", &clean);
         grade(b",\"abcdefghij\":", &clean);
+    }
+
+    /// [`JsonWriter::string_led`] against `raw(lead)` + [`JsonWriter::string`]
+    /// over the whole escape-parity case set — the clean cases through the
+    /// window write and every escaping one through the escaper — each behind a
+    /// prefix of every length to 16, with an empty lead and a real key, into a
+    /// buffer that must grow for the window and one that need not.
+    #[test]
+    fn string_led_matches_string() {
+        fn grade<const K: usize>(lead: &[u8; K], cases: &[String]) {
+            let lead_str = core::str::from_utf8(lead).expect("the lead is UTF-8");
+            for (cap, prefix) in [0, 256]
+                .into_iter()
+                .flat_map(|c| (0..=16).map(move |p| (c, p)))
+            {
+                let front = "{".repeat(prefix);
+                for case in cases {
+                    let mut ours = JsonWriter::with_capacity(cap);
+                    ours.raw(&front);
+                    ours.string_led(lead, case.as_bytes());
+                    ours.raw("}");
+                    let mut theirs = JsonWriter::with_capacity(0);
+                    theirs.raw(&front);
+                    theirs.raw(lead_str);
+                    theirs.string(case);
+                    theirs.raw("}");
+                    assert_eq!(
+                        ours.into_bytes(),
+                        theirs.into_bytes(),
+                        "string_led broke on {case:?}"
+                    );
+                }
+            }
+        }
+        let cases = escape_cases();
+        assert!(
+            cases
+                .iter()
+                .any(|c| c.bytes().any(|b| b < 0x20 || b == b'"' || b == b'\\')),
+            "the escaping arm must be driven"
+        );
+        grade(b"", &cases);
+        grade(b",\"name\":", &cases);
     }
 
     /// The escape-parity case set `string_matches_serde_json` grades.
