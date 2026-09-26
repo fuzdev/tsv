@@ -1086,7 +1086,7 @@ impl<'a> Printer<'a> {
     fn prose_words(&self, node: &FragmentNode<'_>) -> usize {
         match node {
             FragmentNode::Text(t) if !t.is_collapsible_ws_only => {
-                if Self::is_separator_like_text(&t.data(self.source)) {
+                if Self::text_is_separator_like(t, self.source) {
                     0
                 } else {
                     internal::split_collapsible_ws(t.raw(self.source))
@@ -1465,7 +1465,8 @@ impl<'a> Printer<'a> {
     /// no word at all. Such a node then reported as the run's *prose*, made the content a
     /// `fill`, and collapsed an authored break its literal-space twin keeps — see
     /// [inline_separator_entity_newline](../../../../../tests/fixtures/svelte/elements/inline_separator_entity_newline/).
-    /// Both call sites are pre-guarded by `!is_collapsible_ws_only`, so an all-collapsible-
+    /// Its one production caller is [`Self::text_is_separator_like`]'s `&` arm, and that
+    /// wrapper's callers are pre-guarded by `!is_collapsible_ws_only`, so an all-collapsible-
     /// whitespace node never reaches here and the empty-string arm is unreachable in practice.
     ///
     /// ⚠️ **The class is Rust's UNICODE `char::is_whitespace`, deliberately wider than the
@@ -1483,8 +1484,32 @@ impl<'a> Printer<'a> {
     /// An `&nbsp;` node therefore answers yes here and no there, which is correct on both
     /// counts — and a single run may legitimately hold one node of each kind, so neither class
     /// can stand in for the other.
-    pub(super) fn is_separator_like_text(data: &str) -> bool {
-        !data.is_empty() && data.chars().all(char::is_whitespace)
+    fn is_separator_like_text(data: &str) -> bool {
+        !data.is_empty() && data.chars().all(Self::is_separator_char)
+    }
+
+    /// The separator class [`Self::is_separator_like_text`] and
+    /// [`Self::text_is_separator_like`] both test, defined once so the two cannot drift: Rust's
+    /// Unicode `char::is_whitespace` — the WIDE class, on purpose (see
+    /// [`Self::is_separator_like_text`]).
+    #[inline]
+    fn is_separator_char(c: char) -> bool {
+        c.is_whitespace()
+    }
+
+    /// [`Self::is_separator_like_text`] of `text`'s decoded `data`, read off `raw` wherever
+    /// the decode cannot change the answer — which is everywhere but a raw whose first
+    /// non-whitespace character is a `&`. The decode rewrites only what starts at a `&`, so
+    /// every character ahead of the first one reaches `data` as itself: a raw whose first
+    /// non-whitespace character is anything else holds that word in `data` too, and a raw
+    /// with none holds no `&` at all, so `data` is `raw`.
+    pub(super) fn text_is_separator_like(text: &internal::Text, source: &str) -> bool {
+        let raw = text.raw(source);
+        match raw.chars().find(|&c| !Self::is_separator_char(c)) {
+            None => !raw.is_empty(),
+            Some('&') => Self::is_separator_like_text(&text.data(source)),
+            Some(_) => false,
+        }
     }
 
     /// Whether a node is a block-level *element* — the `handleBlockChild` set in
@@ -2024,4 +2049,64 @@ impl<'a> Printer<'a> {
     //
     // Helper methods
     //
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ast::internal::{Text, TextDecoding};
+    use crate::printer::Printer;
+    use tsv_lang::Span;
+
+    /// `Printer::text_is_separator_like` against the question it stands for,
+    /// `is_separator_like_text` of the decoded `data`: every string to length 4 over an
+    /// alphabet of the collapsible and the Unicode-only whitespace (NBSP, U+2028), a word,
+    /// a bare `&`, entities decoding to whitespace and to a word, and `&notit;` (a legacy
+    /// `&not` prefix in text, literal in an attribute) — in every decoding context.
+    #[test]
+    fn text_is_separator_like_matches_the_decoded_question() {
+        let nbsp = char::from_u32(0xA0).unwrap().to_string();
+        let ls = char::from_u32(0x2028).unwrap().to_string();
+        let alphabet = [
+            " ", "\t", "\n", &nbsp, &ls, "a", "&", "&amp;", "&nbsp;", "&#32;", "&#9;", "&lt;",
+            "&notit;",
+        ];
+        let mut cases = 0usize;
+        let mut digits: Vec<usize> = Vec::new();
+        while digits.len() <= 4 {
+            let raw: String = digits.iter().map(|&d| alphabet[d]).collect();
+            let source = format!("<p>{raw}</p>");
+            let span = Span {
+                start: 3,
+                end: (3 + raw.len()) as u32,
+            };
+            for decoding in [
+                TextDecoding::Fragment,
+                TextDecoding::AttributeValue,
+                TextDecoding::Raw,
+            ] {
+                let text = Text::new(span, decoding, span, &source);
+                assert_eq!(
+                    Printer::text_is_separator_like(&text, &source),
+                    Printer::is_separator_like_text(&text.data(&source)),
+                    "{decoding:?} {raw:?}"
+                );
+                cases += 1;
+            }
+            // Odometer over the alphabet, growing the length when every digit wraps.
+            let mut k = 0;
+            loop {
+                if k == digits.len() {
+                    digits.push(0);
+                    break;
+                }
+                digits[k] += 1;
+                if digits[k] < alphabet.len() {
+                    break;
+                }
+                digits[k] = 0;
+                k += 1;
+            }
+        }
+        assert_eq!(cases, 3 * (0..=4).map(|n| 13usize.pow(n)).sum::<usize>());
+    }
 }

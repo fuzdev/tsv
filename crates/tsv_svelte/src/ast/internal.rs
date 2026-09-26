@@ -1883,7 +1883,9 @@ pub struct Text {
     /// whitespace. That is deliberate and matches prettier (`node.raw || node.data`): rewriting
     /// an entity's bytes is a content edit, so the node is printed verbatim. It is still a
     /// *separator* rather than prose — it carries no word for a `fill` to pack — which is the
-    /// question `Printer::is_separator_like_text` answers off `data`.
+    /// question `Printer::is_separator_like_text` answers about `data` — asked through
+    /// `Printer::text_is_separator_like`, which reads `raw` and decodes only where that could
+    /// change the answer.
     pub is_collapsible_ws_only: bool,
     /// Precomputed count of `\n` in `raw`, **saturating at 2** — enough for every test
     /// the printer makes (`has_newline` = `>= 1`, blank line = `>= 2`).

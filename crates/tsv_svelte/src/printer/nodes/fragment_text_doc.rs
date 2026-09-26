@@ -703,7 +703,9 @@ impl<'a> Printer<'a> {
         //
         // Shared by both the leading run here and the trailing run below — see
         // [`Self::is_separator_like_text`] for why such a node is excluded, and why this one
-        // reads the decoded text where the rest of the path reads `raw`.
+        // answers about the decoded text where the rest of the path answers about `raw` (it
+        // still reads `raw`, decoding only where that could change the answer —
+        // [`Self::text_is_separator_like`]).
         //
         // Two prose gates, one per axis. `run_has_prose` is the RUN-level one the separator site
         // asks too — a fill needs a phrase, so a one-word run is a label whose newlines hold
@@ -712,7 +714,7 @@ impl<'a> Printer<'a> {
         // ratchet in reverse). `!separator_like_text` is the NODE-local one and stays beside it:
         // a separator-like node must not flow even when its run holds prose elsewhere, or the
         // fill re-reads a break it emitted itself (the NBSP F1 break).
-        let separator_like_text = Self::is_separator_like_text(&text.data(self.source));
+        let separator_like_text = Self::text_is_separator_like(text, self.source);
         let leading_newlines = text_edge_newlines(raw, true);
         let leading_newline_flows = self.boundary_newline_flows(
             leading_newlines,
