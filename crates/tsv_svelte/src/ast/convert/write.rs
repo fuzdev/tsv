@@ -1048,22 +1048,20 @@ fn write_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
 /// A `Text`'s `raw` value, `,"data":`, then its `data` value — the tail every
 /// `raw`-first `Text` shape shares.
 ///
-/// `data` borrows `raw` whenever the text holds no `&` (nearly every template
-/// text), and then the two values are the same bytes: [`JsonWriter::string_pair`]
-/// escapes them once and copies the escaped form. Only a text holding a `&`
-/// (`Cow::Owned`) escapes two strings.
+/// `data` is `raw` whenever the text holds no `&` (nearly every template text), and
+/// then the two values are the same bytes: [`JsonWriter::string_pair`] escapes them
+/// once and copies the escaped form. Only a text whose `data` is decoded escapes two
+/// strings.
 fn write_raw_then_data(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
     let raw = text.raw(ctx.source);
-    match text.data(ctx.source) {
-        Cow::Borrowed(data) => {
-            debug_assert_eq!(data, raw, "a borrowed `data` is `raw` itself");
-            w.string_pair(raw, ",\"data\":");
-        }
-        Cow::Owned(data) => {
-            w.string(raw);
-            w.raw(",\"data\":");
-            w.string(&data);
-        }
+    // Asked inline rather than through `data()`: this is every raw-first `Text` the writer
+    // emits (all but a raw-content element's, which `write_text` writes itself).
+    if text.data_is_raw(raw) {
+        w.string_pair(raw, ",\"data\":");
+    } else {
+        w.string(raw);
+        w.raw(",\"data\":");
+        w.string(&text.data(ctx.source));
     }
 }
 

@@ -1995,23 +1995,43 @@ impl Text {
     /// Decoded text (`&lt;` → `<`, `&#65;` → `A`), computed lazily from `raw`.
     ///
     /// Borrows `raw` when no `&` is present (no entity possible, decode is
-    /// identity) or when the node's context applies no decode.
+    /// identity) or when the node's context applies no decode — see
+    /// [`Self::data_is_raw`], which a hot caller holding `raw` asks inline instead.
+    ///
+    /// Out of line, and its decode colder still. The hot askers — the wire writer's text
+    /// write — ask [`Self::data_is_raw`] inline and call this only for a text they cannot
+    /// borrow, so inlining `data()` at its every caller would grow the binary for nothing on
+    /// the format path; and fewer than one text in a hundred holds a `&`, so a call costs the
+    /// borrowed answer's price, not the decoder's frame.
+    #[inline(never)]
     pub fn data<'s>(&self, source: &'s str) -> Cow<'s, str> {
         let raw = self.raw(source);
-        let is_attribute_value = match self.decoding {
-            TextDecoding::Raw => return Cow::Borrowed(raw),
-            TextDecoding::Fragment => false,
-            TextDecoding::AttributeValue => true,
-        };
-        if raw.contains('&') {
-            Cow::Owned(tsv_html::decode_character_references(
-                raw,
-                is_attribute_value,
-            ))
-        } else {
-            Cow::Borrowed(raw)
+        if self.data_is_raw(raw) {
+            return Cow::Borrowed(raw);
         }
+        Cow::Owned(decode_text_data(
+            raw,
+            self.decoding == TextDecoding::AttributeValue,
+        ))
     }
+
+    /// Whether [`Self::data`] is `raw` itself — `raw` being this node's own
+    /// [`Self::raw`] — answered without building it: the node's context applies no
+    /// decode, or `raw` holds no `&` for one to start at.
+    #[inline]
+    pub(crate) fn data_is_raw(&self, raw: &str) -> bool {
+        // A raw made only of `[ \t\n\r]` holds no `&`, so the precomputed flag answers the
+        // search for most template texts (the indentation between tags) without it.
+        debug_assert!(!self.is_collapsible_ws_only || !raw.contains('&'));
+        self.is_collapsible_ws_only || self.decoding == TextDecoding::Raw || !raw.contains('&')
+    }
+}
+
+/// [`Text::data`]'s decode, for a raw that holds a `&`.
+#[cold]
+#[inline(never)]
+fn decode_text_data(raw: &str, is_attribute_value: bool) -> String {
+    tsv_html::decode_character_references(raw, is_attribute_value)
 }
 
 /// Svelte ExpressionTag - {expression} in template
@@ -2303,6 +2323,66 @@ mod tests {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /// `Text::data` against the pre-flag model — `Raw` borrows `raw`, otherwise decode iff a
+    /// `&` is present — for every decoding, over whitespace-only, entity-bearing and empty
+    /// raws: the same string, and borrowed exactly when the model borrows.
+    #[test]
+    fn text_data_matches_the_decode_model() {
+        use super::{Span, Text, TextDecoding};
+        use std::borrow::Cow;
+        let nbsp = char::from_u32(0xA0).unwrap();
+        let raws = [
+            String::new(),
+            " ".into(),
+            "\n\t\t".into(),
+            " \r\n \t".into(),
+            "a".into(),
+            "&".into(),
+            "&amp;".into(),
+            " &lt; ".into(),
+            "&#9;".into(),
+            "\n&#10;\n".into(),
+            "a&b".into(),
+            "&notit;".into(),
+            format!("{nbsp}"),
+            format!(" {nbsp}&amp;"),
+        ];
+        for decoding in [
+            TextDecoding::Fragment,
+            TextDecoding::AttributeValue,
+            TextDecoding::Raw,
+        ] {
+            for raw in &raws {
+                let source = format!("<p>{raw}</p>");
+                let span = Span {
+                    start: 3,
+                    end: (3 + raw.len()) as u32,
+                };
+                let text = Text::new(span, decoding, span, &source);
+                let expected: Cow<'_, str> = match decoding {
+                    TextDecoding::Raw => Cow::Borrowed(raw),
+                    _ if raw.contains('&') => Cow::Owned(tsv_html::decode_character_references(
+                        raw,
+                        decoding == TextDecoding::AttributeValue,
+                    )),
+                    _ => Cow::Borrowed(raw),
+                };
+                let data = text.data(&source);
+                assert_eq!(data, expected, "{decoding:?} {raw:?}");
+                assert_eq!(
+                    text.data_is_raw(text.raw(&source)),
+                    matches!(expected, Cow::Borrowed(_)),
+                    "{decoding:?} {raw:?}"
+                );
+                assert_eq!(
+                    matches!(data, Cow::Borrowed(_)),
+                    matches!(expected, Cow::Borrowed(_)),
+                    "{decoding:?} {raw:?}"
+                );
             }
         }
     }
