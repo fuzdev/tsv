@@ -10,11 +10,12 @@
 //! *is* guaranteed — and what every caller relies on — is stated per kernel
 //! below. Read the guarantee before adding a caller.
 //!
-//! [`next_byte_of`] and [`has_ascii_uppercase`] are the **public** entry points, and
-//! the only items here that are scans rather than lane kernels: `tsv_ts` and `tsv_css`
-//! reach them from their lexers and printers, which is what a language crate wants and
-//! what keeps a fourth hand-rolled word loop from being written. The density caveat is
-//! stated on [`next_byte_of`].
+//! [`next_byte_of`], [`next_byte_below_or_of`], [`has_ascii_uppercase`] and
+//! [`count_byte_up_to`] are the **public** entry points, and the only items here that are
+//! scans rather than lane kernels: `tsv_ts`, `tsv_css` and `tsv_svelte` reach them from their
+//! lexers, parsers and printers, which is what a language crate wants and what keeps another
+//! hand-rolled word loop from being written. The density caveat is stated on
+//! [`next_byte_of`].
 
 /// `0x01` in every lane — the borrow unit the has-zero / has-less kernels
 /// subtract.
@@ -364,6 +365,64 @@ pub fn has_ascii_uppercase(bytes: &[u8]) -> bool {
     bytes[i..].iter().any(u8::is_ascii_uppercase)
 }
 
+/// How many bytes of `bytes` equal `needle`, counted no further than `cap`:
+/// `min(count, cap)`.
+///
+/// A word is first asked only WHETHER it holds the needle — [`zero_lanes`], whose boolean
+/// reading is exact — and its lanes are counted only when it does, by the exact kernel:
+/// [`ascii_zero_lanes`] over the XORed word's low seven bits, the lanes whose XORed byte held
+/// a high bit masked back out. That is exact for any needle, ASCII or not (so `0x8A` is not a
+/// `\n`), and counts one lane at a time up to `cap`. The scan
+/// stops at the word that reaches `cap`, so a caller asking "none, one, or more" pays for
+/// the prefix that answers it and a needle-free word costs one test. The last word read is
+/// the slice's LAST eight bytes, the lanes the word before it already counted masked out,
+/// so only a slice shorter than one word walks bytes — the
+/// [`has_ascii_uppercase`] overlap.
+#[inline]
+pub fn count_byte_up_to(bytes: &[u8], needle: u8, cap: usize) -> usize {
+    if bytes.len() < 8 {
+        let mut count = 0;
+        for &b in bytes {
+            count += usize::from(b == needle);
+        }
+        return count.min(cap);
+    }
+    let needle = splat(needle);
+    let mut count = 0;
+    let mut i = 0;
+    while let Some(chunk) = bytes[i..].first_chunk::<8>() {
+        count = count_lanes_up_to(u64::from_le_bytes(*chunk) ^ needle, u64::MAX, count, cap);
+        if count >= cap {
+            return cap;
+        }
+        i += 8;
+    }
+    let fresh = bytes.len() - i;
+    if fresh != 0
+        && let Some(last) = bytes.last_chunk::<8>()
+    {
+        // Little-endian: the lanes already counted are the low ones.
+        let keep = u64::MAX << (64 - 8 * fresh);
+        count = count_lanes_up_to(u64::from_le_bytes(*last) ^ needle, keep, count, cap);
+    }
+    count.min(cap)
+}
+
+/// [`count_byte_up_to`]'s per-word step: `count` plus the zero lanes of `v` (a word already
+/// XORed with the splatted needle) that `keep` keeps, stopping at `cap`.
+#[inline]
+fn count_lanes_up_to(v: u64, keep: u64, mut count: usize, cap: usize) -> usize {
+    if zero_lanes(v) == 0 {
+        return count;
+    }
+    let mut lanes = ascii_zero_lanes(v & !HIGH_BITS) & !v & keep;
+    while lanes != 0 && count < cap {
+        count += 1;
+        lanes &= lanes - 1;
+    }
+    count
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -391,6 +450,52 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    /// [`count_byte_up_to`] against the scalar count, for an ASCII and a non-ASCII needle: the
+    /// needle and its high-bit twin (the byte whose low seven bits spell it — `0x8A` for `\n`,
+    /// the false match the `& !v` term refuses; `b` for `0xE2`) at every pair of positions of
+    /// slices from empty to three words and a tail, over ASCII and non-ASCII backgrounds, at
+    /// every cap from zero to past the count.
+    #[test]
+    fn count_byte_up_to_matches_the_scalar_count() {
+        for needle in [b'\n', 0xE2] {
+            count_byte_up_to_matches_the_scalar_count_for(needle);
+        }
+    }
+
+    fn count_byte_up_to_matches_the_scalar_count_for(needle: u8) {
+        let twin = needle ^ 0x80;
+        for background in [b'a', b' ', 0x00, 0x09, 0x0B, 0x80, 0xE9, 0xFF] {
+            for len in 0..=27 {
+                for i in 0..=len {
+                    for j in i..=len {
+                        for (bi, bj) in [(needle, needle), (needle, twin), (twin, needle)] {
+                            let mut v = vec![background; len];
+                            if i < len {
+                                v[i] = bi;
+                            }
+                            if j < len && j != i {
+                                v[j] = bj;
+                            }
+                            let count: usize = v.iter().map(|&b| usize::from(b == needle)).sum();
+                            for cap in 0..=3 {
+                                assert_eq!(
+                                    count_byte_up_to(&v, needle, cap),
+                                    count.min(cap),
+                                    "needle {needle:#x} background {background:#x} len {len} at {i}/{j} cap {cap}"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // A run of needles longer than a word: the cap, not the count.
+        let run = [needle; 20];
+        for cap in 0..=24 {
+            assert_eq!(count_byte_up_to(&run, needle, cap), cap.min(20));
         }
     }
 

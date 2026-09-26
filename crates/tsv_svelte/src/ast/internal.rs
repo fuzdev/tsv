@@ -1702,7 +1702,7 @@ pub enum AttributeValue<'arena> {
 /// the token-separator question instead, and answer it with
 /// [`is_svelte_ws`](crate::whitespace::is_svelte_ws).
 #[inline]
-pub fn is_collapsible_ws(b: u8) -> bool {
+pub const fn is_collapsible_ws(b: u8) -> bool {
     matches!(b, b' ' | b'\t' | b'\n' | b'\r')
 }
 
@@ -1890,6 +1890,63 @@ pub struct Text {
     pub newline_count: u8,
 }
 
+/// `Text`'s two whitespace scalars over its raw bytes in one pass:
+/// `(is_collapsible_ws_only, newline_count)`, the second saturating at 2 (the printer only
+/// tests `== 0` / `< 2` / `>= 1` / `>= 2`). An empty raw is collapsible-whitespace-only.
+///
+/// The walk counts `\n` through the [collapsible](is_collapsible_ws) head; a text that
+/// ends inside it is whitespace-only, and at the first content byte (never a `\n`) the
+/// rest only has to be counted — [`capped_newline_count`] — until the count saturates.
+/// The head is counted by weight ([`TEXT_WS_WEIGHT`]): its sum over `i` bytes is `i` plus
+/// the head's `\n`s, so one table load answers both the class and the count.
+#[inline]
+fn text_ws_scalars(raw: &[u8]) -> (bool, u8) {
+    let mut weight = 0usize;
+    let mut i = 0;
+    while i < raw.len() {
+        let w = TEXT_WS_WEIGHT[usize::from(raw[i])];
+        if w == 0 {
+            return (false, capped_newline_count(&raw[i + 1..], weight - i));
+        }
+        weight += usize::from(w);
+        i += 1;
+    }
+    (true, (weight - raw.len()).min(2) as u8)
+}
+
+/// [`text_ws_scalars`]' head weights, one per byte: 2 for `\n`, 1 for the rest of the
+/// [`is_collapsible_ws`] class, 0 — content, ending the head — for every other byte.
+const TEXT_WS_WEIGHT: [u8; 256] = {
+    let mut t = [0; 256];
+    let mut i = 0;
+    while i < 256 {
+        let b = i as u8;
+        t[i] = if b == b'\n' {
+            2
+        } else if is_collapsible_ws(b) {
+            1
+        } else {
+            0
+        };
+        i += 1;
+    }
+    t
+};
+
+/// `newlines` plus the `\n`s in `rest`, saturating at 2 — the count stops reading once it
+/// saturates, and reads a word at a time ([`tsv_lang::swar::count_byte_up_to`]): a content
+/// text is most of the bytes `Text::new` reads, and most of its words hold no `\n`.
+///
+/// Out of line: only a content text reaches it, and inlined, its word loop would take
+/// `Text::new` — and the whitespace-only head every text walks — out of line with it.
+#[inline(never)]
+fn capped_newline_count(rest: &[u8], newlines: usize) -> u8 {
+    if newlines >= 2 {
+        return 2;
+    }
+    (newlines + tsv_lang::swar::count_byte_up_to(rest, b'\n', 2 - newlines)) as u8
+}
+
 /// Entity-decode context for a `Text` node, mirroring the decode the canonical
 /// Svelte parser applies when it materializes `data` from `raw`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1910,11 +1967,10 @@ impl Text {
     /// document every later `raw(source)` reader passes), so the flags stay in sync
     /// with `raw` whether the node is standalone or embedded.
     pub fn new(raw_span: Span, decoding: TextDecoding, span: Span, source: &str) -> Self {
-        let raw = raw_span.extract(source);
-        // `is_collapsible_ws_only` is true for an empty node too;
-        // `newline_count` saturates at 2 (the printer only tests ==0 / <2 / >=1 / >=2).
-        let is_collapsible_ws_only = raw.bytes().all(is_collapsible_ws);
-        let newline_count = raw.bytes().filter(|&b| b == b'\n').take(2).count() as u8;
+        // Bytes, not `extract`: both scalars are byte questions, so the `str` slice's
+        // char-boundary checks buy nothing here.
+        let (is_collapsible_ws_only, newline_count) =
+            text_ws_scalars(&source.as_bytes()[raw_span.range()]);
         Text {
             raw_span,
             decoding,
@@ -2111,6 +2167,144 @@ mod tests {
         assert_eq!(mk("a\n\nb").newline_count, 2);
         // 3+ newlines still report the saturated 2.
         assert_eq!(mk("\n\n\n\n").newline_count, 2);
+    }
+
+    /// The two-pass model `Text::new`'s one-pass scalars must equal:
+    /// `(is_collapsible_ws_only, newline_count)`.
+    fn text_scalars_model(raw: &str) -> (bool, u8) {
+        (
+            raw.bytes().all(super::is_collapsible_ws),
+            raw.bytes().filter(|&b| b == b'\n').take(2).count() as u8,
+        )
+    }
+
+    /// `Text::new`'s scalars for `raw`, read both standalone and from inside a host document
+    /// (a non-zero span start, content on both sides), each graded against the model.
+    fn assert_text_scalars(raw: &str) {
+        use super::{Span, Text, TextDecoding};
+        let expected = text_scalars_model(raw);
+        let prefix = "<p>a\n\n";
+        for source in [raw.to_owned(), format!("{prefix}{raw}\n\nb</p>")] {
+            let start = if source.len() == raw.len() {
+                0
+            } else {
+                prefix.len()
+            };
+            let span = Span {
+                start: start as u32,
+                end: (start + raw.len()) as u32,
+            };
+            let text = Text::new(span, TextDecoding::Fragment, span, &source);
+            assert_eq!(
+                (text.is_collapsible_ws_only, text.newline_count),
+                expected,
+                "raw {raw:?} at {start}"
+            );
+        }
+    }
+
+    /// Every string over an alphabet covering each class the scan tells apart — the four
+    /// collapsible bytes, content ASCII (`&` included), the separators the class excludes
+    /// (NBSP, U+202F, form feed) and a multibyte letter — graded against the two-pass model:
+    /// exhaustive to length 5, and to length 6 over its first six symbols (the four
+    /// collapsible bytes, `&` and `a`).
+    #[test]
+    fn text_new_scalars_match_the_two_pass_model_exhaustively() {
+        let alphabet: Vec<String> = [' ', '\t', '\n', '\r', '&', 'a', '\u{c}']
+            .into_iter()
+            .chain([0xA0, 0x202F, 0xE9].map(|c| char::from_u32(c).unwrap()))
+            .map(String::from)
+            .collect();
+        let head = &alphabet[..6];
+        let mut cases = 0usize;
+        for (symbols, max_len) in [(&alphabet[..], 5), (head, 6)] {
+            let mut digits: Vec<usize> = Vec::new();
+            loop {
+                let raw: String = digits.iter().map(|&d| symbols[d].as_str()).collect();
+                assert_text_scalars(&raw);
+                cases += 1;
+                // Odometer over `symbols`, growing the length when every digit wraps.
+                let mut k = 0;
+                loop {
+                    if k == digits.len() {
+                        digits.push(0);
+                        break;
+                    }
+                    digits[k] += 1;
+                    if digits[k] < symbols.len() {
+                        break;
+                    }
+                    digits[k] = 0;
+                    k += 1;
+                }
+                if digits.len() > max_len {
+                    break;
+                }
+            }
+        }
+        let expected: usize = (0..=5).map(|n| 10usize.pow(n)).sum::<usize>()
+            + (0..=6).map(|n| 6usize.pow(n)).sum::<usize>();
+        assert_eq!(cases, expected);
+    }
+
+    /// Long runs, past any word the scan might read at a time: a whitespace or content
+    /// filler with the deciding byte — a content byte, `\n`, or a pair of `\n` — at every
+    /// offset.
+    #[test]
+    fn text_new_scalars_match_the_two_pass_model_on_long_runs() {
+        for len in [7, 8, 9, 15, 16, 17, 23, 24, 25, 31, 32, 33, 64, 65] {
+            for filler in [b' ', b'\t', b'a'] {
+                let base = vec![filler; len];
+                assert_text_scalars(std::str::from_utf8(&base).unwrap());
+                for i in 0..len {
+                    for decider in [b'a', b'&', b'\n', b'\r', 0x0C] {
+                        let mut bytes = base.clone();
+                        bytes[i] = decider;
+                        assert_text_scalars(std::str::from_utf8(&bytes).unwrap());
+                    }
+                    for j in i + 1..len {
+                        let mut bytes = base.clone();
+                        bytes[i] = b'\n';
+                        bytes[j] = b'\n';
+                        assert_text_scalars(std::str::from_utf8(&bytes).unwrap());
+                        // A content byte between, before or after the pair.
+                        for k in [0, usize::midpoint(i, j), len - 1] {
+                            if k != i && k != j {
+                                let mut mixed = bytes.clone();
+                                mixed[k] = b'x';
+                                assert_text_scalars(std::str::from_utf8(&mixed).unwrap());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Long runs of a multibyte filler — bytes at and above 0x80 in every word — with one or
+    /// two `\n` at every character offset, behind a content or a whitespace head.
+    #[test]
+    fn text_new_scalars_match_the_two_pass_model_on_multibyte_runs() {
+        for filler in [0xE9, 0xA0, 0x202F].map(|c| char::from_u32(c).unwrap().to_string()) {
+            for len in [4, 8, 12, 17, 33] {
+                for head in ["", "a", "\n", " \t"] {
+                    for i in 0..len {
+                        for j in i..len {
+                            let raw: String = std::iter::once(head)
+                                .chain((0..len).map(|k| {
+                                    if k == i || k == j {
+                                        "\n"
+                                    } else {
+                                        filler.as_str()
+                                    }
+                                }))
+                                .collect();
+                            assert_text_scalars(&raw);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// Grade every packed [`TagFacts`](super::TagFacts) accessor against the pure predicate it
