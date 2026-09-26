@@ -28,7 +28,7 @@ use crate::ast::internal;
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, prepend_leading,
 };
-use crate::printer::{ParenContext, Printer};
+use crate::printer::{ParenContext, Printer, SecondTypeArgs, prints_as_tsc_comparison};
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -143,9 +143,15 @@ impl<'a> Printer<'a> {
             self.build_frozen_new_callee_doc(new_expr.callee, frozen)
         } else if let Some(sealed) = self.build_sealed_non_null_paren_doc(new_expr.callee) {
             sealed
-        } else if let Some(parens) =
-            super::CalleeParens::of(self, new_expr.callee, ParenContext::NewCallee)
-        {
+        } else if let Some(parens) = super::CalleeParens::of(
+            self,
+            new_expr.callee,
+            ParenContext::NewCallee,
+            new_expr
+                .type_arguments
+                .as_ref()
+                .map(|list| SecondTypeArgs::Arguments(list, new_expr.arguments)),
+        ) {
             // The pair's shape and the operand's builder off ONE derivation of the callee's
             // kind — a `new` callee and a call callee are the same position to prettier, so
             // both read it from [`super::CalleeParens`].
@@ -175,6 +181,15 @@ impl<'a> Printer<'a> {
             .type_arguments
             .as_ref()
             .map_or_else(|| new_expr.callee.span().end, |ta| ta.span.end);
+
+        // A `new` the author wrote without an argument list whose callee tsc reads as a
+        // comparison prints without one too: `` new f<T><U>`x` `` is `new f < T > <U>`x``
+        // to tsc, and an appended `()` would join the assertion's operand
+        // ([`prints_as_tsc_comparison`]). The `new` is then open to a postfix after it,
+        // which is why an authored pair around it survives (`Printer::needs_parens`).
+        if span.end == paren_open && prints_as_tsc_comparison(self.source, new_expr.callee) {
+            return d.concat(&[keyword, callee_with_types_base]);
+        }
 
         // Empty args: just `new Foo()` or `new Foo<K, V>()`, preserving dangling comments
         if new_expr.arguments.is_empty() {

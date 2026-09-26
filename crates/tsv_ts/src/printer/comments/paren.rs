@@ -207,13 +207,26 @@ pub(crate) fn next_significant_byte(source: &str, start: u32, end: u32) -> Optio
     while i < end {
         if let Some(next) = skip_trivia(bytes, i, end, TriviaProfile::JS) {
             i = next;
-        } else if bytes[i].is_ascii_whitespace() {
-            i += 1;
+        } else if let Some(ws) = js_whitespace_at(source, i) {
+            i += ws;
         } else {
             return Some(i);
         }
     }
     None
+}
+
+/// The byte length of the JavaScript whitespace code point at `i` — the lexer's class
+/// ([`tsv_lang::is_js_whitespace`]: a no-break space, a byte-order mark, a line or paragraph
+/// separator step over like a space) — or `None` where `i` holds anything else. `i` sits on
+/// a char boundary.
+pub(crate) fn js_whitespace_at(source: &str, i: usize) -> Option<usize> {
+    let byte = *source.as_bytes().get(i)?;
+    if byte < 0x80 {
+        return tsv_lang::is_js_whitespace(char::from(byte)).then_some(1);
+    }
+    let c = source.get(i..)?.chars().next()?;
+    tsv_lang::is_js_whitespace(c).then(|| c.len_utf8())
 }
 
 /// The index just past the `)` that closes a REQUIRED pair around an operand ending at

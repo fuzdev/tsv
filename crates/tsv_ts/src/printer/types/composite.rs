@@ -33,25 +33,6 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{find_char_skipping_comments, has_newline_after_position};
 
-/// The **effective** span of a tuple element — the node left once the element's redundant
-/// paren shell is stripped ([`unwrap_parenthesized`]), which is the node
-/// [`Printer::build_tuple_type_doc_with_line_comments`] emits.
-///
-/// Shared by that builder and by [`Printer::build_tuple_type_doc`]'s expansion gate so the
-/// two cannot disagree about where an element starts. The width path below that gate
-/// deliberately does NOT use it — see the ⚠️ on `build_tuple_type_doc`.
-///
-/// ⚠️ One shell deep, at the element's own top. A shell **nested inside** the element is
-/// stripped by that inner node's printer instead, so a comment the author wrote in it still
-/// falls inside this span and the tuple's own gaps never see it — an array-type element
-/// (`[a, (⏎/* c */⏎number)[]]`) and a rest element (`[a, ...(⏎/* c */⏎T)]`) both collapse
-/// inline where their bare authoring expands, and prettier expands both.
-/// TODO: reach those by asking each element printer for the span it will emit from, rather
-/// than peeling only the top shell here.
-fn tuple_elem_span(ty: &TSType<'_>) -> Span {
-    unwrap_parenthesized(ty).span()
-}
-
 /// One tuple element's head, as the forced-multiline tuple builder resolves it ahead of its
 /// loop ([`Printer::build_tuple_type_doc_with_line_comments`]): the Rule A freeze verdict,
 /// the leading-edge claim the element's doc is built under, and its PRINTED start — the
@@ -2027,12 +2008,32 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// The **effective** tuple element — the node left once the element's redundant paren
+    /// shell is stripped ([`Self::unwrap_stripped_parens`], which stops at a shell the first
+    /// list of a chain printed bare keeps), which is the node
+    /// [`Self::build_tuple_type_doc_with_line_comments`] emits.
+    ///
+    /// Shared by that builder and by [`Self::build_tuple_type_doc`]'s expansion gate so the
+    /// two cannot disagree about where an element starts. The width path below that gate
+    /// deliberately does NOT use its span — see the ⚠️ on `build_tuple_type_doc`.
+    ///
+    /// ⚠️ One shell deep, at the element's own top. A shell **nested inside** the element is
+    /// stripped by that inner node's printer instead, so a comment the author wrote in it still
+    /// falls inside this span and the tuple's own gaps never see it — an array-type element
+    /// (`[a, (⏎/* c */⏎number)[]]`) and a rest element (`[a, ...(⏎/* c */⏎T)]`) both collapse
+    /// inline where their bare authoring expands, and prettier expands both.
+    /// TODO: reach those by asking each element printer for the span it will emit from, rather
+    /// than peeling only the top shell here.
+    fn tuple_elem<'t>(&self, ty: &'t TSType<'t>) -> &'t TSType<'t> {
+        self.unwrap_stripped_parens(ty)
+    }
+
     /// Build a Doc for a tuple type: `[A, B, C]`
     ///
     /// Uses width-aware breaking: inline if fits, one element per line if not.
     ///
     /// ⚠️ Below the expansion gate this builder reads **raw** `TSType::span`s, not
-    /// [`tuple_elem_span`], and the asymmetry with its expanding twin is deliberate:
+    /// [`Self::tuple_elem`], and the asymmetry with its expanding twin is deliberate:
     /// here each element's doc is `build_type_doc`, so a shell that survives to this path
     /// emits its own interior comments ([`Self::build_parenthesized_type_unwrap_doc`]) and
     /// the gaps this loop scans must stop at the shell, not inside it. Unwrapping the spans
@@ -2077,7 +2078,7 @@ impl<'a> Printer<'a> {
         // or own-line single-line block comments. Also check for line comments BEFORE the
         // first element (between `[` and first element), e.g., `[// leading\n a, b]`.
         //
-        // Every clause asks the **effective** element span (the free `tuple_elem_span`) —
+        // Every clause asks the **effective** element span ([`Self::tuple_elem`]) —
         // the node left once the element's redundant paren shell is stripped, the
         // same node the expansion builder emits. A comment the author wrote inside that
         // shell physically lands in one of the tuple's own gaps (`[`→element,
@@ -2105,12 +2106,12 @@ impl<'a> Printer<'a> {
         // lands in the element→`,` / element→`]` gap and prints from the seam that already
         // owns it (`[A, (B // c⏎)]` → `[⏎A,⏎B // c⏎]`), inside the brackets either way.
         let has_leading_line_comment = t.element_types.first().is_some_and(|first| {
-            self.has_line_comments_between(t.span.start + 1, tuple_elem_span(first).start)
+            self.has_line_comments_between(t.span.start + 1, self.tuple_elem(first).span().start)
         });
         if has_leading_line_comment
             || self.has_line_comments_in_delimited_list(
                 t.element_types,
-                |ty| tuple_elem_span(ty),
+                |ty| self.tuple_elem(ty).span(),
                 t.span.end - 1,
             )
             // A `//` inside a shell at an element's leading printed EDGE is in that
@@ -2118,11 +2119,11 @@ impl<'a> Printer<'a> {
             // one written bare there does ([`Printer::leading_edge_shell_line_comment`]).
             || t.element_types
                 .iter()
-                .any(|e| self.leading_edge_shell_line_comment(unwrap_parenthesized(e)))
+                .any(|e| self.leading_edge_shell_line_comment(self.tuple_elem(e)))
             || self.has_own_line_block_comments_in_bracket_list(
                 t.span,
                 t.element_types,
-                |ty| tuple_elem_span(ty),
+                |ty| self.tuple_elem(ty).span(),
             )
         {
             return self.build_tuple_type_doc_with_line_comments(t);
@@ -2230,7 +2231,7 @@ impl<'a> Printer<'a> {
 
     /// Build tuple type with expanding comments (line comments or own-line block comments)
     ///
-    /// Spans and docs both come from the free `tuple_elem_span` / [`unwrap_parenthesized`],
+    /// Spans and docs both come from [`Self::tuple_elem`],
     /// so this builder's gap emitters and the item docs agree on where each element starts —
     /// see [`Self::build_tuple_type_doc`]'s expansion gate for why a paren shell must not
     /// reach here.
@@ -2244,7 +2245,7 @@ impl<'a> Printer<'a> {
         // line/own-line comment is itself what forces this path. Tuple types have
         // no elision, so the first element is always present. See
         // conformance_prettier_ts_comments.md §Comment relocation (Tuple type `[`).
-        let elem_span_at = |i: usize| tuple_elem_span(t.element_types[i]);
+        let elem_span_at = |i: usize| self.tuple_elem(t.element_types[i]).span();
         // Each element's freeze verdict, leading-edge claim and PRINTED start, resolved
         // ahead of the loop because two of the gap emitters read the NEXT element's start:
         // the `[`-line prefix reads the first element's, the comma emitter each
@@ -2264,8 +2265,8 @@ impl<'a> Printer<'a> {
         let elem_heads: SmallVec<[TupleElementHead; 8]> = (0..t.element_types.len())
             .map(|i| {
                 let frozen = self.list_item_frozen(t.span.start + 1, &elem_span_at, i);
-                let (claim, start) = self
-                    .leading_edge_claim_and_start(frozen, unwrap_parenthesized(t.element_types[i]));
+                let (claim, start) =
+                    self.leading_edge_claim_and_start(frozen, self.tuple_elem(t.element_types[i]));
                 TupleElementHead {
                     frozen,
                     claim,
@@ -2280,7 +2281,7 @@ impl<'a> Printer<'a> {
         let mut prev_end = t.span.start + 1; // After the opening `[`
 
         for (i, raw_elem) in t.element_types.iter().enumerate() {
-            let elem = unwrap_parenthesized(raw_elem); // pairs with `tuple_elem_span`
+            let elem = self.tuple_elem(raw_elem); // pairs with `elem_span_at`
             let elem_end = elem.span().end;
             let is_last = i == t.element_types.len() - 1;
 

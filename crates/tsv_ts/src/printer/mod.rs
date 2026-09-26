@@ -58,7 +58,7 @@ use comments::{
     ClassMemberModifiers, CommentFilter, CommentSpacing, CommentVec, ContinuationValue,
     HeritageKeyword, LeadingGlue, MemberBlankScan, MemberBody, MemberFloor, MemberFreeze,
     MemberGap, MemberSeam, RunLeadingBlank, ShellLeadingRun, ShellPair, StandaloneGlue,
-    next_significant_byte,
+    next_significant_byte, paren_shell_close_after,
 };
 use decorators::class_expr_has_decorators;
 pub use expressions::assignment::should_inline_logical_expression;
@@ -68,12 +68,15 @@ use expressions::assignment::{
 pub(crate) use expressions::assignment::{
     is_curried_arrow_chain, is_curried_arrow_chain_that_breaks,
 };
-use needs_parens::{ParenContext, is_in_binary, needs_parens};
+use needs_parens::{
+    ParenContext, SecondTypeArgs, instantiation_keeps_pair_before_type_args, is_in_binary,
+    needs_parens, prints_as_tsc_comparison,
+};
 use types::unwrap_parenthesized;
 
 use crate::PrinterInputs;
 use crate::ast::internal;
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use tsv_lang::{
     CommentFreeWindow, EmbedContext, OutputBuffer, Span, TAB_WIDTH,
     doc::{
@@ -575,6 +578,26 @@ pub struct Printer<'a> {
     /// only cause more work, never a dropped comment. Defaults `true` (do the full
     /// classify) so any member print reached without a preceding set is fail-safe.
     pub(crate) chain_has_comments: Cell<bool>,
+    /// Spans of the instantiation expressions an OWNER prints bare — the next type
+    /// argument list along, a call, a `new` or a tag (`new f<T><U><V>(x)`) — so their own
+    /// chain of lists continues into the owner's ([`SecondTypeArgs::Instantiation`]).
+    /// Recorded by [`Self::instantiation_keeps_pair`] and the chain base
+    /// (`ChainNode::Base`'s `continues_instantiation`), read by the instantiation printer.
+    /// Keyed by span and never consumed, like the `*_target` cells above, so a head rebuilt
+    /// across conditional-group variants answers the same way every time; a set rather than
+    /// one cell because a chain nests one owner inside the next.
+    pub(crate) continued_instantiation_targets: RefCell<Vec<Span>>,
+    /// Set while the FIRST type argument list of an instantiation chain printed bare is
+    /// built (`f<keyof (A)><U>(x)`): tsc reads that list as the right operand of a `<`
+    /// comparison, so every authored paren the decision that the chain prints bare reads
+    /// as making the list an operand is kept there rather than stripped as redundant — the
+    /// decision and the print read one text. Two parens qualify (the `maybe` arms of
+    /// `type_is_never_an_expression` in `needs_parens`): one directly under a type
+    /// operator (`keyof (A)` is a call to tsc), read by the type operator's operand-pair
+    /// rule, and one around a function type (`(() => T)` is a parenthesized arrow), kept by
+    /// the parenthesized-type printer and seen through by [`Self::printed_operand`], so no
+    /// parent adds a second.
+    pub(crate) first_list_keeps_maybe_parens: Cell<bool>,
     /// The comment-free window the last comment search on this printer established
     /// ([`CommentFreeWindow`]: the mechanism, its soundness argument, and the gate's
     /// inline/outlined shape live there).
@@ -650,6 +673,8 @@ impl<'a> Printer<'a> {
             chain_arg_share_active: Cell::new(false),
             arrow_body_inject: Cell::new(None),
             chain_has_comments: Cell::new(true),
+            continued_instantiation_targets: RefCell::new(Vec::new()),
+            first_list_keeps_maybe_parens: Cell::new(false),
             comment_free_gap,
         }
     }
@@ -904,9 +929,77 @@ impl<'a> Printer<'a> {
     /// call site without threading the flag by hand. Prefer this inside `Printer`
     /// methods; the free function (which still requires the flag explicitly) is
     /// only for the few free helpers that have no `self`.
+    ///
+    /// It also keeps a pair the author wrote around an expression tsc reads as a
+    /// comparison ([`prints_as_tsc_comparison`]) wherever the position would strip it —
+    /// the positions [`ParenContext::binds_tighter_than_a_comparison`] names, where a bare
+    /// comparison reaches out of its own extent.
     #[inline]
     pub(crate) fn needs_parens(&self, expr: &internal::Expression<'_>, ctx: ParenContext) -> bool {
         needs_parens(expr, ctx, self.in_for_init.get())
+            || (ctx.binds_tighter_than_a_comparison() && self.authored_pair_holds_comparison(expr))
+    }
+
+    /// Whether the author wrote a pair around `expr` that tsc needs, because it reads
+    /// `expr` as a comparison ([`prints_as_tsc_comparison`]). Asked only at a position
+    /// [`ParenContext::binds_tighter_than_a_comparison`] names: one side of the operand is
+    /// always the parent's own operator or postfix there, so a `(` right before and a `)`
+    /// right after are the operand's own pair.
+    fn authored_pair_holds_comparison(&self, expr: &internal::Expression<'_>) -> bool {
+        paren_shell_close_after(self.source, expr.span().end).is_some()
+            && prints_as_tsc_comparison(self.source, expr)
+            && self.prev_significant_byte(expr.span().start) == Some(b'(')
+    }
+
+    /// The byte before `pos` once whitespace — the lexer's JavaScript class — and comments
+    /// are stepped over backwards: the reverse of [`next_significant_byte`], reading the
+    /// comment table rather than the bytes to know where a comment began.
+    fn prev_significant_byte(&self, mut pos: u32) -> Option<u8> {
+        let bytes = self.source.as_bytes();
+        loop {
+            while let Some(c) = self.source[..pos as usize].chars().next_back()
+                && tsv_lang::is_js_whitespace(c)
+            {
+                pos -= c.len_utf8() as u32;
+            }
+            if pos == 0 {
+                return None;
+            }
+            let before = self.comments.partition_point(|c| c.span.start < pos);
+            match before.checked_sub(1).map(|i| self.comments[i].span) {
+                Some(comment) if comment.end >= pos => pos = comment.start,
+                _ => return Some(bytes[pos as usize - 1]),
+            }
+        }
+    }
+
+    /// [`instantiation_keeps_pair_before_type_args`], asked by the owner of a second
+    /// list, recording the head as CONTINUED when the owner prints it bare
+    /// ([`Self::continued_instantiation_targets`]) so the head's own chain of lists reads
+    /// on into the owner's.
+    pub(crate) fn instantiation_keeps_pair(
+        &self,
+        head: &internal::Expression<'_>,
+        follow: SecondTypeArgs<'_>,
+    ) -> bool {
+        let keeps = instantiation_keeps_pair_before_type_args(self.source, head, follow);
+        if !keeps {
+            self.mark_continued_instantiation(head);
+        }
+        keeps
+    }
+
+    /// Record `head`, an instantiation expression its owner prints bare, as continued.
+    pub(crate) fn mark_continued_instantiation(&self, head: &internal::Expression<'_>) {
+        if matches!(
+            head.kind,
+            internal::ExpressionKind::TSInstantiationExpression(_)
+        ) {
+            let mut targets = self.continued_instantiation_targets.borrow_mut();
+            if !targets.contains(&head.span()) {
+                targets.push(head.span());
+            }
+        }
     }
 
     /// Get a reference to the doc arena.

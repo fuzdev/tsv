@@ -40,7 +40,9 @@ use crate::printer::comments::{AsiOperandShell, CommentFilter, CommentSpacing};
 use crate::printer::ignore::FrozenOperandPair;
 use crate::printer::types::TrailingBlock;
 use crate::printer::types::helpers::unwrap_parenthesized;
-use crate::printer::{ParenContext, PatternContext, Printer, chain, class_expr_has_decorators};
+use crate::printer::{
+    ParenContext, PatternContext, Printer, SecondTypeArgs, chain, class_expr_has_decorators,
+};
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
@@ -1532,10 +1534,24 @@ impl<'a> Printer<'a> {
         let mut parts: DocBuf = DocBuf::new();
         // The shared operand-shell seam also emits the `^`→expression gap — the
         // authored `(`'s interior, which no other emitter reaches.
+        // An instantiation head keeps the pair a second list asks for. Whether the chain
+        // of lists goes on past this one is this node's own owner's answer: it printed this
+        // node bare ([`Printer::continued_instantiation_targets`]).
+        let continues = self
+            .continued_instantiation_targets
+            .borrow()
+            .contains(&span);
+        let second_list_pair = self.instantiation_keeps_pair(
+            inst_expr.expression,
+            SecondTypeArgs::Instantiation {
+                list: &inst_expr.type_arguments,
+                continues,
+            },
+        );
         parts.push(self.build_shell_operand_doc(
             span.start,
             inst_expr.expression,
-            ParenContext::InstantiationExpression,
+            ParenContext::InstantiationExpression { second_list_pair },
         ));
         // Preserve comments between expression and type args: `fn/* c */ <string>`
         let expr_end = inst_expr.expression.span().end;
@@ -1547,7 +1563,21 @@ impl<'a> Printer<'a> {
         ) {
             parts.push(doc);
         }
+        // The first list of a chain printed bare: tsc reads it as a comparison operand, so
+        // an authored paren under a type operator in it stays
+        // ([`Printer::first_list_keeps_maybe_parens`]).
+        let first_of_bare_chain = continues
+            && (!matches!(
+                inst_expr.expression.kind,
+                ExpressionKind::TSInstantiationExpression(_)
+            ) || self
+                .paren_shell_close_after(inst_expr.expression.span().end)
+                .is_some());
+        let saved = self
+            .first_list_keeps_maybe_parens
+            .replace(first_of_bare_chain);
         parts.push(self.build_type_parameter_instantiation_doc(&inst_expr.type_arguments));
+        self.first_list_keeps_maybe_parens.set(saved);
         d.concat(&parts)
     }
 

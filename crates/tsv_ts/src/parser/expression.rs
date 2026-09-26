@@ -2758,6 +2758,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead
                     ) {
                         callee = self.attach_new_callee_tag(callee, callee_start, Some(ta))?;
+                    } else if self.new_callee_continues_past_type_args() {
+                        // The list stays on the callee as an instantiation and the chain
+                        // goes on: a second list (`new f<T><U>(x)` constructs `f<T>` with
+                        // `<U>`) or a member past a line break (`new f<T>⏎[x](y)`
+                        // constructs `f<T>[x]`) — acorn-typescript's tree, and tsc's for
+                        // the member.
+                        callee = alloc_expr(
+                            arena,
+                            Expression {
+                                span: Span::new(callee_start, ta.span.end),
+                                kind: ExpressionKind::TSInstantiationExpression(
+                                    TSInstantiationExpression {
+                                        expression: callee,
+                                        type_arguments: ta,
+                                    },
+                                ),
+                            },
+                        );
                     } else {
                         type_arguments = Some(ta);
                         break;
@@ -2783,6 +2801,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // `new A<T>()` took the `(` branch above, so its later `.prop` is an
                 // ordinary member access.
                 if type_arguments.is_some() {
+                    // An argument-less `new` cannot head an optional call, and the list
+                    // cannot extend its callee into one (tsc TS1209): no argument list is
+                    // inferred ahead of the `?.` for the chain to start from. A `?.` that
+                    // opens a property access is refused below, as after any list.
+                    if matches!(self.current_kind(), TokenKind::QuestionDot)
+                        && self.peek_is(&TokenKind::ParenOpen)
+                    {
+                        return Err(self.error_msg(
+                            "Optional chaining cannot appear in the callee of new expressions",
+                        ));
+                    }
                     self.reject_instantiation_follower()?;
                 }
                 let end = type_arguments
@@ -2802,6 +2831,48 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }),
             },
         ))
+    }
+
+    /// Whether a `new` callee's type argument list, just parsed and followed by no
+    /// template, stays on the callee as an instantiation with the callee chain going on,
+    /// rather than ending the callee as the `new`'s own list (`new f<T>()`).
+    ///
+    /// acorn-typescript parses the callee with its subscripts first and hands the list to
+    /// the `new` only when it is the callee's LAST subscript; two followers keep the chain
+    /// going:
+    ///
+    /// - **a second type argument list** — `new f<T><U>(x)` is `new (f<T>)<U>(x)`, the
+    ///   second list the `new`'s. tsc takes no list ahead of a `<` and reads the text as a
+    ///   comparison instead; the printer keeps both readings apart (it prints the spelling
+    ///   as written where tsc accepts it, and adds the pair where tsc refuses it).
+    /// - **a `[` past a line break** — `new f<T>⏎[x](y)` constructs the member `f<T>[x]`,
+    ///   to tsc as to acorn: the break commits the list, and the member is the callee's.
+    ///   On the list's own line the `[` refuses it, which the lookahead that admitted the
+    ///   list has already decided.
+    ///
+    /// A second list whose own follower refuses it stays unparsed (`extends new f<T><U> {}`,
+    /// where acorn-typescript reads `<U>` as the heritage's list): acorn tries the list,
+    /// finds the token after it starting an expression, and leaves the `new` at the first.
+    /// The lookahead has asked that of every head already but a function type's
+    /// (`<() => U> {`), so it is asked here.
+    fn new_callee_continues_past_type_args(&self) -> bool {
+        match self.current_kind() {
+            TokenKind::BracketOpen => self.had_line_terminator,
+            _ => {
+                self.check_less_than_in_type()
+                    && self.is_type_arguments_start(TypeArgScan::Parse)
+                    && {
+                        let bytes = self.source.as_bytes();
+                        let lt = self.current.start as usize;
+                        matching_angle_close(bytes, lt + 1, TypeArgScan::Parse).is_none_or(
+                            |close| {
+                                let after = skip_whitespace_and_comments(bytes, close + 1);
+                                !type_args_follower_refuses(bytes, close + 1, after)
+                            },
+                        )
+                    }
+            }
+        }
     }
 
     /// Extend a `new` callee with the tagged template at the current token,

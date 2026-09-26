@@ -103,7 +103,11 @@ pub(crate) fn print_node_inner<'a>(
             paren_leading_start,
             paren_comment_end,
             followed_by_non_null,
+            continues_instantiation,
         } => {
+            if *continues_instantiation {
+                printer.mark_continued_instantiation(expr);
+            }
             // The base's erased-paren freeze, armed by the chain seam
             // (`chain::analysis::build_linearized_chain_doc`): the verbatim slice stands in
             // for the base's doc, and the pair this position may print closes around it

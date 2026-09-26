@@ -95,6 +95,11 @@ pub enum ChainNode<'a> {
         /// COMMENT scan, this one decides a LAYOUT (prettier's `breakClosingParen` fires
         /// on a member parent, so a `!` in between suppresses it).
         followed_by_non_null: bool,
+        /// This base is an instantiation expression the chain's first call prints BARE
+        /// ahead of its own type argument list (`f<T><U>(x).y`), so the base's chain of
+        /// lists continues into the call's — recorded for the instantiation printer when
+        /// the base is built ([`crate::printer::Printer::mark_continued_instantiation`]).
+        continues_instantiation: bool,
     },
     /// Call expression: ()
     Call {
@@ -192,6 +197,7 @@ impl<'a> ChainNode<'a> {
             paren_leading_start: None,
             paren_comment_end: None,
             followed_by_non_null: false,
+            continues_instantiation: false,
         }
     }
 
@@ -206,6 +212,7 @@ impl<'a> ChainNode<'a> {
             paren_leading_start: Some(paren_leading_start),
             paren_comment_end: None,
             followed_by_non_null: false,
+            continues_instantiation: false,
         }
     }
 
@@ -227,6 +234,7 @@ impl<'a> ChainNode<'a> {
             paren_leading_start: Some(paren_leading_start),
             paren_comment_end: Some(paren_comment_end),
             followed_by_non_null: true,
+            continues_instantiation: false,
         }
     }
 

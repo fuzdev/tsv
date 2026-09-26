@@ -313,7 +313,8 @@ impl<'a> Printer<'a> {
         if let Some(kw_start) = extends_keyword_start {
             let kw_end = kw_start + "extends".len() as u32;
             if self.comments_force_own_line_between(kw_end, super_class.span().start) {
-                let mut value_parts: DocBuf = smallvec![self.build_super_class_doc(super_class)];
+                let mut value_parts: DocBuf =
+                    smallvec![self.build_super_class_doc(super_class, super_type_parameters)];
                 if let Some(type_args) = super_type_parameters {
                     let gap_start = super_class.span().end;
                     if let Some(doc) = self.build_name_to_type_params_comments_opt(
@@ -346,7 +347,7 @@ impl<'a> Printer<'a> {
                 ext_parts.push(comments);
             }
         }
-        ext_parts.push(self.build_super_class_doc(super_class));
+        ext_parts.push(self.build_super_class_doc(super_class, super_type_parameters));
         if let Some(type_args) = super_type_parameters {
             let gap_start = super_class.span().end;
             let gap_end = type_args.span.start;
@@ -365,13 +366,22 @@ impl<'a> Printer<'a> {
     /// Render the superclass expression, wrapping it in parens when prettier's
     /// heritage rule requires it (`extends (a + b)`, `extends (new X())`,
     /// `extends ((a) => b)`, …). A bare `Base<T>` keeps `Base` unwrapped — its type
-    /// arguments are rendered separately via `super_type_parameters`.
-    fn build_super_class_doc(&self, super_class: &internal::Expression<'_>) -> DocId {
+    /// arguments are rendered separately via `super_type_parameters`. An instantiation
+    /// superclass ahead of them keeps its pair (`extends (f<T>)<U>`): bare, tsc and tsv read
+    /// `extends f<T>` and stop at the second `<` ([`super::SecondTypeArgs::Heritage`]).
+    fn build_super_class_doc(
+        &self,
+        super_class: &internal::Expression<'_>,
+        super_type_parameters: Option<&internal::TSTypeParameterInstantiation<'_>>,
+    ) -> DocId {
         // The ordinary dispatch — a binary superclass takes the continuation-indent
         // default. The parens below are the PRINTER's and stay outside the operand's own
         // doc.
         let doc = self.build_expression_doc(super_class);
-        if self.needs_parens(super_class, super::ParenContext::SuperClass) {
+        if self.needs_parens(super_class, super::ParenContext::SuperClass)
+            || (super_type_parameters.is_some()
+                && self.instantiation_keeps_pair(super_class, super::SecondTypeArgs::Heritage))
+        {
             // A decorated class expression breaks its parens open and indents the
             // content (prettier), the decorators forcing the break:
             // `extends (⏎\t@deco⏎\tclass {}⏎)`. Every other wrapped heritage form

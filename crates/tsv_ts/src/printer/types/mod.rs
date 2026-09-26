@@ -526,7 +526,17 @@ impl<'a> Printer<'a> {
                 // `needs_parens` below, and as the [`ShellPair`] the hang seam and its gate
                 // are told (see the ⚠️ further down). Asking it twice is how the emitter and
                 // the seam would come to disagree about one operand.
-                let operand_pair = prefix_operator_shell_pair(self, o.type_annotation);
+                // In the first list of a chain printed bare, an authored paren directly under
+                // the operator is the author's call to tsc and stays
+                // ([`Printer::first_list_keeps_maybe_parens`]).
+                let authored_pair_kept = self.first_list_keeps_maybe_parens.get()
+                    && matches!(o.type_annotation, TSType::Parenthesized(_))
+                    && !matches!(unwrap_parenthesized(o.type_annotation), TSType::Function(_));
+                let operand_pair = if authored_pair_kept {
+                    ShellPair::Kept
+                } else {
+                    prefix_operator_shell_pair(self, o.type_annotation)
+                };
                 let needs_parens = operand_pair == ShellPair::Kept;
                 // Comments between keyword and operand type
                 let keyword_end = o.span.start + o.operator.as_str().len() as u32;
@@ -585,8 +595,16 @@ impl<'a> Printer<'a> {
                 // hoisting made the glued and isolated spellings of one comment disagree
                 // across a pass. Asked of the UNWRAPPED operand, the shape the pair would
                 // be re-minted around; a `//` hoists either way.
-                let hang = self
-                    .keyword_value_stripped_paren_hang_with_pair(o.type_annotation, operand_pair);
+                // An authored pair the first list keeps is not stripped for its leading run:
+                // the run stays inside it, and the required-pair seam below opens over it.
+                let hang = if authored_pair_kept {
+                    StrippedParenHang::for_value(o.type_annotation, false)
+                } else {
+                    self.keyword_value_stripped_paren_hang_with_pair(
+                        o.type_annotation,
+                        operand_pair,
+                    )
+                };
                 let (operand_hang_start, operand_hang_type) = (hang.value_start, hang.value_type);
                 // Type position: a trailing block lifted from the shell trails the
                 // operand inline.
@@ -603,6 +621,12 @@ impl<'a> Printer<'a> {
                             // there ([`StrippedParenHang::routed`]). The pair rule is the
                             // position's own either way — a re-minted required pair closes
                             // around the slice exactly as it does around a built operand.
+                            if authored_pair_kept && !hang.routed {
+                                return self.build_required_paren_pair_operand_doc(
+                                    operand_hang_type,
+                                    |_, _| true,
+                                );
+                            }
                             let operand_doc = if hang.routed {
                                 self.build_frozen_single_child_doc(operand_hang_type)
                             } else {
@@ -654,6 +678,9 @@ impl<'a> Printer<'a> {
                         self.build_expanded_parenthesized_union_opt(operand_hang_type)
                     {
                         union_doc
+                    } else if authored_pair_kept {
+                        // No hang took the shell's run, so the pair is its emitter.
+                        self.build_required_paren_pair_operand_doc(operand_hang_type, |_, _| true)
                     } else if needs_parens {
                         self.build_required_paren_operand_doc(operand_hang_type, |operand| {
                             d.concat(&[d.text("("), operand, d.text(")")])
@@ -3085,7 +3112,10 @@ impl<'a> Printer<'a> {
     ///
     /// A shell with **trailing** comments keeps its shell: those sit *after* the type,
     /// a gap the enclosing construct does not emit, so the paren doc must stay their
-    /// emitter. Nested shells peel while each is leading-only.
+    /// emitter. Nested shells peel while each is leading-only. So does a shell the first
+    /// list of a chain printed bare keeps around a function type
+    /// ([`Self::first_list_keeps_function_paren`]): it is not redundant there, so its
+    /// leading run stays inside it.
     ///
     /// This is what makes the two authorings of one comment agree — `f() => // c⏎T`
     /// and `f() => (// c⏎T)` reach one fixed point instead of two, which is the
@@ -3095,7 +3125,12 @@ impl<'a> Printer<'a> {
         ty: &'t TSType<'t>,
     ) -> &'t TSType<'t> {
         match ty {
-            TSType::Parenthesized(p) if self.paren_inner_comment_flags(p).1 => ty,
+            TSType::Parenthesized(p)
+                if self.paren_inner_comment_flags(p).1
+                    || self.first_list_keeps_function_paren(p) =>
+            {
+                ty
+            }
             TSType::Parenthesized(p) => self.leading_paren_unwrapped(p.type_annotation),
             other => other,
         }
@@ -3109,6 +3144,43 @@ impl<'a> Printer<'a> {
     /// `(a // comment\n) | b` → `| a // comment\n| b`
     /// `(a // comment\n) & b` → `a & // comment\nb`
     fn build_parenthesized_type_unwrap_doc(&self, p: &TSParenthesizedType<'_>) -> DocId {
+        // The first list of a chain printed bare keeps the author's paren around a function
+        // type: tsc reads it as a parenthesized arrow, an operand of its `<` comparison,
+        // where the bare arrow is none ([`Printer::first_list_keeps_maybe_parens`]).
+        if self.first_list_keeps_function_paren(p) {
+            return self.build_kept_function_paren_doc(p);
+        }
+        self.build_parenthesized_type_strip_doc(p)
+    }
+
+    /// The paren a bare chain's first list keeps around a function type
+    /// ([`Self::first_list_keeps_function_paren`]), with the comments the author wrote
+    /// inside it. The pair is built the way an array element's required pair is
+    /// ([`Self::build_required_paren_pair_operand_doc`]): a shell retained for its trailing
+    /// run prints its own pair, a leading `//` opens it, and otherwise the stripped shell —
+    /// its comments inline — closes inside a plain `(`…`)`. So the comment stays between
+    /// the author's parens, and a kept pair and a required one share one spelling.
+    pub(in crate::printer) fn build_kept_function_paren_doc(
+        &self,
+        p: &TSParenthesizedType<'_>,
+    ) -> DocId {
+        let d = self.d();
+        if self.paren_inner_comment_flags(p) == (false, false) {
+            return d.parens(self.build_type_doc(p.type_annotation));
+        }
+        if self.paren_shell_retains_for_trailing_run(p) {
+            return self.build_parenthesized_type_strip_doc(p);
+        }
+        let shell = TSType::Parenthesized(p.clone());
+        if let Some(run) = self.required_paren_open_run(&shell) {
+            return self.build_open_required_paren_doc(&shell, run);
+        }
+        d.parens(self.build_parenthesized_type_strip_doc(p))
+    }
+
+    /// [`Self::build_parenthesized_type_unwrap_doc`] past its kept-paren arm: the shell
+    /// strips, or is retained for its trailing run.
+    fn build_parenthesized_type_strip_doc(&self, p: &TSParenthesizedType<'_>) -> DocId {
         let d = self.d();
         let paren_open = p.span.start;
         let inner_start = p.type_annotation.span().start;

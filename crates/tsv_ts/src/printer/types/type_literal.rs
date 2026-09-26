@@ -1282,6 +1282,11 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match ts_type {
             TSType::TypeLiteral(t) => self.build_type_literal_doc(t),
+            // The first list of a chain printed bare keeps the author's paren around a
+            // function type ([`Printer::first_list_keeps_maybe_parens`]).
+            TSType::Parenthesized(p) if self.first_list_keeps_function_paren(p) => {
+                self.build_kept_function_paren_doc(p)
+            }
             TSType::Parenthesized(p) => {
                 // Unwrap the parens (redundant in type-argument position — prettier
                 // strips them too) but preserve any comments the user wrote inside

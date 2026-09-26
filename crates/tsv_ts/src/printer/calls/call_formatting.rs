@@ -3,7 +3,7 @@
 // Contains the primary `build_call_doc_with_wrapping` function that handles
 // all the special cases for call expression formatting.
 
-use super::super::{ParenContext, Printer};
+use super::super::{ParenContext, Printer, SecondTypeArgs};
 use super::CalleeGap;
 use super::arg_comments::{
     PartitionedComments, any_arg_empty_line, first_arg_has_any_comments,
@@ -127,7 +127,14 @@ fn build_call_head(
     // builder its operand takes. Asked BEFORE the body is built, because a cast and a
     // binaryish callee each want an operand doc `build_expression_doc` does not give
     // ([`super::CalleeParens`]); `None` is the callee that needs no pair at all.
-    let callee_parens = super::CalleeParens::of(printer, call.callee, ParenContext::Callee);
+    let callee_parens = super::CalleeParens::of(
+        printer,
+        call.callee,
+        ParenContext::Callee,
+        call.type_arguments
+            .as_ref()
+            .map(|list| SecondTypeArgs::Arguments(list, call.arguments)),
+    );
     // The pair's facts and every window that opens past its `)`, off ONE derivation
     // ([`super::CalleeGap`]).
     let gap = super::callee_gap(printer, call, span);

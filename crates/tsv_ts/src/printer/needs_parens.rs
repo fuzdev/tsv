@@ -18,11 +18,13 @@
 // - `printPathNoParens`'s caller (`print/index.js`, the application layer)
 
 use crate::ast::internal::{
-    AssignmentOperator, BinaryOperator, Expression, ExpressionKind, LiteralValue, UnaryOperator,
-    UpdateOperator,
+    AssignmentOperator, BinaryOperator, Expression, ExpressionKind, LiteralValue, TSKeywordKind,
+    TSType, TSTypeParameterInstantiation, UnaryOperator, UpdateOperator,
 };
 use crate::printer::class_expr_has_decorators;
-use crate::printer::comments::left_side_child_is_parenthesized;
+use crate::printer::comments::{
+    left_side_child_is_parenthesized, next_significant_byte, paren_shell_close_after,
+};
 
 /// Context for parenthesization decisions
 ///
@@ -90,8 +92,12 @@ pub enum ParenContext {
     /// All type assertions need parens here
     AngleBracketAssertion,
 
-    /// Expression in TSInstantiationExpression: `<expr><T>`
-    InstantiationExpression,
+    /// Expression in TSInstantiationExpression: `<expr><T>`. `second_list_pair` is the
+    /// printer's answer for an instantiation `<expr>` — whether it keeps a pair ahead of
+    /// this second list ([`instantiation_keeps_pair_before_type_args`]), which reads the
+    /// source and whether this node's own owner continues its chain, facts the printer
+    /// holds and the node alone does not.
+    InstantiationExpression { second_list_pair: bool },
 
     /// Argument of a unary operator: `!<expr>`, `typeof <expr>`, `-<expr>`.
     /// Carries the parent operator so a `+`/`-` operand that would re-tokenize
@@ -161,6 +167,36 @@ pub enum ParenContext {
     AssignmentTarget { operator: AssignmentOperator },
 }
 
+impl ParenContext {
+    /// Whether a comparison written bare at this position would reach out of the operand's
+    /// own extent — an operator ahead of it binding to its first operand, or a postfix
+    /// after it joining its right side: the operand of a binary or a prefix operator, the
+    /// left side of `as` / `satisfies`, an angle-bracket assertion's operand, and every
+    /// left-spine position (a callee, a `new` callee, a tag, a member object, a `!`
+    /// operand, an instantiation head, a heritage). One side of the operand is always
+    /// the parent's own token here, which is what lets
+    /// [`crate::printer::Printer::needs_parens`] read a `(`…`)` around it as the author's.
+    pub(crate) fn binds_tighter_than_a_comparison(self) -> bool {
+        matches!(
+            self,
+            Self::BinaryLeft { .. }
+                | Self::BinaryRight { .. }
+                | Self::Callee
+                | Self::NewCallee
+                | Self::TaggedTemplateTag
+                | Self::ChainBase
+                | Self::NonNull
+                | Self::TypeAssertion
+                | Self::AngleBracketAssertion
+                | Self::InstantiationExpression { .. }
+                | Self::UnaryArgument { .. }
+                | Self::UpdateArgument { .. }
+                | Self::AwaitArgument
+                | Self::SuperClass
+        )
+    }
+}
+
 /// Whether `expr` is an `in` binary expression — the operator that must be
 /// parenthesized inside a `for` header init so it isn't read as the `for (x in
 /// y)` separator. Shared by `needs_parens` (the ambient for-init rule) and the
@@ -168,6 +204,305 @@ pub enum ParenContext {
 /// `needs_parens` check.
 pub(crate) fn is_in_binary(expr: &Expression<'_>) -> bool {
     matches!(&expr.kind, ExpressionKind::BinaryExpression(b) if b.operator == BinaryOperator::In)
+}
+
+/// A second type argument list that follows an instantiation expression's close
+/// directly (`f<T><U>…`), with the node it belongs to — what
+/// [`instantiation_keeps_pair_before_type_args`] reads to know how tsc takes the bare
+/// spelling.
+#[derive(Clone, Copy)]
+pub(crate) enum SecondTypeArgs<'e> {
+    /// A call's or a `new`'s list, with the argument list after it: `f<T><U>(x)`,
+    /// `new f<T><U>(x)`. A `new` written without one prints an empty list.
+    Arguments(
+        &'e TSTypeParameterInstantiation<'e>,
+        &'e [&'e Expression<'e>],
+    ),
+    /// A tag's list: `` f<T><U>`x` ``.
+    Template(&'e TSTypeParameterInstantiation<'e>),
+    /// Another instantiation's list (`f<T><U>`). `continues` is whether that
+    /// instantiation's OWN owner — the next list along, a call, a `new` or a tag — prints
+    /// it bare (`new f<T><U><V>(x)`), so the chain goes on and that owner answers for the
+    /// rest of it; with none, the assertion `<U>` has nothing to assert.
+    Instantiation {
+        list: &'e TSTypeParameterInstantiation<'e>,
+        continues: bool,
+    },
+    /// A class heritage's list (`extends (f<T>)<U>`), whose bare spelling no parser but
+    /// acorn-typescript takes: tsc and tsv read `extends f<T>` and stop at the `<`.
+    Heritage,
+}
+
+impl SecondTypeArgs<'_> {
+    /// Whether tsc's parser rejects the bare spelling. tsc takes no type argument list
+    /// ahead of a `<`, so it reads `f<T><U>(x)` as the comparison `(f < T) > <U>(x)`: the
+    /// second list is an angle-bracket type assertion — one type, no trailing comma —
+    /// over whatever follows it, and a parenthesized expression holds neither an empty
+    /// list nor a spread.
+    fn bare_is_refused(self, source: &str) -> bool {
+        let list = match self {
+            Self::Arguments(list, _) | Self::Template(list) | Self::Instantiation { list, .. } => {
+                list
+            }
+            Self::Heritage => return true,
+        };
+        !asserts_one_type(source, list)
+            || match self {
+                Self::Arguments(_, arguments) => {
+                    arguments.is_empty()
+                        || arguments.iter().any(|argument| {
+                            matches!(argument.kind, ExpressionKind::SpreadElement(_))
+                        })
+                }
+                Self::Instantiation { continues, .. } => !continues,
+                Self::Template(_) | Self::Heritage => false,
+            }
+    }
+}
+
+/// Whether a type argument list reads as an angle-bracket type assertion's `<T>` to tsc:
+/// exactly one type, with no trailing comma.
+fn asserts_one_type(source: &str, list: &TSTypeParameterInstantiation<'_>) -> bool {
+    match list.params {
+        [only] => next_significant_byte(source, only.span().end, list.span.end)
+            .is_none_or(|pos| source.as_bytes()[pos] != b','),
+        _ => false,
+    }
+}
+
+/// Whether tsc takes the bare spelling of the unparenthesized instantiation chain `head`
+/// ends, as far as the chain itself decides: every list past the first reads as an
+/// assertion (`f<T><U, V>` does not), and the FIRST — which tsc reads as the right operand
+/// of a `<` comparison — reads as an expression ([`first_list_reads_as_expression`]). The
+/// chain's owner answers for what follows it.
+fn chain_reads_bare_under_tsc(source: &str, head: &Expression<'_>) -> bool {
+    let mut level = head;
+    while let ExpressionKind::TSInstantiationExpression(inst) = &level.kind {
+        let inner = inst.expression;
+        if !matches!(inner.kind, ExpressionKind::TSInstantiationExpression(_))
+            || paren_shell_close_after(source, inner.span().end).is_some()
+        {
+            return first_list_reads_as_expression(source, &inst.type_arguments);
+        }
+        if !asserts_one_type(source, &inst.type_arguments) {
+            return false;
+        }
+        level = inner;
+    }
+    true
+}
+
+/// Whether tsc's comparison reading of a chain's first list (`f<T>…` read as `f < T > …`)
+/// can take its text as an expression: no trailing comma (`f < T, >` does not parse), and
+/// no type whose syntax no expression shares ([`type_is_never_an_expression`]). Only a
+/// definite refusal counts — a type whose text may parse as an expression (a type literal,
+/// a mapped type, a spread, `void[]`, a parenthesized function type) leaves the spelling
+/// bare, since a pair added where tsc DID read the comparison would change the program tsc
+/// reads.
+fn first_list_reads_as_expression(source: &str, list: &TSTypeParameterInstantiation<'_>) -> bool {
+    let trailing_comma = list.params.last().is_some_and(|last| {
+        next_significant_byte(source, last.span().end, list.span.end)
+            .is_some_and(|pos| source.as_bytes()[pos] == b',')
+    });
+    !trailing_comma && !list.params.iter().any(|ty| type_is_never_an_expression(ty))
+}
+
+/// Whether a type's text can never parse as the operand of a `<` comparison: an array type
+/// (`T[]` indexes nothing) other than `void[]` (the unary `void []`), a type operator whose operand opens with neither `[` nor `(`
+/// (`keyof T`), a conditional (`extends`), a bare
+/// function or constructor type (an arrow is no relational operand), `void` with nothing
+/// to apply to, an optional or named tuple member, and any type built on one of those. A
+/// spread (`[...A]`, an array-literal element) and a PARENTHESIZED arrow (`(() => T)`, a
+/// primary expression) are operands, so only what they are built on decides.
+fn type_is_never_an_expression(ty: &TSType<'_>) -> bool {
+    let never = type_is_never_an_expression;
+    match ty {
+        // A type operator is an expression when its operand opens with `[` or `(`
+        // (`keyof [A]` indexes `keyof`, `keyof (A)` calls it), so only that operand decides
+        // — read AS PRINTED ([`operator_operand_prints_opening_group`]).
+        TSType::TypeOperator(op) => {
+            !operator_operand_prints_opening_group(op.type_annotation) || never(op.type_annotation)
+        }
+        // `void[]` is the unary `void []` to tsc, so only an array over the `void` keyword
+        // as written is an operand.
+        TSType::Array(array) => !matches!(
+            array.element_type,
+            TSType::Keyword(keyword) if matches!(keyword.kind, TSKeywordKind::Void)
+        ),
+        TSType::Conditional(_)
+        | TSType::Function(_)
+        | TSType::Constructor(_)
+        | TSType::Optional(_)
+        | TSType::NamedTupleMember(_)
+        | TSType::Infer(_)
+        | TSType::TypePredicate(_) => true,
+        TSType::Keyword(keyword) => matches!(keyword.kind, TSKeywordKind::Void),
+        TSType::Union(union) => union.types.iter().any(|t| never(t)),
+        TSType::Intersection(intersection) => intersection.types.iter().any(|t| never(t)),
+        TSType::Tuple(tuple) => tuple.element_types.iter().any(|t| never(t)),
+        TSType::Rest(rest) => never(rest.type_annotation),
+        TSType::Parenthesized(inner) => {
+            !matches!(inner.type_annotation, TSType::Function(_)) && never(inner.type_annotation)
+        }
+        TSType::IndexedAccess(access) => never(access.object_type) || never(access.index_type),
+        TSType::TypeReference(reference) => reference
+            .type_arguments
+            .as_ref()
+            .is_some_and(|list| list.params.iter().any(|t| never(t))),
+        _ => false,
+    }
+}
+
+/// Whether a type operator's operand, as the first list of a chain printed bare prints it,
+/// opens with `[` or `(`: a tuple; a paren the author wrote directly under the operator,
+/// which that position keeps ([`crate::printer::Printer::first_list_keeps_maybe_parens`]);
+/// a pair the prefix-operator rule adds (`readonly (readonly [A])`); or, down the left
+/// spine of an array or indexed-access operand, a tuple or a pair that position's own rule
+/// keeps. A redundant paren further down is stripped (`keyof (A)[0]` prints
+/// `keyof A[0]`), so it does not count.
+fn operator_operand_prints_opening_group(operand: &TSType<'_>) -> bool {
+    match operand {
+        TSType::Parenthesized(_) | TSType::Tuple(_) => true,
+        _ if type_takes_pair_under_postfix_or_operator(operand) => true,
+        TSType::Array(array) => leftmost_prints_opening_group(array.element_type),
+        TSType::IndexedAccess(access) => leftmost_prints_opening_group(access.object_type),
+        _ => false,
+    }
+}
+
+/// [`operator_operand_prints_opening_group`] below an array's element or an indexed
+/// access's object, where an authored paren survives only if that position needs it.
+fn leftmost_prints_opening_group(ty: &TSType<'_>) -> bool {
+    match ty {
+        TSType::Parenthesized(inner) => {
+            takes_pair_under_postfix(inner.type_annotation)
+                || leftmost_prints_opening_group(inner.type_annotation)
+        }
+        TSType::Tuple(_) => true,
+        _ if takes_pair_under_postfix(ty) => true,
+        TSType::Array(array) => leftmost_prints_opening_group(array.element_type),
+        TSType::IndexedAccess(access) => leftmost_prints_opening_group(access.object_type),
+        _ => false,
+    }
+}
+
+/// The types the type printer wraps in a pair under an array's `[]` or an indexed access's
+/// `[K]`: the prefix-operator set plus a `typeof` query.
+fn takes_pair_under_postfix(ty: &TSType<'_>) -> bool {
+    type_takes_pair_under_postfix_or_operator(ty) || matches!(ty, TSType::TypeQuery(_))
+}
+
+/// The types the type printer wraps in a pair under a prefix type operator — the shared
+/// core of that rule and the array / indexed-access ones.
+fn type_takes_pair_under_postfix_or_operator(ty: &TSType<'_>) -> bool {
+    matches!(
+        ty,
+        TSType::Union(_)
+            | TSType::Intersection(_)
+            | TSType::TypeOperator(_)
+            | TSType::Conditional(_)
+            | TSType::Infer(_)
+            | TSType::Function(_)
+            | TSType::Constructor(_)
+    )
+}
+
+/// Whether an instantiation expression `head` keeps a paren pair ahead of the second type
+/// argument list that follows it, `follow`.
+///
+/// acorn-typescript — the parser Svelte compiles through — reads the bare `f<T><U>(x)` as
+/// two lists, the same tree as the paired `(f<T>)<U>(x)`; tsc reads the bare spelling as a
+/// comparison. So the printer changes neither parser's reading: an authored pair is kept
+/// (it is what tsc read), a bare spelling tsc accepts prints bare (tsc read the
+/// comparison, and still does), and a bare spelling tsc REJECTS takes the pair, the one
+/// form both parsers read alike — the repair `fn<T> >= 1` gets.
+///
+/// The one exception is a head that ends an OPEN optional chain (`a?.b<T><U>()`): a pair
+/// there would cut the chain in two — acorn reads the whole call short-circuited, the
+/// paired `(a?.b<T>)<U>()` calls whatever the chain produced — and no paren-free spelling
+/// tsc accepts exists, so the bare spelling stays, acorn's reading intact and tsc
+/// rejecting it as it did the input. A heritage's list is outside the exception: nothing
+/// follows it for the pair to cut away from the chain.
+pub(crate) fn instantiation_keeps_pair_before_type_args(
+    source: &str,
+    head: &Expression<'_>,
+    follow: SecondTypeArgs<'_>,
+) -> bool {
+    matches!(head.kind, ExpressionKind::TSInstantiationExpression(_))
+        && (paren_shell_close_after(source, head.span().end).is_some()
+            || ((follow.bare_is_refused(source) || !chain_reads_bare_under_tsc(source, head))
+                && (matches!(follow, SecondTypeArgs::Heritage) || !ends_open_optional_chain(head))))
+}
+
+/// Whether the instantiation chain `head` is built on an optional chain no authored pair
+/// has sealed (`a?.b<T>`, not `(a?.b)<T>`).
+fn ends_open_optional_chain(head: &Expression<'_>) -> bool {
+    let mut level = head;
+    while let ExpressionKind::TSInstantiationExpression(inst) = &level.kind {
+        if level.span().start < inst.expression.span().start {
+            return false;
+        }
+        level = inst.expression;
+    }
+    level.has_optional_in_chain()
+}
+
+/// Whether tsc reads `expr` as a comparison where acorn-typescript reads a call, a `new`,
+/// a tag or an instantiation: its left spine holds a second type argument list printed
+/// bare ([`instantiation_keeps_pair_before_type_args`]), so to tsc the first list is a
+/// `<`…`>` comparison and everything after it is the operand of the assertion the second
+/// list opens (`f<T><U>(x)` is `(f < T) > <U>(x)`).
+///
+/// Such an expression reaches out of its own extent in a tsc reading: an operator ahead of
+/// it binds to `f` alone, and a postfix after it joins the assertion's operand. So a pair
+/// the author wrote around one must survive, wherever the position would otherwise strip
+/// it ([`crate::printer::Printer::needs_parens`]). An authored pair on the spine below stops the
+/// walk: that pair survives by the same rule and ends the comparison inside it.
+pub(crate) fn prints_as_tsc_comparison(source: &str, expr: &Expression<'_>) -> bool {
+    let bare_owner = |head: &Expression<'_>, follow: Option<SecondTypeArgs<'_>>| {
+        matches!(head.kind, ExpressionKind::TSInstantiationExpression(_))
+            && follow.is_some_and(|follow| {
+                !instantiation_keeps_pair_before_type_args(source, head, follow)
+            })
+    };
+    let descend = |child: &Expression<'_>| {
+        expr.span().start == child.span().start && prints_as_tsc_comparison(source, child)
+    };
+    match &expr.kind {
+        ExpressionKind::CallExpression(call) => {
+            bare_owner(
+                call.callee,
+                call.type_arguments
+                    .as_ref()
+                    .map(|list| SecondTypeArgs::Arguments(list, call.arguments)),
+            ) || descend(call.callee)
+        }
+        ExpressionKind::NewExpression(new_expr) => {
+            bare_owner(
+                new_expr.callee,
+                new_expr
+                    .type_arguments
+                    .as_ref()
+                    .map(|list| SecondTypeArgs::Arguments(list, new_expr.arguments)),
+            ) || (next_significant_byte(
+                source,
+                expr.span().start + "new".len() as u32,
+                new_expr.callee.span().start,
+            )
+            .is_none()
+                && prints_as_tsc_comparison(source, new_expr.callee))
+        }
+        ExpressionKind::TaggedTemplateExpression(tagged) => {
+            bare_owner(
+                tagged.tag,
+                tagged.type_arguments.as_ref().map(SecondTypeArgs::Template),
+            ) || descend(tagged.tag)
+        }
+        ExpressionKind::MemberExpression(member) => descend(member.object),
+        ExpressionKind::TSNonNullExpression(non_null) => descend(non_null.expression),
+        ExpressionKind::TSInstantiationExpression(inst) => descend(inst.expression),
+        _ => false,
+    }
 }
 
 /// Determines if an expression needs parentheses in a given context.
@@ -394,8 +729,10 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         // Instantiation: `(<T>() => {})<U>`, `(x as A)<T>`, `(<T>x)<U>`, `(await x)<T>`, `(a = b)<T>`
         // Ternary/binary/assignment need parens to preserve semantics:
         // `(a ? b : c)<T>` vs `a ? b : c<T>` (different - ternary result vs alternate instantiated)
-        ParenContext::InstantiationExpression => {
-            is_await_or_yield(expr)
+        // An instantiation instantiated again takes the pair the printer decided.
+        ParenContext::InstantiationExpression { second_list_pair } => {
+            second_list_pair
+                || is_await_or_yield(expr)
                 || is_type_assertion(expr)
                 || is_function_like(expr)
                 || matches!(
