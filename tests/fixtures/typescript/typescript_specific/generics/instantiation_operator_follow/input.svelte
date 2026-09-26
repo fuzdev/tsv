@@ -5,7 +5,11 @@
 	// Necessary but not sufficient: `>`, `>>`, `>>>` and `<<` carry no `startsExpr`
 	// either, yet acorn holds the close for none of them. The first three no parser
 	// admits — the `input_invalid_*` files beside this one; `<<` tsc reads as an
-	// instantiation and tsv repairs, so it has no invalid file to sit in.
+	// instantiation and tsv repairs, so it has no invalid file to sit in. The `>`-led
+	// assignment operators `>>=` and `>>>=` are invalid files too: tsc takes no list
+	// ahead of any `>`-led token, and acorn refuses the instantiation as a target. So
+	// is every close GLUED to a `>`-led operator (`f<T>>= c`, `f<A<B>>=c`), which the
+	// longest punctuator swallows, leaving a comparison assigned to.
 
 	// `in` / `instanceof` — binary keyword operators.
 	const a = f<T> in x;

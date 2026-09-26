@@ -9,7 +9,7 @@
 
 use super::assignment::{AssignmentLeft, RhsCommentInfo};
 use crate::ast::internal::{
-    self, ArrowFunctionBody, Expression, ExpressionKind, ObjectPatternProperty,
+    self, ArrowFunctionBody, AssignmentOperator, Expression, ExpressionKind, ObjectPatternProperty,
 };
 use crate::printer::comments::ValueGap;
 use crate::printer::comments::next_real_element_start;
@@ -160,7 +160,9 @@ impl<'a> Printer<'a> {
         let left_doc = self.build_shell_operand_doc(
             assign_span.start,
             assign.left,
-            ParenContext::AssignmentTarget,
+            ParenContext::AssignmentTarget {
+                operator: assign.operator,
+            },
         );
 
         // The VALUE is an assignment operand too, and prettier's call-object clause is
@@ -1567,7 +1569,13 @@ impl<'a> Printer<'a> {
             );
             self.prepend_owned_leading_comment_at(pattern.left.span.start, obj_doc)
         } else {
-            self.build_shell_operand_doc(span.start, pattern.left, ParenContext::AssignmentTarget)
+            self.build_shell_operand_doc(
+                span.start,
+                pattern.left,
+                ParenContext::AssignmentTarget {
+                    operator: AssignmentOperator::Assign,
+                },
+            )
         };
 
         let left_end = pattern.left.span().end;

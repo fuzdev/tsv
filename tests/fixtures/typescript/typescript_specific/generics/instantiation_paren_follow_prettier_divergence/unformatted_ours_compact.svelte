@@ -48,3 +48,4 @@ const q=1+fn<T>;
 	the bare spelling. -->
 {(fn<T>)<1}
 {(fn<T>)>=1}
+{(f<A<B>>)>=1}

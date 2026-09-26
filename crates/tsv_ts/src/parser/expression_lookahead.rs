@@ -30,18 +30,16 @@ fn is_arrow_close(bytes: &[u8], pos: usize) -> bool {
     pos > 0 && bytes[pos - 1] == b'='
 }
 
-/// `>` at `pos` is a `>=` comparison operator, but NOT `>=>` (close-angle +
-/// arrow) nor `>==` / `>===` (close-angle + `==`/`===`). The trailing-`=` and
-/// trailing-`>` carve-outs keep the `>` available as a type-argument close: a
-/// `>=` right after a would-be `<…>` close whose next byte is `=` or `>` can
-/// only be `>` + `==`/`===`/`=>` (never a real `>=` operand — `x >= = y` /
-/// `x >= > y` are nonsense), so acorn re-scans just the `>` and `f<T>==c` reads
-/// as `(f<T>) == c`.
+/// `>` at `pos` is a `>=` token rather than a type-argument close — every `>` an `=`
+/// follows, as tsc's re-scan reads it (`reScanGreaterToken`), so `f<T>==c` closes no list
+/// (`f < T >= = c`, a syntax error to tsc and to acorn-typescript alike). The one carve-out
+/// is `>=>`, a close glued to an arrow (`<T>(x): A<B>=> x`), which keeps its `>` as the
+/// close the type parser needs.
 #[inline]
 fn is_greater_equal_op(bytes: &[u8], pos: usize) -> bool {
     pos + 1 < bytes.len()
         && bytes[pos + 1] == b'='
-        && !(pos + 2 < bytes.len() && matches!(bytes[pos + 2], b'>' | b'='))
+        && !(pos + 2 < bytes.len() && bytes[pos + 2] == b'>')
 }
 
 /// A matched arrow head's byte extents, built by the parser's three head
@@ -678,8 +676,10 @@ pub(super) fn scan_angle_brackets(bytes: &[u8], pos: usize) -> usize {
 ///
 /// Returns `true` if a matching `>` is found before hitting an unbalanced
 /// `)`, `]`, `}`, or `;` at depth 0, and the close isn't followed by a token
-/// that makes the `>` a comparison instead: a `>`/`>>`/`>>>` (relational or
-/// shift) run, or an expression-starting token on the same line.
+/// that refuses the list: a `>`-led token (`>`, `>>`, `>>>`, `>>=`, `>>>=`, a lone
+/// `>=` only when glued), an `=` glued to the close (see
+/// [`type_args_close_is_joined_or_gt_followed`]), or an expression-starting token on the
+/// same line (`/=` included, as a regular expression's head).
 ///
 /// The follower half is the one the two readings disagree on. [`TypeArgScan::Relex`] asks
 /// about the REGION alone and stops at the matching `>`: past a line terminator the
@@ -687,15 +687,15 @@ pub(super) fn scan_angle_brackets(bytes: &[u8], pos: usize) -> usize {
 /// printer puts a break there is unknowable where the question is asked. (Which followers
 /// commit, for tsc and for acorn-typescript, is stated in `docs/conformance_prettier_ts.md`
 /// §Relational chain type-argument parens; where tsc refuses one this parse commits on,
-/// [`TypeArgScan`]'s soundness property is why the pair still stands.) The `>`-led run is
-/// NOT part of that half — a `>>` / `>>>` is one token the printer can never split, so both
+/// [`TypeArgScan`]'s soundness property is why the pair still stands.) The `>`-led token is
+/// NOT part of that half — a `>>` / `>>=` is one token the printer can never split, so both
 /// readings reject it.
 pub(super) fn scan_for_closing_angle_bracket(bytes: &[u8], pos: usize, scan: TypeArgScan) -> bool {
     match matching_angle_close(bytes, pos, scan) {
         None => false,
         Some(close) => {
             let after = skip_whitespace_and_comments(bytes, close + 1);
-            if type_args_close_run_follows(bytes, after) {
+            if type_args_close_is_joined_or_gt_followed(bytes, close + 1, after) {
                 return false;
             }
             // Past the `>`-led run, the follower is the half [`TypeArgScan::Relex`] skips.
@@ -705,21 +705,30 @@ pub(super) fn scan_for_closing_angle_bracket(bytes: &[u8], pos: usize, scan: Typ
     }
 }
 
-/// Whether the token at `after` — the first past a type-argument list's closing `>` — is a
-/// `>`-led run that makes that close the first `>` of a longer relational/shift token:
-/// acorn re-reads `a<b>>c` as `a < (b >> c)` and `a<b>>>c` as `a < (b >>> c)` (its
-/// `tsMatchRightRelational` / bitShift bail), never `(a<b>) > c`. The exception is a run
-/// closed by `=` (`>=` / `>>=`), which acorn keeps as an instantiation follow
-/// (`f<T> >= c` is `(f<T>) >= c`).
-fn type_args_close_run_follows(bytes: &[u8], after: usize) -> bool {
-    if bytes.get(after) != Some(&b'>') {
-        return false;
+/// Whether the token at `after` — the first past a type-argument list whose closing `>`
+/// ends at `close_end` — refuses the list by joining or following that `>`. Two rules,
+/// both tsc's:
+///
+/// - A `>` or `=` GLUED to the close means the close was never one: in an expression the
+///   longest punctuator swallows it (`reScanGreaterToken`), so `a<b>>c` is `a < (b >> c)` —
+///   acorn re-reads it the same way — `f<T>>= c` is `f < T >>= c`, a comparison assigned
+///   to, and `f<() => U>=c` leaves `() => U` nothing to be. The glued `=` reaches here only
+///   from a head that committed its list before the follower was read (a function type) or
+///   through `>=>`; [`is_greater_equal_op`] keeps every other `>=` from closing at all.
+/// - Past a gap, any `>`-led token disqualifies the list
+///   (`canFollowTypeArgumentsInExpression` — the close and the `>` would be ambiguous with
+///   a re-scanned `>>`): `f<T> > c`, `f<T> >> c`, `f<T> >>= c`, `f<T> >>>= c`.
+///
+/// The one exception is a spaced lone `>=`: acorn-typescript reads `f<T> >= c` as
+/// `(f<T>) >= c` where tsc refuses the list, and tsv keeps acorn's reading (the printer
+/// repairs it to the pair every parser reads alike). acorn also reads the list ahead of a
+/// spaced `>>=` / `>>>=`, but refuses that as an assignment target except inside a paren
+/// or a call argument list, where it skips the check; tsv follows tsc there.
+fn type_args_close_is_joined_or_gt_followed(bytes: &[u8], close_end: usize, after: usize) -> bool {
+    if after == close_end {
+        return matches!(bytes.get(after), Some(b'>' | b'='));
     }
-    let mut run = after;
-    while bytes.get(run) == Some(&b'>') {
-        run += 1;
-    }
-    bytes.get(run) != Some(&b'=')
+    bytes.get(after) == Some(&b'>') && bytes.get(after + 1) != Some(&b'=')
 }
 
 /// Whether the token at `after`, the first past a type-argument list that ended at
@@ -756,7 +765,7 @@ fn expression_follows_type_args_close(bytes: &[u8], close_end: usize, after: usi
 /// reads (`a < b > as`); a function-type head has none, so the compiler's reading is the
 /// only one there is.
 pub(super) fn type_args_follower_refuses(bytes: &[u8], close_end: usize, after: usize) -> bool {
-    if type_args_close_run_follows(bytes, after) {
+    if type_args_close_is_joined_or_gt_followed(bytes, close_end, after) {
         return true;
     }
     !(is_word_at(bytes, after, b"as") || is_word_at(bytes, after, b"satisfies"))
@@ -980,8 +989,10 @@ pub(super) fn matching_delimiter_close(bytes: &[u8], open: usize) -> Option<usiz
 /// operator. The question is about the TOKEN, not its first byte: `!=`, `+=` and
 /// `-=` share a byte with a prefix operator but start nothing. `(` (call) and
 /// `` ` `` (tagged template) continue the instantiation instead and are
-/// deliberately excluded; regex is excluded because acorn also rejects
-/// `x < y > /a/`.
+/// deliberately excluded; a `/`-led regex is excluded because acorn also rejects
+/// `x < y > /a/` (a `/` there is the division operator to both parsers) — except one
+/// opening `/=`, the head tsc's `isStartOfExpression` counts, since an assignment
+/// operator never continues a list the way a binary one does.
 fn starts_expression_after_type_args(bytes: &[u8], pos: usize) -> bool {
     if identifier_starts_at(bytes, pos) {
         // `in` and `instanceof` are binary keyword operators — acorn's `tt._in` /
@@ -1004,6 +1015,13 @@ fn starts_expression_after_type_args(bytes: &[u8], pos: usize) -> bool {
     // `f<T> += c` assigns to `f<T>`).
     if matches!(b, b'!' | b'+' | b'-') {
         return bytes.get(pos + 1) != Some(&b'=');
+    }
+    // `/=` is the one assignment operator that can also START an expression — as the head
+    // of a regular expression literal — so on the same line it refuses the list, as tsc's
+    // `isStartOfExpression` does (`f<T> /= c/g` is `(f < T) > /= c/g`, and `f<T> /= c` an
+    // unterminated literal). A bare `/` is a binary operator and continues the list.
+    if b == b'/' {
+        return bytes.get(pos + 1) == Some(&b'=');
     }
     b.is_ascii_digit()
         || matches!(b, b'\'' | b'"' | b'[' | b'{' | b'~')
