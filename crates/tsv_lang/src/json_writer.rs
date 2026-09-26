@@ -606,6 +606,49 @@ const STAGE_CAP: usize = 384;
 /// 16-byte moves reach 32 bytes. Every node type fits (the longest is 31).
 const SHORT_FRAGMENT_MAX: usize = 32;
 
+/// Copy `src` — at most [`SHORT_FRAGMENT_MAX`] bytes — to the front of `dst`
+/// as two overlapping fixed-width moves chosen by length class, where a
+/// `copy_from_slice` of a runtime length would be a libc `memcpy` call.
+///
+/// Each arm writes the source's first and last `K` bytes, which overlap (or
+/// meet) because `K <= n <= 2K` — so together they are the whole source, and
+/// `n <= SHORT_FRAGMENT_MAX` keeps both in `dst`. Bytes of `dst` past `n` are
+/// left as they were.
+///
+/// `inline(always)` because an out-of-line copy is the call this exists to
+/// avoid: its callers — [`JsonWriter::stage_short`] inside a staged run, and
+/// [`JsonWriter::string_escape_free_led`]'s call-free common path — each keep
+/// their state in registers only as long as no call is made.
+#[expect(clippy::inline_always)]
+#[inline(always)]
+fn copy_short(dst: &mut [u8; SHORT_FRAGMENT_MAX], src: &[u8]) {
+    let n = src.len();
+    if let (Some(head), Some(tail)) = (src.first_chunk::<16>(), src.last_chunk::<16>()) {
+        dst[..16].copy_from_slice(head);
+        dst[n - 16..n].copy_from_slice(tail);
+    } else if let (Some(head), Some(tail)) = (src.first_chunk::<8>(), src.last_chunk::<8>()) {
+        dst[..8].copy_from_slice(head);
+        dst[n - 8..n].copy_from_slice(tail);
+    } else if let (Some(head), Some(tail)) = (src.first_chunk::<4>(), src.last_chunk::<4>()) {
+        dst[..4].copy_from_slice(head);
+        dst[n - 4..n].copy_from_slice(tail);
+    } else if let (Some(head), Some(tail)) = (src.first_chunk::<2>(), src.last_chunk::<2>()) {
+        dst[..2].copy_from_slice(head);
+        dst[n - 2..n].copy_from_slice(tail);
+    } else if let Some(&byte) = src.first() {
+        dst[0] = byte;
+    }
+}
+
+/// The widest string [`JsonWriter::string_escape_free_led`] copies inline,
+/// between its two quotes.
+const ESCAPE_FREE_WINDOW: usize = SHORT_FRAGMENT_MAX + 2;
+
+/// [`JsonWriter::string_escape_free_led`]'s window: [`ESCAPE_FREE_WINDOW`]
+/// behind a lead of up to 14 bytes (`,"name":` is 8), rounded to three
+/// 16-byte stores of the fill.
+const LED_ESCAPE_FREE_WINDOW: usize = 48;
+
 impl JsonWriter {
     /// A fresh writer over a buffer pre-sized to `cap` bytes.
     #[inline]
@@ -728,24 +771,7 @@ impl JsonWriter {
             self.stage_raw_cold(s);
             return;
         };
-        // Each arm writes the fragment's first and last `K` bytes, which
-        // overlap (or meet) because `K <= n <= 2K` — so together they are the
-        // whole fragment, and `n <= SHORT_FRAGMENT_MAX` keeps both in `dst`.
-        if let (Some(head), Some(tail)) = (src.first_chunk::<16>(), src.last_chunk::<16>()) {
-            dst[..16].copy_from_slice(head);
-            dst[n - 16..n].copy_from_slice(tail);
-        } else if let (Some(head), Some(tail)) = (src.first_chunk::<8>(), src.last_chunk::<8>()) {
-            dst[..8].copy_from_slice(head);
-            dst[n - 8..n].copy_from_slice(tail);
-        } else if let (Some(head), Some(tail)) = (src.first_chunk::<4>(), src.last_chunk::<4>()) {
-            dst[..4].copy_from_slice(head);
-            dst[n - 4..n].copy_from_slice(tail);
-        } else if let (Some(head), Some(tail)) = (src.first_chunk::<2>(), src.last_chunk::<2>()) {
-            dst[..2].copy_from_slice(head);
-            dst[n - 2..n].copy_from_slice(tail);
-        } else if let Some(&byte) = src.first() {
-            dst[0] = byte;
-        }
+        copy_short(dst, src);
         self.stage_len = at + n;
     }
 
@@ -957,6 +983,91 @@ impl JsonWriter {
         }
         self.buf.push(b'"');
         self.buf.extend_from_slice(s.as_bytes());
+        self.buf.push(b'"');
+    }
+
+    /// A dynamic string value the **caller** guarantees needs no escape,
+    /// quoted, behind the constant fragment `lead` — byte-identical to
+    /// `raw(lead)` then [`JsonWriter::string`] on such input, without the
+    /// prescan `string` runs on every call. `lead` is the field's key
+    /// (`,"name":`), and may be empty.
+    ///
+    /// For an identifier name read from source: an `IdentifierName` holds only
+    /// `ID_Start` / `ID_Continue` characters, `$`, ZWNJ and ZWJ, and none of
+    /// them is `"`, `\` or a control byte, so the scan can only answer
+    /// "clean". The bytes are taken as a slice rather than a `&str` so the
+    /// caller's source slice needs no char-boundary checks; it must still be
+    /// whole UTF-8, and debug builds assert both claims.
+    ///
+    /// Up to [`SHORT_FRAGMENT_MAX`] bytes — nearly every name — the write is
+    /// one fixed-width append: a window of quotes, `lead` stored over its front
+    /// (a fixed-width move, `K` being part of the type), the string laid after
+    /// the opening quote by [`copy_short`]'s two overlapping moves, and a
+    /// `truncate` past the closing quote, which the window already holds. So
+    /// both quotes are part of the fill, the key costs one store, and no libc
+    /// `memcpy` call is made for a runtime length.
+    ///
+    /// ⚠️ The common path makes **no call**, and that is load-bearing: a grow
+    /// or a long string leaves by a tail call to a cold body that does the whole
+    /// write, so no value is live across a call and the write keeps nothing in a
+    /// callee-saved register — with the grow inline (the `Vec` append's own
+    /// reserve), every name paid five register saves and restores around a
+    /// thirty-instruction body. `inline(always)` so the body lands at each call
+    /// site rather than behind a jump: a caller that wants one shared copy
+    /// outlines its own wrapper (`tsv_ts`'s name field), and a caller writing a
+    /// different key inlines another (`tsv_ts`'s literal `raw`).
+    #[expect(clippy::inline_always, clippy::expect_used)]
+    #[inline(always)]
+    pub fn string_escape_free_led<const K: usize>(&mut self, lead: &[u8; K], bytes: &[u8]) {
+        const { assert!(K + ESCAPE_FREE_WINDOW <= LED_ESCAPE_FREE_WINDOW) };
+        debug_assert!(
+            !needs_escape(bytes) && core::str::from_utf8(bytes).is_ok(),
+            "string_escape_free_led takes escape-free UTF-8: {:?}",
+            String::from_utf8_lossy(bytes)
+        );
+        let n = bytes.len();
+        if n > SHORT_FRAGMENT_MAX {
+            self.string_escape_free_long(lead, bytes);
+            return;
+        }
+        let base = self.buf.len();
+        if self.buf.capacity() - base < LED_ESCAPE_FREE_WINDOW {
+            self.string_escape_free_grow(lead, bytes);
+            return;
+        }
+        self.buf.extend_from_slice(&[b'"'; LED_ESCAPE_FREE_WINDOW]);
+        let window = self
+            .buf
+            .last_chunk_mut::<LED_ESCAPE_FREE_WINDOW>()
+            .expect("the window was just appended");
+        window[..K].copy_from_slice(lead);
+        let inner = window[K + 1..]
+            .first_chunk_mut::<SHORT_FRAGMENT_MAX>()
+            .expect("the window holds the lead and the widest inline string between its quotes");
+        copy_short(inner, bytes);
+        self.buf.truncate(base + K + n + 2);
+    }
+
+    /// [`JsonWriter::string_escape_free_led`] with the buffer too full for its
+    /// window: grow it, then write. Out of line and whole — the write included —
+    /// so the common path makes no call and keeps no value live across one,
+    /// and needs no callee-saved register at all.
+    #[cold]
+    #[inline(never)]
+    fn string_escape_free_grow<const K: usize>(&mut self, lead: &[u8; K], bytes: &[u8]) {
+        self.buf.reserve(LED_ESCAPE_FREE_WINDOW);
+        self.string_escape_free_led(lead, bytes);
+    }
+
+    /// [`JsonWriter::string_escape_free_led`] past the inline width — a string
+    /// longer than [`SHORT_FRAGMENT_MAX`] bytes, which few names are.
+    #[cold]
+    #[inline(never)]
+    fn string_escape_free_long<const K: usize>(&mut self, lead: &[u8; K], bytes: &[u8]) {
+        self.raw_fixed(lead);
+        self.buf.reserve(bytes.len() + 2);
+        self.buf.push(b'"');
+        self.buf.extend_from_slice(bytes);
         self.buf.push(b'"');
     }
 
@@ -1378,6 +1489,62 @@ mod tests {
                 String::from_utf8_lossy(&theirs)
             );
         }
+    }
+
+    /// [`JsonWriter::string_escape_free_led`] against `serde_json` and against
+    /// `raw(lead)` + [`JsonWriter::string`], over every escape-parity case that
+    /// holds no byte `serde_json` escapes — the per-byte predicate, not
+    /// [`needs_escape`], so the set is not defined by the scan the write skips
+    /// — each behind a prefix of every length to 16, so the window lands at
+    /// every alignment of the buffer, with an empty lead and a real key. The
+    /// cases carry each multi-byte width at every offset of every length to
+    /// 40, so each copy class (one to three bytes, the 4-, 8- and 16-byte
+    /// pairs) is driven at every length it covers and at every boundary
+    /// between two of them, and past [`SHORT_FRAGMENT_MAX`] into the long arm —
+    /// each into a buffer that must grow for the window and one that need not.
+    #[test]
+    fn string_escape_free_led_matches_string_on_clean_input() {
+        fn grade<const K: usize>(lead: &[u8; K], clean: &[String]) {
+            let lead_str = core::str::from_utf8(lead).expect("the lead is UTF-8");
+            // A writer with no spare room takes the grow path on every call; one
+            // with room to spare takes the window.
+            for (cap, prefix) in [0, 256]
+                .into_iter()
+                .flat_map(|c| (0..=16).map(move |p| (c, p)))
+            {
+                let front = "{".repeat(prefix);
+                for case in clean {
+                    let mut ours = JsonWriter::with_capacity(cap);
+                    ours.raw(&front);
+                    ours.string_escape_free_led(lead, case.as_bytes());
+                    ours.raw("}");
+                    let mut theirs = JsonWriter::with_capacity(0);
+                    theirs.raw(&front);
+                    theirs.raw(lead_str);
+                    theirs.string(case);
+                    theirs.raw("}");
+                    let (ours, theirs) = (ours.into_bytes(), theirs.into_bytes());
+                    assert_eq!(ours, theirs, "string_escape_free_led broke on {case:?}");
+                    let serde = serde_json::to_vec(case).expect("serde_json serializes a str");
+                    assert_eq!(
+                        &ours[prefix + K..ours.len() - 1],
+                        &serde[..],
+                        "serde parity on {case:?}"
+                    );
+                }
+            }
+        }
+        let clean: Vec<String> = escape_cases()
+            .into_iter()
+            .filter(|c| c.bytes().all(|b| b >= 0x20 && b != b'"' && b != b'\\'))
+            .collect();
+        assert!(
+            clean.iter().any(|c| c.len() > SHORT_FRAGMENT_MAX),
+            "the long arm must be driven"
+        );
+        grade(b"", &clean);
+        grade(b",\"name\":", &clean);
+        grade(b",\"abcdefghij\":", &clean);
     }
 
     /// The escape-parity case set `string_matches_serde_json` grades.

@@ -10,7 +10,7 @@ use super::types::{
 };
 use super::{
     Ctx, JsonWriter, close_node, node_header, write_array, write_function_flags_fields,
-    write_identifier_plain, write_identifier_with_optional, write_name, write_or_null,
+    write_identifier_plain, write_identifier_with_optional, write_name_field, write_or_null,
     write_return_type_field, write_type_annotation_field, write_type_parameters_field,
 };
 use tsv_lang::Span;
@@ -551,8 +551,7 @@ pub(super) fn write_type_parameter(
         w.raw(modifier.as_str());
         w.raw("\":true");
     }
-    w.raw(",\"name\":");
-    write_name(w, param.name.ident_name(), param.name.span.start, ctx);
+    write_name_field(w, param.name.ident_name(), param.name.span.start, ctx);
     if let Some(c) = &param.constraint {
         w.raw(",\"constraint\":");
         write_type(w, c, ctx);
