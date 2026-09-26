@@ -1,0 +1,198 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 588,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 171,
+				"data": "\n\tText after a glued nested `<script>` fills from the closing tag's line: the glued boundaries\n\tstay intact, and the text wraps at print width like any other fill.\n"
+			},
+			{
+				"type": "Text",
+				"start": 171,
+				"end": 173,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 173,
+				"end": 254,
+				"data": " the line after the closing tag is exactly 100 wide: it stays on one line "
+			},
+			{
+				"type": "Text",
+				"start": 254,
+				"end": 255,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 255,
+				"end": 391,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 256
+					},
+					"end": {
+						"line": 7,
+						"column": 2,
+						"character": 257
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 258,
+							"end": 265,
+							"raw": "\n\ttext1",
+							"data": "\n\ttext1"
+						},
+						{
+							"type": "RegularElement",
+							"start": 265,
+							"end": 297,
+							"name": "script",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 7,
+									"character": 266
+								},
+								"end": {
+									"line": 8,
+									"column": 13,
+									"character": 272
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 273,
+										"end": 288,
+										"type": "Text",
+										"data": "\n\t\tlet a = 1;\n\t",
+										"raw": "\n\t\tlet a = 1;\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 297,
+							"end": 387,
+							"raw": "text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14 tttttt\n",
+							"data": "text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14 tttttt\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 391,
+				"end": 393,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 393,
+				"end": 448,
+				"data": " one character wider (101): the last word wraps "
+			},
+			{
+				"type": "Text",
+				"start": 448,
+				"end": 449,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 449,
+				"end": 587,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 1,
+						"character": 450
+					},
+					"end": {
+						"line": 14,
+						"column": 2,
+						"character": 451
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 452,
+							"end": 459,
+							"raw": "\n\ttext1",
+							"data": "\n\ttext1"
+						},
+						{
+							"type": "RegularElement",
+							"start": 459,
+							"end": 491,
+							"name": "script",
+							"name_loc": {
+								"start": {
+									"line": 15,
+									"column": 7,
+									"character": 460
+								},
+								"end": {
+									"line": 15,
+									"column": 13,
+									"character": 466
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 467,
+										"end": 482,
+										"type": "Text",
+										"data": "\n\t\tlet b = 2;\n\t",
+										"raw": "\n\t\tlet b = 2;\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 491,
+							"end": 583,
+							"raw": "text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14\n\tttttttt\n",
+							"data": "text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14\n\tttttttt\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

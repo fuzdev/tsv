@@ -1,0 +1,188 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 362,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 189,
+				"data": "\n\tA frozen nested `<script>` / `<style>` glued to content on both sides keeps both glued\n\tboundaries: the boundary after it is the one it gets unfrozen, and unfrozen it stays glued.\n"
+			},
+			{
+				"type": "Text",
+				"start": 189,
+				"end": 191,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 191,
+				"end": 269,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 6,
+						"column": 1,
+						"character": 192
+					},
+					"end": {
+						"line": 6,
+						"column": 4,
+						"character": 195
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 196,
+							"end": 203,
+							"raw": "\n\ttext1",
+							"data": "\n\ttext1"
+						},
+						{
+							"type": "Comment",
+							"start": 203,
+							"end": 227,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "RegularElement",
+							"start": 227,
+							"end": 257,
+							"name": "script",
+							"name_loc": {
+								"start": {
+									"line": 7,
+									"column": 31,
+									"character": 228
+								},
+								"end": {
+									"line": 7,
+									"column": 37,
+									"character": 234
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 235,
+										"end": 248,
+										"type": "Text",
+										"data": "let  a  =  1;",
+										"raw": "let  a  =  1;"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 257,
+							"end": 263,
+							"raw": "text2\n",
+							"data": "text2\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 269,
+				"end": 271,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 271,
+				"end": 361,
+				"test": {
+					"type": "Identifier",
+					"start": 276,
+					"end": 280,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 5
+						},
+						"end": {
+							"line": 10,
+							"column": 9
+						}
+					},
+					"name": "cond"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 281,
+							"end": 288,
+							"raw": "\n\ttext3",
+							"data": "\n\ttext3"
+						},
+						{
+							"type": "Comment",
+							"start": 288,
+							"end": 312,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "RegularElement",
+							"start": 312,
+							"end": 350,
+							"name": "style",
+							"name_loc": {
+								"start": {
+									"line": 11,
+									"column": 31,
+									"character": 313
+								},
+								"end": {
+									"line": 11,
+									"column": 36,
+									"character": 318
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 319,
+										"end": 342,
+										"type": "Text",
+										"data": "div  {  color:  red;  }",
+										"raw": "div  {  color:  red;  }"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 350,
+							"end": 356,
+							"raw": "text4\n",
+							"data": "text4\n"
+						}
+					]
+				},
+				"alternate": null
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

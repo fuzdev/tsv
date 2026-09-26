@@ -737,71 +737,6 @@ impl<'a> Printer<'a> {
             && self.sibling_newline_flows(nodes, content)
     }
 
-    /// Whether the node at `i` is glued to the nearest **content** before (`prev`) or after
-    /// it — the neighbour the compiler's whitespace rules actually see, which is what decides
-    /// whether breaking there would inject a rendered space.
-    ///
-    /// Four things make a neighbour not-content. Three are the compiler's own answer: a
-    /// **hoisted** sibling vanishes from those rules, so the scan steps over it (a run of
-    /// `{@const}`s is not glued to itself — stepping over hoisted neighbours can only end at a
-    /// text, whose edges answer, or at the fragment edge, which is not content). "Hoisted" is the
-    /// compiler's WHOLE list here ([`internal::FragmentNode::is_compiler_hoisted`]), the four
-    /// global `svelte:*` elements included — the trim readers' narrower set leaves them out for a
-    /// layout reason that is no answer to this question, and asking it made the scan stop at a
-    /// global element as at a block one, so `a{const x = 1}<svelte:window />b` split around both.
-    /// Further: a
-    /// **whitespace-only** text is the separator, not the content; and a content **text** counts
-    /// only when its facing edge carries no collapsible whitespace, since that whitespace is the
-    /// separator instead. The fourth is the default display's: a **block element** owns its own
-    /// line ([`Self::owns_own_line`]), so the boundary beside it is a break whatever the author
-    /// wrote, and whitespace at a block-level boundary is not rendered under the default display
-    /// of a block box (a closed `<dialog>` or a nested `<style>` / `<script>` renders no box — the
-    /// known exception; the four global `svelte:*` elements, block-classified too, never reach
-    /// this arm, since the hoist arm above steps over them). Anything else is content and glues.
-    ///
-    /// The block-element answer is what keeps the declaration's own line a one-pass fixed point:
-    /// the layout must not read a signal its own output rewrites. Counted as glued content, a
-    /// block element made `<div>{y}</div>{@const z = 1}t` glued on both sides, so pass 1 gave the
-    /// block element its own line and kept `{@const z = 1}t` glued; pass 2 read the declaration as
-    /// glued on one side only and split the `t` off onto a line of its own.
-    ///
-    /// ⚠️ There is deliberately **no byte-adjacency test** here, and adding one was a render
-    /// bug. Sibling spans tile every fragment except the ROOT, where `<script>` / `<style>` /
-    /// `<svelte:options>` are lifted out of `Fragment::nodes` and leave a byte gap — but the
-    /// compiler removes exactly those before its whitespace rules run, so the survivors around
-    /// the gap are adjacent to it: `a<script>…</script>{const y = 2}b` renders `ab`, and a
-    /// break injected at the gap is a rendered space. A real separator always materializes as
-    /// its own whitespace text node (or a text's own edge), which the arms above answer — a
-    /// byte gap between consecutive fragment nodes is never render-whitespace. Pinned by
-    /// [root_script_gap](../../../../../tests/fixtures/svelte/tags/root_script_gap/).
-    fn glued_to_content(&self, nodes: &[FragmentNode<'_>], i: usize, before: bool) -> bool {
-        let mut cur = i;
-        loop {
-            let neighbor = if before {
-                cur.checked_sub(1)
-            } else {
-                Some(cur + 1).filter(|j| *j < nodes.len())
-            };
-            let Some(j) = neighbor else { return false };
-            match &nodes[j] {
-                FragmentNode::Text(t) if t.is_collapsible_ws_only => return false,
-                FragmentNode::Text(t) => {
-                    // The neighbour's FACING edge, so the directions invert: scanning backward we
-                    // ask about that text's trailing edge, forward about its leading one.
-                    let raw = t.raw(self.source);
-                    return if before {
-                        Self::text_glued_after(raw)
-                    } else {
-                        Self::text_glued_before(raw)
-                    };
-                }
-                n if n.is_compiler_hoisted() => cur = j,
-                n if self.is_block_element_node(n) => return false,
-                _ => return true,
-            }
-        }
-    }
-
     /// Whether the node at `i` **owns its own line** in a multiline fragment — a block element
     /// (via `handle_block_child`) or a declaration tag (via [`Self::handle_own_line_tag`]).
     ///
@@ -837,24 +772,44 @@ impl<'a> Printer<'a> {
             && self.glued_to_content(nodes, i, false)
     }
 
+    /// Whether `node` is a nested `<script>` / `<style>` that is block-classified — one with a
+    /// body ([`Self::is_block_element`]'s raw-text overlay) — and so renders **no box** while the
+    /// printer would otherwise give it a line of its own. (An empty one is already inline.)
+    ///
+    /// The UA stylesheet gives both `display: none`, so the whitespace on either side of one stays
+    /// in the same inline formatting context: `a<script>…</script>b` renders `ab`, and a break on
+    /// either side renders a space. The block-boundary licence a block box earns does not reach
+    /// it.
+    pub(super) fn is_boxless_raw_text_element(&self, node: &FragmentNode<'_>) -> bool {
+        matches!(node, FragmentNode::Element(el)
+            if (el.facts.is_script() || el.facts.is_style()) && self.is_block_element(el))
+    }
+
+    /// Whether the block-classified node at `i` does not own a block line there: a
+    /// [global element glued on both sides](Self::is_glued_global_element) or a
+    /// [nested `<script>` / `<style>` that keeps its glue](Self::is_glued_raw_text_element).
+    pub(super) fn is_glued_block_exception(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+        self.is_glued_global_element(nodes, i) || self.is_glued_raw_text_element(nodes, i)
+    }
+
     /// [`Self::is_block_element_node`] asked of the node at `i` in its sibling list — the same
     /// answer, except for a [global element glued on both sides](Self::is_glued_global_element),
     /// which does not own a block line there.
     pub(super) fn is_block_element_at(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
-        self.is_block_element_node(&nodes[i]) && !self.is_glued_global_element(nodes, i)
+        self.is_block_element_node(&nodes[i]) && !self.is_glued_block_exception(nodes, i)
     }
 
     /// [`Self::is_block_fragment_node`] asked of the node at `i` in its sibling list — see
     /// [`Self::is_block_element_at`].
     pub(super) fn is_block_fragment_at(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
-        self.is_block_fragment_node(&nodes[i]) && !self.is_glued_global_element(nodes, i)
+        self.is_block_fragment_node(&nodes[i]) && !self.is_glued_block_exception(nodes, i)
     }
 
     /// [`Self::is_inline_el_or_comp`] asked of the node at `i` in its sibling list: also true for
     /// a [global element glued on both sides](Self::is_glued_global_element), which flows as an
     /// inline element does.
     pub(super) fn is_inline_el_or_comp_at(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
-        self.is_inline_el_or_comp(&nodes[i]) || self.is_glued_global_element(nodes, i)
+        self.is_inline_el_or_comp(&nodes[i]) || self.is_glued_block_exception(nodes, i)
     }
 
     /// Whether `nodes` holds a declaration that owns its line — the fragment then cannot

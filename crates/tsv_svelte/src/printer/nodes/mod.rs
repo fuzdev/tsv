@@ -7,6 +7,7 @@
 // printer (the root-fragment renderer lives in `crate::printer::mod`).
 //
 // - **fragment_doc.rs** - Core doc-based fragment formatting (sibling walk, node dispatch)
+// - **fragment_boxless.rs** - Nested `<script>` / `<style>` glue analysis (per-fragment flags, edge index)
 // - **fragment_glue_doc.rs** - Byte-glue predicates + glued/welded run docs (unbreakable units)
 // - **fragment_text_doc.rs** - Text-child handling + word-fill doc construction
 // - **blocks_doc.rs** - Doc-based formatting for control flow blocks ({#if}, {#each}, etc.)
@@ -21,6 +22,7 @@ mod blocks_doc;
 mod element_analysis;
 mod element_doc;
 mod element_ws_sensitive_doc;
+mod fragment_boxless;
 mod fragment_doc;
 mod fragment_glue_doc;
 mod fragment_text_doc;
@@ -29,6 +31,7 @@ mod special_doc;
 mod tags_doc;
 
 // Shared with the root-fragment printer (`crate::printer::mod`) for run detection.
+pub(crate) use fragment_boxless::{EdgeFree, FragmentGlue};
 pub(crate) use helpers::is_control_flow_block;
 
 // Shared with the `<svelte:options>` printer (`crate::printer::mod`) — the one tag head

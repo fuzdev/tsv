@@ -1,0 +1,198 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 426,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 256,
+				"data": "\n\tA nested `<script>` / `<style>` whose body stays as written — a body that fails its parse, or\n\tone that formats to nothing — glued to content on both sides: both glued boundaries are kept,\n\tand with no body line to break the element stays inline.\n"
+			},
+			{
+				"type": "Text",
+				"start": 256,
+				"end": 258,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 258,
+				"end": 300,
+				"data": " a style body that fails its parse "
+			},
+			{
+				"type": "Text",
+				"start": 300,
+				"end": 301,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 301,
+				"end": 341,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 302
+					},
+					"end": {
+						"line": 8,
+						"column": 2,
+						"character": 303
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 304,
+							"end": 309,
+							"raw": "text1",
+							"data": "text1"
+						},
+						{
+							"type": "RegularElement",
+							"start": 309,
+							"end": 332,
+							"name": "style",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 9,
+									"character": 310
+								},
+								"end": {
+									"line": 8,
+									"column": 14,
+									"character": 315
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 316,
+										"end": 324,
+										"type": "Text",
+										"data": "$c: red;",
+										"raw": "$c: red;"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 332,
+							"end": 337,
+							"raw": "text2",
+							"data": "text2"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 341,
+				"end": 343,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 343,
+				"end": 389,
+				"data": " a script body that formats to nothing "
+			},
+			{
+				"type": "Text",
+				"start": 389,
+				"end": 390,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 390,
+				"end": 425,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 11,
+						"column": 1,
+						"character": 391
+					},
+					"end": {
+						"line": 11,
+						"column": 2,
+						"character": 392
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 393,
+							"end": 398,
+							"raw": "text1",
+							"data": "text1"
+						},
+						{
+							"type": "RegularElement",
+							"start": 398,
+							"end": 416,
+							"name": "script",
+							"name_loc": {
+								"start": {
+									"line": 11,
+									"column": 9,
+									"character": 399
+								},
+								"end": {
+									"line": 11,
+									"column": 15,
+									"character": 405
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 406,
+										"end": 407,
+										"type": "Text",
+										"data": ";",
+										"raw": ";"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 416,
+							"end": 421,
+							"raw": "text2",
+							"data": "text2"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
