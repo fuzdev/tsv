@@ -44,46 +44,17 @@ pub(crate) fn is_nested_rule_start(parser: &CssParser<'_, '_>) -> Result<bool, P
             // permits any token sequence with balanced `()` / `[]` / `{}` — including
             // a top-level `{...}` block. Without this short-circuit, `--foo: { ... }`
             // would misclassify as a type-selector + pseudo-class.
-            if parser.current_identifier().starts_with("--") {
+            if parser.current_identifier_is_custom_property() {
                 return Ok(false);
             }
-            // Peek past whitespace and comments to find the significant next token. A `:`
-            // is settled from the bytes — a property name is followed by one, so this is
-            // the path nearly every block child takes.
-            let next_kind = super::decl_scan::peek_significant_kind(parser)?;
-            match next_kind {
-                // Colon after identifier - ambiguous: could be declaration (`color: red`)
-                // or nested rule with pseudo-class (`span:hover { }`)
-                // Need deeper lookahead to disambiguate
-                TokenKind::Colon => is_type_selector_with_pseudo(parser),
-                // Left brace after identifier = nested rule (e.g., "div {")
-                TokenKind::LeftBrace => Ok(true),
-                // Selector tokens after identifier = nested rule
-                TokenKind::Dot | TokenKind::Hash | TokenKind::LeftBracket => Ok(true),
-                // Other tokens - likely nested rule
-                _ => Ok(true),
-            }
+            // Look ahead past whitespace and comments: a `:` there may still be a declaration
+            // (`color: red`) or a nested rule with a pseudo-class (`span:hover { }`), told apart
+            // by a deeper scan; anything else (`div {`, `a.b`, `a#b`, `a[b]`) opens a rule.
+            super::decl_scan::identifier_child_is_rule(parser)
         }
 
         _ => Ok(false),
     }
-}
-
-/// Disambiguate `Identifier` + `Colon` between declaration and nested rule.
-///
-/// Examples:
-/// - `color: red;` or `color:red;` → declaration (ends with `;`)
-/// - `span:hover { }` → nested rule (ends with `{`)
-/// - `filter:blur(5px);` → declaration (function value, ends with `;`)
-/// - `span:not(:last-child)::after { }` → nested rule (ends with `{`)
-///
-/// Scans forward from after the identifier, skipping parenthesized groups, until it finds
-/// `{` (nested rule) or `;`/`}` (declaration). For a declaration that means walking the whole
-/// value — so `decl_scan` walks it as bytes (keeping an equivalent token walk as its fallback
-/// and its debug-time oracle) and, in that one pass, also collects the value facts, which it
-/// stashes on the parser for `parse_declaration` to reuse rather than re-scan.
-fn is_type_selector_with_pseudo(parser: &CssParser<'_, '_>) -> Result<bool, ParseError> {
-    super::decl_scan::scan_rule_or_declaration(parser, parser.current_end())
 }
 
 /// Parse a CSS rule: `selector { property: value; }`

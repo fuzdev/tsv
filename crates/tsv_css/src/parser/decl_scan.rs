@@ -233,12 +233,19 @@ enum Disambiguation {
 /// token would run on through, putting the value's start past where this scan stopped. An
 /// unterminated comment declines too, leaving the lexer its error.
 pub(super) fn scan_declaration_head_bytes(bytes: &[u8], from: usize) -> Option<DeclarationHead> {
-    let len = bytes.len();
-    // To the `:`. Anything else declines to the token head rather than guess: the
-    // disambiguation caller has settled that a `:` follows, so another byte there means the
-    // bytes disagree with its lookahead, and for a custom property it is the token head's
-    // own missing-colon error to raise.
+    // To the `:`. Anything else declines to the token head rather than guess: for a custom
+    // property it is the token head's own missing-colon error to raise.
     let (colon, gap_comment) = colon_after_trivia(bytes, from)?;
+    head_after_colon(bytes, colon, gap_comment)
+}
+
+/// The declaration head's second half: from the `:` at `colon` (the property→colon gap
+/// already walked, `gap_comment` its answer) across ASCII whitespace to the value's first
+/// byte. `None` where [`scan_declaration_head_bytes`] declines past the colon: a non-ASCII
+/// value start.
+#[inline]
+fn head_after_colon(bytes: &[u8], colon: usize, gap_comment: bool) -> Option<DeclarationHead> {
+    let len = bytes.len();
     // Whitespace only after the `:` — a comment here opens the value.
     let mut i = colon + 1;
     while i < len && is_ascii_css_whitespace(bytes[i]) {
@@ -255,17 +262,20 @@ pub(super) fn scan_declaration_head_bytes(bytes: &[u8], from: usize) -> Option<D
 }
 
 /// Disambiguate `identifier :` between a nested rule and a declaration, and — for a
-/// declaration — collect its head and `ValueFacts` in the same walk.
+/// declaration — collect its `ValueFacts` in the same walk.
 ///
-/// `from` is just past the identifier; the caller's `peek_significant_kind` has already
-/// established the next significant token is `:`. Phase one is the declaration head
-/// ([`scan_declaration_head_bytes`]), skipping to the value's first byte exactly as the
-/// parser does. Phase two is the shared value loop with the verdict latch on: it stops at the
-/// first paren-depth-0 `{` (a rule) and otherwise runs the value to its terminator, so the
-/// one walk answers both questions. `None` declines — exactly as the value byte scan does,
-/// for the same reasons — and hands the verdict back to `scan_rule_or_declaration_tokens`.
-fn scan_rule_or_declaration_and_value_bytes(source: &str, from: usize) -> Option<Disambiguation> {
-    let head = scan_declaration_head_bytes(source.as_bytes(), from)?;
+/// Phase one, the declaration head, is the caller's: [`identifier_child_is_rule`] has walked
+/// the property→colon gap to learn that a `:` follows the name, and the head that walk ends in
+/// is taken on from its `:` ([`head_after_colon`]) rather than walked again. Phase two is the
+/// shared value loop with the verdict latch on: it stops at the first paren-depth-0 `{` (a
+/// rule) and otherwise runs the value to its terminator, so the one walk answers both
+/// questions. `None` declines —
+/// exactly as the value byte scan does, for the same reasons — and hands the verdict back to
+/// `scan_rule_or_declaration_tokens`.
+fn scan_rule_or_declaration_and_value_bytes(
+    source: &str,
+    head: DeclarationHead,
+) -> Option<Disambiguation> {
     match scan_value_core::<true>(source, head.value_start)? {
         ValueScanOutcome::Rule => Some(Disambiguation::Rule),
         ValueScanOutcome::Value(facts, class) => {
@@ -283,12 +293,19 @@ fn scan_rule_or_declaration_and_value_bytes(source: &str, from: usize) -> Option
 /// the test suite proves the equivalence. A declaration's head and facts are stashed on the
 /// parser for `parse_declaration` to take instead of lexing its head and re-scanning its
 /// value; a rule (or a decline) clears the stash.
-pub(super) fn scan_rule_or_declaration(
+///
+/// `from` is just past the identifier, and `colon` / `gap_comment` are where and how the
+/// gap walk from there found the `:`. The byte head's second half runs here
+/// ([`head_after_colon`]); its decline declines the byte scan outright.
+fn scan_rule_or_declaration(
     parser: &CssParser<'_, '_>,
     from: usize,
+    colon: usize,
+    gap_comment: bool,
 ) -> Result<bool, ParseError> {
     let source = parser.source();
-    match scan_rule_or_declaration_and_value_bytes(source, from) {
+    let head = head_after_colon(source.as_bytes(), colon, gap_comment);
+    match head.and_then(|head| scan_rule_or_declaration_and_value_bytes(source, head)) {
         Some(outcome) => {
             let is_rule = matches!(outcome, Disambiguation::Rule);
             #[cfg(debug_assertions)]
@@ -321,13 +338,18 @@ pub(super) fn scan_rule_or_declaration(
             });
             Ok(is_rule)
         }
-        None => {
-            // The byte scan declined; `parse_declaration` lexes its head and scans the value
-            // itself.
-            parser.stash_declaration(None);
-            scan_rule_or_declaration_tokens(source, parser.base_offset(), from)
-        }
+        None => rule_or_declaration_by_tokens(parser, from),
     }
+}
+
+/// The rule-or-declaration verdict where the byte scan declined: the token walk, with the
+/// stash cleared, so `parse_declaration` lexes its head and scans the value itself.
+fn rule_or_declaration_by_tokens(
+    parser: &CssParser<'_, '_>,
+    from: usize,
+) -> Result<bool, ParseError> {
+    parser.stash_declaration(None);
+    scan_rule_or_declaration_tokens(parser.source(), parser.base_offset(), from)
 }
 
 /// The reference: the disambiguation as a token walk, on its own lexer.
@@ -358,33 +380,76 @@ fn scan_rule_or_declaration_tokens(
     }
 }
 
-/// The kind of the next significant token after `from`, when the bytes settle it.
+/// Whether the identifier-led block child at the current token — a name that is not a
+/// custom property's — opens a nested rule rather than a declaration.
 ///
-/// Every block child that starts with an identifier asks this once, and asks it only to
-/// learn whether a `:` follows the name — `color` is a property, `span` is a type selector,
-/// and the colon is the whole difference. So a `:` is the one kind recognized here:
-/// whitespace and comments are trivia and get skipped, and **everything else declines**
-/// (`None`), including bytes whose token is perfectly obvious.
+/// `color` is a property and `span` a type selector, and whether a `:` follows the name is
+/// the whole difference: so the property→colon gap is walked once ([`colon_after_trivia`]),
+/// and a `:` found there is where the rule-or-declaration scan's declaration head goes on
+/// from ([`head_after_colon`]), rather than a second walk of the same gap locating it again.
+/// A property name is followed by a `:`, so this is the path nearly every block child takes.
+/// With a `:` the child is still ambiguous — `color: red;` against `span:hover { }` — and
+/// [`scan_rule_or_declaration`] settles it by walking on to the first paren-depth-0 `{`
+/// (a rule) or `;`/`}` (a declaration).
 ///
-/// Declining on the negative is deliberate. It costs one short whitespace scan on the rarer
-/// nested-rule child, and it buys the property the rest of this module rests on: the scan
-/// never has to *reject*, so a lexer error stays `peek_past_boundary_whitespace`'s alone,
+/// Only the `:` is recognized from the bytes: whitespace and comments are trivia and get
+/// skipped, and **everything else declines**, including bytes whose token is perfectly
+/// obvious. Declining on the negative is deliberate. It costs one short whitespace scan on
+/// the rarer nested-rule child, and it buys the property the rest of this module rests on:
+/// the scan never has to *reject*, so a lexer error stays
+/// [`peek_past_boundary_whitespace`](CssParser::peek_past_boundary_whitespace)'s alone,
 /// reported at its own position. Widening the accept set would mean re-deriving which bytes
 /// the lexer can error on — the same bet `scan_value_bytes` declines to make.
 ///
-/// The whitespace it skips is ASCII, and that is a second decline, not a class: a boundary
-/// run (`a { color <NBSP>: red }`) is a non-ASCII byte to this loop, so it declines to the
+/// The whitespace the walk skips is ASCII, and that is a second decline, not a class: a
+/// boundary run (`a { color <NBSP>: red }`) is a non-ASCII byte to it, so it declines to the
 /// token lookahead, which steps the run — `read_declaration` ends the property at JS `\s`
-/// and `allow_whitespace()`s to the colon, so the gap is a juncture like any other.
-fn peek_significant_kind_bytes(bytes: &[u8], from: usize) -> Option<TokenKind> {
-    colon_after_trivia(bytes, from).map(|_| TokenKind::Colon)
+/// and `allow_whitespace()`s to the colon, so the gap is a juncture like any other. That
+/// lookahead is the boundary-aware one because the skip it predicts is boundary-aware: a run
+/// in the gap declines the declaration's byte head, so the gap is stepped by its token head
+/// (`lex_declaration_head`) with `skip_boundary_whitespace_and_comments`. A lookahead narrower
+/// than that skip reads the run as the identifier where the `:` is due, classifies the child
+/// a nested rule, and rejects the document. A `:` that lookahead finds past a gap the bytes
+/// declined is still a declaration head the bytes cannot locate, so the scan behind it runs on
+/// the token walk.
+///
+/// In debug the token lookahead runs behind a `:` the bytes found and must agree, so the
+/// test suite proves the equivalence.
+pub(super) fn identifier_child_is_rule(parser: &CssParser<'_, '_>) -> Result<bool, ParseError> {
+    let bytes = parser.source().as_bytes();
+    let from = parser.current_end();
+    match colon_after_trivia(bytes, from) {
+        Some((colon, gap_comment)) => {
+            #[cfg(debug_assertions)]
+            {
+                // An `Err` here fails the assert too, and must: it would mean the byte walk
+                // accepted a lookahead the lexer rejects.
+                let expected = parser.peek_past_boundary_whitespace();
+                assert!(
+                    expected
+                        .as_ref()
+                        .is_ok_and(|expected| *expected == TokenKind::Colon),
+                    "property→colon byte walk disagreed with the token lookahead at {from}: \
+                     walk found a `:`, lookahead said {expected:?}"
+                );
+            }
+            scan_rule_or_declaration(parser, from, colon, gap_comment)
+        }
+        None => match parser.peek_past_boundary_whitespace()? {
+            // The gap walk declined, so the byte head — which starts with the same walk —
+            // would too.
+            TokenKind::Colon => rule_or_declaration_by_tokens(parser, from),
+            // `{` (`div {`), a selector token (`a.b`, `a#b`, `a[b]`), or anything else: a
+            // nested rule
+            _ => Ok(true),
+        },
+    }
 }
 
 /// The `:` that is the first significant byte at or past `from` — ASCII whitespace and
 /// comments are trivia — as its offset and whether a comment stood in the gap. `None` at any
-/// other byte, a non-ASCII one included, and at an unterminated comment. The one gap walk
-/// behind [`scan_declaration_head_bytes`] and [`peek_significant_kind_bytes`], which ask it
-/// of the same gap back to back.
+/// other byte, a non-ASCII one included, and at an unterminated comment. The gap walk behind
+/// [`scan_declaration_head_bytes`] and [`identifier_child_is_rule`].
 #[inline]
 fn colon_after_trivia(bytes: &[u8], from: usize) -> Option<(usize, bool)> {
     let len = bytes.len();
@@ -402,37 +467,6 @@ fn colon_after_trivia(bytes: &[u8], from: usize) -> Option<(usize, bool)> {
             }
             _ => return None,
         }
-    }
-}
-
-/// Byte scan first, `peek_past_boundary_whitespace` on decline — and in debug the token
-/// lookahead runs behind a successful byte scan and must agree, so the test suite proves the
-/// equivalence.
-///
-/// The boundary-aware lookahead, because the skip it predicts is: a run in the
-/// property→colon gap declines the declaration's byte head, so the gap is stepped by its
-/// token head (`lex_declaration_head`) with `skip_boundary_whitespace_and_comments`, and a
-/// lookahead narrower than that skip read `a { color <NBSP>: red }`'s run as the identifier
-/// that should have been the `:`, classified the child a nested rule, and rejected the
-/// document.
-pub(super) fn peek_significant_kind(parser: &CssParser<'_, '_>) -> Result<TokenKind, ParseError> {
-    match peek_significant_kind_bytes(parser.source().as_bytes(), parser.current_end()) {
-        Some(kind) => {
-            #[cfg(debug_assertions)]
-            {
-                // An `Err` here fails the assert too, and must: it would mean the byte scan
-                // accepted a lookahead the lexer rejects.
-                let expected = parser.peek_past_boundary_whitespace();
-                assert!(
-                    expected.as_ref().is_ok_and(|expected| *expected == kind),
-                    "significant-kind byte scan disagreed with the token lookahead at {}: \
-                     scan said {kind:?}, lookahead said {expected:?}",
-                    parser.current_end()
-                );
-            }
-            Ok(kind)
-        }
-        None => parser.peek_past_boundary_whitespace(),
     }
 }
 
@@ -1118,6 +1152,85 @@ mod tests {
         assert_eq!(head_of("a{content: \u{e9}}", "content"), None);
     }
 
+    /// The block-child disambiguation over `source`, whose first token is the identifier:
+    /// the verdict (`true` = a nested rule), and whether it left a declaration stashed for
+    /// that identifier — which it does exactly where the byte walks located the declaration.
+    fn identifier_child(source: &str) -> (bool, bool) {
+        let arena = bumpalo::Bump::new();
+        let parser = CssParser::new(source, 0, &arena).expect("test source lexes");
+        assert_eq!(parser.current_kind(), TokenKind::Identifier);
+        let is_rule = identifier_child_is_rule(&parser).expect("test source disambiguates");
+        let stashed = parser.take_declaration(parser.current_end()).is_some();
+        (is_rule, stashed)
+    }
+
+    /// A `:` found across the property→colon gap is the head the rule-or-declaration scan
+    /// goes on from, so the gap is walked once; a gap the bytes decline reaches the token
+    /// lookahead, and a `:` it finds still settles the child, on the token walk alone.
+    #[test]
+    fn identifier_child_walks_the_gap_once() {
+        // declarations, located from the bytes and stashed
+        assert_eq!(identifier_child("color: red;"), (false, true));
+        assert_eq!(identifier_child("color:red}"), (false, true));
+        assert_eq!(
+            identifier_child("color\t/* a */ /* b */\n: red"),
+            (false, true)
+        );
+        assert_eq!(identifier_child("filter:blur(5px);"), (false, true));
+        // nested rules: a `:` the value walk finds a `{` past, and no `:` at all
+        assert_eq!(identifier_child("span:hover { }"), (true, false));
+        assert_eq!(
+            identifier_child("span:not(:last-child)::after { }"),
+            (true, false)
+        );
+        assert_eq!(identifier_child("div { }"), (true, false));
+        assert_eq!(identifier_child("a.b { }"), (true, false));
+        assert_eq!(identifier_child("a /* c */ [b] { }"), (true, false));
+        // a boundary run in the gap declines the byte walk; the token lookahead steps it to
+        // the `:`, and the declaration is left for `parse_declaration`'s token head
+        assert_eq!(identifier_child("color \u{a0}: red;"), (false, false));
+        assert_eq!(
+            identifier_child("color /* c */\u{a0}: red;"),
+            (false, false)
+        );
+        // a non-ASCII value start declines the byte head past a `:` the gap walk found
+        assert_eq!(identifier_child("color: \u{85}red;"), (false, false));
+        assert_eq!(identifier_child("content: \u{e9};"), (false, false));
+    }
+
+    /// Whether the current identifier names a custom property, beside the resolved text it is
+    /// the question of: an escape-spelled `--` counts, a `--` its escapes spell otherwise
+    /// does not.
+    #[test]
+    fn custom_property_names_are_read_from_the_resolved_text() {
+        let cases = [
+            ("--x: 1", true),
+            ("--: 1", true),
+            ("-x: 1", false),
+            ("x--: 1", false),
+            ("-\\-x: 1", true),
+            ("\\2d\\2d x: 1", true),
+            ("\\2d x: 1", false),
+            ("-\\2d x: 1", true),
+            ("\\-x: 1", false),
+        ];
+        for (source, expected) in cases {
+            let arena = bumpalo::Bump::new();
+            let parser = CssParser::new(source, 0, &arena).expect("test source lexes");
+            assert_eq!(parser.current_kind(), TokenKind::Identifier, "{source:?}");
+            assert_eq!(
+                parser.current_identifier_is_custom_property(),
+                parser.current_identifier().starts_with("--"),
+                "{source:?}"
+            );
+            assert_eq!(
+                parser.current_identifier_is_custom_property(),
+                expected,
+                "{source:?}"
+            );
+        }
+    }
+
     /// Both byte scans over the declaration `source` holds, graded exactly as the debug
     /// oracles in [`scan_value`] and [`scan_rule_or_declaration`] grade them: a scan that
     /// answers must agree with the token walk fact for fact (an `Err` walk fails too — the
@@ -1141,9 +1254,10 @@ mod tests {
             );
         }
 
-        // The fused walk starts where the disambiguation does, just past the property; the
-        // head scan steps to the `:` itself, so the colon's own offset serves.
-        let fused = scan_rule_or_declaration_and_value_bytes(source, colon);
+        // The fused walk takes the head the disambiguation's gap walk ends in; the head scan
+        // steps to the `:` itself, so the colon's own offset serves as the property's end.
+        let fused = scan_declaration_head_bytes(bytes, colon)
+            .and_then(|head| scan_rule_or_declaration_and_value_bytes(source, head));
         match &fused {
             Some(Disambiguation::Declaration(scanned)) => {
                 assert_eq!(

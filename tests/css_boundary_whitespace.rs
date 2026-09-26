@@ -107,7 +107,7 @@
 //!   so `:nth-child(2n<NBSP>)` was rejected and `(even<NBSP>)` demoted to a type selector;
 //!   one scanner now serves two grammars behind a `spec` flag, each with its own class.
 //!   Pinned by `an_an_plus_b_juncture_steps_the_boundary_class`.
-//! - the **declaration-vs-rule byte scan** (`decl_scan::peek_significant_kind`): ASCII by
+//! - the **declaration-vs-rule byte scan** (`decl_scan::identifier_child_is_rule`): ASCII by
 //!   design (it DECLINES what it does not model), but the token lookahead it declined to was
 //!   the narrow one, and read `a { color <NBSP>: red }`'s run as the identifier that should
 //!   have been the `:`. `read_declaration` ends the property at JS `\s`

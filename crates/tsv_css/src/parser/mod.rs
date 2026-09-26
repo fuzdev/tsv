@@ -53,8 +53,10 @@ pub(crate) struct CssParser<'a, 'arena> {
     /// A declaration located and measured speculatively by the rule/declaration
     /// disambiguation scan — its head and its value's facts — for the `parse_declaration`
     /// that immediately follows to take instead of lexing its head and re-walking its value.
-    /// Set (or cleared) at every `scan_rule_or_declaration` and keyed on the property's end
-    /// offset — [`take_declaration`](Self::take_declaration) states what the key guards.
+    /// Set (or cleared) at every disambiguation that reaches a `:` — by `decl_scan`'s
+    /// `scan_rule_or_declaration`, or cleared by its `rule_or_declaration_by_tokens` where a
+    /// byte walk declined — and keyed on the property's end offset —
+    /// [`take_declaration`](Self::take_declaration) states what the key guards.
     /// `Cell` because the scan runs behind `&CssParser` (the disambiguation is a read-only
     /// lookahead).
     speculative_declaration: Cell<Option<(usize, ScannedDeclaration)>>,
@@ -526,7 +528,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// For the lookaheads that ask "what does this gap lead to?" and act on the answer: the
     /// two selector ones — whether a gap comment continues the selector, and whether a
     /// comment sits before a `,` — and the declaration-vs-rule disambiguation's token walk
-    /// (`decl_scan::peek_significant_kind`, behind its ASCII byte scan). Each was reading a
+    /// (`decl_scan::identifier_child_is_rule`, behind its ASCII byte walk). Each was reading a
     /// `<NBSP>` in the gap as an identifier — a selector start, a non-comma, the token that
     /// should have been a `:` — and so classified `a /* c */<NBSP>{` as a descendant
     /// combinator, `a /* c */<NBSP>, b` as a list that had ended, and `a { color <NBSP>: red }`
@@ -832,6 +834,23 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     #[inline]
     pub(crate) fn current_identifier(&self) -> &str {
         self.current_decoded.unwrap_or_else(|| self.current_value())
+    }
+
+    /// Whether the current identifier's resolved text begins `--` — a custom property's name
+    /// (css-variables-1 §2) — asked of [`current_identifier`](Self::current_identifier)'s own
+    /// text: the decode where the identifier held an escape, else its source bytes, read as
+    /// bytes so the common name pays no `str` slice's char-boundary checks. Only meaningful
+    /// when the current token is an `Identifier`.
+    #[inline]
+    pub(in crate::parser) fn current_identifier_is_custom_property(&self) -> bool {
+        match self.current_decoded {
+            Some(decoded) => decoded.starts_with("--"),
+            None => self
+                .source
+                .as_bytes()
+                .get(self.current_start()..self.current_end())
+                .is_some_and(|raw| raw.starts_with(b"--")),
+        }
     }
 
     /// The current identifier's resolved text as an `&'arena str`, for callers that
