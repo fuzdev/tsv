@@ -18,7 +18,7 @@ use crate::ast::internal;
 use crate::whitespace::svelte_ws_width_at;
 
 use tsv_lang::{AcornPrefix, Comment, Span, source_scan::skip_comment};
-use tsv_ts::ast::convert::{CommentAttach, IslandComments};
+use tsv_ts::ast::convert::{CommentAttach, CommentMode, IslandComments};
 
 /// The inputs every island's comment-attach builder (the `attach_*` fns below)
 /// shares: the document's template comments and its source.
@@ -100,67 +100,98 @@ pub(super) fn attach_expression<'a>(
     )
 }
 
-/// The attach for a comment-bearing **block binding pattern** — the `{#each … as ctx}`
-/// context, the `{:then value}` / `{:catch error}` bindings, and the `{@const}`
-/// id, which takes it directly (see [`attach_const_tag_init`] for that split).
+/// The attaches for a comment-bearing **block binding pattern** — the `{#each … as ctx}`
+/// context, the `{:then value}` / `{:catch error}` bindings, and the `{@const}` id, which
+/// takes it directly (see [`attach_const_tag_init`] for that split).
 ///
-/// The window is the binding's own, and it runs to the end of the ANNOTATION
-/// where one follows: canonical parses a destructure as a synthetic
-/// `(pattern = 1)` acorn expression and its trailing `: T` as a second parse,
-/// and a comment inside either attaches within the pattern subtree. Deriving
-/// the end from the root node instead collapses it to the bare binding — an
-/// annotated *identifier*'s span stops at the name — and every annotation
-/// comment attaches nowhere. The start is the binding's, never the enclosing
-/// head's: canonical filters each parse's comments to `start >= index`, where
-/// `index` is where *that* parse began, so a `{#each}` key's own parse (which
-/// begins at its `(`) must not see a comment written back in the pattern.
+/// A typed binding is **two** acorn parses, so it is two islands: canonical parses a
+/// destructure as a synthetic `(pattern = 1)` expression (`read_pattern`) and its trailing
+/// `: T` with a second, separately padded one (`read_type_annotation`'s `_ as ` trick), and
+/// `add_comments` runs once per parse over that parse's own comments. A comment inside the
+/// pattern therefore attaches within the pattern subtree or nowhere — never to the
+/// annotation — and one inside the annotation within the annotation or nowhere. One attach
+/// over both let a comment the pattern's walk leaves unclaimed (an own-line one before the
+/// closing bracket, outside acorn's single-trailing gap class) lead the `TSTypeAnnotation`
+/// that opens after it, and let one the annotation's walk leaves unclaimed fall back to
+/// trail the pattern root, whose span stops at the bare pattern.
 ///
-/// The window is fully known up front, so no trailing scan: its end IS the
-/// container bound, which leaves acorn's scan nowhere to run.
+/// Each window is its parse's own. The pattern's starts at the binding, never at the
+/// enclosing head: canonical filters each parse's comments to `start >= index`, where
+/// `index` is where *that* parse began, so a `{#each}` key's own parse (which begins at its
+/// `(`) must not see a comment written back in the pattern. The annotation's is its span,
+/// which starts where the binding ends — the gap before the `:` included, as Svelte builds
+/// the node.
+///
+/// Both windows are fully known up front, so no trailing scan, and neither runs acorn's
+/// root fallback: each parse's root is a wrapper the wire discards (the `= 1` assignment,
+/// the `_ as` expression), and a comment inside a window starts before that wrapper ends.
 pub(super) fn attach_binding_pattern<'a>(
     pattern: &tsv_ts::ast::internal::Expression<'_>,
     attach: AttachInputs<'a>,
-) -> CommentAttach<'a> {
-    let window = pattern_comment_window(pattern);
-    CommentAttach::new(
-        attach.source,
-        IslandComments {
-            queue: attach.window_queue(window.start, window.end),
-            root_parent_end: None,
-            root_fallback: true,
-            html_leading: None,
-        },
-    )
+) -> BindingAttach<'a> {
+    let island = |span: Span| {
+        CommentAttach::new(
+            attach.source,
+            IslandComments {
+                queue: attach.window_queue(span.start, span.end),
+                root_parent_end: None,
+                root_fallback: false,
+                html_leading: None,
+            },
+        )
+    };
+    BindingAttach {
+        pattern: island(pattern.span()),
+        annotation: tsv_ts::pattern_type_annotation(pattern).map(|ann| island(ann.span)),
+    }
+}
+
+/// A block binding's two islands (see [`attach_binding_pattern`]): the pattern's, and the
+/// annotation's when the binding carries a `: T`.
+pub(super) struct BindingAttach<'a> {
+    pattern: CommentAttach<'a>,
+    annotation: Option<CommentAttach<'a>>,
+}
+
+impl BindingAttach<'_> {
+    /// The pattern's comment mode, then the annotation's (`Off` without one).
+    pub(super) fn modes(&self) -> (CommentMode<'_>, CommentMode<'_>) {
+        (
+            self.pattern.mode(),
+            self.annotation
+                .as_ref()
+                .map_or(CommentMode::Off, CommentAttach::mode),
+        )
+    }
 }
 
 /// The region a binding pattern's comments come from — its own start through the
-/// end of its annotation, if it has one.
+/// end of its annotation, if it has one: the union of [`attach_binding_pattern`]'s two
+/// windows, which meet at the annotation's start.
 ///
-/// One definition because two callers must agree on it exactly: the writer's cheap
-/// "is there anything here at all" pre-check and this module's attach filter. A
-/// pre-check narrower than the filter silently DROPS a comment (the attach is never
-/// built, and nothing else emits it); a wider one only wastes a build. Stating the
-/// region twice is how the two drift.
+/// The writer's cheap "is there anything here at all" pre-check, which must CONTAIN both
+/// attach windows: a pre-check narrower than either silently DROPS a comment (the attach
+/// is never built, and nothing else emits it); a wider one only wastes a build. It is
+/// also where a `{@const}`'s init window begins ([`attach_const_tag_init`]).
 pub(super) fn pattern_comment_window(pattern: &tsv_ts::ast::internal::Expression<'_>) -> Span {
     Span::new(pattern.span().start, tsv_ts::pattern_binding_end(pattern))
 }
 
-/// The `{@const id = init}` INIT attach — the second of the tag's two windows.
+/// The `{@const id = init}` INIT attach — the tag's last window.
 ///
-/// Canonical Svelte runs **two** acorn parses, each with its own comment
-/// attach: `read_pattern` parses a destructure id as a synthetic
-/// `(pattern = 1)` expression (so an id-internal comment attaches inside the
-/// pattern subtree — e.g. a destructure default's literal), and
-/// `read_expression` parses the init (comments from after the id through the
-/// tag close attach in the init subtree). Comments *between* the pattern and
-/// the `=` are a canonical parse error, so the two windows partition the tag.
-/// The `VariableDeclaration`/`VariableDeclarator` envelope carries no comments
-/// and is reproduced at emit time.
+/// Canonical Svelte runs an acorn parse per island, each with its own comment attach — the
+/// id (two islands with a `: T` annotation, the pattern then the type; see
+/// [`attach_binding_pattern`]) and the init: `read_pattern` parses a destructure id as a
+/// synthetic `(pattern = 1)` expression (so an id-internal comment attaches inside the
+/// pattern subtree — e.g. a destructure default's literal), and `read_expression` parses
+/// the init (comments from after the id through the tag close attach in the init subtree).
+/// Comments *between* the pattern and the `=` are a canonical parse error, so the id and
+/// init windows partition the tag. The `VariableDeclaration`/`VariableDeclarator` envelope
+/// carries no comments and is reproduced at emit time.
 ///
-/// The id window is the shared binding-pattern one ([`attach_binding_pattern`])
-/// — the same window the `{#each}` / `{:then}` / `{:catch}` bindings take,
-/// which is what makes the two windows here split at the end of the BINDING
-/// rather than of its bare name.
+/// The id windows are the shared binding-pattern ones ([`attach_binding_pattern`]) — the
+/// same windows the `{#each}` / `{:then}` / `{:catch}` bindings take, which is what makes
+/// the id and init windows split at the end of the BINDING rather than of its bare name.
 pub(super) fn attach_const_tag_init<'a>(
     tag: &internal::ConstTag<'_>,
     attach: AttachInputs<'a>,

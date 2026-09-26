@@ -176,7 +176,9 @@ fn write_identifier_expression_with_character_in(
 /// `comments` is `Attach` for a comment-carrying destructure pattern
 /// (`{@const { b = /* c */ 1 } = expr}`): canonical parses it as a synthetic
 /// `(pattern = 1)` acorn expression whose comment attach covers the pattern
-/// subtree, and attached comments emit at each node's close.
+/// subtree, and attached comments emit at each node's close. A trailing `: T` is
+/// Svelte's second parse and attaches under `annotation_comments` instead — see
+/// `Ctx::annotation_comments`.
 #[inline]
 pub fn write_pattern_embedded(
     w: &mut JsonWriter,
@@ -319,8 +321,8 @@ pub enum ProgramLoc {
 /// mapper, comment role, `loc`-emission flag, and parser variant each one
 /// funnels into a `Ctx`.
 ///
-/// Bundled into one `Copy` value (every field is `Copy` — two references, an
-/// enum, two bools, two seeds) so the call sites stop re-threading the same
+/// Bundled into one `Copy` value (every field is `Copy` — two references, two
+/// enums, two bools, two seeds) so the call sites stop re-threading the same
 /// arguments. It is an entry-boundary value: each writer destructures it into a
 /// stack `Ctx` (`Ctx::from_embed`) and the per-node walk threads `&Ctx`, so it
 /// is copied once per island rather than once per node. `ProgramWriter` is its
@@ -341,6 +343,9 @@ pub struct EmbedWriter<'a> {
     /// `write_pattern_embedded` can reach it, so every other entry leaves it
     /// `AcornSeed::NONE`.
     pub acorn_annotation: AcornSeed,
+    /// The block pattern's trailing `: T` — its comment role, see
+    /// `Ctx::annotation_comments`. `Off` for every other entry.
+    pub annotation_comments: CommentMode<'a>,
 }
 
 /// The per-document inputs `write_program_embedded` takes — `EmbedWriter`'s
@@ -429,6 +434,14 @@ pub(super) struct Ctx<'a> {
     /// boundary that stops the `+1` column bump, and for the same reason.
     /// Inert with the bump: `pattern_ann_span.start == u32::MAX`.
     pub(super) acorn_annotation: AcornSeed,
+    /// The block pattern's trailing `: T` is a second acorn parse, so it is a second
+    /// comment island too: the top-level annotation (`pattern_ann_span`) is emitted under
+    /// this mode instead of `comments`. Svelte's `add_comments` runs once per parse over
+    /// that parse's own comments, so a comment inside the pattern can never attach to the
+    /// annotation, and one inside the annotation can never fall back to the pattern root —
+    /// which one attach over both let happen wherever a walk left a comment unclaimed.
+    /// `Off` for every ordinary emission.
+    pub(super) annotation_comments: CommentMode<'a>,
     /// Whether to emit the per-node `loc` object (line/column). `true` for the
     /// default acorn/svelte drop-in wire; `false` for the opt-in `no-locations`
     /// variant (`start`/`end` offsets only — `loc` is derivable from them plus
@@ -464,6 +477,7 @@ impl<'a> Ctx<'a> {
             vanilla_acorn: schema.is_svelte_script(),
             acorn,
             acorn_annotation: AcornSeed::NONE,
+            annotation_comments: CommentMode::Off,
             emit_loc,
         }
     }
@@ -484,6 +498,7 @@ impl<'a> Ctx<'a> {
             vanilla_acorn: env.vanilla_acorn,
             acorn: env.acorn,
             acorn_annotation: env.acorn_annotation,
+            annotation_comments: env.annotation_comments,
             emit_loc: env.emit_loc,
         }
     }

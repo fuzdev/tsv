@@ -417,9 +417,10 @@ impl<'a> Ctx<'a> {
             emit_loc: self.emit_loc,
             vanilla_acorn: !self.component_is_ts,
             acorn,
-            // Only `embed_pattern` fills this: a block pattern is the one island
+            // Only `embed_pattern` fills these two: a block pattern is the one island
             // that can be two parses.
             acorn_annotation: AcornSeed::NONE,
+            annotation_comments: CommentMode::Off,
         }
     }
 
@@ -427,7 +428,8 @@ impl<'a> Ctx<'a> {
     /// the pattern itself, and its trailing `: T`, which Svelte reads with a
     /// separately padded second one (`read_type_annotation`). `AcornRegion::annotation_lex_start`
     /// is what names that second region — the one position the parser records it
-    /// at and this looks it up by.
+    /// at and this looks it up by. The second parse attaches its own comments, so
+    /// it takes its own comment mode, `annotation_mode` (see `attach_binding_pattern`).
     ///
     /// A simple identifier binding is Svelte's `read_identifier`, not an acorn
     /// parse at all — see `embed_locator` for why its LF-class seed is
@@ -436,10 +438,12 @@ impl<'a> Ctx<'a> {
     fn embed_pattern(
         &self,
         mode: CommentMode<'a>,
+        annotation_mode: CommentMode<'a>,
         expr: &tsv_ts::ast::internal::Expression<'_>,
     ) -> EmbedWriter<'a> {
         let mut env = self.embed_expr(mode, expr);
         if let Some(ann) = tsv_ts::pattern_type_annotation(expr) {
+            env.annotation_comments = annotation_mode;
             env.acorn_annotation = self.acorn_seed(internal::AcornRegion::annotation_lex_start(
                 self.source,
                 ann.span.start,
@@ -1304,10 +1308,10 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
 /// `{@`), declarator `end = parser.index` after `read_expression` (see
 /// `const_declarator_end`), declaration `end = tag.span.end - 1`
 /// (`parser.index - 1`, the byte before the closing `}`). The comment-free
-/// document fuses directly; a document with template comments builds TWO attaches,
-/// one per canonical acorn parse — `read_pattern`'s synthetic `(pattern = 1)` for
-/// the id and `read_expression`'s for the init — so a comment in one window can
-/// never reach the other's tree.
+/// document fuses directly; a document with template comments builds one attach per
+/// canonical acorn parse — `read_pattern`'s synthetic `(pattern = 1)` for the id (plus
+/// its `: T` annotation's own, when typed) and `read_expression`'s for the init — so a
+/// comment in one window can never reach another's tree.
 fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"ConstTag\",\"start\":");
     w.start_end(ctx.pos(tag.span.start), ctx.pos(tag.span.end));
@@ -1317,21 +1321,22 @@ fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'
     let decl_end = ctx.pos(tag.span.end - 1);
     let declarator_end = ctx.pos(const_declarator_end(tag, ctx));
     // Scoped comment pre-check: a comment attaching to this tag necessarily starts
-    // inside its span, so no comment in `[tag.span.start, tag.span.end)` means both
-    // attach queues would be empty — fuse directly (Off ≡ an empty queue).
+    // inside its span, so no comment in `[tag.span.start, tag.span.end)` means every
+    // attach queue would be empty — fuse directly (Off ≡ an empty queue).
     if !ctx.any_comment_in(tag.span.start, tag.span.end) {
         write_const_declaration(
             w,
             tag,
             decl_end,
             declarator_end,
-            CommentMode::Off,
+            (CommentMode::Off, CommentMode::Off),
             CommentMode::Off,
             ctx,
         );
     } else {
-        // The document has template comments: the tag's TWO acorn parses take
-        // two attaches, split at the end of the binding (see `attach_const_tag_init`).
+        // The document has template comments: each of the tag's acorn parses takes its
+        // own attach — the id's (pattern, annotation) pair, then the init, split at the
+        // end of the binding (see `attach_const_tag_init`).
         let id_attach = attach_binding_pattern(tag.id, ctx.attach_inputs());
         let init_attach = attach_const_tag_init(tag, ctx.attach_inputs());
         write_const_declaration(
@@ -1339,7 +1344,7 @@ fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'
             tag,
             decl_end,
             declarator_end,
-            id_attach.mode(),
+            id_attach.modes(),
             init_attach.mode(),
             ctx,
         );
@@ -1402,14 +1407,18 @@ fn write_const_declaration(
     tag: &internal::ConstTag<'_>,
     decl_end: u32,
     declarator_end: u32,
-    id_mode: CommentMode<'_>,
+    (id_mode, id_annotation_mode): (CommentMode<'_>, CommentMode<'_>),
     init_mode: CommentMode<'_>,
     ctx: &Ctx<'_>,
 ) {
     w.raw(
         "{\"type\":\"VariableDeclaration\",\"kind\":\"const\",\"declarations\":[{\"type\":\"VariableDeclarator\",\"id\":",
     );
-    write_pattern_embedded(w, tag.id, ctx.embed_pattern(id_mode, tag.id));
+    write_pattern_embedded(
+        w,
+        tag.id,
+        ctx.embed_pattern(id_mode, id_annotation_mode, tag.id),
+    );
     w.raw(",\"init\":");
     write_expression_embedded(w, tag.init, ctx.embed_expr(init_mode, tag.init));
     w.start_end_field(ctx.pos(tag.id.span().start), declarator_end);
@@ -2154,10 +2163,11 @@ fn write_value_attributes(
 ///
 /// Patterns DO collect comments — `parse_ts_pattern` and, for `{#each}`, the
 /// separately-read `parse_ts_type_annotation` both extend `expression_comments`
-/// — and canonical attaches each one to its adjacent node inside the pattern
-/// subtree, so a comment-bearing binding attaches over the same window
-/// `{@const}`'s id takes (`attach_binding_pattern`). The pre-check is the window
-/// itself rather than the enclosing block's span: a comment attaching here
+/// — and canonical attaches each one to its adjacent node inside the subtree of
+/// the parse that read it, so a comment-bearing binding attaches over the same two
+/// windows `{@const}`'s id takes (`attach_binding_pattern`: the pattern, then its
+/// `: T`). The pre-check is the union of the two rather than the enclosing
+/// block's span: a comment attaching here
 /// necessarily starts inside the binding, and asking wider would only build an
 /// attach with nothing in its queue.
 fn write_pattern_island(
@@ -2167,11 +2177,16 @@ fn write_pattern_island(
 ) {
     let window = pattern_comment_window(expr);
     if !ctx.any_comment_in(window.start, window.end) {
-        write_pattern_embedded(w, expr, ctx.embed_pattern(CommentMode::Off, expr));
+        write_pattern_embedded(
+            w,
+            expr,
+            ctx.embed_pattern(CommentMode::Off, CommentMode::Off, expr),
+        );
         return;
     }
     let attach = attach_binding_pattern(expr, ctx.attach_inputs());
-    write_pattern_embedded(w, expr, ctx.embed_pattern(attach.mode(), expr));
+    let (mode, annotation_mode) = attach.modes();
+    write_pattern_embedded(w, expr, ctx.embed_pattern(mode, annotation_mode, expr));
 }
 
 /// A fragment or `null` (the `AwaitBlock` branch fields and `IfBlock`'s

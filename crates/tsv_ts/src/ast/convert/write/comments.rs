@@ -63,7 +63,9 @@
 //! later than it does** (a child may START earlier — a decorator ahead of `export` — which
 //! the proof never needs). The one node that breaks it is a typed Svelte block binding
 //! (`{#each xs as a: T}`), whose span is the bare binding while its `typeAnnotation` child
-//! runs past it, and that node is always its island's root. A debug build asserts the fact
+//! runs past it, and that node is always its island's root — and since the annotation is a
+//! second acorn parse, it is emitted under an island of its own (`Ctx::annotation_comments`),
+//! so no attach ever walks the overhanging child at all. A debug build asserts the fact
 //! at every open, asserts where the writer emits that node that it opens as its island's
 //! root (`CommentAttach::debug_assert_opens_island_root`), and asserts at every skipped
 //! node that the rules would have claimed nothing there.
