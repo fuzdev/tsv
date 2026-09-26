@@ -17,6 +17,7 @@ use super::element_doc::{AttrListEmission, ElementAttrsDoc};
 use super::helpers::each_expr_comment_end;
 use crate::ast::internal::{self, Fragment, FragmentNode, is_collapsible_ws_char};
 use crate::printer::Printer;
+use crate::printer::classification::element::has_raw_content;
 use smallvec::smallvec;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
@@ -43,6 +44,29 @@ pub(super) struct ContentEdges {
     hugs_open: bool,
     /// The content ends on a visible byte, so the closing tag splits and its `>` dangles.
     hugs_close: bool,
+}
+
+impl ContentEdges {
+    /// The same edges with the closing tag held whole — the answer for a nested `<script>` /
+    /// `<style>`, whose end tag is not a place a break may land at all.
+    ///
+    /// Svelte reads a nested raw-text body up to the first **literal** `</script>` /
+    /// `</style>` (no whitespace before the `>`; tsv's `find_exact_tag_close` matches it), so
+    /// `</script⏎>` does not parse — and beside a second raw-text element of the same name a
+    /// split first closing tag parses as ONE element whose body runs on to the second one. A
+    /// top-level `<script>` / `<style>` (`</script\s*>`) and a `<textarea>` / `<title>` (an
+    /// ordinary end tag) accept the split, so they keep the content's own answer.
+    ///
+    /// Only the element's own closing delimiter moves out of play: the opening `>` still reads
+    /// its content edge, so a line too wide for the element breaks there instead — the shape a
+    /// content ending on whitespace already takes. And the parent's edges are the parent's
+    /// question: its last child is an element either way, which hugs.
+    fn with_whole_close(self) -> Self {
+        Self {
+            hugs_close: false,
+            ..self
+        }
+    }
 }
 
 impl<'a> Printer<'a> {
@@ -134,11 +158,22 @@ impl<'a> Printer<'a> {
         // `<pre>`/`<textarea>` themselves but diverge on a nested `<Comp>`, so this stays its own
         // question rather than being folded into the shared one.
         let is_inline = !element.facts.is_block();
-        let has_content = !element.fragment.nodes.is_empty();
+        // Content is what WILL be printed: a nested `<script>` / `<style>` with an empty body
+        // still carries one empty `Text` child (Svelte always emits it), which prints nothing,
+        // so it takes the empty element's layouts — `<strong></strong>`'s, not a content head
+        // whose delimiters have nothing between them to protect. The same reading the block
+        // classification makes of it, from the same helper.
+        let has_content = has_raw_content(element);
 
         // Which delimiters the content lets move — one read per boundary, see
-        // [`ContentEdges`].
-        let edges = self.ws_sensitive_content_edges(element.fragment.nodes);
+        // [`ContentEdges`]; a nested raw-text element's closing tag never splits
+        // ([`ContentEdges::with_whole_close`]).
+        let content_edges = self.ws_sensitive_content_edges(element.fragment.nodes);
+        let edges = if class.raw_text.is_some() {
+            content_edges.with_whole_close()
+        } else {
+            content_edges
+        };
 
         // Whitespace-sensitive elements with content: one shape, off `edges` and the list.
         //
