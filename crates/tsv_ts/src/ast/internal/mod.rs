@@ -398,6 +398,13 @@ pub struct Identifier<'arena> {
     /// arena pointer so `Identifier` stays ~24 B: it is an *inline* `Expression`
     /// variant, so its size drives `sizeof(Expression)`. Read via the
     /// `type_annotation()` / `decorators()` accessors.
+    ///
+    /// ⚠️ Every field of `Identifier` beyond the name is `optional` or behind `extra`: the
+    /// two expression-position fast paths (the printer's `build_identifier_expression_doc`,
+    /// the wire's `write_expression_inner`) test just those two (the wire's also its
+    /// `force_optional` context flag), and `build_identifier_doc_inner`'s fast path tests
+    /// `optional` plus each accessor — a new `Identifier` field must join all three, a new
+    /// `IdentifierParamExtra` field the last.
     pub extra: Option<&'arena IdentifierParamExtra<'arena>>,
     pub span: Span,
 }

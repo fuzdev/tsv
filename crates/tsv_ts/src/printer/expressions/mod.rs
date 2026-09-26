@@ -79,7 +79,7 @@ impl<'a> Printer<'a> {
     /// break so prettier opens the parens — unlike an undecorated `(class {})`, which
     /// stays flat. Shared by the bare-statement form (`build_expression_statement_doc`)
     /// and the self-wrapping member/call form (`(@dec class {}).foo` / `()`, via the
-    /// `ClassExpression` arm of `build_expression_doc`).
+    /// `ClassExpression` arm of `build_expression_doc_full_dispatch`).
     pub(in crate::printer) fn build_break_open_parens(&self, inner: DocId) -> DocId {
         let d = self.d();
         d.concat(&[
@@ -99,6 +99,54 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_expression_doc(&self, expr: &Expression<'_>) -> DocId {
         let doc = self.build_expression_doc_dispatch(expr);
         self.prepend_owned_leading_comment(expr, doc)
+    }
+
+    /// The expression dispatch's front: the two leaf kinds — a literal and an
+    /// identifier, more than half of all calls — are answered here, and every other
+    /// kind goes on to [`Self::build_expression_doc_full_dispatch`], whose arms share
+    /// one frame the size of its largest (over a kilobyte, six callee-saved registers)
+    /// that a leaf arm handing off to its builder would set up and tear down for nothing.
+    ///
+    /// ⚠️ Out of line, and leaving by a tail call, for one reason: the dispatch IS the
+    /// expression recursion, so this function must add nothing to its frames.
+    /// `build_expression_doc` is inlined at most of its callers, so a leaf test placed
+    /// there lands in their frames on the recursive call path (`f(f(f(1)))` then nests
+    /// about 2% shallower); here the non-leaf path is a compare and a jump.
+    #[inline(never)]
+    fn build_expression_doc_dispatch(&self, expr: &Expression<'_>) -> DocId {
+        match &expr.kind {
+            // The full dispatch's take-and-clear of `is_expression_statement`, which a
+            // leaf never re-sets (see the rule at the top of that function).
+            ExpressionKind::Literal(lit) => {
+                self.is_expression_statement.set(false);
+                self.build_literal_doc(lit)
+            }
+            ExpressionKind::Identifier(id) => {
+                self.is_expression_statement.set(false);
+                self.build_identifier_expression_doc(id)
+            }
+            _ => self.build_expression_doc_full_dispatch(expr),
+        }
+    }
+
+    /// An `Identifier` in expression position — the arm both dispatches share.
+    ///
+    /// A contextual keyword heading an `as`/`satisfies` cast at statement level wraps
+    /// itself (`(type) as T;`) — see `build_expression_statement_doc`. A no-op for every
+    /// other identifier (the target is None or a different span).
+    // Out of line so the dispatch front stays frameless: inlined, this arm's registers
+    // are saved on entry to the front, ahead of its kind test, by every kind.
+    #[inline(never)]
+    fn build_identifier_expression_doc(&self, id: &crate::ast::internal::Identifier<'_>) -> DocId {
+        // A variable reference — no `?`, no binding extra — is its name alone, the
+        // answer `build_identifier_doc`'s own fast path gives, taken here without paying
+        // that function's frame.
+        let doc = if id.extra.is_none() && !id.optional {
+            self.identifier_name_doc(id)
+        } else {
+            self.build_identifier_doc(id)
+        };
+        self.maybe_wrap_expr_stmt_paren(id.span, doc)
     }
 
     /// Build the doc for an embedding host's expression ROOT (a Svelte `{expr}` value).
@@ -258,7 +306,13 @@ impl<'a> Printer<'a> {
         self.build_expression_doc(expr)
     }
 
-    fn build_expression_doc_dispatch(&self, expr: &Expression<'_>) -> DocId {
+    /// Every expression kind's arm, the leaf kinds' included, so this is a total answer
+    /// on its own; [`Self::build_expression_doc_dispatch`] answers the leaves before
+    /// reaching it.
+    // Out of line: inlined into its front, its frame would be paid by the leaf kinds the
+    // front answers first.
+    #[inline(never)]
+    fn build_expression_doc_full_dispatch(&self, expr: &Expression<'_>) -> DocId {
         let d = self.d();
 
         // Take and clear is_expression_statement so it doesn't leak to sub-expressions.
@@ -268,15 +322,11 @@ impl<'a> Printer<'a> {
         let was_expr_stmt = self.is_expression_statement.replace(false);
 
         match &expr.kind {
+            // Unreachable through the front (this function's only caller), which answers
+            // both kinds first; kept so the match stays total. Leaf behavior belongs in the
+            // front and the shared builders, or it never runs.
             ExpressionKind::Literal(lit) => self.build_literal_doc(lit),
-            ExpressionKind::Identifier(id) => {
-                // A contextual keyword heading an `as`/`satisfies` cast at statement
-                // level wraps itself (`(type) as T;`) — see
-                // `build_expression_statement_doc`. A no-op for every other identifier
-                // (the target is None or a different span).
-                let doc = self.build_identifier_doc(id);
-                self.maybe_wrap_expr_stmt_paren(id.span, doc)
-            }
+            ExpressionKind::Identifier(id) => self.build_identifier_expression_doc(id),
             ExpressionKind::PrivateIdentifier(pid) => {
                 self.build_private_identifier_doc(pid, expr.span)
             }
