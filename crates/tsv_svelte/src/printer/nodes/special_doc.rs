@@ -44,8 +44,48 @@ impl<'a> Printer<'a> {
         // which for this one kind deletes rendered bytes. It leaves **before**
         // `analyze_element` because it reads nothing that stage produces — its head comes from
         // the whitespace-sensitive family and its content from the source.
+        //
+        // `<pre>`/`<textarea>` are not the whole of the compiler's whitespace exemption. A
+        // `<title>` that is a (transparent) child of `<svelte:head>` parses as a `TitleElement`,
+        // and both of Svelte's `TitleElement` visitors walk `node.fragment.nodes` **directly** —
+        // the server one wraps them in `$$renderer.title(…)`, the client one concatenates them
+        // into a `document.title` assignment — so **`clean_nodes` never runs over them**. The
+        // content boundaries, the runs around an `{expr}` tag, and a whitespace-only body all
+        // reach the served page as authored, which puts this kind in the whitespace-sensitive
+        // class rather than the trimming one.
+        //
+        // The bytes are observable, so this is content preservation and not layout taste: only
+        // `document.title`'s **getter** strips and collapses them (HTML `Document.title`); its
+        // setter does not, `HTMLTitleElement.text` returns the child text content unchanged, and
+        // `<title>` is deliberately outside the `pre`/`listing`/`textarea` set whose leading
+        // newline the parser drops.
+        //
+        // Two neighbouring facts are untouched. The **hoist** still holds — `clean_nodes` lifts a
+        // `TitleElement` out of its parent fragment, so the run between it and a *sibling* is a
+        // fragment edge and is deleted; that happens in the fragment walk, not here. And an
+        // **empty** title has no content bytes to preserve, so it keeps the shared pipeline's
+        // self-closing / empty layouts (the gate below).
+        //
+        // The **head** is the ws-sensitive family's, not the block-style one:
+        // `build_verbatim_content_doc` hands the whole of it to
+        // `build_ws_sensitive_head_with_content_doc`, off the same `ws_sensitive_content_edges`
+        // read `<pre>` / `<textarea>` use. So the `>` hugs the last list member and the closing
+        // tag dangles on the same terms they do — `<title>` is inline by
+        // `SpecialElementKind::is_block`, which is what decides the dangle for the other two.
+        //
+        // Reaching for `build_opening_tag` here instead (whose `dedent(softline)` is the
+        // block-style `>` placement) gave this one kind a third answer to a question the family
+        // answers once: an own-line comment left the `>` at base indent where a `<textarea>` hugs
+        // it. Attributes are a compile error on a `<title>`, so the list is empty in anything
+        // Svelte accepts and a comment is the only member it can have — but the formatter still
+        // has to print what it was handed, and an attribute-bearing head takes the family's shape
+        // too.
+        //
+        // Pinned by `special_elements/title_content_verbatim_prettier_divergence` (the content)
+        // and `special_elements/title_head_comment_prettier_divergence` (the head); see
+        // docs/conformance_prettier_svelte.md §Svelte: Elements.
         if element.kind.preserves_content_whitespace() && !element.fragment.nodes.is_empty() {
-            return self.build_title_content_doc(
+            return self.build_verbatim_content_doc(
                 name,
                 element.fragment.nodes,
                 &attr_docs,
@@ -132,51 +172,17 @@ impl<'a> Printer<'a> {
         .then(|| self.build_close_gt_dangle_doc(&parts, &ctx, &attr_docs))
     }
 
-    /// Build `<title>…</title>` for a **head** `<title>`, whose content prints verbatim.
+    /// Build a special element whose content prints **verbatim**, under the whitespace-sensitive
+    /// family's head: the content through [`Printer::build_whitespace_sensitive_content_doc`],
+    /// the head through [`Printer::build_ws_sensitive_head_with_content_doc`] off
+    /// [`Printer::ws_sensitive_content_edges`], so the `>` hugs the last list member and each
+    /// delimiter reads its own content edge, as on `<pre>` / `<textarea>`.
     ///
-    /// `<pre>`/`<textarea>` are not the whole of the compiler's whitespace exemption. A
-    /// `<title>` that is a (transparent) child of `<svelte:head>` parses as a `TitleElement`,
-    /// and both of Svelte's `TitleElement` visitors walk `node.fragment.nodes` **directly** —
-    /// the server one wraps them in `$$renderer.title(…)`, the client one concatenates them
-    /// into a `document.title` assignment — so **`clean_nodes` never runs over them**. The
-    /// content boundaries, the runs around an `{expr}` tag, and a whitespace-only body all
-    /// reach the served page as authored, which puts this kind in the whitespace-sensitive
-    /// class rather than the trimming one.
-    ///
-    /// The bytes are observable, so this is content preservation and not layout taste: only
-    /// `document.title`'s **getter** strips and collapses them (HTML `Document.title`); its
-    /// setter does not, `HTMLTitleElement.text` returns the child text content unchanged, and
-    /// `<title>` is deliberately outside the `pre`/`listing`/`textarea` set whose leading
-    /// newline the parser drops.
-    ///
-    /// Two neighbouring facts are untouched. The **hoist** still holds — `clean_nodes` lifts a
-    /// `TitleElement` out of its parent fragment, so the run between it and a *sibling* is a
-    /// fragment edge and is deleted; that happens in the fragment walk, not here. And an
-    /// **empty** title has no content bytes to preserve, so it keeps the shared pipeline's
-    /// self-closing / empty layouts (the caller gates on that).
-    ///
-    /// The **head** is the ws-sensitive family's, not the block-style one: this hands the
-    /// whole of it to [`Printer::build_ws_sensitive_head_with_content_doc`], off the same
-    /// [`Printer::ws_sensitive_content_edges`] read `<pre>` / `<textarea>` use. So the `>`
-    /// hugs the last list member and the closing tag dangles on the same terms they do —
-    /// `<title>` is inline by [`internal::SpecialElementKind::is_block`], which is what
-    /// decides the dangle for the other two.
-    ///
-    /// Reaching for `build_opening_tag` here instead (whose `dedent(softline)` is the
-    /// block-style `>` placement) gave this one kind a third answer to a question the family
-    /// answers once: an own-line comment left the `>` at base indent where a `<textarea>` hugs
-    /// it. Attributes are a compile error on a `<title>`, so the list is empty in anything
-    /// Svelte accepts and a comment is the only member it can have — but the formatter still
-    /// has to print what it was handed, and an attribute-bearing head takes the family's shape
-    /// too.
-    ///
-    /// Pinned by
-    /// [`title_content_verbatim`](../../../../../tests/fixtures/svelte/special_elements/title_content_verbatim_prettier_divergence/)
-    /// (the content) and
-    /// [`title_head_comment`](../../../../../tests/fixtures/svelte/special_elements/title_head_comment_prettier_divergence/)
-    /// (the head);
-    /// see [conformance_prettier_svelte.md §Svelte: Elements](../../../../../docs/conformance_prettier_svelte.md#svelte-elements).
-    fn build_title_content_doc(
+    /// Two callers, one shape: a head `<title>` ([`Self::build_special_element_doc`], whose
+    /// dispatch comment carries that kind's rationale) and every special element inside a
+    /// whitespace-sensitive element ([`Self::build_ws_sensitive_special_element_doc`]). Both
+    /// gate on non-empty content first; an empty element keeps the shared pipeline's layouts.
+    fn build_verbatim_content_doc(
         &self,
         name: DocId,
         nodes: &[internal::FragmentNode<'_>],
@@ -186,6 +192,51 @@ impl<'a> Printer<'a> {
         let content = self.build_whitespace_sensitive_content_doc(nodes);
         let edges = self.ws_sensitive_content_edges(nodes);
         self.build_ws_sensitive_head_with_content_doc(name, attr_docs, emission, content, edges)
+    }
+
+    /// Build a special element that sits **inside a whitespace-sensitive element** (`<pre>`,
+    /// directly or through any nesting of elements, components and blocks).
+    ///
+    /// Every special element that can appear there renders its content in place —
+    /// `<svelte:element>`, `<svelte:component>`, `<svelte:self>`, `<svelte:boundary>`,
+    /// `<svelte:fragment>`, `<slot>`. (The hoisted `svelte:*` kinds are root-only: Svelte
+    /// rejects them anywhere else; tsv parses them and defers the placement rule, so they reach
+    /// this builder only in a document Svelte rejects.) Svelte's compiler carries the
+    /// ancestor's whitespace-preserving state into every child fragment, theirs included. So the
+    /// content is the ancestor's text: it goes through
+    /// [`Printer::build_whitespace_sensitive_content_doc`], and the head is the
+    /// family's [`Printer::build_ws_sensitive_head_with_content_doc`] off
+    /// [`Printer::ws_sensitive_content_edges`] — the shape a component takes in the same
+    /// position, and the one a head `<title>` takes ([`Self::build_verbatim_content_doc`]). The
+    /// shared pipeline ([`Self::build_special_element_doc`]) would lay the children out as flow
+    /// content, collapsing the runs and breaking the content block-style, every byte of which
+    /// renders here.
+    ///
+    /// A special element is **inline** in this family, as a component is: its delimiters read
+    /// only the content's edges and the width. That includes `<svelte:boundary>`, which
+    /// prettier-plugin-svelte exempts from hugging outright — a per-kind rule with nothing in the
+    /// render behind it.
+    ///
+    /// An element with no content keeps the shared pipeline's empty and self-closing layouts:
+    /// with no content bytes there is nothing for the family's head to protect.
+    ///
+    /// Pinned by the `svelte/elements/pre_special_element_*` fixtures;
+    /// [`special_element_flow_content`](../../../../../tests/fixtures/svelte/special_elements/special_element_flow_content_prettier_divergence/)
+    /// pins the same kinds outside the family, where this builder does not run.
+    pub(super) fn build_ws_sensitive_special_element_doc(
+        &self,
+        element: &internal::SpecialElement<'_>,
+    ) -> DocId {
+        let nodes = element.fragment.nodes;
+        if nodes.is_empty() {
+            return self.build_special_element_doc(element);
+        }
+        let name = self.d().text(element.kind.tag_name());
+        let ElementAttrsDoc {
+            docs: attr_docs,
+            emission,
+        } = self.build_special_element_attrs_doc(element, self.d().line());
+        self.build_verbatim_content_doc(name, nodes, &attr_docs, emission)
     }
 
     /// Build `<tag></tag>` for a special element with no content, wrapping the attributes in the

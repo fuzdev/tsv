@@ -476,6 +476,8 @@ impl<'a> Printer<'a> {
     ///
     /// - **Text**: preserve raw whitespace (significant in pre/textarea).
     /// - **Elements**: recursively use whitespace-sensitive formatting (e.g., `<code>` inside `<pre>`).
+    /// - **Special elements** (`<svelte:element>`, `<slot>`, …): the same, through
+    ///   [`Self::build_ws_sensitive_special_element_doc`].
     /// - **Blocks** (`{#if}`, `{#each}`, `{#await}`, `{#key}`, `{#snippet}`): inline
     ///   ws-sensitive block formatting — the head may open around a comment, but no
     ///   whitespace is added beside a section body, and body nodes are formatted
@@ -503,9 +505,10 @@ impl<'a> Printer<'a> {
                 );
                 self.build_whitespace_sensitive_element_doc(element, attrs)
             }
+            // Special elements: their content is this subtree's content too — see
+            // `build_ws_sensitive_special_element_doc`.
             FragmentNode::SpecialElement(element) => {
-                // Special elements in whitespace-sensitive context: format normally without indent
-                self.build_special_element_doc(element)
+                self.build_ws_sensitive_special_element_doc(element)
             }
 
             // Expressions and blocks: format normally. The body-indent level is

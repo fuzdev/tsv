@@ -1,0 +1,430 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 622,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 215,
+				"data": "\n\tInside `<pre>` a special element's head takes the whitespace-sensitive family's shape around a\n\t`//`: a list ending on one puts the `>` on the next line, one level in, and the closing tag\n\tdangles its `>`.\n"
+			},
+			{
+				"type": "Text",
+				"start": 215,
+				"end": 217,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 217,
+				"end": 299,
+				"data": " a `//` inside the `this` binding: the list wraps and the `>` hugs the `}` "
+			},
+			{
+				"type": "Text",
+				"start": 299,
+				"end": 300,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 300,
+				"end": 382,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 301
+					},
+					"end": {
+						"line": 8,
+						"column": 4,
+						"character": 304
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 305,
+							"end": 306,
+							"raw": "a",
+							"data": "a"
+						},
+						{
+							"type": "SvelteElement",
+							"start": 306,
+							"end": 375,
+							"name": "svelte:element",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 7,
+									"character": 307
+								},
+								"end": {
+									"line": 8,
+									"column": 21,
+									"character": 321
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 343,
+										"end": 356,
+										"raw": "text1   text2",
+										"data": "text1   text2"
+									}
+								]
+							},
+							"tag": {
+								"type": "Identifier",
+								"start": 330,
+								"end": 333,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 8
+									},
+									"end": {
+										"line": 9,
+										"column": 11
+									}
+								},
+								"name": "tag",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 334,
+										"end": 338
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 375,
+							"end": 376,
+							"raw": "c",
+							"data": "c"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 382,
+				"end": 384,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 384,
+				"end": 416,
+				"data": " a list ending on a `//` "
+			},
+			{
+				"type": "Text",
+				"start": 416,
+				"end": 417,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 417,
+				"end": 517,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 1,
+						"character": 418
+					},
+					"end": {
+						"line": 14,
+						"column": 4,
+						"character": 421
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 422,
+							"end": 423,
+							"raw": "a",
+							"data": "a"
+						},
+						{
+							"type": "SvelteElement",
+							"start": 423,
+							"end": 510,
+							"name": "svelte:element",
+							"name_loc": {
+								"start": {
+									"line": 14,
+									"column": 7,
+									"character": 424
+								},
+								"end": {
+									"line": 14,
+									"column": 21,
+									"character": 438
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 452,
+									"end": 469,
+									"name": "data-attr",
+									"name_loc": {
+										"start": {
+											"line": 16,
+											"column": 2,
+											"character": 452
+										},
+										"end": {
+											"line": 16,
+											"column": 11,
+											"character": 461
+										}
+									},
+									"value": [
+										{
+											"start": 463,
+											"end": 468,
+											"type": "Text",
+											"raw": "value",
+											"data": "value"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 478,
+										"end": 491,
+										"raw": "text1   text2",
+										"data": "text1   text2"
+									}
+								]
+							},
+							"tag": {
+								"type": "Literal",
+								"value": "b",
+								"raw": "'b'",
+								"start": 447,
+								"end": 448
+							}
+						},
+						{
+							"type": "Text",
+							"start": 510,
+							"end": 511,
+							"raw": "c",
+							"data": "c"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 517,
+				"end": 519,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 519,
+				"end": 621,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 20,
+						"column": 1,
+						"character": 520
+					},
+					"end": {
+						"line": 20,
+						"column": 4,
+						"character": 523
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 524,
+							"end": 525,
+							"raw": "a",
+							"data": "a"
+						},
+						{
+							"type": "SvelteComponent",
+							"start": 525,
+							"end": 614,
+							"name": "svelte:component",
+							"name_loc": {
+								"start": {
+									"line": 20,
+									"column": 7,
+									"character": 526
+								},
+								"end": {
+									"line": 20,
+									"column": 23,
+									"character": 542
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 559,
+									"end": 571,
+									"name": "prop",
+									"name_loc": {
+										"start": {
+											"line": 22,
+											"column": 2,
+											"character": 559
+										},
+										"end": {
+											"line": 22,
+											"column": 6,
+											"character": 563
+										}
+									},
+									"value": [
+										{
+											"start": 565,
+											"end": 570,
+											"type": "Text",
+											"raw": "value",
+											"data": "value"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 580,
+										"end": 593,
+										"raw": "text1   text2",
+										"data": "text1   text2"
+									}
+								]
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 551,
+								"end": 555,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 8
+									},
+									"end": {
+										"line": 21,
+										"column": 12
+									}
+								},
+								"name": "Comp"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 614,
+							"end": 615,
+							"raw": "c",
+							"data": "c"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 334,
+			"end": 338,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 12
+				},
+				"end": {
+					"line": 9,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"start": 470,
+			"end": 474,
+			"value": " c",
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 20,
+					"character": 470
+				},
+				"end": {
+					"line": 16,
+					"column": 24,
+					"character": 474
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"start": 572,
+			"end": 576,
+			"value": " c",
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 15,
+					"character": 572
+				},
+				"end": {
+					"line": 22,
+					"column": 19,
+					"character": 576
+				}
+			}
+		}
+	]
+}
