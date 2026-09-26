@@ -1,0 +1,197 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 520,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 154,
+				"data": "\n\tA frozen global `svelte:*` element glued to the text before it ends that text's line: the break\n\tafter it is not part of the glued unit's width.\n"
+			},
+			{
+				"type": "Text",
+				"start": 154,
+				"end": 156,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 156,
+				"end": 218,
+				"data": " the glued unit ends its line at exactly 100: it stays "
+			},
+			{
+				"type": "Text",
+				"start": 218,
+				"end": 266,
+				"raw": "\ntext1 text2 text3 text4 text5 text6 text7 text8",
+				"data": "\ntext1 text2 text3 text4 text5 text6 text7 text8"
+			},
+			{
+				"type": "Comment",
+				"start": 266,
+				"end": 290,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "SvelteWindow",
+				"start": 290,
+				"end": 319,
+				"name": "svelte:window",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 72,
+						"character": 291
+					},
+					"end": {
+						"line": 7,
+						"column": 85,
+						"character": 304
+					}
+				},
+				"attributes": [
+					{
+						"start": 305,
+						"end": 316,
+						"type": "OnDirective",
+						"name": "xx",
+						"name_loc": {
+							"start": {
+								"line": 7,
+								"column": 86,
+								"character": 305
+							},
+							"end": {
+								"line": 7,
+								"column": 91,
+								"character": 310
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 312,
+							"end": 315,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 93
+								},
+								"end": {
+									"line": 7,
+									"column": 96
+								}
+							},
+							"name": "fn1"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 319,
+				"end": 327,
+				"raw": "\ntext9\n\n",
+				"data": "\ntext9\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 327,
+				"end": 410,
+				"data": " the glued unit would end its line at 101: it travels to a fresh line whole "
+			},
+			{
+				"type": "Text",
+				"start": 410,
+				"end": 452,
+				"raw": "\ntext10 text11 text12 text13 text14\ntext15",
+				"data": "\ntext10 text11 text12 text13 text14\ntext15"
+			},
+			{
+				"type": "Comment",
+				"start": 452,
+				"end": 476,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "SvelteDocument",
+				"start": 476,
+				"end": 512,
+				"name": "svelte:document",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 31,
+						"character": 477
+					},
+					"end": {
+						"line": 12,
+						"column": 46,
+						"character": 492
+					}
+				},
+				"attributes": [
+					{
+						"start": 493,
+						"end": 509,
+						"type": "OnDirective",
+						"name": "xxxxxxx",
+						"name_loc": {
+							"start": {
+								"line": 12,
+								"column": 47,
+								"character": 493
+							},
+							"end": {
+								"line": 12,
+								"column": 57,
+								"character": 503
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 505,
+							"end": 508,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 59
+								},
+								"end": {
+									"line": 12,
+									"column": 62
+								}
+							},
+							"name": "fn2"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 512,
+				"end": 519,
+				"raw": "\ntext16",
+				"data": "\ntext16"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

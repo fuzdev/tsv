@@ -1,0 +1,252 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 355,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 109,
+				"data": "\n\tAn authored blank line after a frozen declaration tag survives, as it does after the tag\n\tunfrozen.\n"
+			},
+			{
+				"type": "Text",
+				"start": 109,
+				"end": 111,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 111,
+				"end": 170,
+				"data": " the directive on its own line, inside a block body "
+			},
+			{
+				"type": "Text",
+				"start": 170,
+				"end": 171,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 171,
+				"end": 239,
+				"test": {
+					"type": "Identifier",
+					"start": 176,
+					"end": 180,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 5
+						},
+						"end": {
+							"line": 7,
+							"column": 9
+						}
+					},
+					"name": "cond"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 181,
+							"end": 183,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 183,
+							"end": 207,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "Text",
+							"start": 207,
+							"end": 209,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ConstTag",
+							"start": 209,
+							"end": 225,
+							"declaration": {
+								"type": "VariableDeclaration",
+								"kind": "const",
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"id": {
+											"type": "Identifier",
+											"name": "a",
+											"start": 219,
+											"end": 220,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 11,
+													"character": 219
+												},
+												"end": {
+													"line": 9,
+													"column": 12,
+													"character": 220
+												}
+											}
+										},
+										"init": {
+											"type": "Literal",
+											"start": 223,
+											"end": 224,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 15
+												},
+												"end": {
+													"line": 9,
+													"column": 16
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"start": 219,
+										"end": 224
+									}
+								],
+								"start": 211,
+								"end": 224
+							}
+						},
+						{
+							"type": "Text",
+							"start": 225,
+							"end": 234,
+							"raw": "\n\n\ttext1\n",
+							"data": "\n\n\ttext1\n"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 239,
+				"end": 241,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 241,
+				"end": 304,
+				"data": " the directive glued to the text before it, at the root "
+			},
+			{
+				"type": "Text",
+				"start": 304,
+				"end": 310,
+				"raw": "\ntext2",
+				"data": "\ntext2"
+			},
+			{
+				"type": "Comment",
+				"start": 310,
+				"end": 334,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "DeclarationTag",
+				"start": 334,
+				"end": 347,
+				"declaration": {
+					"type": "VariableDeclaration",
+					"start": 335,
+					"end": 346,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 30
+						},
+						"end": {
+							"line": 15,
+							"column": 41
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 341,
+							"end": 346,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 36
+								},
+								"end": {
+									"line": 15,
+									"column": 41
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 341,
+								"end": 342,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 36
+									},
+									"end": {
+										"line": 15,
+										"column": 37
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 345,
+								"end": 346,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 40
+									},
+									"end": {
+										"line": 15,
+										"column": 41
+									}
+								},
+								"value": 2,
+								"raw": "2"
+							}
+						}
+					],
+					"kind": "let"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 347,
+				"end": 354,
+				"raw": "\n\ntext3",
+				"data": "\n\ntext3"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
