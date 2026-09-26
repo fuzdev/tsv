@@ -1,0 +1,257 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 366,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 152,
+				"data": "\n\tA nested `<script>` / `<style>` among a special element's content inside `<pre>` keeps its body\n\tbyte-for-byte, like the rest of that content.\n"
+			},
+			{
+				"type": "Text",
+				"start": 152,
+				"end": 154,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 154,
+				"end": 249,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 6,
+						"column": 1,
+						"character": 155
+					},
+					"end": {
+						"line": 6,
+						"column": 4,
+						"character": 158
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 159,
+							"end": 160,
+							"raw": "a",
+							"data": "a"
+						},
+						{
+							"type": "SvelteElement",
+							"start": 160,
+							"end": 242,
+							"name": "svelte:element",
+							"name_loc": {
+								"start": {
+									"line": 6,
+									"column": 7,
+									"character": 161
+								},
+								"end": {
+									"line": 6,
+									"column": 21,
+									"character": 175
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "RegularElement",
+										"start": 185,
+										"end": 212,
+										"name": "script",
+										"name_loc": {
+											"start": {
+												"line": 6,
+												"column": 32,
+												"character": 186
+											},
+											"end": {
+												"line": 6,
+												"column": 38,
+												"character": 192
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"start": 193,
+													"end": 203,
+													"type": "Text",
+													"data": "let q = 1;",
+													"raw": "let q = 1;"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 212,
+										"end": 225,
+										"raw": "text1   text2",
+										"data": "text1   text2"
+									}
+								]
+							},
+							"tag": {
+								"type": "Literal",
+								"value": "b",
+								"raw": "'b'",
+								"start": 182,
+								"end": 183
+							}
+						},
+						{
+							"type": "Text",
+							"start": 242,
+							"end": 243,
+							"raw": "c",
+							"data": "c"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 249,
+				"end": 251,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 251,
+				"end": 365,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 252
+					},
+					"end": {
+						"line": 8,
+						"column": 4,
+						"character": 255
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 256,
+							"end": 257,
+							"raw": "a",
+							"data": "a"
+						},
+						{
+							"type": "SvelteComponent",
+							"start": 257,
+							"end": 358,
+							"name": "svelte:component",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 7,
+									"character": 258
+								},
+								"end": {
+									"line": 8,
+									"column": 23,
+									"character": 274
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 290,
+										"end": 303,
+										"raw": "text1   text2",
+										"data": "text1   text2"
+									},
+									{
+										"type": "RegularElement",
+										"start": 303,
+										"end": 337,
+										"name": "style",
+										"name_loc": {
+											"start": {
+												"line": 9,
+												"column": 17,
+												"character": 304
+											},
+											"end": {
+												"line": 9,
+												"column": 22,
+												"character": 309
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"start": 310,
+													"end": 329,
+													"type": "Text",
+													"data": "div { color: red; }",
+													"raw": "div { color: red; }"
+												}
+											]
+										}
+									}
+								]
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 281,
+								"end": 285,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 30
+									},
+									"end": {
+										"line": 8,
+										"column": 34
+									}
+								},
+								"name": "Comp"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 358,
+							"end": 359,
+							"raw": "c",
+							"data": "c"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

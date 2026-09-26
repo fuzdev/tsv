@@ -1,11 +1,11 @@
-<!-- Special elements (slot / svelte:*) inside <pre>: whitespace is significant, so they format inline (via the normal special-element builder) without injecting rendered whitespace -->
+<!-- Special elements (slot / svelte:*) inside <pre>: their content is <pre> content, laid out by the whitespace-sensitive builders, so nothing adds rendered whitespace; an empty or self-closing one keeps its own tag form -->
 <pre><slot /></pre>
 
 <pre><slot name="x">text</slot></pre>
 
 <pre><svelte:element this="span">text</svelte:element></pre>
 
-<pre><svelte:self /></pre>
+{#if cond}<pre><svelte:self /></pre>{/if}
 
 <pre><svelte:component this={Comp} /></pre>
 

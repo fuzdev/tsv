@@ -153,14 +153,13 @@ const HOSTS: &[&[(&str, &str)]] = &[
         ("<div>", "</div>"),
         ("<span>", "</span>"),
     ],
-    // Whitespace-sensitive ancestors: the body indents one level per container there too.
-    &[
-        ("<pre>", "</pre>"),
-        ("<svelte:boundary>", "</svelte:boundary>"),
-    ],
+    // Special elements count one level each, like any container. (Under a whitespace-sensitive
+    // ancestor a nested body is the ancestor's text and prints verbatim instead — the
+    // `svelte/elements/pre_raw_text_close_*` and `pre_special_element_raw_text` fixtures.)
+    &[("<svelte:boundary>", "</svelte:boundary>")],
     &[
         ("<div>", "</div>"),
-        ("<pre>", "</pre>"),
+        ("<section>", "</section>"),
         ("<svelte:element this=\"div\">", "</svelte:element>"),
     ],
     &[

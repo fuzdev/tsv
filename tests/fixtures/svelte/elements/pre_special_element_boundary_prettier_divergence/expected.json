@@ -1,0 +1,455 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 946,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 233,
+				"data": "\n\tInside `<pre>` a `<svelte:boundary>` lays out like every other element of the\n\twhitespace-sensitive family: a line break in its content breaks its tags around the content,\n\tand a line too wide for it breaks inside its tags.\n"
+			},
+			{
+				"type": "Text",
+				"start": 233,
+				"end": 235,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 235,
+				"end": 328,
+				"data": " a line break in the content: the `>` takes the next line and the closing `>` dangles "
+			},
+			{
+				"type": "Text",
+				"start": 328,
+				"end": 329,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 329,
+				"end": 395,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 330
+					},
+					"end": {
+						"line": 8,
+						"column": 4,
+						"character": 333
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 334,
+							"end": 335,
+							"raw": "a",
+							"data": "a"
+						},
+						{
+							"type": "SvelteBoundary",
+							"start": 335,
+							"end": 388,
+							"name": "svelte:boundary",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 7,
+									"character": 336
+								},
+								"end": {
+									"line": 8,
+									"column": 22,
+									"character": 351
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 355,
+										"end": 368,
+										"raw": "text1\n  text2",
+										"data": "text1\n  text2"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 388,
+							"end": 389,
+							"raw": "c",
+							"data": "c"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 395,
+				"end": 397,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 397,
+				"end": 440,
+				"data": " exactly 100 columns: nothing moves "
+			},
+			{
+				"type": "Text",
+				"start": 440,
+				"end": 441,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 441,
+				"end": 541,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 1,
+						"character": 442
+					},
+					"end": {
+						"line": 14,
+						"column": 4,
+						"character": 445
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 446,
+							"end": 447,
+							"raw": "a",
+							"data": "a"
+						},
+						{
+							"type": "SvelteBoundary",
+							"start": 447,
+							"end": 534,
+							"name": "svelte:boundary",
+							"name_loc": {
+								"start": {
+									"line": 14,
+									"column": 7,
+									"character": 448
+								},
+								"end": {
+									"line": 14,
+									"column": 22,
+									"character": 463
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 464,
+										"end": 516,
+										"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa text1   text2",
+										"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa text1   text2"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 534,
+							"end": 535,
+							"raw": "c",
+							"data": "c"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 541,
+				"end": 543,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 543,
+				"end": 588,
+				"data": " 101 columns: the closing `>` dangles "
+			},
+			{
+				"type": "Text",
+				"start": 588,
+				"end": 589,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 589,
+				"end": 692,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 17,
+						"column": 1,
+						"character": 590
+					},
+					"end": {
+						"line": 17,
+						"column": 4,
+						"character": 593
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 594,
+							"end": 595,
+							"raw": "a",
+							"data": "a"
+						},
+						{
+							"type": "SvelteBoundary",
+							"start": 595,
+							"end": 685,
+							"name": "svelte:boundary",
+							"name_loc": {
+								"start": {
+									"line": 17,
+									"column": 7,
+									"character": 596
+								},
+								"end": {
+									"line": 17,
+									"column": 22,
+									"character": 611
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 612,
+										"end": 665,
+										"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa text1   text2",
+										"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa text1   text2"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 685,
+							"end": 686,
+							"raw": "c",
+							"data": "c"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 692,
+				"end": 694,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 694,
+				"end": 789,
+				"data": " a wrapping attribute list: the `>` hugs the last attribute and the closing `>` dangles "
+			},
+			{
+				"type": "Text",
+				"start": 789,
+				"end": 790,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 790,
+				"end": 945,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 21,
+						"column": 1,
+						"character": 791
+					},
+					"end": {
+						"line": 21,
+						"column": 4,
+						"character": 794
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 795,
+							"end": 796,
+							"raw": "a",
+							"data": "a"
+						},
+						{
+							"type": "SvelteBoundary",
+							"start": 796,
+							"end": 938,
+							"name": "svelte:boundary",
+							"name_loc": {
+								"start": {
+									"line": 21,
+									"column": 7,
+									"character": 797
+								},
+								"end": {
+									"line": 21,
+									"column": 22,
+									"character": 812
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 815,
+									"end": 862,
+									"name": "onerror",
+									"name_loc": {
+										"start": {
+											"line": 22,
+											"column": 2,
+											"character": 815
+										},
+										"end": {
+											"line": 22,
+											"column": 9,
+											"character": 822
+										}
+									},
+									"value": {
+										"type": "ExpressionTag",
+										"start": 823,
+										"end": 862,
+										"expression": {
+											"type": "Identifier",
+											"start": 824,
+											"end": 861,
+											"loc": {
+												"start": {
+													"line": 22,
+													"column": 11
+												},
+												"end": {
+													"line": 22,
+													"column": 48
+												}
+											},
+											"name": "handle_error_aaaaaaaaaaaaaaaaaaaaaaaa"
+										}
+									}
+								},
+								{
+									"type": "Attribute",
+									"start": 865,
+									"end": 904,
+									"name": "failed",
+									"name_loc": {
+										"start": {
+											"line": 23,
+											"column": 2,
+											"character": 865
+										},
+										"end": {
+											"line": 23,
+											"column": 8,
+											"character": 871
+										}
+									},
+									"value": {
+										"type": "ExpressionTag",
+										"start": 872,
+										"end": 904,
+										"expression": {
+											"type": "Identifier",
+											"start": 873,
+											"end": 903,
+											"loc": {
+												"start": {
+													"line": 23,
+													"column": 10
+												},
+												"end": {
+													"line": 23,
+													"column": 40
+												}
+											},
+											"name": "failed_aaaaaaaaaaaaaaaaaaaaaaa"
+										}
+									}
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 905,
+										"end": 918,
+										"raw": "text1   text2",
+										"data": "text1   text2"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 938,
+							"end": 939,
+							"raw": "c",
+							"data": "c"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
