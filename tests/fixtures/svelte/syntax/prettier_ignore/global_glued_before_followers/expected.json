@@ -1,0 +1,419 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 689,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 188,
+				"data": "\n\tA frozen global `svelte:*` element glued to the content before it takes a line break after it\n\twhatever inline kind follows: a component, a `svelte:element`, a `svelte:boundary`.\n"
+			},
+			{
+				"type": "Text",
+				"start": 188,
+				"end": 190,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 190,
+				"end": 216,
+				"data": " a component after "
+			},
+			{
+				"type": "Text",
+				"start": 216,
+				"end": 222,
+				"raw": "\ntext1",
+				"data": "\ntext1"
+			},
+			{
+				"type": "Comment",
+				"start": 222,
+				"end": 246,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "SvelteWindow",
+				"start": 246,
+				"end": 279,
+				"name": "svelte:window",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 30,
+						"character": 247
+					},
+					"end": {
+						"line": 7,
+						"column": 43,
+						"character": 260
+					}
+				},
+				"attributes": [
+					{
+						"start": 264,
+						"end": 274,
+						"type": "OnDirective",
+						"name": "x",
+						"name_loc": {
+							"start": {
+								"line": 7,
+								"column": 47,
+								"character": 264
+							},
+							"end": {
+								"line": 7,
+								"column": 51,
+								"character": 268
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 270,
+							"end": 273,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 53
+								},
+								"end": {
+									"line": 7,
+									"column": 56
+								}
+							},
+							"name": "fn1"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 279,
+				"end": 280,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 280,
+				"end": 288,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 281
+					},
+					"end": {
+						"line": 8,
+						"column": 5,
+						"character": 285
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 288,
+				"end": 290,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 290,
+				"end": 321,
+				"data": " a svelte:element after "
+			},
+			{
+				"type": "Text",
+				"start": 321,
+				"end": 327,
+				"raw": "\ntext2",
+				"data": "\ntext2"
+			},
+			{
+				"type": "Comment",
+				"start": 327,
+				"end": 351,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "SvelteDocument",
+				"start": 351,
+				"end": 370,
+				"name": "svelte:document",
+				"name_loc": {
+					"start": {
+						"line": 11,
+						"column": 30,
+						"character": 352
+					},
+					"end": {
+						"line": 11,
+						"column": 45,
+						"character": 367
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 370,
+				"end": 371,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteElement",
+				"start": 371,
+				"end": 400,
+				"name": "svelte:element",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 1,
+						"character": 372
+					},
+					"end": {
+						"line": 12,
+						"column": 15,
+						"character": 386
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				},
+				"tag": {
+					"type": "Identifier",
+					"start": 393,
+					"end": 396,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 22
+						},
+						"end": {
+							"line": 12,
+							"column": 25
+						}
+					},
+					"name": "tag"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 400,
+				"end": 402,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 402,
+				"end": 434,
+				"data": " a svelte:boundary after "
+			},
+			{
+				"type": "Text",
+				"start": 434,
+				"end": 440,
+				"raw": "\ntext3",
+				"data": "\ntext3"
+			},
+			{
+				"type": "Comment",
+				"start": 440,
+				"end": 464,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "SvelteBody",
+				"start": 464,
+				"end": 479,
+				"name": "svelte:body",
+				"name_loc": {
+					"start": {
+						"line": 15,
+						"column": 30,
+						"character": 465
+					},
+					"end": {
+						"line": 15,
+						"column": 41,
+						"character": 476
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 479,
+				"end": 480,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteBoundary",
+				"start": 480,
+				"end": 520,
+				"name": "svelte:boundary",
+				"name_loc": {
+					"start": {
+						"line": 16,
+						"column": 1,
+						"character": 481
+					},
+					"end": {
+						"line": 16,
+						"column": 16,
+						"character": 496
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 497,
+							"end": 502,
+							"raw": "text3",
+							"data": "text3"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 520,
+				"end": 522,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 522,
+				"end": 602,
+				"data": " control: glued on both sides, the element stays on its neighbours' line "
+			},
+			{
+				"type": "Text",
+				"start": 602,
+				"end": 608,
+				"raw": "\ntext4",
+				"data": "\ntext4"
+			},
+			{
+				"type": "Comment",
+				"start": 608,
+				"end": 632,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "SvelteHead",
+				"start": 632,
+				"end": 683,
+				"name": "svelte:head",
+				"name_loc": {
+					"start": {
+						"line": 19,
+						"column": 30,
+						"character": 633
+					},
+					"end": {
+						"line": 19,
+						"column": 41,
+						"character": 644
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 645,
+							"end": 647,
+							"raw": "  ",
+							"data": "  "
+						},
+						{
+							"type": "TitleElement",
+							"start": 647,
+							"end": 667,
+							"name": "title",
+							"name_loc": {
+								"start": {
+									"line": 19,
+									"column": 45,
+									"character": 648
+								},
+								"end": {
+									"line": 19,
+									"column": 50,
+									"character": 653
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 654,
+										"end": 659,
+										"raw": "text5",
+										"data": "text5"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 667,
+							"end": 669,
+							"raw": "  ",
+							"data": "  "
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 683,
+				"end": 688,
+				"raw": "text6",
+				"data": "text6"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

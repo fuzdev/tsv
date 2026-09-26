@@ -312,6 +312,17 @@ impl<'a> Printer<'a> {
                         self.push_format_ignore_gap(freeze.gap, frozen, multiline, &mut child_docs);
                     }
                     child_docs.push(raw_doc);
+                    // The boundary after the slice is the printer's, and it is the one the node
+                    // gets unfrozen: the follower does not know its neighbour is frozen, so beside
+                    // a node that owns its line it trims on the break that node's handler would
+                    // emit. A hardline, as both handlers spell it here — `force_break` holds
+                    // whenever a node owning its line has a follower.
+                    if multiline
+                        && self.owns_own_line(trimmed_nodes, i)
+                        && self.owes_break_after(trimmed_nodes, i)
+                    {
+                        child_docs.push(self.d().hardline());
+                    }
                     // The trailing run the slice gave up: its boundary is the follower's own line,
                     // but an authored blank in it is content that one break cannot carry — the
                     // same second hardline `handle_content_text_child` pushes at this seam. At the
@@ -1566,7 +1577,6 @@ impl<'a> Printer<'a> {
             }
         };
         let prev = i.checked_sub(1).map(|j| (j, &trimmed_nodes[j]));
-        let next = trimmed_nodes.get(i + 1);
 
         // A previous sibling that owns its own line ([`Self::owns_own_line`] — a block element or
         // a declaration tag) already emitted the break after itself; asking only about block
@@ -1587,7 +1597,36 @@ impl<'a> Printer<'a> {
             child_docs.push(node_doc);
         }
 
-        let break_after = match next {
+        if self.owes_break_after(trimmed_nodes, i) {
+            child_docs.push(sep());
+        }
+    }
+
+    /// Whether the node at `i`, which [owns its own line](Self::owns_own_line), owes the break
+    /// AFTER itself — the half of its handler ([`Self::handle_block_child`] /
+    /// [`Self::handle_own_line_tag`]) its follower relies on. A content text after it trims the
+    /// run between them, and a whitespace-only separator before an inline element or component
+    /// stays off, both because this break is the one that separates them.
+    ///
+    /// A declaration owes it across a directly adjacent sibling only: a whitespace-only separator
+    /// emits the whole boundary itself (see [`Self::handle_own_line_tag`]). A block element owes
+    /// it before any follower but a leading-linebreak text, which supplies its own, and a
+    /// whitespace-only separator followed by anything but an inline element or component.
+    ///
+    /// ⚠️ **A frozen node owes it too.** The `format-ignore` arm emits the node's slice in place
+    /// of its handler, but the follower is unfrozen and trims exactly as it does beside any node
+    /// that owns its line — so the arm asks this, or the two nodes weld. The weld is
+    /// render-visible wherever the compiler hoists the frozen node, since its neighbours then
+    /// meet directly: a global `svelte:*` element
+    /// (`syntax/prettier_ignore/global_glued_before_prettier_divergence`) and a declaration
+    /// (`syntax/prettier_ignore/declaration_glued_before_prettier_divergence`).
+    fn owes_break_after(&self, trimmed_nodes: &[FragmentNode<'_>], i: usize) -> bool {
+        if trimmed_nodes[i].is_declaration() {
+            return trimmed_nodes
+                .get(i + 1)
+                .is_some_and(|n| !n.is_whitespace_only_text());
+        }
+        match trimmed_nodes.get(i + 1) {
             Some(FragmentNode::Text(t)) => {
                 let raw = t.raw(self.source);
                 let is_empty_ws = t.is_collapsible_ws_only;
@@ -1604,9 +1643,6 @@ impl<'a> Printer<'a> {
             }
             Some(_) => true,
             None => false,
-        };
-        if break_after {
-            child_docs.push(sep());
         }
     }
 
@@ -1656,10 +1692,7 @@ impl<'a> Printer<'a> {
             child_docs.push(node_doc);
         }
 
-        if trimmed_nodes
-            .get(i + 1)
-            .is_some_and(|n| !n.is_whitespace_only_text())
-        {
+        if self.owes_break_after(trimmed_nodes, i) {
             child_docs.push(d.hardline());
         }
     }

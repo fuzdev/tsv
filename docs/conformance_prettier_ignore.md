@@ -21,6 +21,9 @@ For a whole-construct freeze the `prettier-ignore` family matches prettier (both
 - glued nodes **inside** a range (byte-verbatim vs prettier's inter-node re-layout) — ◆design_choice — [range_glued](../tests/fixtures/svelte/syntax/prettier_ignore/range_glued_prettier_divergence/)
 - the gap in front of a frozen **text** node, where prettier never converges — ◆content_preservation — [directive_gap_text](../tests/fixtures/svelte/syntax/prettier_ignore/directive_gap_text_prettier_divergence/)
 - a frozen **text** node the section reorder leaves at the end of the document — ◆content_preservation — [template_tail_ignore](../tests/fixtures/svelte/script/ordering/template_tail_ignore_prettier_divergence/)
+- the boundary **after** a frozen global `svelte:*` element, a space and a line break converged on the break — ◆stable_quirk ◆design_choice — [global_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/global_glued_before_prettier_divergence/), [global_glued_before_neighbours](../tests/fixtures/svelte/syntax/prettier_ignore/global_glued_before_neighbours_prettier_divergence/), [global_space_after](../tests/fixtures/svelte/syntax/prettier_ignore/global_space_after_prettier_divergence/), [global_glued_before_long](../tests/fixtures/svelte/syntax/prettier_ignore/global_glued_before_long_prettier_divergence/)
+- the boundary **after** a frozen declaration tag, a space and a line break converged on the break — ◆stable_quirk ◆design_choice — [declaration_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/declaration_glued_before_prettier_divergence/)
+- a directive glued to the text in front of a frozen **block** element, kept glued — ◆design_choice — [block_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/block_glued_before_prettier_divergence/)
 
 **The gap in front of a frozen node is the author's, and it is printed once.** A directive and
 the node it freezes are separated by whatever the author wrote there, and that gap reaches the
@@ -55,7 +58,7 @@ stays glued: there is no whitespace at that boundary, so a break there injects a
 the source does not have (`render_compare` grades it VISIBLE — `text0a` becomes `text0 a`), and
 the formatter already declines the same break on the directive's other side. Own-line
 normalization is a layout preference, the glue is a render fact, so the glue wins — matching
-prettier, which keeps every spelling of this gap as authored
+prettier, which keeps every spelling of this gap as authored in front of an inline node
 ([directive_gap_glued](../tests/fixtures/svelte/syntax/prettier_ignore/directive_gap_glued/), a
 parity fixture). Nor is it deleted: an **inline** fragment keeps that gap as the one space it
 renders as, a collapsible `line` like every other inline sibling boundary — emitting nothing there
@@ -66,6 +69,50 @@ only: a **space** standing in its own whitespace node before a frozen element be
 rather than remaining inline. That one is render-neutral (a space and a newline both collapse to
 one rendered space) and matching prettier there would mean a collapsible `line` where every other
 node boundary in a block-style fragment takes a hardline — ◆design_choice.
+
+**The glue holds at a block element too, where prettier parts from it.** A directive glued to
+the text in front of the block element it freezes stays glued in tsv, the same one rule as at
+every other frozen kind; prettier breaks between the directive and a block element, though it keeps
+the glue at an inline one ([block_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/block_glued_before_prettier_divergence/)) —
+◆design_choice.
+
+**The boundary after a frozen node is the one the node gets unfrozen.** A freeze pins the node's
+bytes, not the whitespace between it and its follower: that boundary is the printer's, and it
+takes the form the same node takes there unfrozen. After a node that owns its line — a block
+element, or a declaration tag (`{let}` / `{const}` / `{@const}` / `{#snippet}`) not glued on both
+sides — that is a line break, however the author spelled the whitespace and whatever inline kind
+follows (text, an inline element, a component, a `<svelte:element>` / `<svelte:boundary>`) — the
+same break an expression tag or a block after it gets. After a frozen **inline** node it is the space it keeps unfrozen
+([inline_space_after](../tests/fixtures/svelte/syntax/prettier_ignore/inline_space_after/), a parity fixture whose no-break-space control is
+content rather than a separator). After a block element whose directive owns its line, the break is
+the parity layout ([block_space_after](../tests/fixtures/svelte/syntax/prettier_ignore/block_space_after/)); with the directive glued in front
+prettier also breaks before the element (above), and after it the two agree again. After a global
+`svelte:*` element (`<svelte:window>` / `<svelte:document>` / `<svelte:body>` / `<svelte:head>`)
+it is the break after the element that the glued-on-one-side rule of
+[conformance_prettier_svelte.md §Svelte: Inline content block-style](./conformance_prettier_svelte.md#svelte-inline-content-block-style)
+gives: the compiler hoists the element out of the fragment, so the content on its two sides meets
+across that whitespace and renders one space whether it is spelled as a space or as a break. The
+whitespace is never deleted — with the element hoisted, `text1<!-- prettier-ignore --><svelte:window />text2`
+renders `text1text2` — and the directive glued in front of the element stays glued (above), so the
+element keeps the line it shares with the content before it and only its far side breaks. The
+break is owed after the element's last byte, so a frozen `<svelte:head>` spanning lines takes it
+after its closing tag, and it is owed wherever the directive sits: on its own line, after a space,
+or glued to another global element (which, hoisted too, takes its own line in front). Prettier
+keeps the space and the break as two stable forms, and tsv converges them on the break
+([global_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/global_glued_before_prettier_divergence/),
+[global_glued_before_neighbours](../tests/fixtures/svelte/syntax/prettier_ignore/global_glued_before_neighbours_prettier_divergence/),
+[global_space_after](../tests/fixtures/svelte/syntax/prettier_ignore/global_space_after_prettier_divergence/)) — ◆stable_quirk; where prettier
+breaks before the follower as well — a component, a `<svelte:element>`, a `<svelte:boundary>` — the
+two agree ([global_glued_before_followers](../tests/fixtures/svelte/syntax/prettier_ignore/global_glued_before_followers/), whose element glued
+on **both** sides is the control that owes no break at all). The break is not part of the glued
+unit's width: a unit ending its line at exactly 100 stays, and one that would end it at 101 travels
+to a fresh line whole, where prettier keeps it on the line
+([global_glued_before_long](../tests/fixtures/svelte/syntax/prettier_ignore/global_glued_before_long_prettier_divergence/)).
+A frozen **declaration** tag glued to the text before it takes the same break after it: it renders
+nothing and the compiler hoists it, so the text on its two sides meets across that whitespace
+exactly as around a global element, and prettier keeps each spelling of it where tsv converges them
+on the break ([declaration_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/declaration_glued_before_prettier_divergence/)) —
+◆stable_quirk.
 
 **A range does not pin a section's position.** A `<script>` / `<style>` / `<svelte:options>` written *inside* a range is still lifted to the component root and printed at its canonical position, and its bytes are cut out of the frozen slice — leaving them there emits the section twice, which the parser rejects (`Duplicate instance script found`). Prettier does the same, so the plain case needs no divergence ([range_section_hoist](../tests/fixtures/svelte/syntax/prettier_ignore/range_section_hoist/)); a comment sitting beside such a section diverges ([range_interior_comment](../tests/fixtures/svelte/syntax/prettier_ignore/range_interior_comment_prettier_divergence/)), and the seam the cut leaves behind follows the byte-verbatim rule ([range_glued](../tests/fixtures/svelte/syntax/prettier_ignore/range_glued_prettier_divergence/)): tsv freezes the whole slice including inter-node whitespace, where prettier freezes node *content* but re-lays out the whitespace between nodes.
 

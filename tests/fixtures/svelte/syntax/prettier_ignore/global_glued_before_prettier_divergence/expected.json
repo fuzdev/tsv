@@ -1,0 +1,502 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 949,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 383,
+				"data": "\n\tA frozen global `svelte:*` element glued to the content before it, with whitespace after it,\n\tlays out on that side as the same element unfrozen does: the whitespace after it is a line\n\tbreak. The compiler hoists the element out of the fragment, so its neighbours meet across that\n\twhitespace and render one space either way; the directive glued in front of it stays glued.\n"
+			},
+			{
+				"type": "Text",
+				"start": 383,
+				"end": 385,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 385,
+				"end": 443,
+				"data": " text before, text after, svelte:head with content "
+			},
+			{
+				"type": "Text",
+				"start": 443,
+				"end": 449,
+				"raw": "\ntext1",
+				"data": "\ntext1"
+			},
+			{
+				"type": "Comment",
+				"start": 449,
+				"end": 473,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "SvelteHead",
+				"start": 473,
+				"end": 524,
+				"name": "svelte:head",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 30,
+						"character": 474
+					},
+					"end": {
+						"line": 9,
+						"column": 41,
+						"character": 485
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 486,
+							"end": 488,
+							"raw": "  ",
+							"data": "  "
+						},
+						{
+							"type": "TitleElement",
+							"start": 488,
+							"end": 508,
+							"name": "title",
+							"name_loc": {
+								"start": {
+									"line": 9,
+									"column": 45,
+									"character": 489
+								},
+								"end": {
+									"line": 9,
+									"column": 50,
+									"character": 494
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 495,
+										"end": 500,
+										"raw": "text2",
+										"data": "text2"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 508,
+							"end": 510,
+							"raw": "  ",
+							"data": "  "
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 524,
+				"end": 532,
+				"raw": "\ntext3\n\n",
+				"data": "\ntext3\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 532,
+				"end": 590,
+				"data": " an expression tag before, an inline element after "
+			},
+			{
+				"type": "Text",
+				"start": 590,
+				"end": 591,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 591,
+				"end": 597,
+				"expression": {
+					"type": "Identifier",
+					"start": 592,
+					"end": 596,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 5
+						}
+					},
+					"name": "expr"
+				}
+			},
+			{
+				"type": "Comment",
+				"start": 597,
+				"end": 621,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "SvelteDocument",
+				"start": 621,
+				"end": 656,
+				"name": "svelte:document",
+				"name_loc": {
+					"start": {
+						"line": 13,
+						"column": 31,
+						"character": 622
+					},
+					"end": {
+						"line": 13,
+						"column": 46,
+						"character": 637
+					}
+				},
+				"attributes": [
+					{
+						"start": 641,
+						"end": 651,
+						"type": "OnDirective",
+						"name": "x",
+						"name_loc": {
+							"start": {
+								"line": 13,
+								"column": 50,
+								"character": 641
+							},
+							"end": {
+								"line": 13,
+								"column": 54,
+								"character": 645
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 647,
+							"end": 650,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 56
+								},
+								"end": {
+									"line": 13,
+									"column": 59
+								}
+							},
+							"name": "fn1"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 656,
+				"end": 657,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 657,
+				"end": 677,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 1,
+						"character": 658
+					},
+					"end": {
+						"line": 14,
+						"column": 5,
+						"character": 662
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 663,
+							"end": 670,
+							"raw": "inline1",
+							"data": "inline1"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 677,
+				"end": 679,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 679,
+				"end": 751,
+				"data": " an inline element before, text after, the tool-neutral spelling "
+			},
+			{
+				"type": "Text",
+				"start": 751,
+				"end": 752,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 752,
+				"end": 772,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 17,
+						"column": 1,
+						"character": 753
+					},
+					"end": {
+						"line": 17,
+						"column": 5,
+						"character": 757
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 758,
+							"end": 765,
+							"raw": "inline2",
+							"data": "inline2"
+						}
+					]
+				}
+			},
+			{
+				"type": "Comment",
+				"start": 772,
+				"end": 794,
+				"data": " format-ignore "
+			},
+			{
+				"type": "SvelteBody",
+				"start": 794,
+				"end": 820,
+				"name": "svelte:body",
+				"name_loc": {
+					"start": {
+						"line": 17,
+						"column": 43,
+						"character": 795
+					},
+					"end": {
+						"line": 17,
+						"column": 54,
+						"character": 806
+					}
+				},
+				"attributes": [
+					{
+						"start": 807,
+						"end": 817,
+						"type": "OnDirective",
+						"name": "x",
+						"name_loc": {
+							"start": {
+								"line": 17,
+								"column": 55,
+								"character": 807
+							},
+							"end": {
+								"line": 17,
+								"column": 59,
+								"character": 811
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 813,
+							"end": 816,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 61
+								},
+								"end": {
+									"line": 17,
+									"column": 64
+								}
+							},
+							"name": "fn2"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 820,
+				"end": 828,
+				"raw": "\ntext4\n\n",
+				"data": "\ntext4\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 828,
+				"end": 864,
+				"data": " a control-flow block before "
+			},
+			{
+				"type": "Text",
+				"start": 864,
+				"end": 865,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 865,
+				"end": 885,
+				"test": {
+					"type": "Identifier",
+					"start": 870,
+					"end": 874,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 5
+						},
+						"end": {
+							"line": 21,
+							"column": 9
+						}
+					},
+					"name": "cond"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 875,
+							"end": 880,
+							"raw": "text5",
+							"data": "text5"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Comment",
+				"start": 885,
+				"end": 909,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "SvelteWindow",
+				"start": 909,
+				"end": 942,
+				"name": "svelte:window",
+				"name_loc": {
+					"start": {
+						"line": 21,
+						"column": 45,
+						"character": 910
+					},
+					"end": {
+						"line": 21,
+						"column": 58,
+						"character": 923
+					}
+				},
+				"attributes": [
+					{
+						"start": 927,
+						"end": 937,
+						"type": "OnDirective",
+						"name": "x",
+						"name_loc": {
+							"start": {
+								"line": 21,
+								"column": 62,
+								"character": 927
+							},
+							"end": {
+								"line": 21,
+								"column": 66,
+								"character": 931
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 933,
+							"end": 936,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 68
+								},
+								"end": {
+									"line": 21,
+									"column": 71
+								}
+							},
+							"name": "fn3"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 942,
+				"end": 948,
+				"raw": "\ntext6",
+				"data": "\ntext6"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

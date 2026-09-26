@@ -1,0 +1,357 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 571,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 182,
+				"data": "\n\tThe boundary after a frozen global `svelte:*` element is the printer's wherever the directive\n\tsits and whatever the element spans: the whitespace after it is a line break.\n"
+			},
+			{
+				"type": "Text",
+				"start": 182,
+				"end": 184,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 184,
+				"end": 235,
+				"data": " the directive on its own line, prose after "
+			},
+			{
+				"type": "Text",
+				"start": 235,
+				"end": 236,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Comment",
+				"start": 236,
+				"end": 260,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "Text",
+				"start": 260,
+				"end": 261,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteWindow",
+				"start": 261,
+				"end": 294,
+				"name": "svelte:window",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 262
+					},
+					"end": {
+						"line": 8,
+						"column": 14,
+						"character": 275
+					}
+				},
+				"attributes": [
+					{
+						"start": 279,
+						"end": 289,
+						"type": "OnDirective",
+						"name": "x",
+						"name_loc": {
+							"start": {
+								"line": 8,
+								"column": 18,
+								"character": 279
+							},
+							"end": {
+								"line": 8,
+								"column": 22,
+								"character": 283
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 285,
+							"end": 288,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 24
+								},
+								"end": {
+									"line": 8,
+									"column": 27
+								}
+							},
+							"name": "fn1"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 294,
+				"end": 301,
+				"raw": "\ntext1 ",
+				"data": "\ntext1 "
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 301,
+				"end": 307,
+				"expression": {
+					"type": "Identifier",
+					"start": 302,
+					"end": 306,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 7
+						},
+						"end": {
+							"line": 9,
+							"column": 11
+						}
+					},
+					"name": "expr"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 307,
+				"end": 309,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 309,
+				"end": 361,
+				"data": " another global element before the directive "
+			},
+			{
+				"type": "Text",
+				"start": 361,
+				"end": 362,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteBody",
+				"start": 362,
+				"end": 377,
+				"name": "svelte:body",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 1,
+						"character": 363
+					},
+					"end": {
+						"line": 12,
+						"column": 12,
+						"character": 374
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 377,
+				"end": 378,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Comment",
+				"start": 378,
+				"end": 402,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "SvelteDocument",
+				"start": 402,
+				"end": 437,
+				"name": "svelte:document",
+				"name_loc": {
+					"start": {
+						"line": 13,
+						"column": 25,
+						"character": 403
+					},
+					"end": {
+						"line": 13,
+						"column": 40,
+						"character": 418
+					}
+				},
+				"attributes": [
+					{
+						"start": 422,
+						"end": 432,
+						"type": "OnDirective",
+						"name": "x",
+						"name_loc": {
+							"start": {
+								"line": 13,
+								"column": 44,
+								"character": 422
+							},
+							"end": {
+								"line": 13,
+								"column": 48,
+								"character": 426
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 428,
+							"end": 431,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 50
+								},
+								"end": {
+									"line": 13,
+									"column": 53
+								}
+							},
+							"name": "fn2"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 437,
+				"end": 445,
+				"raw": "\ntext2\n\n",
+				"data": "\ntext2\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 445,
+				"end": 484,
+				"data": " a svelte:head that spans lines "
+			},
+			{
+				"type": "Text",
+				"start": 484,
+				"end": 490,
+				"raw": "\ntext3",
+				"data": "\ntext3"
+			},
+			{
+				"type": "Comment",
+				"start": 490,
+				"end": 514,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "SvelteHead",
+				"start": 514,
+				"end": 564,
+				"name": "svelte:head",
+				"name_loc": {
+					"start": {
+						"line": 17,
+						"column": 30,
+						"character": 515
+					},
+					"end": {
+						"line": 17,
+						"column": 41,
+						"character": 526
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 527,
+							"end": 529,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "TitleElement",
+							"start": 529,
+							"end": 549,
+							"name": "title",
+							"name_loc": {
+								"start": {
+									"line": 18,
+									"column": 2,
+									"character": 530
+								},
+								"end": {
+									"line": 18,
+									"column": 7,
+									"character": 535
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 536,
+										"end": 541,
+										"raw": "text4",
+										"data": "text4"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 549,
+							"end": 550,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 564,
+				"end": 570,
+				"raw": "\ntext5",
+				"data": "\ntext5"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,455 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 797,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 164,
+				"data": "\n\tA frozen INLINE node keeps the space after it, as it does unfrozen: an element, a component, an\n\texpression tag, a control-flow block, a `svelte:element`.\n"
+			},
+			{
+				"type": "Text",
+				"start": 164,
+				"end": 166,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 166,
+				"end": 185,
+				"data": " an element "
+			},
+			{
+				"type": "Text",
+				"start": 185,
+				"end": 191,
+				"raw": "\ntext1",
+				"data": "\ntext1"
+			},
+			{
+				"type": "Comment",
+				"start": 191,
+				"end": 215,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "RegularElement",
+				"start": 215,
+				"end": 259,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 30,
+						"character": 216
+					},
+					"end": {
+						"line": 7,
+						"column": 34,
+						"character": 220
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 224,
+						"end": 241,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 7,
+								"column": 38,
+								"character": 224
+							},
+							"end": {
+								"line": 7,
+								"column": 47,
+								"character": 233
+							}
+						},
+						"value": [
+							{
+								"start": 235,
+								"end": 240,
+								"type": "Text",
+								"raw": "value",
+								"data": "value"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 245,
+							"end": 252,
+							"raw": "inline1",
+							"data": "inline1"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 259,
+				"end": 267,
+				"raw": " text2\n\n",
+				"data": " text2\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 267,
+				"end": 287,
+				"data": " a component "
+			},
+			{
+				"type": "Text",
+				"start": 287,
+				"end": 293,
+				"raw": "\ntext3",
+				"data": "\ntext3"
+			},
+			{
+				"type": "Comment",
+				"start": 293,
+				"end": 317,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "Component",
+				"start": 317,
+				"end": 343,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 30,
+						"character": 318
+					},
+					"end": {
+						"line": 10,
+						"column": 34,
+						"character": 322
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 326,
+						"end": 338,
+						"name": "prop",
+						"name_loc": {
+							"start": {
+								"line": 10,
+								"column": 38,
+								"character": 326
+							},
+							"end": {
+								"line": 10,
+								"column": 42,
+								"character": 330
+							}
+						},
+						"value": [
+							{
+								"start": 332,
+								"end": 337,
+								"type": "Text",
+								"raw": "value",
+								"data": "value"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 343,
+				"end": 351,
+				"raw": " text4\n\n",
+				"data": " text4\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 351,
+				"end": 377,
+				"data": " an expression tag "
+			},
+			{
+				"type": "Text",
+				"start": 377,
+				"end": 383,
+				"raw": "\ntext5",
+				"data": "\ntext5"
+			},
+			{
+				"type": "Comment",
+				"start": 383,
+				"end": 407,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 407,
+				"end": 419,
+				"expression": {
+					"type": "Identifier",
+					"start": 411,
+					"end": 415,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 33
+						},
+						"end": {
+							"line": 13,
+							"column": 37
+						}
+					},
+					"name": "expr"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 419,
+				"end": 427,
+				"raw": " text6\n\n",
+				"data": " text6\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 427,
+				"end": 456,
+				"data": " a control-flow block "
+			},
+			{
+				"type": "Text",
+				"start": 456,
+				"end": 462,
+				"raw": "\ntext7",
+				"data": "\ntext7"
+			},
+			{
+				"type": "Comment",
+				"start": 462,
+				"end": 486,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 486,
+				"end": 508,
+				"test": {
+					"type": "Identifier",
+					"start": 493,
+					"end": 497,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 36
+						},
+						"end": {
+							"line": 16,
+							"column": 40
+						}
+					},
+					"name": "cond"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 498,
+							"end": 503,
+							"raw": "text8",
+							"data": "text8"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 508,
+				"end": 516,
+				"raw": " text9\n\n",
+				"data": " text9\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 516,
+				"end": 541,
+				"data": " a svelte:element "
+			},
+			{
+				"type": "Text",
+				"start": 541,
+				"end": 548,
+				"raw": "\ntext10",
+				"data": "\ntext10"
+			},
+			{
+				"type": "Comment",
+				"start": 548,
+				"end": 572,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "SvelteElement",
+				"start": 572,
+				"end": 624,
+				"name": "svelte:element",
+				"name_loc": {
+					"start": {
+						"line": 19,
+						"column": 31,
+						"character": 573
+					},
+					"end": {
+						"line": 19,
+						"column": 45,
+						"character": 587
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 601,
+							"end": 607,
+							"raw": "text11",
+							"data": "text11"
+						}
+					]
+				},
+				"tag": {
+					"type": "Identifier",
+					"start": 595,
+					"end": 598,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 53
+						},
+						"end": {
+							"line": 19,
+							"column": 56
+						}
+					},
+					"name": "tag"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 624,
+				"end": 633,
+				"raw": " text12\n\n",
+				"data": " text12\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 633,
+				"end": 725,
+				"data": " control: a no-break space after a frozen global element is content, not a separator "
+			},
+			{
+				"type": "Text",
+				"start": 725,
+				"end": 732,
+				"raw": "\ntext13",
+				"data": "\ntext13"
+			},
+			{
+				"type": "Comment",
+				"start": 732,
+				"end": 756,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "SvelteWindow",
+				"start": 756,
+				"end": 789,
+				"name": "svelte:window",
+				"name_loc": {
+					"start": {
+						"line": 22,
+						"column": 31,
+						"character": 757
+					},
+					"end": {
+						"line": 22,
+						"column": 44,
+						"character": 770
+					}
+				},
+				"attributes": [
+					{
+						"start": 774,
+						"end": 784,
+						"type": "OnDirective",
+						"name": "x",
+						"name_loc": {
+							"start": {
+								"line": 22,
+								"column": 48,
+								"character": 774
+							},
+							"end": {
+								"line": 22,
+								"column": 52,
+								"character": 778
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 780,
+							"end": 783,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 54
+								},
+								"end": {
+									"line": 22,
+									"column": 57
+								}
+							},
+							"name": "fn1"
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 789,
+				"end": 796,
+				"raw": " text14",
+				"data": " text14"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
