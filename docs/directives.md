@@ -92,6 +92,12 @@ it survives as the one space it renders as. The gap in front of a frozen node is
 the author's: the formatter prints it once, never invents one, and never eats
 one.
 
+A template directive directly above a `<script>` or `<style>` freezes that section alone,
+wherever the canonical section order prints it: the section below keeps its source text, and
+the next section is formatted as usual, whichever order the sections were written in. Above
+`<svelte:options>` a directive freezes nothing — the options tag is always normalized — and it
+does not reach past it to the section that follows.
+
 To freeze a construct, put the directive alone on the line above it.
 
 ### On type-member lists

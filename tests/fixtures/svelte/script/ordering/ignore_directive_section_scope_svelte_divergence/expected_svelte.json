@@ -1,0 +1,254 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 100,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 24,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "Text",
+				"start": 24,
+				"end": 25,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Text",
+				"start": 61,
+				"end": 63,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Text",
+				"start": 89,
+				"end": 91,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 91,
+				"end": 99,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 92
+					},
+					"end": {
+						"line": 10,
+						"column": 2,
+						"character": 93
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 94,
+							"end": 95,
+							"raw": "a",
+							"data": "a"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"module": {
+		"type": "Script",
+		"start": 25,
+		"end": 61,
+		"context": "module",
+		"content": {
+			"type": "Program",
+			"start": 40,
+			"end": 52,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 43,
+					"end": 51,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 2
+						},
+						"end": {
+							"line": 3,
+							"column": 10
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 49,
+							"end": 50,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 8
+								},
+								"end": {
+									"line": 3,
+									"column": 9
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 49,
+								"end": 50,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 8
+									},
+									"end": {
+										"line": 3,
+										"column": 9
+									}
+								},
+								"name": "m"
+							},
+							"init": null
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module",
+			"leadingComments": [
+				{
+					"type": "Line",
+					"value": " prettier-ignore "
+				}
+			]
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 33,
+				"end": 39,
+				"name": "module",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 8,
+						"character": 33
+					},
+					"end": {
+						"line": 2,
+						"column": 14,
+						"character": 39
+					}
+				},
+				"value": true
+			}
+		]
+	},
+	"instance": {
+		"type": "Script",
+		"start": 63,
+		"end": 89,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 71,
+			"end": 80,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 0
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 73,
+					"end": 79,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 77,
+							"end": 78,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 5
+								},
+								"end": {
+									"line": 7,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 77,
+								"end": 78,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 5
+									},
+									"end": {
+										"line": 7,
+										"column": 6
+									}
+								},
+								"name": "a"
+							},
+							"init": null
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module",
+			"leadingComments": [
+				{
+					"type": "Line",
+					"value": " prettier-ignore "
+				}
+			]
+		},
+		"attributes": []
+	}
+}

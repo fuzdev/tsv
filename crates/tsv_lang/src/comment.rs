@@ -462,6 +462,29 @@ pub fn is_format_ignore_range_end(content: &str) -> bool {
     )
 }
 
+/// Whether an HTML comment's content (the text between `<!--` and `-->`) is an editor
+/// region-end marker — `#endregion`, optionally spaced after the `#` and followed by a label
+/// (`<!-- #endregion STYLES -->`), matched anywhere in the content and case-insensitively: the
+/// comment the Svelte formatter keeps below the root section it is written under. The spelling
+/// is prettier-plugin-svelte's (`/#\s*endregion\b/i` in its region-end trail), so the whitespace
+/// between `#` and the word is JS `\s` and the `\b` after it is the ASCII word boundary.
+pub fn is_region_end_marker(content: &str) -> bool {
+    const WORD: &str = "endregion";
+    let is_word_byte = |c: char| c.is_ascii_alphanumeric() || c == '_';
+    content
+        .bytes()
+        .enumerate()
+        .filter(|&(_, b)| b == b'#')
+        .any(|(i, _)| {
+            // `#` is ASCII, so `i + 1` is a char boundary; `get` refuses a cut inside a
+            // multibyte char, which is then not the word either
+            let after = trim_start_js_whitespace(&content[i + 1..]);
+            after.get(..WORD.len()).is_some_and(|word| {
+                word.eq_ignore_ascii_case(WORD) && !after[WORD.len()..].starts_with(is_word_byte)
+            })
+        })
+}
+
 //
 // Comment Classification
 //

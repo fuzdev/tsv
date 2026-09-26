@@ -7,8 +7,11 @@ the comment stood behind, now ends the document. tsv spells its last character `
 does when the script itself follows the text
 ([template_tail_nbsp](../template_tail_nbsp_prettier_divergence/)).
 
-Prettier carries the comment the same way but drops the whole text node, landing on
-`variant_text_dropped.svelte` in one pass — a render change.
+Prettier carries the comment the same way, but a comment glued to a hoisted `<script>` makes it
+drop the template's **last** node — here the text, which the reorder leaves as the whole
+template — landing on `variant_text_dropped.svelte` in one pass, a render change. The loss is
+not about the respelled character: the same glue drops the last node wherever the section sits
+([lifted_run_glued_comment](../lifted_run_glued_comment_prettier_divergence/)).
 
 ## Reason
 

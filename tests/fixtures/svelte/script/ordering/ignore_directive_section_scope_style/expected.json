@@ -1,0 +1,213 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 63,
+		"end": 94,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 73,
+					"end": 74,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 73,
+							"end": 74,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "p",
+											"start": 73,
+											"end": 74
+										}
+									],
+									"start": 73,
+									"end": 74
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 74,
+					"end": 85,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 75,
+							"end": 84,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 73,
+				"end": 85
+			}
+		],
+		"comments": [],
+		"content": {
+			"start": 70,
+			"end": 86,
+			"styles": "\n  p{color:red}\n",
+			"comment": {
+				"type": "Comment",
+				"start": 38,
+				"end": 62,
+				"data": " prettier-ignore "
+			}
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 95,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 26,
+				"end": 28,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 28,
+				"end": 36,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 29
+					},
+					"end": {
+						"line": 5,
+						"column": 2,
+						"character": 30
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 31,
+							"end": 32,
+							"raw": "a",
+							"data": "a"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 36,
+				"end": 38,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 38,
+				"end": 62,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "Text",
+				"start": 62,
+				"end": 63,
+				"raw": "\n",
+				"data": "\n"
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 26,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 17,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 10,
+					"end": 16,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 14,
+							"end": 15,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 5
+								},
+								"end": {
+									"line": 2,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 14,
+								"end": 15,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 5
+									},
+									"end": {
+										"line": 2,
+										"column": 6
+									}
+								},
+								"name": "a"
+							},
+							"init": null
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

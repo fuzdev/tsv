@@ -1,0 +1,17 @@
+xy
+<p>a</p>
+{a}{b}
+<p>b</p>
+<b>x</b><b>y</b>
+<p>c</p>
+x <!-- c --><script>
+	let a;
+</script> y
+<p>d</p>
+
+<p>e</p>
+<A /><B />
+<p>f</p>
+<b>x</b> <b>y</b>
+<p>g</p>
+x<b>y</b>

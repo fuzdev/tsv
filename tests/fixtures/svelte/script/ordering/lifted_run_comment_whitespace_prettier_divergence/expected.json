@@ -1,0 +1,285 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 80,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 10,
+				"data": " c "
+			},
+			{
+				"type": "Text",
+				"start": 10,
+				"end": 11,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Text",
+				"start": 37,
+				"end": 39,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 39,
+				"end": 47,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 6,
+						"column": 1,
+						"character": 40
+					},
+					"end": {
+						"line": 6,
+						"column": 2,
+						"character": 41
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 42,
+							"end": 43,
+							"raw": "a",
+							"data": "a"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 47,
+				"end": 49,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 49,
+				"end": 57,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 50
+					},
+					"end": {
+						"line": 8,
+						"column": 2,
+						"character": 51
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 52,
+							"end": 53,
+							"raw": "b",
+							"data": "b"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 57,
+				"end": 58,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 58,
+				"end": 61,
+				"expression": {
+					"type": "Identifier",
+					"start": 59,
+					"end": 60,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 2
+						}
+					},
+					"name": "a"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 61,
+				"end": 63,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 63,
+				"end": 66,
+				"expression": {
+					"type": "Identifier",
+					"start": 64,
+					"end": 65,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 2
+						}
+					},
+					"name": "b"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 66,
+				"end": 67,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 67,
+				"end": 75,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 1,
+						"character": 68
+					},
+					"end": {
+						"line": 12,
+						"column": 2,
+						"character": 69
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 70,
+							"end": 71,
+							"raw": "c",
+							"data": "c"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 75,
+				"end": 79,
+				"raw": "\nx y",
+				"data": "\nx y"
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 11,
+		"end": 37,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 19,
+			"end": 28,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 21,
+					"end": 27,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 25,
+							"end": 26,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 5
+								},
+								"end": {
+									"line": 3,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 25,
+								"end": 26,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 5
+									},
+									"end": {
+										"line": 3,
+										"column": 6
+									}
+								},
+								"name": "a"
+							},
+							"init": null
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module",
+			"leadingComments": [
+				{
+					"type": "Line",
+					"value": " c "
+				}
+			]
+		},
+		"attributes": []
+	}
+}

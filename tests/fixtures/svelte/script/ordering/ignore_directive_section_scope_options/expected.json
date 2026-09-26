@@ -1,0 +1,172 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 88,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 24,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "Text",
+				"start": 24,
+				"end": 25,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Text",
+				"start": 49,
+				"end": 51,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Text",
+				"start": 77,
+				"end": 79,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 79,
+				"end": 87,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 80
+					},
+					"end": {
+						"line": 8,
+						"column": 2,
+						"character": 81
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 82,
+							"end": 83,
+							"raw": "a",
+							"data": "a"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": {
+		"start": 25,
+		"end": 49,
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 41,
+				"end": 46,
+				"name": "runes",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 16,
+						"character": 41
+					},
+					"end": {
+						"line": 2,
+						"column": 21,
+						"character": 46
+					}
+				},
+				"value": true
+			}
+		],
+		"runes": true
+	},
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 51,
+		"end": 77,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 59,
+			"end": 68,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 0
+				},
+				"end": {
+					"line": 6,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 61,
+					"end": 67,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 65,
+							"end": 66,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 5
+								},
+								"end": {
+									"line": 5,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 65,
+								"end": 66,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 5
+									},
+									"end": {
+										"line": 5,
+										"column": 6
+									}
+								},
+								"name": "a"
+							},
+							"init": null
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

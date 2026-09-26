@@ -22,6 +22,7 @@ mod attributes;
 mod classification;
 mod frozen_body;
 mod helpers;
+mod lifted_runs;
 mod nodes;
 mod script_style;
 mod text;
@@ -41,6 +42,7 @@ use tsv_lang::{
     comments_in_source_from, comments_on_page_from, comments_to_emit_from,
     has_comments_on_page_from, has_comments_to_emit_from, is_format_ignore_directive,
     is_format_ignore_range_end, is_format_ignore_range_start, is_honored_format_ignore,
+    is_region_end_marker,
 };
 use tsv_ts::{Expression, ExpressionKind};
 
@@ -138,10 +140,73 @@ impl IndexMut<HoistedSection> for HoistedComments {
     }
 }
 
+/// Whether each hoisted section is frozen by a format-ignore directive
+/// ([`Printer::section_is_frozen`]), in [`HoistedSection::ALL`] order. `<svelte:options>` is
+/// never frozen.
+type FrozenSections = [bool; 4];
+
 /// The four root sections in canonical print order ([`HoistedSection::ALL`]), each with its
 /// span when the component has it.
 fn root_sections(root: &internal::Root<'_>) -> [(Option<Span>, HoistedSection); 4] {
     HoistedSection::ALL.map(|section| (section.span_in(root), section))
+}
+
+/// The per-node facts [`Printer::classify_fragment_comment`] reads, taken for the whole
+/// fragment in one pass each way — so classifying every comment of a document is linear. Asked
+/// per comment instead, the range and barrier scans each walked the fragment again, which is
+/// quadratic in a comment-heavy template.
+struct CommentScan {
+    /// Each node's range marker ([`range_marker`]), `None` for every other node.
+    markers: Vec<Option<RangeMarker>>,
+    /// Whether the node sits inside a frozen range — [`Printer::is_inside_ignore_range`]'s
+    /// answer: the nearest marker before it opens a range, and a closing marker follows.
+    inside_range: Vec<bool>,
+    /// The start of the first node after each one that pins a comment there to the template —
+    /// a node other than whitespace text or an ordinary comment (a range marker is one).
+    next_barrier: Vec<Option<u32>>,
+}
+
+impl CommentScan {
+    fn new(fragment: &internal::Fragment<'_>, source: &str) -> Self {
+        let nodes = &fragment.nodes;
+        let markers: Vec<Option<RangeMarker>> = nodes
+            .iter()
+            .map(|n| match n {
+                FragmentNode::Comment(c) => range_marker(c, source),
+                _ => None,
+            })
+            .collect();
+
+        let mut inside_range = vec![false; nodes.len()];
+        let mut opened = false;
+        for (i, marker) in markers.iter().enumerate() {
+            inside_range[i] = opened;
+            if let Some(marker) = marker {
+                opened = *marker == RangeMarker::Start;
+            }
+        }
+        let mut closed_after = false;
+        let mut next_barrier = vec![None; nodes.len()];
+        let mut barrier = None;
+        for i in (0..nodes.len()).rev() {
+            closed_after |= markers[i] == Some(RangeMarker::End);
+            inside_range[i] &= closed_after;
+            next_barrier[i] = barrier;
+            let pins = match &nodes[i] {
+                FragmentNode::Text(t) => !t.is_collapsible_ws_only,
+                FragmentNode::Comment(_) => markers[i].is_some(),
+                _ => true,
+            };
+            if pins {
+                barrier = Some(nodes[i].span().start);
+            }
+        }
+        Self {
+            markers,
+            inside_range,
+            next_barrier,
+        }
+    }
 }
 
 /// A format-ignore **range marker**'s kind — the `…-start` / `…-end` pair that brackets a
@@ -167,28 +232,6 @@ fn range_marker(comment: &internal::HtmlComment, source: &str) -> Option<RangeMa
     } else {
         None
     }
-}
-
-/// Whether an HTML comment is an editor region-end marker — `#endregion`, optionally
-/// spaced after the `#` and followed by a label (`<!-- #endregion STYLES -->`), matched
-/// anywhere in the content and case-insensitively. The spelling is prettier-plugin-svelte's
-/// (`/#\s*endregion\b/i` in its region-end trail), so the whitespace between `#` and the word
-/// is JS `\s` and the `\b` after it is the ASCII word boundary.
-fn is_region_end_marker(content: &str) -> bool {
-    const WORD: &str = "endregion";
-    let is_word_byte = |c: char| c.is_ascii_alphanumeric() || c == '_';
-    content
-        .bytes()
-        .enumerate()
-        .filter(|&(_, b)| b == b'#')
-        .any(|(i, _)| {
-            // `#` is ASCII, so `i + 1` is a char boundary; `get` refuses a cut inside a
-            // multibyte char, which is then not the word either
-            let after = tsv_lang::trim_start_js_whitespace(&content[i + 1..]);
-            after.get(..WORD.len()).is_some_and(|word| {
-                word.eq_ignore_ascii_case(WORD) && !after[WORD.len()..].starts_with(is_word_byte)
-            })
-        })
 }
 
 /// A head's content doc plus whether that content **opens on its own line** — the pair every
@@ -1217,7 +1260,15 @@ pub(crate) fn format_svelte_in(
     arena: &DocArena,
 ) -> String {
     let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
-    format_root(root, source, line_breaks, arena, TailRespell::Allow)
+    format_root(
+        root,
+        source,
+        line_breaks,
+        arena,
+        TailRespell::Allow,
+        LiftRuns::Allow,
+        Known::default(),
+    )
 }
 
 /// [`format_svelte_in`] over a document the caller folded ahead of the parse: the line
@@ -1228,7 +1279,15 @@ pub(crate) fn format_svelte_folded_in(
     arena: &DocArena,
 ) -> String {
     let line_breaks = LineBreaks::of_folded(folded, arena.take_line_breaks_scratch());
-    format_root(root, folded.text(), line_breaks, arena, TailRespell::Allow)
+    format_root(
+        root,
+        folded.text(),
+        line_breaks,
+        arena,
+        TailRespell::Allow,
+        LiftRuns::Allow,
+        Known::default(),
+    )
 }
 
 /// Whether [`format_root`] may respell the template tail ([`format_respelled_tail`]).
@@ -1242,17 +1301,52 @@ enum TailRespell {
     Declined,
 }
 
+/// Whether [`format_root`] may move the component's mid-template lifted runs out of the
+/// template ([`format_lifted_runs`]).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum LiftRuns {
+    /// The entry points: rewrite when `Printer::lifted_runs_source` asks for it.
+    Allow,
+    /// A rewritten source (or a respelling of a source that had nothing to lift): no run sits
+    /// between template nodes any more, so it never asks again.
+    Lifted,
+    /// The rewritten source did not parse, so the original prints with its runs in place.
+    Declined,
+}
+
+/// What a caller of [`format_root`] already knows about the document it hands over: its
+/// comment classification ([`Printer::hoisted_comments`]) and its sections' freeze verdicts
+/// ([`FrozenSections`]). A rewrite carries the original's freeze verdicts, since it moves
+/// sections past the comments a directive is read off.
+#[derive(Default)]
+struct Known {
+    sections: Option<HoistedComments>,
+    frozen: Option<FrozenSections>,
+}
+
+impl Known {
+    fn frozen(frozen: FrozenSections) -> Self {
+        Self {
+            sections: None,
+            frozen: Some(frozen),
+        }
+    }
+}
+
 /// The shared body of the two: build the printer on its line table, register the
 /// document's comments, print the root, and write a BOM ahead of a leading content U+FEFF
-/// (`tsv_lang::printing::encode_leading_zwnbsp`) — or, for a document whose template tail
-/// the reorder would expose to the parse's end-of-document trim, format the respelled source
-/// instead ([`format_respelled_tail`]).
+/// (`tsv_lang::printing::encode_leading_zwnbsp`) — or, for a document with a hoisted section
+/// written between template nodes, format the rewritten source that joins the neighbours
+/// ([`format_lifted_runs`]); or, for a document whose template tail the reorder would expose
+/// to the parse's end-of-document trim, the respelled source ([`format_respelled_tail`]).
 fn format_root<'a>(
     root: &internal::Root<'_>,
     source: &'a str,
     line_breaks: LineBreaks<'a>,
     arena: &'a DocArena,
     tail: TailRespell,
+    lift: LiftRuns,
+    known: Known,
 ) -> String {
     // The printer's comment VIEW (`tsv_lang::merge_nestled_block_comments`). Two facts are
     // this array's own: it serves both this printer and every TEMPLATE island it constructs
@@ -1278,17 +1372,50 @@ fn format_root<'a>(
         line_breaks,
     );
 
-    // Asked ahead of everything the print does, the ledger included: a document whose
-    // template tail must be respelled is formatted from the respelled source instead.
+    // Which fragment comments travel with which section: asked once per document and shared by
+    // the lifted-run rewrite, the tail respell and the print — a caller that already classified
+    // this document hands its answer in.
+    let sections = known
+        .sections
+        .unwrap_or_else(|| printer.hoisted_comments(root));
+    // Which sections a directive freezes — a caller that rewrote the document hands in the
+    // original's answer, since the rewrite moves sections past comments (`frozen_sections`).
+    let frozen = known
+        .frozen
+        .unwrap_or_else(|| printer.frozen_sections(root));
+
+    // Asked ahead of everything the print does, the ledger included — and ahead of the tail
+    // respell, since moving a run can change which text ends the template: a document with a
+    // lifted run between template nodes is formatted from the rewritten source instead.
+    match lift {
+        LiftRuns::Allow => {
+            if let Some(lifted) = printer.lifted_runs_source(root, &sections) {
+                drop(printer.into_string()); // parks the line-break scratch
+                return format_lifted_runs(root, source, &lifted, arena, tail, sections, frozen);
+            }
+        }
+        LiftRuns::Lifted => debug_assert!(
+            printer.lifted_runs_source(root, &sections).is_none(),
+            "a lifted source must not ask to be lifted again"
+        ),
+        LiftRuns::Declined => {}
+    }
+
+    // A document whose template tail must be respelled is formatted from the respelled source
+    // instead.
     match tail {
         TailRespell::Allow => {
-            if let Some((at, ch)) = printer.template_tail_respell(root) {
+            if let Some((at, ch)) = printer.template_tail_respell(root, &sections) {
                 drop(printer.into_string()); // parks the line-break scratch
-                return format_respelled_tail(root, source, at, ch, arena);
+                let lift = match lift {
+                    LiftRuns::Declined => LiftRuns::Declined,
+                    LiftRuns::Allow | LiftRuns::Lifted => LiftRuns::Lifted,
+                };
+                return format_respelled_tail(root, source, at, ch, arena, lift, frozen);
             }
         }
         TailRespell::Respelled => debug_assert!(
-            printer.template_tail_respell(root).is_none(),
+            printer.template_tail_respell(root, &sections).is_none(),
             "a respelled template tail must not ask to be respelled again"
         ),
         TailRespell::Declined => {}
@@ -1309,13 +1436,18 @@ fn format_root<'a>(
         tsv_lang::comment_ledger::register_parsed_spans(source, html_comment_spans);
     }
 
-    print_document(printer, root)
+    print_document(printer, root, &sections, frozen)
 }
 
 /// Print `root` through `printer` and write a BOM ahead of a leading content U+FEFF
 /// (`tsv_lang::printing::encode_leading_zwnbsp`).
-fn print_document(mut printer: Printer<'_>, root: &internal::Root<'_>) -> String {
-    printer.print_root(root);
+fn print_document(
+    mut printer: Printer<'_>,
+    root: &internal::Root<'_>,
+    sections: &HoistedComments,
+    frozen: FrozenSections,
+) -> String {
+    printer.print_root(root, sections, frozen);
     // A content U+FEFF at output byte 0 needs a BOM ahead of it, or the next read strips it.
     tsv_lang::printing::encode_leading_zwnbsp(printer.into_string())
 }
@@ -1341,6 +1473,8 @@ fn format_respelled_tail(
     at: usize,
     ch: char,
     arena: &DocArena,
+    lift: LiftRuns,
+    frozen: FrozenSections,
 ) -> String {
     let mut respelled = String::with_capacity(source.len() + 10);
     respelled.push_str(&source[..at]);
@@ -1357,11 +1491,73 @@ fn format_respelled_tail(
                 line_breaks,
                 arena,
                 TailRespell::Respelled,
+                lift,
+                Known::frozen(frozen),
             )
         }
         Err(_) => {
             let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
-            format_root(root, source, line_breaks, arena, TailRespell::Declined)
+            format_root(
+                root,
+                source,
+                line_breaks,
+                arena,
+                TailRespell::Declined,
+                lift,
+                Known::frozen(frozen),
+            )
+        }
+    }
+}
+
+/// Format `lifted` — `source` rewritten in the output's layout (`Printer::lifted_runs_source`)
+/// — in its place.
+///
+/// The rewrite writes every section run where the output prints it, so it holds its comments in
+/// the output's order and classifies them as the output's own next pass does; there is nothing
+/// left to check it against. The one thing it cannot carry is a section's freeze: a directive
+/// is read off what stands above the section, which the rewrite changes, so the original's
+/// verdict (`frozen`) goes along with it. The rewrite only moves source text and respells
+/// whitespace between two template nodes, so its parse can fail only on the size limit
+/// (`ParseError`'s `FileTooLarge`), which the few added line breaks can cross; the original is
+/// then printed with its runs where they stand (`sections` is its classification).
+fn format_lifted_runs(
+    root: &internal::Root<'_>,
+    source: &str,
+    lifted: &str,
+    arena: &DocArena,
+    tail: TailRespell,
+    sections: HoistedComments,
+    frozen: FrozenSections,
+) -> String {
+    let bump = bumpalo::Bump::new();
+    match crate::parse(lifted, &bump) {
+        Ok(lifted_root) => {
+            let line_breaks = LineBreaks::new(lifted, arena.take_line_breaks_scratch());
+            format_root(
+                &lifted_root,
+                lifted,
+                line_breaks,
+                arena,
+                tail,
+                LiftRuns::Lifted,
+                Known::frozen(frozen),
+            )
+        }
+        Err(_) => {
+            let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
+            format_root(
+                root,
+                source,
+                line_breaks,
+                arena,
+                tail,
+                LiftRuns::Declined,
+                Known {
+                    sections: Some(sections),
+                    frozen: Some(frozen),
+                },
+            )
         }
     }
 }
@@ -1460,33 +1656,48 @@ impl<'a> Printer<'a> {
         self.has_format_ignore && is_honored_format_ignore(self.source, c, 0)
     }
 
-    /// Check if the last non-whitespace fragment node before `target_start` is
-    /// a `<!-- format-ignore -->` (or `prettier-ignore`) comment.
-    fn has_format_ignore_before(
+    /// Whether a section is frozen: the fragment node nearest above it (whitespace aside) is a
+    /// `<!-- format-ignore -->` (or `prettier-ignore`) directive, with no other hoisted
+    /// section (`hoisted`) between the two.
+    ///
+    /// The "no other section between" is the point: a section is not a fragment node, so the
+    /// node nearest above a section can sit above ANOTHER section too, and a directive there
+    /// belongs to that one (`<!-- prettier-ignore -->⏎<script module>…</script>⏎<script>…`
+    /// freezes the module script alone). The nearest NODE rather than the section's travelling
+    /// run, because a directive inside a `format-ignore` range never travels (the range prints
+    /// it where it stands) and still freezes the section below it.
+    fn section_is_frozen(
         &self,
         fragment: &internal::Fragment<'_>,
-        target_start: u32,
+        section: Span,
+        hoisted: &[Span],
     ) -> bool {
-        let mut last_comment = None;
-        for node in fragment.nodes {
-            let node_end = node.span().end;
-            if node_end > target_start {
-                break;
-            }
-            match node {
-                FragmentNode::Comment(comment) => {
-                    last_comment = Some(comment);
-                }
-                FragmentNode::Text(text) if text.is_collapsible_ws_only => {
-                    // Skip whitespace text nodes
-                }
-                _ => {
-                    // Non-comment, non-whitespace node resets
-                    last_comment = None;
-                }
-            }
-        }
-        last_comment.is_some_and(|c| is_format_ignore_directive(c.content(self.source)))
+        let nodes = &fragment.nodes;
+        let above = nodes.partition_point(|n| n.span().end <= section.start);
+        let Some(FragmentNode::Comment(comment)) = nodes[..above]
+            .iter()
+            .rev()
+            .find(|n| !n.is_whitespace_only_text())
+        else {
+            return false;
+        };
+        is_format_ignore_directive(comment.content(self.source))
+            && !hoisted
+                .iter()
+                .any(|h| comment.span.end <= h.start && h.end <= section.start)
+    }
+
+    /// Every section's freeze verdict ([`Self::section_is_frozen`]) — `<svelte:options>`
+    /// takes none, since it always prints normalized.
+    fn frozen_sections(&self, root: &internal::Root<'_>) -> FrozenSections {
+        let hoisted: SmallVec<[Span; 4]> = root_sections(root)
+            .into_iter()
+            .filter_map(|(span, _)| span)
+            .collect();
+        root_sections(root).map(|(span, section)| {
+            section != HoistedSection::Options
+                && span.is_some_and(|span| self.section_is_frozen(&root.fragment, span, &hoisted))
+        })
     }
 
     /// Whether the fragment node at `idx` sits **inside a frozen range** — the nearest range
@@ -1517,27 +1728,26 @@ impl<'a> Printer<'a> {
     /// leads that node, not a section), and a **format-ignore range marker** — see
     /// [`range_marker`]'s role in the scan below.
     fn classify_fragment_comment(
-        &self,
         comment: &internal::HtmlComment,
         comment_idx: usize,
         root: &internal::Root<'_>,
+        scan: &CommentScan,
     ) -> Option<HoistedSection> {
         // format-ignore-start/end mark ranges within the template —
         // they must stay in the fragment so the range preservation logic sees them
-        if range_marker(comment, self.source).is_some() {
+        if scan.markers[comment_idx].is_some() {
             return None;
         }
 
         // A comment INSIDE a frozen range is already emitted by the range's verbatim slice, so
-        // hoisting it prints it twice. The forward scan below cannot see this on its own: when
-        // the *section* is inside the range too, its start precedes the closing marker and wins
-        // the nearest-start contest.
-        if self.is_inside_ignore_range(comment_idx, &root.fragment) {
+        // hoisting it prints it twice. The barrier below cannot see this on its own: when the
+        // *section* is inside the range too, its start precedes the closing marker and wins the
+        // nearest-start contest.
+        if scan.inside_range[comment_idx] {
             return None;
         }
 
         let comment_end = comment.span.end;
-        let mut nearest: Option<(u32, Option<HoistedSection>)> = None;
 
         // The first thing after the comment that pins it to the template: a real node (the
         // comment leads *it*), or a range marker.
@@ -1547,18 +1757,8 @@ impl<'a> Printer<'a> {
         // comment sits INSIDE the range it is printed twice, since the fragment emits the whole
         // range verbatim while the section emits the comment again. Ordinary comments are still
         // skipped: a run of them all lead the same section.
-        for node in root.fragment.nodes.iter().skip(comment_idx + 1) {
-            let barrier = match node {
-                FragmentNode::Text(t) if t.is_collapsible_ws_only => continue,
-                FragmentNode::Comment(c) if range_marker(c, self.source).is_some() => c.span.start,
-                FragmentNode::Comment(_) => continue,
-                other => other.span().start,
-            };
-            if barrier >= comment_end {
-                nearest = Some((barrier, None));
-            }
-            break;
-        }
+        let mut nearest: Option<(u32, Option<HoistedSection>)> =
+            scan.next_barrier[comment_idx].map(|barrier| (barrier, None));
 
         // Every root section competes on the same rule — the nearest start after the comment
         // wins. One loop over the shared [`root_sections`] table rather than four copies of
@@ -1735,10 +1935,11 @@ impl<'a> Printer<'a> {
     fn hoisted_comments(&self, root: &internal::Root<'_>) -> HoistedComments {
         let trails = self.region_end_trails(root);
         let mut sections = HoistedComments::default();
+        let scan = CommentScan::new(&root.fragment, self.source);
 
         for (i, node) in root.fragment.nodes.iter().enumerate() {
             if let FragmentNode::Comment(comment) = node {
-                let section = self.classify_fragment_comment(comment, i, root);
+                let section = Self::classify_fragment_comment(comment, i, root, &scan);
                 if matches!(section, None | Some(HoistedSection::Options))
                     && let Some(k) = trails.iter().position(|&trail| trail == Some(i))
                 {
@@ -1770,7 +1971,11 @@ impl<'a> Printer<'a> {
     /// Read off the parsed text node (its own `raw`, trailing collapsible whitespace aside),
     /// never off source bytes past it. A `prettier-ignore`-frozen node answers the same: the
     /// move is tsv's, so the respell completes it.
-    fn template_tail_respell(&self, root: &internal::Root<'_>) -> Option<(usize, char)> {
+    fn template_tail_respell(
+        &self,
+        root: &internal::Root<'_>,
+        sections: &HoistedComments,
+    ) -> Option<(usize, char)> {
         if root.css.is_some() {
             return None;
         }
@@ -1797,7 +2002,6 @@ impl<'a> Printer<'a> {
         // template) or stays in the template, where it ends the document instead of the text.
         let is_comment = |i: usize| matches!(nodes[i], FragmentNode::Comment(_));
         if (idx + 1..nodes.len()).any(is_comment) {
-            let sections = self.hoisted_comments(root);
             let travels = |i: usize| {
                 sections
                     .0
@@ -1814,6 +2018,53 @@ impl<'a> Printer<'a> {
         ))
     }
 
+    /// The comment run that ENDS the fragment — comments after the last real template node,
+    /// with nothing but whitespace between them and the end — when a `<style>` prints after
+    /// the template, as fragment indices in source order. Printed as the style's leading run
+    /// rather than as template content, for one fixed point: printed at the template's end,
+    /// that run sits directly above the `<style>` in the OUTPUT, so the next pass reads it as
+    /// the style's leading comments (that is what a comment above a section is) and inserts the
+    /// section blank above it — a second pass that differs from the first.
+    /// prettier-plugin-svelte converges on that second form too, so it is the one pass prints.
+    /// A region-end trail is stepped over (it is the section's own, already placed); a range
+    /// marker or a comment inside a frozen range ends the run, since moving either would move
+    /// the freeze.
+    fn style_trailing_comments(
+        &self,
+        root: &internal::Root<'_>,
+        sections: &HoistedComments,
+    ) -> Vec<usize> {
+        let mut run: Vec<usize> = Vec::new();
+        if root.css.is_none() {
+            return run;
+        }
+        let nodes = &root.fragment.nodes;
+        let mut travels = vec![false; nodes.len()];
+        for section in &sections.0 {
+            for &i in section.leading.iter().chain(&section.trail) {
+                travels[i] = true;
+            }
+        }
+        let mut scan: Option<CommentScan> = None;
+        for (i, node) in nodes.iter().enumerate().rev() {
+            match node {
+                FragmentNode::Text(t) if t.is_collapsible_ws_only => {}
+                FragmentNode::Comment(_) if sections.0.iter().any(|s| s.trail == Some(i)) => {}
+                FragmentNode::Comment(_) if !travels[i] => {
+                    let scan =
+                        scan.get_or_insert_with(|| CommentScan::new(&root.fragment, self.source));
+                    if scan.markers[i].is_some() || scan.inside_range[i] {
+                        break;
+                    }
+                    run.push(i);
+                }
+                _ => break,
+            }
+        }
+        run.reverse();
+        run
+    }
+
     /// Format a Svelte Root node
     ///
     /// Orchestrates formatting of the four main sections of a .svelte file:
@@ -1826,9 +2077,12 @@ impl<'a> Printer<'a> {
     /// Comments travel with the section they immediately precede in source order — and a
     /// `#endregion` marker directly after a section travels below it
     /// ([`Self::region_end_trails`]).
-    pub(crate) fn print_root(&mut self, root: &internal::Root<'_>) {
-        let sections = self.hoisted_comments(root);
-
+    fn print_root(
+        &mut self,
+        root: &internal::Root<'_>,
+        sections: &HoistedComments,
+        frozen: FrozenSections,
+    ) {
         // Sections are lifted off the fragment and printed at canonical positions, but a
         // `format-ignore` range's verbatim slice is raw source and would re-emit any that sits
         // inside it — see `build_ignore_range_doc`.
@@ -1844,35 +2098,10 @@ impl<'a> Printer<'a> {
             printed_comment_indices.extend(section.trail);
         }
 
-        // The comment run that ENDS the fragment — comments after the last real template node,
-        // with nothing but whitespace between them and the end — when a `<style>` prints after
-        // the template. Printed as the style's leading run rather than as template content, for
-        // one fixed point: printed at the template's end, that run sits directly above the
-        // `<style>` in the OUTPUT, so the next pass reads it as the style's leading comments
-        // (that is what a comment above a section is) and inserts the section blank above it —
-        // a second pass that differs from the first. prettier-plugin-svelte converges on that
-        // second form too, so it is the one pass prints. A region-end trail is stepped over (it
-        // is the section's own, already placed); a range marker or a comment inside a frozen
-        // range ends the run, since moving either would move the freeze.
-        let mut style_trailing: Vec<usize> = Vec::new();
-        if root.css.is_some() {
-            for (i, node) in root.fragment.nodes.iter().enumerate().rev() {
-                match node {
-                    FragmentNode::Text(t) if t.is_collapsible_ws_only => {}
-                    FragmentNode::Comment(_) if sections.0.iter().any(|s| s.trail == Some(i)) => {}
-                    FragmentNode::Comment(c)
-                        if !printed_comment_indices.contains(&i)
-                            && range_marker(c, self.source).is_none()
-                            && !self.is_inside_ignore_range(i, &root.fragment) =>
-                    {
-                        style_trailing.push(i);
-                    }
-                    _ => break,
-                }
-            }
-            style_trailing.reverse();
-            printed_comment_indices.extend(&style_trailing);
-        }
+        // The comment run that ends the fragment prints as the style's leading run
+        // (`Self::style_trailing_comments`).
+        let style_trailing = self.style_trailing_comments(root, sections);
+        printed_comment_indices.extend(&style_trailing);
 
         let mut has_previous_section = false;
 
@@ -1886,22 +2115,17 @@ impl<'a> Printer<'a> {
         }
 
         // Format scripts (module then instance)
-        for (script, comments) in [
-            (
-                root.module.as_ref(),
-                &sections[HoistedSection::ModuleScript],
-            ),
-            (
-                root.instance.as_ref(),
-                &sections[HoistedSection::InstanceScript],
-            ),
+        for (script, section) in [
+            (root.module.as_ref(), HoistedSection::ModuleScript),
+            (root.instance.as_ref(), HoistedSection::InstanceScript),
         ] {
+            let comments = &sections[section];
             if let Some(script) = script {
                 if has_previous_section {
                     self.write("\n"); // Blank line between sections
                 }
                 self.print_section_comments(&comments.leading, &root.fragment, script.span.start);
-                if self.has_format_ignore_before(&root.fragment, script.span.start) {
+                if frozen[section.slot()] {
                     self.write_verbatim_span(script.span);
                     self.write("\n");
                 } else {
@@ -1931,7 +2155,7 @@ impl<'a> Printer<'a> {
 
         // Format style (if present)
         if let Some(style) = &root.css {
-            let ignore_style = self.has_format_ignore_before(&root.fragment, style.span.start);
+            let ignore_style = frozen[HoistedSection::Style.slot()];
             if has_previous_section {
                 self.write("\n"); // Blank line between sections
             }

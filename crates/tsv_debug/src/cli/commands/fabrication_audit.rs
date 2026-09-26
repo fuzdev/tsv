@@ -261,6 +261,9 @@ struct BlankRun<'a> {
     line: usize,
     /// Last non-blank line before the run; `""` at the start of the document.
     prev: &'a str,
+    /// Every line before the run, the last non-blank one last — what [`trails_section`] reads
+    /// back past [`Self::prev`].
+    before: &'a [&'a str],
     /// Every line after the run, the first non-blank one first — what [`leads_section`] reads
     /// past the bracketing pair, and what [`Self::next`] heads.
     after: &'a [&'a str],
@@ -305,6 +308,7 @@ fn for_each_blank_run(s: &str, mut visit: impl FnMut(BlankRun<'_>)) {
         visit(BlankRun {
             line: i + 1,
             prev,
+            before: &lines[..i],
             after: &lines[end..],
         });
         i = end;
@@ -348,6 +352,58 @@ fn leads_section(after: &[&str]) -> bool {
         return saw_comment && markup_head(t).is_some_and(|head| is_section_opener(&head));
     }
     false
+}
+
+/// Whether the lines before a blank run END a section's REGION-END TRAIL — a full-line
+/// `<!-- … -->` comment (multi-line included) that is a region-end marker
+/// ([`tsv_lang::is_region_end_marker`], the formatter's own spelling of `#endregion`), with
+/// nothing but blank lines between it and a `</script>` / `</style>` / `<svelte:options>` line
+/// above.
+///
+/// [`leads_section`] read from the other side: a `#endregion` written directly below a section
+/// travels with it and prints below it, so the section seam's blank follows the trail rather
+/// than the closing tag, and the run reads `<!--` ⇢ the template. Keyed on the MARKER, not on
+/// any comment: an ordinary comment below a section stays in the template, so a blank after it
+/// is one the formatter would have invented — reading only "a comment below a closing tag"
+/// would sanction exactly that.
+fn trails_section(before: &[&str]) -> bool {
+    let mut lines = before
+        .iter()
+        .rev()
+        .map(|l| l.trim())
+        .skip_while(|t| t.is_empty());
+    let Some(last) = lines.next() else {
+        return false;
+    };
+    let Some(inner) = last.strip_suffix("-->") else {
+        return false;
+    };
+    // The comment's content, gathered back to the line that opens it.
+    let mut content: Vec<&str> = Vec::new();
+    let mut line = inner;
+    loop {
+        if let Some(open) = line.strip_prefix("<!--") {
+            if open.contains("-->") {
+                return false;
+            }
+            content.push(open);
+            break;
+        }
+        if line.contains("-->") || line.contains("<!--") {
+            return false;
+        }
+        content.push(line);
+        match lines.next() {
+            Some(t) => line = t,
+            None => return false,
+        }
+    }
+    content.reverse();
+    tsv_lang::is_region_end_marker(&content.join("\n"))
+        && lines
+            .find(|t| !t.is_empty())
+            .and_then(markup_head)
+            .is_some_and(|head| matches!(head.as_str(), "</script" | "</style" | "<svelte:options"))
 }
 
 /// The opening-tag half of [`is_section_seam`], on a line shape.
@@ -493,7 +549,7 @@ fn scan_output(out: &str) -> OutputScan {
             before: line_shape(run.prev),
             after: line_shape(run.next()),
         };
-        if is_sanctioned(&shape) || leads_section(run.after) {
+        if is_sanctioned(&shape) || leads_section(run.after) || trails_section(run.before) {
             scan.sanctioned += 1;
             return;
         }
@@ -592,7 +648,7 @@ fn print_json(sweep: &Sweep) {
 mod tests {
     use super::{
         FabricationShape, count_blank_runs, is_blank_line, is_sanctioned, leads_section,
-        line_shape, scan_output,
+        line_shape, scan_output, trails_section,
     };
 
     /// The raw-line → shape → carve-out pipeline exactly as [`scan_output`] runs it, so the
@@ -661,6 +717,46 @@ mod tests {
         );
         assert_eq!(
             scan_output("<div>a</div>\n\n<!-- c -->\n<div>b</div>")
+                .invented
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn a_region_end_trail_is_the_seam_one_step_removed() {
+        let trails = |doc: &str| trails_section(&doc.lines().collect::<Vec<_>>());
+        assert!(trails("</script>\n<!-- #endregion -->"));
+        assert!(trails("</style>\n\n<!-- #endregion STYLES -->"));
+        assert!(trails(
+            "<svelte:options runes />\n<!-- multi\n#endregion -->"
+        ));
+        // Only a region-end marker travels below a section: any other comment there stays in
+        // the template, and a blank after it would be invented.
+        assert!(!trails("</script>\n<!-- c -->"));
+        assert!(!trails("</script>\n<!-- #region a -->"));
+        assert!(!trails("<svelte:options runes />\n<!-- multi\nline -->"));
+        // The comment must follow the closing tag, with nothing but blank lines between.
+        assert!(!trails("</script>\n<div>a</div>\n<!-- #endregion -->"));
+        assert!(!trails("<div>a</div>\n<!-- #endregion -->"));
+        assert!(!trails("</script>\ntext <!-- #endregion -->"));
+        assert!(!trails("</script>"));
+        // Through `scan_output`: the seam blank below a trail is sanctioned, one below a
+        // template comment is not.
+        assert_eq!(
+            scan_output("<script>\n</script>\n<!-- #endregion -->\n\n<div>a</div>")
+                .invented
+                .len(),
+            0
+        );
+        assert_eq!(
+            scan_output("<div>a</div>\n<!-- c -->\n\n<div>b</div>")
+                .invented
+                .len(),
+            1
+        );
+        assert_eq!(
+            scan_output("<script>\n</script>\n<!-- c -->\n\n<div>a</div>")
                 .invented
                 .len(),
             1

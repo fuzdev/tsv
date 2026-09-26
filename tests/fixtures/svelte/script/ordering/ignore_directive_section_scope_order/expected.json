@@ -1,0 +1,316 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 101,
+		"end": 139,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 110,
+					"end": 111,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 110,
+							"end": 111,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "p",
+											"start": 110,
+											"end": 111
+										}
+									],
+									"start": 110,
+									"end": 111
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 112,
+					"end": 130,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 116,
+							"end": 126,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 110,
+				"end": 130
+			}
+		],
+		"comments": [],
+		"content": {
+			"start": 108,
+			"end": 131,
+			"styles": "\n\tp {\n\t\tcolor: red;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 140,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 33,
+				"end": 35,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 35,
+				"end": 59,
+				"data": " prettier-ignore "
+			},
+			{
+				"type": "Text",
+				"start": 59,
+				"end": 60,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Text",
+				"start": 89,
+				"end": 91,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 91,
+				"end": 99,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 92
+					},
+					"end": {
+						"line": 10,
+						"column": 2,
+						"character": 93
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 94,
+							"end": 95,
+							"raw": "a",
+							"data": "a"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 99,
+				"end": 101,
+				"raw": "\n\n",
+				"data": "\n\n"
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"module": {
+		"type": "Script",
+		"start": 0,
+		"end": 33,
+		"context": "module",
+		"content": {
+			"type": "Program",
+			"start": 15,
+			"end": 24,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 17,
+					"end": 23,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 21,
+							"end": 22,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 5
+								},
+								"end": {
+									"line": 2,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 21,
+								"end": 22,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 5
+									},
+									"end": {
+										"line": 2,
+										"column": 6
+									}
+								},
+								"name": "m"
+							},
+							"init": null
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 14,
+				"name": "module",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 14,
+						"character": 14
+					}
+				},
+				"value": true
+			}
+		]
+	},
+	"instance": {
+		"type": "Script",
+		"start": 60,
+		"end": 89,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 68,
+			"end": 80,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 0
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 71,
+					"end": 79,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 2
+						},
+						"end": {
+							"line": 7,
+							"column": 10
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 77,
+							"end": 78,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 8
+								},
+								"end": {
+									"line": 7,
+									"column": 9
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 77,
+								"end": 78,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 8
+									},
+									"end": {
+										"line": 7,
+										"column": 9
+									}
+								},
+								"name": "a"
+							},
+							"init": null
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module",
+			"leadingComments": [
+				{
+					"type": "Line",
+					"value": " prettier-ignore "
+				}
+			]
+		},
+		"attributes": []
+	}
+}
