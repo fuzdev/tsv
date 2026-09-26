@@ -2660,7 +2660,7 @@ it is believed. **Audited across the repo's seven such claims** (count `pcmpeqb`
 / `psadbw` per symbol in the profiling build, which keeps the symbols the release binary
 folds away): `printing::visual_width` does
 vectorize (and so did the doc arena's tab count, until the width measure stopped counting —
-§The width of a plain ASCII line IS its byte count); `tsv_css::lexer::comments::read_comment`, `tsv_ts::lexer::comments::read_block_comment`
+§The width of a plain ASCII line IS its byte count); `tsv_css::lexer::comments::read_comment`, `tsv_ts::lexer::comments::block_comment_end`
 and `tsv_ts::lexer::core::Lexer::scan_string_into` retired **zero** vector instructions and
 their comments were wrong (all three are the word loop of the next section now). The
 predictor is structural: **a single-byte inner run nested in an

@@ -263,7 +263,7 @@ pub struct Lexer<'a> {
 /// not classified in general category 'Space_Separator'".
 ///
 /// LineTerminators are the separate [`is_es_line_terminator`] production,
-/// matched ahead of this in [`Lexer::skip_whitespace`] because a newline drives
+/// matched ahead of this in [`skip_whitespace_general`] because a newline drives
 /// ASI — so they are intentionally absent here. A scan that wants "the next
 /// token starts where?" wants the **union** of the two, which is what JS's `\s`
 /// means; the parser's lookahead (`parser::scan::skip_whitespace`) asks for both.
@@ -336,6 +336,31 @@ pub(crate) fn is_es_line_terminator_at(bytes: &[u8], pos: usize) -> bool {
 /// hand-rolled `<LS>` / `<PS>` peeks drifted apart before; the relation is asserted by
 /// a test beside them.
 pub(crate) const ES_LINE_TERMINATOR_LEADS: [u8; 3] = [b'\n', b'\r', 0xE2];
+
+/// [`Lexer::skip_whitespace`] from the non-ASCII byte at `pos` of `source` on: every
+/// character is decoded and classified against the Unicode rules — LS / PS are the
+/// non-ASCII LineTerminators, NBSP / U+FEFF / the `Zs` spaces the non-ASCII WhiteSpace —
+/// until one is neither. Returns where that character starts and whether a LineTerminator
+/// was crossed on the way.
+///
+/// A free function over the source rather than a `&mut self` method, so the call cannot
+/// write the lexer as far as the optimizer knows and the handoff keeps its slice and
+/// cursor across it; the caller records the crossing.
+#[cold]
+#[inline(never)]
+fn skip_whitespace_general(source: &str, mut pos: usize) -> (usize, bool) {
+    let mut crossed = false;
+    loop {
+        match source[pos..].chars().next() {
+            Some(c) if is_es_line_terminator(c) => {
+                crossed = true;
+                pos += c.len_utf8();
+            }
+            Some(c) if is_es_whitespace(c) => pos += c.len_utf8(),
+            _ => return (pos, crossed),
+        }
+    }
+}
 
 impl<'a> Lexer<'a> {
     /// A lexer over `source`, which sits at `base_offset` in the document its errors will
@@ -518,6 +543,17 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Advance the cursor past the ASCII byte under it — the dispatch's form of
+    /// [`Lexer::advance`], for a byte it has already matched. The dispatch matches the byte
+    /// [`Lexer::skip_whitespace`] handed it, not one it read through `self`, so `advance`'s
+    /// own read of the byte would no longer fold into the match: every punctuator would
+    /// re-read it and decode the length of a UTF-8 sequence it knows is one byte.
+    #[inline]
+    fn advance_ascii(&mut self) {
+        debug_assert!(self.bytes[self.position].is_ascii());
+        self.position += 1;
+    }
+
     /// Create a token with the current position as end
     #[inline]
     fn make_token(&self, kind: TokenKind, start: usize) -> Token {
@@ -545,9 +581,18 @@ impl<'a> Lexer<'a> {
     /// name then paid a call.) The path relies on the plain `#[inline]` being honored:
     /// it inlines into the dispatch, and a call here is the first thing to check if the
     /// dispatch grows.
+    ///
+    /// `bytes` is the slice [`Lexer::skip_whitespace`] read the start byte from, passed
+    /// down rather than re-read from `self` so the run is walked against the same length
+    /// the handoff checked.
     #[inline]
-    fn scan_ascii_identifier_into(&mut self, start: usize, dst: &mut Token) {
-        let bytes = self.bytes;
+    fn scan_ascii_identifier_into(&mut self, bytes: &'a [u8], start: usize, dst: &mut Token) {
+        // An index, not a `get`: the handoff proved `start` in bounds where the run's trip
+        // count below cannot see it, and without the proof the run takes an extra
+        // instruction a byte and the keyword pre-filter re-checks its read of
+        // `bytes[start]`. The index restates it once, ahead of both.
+        let first = bytes[start];
+        debug_assert!(is_ascii_id_start(first));
         let mut end = start + 1;
         while end < bytes.len() && is_ascii_id_continue(bytes[end]) {
             end += 1;
@@ -1067,45 +1112,48 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn skip_whitespace(&mut self) {
+    /// Skip the WhiteSpace and LineTerminators ahead of the next token, recording in
+    /// `had_line_terminator` whether a LineTerminator was among them, and hand back the
+    /// byte the token starts with (`None` at end of input), the cursor left on it.
+    ///
+    /// The run is ASCII on essentially every token, and empty on most, so it walks a local
+    /// cursor that is stored once and hands the dispatch the stop byte it already holds
+    /// rather than have it load the byte again. `<CR><LF>` needs no pairing here: each of
+    /// the two is a LineTerminator, and each sets the one flag. A non-ASCII byte — NBSP,
+    /// U+FEFF, a `Zs` space, LS / PS, or the first byte of the token itself — goes to the
+    /// cold [`skip_whitespace_general`], so the hot loop keeps nothing live for a decode.
+    ///
+    /// Taking the byte from here rather than reading it again has two consumers that must
+    /// know it: the dispatch's arms step over it with [`Lexer::advance_ascii`], and the
+    /// identifier arm restates the bound (see [`Lexer::scan_ascii_identifier_into`]).
+    #[inline]
+    fn skip_whitespace(&mut self, bytes: &'a [u8]) -> Option<u8> {
         self.had_line_terminator = false;
-        loop {
-            match self.cur_byte() {
-                // ASCII fast paths (the overwhelming common case).
-                Some(b'\n') => {
-                    // LF — line terminator (ES spec 12.3)
-                    self.had_line_terminator = true;
-                    self.advance();
-                }
-                Some(b'\r') => {
-                    // CR — line terminator; collapse CRLF into one
-                    self.had_line_terminator = true;
-                    self.advance();
-                    if self.cur_byte() == Some(b'\n') {
-                        self.advance();
-                    }
-                }
+        let mut pos = self.position;
+        while let Some(&b) = bytes.get(pos) {
+            match b {
                 // SPACE / TAB / VT / FF — the ASCII subset of WhiteSpace
-                Some(b' ' | b'\t' | 0x0B | 0x0C) => {
-                    self.advance();
-                }
-                // Any other ASCII byte is not whitespace — stop.
-                Some(b) if b < 0x80 => break,
-                // Non-ASCII lead byte: decode to classify against the Unicode rules
-                // (LS/PS line terminators, plus NBSP/ZWNBSP/Zs whitespace).
-                Some(_) => match self.cur_char() {
-                    // LS (Line Separator) / PS (Paragraph Separator) — the
-                    // non-ASCII half of the production; LF/CR took the fast path.
-                    Some(c) if is_es_line_terminator(c) => {
+                b' ' | b'\t' | 0x0B | 0x0C => {}
+                // LF / CR — the ASCII LineTerminators (ES spec 12.3)
+                b'\n' | b'\r' => self.had_line_terminator = true,
+                0x80.. => {
+                    let (end, crossed) = skip_whitespace_general(self.source, pos);
+                    if crossed {
                         self.had_line_terminator = true;
-                        self.advance();
                     }
-                    Some(c) if is_es_whitespace(c) => self.advance(),
-                    _ => break,
-                },
-                None => break,
+                    self.position = end;
+                    return bytes.get(end).copied();
+                }
+                // Any other ASCII byte is not whitespace — the token starts here.
+                _ => {
+                    self.position = pos;
+                    return Some(b);
+                }
             }
+            pos += 1;
         }
+        self.position = pos;
+        None
     }
 
     /// Lex the next token directly into `*dst` — the hot advance path. Writing
@@ -1114,10 +1162,13 @@ impl<'a> Lexer<'a> {
     /// makes through the caller's frame (the intermediate `Token` built,
     /// returned through a slot, then reloaded and re-scattered into the
     /// parser's field). The match yields a `Token` value only for the short
-    /// punctuation/operator paths; the identifier/number/string/template/hashbang
-    /// scanners and the error paths write `dst` (or propagate the error) via an
-    /// early `return`. [`Lexer::next_token`] is the thin by-value wrapper every
-    /// other caller takes.
+    /// punctuation/operator paths, whose kinds carry no payload; the
+    /// identifier/number/string/template/comment/hashbang scanners and the error
+    /// paths write `dst` (or propagate the error) via an early `return`. A payload
+    /// kind yielded by the match is not free even where it is rare: the arms merge
+    /// into one value, so every punctuation token then copies the payload bytes
+    /// through the merged stack temporary into `dst`. [`Lexer::next_token`] is the
+    /// thin by-value wrapper every other caller takes.
     ///
     /// The error path is lifted into host coordinates here, at the producer
     /// ([`Lexer::host_err`]); the scan itself works in — and reports in — the lexer's own.
@@ -1133,11 +1184,11 @@ impl<'a> Lexer<'a> {
         // Clear the decoded-value flag from the previous token so `decoded_str`
         // reflects only the token produced by this call (set by the escape paths below).
         self.has_decoded = false;
-        self.skip_whitespace();
-
+        let bytes = self.bytes;
+        let first = self.skip_whitespace(bytes);
         let start = self.position;
 
-        *dst = match self.cur_byte() {
+        *dst = match first {
             None => Token {
                 kind: TokenKind::Eof,
                 start: start as u32,
@@ -1149,30 +1200,30 @@ impl<'a> Lexer<'a> {
             // Tested ahead of every other byte arm, the identifier being the most common
             // token: none of the arms it precedes matches an ASCII `IdentifierStart` byte.
             Some(b) if is_ascii_id_start(b) => {
-                self.scan_ascii_identifier_into(start, dst);
+                self.scan_ascii_identifier_into(bytes, start, dst);
                 return Ok(());
             }
             Some(b';') => {
-                self.advance();
+                self.advance_ascii();
                 self.make_token(TokenKind::Semicolon, start)
             }
             Some(b':') => {
-                self.advance();
+                self.advance_ascii();
                 self.make_token(TokenKind::Colon, start)
             }
             Some(b'=') => {
-                self.advance();
+                self.advance_ascii();
                 match self.cur_byte() {
                     Some(b'>') => {
                         // =>
-                        self.advance();
+                        self.advance_ascii();
                         self.make_token(TokenKind::Arrow, start)
                     }
                     Some(b'=') => {
-                        self.advance();
+                        self.advance_ascii();
                         if self.cur_byte() == Some(b'=') {
                             // ===
-                            self.advance();
+                            self.advance_ascii();
                             self.make_token(TokenKind::EqualsEqualsEquals, start)
                         } else {
                             // ==
@@ -1199,40 +1250,40 @@ impl<'a> Lexer<'a> {
             }
             Some(quote @ (b'\'' | b'"')) => return self.scan_string_into(start, quote, dst),
             Some(b',') => {
-                self.advance();
+                self.advance_ascii();
                 self.make_token(TokenKind::Comma, start)
             }
             Some(b'{') => {
-                self.advance();
+                self.advance_ascii();
                 self.make_token(TokenKind::BraceOpen, start)
             }
             Some(b'}') => {
-                self.advance();
+                self.advance_ascii();
                 self.make_token(TokenKind::BraceClose, start)
             }
             Some(b'[') => {
-                self.advance();
+                self.advance_ascii();
                 self.make_token(TokenKind::BracketOpen, start)
             }
             Some(b']') => {
-                self.advance();
+                self.advance_ascii();
                 self.make_token(TokenKind::BracketClose, start)
             }
             Some(b'(') => {
-                self.advance();
+                self.advance_ascii();
                 self.make_token(TokenKind::ParenOpen, start)
             }
             Some(b')') => {
-                self.advance();
+                self.advance_ascii();
                 self.make_token(TokenKind::ParenClose, start)
             }
             Some(b'.') => {
                 // `.`, `..`, `...` and digits are all ASCII, so peek the next two bytes.
                 if self.byte_ahead(1) == Some(b'.') && self.byte_ahead(2) == Some(b'.') {
                     // Spread operator: ...
-                    self.advance(); // consume first .
-                    self.advance(); // consume second .
-                    self.advance(); // consume third .
+                    self.advance_ascii(); // consume first .
+                    self.advance_ascii(); // consume second .
+                    self.advance_ascii(); // consume third .
                     self.make_token(TokenKind::DotDotDot, start)
                 } else if self.byte_ahead(1).is_some_and(|b| b.is_ascii_digit()) {
                     // Number starting with a decimal point (`.5`, `.5e3`). Route it
@@ -1243,29 +1294,29 @@ impl<'a> Lexer<'a> {
                     return self.scan_number_into(start, b'.', dst);
                 } else {
                     // Single dot: member access operator
-                    self.advance();
+                    self.advance_ascii();
                     self.make_token(TokenKind::Dot, start)
                 }
             }
             Some(b'-') => {
-                self.advance();
+                self.advance_ascii();
                 if self.cur_byte() == Some(b'-') {
-                    self.advance();
+                    self.advance_ascii();
                     self.make_token(TokenKind::MinusMinus, start)
                 } else if self.cur_byte() == Some(b'=') {
-                    self.advance();
+                    self.advance_ascii();
                     self.make_token(TokenKind::MinusEquals, start)
                 } else {
                     self.make_token(TokenKind::Minus, start)
                 }
             }
             Some(b'+') => {
-                self.advance();
+                self.advance_ascii();
                 if self.cur_byte() == Some(b'+') {
-                    self.advance();
+                    self.advance_ascii();
                     self.make_token(TokenKind::PlusPlus, start)
                 } else if self.cur_byte() == Some(b'=') {
-                    self.advance();
+                    self.advance_ascii();
                     self.make_token(TokenKind::PlusEquals, start)
                 } else {
                     self.make_token(TokenKind::Plus, start)
@@ -1278,79 +1329,77 @@ impl<'a> Lexer<'a> {
                 match peek {
                     Some(b'/') => {
                         // Line comment
-                        let mut pos = self.position;
-                        let token = comments::read_line_comment(self.source, &mut pos)?;
-                        self.set_position(pos);
-                        token
+                        let end = comments::line_comment_end(bytes, start);
+                        self.comment_into(start, end, false, dst);
+                        return Ok(());
                     }
                     Some(b'*') => {
                         // Block comment
-                        let mut pos = self.position;
-                        let token = comments::read_block_comment(self.source, &mut pos)?;
-                        self.set_position(pos);
-                        token
+                        let end = comments::block_comment_end(bytes, start)?;
+                        self.comment_into(start, end, true, dst);
+                        return Ok(());
                     }
                     Some(b'=') => {
                         // Division assignment operator /=
-                        self.advance();
-                        self.advance();
+                        self.advance_ascii();
+                        self.advance_ascii();
                         self.make_token(TokenKind::SlashEquals, start)
                     }
                     _ => {
                         // Division operator /
-                        self.advance();
+                        self.advance_ascii();
                         self.make_token(TokenKind::Slash, start)
                     }
                 }
             }
             Some(b'*') => {
-                self.advance();
+                self.advance_ascii();
                 if self.cur_byte() == Some(b'*') {
-                    self.advance();
+                    self.advance_ascii();
                     if self.cur_byte() == Some(b'=') {
-                        self.advance();
+                        self.advance_ascii();
                         self.make_token(TokenKind::StarStarEquals, start)
                     } else {
                         self.make_token(TokenKind::StarStar, start)
                     }
                 } else if self.cur_byte() == Some(b'=') {
-                    self.advance();
+                    self.advance_ascii();
                     self.make_token(TokenKind::StarEquals, start)
                 } else {
                     self.make_token(TokenKind::Star, start)
                 }
             }
             Some(b'%') => {
-                self.advance();
+                self.advance_ascii();
                 if self.cur_byte() == Some(b'=') {
-                    self.advance();
+                    self.advance_ascii();
                     self.make_token(TokenKind::PercentEquals, start)
                 } else {
                     self.make_token(TokenKind::Percent, start)
                 }
             }
             Some(b'^') => {
-                self.advance();
+                self.advance_ascii();
                 if self.cur_byte() == Some(b'=') {
-                    self.advance();
+                    self.advance_ascii();
                     self.make_token(TokenKind::CaretEquals, start)
                 } else {
                     self.make_token(TokenKind::Caret, start)
                 }
             }
             Some(b'~') => {
-                self.advance();
+                self.advance_ascii();
                 self.make_token(TokenKind::Tilde, start)
             }
             Some(b'<') => {
-                self.advance();
+                self.advance_ascii();
                 if self.cur_byte() == Some(b'=') {
-                    self.advance();
+                    self.advance_ascii();
                     self.make_token(TokenKind::LessThanEquals, start)
                 } else if self.cur_byte() == Some(b'<') {
-                    self.advance();
+                    self.advance_ascii();
                     if self.cur_byte() == Some(b'=') {
-                        self.advance();
+                        self.advance_ascii();
                         self.make_token(TokenKind::LeftShiftEquals, start)
                     } else {
                         self.make_token(TokenKind::LeftShift, start)
@@ -1360,24 +1409,24 @@ impl<'a> Lexer<'a> {
                 }
             }
             Some(b'>') => {
-                self.advance();
+                self.advance_ascii();
                 if self.cur_byte() == Some(b'=') {
-                    self.advance();
+                    self.advance_ascii();
                     self.make_token(TokenKind::GreaterThanEquals, start)
                 } else if self.cur_byte() == Some(b'>') {
-                    self.advance();
+                    self.advance_ascii();
                     if self.cur_byte() == Some(b'>') {
                         // >>> or >>>=
-                        self.advance();
+                        self.advance_ascii();
                         if self.cur_byte() == Some(b'=') {
-                            self.advance();
+                            self.advance_ascii();
                             self.make_token(TokenKind::UnsignedRightShiftEquals, start)
                         } else {
                             self.make_token(TokenKind::UnsignedRightShift, start)
                         }
                     } else if self.cur_byte() == Some(b'=') {
                         // >>=
-                        self.advance();
+                        self.advance_ascii();
                         self.make_token(TokenKind::RightShiftEquals, start)
                     } else {
                         // >>
@@ -1388,11 +1437,11 @@ impl<'a> Lexer<'a> {
                 }
             }
             Some(b'!') => {
-                self.advance();
+                self.advance_ascii();
                 if self.cur_byte() == Some(b'=') {
-                    self.advance();
+                    self.advance_ascii();
                     if self.cur_byte() == Some(b'=') {
-                        self.advance();
+                        self.advance_ascii();
                         self.make_token(TokenKind::BangEqualsEquals, start)
                     } else {
                         self.make_token(TokenKind::BangEquals, start)
@@ -1402,45 +1451,45 @@ impl<'a> Lexer<'a> {
                 }
             }
             Some(b'&') => {
-                self.advance();
+                self.advance_ascii();
                 if self.cur_byte() == Some(b'&') {
-                    self.advance();
+                    self.advance_ascii();
                     if self.cur_byte() == Some(b'=') {
-                        self.advance();
+                        self.advance_ascii();
                         self.make_token(TokenKind::AmpersandAmpersandEquals, start)
                     } else {
                         self.make_token(TokenKind::AmpersandAmpersand, start)
                     }
                 } else if self.cur_byte() == Some(b'=') {
-                    self.advance();
+                    self.advance_ascii();
                     self.make_token(TokenKind::AmpersandEquals, start)
                 } else {
                     self.make_token(TokenKind::Ampersand, start)
                 }
             }
             Some(b'|') => {
-                self.advance();
+                self.advance_ascii();
                 if self.cur_byte() == Some(b'|') {
-                    self.advance();
+                    self.advance_ascii();
                     if self.cur_byte() == Some(b'=') {
-                        self.advance();
+                        self.advance_ascii();
                         self.make_token(TokenKind::PipePipeEquals, start)
                     } else {
                         self.make_token(TokenKind::PipePipe, start)
                     }
                 } else if self.cur_byte() == Some(b'=') {
-                    self.advance();
+                    self.advance_ascii();
                     self.make_token(TokenKind::PipeEquals, start)
                 } else {
                     self.make_token(TokenKind::Pipe, start)
                 }
             }
             Some(b'?') => {
-                self.advance();
+                self.advance_ascii();
                 if self.cur_byte() == Some(b'?') {
-                    self.advance();
+                    self.advance_ascii();
                     if self.cur_byte() == Some(b'=') {
-                        self.advance();
+                        self.advance_ascii();
                         self.make_token(TokenKind::QuestionQuestionEquals, start)
                     } else {
                         self.make_token(TokenKind::QuestionQuestion, start)
@@ -1451,7 +1500,7 @@ impl<'a> Lexer<'a> {
                     // Cursor is on `.`; the byte after it is `position + 1`.
                     let next = self.byte_ahead(1);
                     if next.is_none_or(|b| !b.is_ascii_digit()) {
-                        self.advance();
+                        self.advance_ascii();
                         self.make_token(TokenKind::QuestionDot, start)
                     } else {
                         // `?.0` should be `?` followed by `.0` (number)
@@ -1467,7 +1516,7 @@ impl<'a> Lexer<'a> {
             }
             Some(b'@') => {
                 // @ for decorators
-                self.advance();
+                self.advance_ascii();
                 self.make_token(TokenKind::At, start)
             }
             Some(b'#') => {
@@ -1480,7 +1529,7 @@ impl<'a> Lexer<'a> {
                     }
                 }
                 // # for private identifiers
-                self.advance();
+                self.advance_ascii();
                 self.make_token(TokenKind::Hash, start)
             }
             // Non-ASCII lead byte: a Unicode IdentifierStart, otherwise an error.
@@ -1501,6 +1550,22 @@ impl<'a> Lexer<'a> {
             }
         };
         Ok(())
+    }
+
+    /// Write the `//` (`is_block: false`) or `/* */` comment token spanning `start..end`
+    /// into `*dst` and move the cursor past it; the content starts after the two-byte
+    /// opener.
+    #[inline]
+    fn comment_into(&mut self, start: usize, end: usize, is_block: bool, dst: &mut Token) {
+        self.position = end;
+        *dst = Token {
+            kind: TokenKind::Comment {
+                is_block,
+                content_start: (start + 2) as u32,
+            },
+            start: start as u32,
+            end: end as u32,
+        };
     }
 
     /// By-value next-token for every caller but the hot advance path: the parser's
@@ -2186,5 +2251,291 @@ mod tests {
             (name.kind, name.start, name.end),
             (model_identifier("private").0, 1, 8)
         );
+    }
+
+    /// One comment token [`model_trivia`] reads — kind, span, and whether a line terminator
+    /// came between it and the token before it — or the error that ends the stream.
+    type TriviaItem = Result<(TokenKind, u32, u32, bool), ParseError>;
+
+    /// The trivia ECMAScript reads from byte `pos` of `src` — WhiteSpace, LineTerminators,
+    /// `//` and `/* */` comments, and a hashbang at byte 0 — restated from the grammar's
+    /// char-level predicates alone ([`is_es_whitespace`], [`is_es_line_terminator`]) with
+    /// none of the lexer's byte fast paths. Returns each comment, then where the next token
+    /// starts and whether a line terminator came ahead of it; an unterminated block comment
+    /// ends the stream with its error.
+    fn model_trivia(src: &str, mut pos: usize) -> (Vec<TriviaItem>, usize, bool) {
+        let line_end = |from: usize| {
+            src[from..]
+                .char_indices()
+                .find(|&(_, c)| is_es_line_terminator(c))
+                .map_or(src.len(), |(i, _)| from + i)
+        };
+        let mut items = Vec::new();
+        if pos == 0 && src.starts_with("#!") {
+            let kind = TokenKind::Comment {
+                is_block: false,
+                content_start: 0,
+            };
+            pos = line_end(0);
+            items.push(Ok((kind, 0, pos as u32, false)));
+        }
+        loop {
+            let mut crossed = false;
+            while let Some(c) = src[pos..].chars().next() {
+                if is_es_line_terminator(c) {
+                    crossed = true;
+                } else if !is_es_whitespace(c) {
+                    break;
+                }
+                pos += c.len_utf8();
+            }
+            let (is_block, end) = if src[pos..].starts_with("//") {
+                (false, line_end(pos))
+            } else if src[pos..].starts_with("/*") {
+                let Some(close) = src[pos + 2..].find("*/") else {
+                    items.push(Err(lex_err("Unterminated block comment", pos)));
+                    return (items, pos, crossed);
+                };
+                (true, pos + 2 + close + 2)
+            } else {
+                return (items, pos, crossed);
+            };
+            let kind = TokenKind::Comment {
+                is_block,
+                content_start: (pos + 2) as u32,
+            };
+            items.push(Ok((kind, pos as u32, end as u32, crossed)));
+            pos = end;
+        }
+    }
+
+    /// The pieces the trivia sweep composes: every ASCII WhiteSpace byte, LF / CR / CRLF,
+    /// every non-ASCII WhiteSpace code point (NBSP, U+FEFF and each `Zs`), LS / PS, and line
+    /// and block comments — empty, single- and multi-line, holding a `*` or a `/`, and
+    /// unterminated.
+    const TRIVIA_PIECES: &[&str] = &[
+        " ",
+        "\t",
+        "\u{0B}",
+        "\u{0C}",
+        "\n",
+        "\r",
+        "\r\n",
+        "\u{A0}",
+        "\u{FEFF}",
+        "\u{1680}",
+        "\u{2000}",
+        "\u{2001}",
+        "\u{2002}",
+        "\u{2003}",
+        "\u{2004}",
+        "\u{2005}",
+        "\u{2006}",
+        "\u{2007}",
+        "\u{2008}",
+        "\u{2009}",
+        "\u{200A}",
+        "\u{202F}",
+        "\u{205F}",
+        "\u{3000}",
+        "\u{2028}",
+        "\u{2029}",
+        "//",
+        "//x",
+        "/**/",
+        "/*x*/",
+        "/*\n*/",
+        "/*\u{2028}* /*/",
+        "/*",
+    ];
+
+    /// What may follow the trivia, with the first token it opens and that token's length, or
+    /// `None` where the lexer rejects the character: end of input, identifiers and a keyword
+    /// (ASCII- and non-ASCII-led), `/` and `/=` (division — a regex is the parser's relex,
+    /// never the lexer's reading), `=>`, the HTML-like comment openers (plain operators:
+    /// Annex B is out), `#`, and non-ASCII code points that are neither WhiteSpace nor an
+    /// identifier start (NEL, ZWSP, U+180E).
+    fn trivia_followers() -> Vec<(&'static str, Option<(TokenKind, usize)>)> {
+        vec![
+            ("", Some((TokenKind::Eof, 0))),
+            ("a", Some((TokenKind::Identifier, 1))),
+            ("if", Some((model_identifier("if").0, 2))),
+            ("é", Some((TokenKind::Identifier, 2))),
+            (";", Some((TokenKind::Semicolon, 1))),
+            ("/", Some((TokenKind::Slash, 1))),
+            ("/=", Some((TokenKind::SlashEquals, 2))),
+            ("=>", Some((TokenKind::Arrow, 2))),
+            ("<!--", Some((TokenKind::LessThan, 1))),
+            ("-->", Some((TokenKind::MinusMinus, 2))),
+            ("#", Some((TokenKind::Hash, 1))),
+            ("\u{85}", None),
+            ("\u{200B}", None),
+            ("\u{180E}", None),
+        ]
+    }
+
+    /// Lex `prefix` + `trivia` + `follower` through the public `next_token` — the prefix's
+    /// one token first, when there is one — and check every token the trivia yields, and the
+    /// token after it, against [`model_trivia`]: kind, span, the line-terminator flag, and
+    /// the error (text and position) of an unterminated block comment or a rejected
+    /// character.
+    #[track_caller]
+    fn assert_trivia_matches_model(
+        prefix: &str,
+        trivia: &str,
+        follower: &str,
+        token: Option<&(TokenKind, usize)>,
+    ) {
+        let source = format!("{prefix}{trivia}{follower}");
+        let mut lexer = Lexer::at_offset(&source, 0);
+        let from = if prefix.is_empty() {
+            tsv_lang::leading_bom_len(&source)
+        } else {
+            let first = lexer.next_token().expect("the prefix lexes");
+            assert_eq!(first.end as usize, prefix.len(), "prefix of {source:?}");
+            prefix.len()
+        };
+        let (items, pos, crossed) = model_trivia(&source, from);
+        for item in items {
+            match item {
+                Ok((kind, start, end, crossed)) => {
+                    let comment = lexer
+                        .next_token()
+                        .unwrap_or_else(|e| panic!("{source:?} failed to lex: {e}"));
+                    assert_eq!(
+                        (comment.kind, comment.start, comment.end),
+                        (kind, start, end),
+                        "comment of {source:?}"
+                    );
+                    assert_eq!(
+                        lexer.had_line_terminator(),
+                        crossed,
+                        "line terminator ahead of the comment at {start} in {source:?}"
+                    );
+                }
+                Err(expected) => {
+                    assert_eq!(
+                        lexer.next_token().map(|t| t.kind),
+                        Err(expected),
+                        "{source:?}"
+                    );
+                    return;
+                }
+            }
+        }
+        let result = lexer.next_token();
+        // A line comment may run into the follower and leave nothing after it; a run whose
+        // pieces spell a token of their own (`//` then `/*\n*/` leaves `*/`) stops inside
+        // the trivia, where only the token's start and flag are the trivia's to decide.
+        let token = if pos == source.len() {
+            Some(&(TokenKind::Eof, 0))
+        } else if &source[pos..] == follower {
+            token
+        } else {
+            let next = result.unwrap_or_else(|e| panic!("{source:?} failed to lex: {e}"));
+            assert_eq!(
+                next.start as usize, pos,
+                "token inside the trivia of {source:?}"
+            );
+            assert_eq!(
+                lexer.had_line_terminator(),
+                crossed,
+                "line terminator ahead of the token in {source:?}"
+            );
+            return;
+        };
+        match token {
+            Some((kind, len)) => {
+                let next = result.unwrap_or_else(|e| panic!("{source:?} failed to lex: {e}"));
+                assert_eq!(
+                    (next.kind, next.start as usize, next.end as usize),
+                    (kind.clone(), pos, pos + len),
+                    "token after the trivia of {source:?}"
+                );
+                assert_eq!(
+                    lexer.had_line_terminator(),
+                    crossed,
+                    "line terminator ahead of the token in {source:?}"
+                );
+                assert_eq!(lexer.position, pos + len, "cursor after {source:?}");
+            }
+            None => {
+                let ch = follower
+                    .chars()
+                    .next()
+                    .expect("a rejected follower is a char");
+                assert_eq!(
+                    result.map(|t| t.kind),
+                    Err(lex_err(format!("Unexpected character: '{ch}'"), pos)),
+                    "{source:?}"
+                );
+            }
+        }
+    }
+
+    /// The whitespace ahead of a token is skipped by an ASCII fast path that hands the
+    /// dispatch its stop byte, and a comment is written into the token slot by the
+    /// dispatch's `/` arm; no corpus holds most of what either must get right. Every run of
+    /// zero to three [`TRIVIA_PIECES`] — so every pairing of CR, LF and CRLF, every
+    /// whitespace code point beside every comment shape, and every comment against end of
+    /// input — is lexed ahead of every one of [`trivia_followers`], at byte 0 and behind a
+    /// `;` (so a scan that reads from the source's start rather than the token's is caught).
+    #[test]
+    fn every_trivia_run_matches_the_grammar() {
+        let followers = trivia_followers();
+        let mut runs = vec![String::new()];
+        let mut frontier = runs.clone();
+        for _ in 0..3 {
+            frontier = frontier
+                .iter()
+                .flat_map(|run| {
+                    TRIVIA_PIECES
+                        .iter()
+                        .map(move |piece| format!("{run}{piece}"))
+                })
+                .collect();
+            runs.extend(frontier.iter().cloned());
+        }
+        let mut cases = 0_u32;
+        for run in &runs {
+            for (follower, token) in &followers {
+                for prefix in ["", ";"] {
+                    assert_trivia_matches_model(prefix, run, follower, token.as_ref());
+                    cases += 1;
+                }
+            }
+        }
+        assert!(
+            cases > 1_000_000,
+            "the trivia sweep collapsed to {cases} cases"
+        );
+    }
+
+    /// The byte-0 forms the sweep's `;` prefix cannot reach: a hashbang (a comment token
+    /// whose content includes the `#!`, only at byte 0), a BOM ahead of it (which makes the
+    /// `#` a plain token), and a BOM ahead of trivia (skipped before the first token).
+    #[test]
+    fn byte_zero_trivia_matches_the_grammar() {
+        let followers = trivia_followers();
+        for head in [
+            "#!",
+            "#!x",
+            "#!x\n",
+            "#!x\r\n",
+            "#!x\u{2028}",
+            "\u{FEFF}",
+            "\u{FEFF}#!x\n",
+        ] {
+            for piece in ["", " ", "\n", "//x", "/**/", "/*"] {
+                for (follower, token) in &followers {
+                    assert_trivia_matches_model(
+                        "",
+                        &format!("{head}{piece}"),
+                        follower,
+                        token.as_ref(),
+                    );
+                }
+            }
+        }
     }
 }
