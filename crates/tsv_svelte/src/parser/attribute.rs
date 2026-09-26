@@ -258,28 +258,38 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// `current_start`. The lexer already scanned a leading token; Svelte folds any trailing
     /// non-terminator chars (`%`, `&`, `#`, …) into the same name.
     ///
-    /// ⚠️ **The scan starts at `current_start`, never at the token's end.** Resuming at
-    /// `current_end` gives the same answer only while the token holds no terminator, and
-    /// reading it as a fast path is what hid two bugs: a **marker brace is one token across
-    /// the gap** ([`TokenKind::BlockOpen`] and friends tokenize `{ #`, mirroring Svelte's
-    /// `tag()`), so `<script { #a}>` folded the author's whitespace into the name and came
-    /// back `{ #a}` where Svelte reads `{` then `#a}`; and `{/a}` skipped over a `/` — a
-    /// terminator Svelte stops at — so a head the canonical parser rejects parsed. A token
-    /// boundary is not part of this question at all, which is what the caller's own dispatch
-    /// comment already says: the run is read from `current_start` whatever the lexer made of
-    /// its first character.
+    /// ⚠️ **The run is measured from `current_start`, and only an `Identifier` token may be
+    /// stepped over whole.** An `Identifier` holds no terminator — every lexer arm that yields
+    /// one reads either a single character that no earlier arm claimed (and every terminator is
+    /// claimed earlier, whitespace by the skip ahead of the dispatch) or a run of the name
+    /// class (behind a letter, `_`, `$`, `-`, a non-ASCII letter, or the `!` a doctype name
+    /// opens with) or of the unquoted-numeric class (alphanumerics, `_`, `-`, behind a digit),
+    /// both disjoint from `[\s=/>"']` (graded per scalar by this module's tests) — so the scan
+    /// resumes at its end with the same answer, and the common name, which the token already
+    /// ends at a terminator, is settled by one check. Any other token is NOT a prefix of the
+    /// name, and resuming past it is what hid two bugs: a **marker brace is one
+    /// token across the gap** ([`TokenKind::BlockOpen`] and friends tokenize `{ #`, mirroring
+    /// Svelte's `tag()`), so `<script { #a}>` folded the author's whitespace into the name and
+    /// came back `{ #a}` where Svelte reads `{` then `#a}`; and `{/a}` skipped over a `/` — a
+    /// terminator Svelte stops at — so a head the canonical parser rejects parsed. Those scan
+    /// from `current_start`, whatever the lexer made of the first character.
     ///
     /// Only a **static** `<script>`/`<style>` head reaches here holding a brace token; the
     /// element reader peels every `{` off first
     /// ([`Self::current_token_opens_a_brace_attribute`]).
     ///
     /// A **symbol-led** name is no special case, which follows from the same sentence: the
-    /// scan starts at the first byte whatever the lexer made of it, so `<div %foo #bar>` and
+    /// run starts at the first byte whatever the lexer made of it, so `<div %foo #bar>` and
     /// `<p }>` read as Svelte reads them (`svelte/attributes/name_leading_symbol/`,
     /// `svelte/attributes/name_leading_brace/`). The symbol-led *tag* name it would otherwise
     /// pair with is refused separately, by `element.rs`'s `is_valid_tag_name`.
     fn attribute_name_run_end(&self) -> usize {
-        attr_name_end(self.source, self.current_start())
+        let from = if self.check(TokenKind::Identifier) {
+            self.current_end()
+        } else {
+            self.current_start()
+        };
+        attr_name_end(self.source, from)
     }
 
     /// Parse an attribute or directive
@@ -1266,6 +1276,57 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 #[cfg(test)]
 mod tests {
     use super::attr_name_end;
+    use crate::lexer::{Lexer, Token, TokenKind};
+
+    /// An `Identifier` token holds no attribute-name terminator, so the name run may resume
+    /// at its end (`SvelteParser::attribute_name_run_end`): for every Unicode scalar, in every
+    /// lexer arm that yields one — letter-, `!`-, digit- and non-ASCII-led runs, and the
+    /// single-character arm — measuring the run from the token's end gives the same answer as
+    /// measuring it from its start.
+    #[test]
+    fn an_identifier_token_holds_no_attribute_name_terminator() {
+        let mut identifiers = 0usize;
+        for cp in 0..=0x10_ffff_u32 {
+            let Some(c) = char::from_u32(cp) else {
+                continue;
+            };
+            for name in [
+                format!("{c}"),
+                format!("{c}x"),
+                format!("a{c}"),
+                format!("a-{c}b"),
+                format!("!{c}"),
+                format!("1{c}"),
+                format!("\u{e9}{c}"),
+                format!("%{c}"),
+                format!("on:a|{c}"),
+            ] {
+                let doc = format!("<div {name}=x>");
+                let mut lexer = Lexer::new(&doc);
+                lexer.inside_tag = true;
+                lexer.seek("<div ".len());
+                let mut token = Token {
+                    kind: TokenKind::Eof,
+                    start: 0,
+                    end: 0,
+                };
+                if lexer.next_token_into(&mut token).is_err() || token.kind != TokenKind::Identifier
+                {
+                    continue;
+                }
+                identifiers += 1;
+                assert_eq!(
+                    attr_name_end(&doc, token.end as usize),
+                    attr_name_end(&doc, token.start as usize),
+                    "U+{cp:04X} in {doc:?}"
+                );
+            }
+        }
+        assert!(
+            identifiers > 9_000_000,
+            "the scalar walk lexed identifiers ({identifiers})"
+        );
+    }
 
     /// The attribute-name run ends at `[\s=/>"']` and at nothing else. Wider than the
     /// tag-name class ([`is_tag_name_terminator`](super::super::element)), which keeps `=`,
