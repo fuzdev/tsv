@@ -16,6 +16,7 @@ governs every entry here live in [conformance_prettier.md](./conformance_prettie
 - Non-null parenthesized base — ◆design_choice — [non_null_paren_base_long](../tests/fixtures/typescript/expressions/member/non_null_paren_base_long_prettier_divergence/)
 - Parenthesized binary member base — ◆design_choice ◆print_width — [paren_binary_base_long](../tests/fixtures/typescript/expressions/member/paren_binary_base_long_prettier_divergence/)
 - Constrained infer extends-operand parens — ◆prettier_bug — [constrained_extends_parens](../tests/fixtures/typescript/types/infer/constrained_extends_parens_prettier_divergence/)
+- Negative literal postfix-operand parens — ◆prettier_bug ◆parser_compat — [negative_literal_postfix_parens](../tests/fixtures/typescript/types/negative_literal_postfix_parens_prettier_divergence/), [negative_literal_postfix_parens_comment](../tests/fixtures/typescript/types/negative_literal_postfix_parens_comment_prettier_divergence/)
 - Arrow type param trailing comma — ◆design_choice — [single_type_param](../tests/fixtures/typescript/expressions/arrow/generic/single_type_param_prettier_divergence/)
 - Empty-object comment bracket spacing — ◆design_choice — [empty_block_comment](../tests/fixtures/typescript/expressions/objects/empty_block_comment_prettier_divergence/), [destructure empty_comment](../tests/fixtures/typescript/expressions/destructuring/empty_comment_prettier_divergence/), [enum empty_comment](../tests/fixtures/typescript/declarations/enum/body_empty_comment_prettier_divergence/), [literal_body_empty](../tests/fixtures/typescript/types/comments/literal_body_empty_prettier_divergence/), [union_empty_object_member](../tests/fixtures/typescript/types/union_empty_object_member_prettier_divergence/), [call_type_arg_empty_comment](../tests/fixtures/typescript/typescript_specific/generics/call_type_arg_empty_comment_prettier_divergence/)
 - Optional rest parameter `?` — ◆design_choice — [rest_optional_param](../tests/fixtures/typescript/typescript_specific/rest_optional_param_prettier_divergence/)
@@ -473,6 +474,27 @@ parser erased — is the position-pair seam that also serves the expression stat
 `() => (⏎// prettier-ignore⏎@dec class {}⏎).bbb` prints `(@dec class {}).bbb`.
 
 **Constrained infer extends-operand parens**: An `infer X extends C` only ever appears in a conditional type's extends-type, so a trailing token always follows the constraint. When a _nested_ arrow's return abuts the enclosing `? :`, the parens TypeScript requires are the only thing keeping the parse unambiguous, and Prettier strips them, emitting output that **fails to re-parse** (acorn-typescript rejects it): `M extends (() => () => infer U extends string) ? …` → `M extends () => () => infer U extends string ? …` (Prettier's `needs-parentheses` rule only inspects the immediate return type). tsv keeps the parens, staying valid. Two related forms are preserved by both formatters: the _conditional-type_ infer constraint (`X extends infer U extends (A extends B ? C : D) ? …` — Prettier keeps these parens) and the single-arrow return (`M extends (() => infer U extends string) ? …` — Prettier's single-level rule covers it; see [constrained_extends_parens](../tests/fixtures/typescript/types/infer/constrained_extends_parens/), where tsv matches). A bare `<T extends (A extends B ? C : D)>` type-parameter declaration is unaffected: the `>` terminates it, so Prettier strips and tsv matches.
+
+**Negative literal postfix-operand parens**: A negative literal type (`-1`, `-1n`) as the
+operand of a type's postfix brackets — an array element type (`(-1)[]`) or an indexed-access
+object type (`(-1)[K]`) — keeps its parens, which prettier strips. tsc reads either spelling
+as the same type: `-` is a negative literal type when a numeric or bigint literal follows, and
+its postfix loop then takes the brackets. acorn-typescript — the parser Svelte itself uses —
+reads the literal with its expression parser instead, which takes every `[…]` that follows as
+a computed member, so the stripped `-1[]` is a syntax error at the `]` (a `<script lang="ts">`
+that compiled stops compiling, and prettier's own next pass over the component throws) and the
+stripped `-1[K]` is the literal type `-(1[K])`, a different tree. The pair is kept wherever
+the operand sits — `readonly (-1)[]`, `[...(-1)[]]`, an annotation, a type argument, an `as` /
+`satisfies` target, a template expression — with a comment the author wrote inside the parens
+or between them and the brackets kept where it was written, where prettier strips the pair
+(and, for a trailing `//`, floats the comment past the `;`). A negative literal anywhere else
+needs no pair and strips in both formatters (`(-1) | 2`, `A[(-1)]`, `[(-1)?]`,
+[negative_literal_redundant_parens](../tests/fixtures/typescript/types/negative_literal_redundant_parens/)),
+as does a non-negative literal in these positions (`(1)[]`). The bare spellings are pinned in
+[tests/negative_literal_postfix_parens.rs](../tests/negative_literal_postfix_parens.rs): where
+acorn-typescript rejects the bare text (`-1[]`, `-1[K][]`, `readonly -1[]`) tsv REPAIRS it to
+the paired spelling every parser reads alike, and where both parsers accept it as different
+programs (`-1[K]`, and a pair around such a run, `(-1[K])[]`) tsv prints it as written.
 
 **Module path calls**: Prettier special-cases `require`/`import` identifiers:
 

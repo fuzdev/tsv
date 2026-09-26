@@ -587,6 +587,17 @@ pub struct Printer<'a> {
     /// across conditional-group variants answers the same way every time; a set rather than
     /// one cell because a chain nests one owner inside the next.
     pub(crate) continued_instantiation_targets: RefCell<Vec<Span>>,
+    /// Spans of the bare negative literals an array type's element run of indexed accesses
+    /// leads (`-1[K][]`), which the indexed-access object rule prints with a pair
+    /// (`(-1)[K][]`; `array_run_negative_literal`). Recorded by the array
+    /// builder ahead of its element, read by the object rule, which cannot see the `[]`
+    /// further out. Keyed by span and never consumed, like
+    /// [`Self::continued_instantiation_targets`]. Sound because a recorded span only ever
+    /// adds a pair: every reader that can run BEFORE the array records it (the `=` hug
+    /// gate, the head-shell and open-pair gates) acts only on a paren SHELL, and the bare
+    /// literal a span names has none, so an early reader's unrecorded answer is the answer
+    /// it would give anyway.
+    pub(crate) negative_literal_pair_targets: RefCell<Vec<Span>>,
     /// Set while the FIRST type argument list of an instantiation chain printed bare is
     /// built (`f<keyof (A)><U>(x)`): tsc reads that list as the right operand of a `<`
     /// comparison, so every authored paren the decision that the chain prints bare reads
@@ -674,6 +685,7 @@ impl<'a> Printer<'a> {
             arrow_body_inject: Cell::new(None),
             chain_has_comments: Cell::new(true),
             continued_instantiation_targets: RefCell::new(Vec::new()),
+            negative_literal_pair_targets: RefCell::new(Vec::new()),
             first_list_keeps_maybe_parens: Cell::new(false),
             comment_free_gap,
         }

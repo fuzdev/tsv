@@ -5,8 +5,8 @@ use super::{Printer, build_entity_name_doc, is_effectively_empty_body};
 use crate::ast::internal::{self, TSType};
 use crate::printer::statements::function::FunctionHeadModifier;
 use crate::printer::types::helpers::{
-    type_needs_parens_for_array_element, type_needs_parens_for_indexed_access_object,
-    unwrap_parenthesized,
+    is_negative_literal, type_needs_parens_for_array_element,
+    type_needs_parens_for_indexed_access_object, unwrap_parenthesized,
 };
 use crate::printer::types::{
     ArraySuffixLayout, TrailingBlock, UnionValueDoc, prefix_operator_shell_pair,
@@ -92,8 +92,14 @@ fn type_has_internal_breaking(printer: &Printer<'_>, ts_type: &TSType<'_>) -> bo
         // the first disjunct misses — an element the author left bare that the printer
         // parenthesizes anyway (`typeof x /* c */[]`), where the AST holds no
         // `Parenthesized` node to match on.
+        //
+        // A bare negative literal element is read as the pair the printer ADDS around it
+        // (`-1[]` → `(-1)[]`, `is_negative_literal`): the next pass sees that pair as
+        // authored, so answering from the bare source would hang a sign-gap `//`
+        // (`-// c⏎1[]`) after `=` on the first pass and hug it on the second.
         TSType::Array(a) => {
             matches!(a.element_type, TSType::Parenthesized(_))
+                || is_negative_literal(a.element_type)
                 || matches!(printer.array_suffix_layout(a), ArraySuffixLayout::Split { .. })
         }
         // An indexed access whose index→`]` gap holds a line comment breaks inside the

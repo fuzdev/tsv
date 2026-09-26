@@ -399,6 +399,18 @@ impl Printer<'_> {
         }
     }
 
+    /// Whether `ts_type`, a bare negative literal indexed-access object, was recorded by an
+    /// enclosing array type as leading a run that holds a `[]`
+    /// ([`Printer::negative_literal_pair_targets`]).
+    pub(in crate::printer) fn negative_literal_array_run_pairs(
+        &self,
+        ts_type: &TSType<'_>,
+    ) -> bool {
+        self.negative_literal_pair_targets
+            .borrow()
+            .contains(&ts_type.span())
+    }
+
     /// [`unwrap_parenthesized`] short of a shell the first list of a chain printed bare
     /// keeps ([`Self::first_list_keeps_function_paren`]) — the node a run of paren shells
     /// prints from, where every other shell strips.
@@ -439,6 +451,10 @@ impl Printer<'_> {
 
 /// Check if a type needs parentheses when used as the object in indexed access (`T[K]`).
 /// Without parens: `A | B[K]` parses as `A | (B[K])`, not `(A | B)[K]`
+///
+/// A negative literal object (`(-1)[K]`) keeps an AUTHORED pair — and so does a pair around a
+/// postfix run such a literal leads (`(-1[K])[J]`) — but a bare one prints as written, unless
+/// an array suffix further out needs the pair ([`array_run_negative_literal`]).
 pub(in crate::printer) fn type_needs_parens_for_indexed_access_object(
     p: &Printer<'_>,
     ts_type: &TSType<'_>,
@@ -455,11 +471,18 @@ pub(in crate::printer) fn type_needs_parens_for_indexed_access_object(
             | TSType::Infer(_)
             | TSType::Function(_)
             | TSType::Constructor(_)
-    )
+    ) || authored_pair_leads_with_bare_negative_literal(p, ts_type)
+        || (is_negative_literal(ts_type) && p.negative_literal_array_run_pairs(ts_type))
 }
 
 /// Check if a type needs parentheses when used as the element type in an array (`T[]`).
 /// Without parens: `A | B[]` parses as `A | (B[])`, not `(A | B)[]`
+///
+/// A negative literal element always takes a pair (`-1[]` → `(-1)[]`): acorn-typescript
+/// reads the bare literal with its expression parser, whose member read meets the `]` and
+/// does not parse, while tsc reads the paired and the bare spelling as one type
+/// ([`is_negative_literal`]). An authored pair around a run such a literal leads
+/// (`(-1[K])[]`) is kept as written.
 pub(in crate::printer) fn type_needs_parens_for_array_element(
     p: &Printer<'_>,
     ts_type: &TSType<'_>,
@@ -477,7 +500,65 @@ pub(in crate::printer) fn type_needs_parens_for_array_element(
             | TSType::Infer(_)
             | TSType::Function(_)
             | TSType::Constructor(_)
-    )
+    ) || is_negative_literal(inner)
+        || authored_pair_leads_with_bare_negative_literal(p, ts_type)
+}
+
+/// Whether `ts_type` is a negative literal type (`-1`, `-1n`).
+///
+/// Such a literal is the one type tsc and acorn-typescript read differently ahead of
+/// postfix brackets: tsc's postfix loop takes `[]` / `[K]` after it, but acorn-typescript
+/// reads the literal with its EXPRESSION parser (`parseMaybeUnary`), which takes every
+/// `[…]` that follows as a computed member. So a bare `-1[]` does not parse there, and a
+/// bare `-1[K]` is the literal type `-(1[K])` — a different tree. A pair settles both
+/// parsers on tsc's reading.
+pub(in crate::printer) fn is_negative_literal(ts_type: &TSType<'_>) -> bool {
+    matches!(ts_type, TSType::Literal(TSLiteralType::UnaryExpression(_)))
+}
+
+/// Whether `ts_type` PRINTS starting with a negative literal's `-` — the literal itself,
+/// or a run of indexed accesses whose leftmost object is one printed without a pair.
+///
+/// Read from the printed form, not the source: an object behind a paren shell prints a
+/// `(` first whichever way the shell resolves (kept, it is the pair; stripped, its inner
+/// does not lead with the literal, or it would have been kept), and an ARRAY run never
+/// qualifies — its leftmost literal always gains a pair
+/// ([`array_run_negative_literal`]).
+fn leads_with_bare_negative_literal(ts_type: &TSType<'_>) -> bool {
+    match ts_type {
+        TSType::Literal(TSLiteralType::UnaryExpression(_)) => true,
+        TSType::IndexedAccess(i) => leads_with_bare_negative_literal(i.object_type),
+        _ => false,
+    }
+}
+
+/// Whether `ts_type` is an AUTHORED paren shell (redundant layers included) whose content
+/// prints starting with a negative literal — `(-1)`, `((-1))`, `(-1[K])` — ahead of postfix
+/// brackets. The pair is kept: each parser reads the output as it read the input, where
+/// stripping it hands acorn-typescript a member read (`-1[]` rejected, `-1[K]` the literal
+/// `-(1[K])`) or, around a bare run, tsc's tree in place of the one acorn read.
+fn authored_pair_leads_with_bare_negative_literal(p: &Printer<'_>, ts_type: &TSType<'_>) -> bool {
+    matches!(ts_type, TSType::Parenthesized(_))
+        && leads_with_bare_negative_literal(p.printed_operand(ts_type))
+}
+
+/// The bare negative literal at the leftmost end of an array element's run of indexed
+/// accesses (`-1[K][]` → the `-1`), which needs a pair because the run holds a `[]`:
+/// acorn-typescript's member read of the literal meets the `[]` and does not parse, so
+/// tsv REPAIRS it to `(-1)[K][]`, the tree tsc read, in the spelling both parsers read. A
+/// run of `[K]` alone is spelled as written instead — both parsers accept it, each as its
+/// own program. Descends only through BARE objects: a paren shell ends the run.
+pub(in crate::printer) fn array_run_negative_literal<'t>(
+    element: &'t TSType<'t>,
+) -> Option<&'t TSType<'t>> {
+    let TSType::IndexedAccess(_) = element else {
+        return None;
+    };
+    let mut ty = element;
+    while let TSType::IndexedAccess(i) = ty {
+        ty = i.object_type;
+    }
+    is_negative_literal(ty).then_some(ty)
 }
 
 /// Check if a type needs parentheses when used as an optional tuple element (`[T?]`).
