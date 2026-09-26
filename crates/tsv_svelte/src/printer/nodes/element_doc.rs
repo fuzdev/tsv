@@ -13,7 +13,7 @@
 
 use crate::ast::internal::{self, FragmentNode, is_collapsible_ws_char};
 use crate::printer::Printer;
-use smallvec::smallvec;
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
@@ -1272,38 +1272,74 @@ impl<'a> Printer<'a> {
     /// The CSS printer writes its output rather than building one doc, so the body cannot
     /// ride this document's indentation the way a nested `<script>` does. It is formatted
     /// the way the top-level `<style>` is instead (`tsv_css::format_embedded_in`), at the
-    /// indent level it will render at — [`Printer::body_indent_level`], read while this
-    /// element's parent fragment is being built — so width is measured from the real column
+    /// indent level it is expected to render at — [`Printer::body_indent_level`], read while
+    /// this element's parent fragment is being built — so width is measured from that column
     /// and verbatim text (a comment's interior, an escaped-newline string, a raw at-rule
-    /// prelude) keeps its column. The result is placed as literal text: the leading `hardline`
-    /// the caller emits indents the first line, and every later line already carries its own.
+    /// prelude) keeps its column.
+    ///
+    /// That level is a count of the fragments open around the element, and the element does
+    /// not always render there: the parent it sits in may hug it without indenting its content —
+    /// a style glued inline (`text1<span><style>…</style>text2</span>`), a lone style in an inline
+    /// parent (`x<span><style>…</style></span>y`), a block holding one inside a hugged inline
+    /// parent. So the body is placed by the host's renderer rather than at that count: each line
+    /// the CSS printer broke and indented itself rides a `hardline` at its indent relative to the
+    /// body, and each line that is verbatim text keeps its authored column behind a
+    /// `literalline`. The two are told apart by formatting once more one level deeper — the
+    /// printer's own lines move with the level, verbatim ones do not.
     fn build_nested_style_body_doc(
         &self,
         stylesheet: &tsv_css::CssStyleSheet<'_>,
     ) -> Option<DocId> {
         let level = self.body_indent_level();
-        let embed = tsv_lang::EmbedContext {
-            base_indent_offset: level,
-            ..tsv_lang::EmbedContext::default()
+        let format_at = |level: usize| {
+            let embed = tsv_lang::EmbedContext {
+                base_indent_offset: level,
+                ..tsv_lang::EmbedContext::default()
+            };
+            tsv_css::format_embedded_in(
+                stylesheet,
+                self.source,
+                self.line_table(),
+                embed,
+                self.css_host_scan(),
+                self.d(),
+            )
         };
-        let formatted = tsv_css::format_embedded_in(
-            stylesheet,
-            self.source,
-            self.line_table(),
-            embed,
-            self.css_host_scan(),
-            self.d(),
-        );
+        let formatted = format_at(level);
         let formatted = formatted.trim_end();
         if formatted.trim_start().is_empty() {
             return None;
         }
-        // The first line carries the body's indentation, which the caller's `hardline`
-        // supplies instead.
-        Some(
-            self.d()
-                .multiline_text_literal(formatted.trim_start_matches('\t')),
-        )
+        let d = self.d();
+        // TODO: the verbatim lines are the CSS printer's to report — `tsv_css` handing back the
+        // line ranges it emitted verbatim would replace this second format.
+        let deeper = {
+            // A measurement only: its comments are the first format's, printed once.
+            #[cfg(feature = "comment_check")]
+            let _measuring = tsv_lang::comment_ledger::SuppressEmits::new();
+            format_at(level + 1)
+        };
+        let deeper = deeper.trim_end();
+        let lines: Vec<&str> = formatted.split('\n').collect();
+        let deeper_lines: Vec<&str> = deeper.split('\n').collect();
+        if lines.len() != deeper_lines.len() {
+            // The deeper format wrapped differently: keep every later line where it is.
+            return Some(d.multiline_text_literal(formatted.trim_start_matches('\t')));
+        }
+        let mut parts: SmallVec<[DocId; 16]> = SmallVec::new();
+        parts.push(d.text_pooled(lines[0].trim_start_matches('\t')));
+        for (line, deeper_line) in lines.iter().zip(&deeper_lines).skip(1) {
+            let owned = deeper_line.strip_prefix('\t') == Some(*line)
+                && line.len() - line.trim_start_matches('\t').len() >= level;
+            if owned {
+                parts.push(d.hardline());
+                parts.push(d.text_pooled(&line[level..]));
+            } else {
+                parts.push(d.literalline());
+                parts.push(d.text_pooled(line));
+            }
+        }
+        Some(d.concat(&parts))
     }
 
     /// Build docs for element attributes.

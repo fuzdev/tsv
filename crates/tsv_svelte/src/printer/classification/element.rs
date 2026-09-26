@@ -19,7 +19,9 @@ impl<'a> Printer<'a> {
     ///
     /// Note: `<script>` and `<style>` elements with content are treated as block
     /// elements for formatting purposes, since their content will be formatted
-    /// on separate lines. Empty `<script>`/`<style>` remain inline.
+    /// on separate lines. Empty `<script>`/`<style>` remain inline. This is the NODE-only answer:
+    /// such an element renders no box, so where a break beside it would render, the positional
+    /// readers lay it out as a glued inline element instead (`Printer::is_glued_raw_text_element`).
     pub(crate) fn is_block_element(&self, element: &internal::Element<'_>) -> bool {
         // Components are treated as inline, not block
         if element.kind == ElementKind::Component {

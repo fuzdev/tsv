@@ -33,7 +33,6 @@ use smallvec::SmallVec;
 use std::cell::{Cell, RefCell};
 use std::fmt::Write as _;
 use std::ops::{Index, IndexMut};
-use tsv_lang::FxHashSet;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::printing::LineBreaks;
@@ -44,6 +43,7 @@ use tsv_lang::{
     is_format_ignore_range_end, is_format_ignore_range_start, is_honored_format_ignore,
     is_region_end_marker,
 };
+use tsv_lang::{FxHashMap, FxHashSet};
 use tsv_ts::{Expression, ExpressionKind};
 
 /// A buffered run of comments from one gap — collected rather than iterated because the
@@ -419,6 +419,13 @@ pub(crate) struct Printer<'a> {
     /// asks in four, and nine of the islands' first searches in ten, lay inside a window
     /// already drawn.
     comment_free_gap: CommentFreeWindow<'a>,
+    /// Each fragment's node count and content-edge answer (`nodes::EdgeFree`), keyed by the
+    /// address of its first node — indexed once per document, top down, by
+    /// [`Printer::index_fragment_edges`], since a block tag's body reads its edges from where the
+    /// tag sits in its parent. A run of a fragment finds its fragment by address.
+    fragment_edges: RefCell<std::collections::BTreeMap<usize, (usize, nodes::EdgeFree)>>,
+    /// Each node slice's glue flags (`nodes::FragmentGlue`), computed on first ask.
+    fragment_glue_cache: RefCell<FxHashMap<(usize, usize), std::rc::Rc<nodes::FragmentGlue>>>,
 }
 
 impl<'a> Printer<'a> {
@@ -476,6 +483,8 @@ impl<'a> Printer<'a> {
             css_host_scan_cache: Cell::new(None),
             root_inline_run_block_starts: RefCell::new(FxHashSet::default()),
             comment_free_gap: CommentFreeWindow::new(comments),
+            fragment_edges: RefCell::new(std::collections::BTreeMap::new()),
+            fragment_glue_cache: RefCell::new(FxHashMap::default()),
         }
     }
 
@@ -1371,6 +1380,9 @@ fn format_root<'a>(
         EmbedContext::default(),
         line_breaks,
     );
+    // Which fragment content edges are line-box edges — asked by the nested `<script>` /
+    // `<style>` glue, and indexed before anything reads it.
+    printer.index_fragment_edges(&root.fragment);
 
     // Which fragment comments travel with which section: asked once per document and shared by
     // the lifted-run rewrite, the tail respell and the print — a caller that already classified

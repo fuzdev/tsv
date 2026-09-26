@@ -1,0 +1,1 @@
+prettier grows a blank line after a frozen glued nested script or style on every pass

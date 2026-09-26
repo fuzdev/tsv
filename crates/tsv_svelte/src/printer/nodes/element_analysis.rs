@@ -574,12 +574,16 @@ impl<'a> Printer<'a> {
         // newlines as authored, built the multiline layout and gave the block element its own
         // line, splitting the two (and the same for the `{#await}`-first order, in a block
         // parent too, whose sibling rule below reads only a block AFTER a breakable sibling).
-        if nodes.iter().any(|n| self.is_block_element_child(n))
-            && nodes
-                .iter()
-                .filter(|n| !n.is_whitespace_only_text())
-                .nth(1)
-                .is_some()
+        // Asked by position: a nested `<script>` / `<style>` that keeps its glue lays out as a
+        // glued inline element (`Printer::is_glued_raw_text_element`), so it forces the element
+        // open only through its own body's breaks, never as a block child.
+        if (0..nodes.len()).any(|i| {
+            self.is_block_element_child(&nodes[i]) && !self.is_glued_raw_text_element(nodes, i)
+        }) && nodes
+            .iter()
+            .filter(|n| !n.is_whitespace_only_text())
+            .nth(1)
+            .is_some()
         {
             return MultilineCause::Structural;
         }

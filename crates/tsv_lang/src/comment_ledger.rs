@@ -74,7 +74,7 @@
 //! valid only while the sources are alive — [`take_comment_ledger`] drains after each
 //! document, so a later file's source reusing an address can't inherit stale entries.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::{Comment, Span};
@@ -87,6 +87,39 @@ thread_local! {
     /// genuine registration gap (an emitter running over a comment the walk missed). Counted,
     /// never a finding; over a clean corpus it is zero.
     static UNREGISTERED: RefCell<usize> = const { RefCell::new(0) };
+    /// How many [`SuppressEmits`] guards are alive on this thread.
+    static SUPPRESSED: Cell<u32> = const { Cell::new(0) };
+}
+
+/// While alive, this thread's emits record nothing — for a printer that formats a region a
+/// second time only to MEASURE it (the output is discarded), so the comments it prints there
+/// are not printed at all. Nest freely.
+pub struct SuppressEmits(());
+
+impl SuppressEmits {
+    /// Start suppressing this thread's emits until the guard drops.
+    #[must_use]
+    pub fn new() -> Self {
+        SUPPRESSED.with(|s| s.set(s.get() + 1));
+        Self(())
+    }
+}
+
+impl Default for SuppressEmits {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Drop for SuppressEmits {
+    fn drop(&mut self) {
+        SUPPRESSED.with(|s| s.set(s.get() - 1));
+    }
+}
+
+/// Whether a [`SuppressEmits`] guard is alive on this thread.
+fn emits_suppressed() -> bool {
+    SUPPRESSED.with(Cell::get) > 0
 }
 
 /// A document's identity: its source text's address + length.
@@ -235,7 +268,7 @@ pub fn record_emitted(source: &str, span: Span) {
 /// [`record_emitted`] against an already-resolved [`DocumentKey`] — what the doc
 /// renderer calls, having no `source` of its own.
 pub fn record_emitted_keyed(key: DocumentKey, span: Span) {
-    if !comment_check_enabled() {
+    if !comment_check_enabled() || emits_suppressed() {
         return;
     }
     DOCS.with(|docs| {
@@ -271,7 +304,7 @@ pub fn record_filtered_skip(
     span: Span,
     site: &'static std::panic::Location<'static>,
 ) {
-    if !comment_check_enabled() {
+    if !comment_check_enabled() || emits_suppressed() {
         return;
     }
     DOCS.with(|docs| {
@@ -285,7 +318,7 @@ pub fn record_filtered_skip(
 /// Declare `[start, end)` of `source` emitted **verbatim** — every comment it covers
 /// counts as emitted once.
 pub fn record_verbatim_range(source: &str, start: u32, end: u32) {
-    if !comment_check_enabled() {
+    if !comment_check_enabled() || emits_suppressed() {
         return;
     }
     DOCS.with(|docs| {

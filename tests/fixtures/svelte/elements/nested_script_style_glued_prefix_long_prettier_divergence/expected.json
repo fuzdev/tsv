@@ -1,0 +1,198 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 603,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 223,
+				"data": "\n\tText in front of a glued nested `<script>`: the glued run renders multiline, so the space in\n\tfront of it is spent on a line break at every width and the run starts its own line; the glued\n\tboundaries stay intact.\n"
+			},
+			{
+				"type": "Text",
+				"start": 223,
+				"end": 225,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 225,
+				"end": 285,
+				"data": " the text line with the run would end at exactly 100 "
+			},
+			{
+				"type": "Text",
+				"start": 285,
+				"end": 286,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 286,
+				"end": 425,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 287
+					},
+					"end": {
+						"line": 8,
+						"column": 2,
+						"character": 288
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 289,
+							"end": 382,
+							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14\n\ta",
+							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14\n\ta"
+						},
+						{
+							"type": "RegularElement",
+							"start": 382,
+							"end": 414,
+							"name": "script",
+							"name_loc": {
+								"start": {
+									"line": 10,
+									"column": 3,
+									"character": 383
+								},
+								"end": {
+									"line": 10,
+									"column": 9,
+									"character": 389
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 390,
+										"end": 405,
+										"type": "Text",
+										"data": "\n\t\tlet a = 1;\n\t",
+										"raw": "\n\t\tlet a = 1;\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 414,
+							"end": 421,
+							"raw": "text15\n",
+							"data": "text15\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 425,
+				"end": 427,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 427,
+				"end": 461,
+				"data": " one character wider (101) "
+			},
+			{
+				"type": "Text",
+				"start": 461,
+				"end": 462,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 462,
+				"end": 602,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 16,
+						"column": 1,
+						"character": 463
+					},
+					"end": {
+						"line": 16,
+						"column": 2,
+						"character": 464
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 465,
+							"end": 559,
+							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14\n\taa",
+							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14\n\taa"
+						},
+						{
+							"type": "RegularElement",
+							"start": 559,
+							"end": 591,
+							"name": "script",
+							"name_loc": {
+								"start": {
+									"line": 18,
+									"column": 4,
+									"character": 560
+								},
+								"end": {
+									"line": 18,
+									"column": 10,
+									"character": 566
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 567,
+										"end": 582,
+										"type": "Text",
+										"data": "\n\t\tlet b = 2;\n\t",
+										"raw": "\n\t\tlet b = 2;\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 591,
+							"end": 598,
+							"raw": "text15\n",
+							"data": "text15\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
