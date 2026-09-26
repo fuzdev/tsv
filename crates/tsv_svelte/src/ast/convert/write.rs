@@ -859,8 +859,9 @@ fn write_element_name_field(w: &mut JsonWriter, elem: &internal::Element<'_>, ct
 /// the escape scan, then the key and the quoted name as one fixed-width append when it
 /// comes back clean ([`JsonWriter::string_led`]).
 ///
-/// `inline(never)`: one shared copy of the scan and the window write for its two callers
-/// (the attribute and the component name), whose arms leave by tail call.
+/// `inline(never)`: one shared copy of the short scan and the window write for its two
+/// callers (the attribute and the component name); the word loop and the escaping arm leave
+/// by tail call.
 #[inline(never)]
 fn write_scanned_name_field(w: &mut JsonWriter, name: &[u8]) {
     w.string_led(NAME_KEY, name);

@@ -389,11 +389,22 @@ fn needs_escape(bytes: &[u8]) -> bool {
         // already-cleared bytes, harmlessly — see above).
         return word_needs_escape(*chunk);
     }
-    // Shorter than one word, so the loop above never ran — but the same union
-    // argument still gathers the slice into one word. Four to seven bytes are
-    // two overlapping four-byte loads; one to three are the first, middle and
-    // last byte (which between them name every byte of a slice that short),
-    // with the lanes past them filled by a byte no kernel flags.
+    // Shorter than one word, so the loop above never ran.
+    short_needs_escape(bytes)
+}
+
+/// [`needs_escape`] for a slice shorter than one word: the same union argument
+/// gathers it into one word. Four to seven bytes are two overlapping four-byte
+/// loads; one to three are the first, middle and last byte (which between them
+/// name every byte of a slice that short), with the lanes past them filled by a
+/// byte no kernel flags.
+///
+/// Its own function so a caller can take the short case ahead of the word loop
+/// ([`JsonWriter::string_led`]): the loop's hoisted lane constants are what cost
+/// the registers, and a slice this short never runs it.
+#[inline]
+fn short_needs_escape(bytes: &[u8]) -> bool {
+    debug_assert!(bytes.len() < 8, "a short slice is shorter than one word");
     let word = if let (Some(lo), Some(hi)) = (bytes.first_chunk::<4>(), bytes.last_chunk::<4>()) {
         u64::from(u32::from_le_bytes(*lo)) | u64::from(u32::from_le_bytes(*hi)) << 32
     } else if let (Some(&first), Some(&last)) = (bytes.first(), bytes.last()) {
@@ -1073,15 +1084,22 @@ impl JsonWriter {
 
     /// [`JsonWriter::string`] behind the constant fragment `lead` — byte-identical
     /// to `raw(lead)` then `string` — for a dynamic string written behind a fixed
-    /// key that the caller cannot vouch for: the prescan runs here, inline, and a
-    /// clean answer takes [`JsonWriter::string_escape_free_led`]'s one
-    /// fixed-width append, key included, where `string` would copy the string
-    /// through a libc `memcpy` call after an outlined call of its own.
+    /// key that the caller cannot vouch for: the prescan runs here, and a clean
+    /// answer takes [`JsonWriter::string_escape_free_led`]'s one fixed-width
+    /// append, key included, where `string` would copy the string through a libc
+    /// `memcpy` call after an outlined call of its own.
     ///
     /// For a name field whose grammar admits an escaped byte but whose real
     /// values rarely hold one — a Svelte attribute or component name. The bytes are
     /// taken as a slice, so the caller's source slice needs no char-boundary
     /// checks; it must still be whole UTF-8, which debug builds assert.
+    ///
+    /// A string shorter than a word — most names — is gathered and tested inline
+    /// ([`short_needs_escape`]); a longer one leaves by tail call to
+    /// [`JsonWriter::string_led_long`], which runs the word loop. Split so the
+    /// short path makes no call and saves no register: with the loop inline, its
+    /// hoisted lane constants and cursors took every callee-saved register, and
+    /// the saves ran ahead of the length test, on every name.
     #[expect(clippy::inline_always)]
     #[inline(always)]
     pub fn string_led<const K: usize>(&mut self, lead: &[u8; K], bytes: &[u8]) {
@@ -1090,6 +1108,22 @@ impl JsonWriter {
             "string_led takes UTF-8: {:?}",
             String::from_utf8_lossy(bytes)
         );
+        if bytes.len() >= 8 {
+            self.string_led_long(lead, bytes);
+            return;
+        }
+        if short_needs_escape(bytes) {
+            self.string_led_escaped(lead, bytes);
+            return;
+        }
+        self.string_escape_free_led(lead, bytes);
+    }
+
+    /// [`JsonWriter::string_led`] for a string of a word or more, out of line: the
+    /// word-at-a-time prescan, then the same two arms.
+    #[inline(never)]
+    fn string_led_long<const K: usize>(&mut self, lead: &[u8; K], bytes: &[u8]) {
+        debug_assert!(bytes.len() >= 8, "a long slice holds at least one word");
         if needs_escape(bytes) {
             self.string_led_escaped(lead, bytes);
             return;
