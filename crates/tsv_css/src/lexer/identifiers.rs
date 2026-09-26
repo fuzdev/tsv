@@ -308,9 +308,10 @@ pub(crate) fn decode_unicode_escape(source: &str, pos: &mut usize) -> Result<cha
     // class, which is what keeps the wire agreeing with the span it was cut from.
     //
     // The lexer's two other non-ASCII whitespace reads are NOT this rule and are still on
-    // `char::is_whitespace`: `skip_whitespace`'s non-ASCII arm, which only `<NEL>` can reach
-    // (every code point at or above U+00A0 is an identifier code point here) and which is the
-    // tracked gap pinned in tests/css_boundary_whitespace.rs; and `url_arg_is_quoted`, which
+    // `char::is_whitespace`: the whitespace token's non-ASCII half
+    // (`non_ascii_whitespace_run_end`), which only `<NEL>` can reach (every code point at or
+    // above U+00A0 is an identifier code point here) and which is the tracked gap pinned in
+    // tests/css_boundary_whitespace.rs; and `url_arg_is_quoted`, which
     // forks a url-token per css-syntax-3 §4.3.6 — a grammar `parseCss` has no counterpart for,
     // so its class answers to nothing named here.
     if let Some(ch) = source[*pos..].chars().next()

@@ -184,41 +184,26 @@ impl<'a> Lexer<'a> {
         self.source[self.pos..].chars().nth(offset)
     }
 
-    /// Step the cursor over a whitespace run; the dispatch builds the token from the
-    /// positions either side of it.
-    fn skip_whitespace(&mut self) {
+    /// The end of the whitespace run whose first byte, at `start`, the dispatch has already
+    /// classified as ASCII whitespace.
+    ///
+    /// The run is ASCII on essentially every token (and a byte or two long), so it is walked
+    /// here with a local cursor — the dispatch stores the one end it returns — starting past
+    /// the byte the dispatch matched rather than reading it again. A non-ASCII byte hands the
+    /// rest of the run to the cold [`non_ascii_whitespace_run_end`], so the loop keeps nothing
+    /// live for a decode.
+    #[inline]
+    fn ascii_led_whitespace_run_end(&self, start: usize) -> usize {
+        let bytes = self.bytes;
+        let mut pos = start + 1;
         loop {
-            match self.cur_byte() {
-                // ASCII whitespace fast path — the overwhelming common case. Advances
-                // one byte per whitespace char, decoding nothing (see
-                // `is_ascii_css_whitespace`, which matches `char::is_whitespace` for ASCII).
-                Some(b) if is_ascii_css_whitespace(b) => self.pos += 1,
-                // Any other ASCII byte is not whitespace — stop.
-                Some(b) if b < 0x80 => break,
-                // Non-ASCII lead byte: CSS whitespace is ASCII-only (CSS Syntax 3 §4.2).
-                // tsv follows `parseCss` in treating every code point ≥ U+00A0 (NBSP, em
-                // space, ideographic space, …) as an *identifier* code point — value/ident
-                // content, never a separator, and deliberately broader than the CSS Syntax
-                // ident set (which excludes these look-alike whitespace chars). So a
-                // whitespace run stops at one; it lexes as identifier content instead. Only
-                // the sub-U+00A0 non-ASCII whitespace (the C1 controls, e.g. NEL U+0085 —
-                // not identifier code points here) stays whitespace.
-                //
-                // ⚠️ That is the right class HERE and the wrong one at a **boundary**, where
-                // `parseCss` runs `allow_whitespace()` (JS `\s`) before the token starts and
-                // would step over the very same character. The lexer cannot tell the two
-                // apart — only the parser knows which juncture it is at — so the boundary
-                // half lives in `CssParser::skip_boundary_whitespace`, called from the
-                // parser's own whitespace skips. Keeping it out of the lexer is what leaves
-                // a declaration VALUE alone, where a non-ASCII space is content
-                // (`css/values/boundary_nonascii_space_prettier_divergence`).
-                Some(_) => match self.current_char() {
-                    Some(ch) if ch.is_whitespace() && !is_non_ascii_identifier_codepoint(ch) => {
-                        self.pos += ch.len_utf8();
-                    }
-                    _ => break,
-                },
-                None => break,
+            match bytes.get(pos) {
+                // ASCII whitespace — see `is_ascii_css_whitespace`, which matches
+                // `char::is_whitespace` for ASCII.
+                Some(&b) if is_ascii_css_whitespace(b) => pos += 1,
+                Some(&b) if !b.is_ascii() => return non_ascii_whitespace_run_end(self.source, pos),
+                // Any other ASCII byte is not whitespace, and end of input ends the run.
+                _ => return pos,
             }
         }
     }
@@ -452,7 +437,7 @@ impl<'a> Lexer<'a> {
             // Whitespace (ASCII subset of `char::is_whitespace`; non-ASCII whitespace is
             // handled in the tail below).
             _ if is_ascii_css_whitespace(b) => {
-                self.skip_whitespace();
+                self.pos = self.ascii_led_whitespace_run_end(start);
                 TokenKind::Whitespace
             }
 
@@ -559,7 +544,7 @@ impl<'a> Lexer<'a> {
             _ => match self.current_char() {
                 Some(ch) if is_identifier_start(ch) => return self.read_identifier_into(dst),
                 Some(ch) if ch.is_whitespace() => {
-                    self.skip_whitespace();
+                    self.pos = non_ascii_whitespace_run_end(self.source, self.pos);
                     TokenKind::Whitespace
                 }
                 Some(ch) => {
@@ -579,6 +564,47 @@ impl<'a> Lexer<'a> {
             end: self.pos as u32,
         };
         Ok(())
+    }
+}
+
+/// The end of a whitespace run from `pos` on, where the byte at `pos` is non-ASCII — the
+/// run's head, or where [`Lexer::ascii_led_whitespace_run_end`]'s ASCII walk stopped.
+///
+/// The run's whole class, both halves: ASCII whitespace, and the non-ASCII whitespace that is
+/// not an identifier code point. CSS whitespace is ASCII-only (CSS Syntax 3 §4.2), and tsv
+/// follows `parseCss` in treating every code point ≥ U+00A0 (NBSP, em space, ideographic
+/// space, …) as an *identifier* code point — value/ident content, never a separator, and
+/// deliberately broader than the CSS Syntax ident set (which excludes these look-alike
+/// whitespace chars). So a whitespace run stops at one; it lexes as identifier content
+/// instead. Only the sub-U+00A0 non-ASCII whitespace (the C1 controls, e.g. NEL U+0085 — not
+/// identifier code points here) stays whitespace.
+///
+/// ⚠️ That is the right class HERE and the wrong one at a **boundary**, where `parseCss` runs
+/// `allow_whitespace()` (JS `\s`) before the token starts and would step over the very same
+/// character. The lexer cannot tell the two apart — only the parser knows which juncture it
+/// is at — so the boundary half lives in `CssParser::skip_boundary_whitespace`, called from
+/// the parser's own whitespace skips. Keeping it out of the lexer is what leaves a
+/// declaration VALUE alone, where a non-ASCII space is content
+/// (`css/values/boundary_nonascii_space_prettier_divergence`).
+///
+/// A free function over the source rather than a `&mut self` method, so the call cannot write
+/// the lexer as far as the optimizer knows; the caller stores the end.
+#[cold]
+#[inline(never)]
+fn non_ascii_whitespace_run_end(source: &str, mut pos: usize) -> usize {
+    let bytes = source.as_bytes();
+    loop {
+        match bytes.get(pos) {
+            Some(&b) if is_ascii_css_whitespace(b) => pos += 1,
+            Some(&b) if b.is_ascii() => return pos,
+            Some(_) => match source[pos..].chars().next() {
+                Some(ch) if ch.is_whitespace() && !is_non_ascii_identifier_codepoint(ch) => {
+                    pos += ch.len_utf8();
+                }
+                _ => return pos,
+            },
+            None => return pos,
+        }
     }
 }
 
@@ -638,5 +664,96 @@ pub(crate) fn url_token_close(bytes: &[u8], after_paren: usize) -> Option<usize>
         if j < len {
             j += 1;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The whitespace run's end from `pos` as one character loop over both halves of the
+    /// class — the shape the dispatch's split walk (an ASCII loop, a cold non-ASCII tail)
+    /// must reproduce.
+    fn reference_run_end(source: &str, mut pos: usize) -> usize {
+        while let Some(ch) = source[pos..].chars().next() {
+            let is_run = if ch.is_ascii() {
+                is_ascii_css_whitespace(ch as u8)
+            } else {
+                ch.is_whitespace() && !is_non_ascii_identifier_codepoint(ch)
+            };
+            if !is_run {
+                break;
+            }
+            pos += ch.len_utf8();
+        }
+        pos
+    }
+
+    /// One character for every byte a token boundary can meet: each ASCII byte, each
+    /// two-byte `U+0080..=U+00FF` character, and a character opening with every other UTF-8
+    /// lead byte — plus the non-ASCII whitespace and look-alike spaces the class decides on.
+    fn followers() -> Vec<String> {
+        let mut out: Vec<String> = (0u32..=0xFF)
+            .map(|c| char::from_u32(c).expect("a Latin-1 code point").to_string())
+            .collect();
+        for lead in 0xC4u8..=0xF4 {
+            let bytes: &[u8] = match lead {
+                0xE0 => &[0xE0, 0xA0, 0x80],
+                0xE1..=0xEF => &[lead, 0x80, 0x80],
+                0xF0 => &[0xF0, 0x90, 0x80, 0x80],
+                0xF1..=0xF4 => &[lead, 0x80, 0x80, 0x80],
+                _ => &[lead, 0x80],
+            };
+            let bytes = bytes.to_vec();
+            out.push(String::from_utf8(bytes).expect("a valid UTF-8 sequence"));
+        }
+        for c in [
+            0x1680, 0x2000, 0x200A, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000, 0xFEFF, 0x1F600,
+        ] {
+            out.push(char::from_u32(c).expect("a code point").to_string());
+        }
+        out
+    }
+
+    /// Every whitespace token ends where the class says it does: runs of every length over
+    /// every member (the six ASCII bytes the lexer takes — SP, TAB, LF, CR, VT, FF — CRLF
+    /// among them, and NEL, the non-ASCII member), opening at offset 0 and mid-document,
+    /// against every byte that can follow them.
+    #[test]
+    fn whitespace_runs_end_where_the_class_ends() {
+        let members = [" ", "\t", "\n", "\r", "\u{b}", "\u{c}", "\r\n", "\u{85}"];
+        // and end of input, which ends a run as surely as a byte does
+        let mut followers = followers();
+        followers.push(String::new());
+        let mut graded = 0;
+        for len in 1..=9 {
+            for rot in 0..members.len() {
+                let run: String = (0..len)
+                    .map(|i| members[(rot + i * 3) % members.len()])
+                    .collect();
+                for follower in &followers {
+                    for prefix in ["", "a", "a{b:"] {
+                        let tail = if follower.is_empty() { "" } else { "x" };
+                        let source = format!("{prefix}{run}{follower}{tail}");
+                        let mut lexer = Lexer::at_offset(&source, 0);
+                        let token = loop {
+                            let token = lexer.next_token().expect("the prefix lexes");
+                            if token.start as usize >= prefix.len() {
+                                break token;
+                            }
+                        };
+                        assert_eq!(token.start as usize, prefix.len(), "{source:?}");
+                        assert_eq!(token.kind, TokenKind::Whitespace, "{source:?}");
+                        assert_eq!(
+                            token.end as usize,
+                            reference_run_end(&source, prefix.len()),
+                            "{source:?}"
+                        );
+                        graded += 1;
+                    }
+                }
+            }
+        }
+        assert!(graded > 60_000, "{graded}");
     }
 }
