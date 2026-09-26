@@ -42,10 +42,16 @@ impl<'a> Printer<'a> {
     }
 }
 
-/// Whether a raw-text element (`<script>`/`<style>`) carries non-empty content.
-/// Raw-text parsing emits exactly one `Text` node whose `raw` is the verbatim
-/// body (empty for `<script></script>`), so an empty `raw` means no content.
-fn has_raw_content(element: &internal::Element<'_>) -> bool {
+/// Whether an element's content prints anything — asked of a raw-text element
+/// (`<script>`/`<style>`), whose parse emits exactly one `Text` node holding the verbatim body
+/// (empty for `<script></script>`, which Svelte still gives that node), so node-presence is not
+/// "has content" and an empty `raw` means none.
+///
+/// The one reading for both askers: the block classification above (a non-empty body is
+/// block) and the whitespace-sensitive head (`build_whitespace_sensitive_element_doc`, where an
+/// empty body takes the empty element's layouts). Two spellings of it would let the two answer
+/// differently for the same element.
+pub(crate) fn has_raw_content(element: &internal::Element<'_>) -> bool {
     use crate::ast::internal::FragmentNode;
     element
         .fragment
