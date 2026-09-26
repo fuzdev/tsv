@@ -60,7 +60,8 @@ fn linearize_chain<'a>(expr: &'a Expression<'_>, input: LinearizeInput<'_>) -> C
 // chains a fuz_app pass — `buffer_sizes`), so a by-value return copies the WHOLE array,
 // length-independently, into a second slot the caller reserves to receive it; the caller's
 // local is where the buffer has to live either way. That slot lands in
-// `build_expression_doc_dispatch`, on the expression recursion cycle, where every level pays.
+// `build_expression_doc_full_dispatch`, on the expression recursion cycle, where every level
+// pays.
 //
 // ⚠️ Each one FILLS the buffer; none of them appends to it. The buffer arriving EMPTY is a
 // precondition, because `finalize_chain_nodes` is three WHOLE-SLICE passes over one chain:
