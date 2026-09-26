@@ -34,3 +34,13 @@
 <pre>{#if obj[
 		// c
 		key]}a{/if}</pre>
+
+<!-- the {#await} and {#key} heads: the head opens around the comment, and every section
+	stays glued to its tags -->
+<pre>{#await f( // c
+		promise
+	)}loading{:then value}{value}{/await}</pre>
+
+<pre>{#key f( // c
+		id
+	)}text{/key}</pre>

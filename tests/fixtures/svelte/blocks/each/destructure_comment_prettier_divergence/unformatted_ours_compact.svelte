@@ -42,9 +42,16 @@
 
 {#each items as [/* c */{z}]}<div>{z}</div>{/each}
 
-<!-- line comment: a // runs to end of line, so the pattern tail drops to the next line (no swallow) -->
+<!-- line comment: it breaks the pattern, laid out like the same pattern in a TypeScript declaration -->
 {#each items as {q =// c
-1}}<div>{q}</div>{/each}
+1}}
+	<div>{q}</div>
+{/each}
 
 <!-- keyed each: the pattern's comment stays in the pattern, never on the (key) -->
 {#each items as {j/* c */},i (j)}<div>{j}{i}</div>{/each}
+
+<!-- an empty pattern holding only a block comment -->
+{#each items as {/* c */}}<div>x</div>{/each}
+
+{#each items as [/* c */]}<div>x</div>{/each}

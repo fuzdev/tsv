@@ -1745,3 +1745,147 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 }
+
+/// A Svelte **block binding pattern** (`{#each … as P}`, `{#await … then P}`, `{:then P}`,
+/// `{:catch P}`) — the host's two seams into the destructuring layout above.
+///
+/// The rule the host states: a block pattern lays out like its TypeScript twin wherever a
+/// COMMENT breaks it, and stays inline everywhere else — at any width, and whatever it nests
+/// (prettier-plugin-svelte keeps these heads on one line, and the declaration twin's
+/// nested-pattern break is a declarator's rule). So the gate here is the comment half of the
+/// object and array patterns' expansion gates only, asked of the whole binding, and the doc is
+/// the expanded builder those gates select.
+impl Printer<'_> {
+    /// Whether a comment in the destructuring pattern `expr` takes the declaration twin's
+    /// layout — any comment in an EMPTY pattern, which only the twin's empty-brace builder
+    /// prints the twin's way, and otherwise a comment that forces the pattern open the way the
+    /// twin opens it: a `//` or a multi-line block anywhere in its body (the
+    /// twin's break propagates out of any sub-node that holds one), or an own-line block in
+    /// the gaps of this pattern or of a pattern nested in it (each expands its own list, and
+    /// that break propagates too), or an own-line comment in a rest's stripped parens. The
+    /// `: T` tail is not the pattern's — the twin's annotation breaks on its own — and neither
+    /// is a blank line, which only a comment-broken pattern keeps.
+    pub(crate) fn block_pattern_comment_breaks(&self, expr: &Expression<'_>) -> bool {
+        let (span, body_end) = match &expr.kind {
+            ExpressionKind::ObjectPattern(obj) => {
+                (expr.span, self.object_pattern_tail(obj, expr.span).body_end)
+            }
+            ExpressionKind::ArrayPattern(arr) => {
+                (expr.span, self.array_pattern_tail(arr, expr.span).body_end)
+            }
+            _ => return false,
+        };
+        if !self.has_comments_on_page_between(span.start, body_end) {
+            return false;
+        }
+        // An empty pattern's only content is its dangling run, which the twin's empty-brace
+        // builder prints whatever it holds — spaced braces around a block (`{ /* c */ }`),
+        // tight brackets (`[/* c */]`), and opened around a `//`.
+        let is_empty = match &expr.kind {
+            ExpressionKind::ObjectPattern(obj) => obj.properties.is_empty(),
+            ExpressionKind::ArrayPattern(arr) => arr.elements.is_empty(),
+            _ => false,
+        };
+        is_empty
+            || self.has_line_comments_between(span.start, body_end)
+            || self.has_multiline_block_comments_on_page_between(span.start, body_end)
+            || self.pattern_own_line_block_breaks(expr)
+    }
+
+    /// The own-line half of [`Self::block_pattern_comment_breaks`], recursing into every
+    /// pattern nested in `expr` — the nested pattern's own expansion is what the twin
+    /// propagates out.
+    fn pattern_own_line_block_breaks(&self, expr: &Expression<'_>) -> bool {
+        match &expr.kind {
+            ExpressionKind::ObjectPattern(obj) if !obj.properties.is_empty() => {
+                let boundary = self.object_pattern_tail(obj, expr.span).body_end;
+                self.object_pattern_has_own_line_block_comments(obj, expr.span, boundary)
+                    || self.paren_interior_forces_expansion(
+                        obj.properties
+                            .last()
+                            .and_then(ObjectPatternProperty::paren_interior),
+                    )
+                    || obj.properties.iter().any(|p| match p {
+                        ObjectPatternProperty::Property(p) => {
+                            self.pattern_own_line_block_breaks(p.value)
+                        }
+                        ObjectPatternProperty::RestElement(r) => {
+                            self.pattern_own_line_block_breaks(r.argument)
+                        }
+                    })
+            }
+            ExpressionKind::ArrayPattern(arr) if !arr.elements.is_empty() => {
+                let boundary = self.array_pattern_tail(arr, expr.span).body_end;
+                let non_null: SmallVec<[_; 8]> = arr.elements.iter().flatten().collect();
+                self.has_own_line_block_comments_in_bracket_list(
+                    Span::new(expr.span.start, boundary),
+                    &non_null,
+                    |elem| Span::new(elem.span().start, elem.printed_end()),
+                ) || self.paren_interior_forces_expansion(
+                    arr.elements
+                        .last()
+                        .and_then(|e| e.as_ref()?.paren_interior()),
+                ) || non_null
+                    .iter()
+                    .any(|e| self.pattern_own_line_block_breaks(e))
+            }
+            // A default value is no list of this pattern's, but an own-line block inside it
+            // opens the value itself (an object's or array's elements, a call's arguments, an
+            // arrow's body), and that break propagates out through the pattern in the twin.
+            ExpressionKind::AssignmentPattern(ap) => {
+                self.pattern_own_line_block_breaks(ap.left)
+                    || self.default_value_comment_breaks(ap.right)
+            }
+            ExpressionKind::AssignmentExpression(ae) => {
+                self.pattern_own_line_block_breaks(ae.left)
+                    || self.default_value_comment_breaks(ae.right)
+            }
+            ExpressionKind::RestElement(r) => self.pattern_own_line_block_breaks(r.argument),
+            _ => false,
+        }
+    }
+
+    /// Whether a comment-bearing default value `value` breaks — asked of the value's own doc,
+    /// since what opens a value is each value kind's own rule (an own-line block among an
+    /// object's or array's elements, in a call's arguments, in an arrow's body).
+    ///
+    /// Keyed on the value holding ANY comment, not only an own-line one, because the verdict
+    /// must survive its own output. An own-line block at an object's `key:` gap opens the
+    /// object while collapsing onto the key's line (`{ s:⏎/* c */⏎1 }` → `{⏎→s: /* c */ 1⏎}`),
+    /// and that object then stays open on its authored first-line break with the comment no
+    /// longer on its own line — so an own-line key read on the second pass returned the
+    /// pattern to one line. A value that breaks with no comment in it (an arrow's block body,
+    /// an object the author opened) is still the rule a block pattern does not take.
+    fn default_value_comment_breaks(&self, value: &Expression<'_>) -> bool {
+        let span = value.span();
+        self.has_comments_on_page_between(span.start, span.end)
+            && self.d().will_break(self.build_expression_doc(value))
+    }
+
+    /// The comment-broken layout of the block pattern `expr` — the declaration twin's
+    /// expanded object or array pattern, `: T` tail included, with the owned comment glued
+    /// ahead of its opening delimiter claimed here, since this reaches past
+    /// `build_expression_doc`. Asked only once [`Self::block_pattern_comment_breaks`] holds.
+    pub(crate) fn build_block_pattern_broken_doc(&self, expr: &Expression<'_>) -> DocId {
+        let doc = match &expr.kind {
+            // An empty pattern holds only a dangling run, which the twin's empty-brace builder
+            // opens around a `//` itself.
+            ExpressionKind::ObjectPattern(obj) if obj.properties.is_empty() => {
+                self.build_empty_object_pattern_doc(obj, expr.span)
+            }
+            ExpressionKind::ArrayPattern(arr) if arr.elements.is_empty() => {
+                self.build_empty_array_pattern_doc(arr, expr.span)
+            }
+            ExpressionKind::ObjectPattern(obj) => {
+                let tail = self.object_pattern_tail(obj, expr.span);
+                self.build_expanded_object_pattern_doc(obj, expr.span, tail)
+            }
+            ExpressionKind::ArrayPattern(arr) => {
+                let tail = self.array_pattern_tail(arr, expr.span);
+                self.build_expanded_array_pattern_doc(arr, expr.span, tail)
+            }
+            _ => return self.build_expression_doc(expr),
+        };
+        self.prepend_owned_leading_comment(expr, doc)
+    }
+}

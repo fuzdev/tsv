@@ -15,6 +15,10 @@ also mis-relocated out to trail the awaited expression — `{#await promise /* c
 — because the expression's trailing-comment range spanned the whole head; the range now
 stops at the pattern, so the comment stays inside it.)
 
+The `//` cell (`{ d = // c⏎1 }`) breaks the pattern open, laid out like the same pattern
+in a TypeScript declaration
+([destructure_own_line_comment](../destructure_own_line_comment_prettier_divergence/)).
+
 The wire is a **parser match** here as it is for `{#each}`: canonical attaches each
 interior comment to its adjacent pattern node, and tsv reproduces the attachment from the
 same window. These branches reach it by the other route — `{:then}` / `{:catch}` take
@@ -30,4 +34,5 @@ in these positions. See
 ## Related
 
 - [destructure_comment](../../each/destructure_comment_prettier_divergence/) — the `{#each … as}` counterpart (full position matrix)
+- [destructure_own_line_comment](../destructure_own_line_comment_prettier_divergence/) — the comments that break the pattern open
 - [expr_trailing](../../../syntax/comments/expr_trailing_prettier_divergence/) — same drop-vs-preserve family for trailing comments in template expressions

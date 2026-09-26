@@ -914,6 +914,30 @@ pub fn build_expression_doc(
     })
 }
 
+/// The comment-broken layout of a Svelte **block binding pattern** (`{#each … as P}`,
+/// `{#await … then P}`, `{:then P}`, `{:catch P}`), in the caller's arena — `Some` exactly when
+/// a comment in `pattern` breaks its TypeScript twin (`const P = x`) open: then the twin's
+/// expanded object or array pattern, `: T` tail included. `None` for every other pattern, which
+/// the host keeps on one line — at any width, and whatever it nests, as prettier-plugin-svelte
+/// keeps these heads.
+pub fn build_block_pattern_broken_doc(
+    arena: &DocArena,
+    pattern: &Expression<'_>,
+    inputs: &PrinterInputs<'_>,
+    embed: EmbedContext,
+) -> Option<DocId> {
+    // The gate may build a default value's doc to ask whether it breaks, so it runs in a
+    // printer of its own: the doc the host keeps is built fresh.
+    with_doc_printer(arena, inputs, embed, |printer| {
+        printer.block_pattern_comment_breaks(pattern)
+    })
+    .then(|| {
+        with_doc_printer(arena, inputs, embed, |printer| {
+            printer.build_block_pattern_broken_doc(pattern)
+        })
+    })
+}
+
 /// Where `expression`'s doc STARTS PRINTING — its span start advanced past every grouping
 /// paren on its left spine that this crate's printer strips.
 ///

@@ -1,8 +1,10 @@
 # pre_block_head_line_comment_prettier_divergence
 
-A `//` inside a `{#if}` / `{#each}` head in a whitespace-sensitive element (`<pre>`), at all
-three head sites the whitespace-sensitive builder owns — the `{#if}` test, the `{#each}`
-expression, and the `{#each}` key.
+A `//` inside a block head in a whitespace-sensitive element (`<pre>`), at every head site
+the whitespace-sensitive builders own — the `{#if}` test, the `{#each}` expression, the
+`{#each}` key, the `{#await}` expression and the `{#key}` expression. The comment opens the
+head and nothing else: every section of the block stays glued to its tags, since a line break
+added beside a body is rendered content.
 
 Such a head never wraps on **width**: a line break added there is rendered content
 ([pre_block_head_long](../pre_block_head_long/) pins that, and the inert 100/101 boundary). A
@@ -55,6 +57,8 @@ and the opening-delimiter rule in
 [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).
 
 ## Related
+
+- [pre_block_pattern_comment](../pre_block_pattern_comment_prettier_divergence/) — the same licence inside a block's binding pattern
 
 - [pre_block_head_bracket_close_line_comment](../pre_block_head_bracket_close_line_comment_prettier_divergence/) — the index→`]` gap, where prettier ejects the comment out of the element instead
 - [pre_block_head_long](../pre_block_head_long/) — the width rule this comment rule is not

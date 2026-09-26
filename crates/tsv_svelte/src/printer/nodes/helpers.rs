@@ -320,12 +320,32 @@ impl<'a> Printer<'a> {
         (docs, ends_with_line_comment)
     }
 
-    /// Emit every comment in `[start, end)` in **leading** style: a block comment as
-    /// `/* … */ ` (inline, trailing space); a line comment as `// …` + `hardline` (a `//`
-    /// runs to end of line, so the following token drops to the next line to avoid
-    /// swallowing it). Empty doc when the range holds no comments.
+    /// Emit every comment in `[start, end)` in **leading** style, inline: each block comment
+    /// as `/* … */ ` (trailing space), on the line of what follows it wherever the author
+    /// wrote it — the twin's answer at every gap this inline builder prints, since an own-line
+    /// comment in a list gap routes the whole pattern to the twin's layout instead
+    /// ([`Self::build_block_pattern_doc`]), and at a key's `:` or a default's `=` the twin
+    /// collapses it (`{ a =⏎/* c */⏎1 }` → `{ a = /* c */ 1 }`). Empty doc when the range holds
+    /// no comments.
+    ///
+    /// A `//` or a multi-line block breaks the pattern and so never reaches here; should one,
+    /// the run takes the shared leading emitter, whose break keeps the `//` from swallowing
+    /// what follows it.
     fn build_pattern_leading_comments(&self, start: u32, end: u32) -> DocId {
-        self.d().concat(&self.leading_comment_docs(start, end))
+        let d = self.d();
+        if self.gap_known_comment_free(start, end) {
+            return d.empty();
+        }
+        let run: SmallVec<[&Comment; 2]> = self.comments_to_emit_between(start, end).collect();
+        if run.iter().any(|c| !c.is_block || c.multiline) {
+            return d.concat(&self.leading_comment_docs(start, end));
+        }
+        let inputs = self.ts_inputs();
+        let docs: DocBuf = run
+            .iter()
+            .flat_map(|c| [tsv_ts::build_comment_doc(d, c, &inputs), d.text(" ")])
+            .collect();
+        d.concat(&docs)
     }
 
     /// Emit every comment in `[start, end)` in **trailing** style: a block comment as
@@ -374,8 +394,10 @@ impl<'a> Printer<'a> {
     /// The node's stripped-paren interior (`...(rest /* c */)`) is NOT this doc's: the
     /// enclosing brackets anchor their next gap at the binding's printed end
     /// ([`element_printed_end`]), so the interior and the gap past the `)` are one trailing
-    /// run — a binding pattern stays inline, so there is no own-line share to split off,
-    /// and one run is what lets each comment take its separator from the one before it.
+    /// run — this builder only prints a pattern no comment breaks (an own-line one routes
+    /// the whole pattern to the twin's layout, [`Self::build_block_pattern_doc`]), so there
+    /// is no own-line share to split off, and one run is what lets each comment take its
+    /// separator from the one before it.
     fn build_rest_pattern_doc(&self, rest_span_start: u32, argument: &Expression<'_>) -> DocId {
         let d = self.d();
         let dots_end = rest_span_start + 3; // past "..."
@@ -570,32 +592,6 @@ impl<'a> Printer<'a> {
         self.claim_owned_leading_comment(d.concat(&parts), span_start)
     }
 
-    /// Build a doc for a pattern (destructuring context).
-    ///
-    /// Patterns use specific whitespace rules:
-    /// - Object patterns: `{ a, b }` (inner-padded braces, `bracketSpacing: true`)
-    /// - Array patterns: `[a, b]` (no spaces inside brackets — `bracketSpacing`
-    ///   governs object braces, not array brackets)
-    ///
-    /// Used for `{#each ... as pattern}`, `{#await ... then pattern}`,
-    /// `{:then pattern}`, and `{:catch pattern}` binding contexts. Non-empty object
-    /// braces carry an inner space (`{ a, b }`) under the project-wide
-    /// `bracketSpacing: true`, consistent with every other object tsv emits and
-    /// matching prettier-plugin-svelte; an empty `{}` stays tight.
-    ///
-    /// **Comments are preserved in place.** A comment in any pattern position (after a
-    /// brace/bracket, around a `,` / `:` / `=`, inside a property, before the close) is
-    /// threaded through via `comments_to_emit_in_range` and kept where the author wrote it —
-    /// block comments inline, line comments line-safely (`//` + `hardline`, so the tail
-    /// drops to the next line without swallow). prettier-plugin-svelte prints these
-    /// patterns from a comment-blind path and drops them, so this is a
-    /// `_svelte_prettier_divergence` (see conformance_prettier_svelte.md §Svelte: destructuring
-    /// binding-pattern comments).
-    ///
-    /// Literal **default values** normalize through the TS printer (string quotes +
-    /// numeric form), where prettier-plugin-svelte preserves the author's source
-    /// token — a separate deliberate divergence (see conformance_prettier_svelte.md §Svelte:
-    /// destructuring literal normalization).
     /// Append a destructuring pattern's `: T` tail (`{#each xs as { a }: T}`).
     ///
     /// A binding **identifier** carries its annotation through the TypeScript
@@ -617,6 +613,69 @@ impl<'a> Printer<'a> {
         d.concat(&[pattern, tail])
     }
 
+    /// Build a **block binding pattern** — the `{#each … as P}`, `{#await … then P}`,
+    /// `{:then P}` and `{:catch P}` binding — as a whole: the one entry the block builders
+    /// call, where [`Self::build_pattern_doc`] is the inline builder it recurses through.
+    ///
+    /// **A block pattern lays out like its TypeScript twin wherever a comment breaks it.** A
+    /// `//`, a multi-line block, or a block the author put on its own line opens the twin
+    /// (`const P = x`) one entry per line; the same comment opens the block pattern the same
+    /// way, through the twin's own builder
+    /// ([`tsv_ts::build_block_pattern_broken_doc`]), so the delimiter-line rule, the
+    /// element-comma seam, the author blanks and the `: T` tail are the twin's by
+    /// construction. Every other pattern stays on one line — at any width, and whatever it
+    /// nests — which is how prettier-plugin-svelte keeps these heads, and is the one twin rule
+    /// the block pattern does not take (the declaration's nested-pattern break). See
+    /// conformance_prettier_svelte.md §Svelte: destructuring binding-pattern comments.
+    ///
+    /// A caller whose layout depends on whether the pattern broke asks `will_break` of this
+    /// doc before wrapping it — the `{#each}` clause rides inside an `if_break`, which
+    /// `will_break` cannot see through.
+    pub(super) fn build_block_pattern_doc(&self, expr: &Expression<'_>) -> DocId {
+        if matches!(
+            expr.kind,
+            ExpressionKind::ObjectPattern(_) | ExpressionKind::ArrayPattern(_)
+        ) && !self.gap_known_comment_free(expr.span.start, tsv_ts::pattern_binding_end(expr))
+            && let Some(doc) = tsv_ts::build_block_pattern_broken_doc(
+                self.d(),
+                expr,
+                &self.ts_inputs(),
+                self.embed,
+            )
+        {
+            return doc;
+        }
+        self.build_pattern_doc(expr)
+    }
+
+    /// Build the **inline** layout of a pattern (destructuring context) — every block
+    /// pattern no comment breaks, reached through [`Self::build_block_pattern_doc`], and the
+    /// patterns and default values nested in one.
+    ///
+    /// Patterns use specific whitespace rules:
+    /// - Object patterns: `{ a, b }` (inner-padded braces, `bracketSpacing: true`)
+    /// - Array patterns: `[a, b]` (no spaces inside brackets — `bracketSpacing`
+    ///   governs object braces, not array brackets)
+    ///
+    /// Non-empty object braces carry an inner space (`{ a, b }`) under the project-wide
+    /// `bracketSpacing: true`, consistent with every other object tsv emits and matching
+    /// prettier-plugin-svelte; an empty `{}` stays tight.
+    ///
+    /// **Comments are preserved in place.** A single-line block comment in any position —
+    /// after a brace/bracket, around a `,` / `:` / `=`, inside a property, before the close —
+    /// is threaded through via `comments_to_emit_in_range` and kept where the author wrote
+    /// it, on the pattern's one line. A comment that breaks the twin (`const P = x`) never
+    /// reaches here — a `//`, a multi-line block, an own-line block in a list gap or one that
+    /// opens a default value: the caller hands the whole pattern to the twin's layout. An
+    /// own-line block anywhere else (at a key's `:`, a default's `=`) collapses onto the
+    /// line, as the twin collapses it. prettier-plugin-svelte prints these patterns from a
+    /// comment-blind path and drops them, so this is a `_prettier_divergence` (see
+    /// conformance_prettier_svelte.md §Svelte: destructuring binding-pattern comments).
+    ///
+    /// Literal **default values** normalize through the TS printer (string quotes +
+    /// numeric form), where prettier-plugin-svelte preserves the author's source
+    /// token — a separate deliberate divergence (see conformance_prettier_svelte.md §Svelte:
+    /// destructuring literal normalization).
     pub(super) fn build_pattern_doc(&self, expr: &Expression<'_>) -> DocId {
         match &expr.kind {
             // Comments thread through every gap so a comment in any pattern position is

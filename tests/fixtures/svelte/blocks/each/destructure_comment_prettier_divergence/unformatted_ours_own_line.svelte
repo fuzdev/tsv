@@ -1,5 +1,7 @@
 <!-- object default: comment after the `=` -->
-{#each items as { a = /* c */ 1 }}<div>{a}</div>{/each}
+{#each items as { a =
+/* c */
+1 }}<div>{a}</div>{/each}
 
 <!-- object default: comment before the `=` (stays on the binding) -->
 {#each items as { b /* c */ = 1 }}<div>{b}</div>{/each}
@@ -10,7 +12,9 @@
 <!-- object rename key:value: comment before and after the colon -->
 {#each items as { e /* c */: f }}<div>{f}</div>{/each}
 
-{#each items as { g: /* c */ h }}<div>{h}</div>{/each}
+{#each items as { g:
+/* c */
+h }}<div>{h}</div>{/each}
 
 <!-- object computed key: comment inside the brackets -->
 {#each items as { [/* c */ k]: v }}<div>{v}</div>{/each}
@@ -54,6 +58,10 @@
 {#each items as { j /* c */ }, i (j)}<div>{j}{i}</div>{/each}
 
 <!-- an empty pattern holding only a block comment -->
-{#each items as { /* c */ }}<div>x</div>{/each}
+{#each items as {
+/* c */
+}}<div>x</div>{/each}
 
-{#each items as [/* c */]}<div>x</div>{/each}
+{#each items as [
+/* c */
+]}<div>x</div>{/each}
