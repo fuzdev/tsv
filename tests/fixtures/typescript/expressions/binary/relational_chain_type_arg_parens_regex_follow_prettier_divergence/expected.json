@@ -1,0 +1,332 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 74,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 73,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 64,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 20,
+					"end": 40,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 21
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 20,
+						"end": 39,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 1
+							},
+							"end": {
+								"line": 2,
+								"column": 20
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 20,
+							"end": 21,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 1
+								},
+								"end": {
+									"line": 2,
+									"column": 2
+								}
+							},
+							"name": "g"
+						},
+						"arguments": [
+							{
+								"type": "BinaryExpression",
+								"start": 22,
+								"end": 38,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 3
+									},
+									"end": {
+										"line": 2,
+										"column": 19
+									}
+								},
+								"left": {
+									"type": "BinaryExpression",
+									"start": 23,
+									"end": 28,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 4
+										},
+										"end": {
+											"line": 2,
+											"column": 9
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 23,
+										"end": 24,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 4
+											},
+											"end": {
+												"line": 2,
+												"column": 5
+											}
+										},
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 27,
+										"end": 28,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 8
+											},
+											"end": {
+												"line": 2,
+												"column": 9
+											}
+										},
+										"name": "T"
+									}
+								},
+								"operator": ">",
+								"right": {
+									"type": "Literal",
+									"start": 32,
+									"end": 38,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 13
+										},
+										"end": {
+											"line": 2,
+											"column": 19
+										}
+									},
+									"value": {},
+									"raw": "/= c/g",
+									"regex": {
+										"pattern": "= c",
+										"flags": "g"
+									}
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 42,
+					"end": 63,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 22
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 42,
+						"end": 62,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 3,
+								"column": 21
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 42,
+							"end": 43,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 2
+								}
+							},
+							"name": "x"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 46,
+							"end": 62,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 5
+								},
+								"end": {
+									"line": 3,
+									"column": 21
+								}
+							},
+							"left": {
+								"type": "BinaryExpression",
+								"start": 47,
+								"end": 52,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 6
+									},
+									"end": {
+										"line": 3,
+										"column": 11
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 47,
+									"end": 48,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 6
+										},
+										"end": {
+											"line": 3,
+											"column": 7
+										}
+									},
+									"name": "f"
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 51,
+									"end": 52,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 10
+										},
+										"end": {
+											"line": 3,
+											"column": 11
+										}
+									},
+									"name": "T"
+								}
+							},
+							"operator": ">",
+							"right": {
+								"type": "Literal",
+								"start": 56,
+								"end": 62,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 15
+									},
+									"end": {
+										"line": 3,
+										"column": 21
+									}
+								},
+								"value": {},
+								"raw": "/= c/g",
+								"regex": {
+									"pattern": "= c",
+									"flags": "g"
+								}
+							}
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

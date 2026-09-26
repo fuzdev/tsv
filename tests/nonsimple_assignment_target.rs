@@ -501,3 +501,280 @@ fn a_unary_follower_still_reads_as_a_comparison_chain() {
         "across a line break the instantiation already holds: {broken}"
     );
 }
+
+/// The far edge of the instantiation-target deferral: a `>`-LED assignment operator.
+/// tsc refuses a type argument list ahead of any token its scanner starts with `>`
+/// (`canFollowTypeArgumentsInExpression` — the close and the `>` would be ambiguous with
+/// a re-scanned `>>`), and `>>=` / `>>>=` are two such tokens, so `f<T> >>= c` has no
+/// instantiation to assign to: the `<…>` falls back to a comparison with no operand
+/// (TS1109) — a GRAMMAR refusal. A close GLUED to the operator is no close at all: the
+/// longest punctuator at that position swallows it (`f<T>>= c` is `f < T >>= c`,
+/// `f<A<B>>=c` is `f < A < B >>= c`), a comparison assigned to, which no production
+/// derives. acorn rejects every row here, but for the SPACED rows its reason is its own
+/// reading — an instantiation target, refused by the assignment-target early error — not
+/// its grammar; inside a paren or argument list, where it skips that check, it accepts
+/// them (`a_greater_than_led_assignment_rejects_where_acorn_skips_the_target_check`). The
+/// fixture path carries the headline spellings as the `input_invalid_*` files of
+/// `typescript_specific/generics/instantiation_operator_follow`; these are the heads,
+/// depths, trivia, positions and line breaks beside them.
+#[test]
+fn instantiation_target_refuses_a_greater_than_led_assignment() {
+    for source in [
+        // spaced: tsc's follower refusal
+        "f<T> >>= c;",
+        "f<T> >>>= c;",
+        "f<A<B>> >>= c;",
+        "a.b<T> >>= c;",
+        "f()<T> >>= c;",
+        "a?.b<T> >>= c;",
+        "new f<T> >>= c;",
+        "x = f<T> >>= c;",
+        "() => f<T> >>= c;",
+        "f<T> /* x */ >>= c;",
+        "f<T>/**/>>= c;",
+        "f<T>\n>>= c;",
+        "a < b > >>= c;",
+        // glued: the longest punctuator swallows the close
+        "f<T>>= c;",
+        "f<T>>>= c;",
+        "f<T>>>=c;",
+        "f<A<B>>=c;",
+        "f<A<B>>>=c;",
+        "f<A<B<C>>>=c;",
+        "f<A<B<C>>>>=c;",
+        "f<A<B<C>>>>>=c;",
+        "a.b<T>>= c;",
+        "f()<T>>>=c;",
+        "a?.b<T>>= c;",
+        "new f<T>>= c;",
+        "x = a + f<T>>= c;",
+        "class C { p = f<T>>= c; }",
+        // a spaced `<`: the first `>` of the operator is no close either
+        "a < b >>= c;",
+        "a < b >>>= c;",
+        "a<b>>=c;",
+        "[a < b >>= c];",
+        "`${a < b >>= c}`;",
+    ] {
+        assert!(rejects(source), "must reject: {source:?}");
+    }
+}
+
+/// The acorn-kept side of the same seam: a SPACED `>=` — one `>` and an `=` — is the
+/// follower acorn-typescript reads as `(f<T>) >= c` where tsc refuses the list, and
+/// rejecting it would refuse a component Svelte compiles, so tsv accepts it and the
+/// formatter repairs it to the pair every parser reads alike. A close glued
+/// to `=` alone is `>=` itself, a comparison every parser reads alike (`f<T>= c` is
+/// `f < T >= c`), and a `>`-led run with no `=` stays the shift it always was
+/// (`f<T>>c` is `f < (T >> c)`). A `<<=` is no `>`-led token, so the instantiation
+/// target it assigns to is the deferred class again; and a call's `)` ends the target
+/// on no `>` at all, so `f<T>(x) >>= c` is the deferred call target (`foo() >>= c`).
+#[test]
+fn a_spaced_greater_equal_follower_keeps_the_acorn_reading() {
+    for (source, printed) in [
+        ("f<T> >= c;", "(f<T>) >= c;\n"),
+        ("f<T>\n>= c;", "(f<T>) >= c;\n"),
+        ("f<T> /* x */ >= c;", "(f<T>) /* x */ >= c;\n"),
+        ("f<A<B>> >= c;", "(f<A<B>>) >= c;\n"),
+        ("f<A<B<C>>> >= c;", "(f<A<B<C>>>) >= c;\n"),
+        ("a.b<T> >= c;", "(a.b<T>) >= c;\n"),
+        ("a?.b<T> >= c;", "(a?.b<T>) >= c;\n"),
+        ("new f<T> >= c;", "new f<T>() >= c;\n"),
+        ("a < b > >= c;", "(a<b>) >= c;\n"),
+        ("x = a + f<T> >= c;", "x = (a + f<T>) >= c;\n"),
+        ("f<T>= c;", "f < T >= c;\n"),
+        ("a < b >= c;", "a < b >= c;\n"),
+        ("f<T>>c;", "f < T >> c;\n"),
+        ("f<T>>>c;", "f < T >>> c;\n"),
+        ("f<A<B>>>c;", "f < A < B >>> c;\n"),
+        ("f<T> <<= c;", "f<T> <<= c;\n"),
+        ("f<T>(x) >>= c;", "f<T>(x) >>= c;\n"),
+        ("f<T>(x) >>>= c;", "f<T>(x) >>>= c;\n"),
+        // A `<` that never closes: the `>>=` is an ordinary operator on the last operand.
+        ("f<T, U>>=c;", "(f < T, (U >>= c));\n"),
+        ("f<T, U>>>=c;", "(f < T, (U >>>= c));\n"),
+        ("g(c < d, x >>= 1);", "g(c < d, (x >>= 1));\n"),
+    ] {
+        assert!(!rejects(source), "must parse: {source:?}");
+        assert_eq!(format(source), printed, "{source:?}");
+    }
+}
+
+/// A parenthesized instantiation stays a target of `>>=` / `>>>=` (tsc's parser accepts
+/// it; acorn's `Assigning to rvalue` is the deferred early error) and keeps its pair,
+/// since stripping it leaves the bare spelling above that tsc's grammar refuses. The
+/// fixture `typescript/expressions/assignment/instantiation_target_paren_svelte_prettier_divergence`
+/// pins the script-block spellings against prettier; this adds the glued and the
+/// optional-chain heads, and a Svelte template, where the pair must survive inside the
+/// assignment's own.
+#[test]
+fn a_parenthesized_instantiation_keeps_its_pair_before_a_shift_assignment() {
+    for source in [
+        "(f<T>) >>= c;\n",
+        "(f<T>) >>>= c;\n",
+        "(a?.b<T>) >>= c;\n",
+        "(f()<T>) >>= c;\n",
+        "(f<T>) >>= c >>= d;\n",
+        "(f<T>) /= c;\n",
+    ] {
+        assert_eq!(format(source), source, "the pair must stay: {source:?}");
+    }
+    assert_eq!(format("(f<T>)>>=c;"), "(f<T>) >>= c;\n");
+    // tsc takes the list past a line break; joined, the pair must appear
+    assert_eq!(format("f<T>\n/= c;"), "(f<T>) /= c;\n");
+    assert_eq!(format("f<T>\n/= c/g;"), "(f<T>) /= c / g;\n");
+    assert_eq!(format("(f<T>) /= c/g;"), "(f<T>) /= c / g;\n");
+
+    let template = "<script lang=\"ts\"></script>\n\n{((f<T>) >>= c)}\n";
+    assert_eq!(
+        tsv_svelte::format_str("<script lang=\"ts\"></script>\n\n{(f<T>) >>= c}\n")
+            .expect("a parenthesized target parses in a template"),
+        template,
+        "keeps the target pair inside the assignment's own"
+    );
+    assert_eq!(
+        tsv_svelte::format_str(template).expect("the output parses"),
+        template,
+        "idempotent"
+    );
+}
+
+/// Inside a paren or a call argument list acorn-typescript does not know yet whether the list
+/// is an arrow's parameters (`maybeInArrowParameters`), so it skips the target check an
+/// assignment operator runs, and never runs it once the list turns out not to be one —
+/// the window reaches everything nested in the list (an object value, an array element, a
+/// template hole, a spread, an arrow-parameter default) until a function body resets it.
+/// There acorn accepts both classes above as it reads them: a `>`-led operator assigning
+/// to an instantiation (`g(f<T> >>= c)`), and any compound operator assigning to a
+/// comparison or other binary (`g(a < b >>= c)`, `g(f<T>>= c)` — the glued close is no
+/// close — and `g(a + b >>= c)`, which tsv already rejects). tsc refuses every row
+/// (TS1109 / TS1005): the first is its follower refusal, the second its
+/// `LeftHandSideExpression` production, and neither is the deferred early error. The
+/// fixture path pins one of each against Svelte's own parse (`tsv_rejects.txt`):
+/// `typescript/expressions/assignment/operator_target_compound_paren_list/*` and
+/// `typescript/typescript_specific/generics/instantiation_shift_assign_call_arg_svelte_divergence`.
+#[test]
+fn a_greater_than_led_assignment_rejects_where_acorn_skips_the_target_check() {
+    for source in [
+        "g(f<T> >>= c);",
+        "(f<T> >>= c);",
+        "({ k: f<T> >>= c });",
+        "g(new f<T> >>= c);",
+        "g(f<T>>>= c);",
+        "g(a < b >>= c);",
+        "g(f<T>>= c);",
+        "g(f<A<B>>=c);",
+        "(a < b >>= c);",
+        "x = (f<A<B>>=c);",
+        "({ k: a < b >>= c });",
+        "(x = a < b >>= c) => 0;",
+        "g(a + b >>= c);",
+    ] {
+        assert!(rejects(source), "must reject: {source:?}");
+    }
+    assert!(
+        tsv_svelte::format_str("<script lang=\"ts\"></script>\n\n{g(f<T> >>= c)}\n").is_err(),
+        "a template expression reads the same window"
+    );
+    let unclosed = "<script lang=\"ts\"></script>\n\n{g(c < d, (x >>= 1))}\n";
+    assert_eq!(
+        tsv_svelte::format_str("<script lang=\"ts\"></script>\n\n{g(c < d, x >>= 1)}\n")
+            .expect("a `<` that never closes leaves an ordinary `>>=`"),
+        unclosed
+    );
+}
+
+/// A close GLUED to an `=` is no close either: tsc's re-scan joins it to the `=` as `>=`
+/// (`reScanGreaterToken`), so `f<T>==c` is `f < T >= = c` and `f<() => U>=c` has nothing
+/// to read `() => U` as — every row is a syntax error to tsc and to acorn-typescript,
+/// inside a call argument list too. The spaced spellings are the instantiation compared
+/// (`f<T> == c`), which both take.
+#[test]
+fn a_close_glued_to_an_equals_is_no_close() {
+    for source in [
+        "f<T>==c;",
+        "f<T>===c;",
+        "f<A<B>>==c;",
+        "a < b >== c;",
+        "x = a.b<A<B>>==c;",
+        "g(f<T>==c);",
+        // a function-type head commits its list before the follower is read
+        "f<() => U>=c;",
+        "f<(a: A<B>) => C<D>>=c;",
+        "g(f<() => U>=c);",
+        "f<() => U>==c;",
+        "f<A<B>>===c;",
+        // a `new` head too: none of these is `new f<…>()` compared or assigned to
+        "new f<() => U>=c;",
+    ] {
+        assert!(rejects(source), "must reject: {source:?}");
+    }
+    assert_eq!(format("f<T> == c;"), "f<T> == c;\n");
+}
+
+/// A same-line `/=` refuses the list as a `>`-led operator does, one rule over: tsc takes a
+/// list only before a token that cannot START an expression, and `/=` can — as the head
+/// of a regular expression literal. So `f<T> /= c` is `f < T >` followed by an
+/// unterminated literal (TS1161), and `x = f<T> /= c/g` is the comparison with the regular
+/// expression `/= c/g` as its right operand, which tsc accepts and tsv must read the same
+/// way rather than as the instantiation assigned to acorn builds. Past a line break tsc
+/// takes the list (`f<T>⏎/= c`).
+#[test]
+fn a_same_line_divide_assign_refuses_the_list() {
+    for source in [
+        "f<T> /= c;",
+        "f<T>/= c;",
+        "x = f<T> /= c;",
+        "g(f<T> /= c);",
+        "a.b<T> /= c;",
+        "new f<T> /= c;",
+        // a comment with no line terminator in it is no line break (TS1161)
+        "f<T> /**/ /= c;",
+    ] {
+        assert!(rejects(source), "must reject: {source:?}");
+    }
+    let json = parse_json("x = f<T> /= c/g;");
+    let right = "/body/0/expression/right";
+    assert_eq!(
+        json.pointer(&format!("{right}/operator"))
+            .and_then(Value::as_str),
+        Some(">"),
+        "the comparison chain: {json}"
+    );
+    assert_eq!(
+        json.pointer(&format!("{right}/right/regex/pattern"))
+            .and_then(Value::as_str),
+        Some("= c"),
+        "the regular expression operand: {json}"
+    );
+    // Inside a call argument list acorn-typescript reads the instantiation assigned to
+    // (its target check is skipped there); tsc — and tsv — read the same comparison.
+    let json = parse_json("g(f<T> /= c/g);");
+    let arg = "/body/0/expression/arguments/0";
+    assert_eq!(
+        json.pointer(&format!("{arg}/operator"))
+            .and_then(Value::as_str),
+        Some(">"),
+        "the comparison chain in the argument: {json}"
+    );
+    assert_eq!(
+        json.pointer(&format!("{arg}/right/regex/pattern"))
+            .and_then(Value::as_str),
+        Some("= c"),
+        "the regular expression operand in the argument: {json}"
+    );
+    assert_eq!(format("g(f<T> /= c/g);"), "g((f < T) > /= c/g);\n");
+    // Across a line break — a comment holding one counts, as it does for tsc — the list
+    // holds, and whatever the printer does with the break it keeps that reading.
+    for source in ["f<T>\n/= c;", "f<T> /*\n*/ /= c;", "f<T> //x\n/= c;"] {
+        for (pass, text) in [("source", source.to_string()), ("printed", format(source))] {
+            let json = parse_json(&text);
+            assert_eq!(
+                json.pointer("/body/0/expression/left/type")
+                    .and_then(Value::as_str),
+                Some("TSInstantiationExpression"),
+                "{pass} of {source:?} keeps the instantiation target: {text:?} {json}"
+            );
+        }
+    }
+}

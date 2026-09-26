@@ -1,0 +1,225 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 47,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 46,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 37,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 20,
+					"end": 36,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 17
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 20,
+						"end": 35,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 1
+							},
+							"end": {
+								"line": 2,
+								"column": 16
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 20,
+							"end": 21,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 1
+								},
+								"end": {
+									"line": 2,
+									"column": 2
+								}
+							},
+							"name": "x"
+						},
+						"right": {
+							"type": "AssignmentExpression",
+							"start": 25,
+							"end": 34,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 6
+								},
+								"end": {
+									"line": 2,
+									"column": 15
+								}
+							},
+							"operator": ">>=",
+							"left": {
+								"type": "BinaryExpression",
+								"start": 25,
+								"end": 30,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 6
+									},
+									"end": {
+										"line": 2,
+										"column": 11
+									}
+								},
+								"left": {
+									"type": "BinaryExpression",
+									"start": 25,
+									"end": 28,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 6
+										},
+										"end": {
+											"line": 2,
+											"column": 9
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 25,
+										"end": 26,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 6
+											},
+											"end": {
+												"line": 2,
+												"column": 7
+											}
+										},
+										"name": "f"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 27,
+										"end": 28,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 8
+											},
+											"end": {
+												"line": 2,
+												"column": 9
+											}
+										},
+										"name": "A"
+									}
+								},
+								"operator": "<",
+								"right": {
+									"type": "Identifier",
+									"start": 29,
+									"end": 30,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 10
+										},
+										"end": {
+											"line": 2,
+											"column": 11
+										}
+									},
+									"name": "B"
+								}
+							},
+							"right": {
+								"type": "Identifier",
+								"start": 33,
+								"end": 34,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 14
+									},
+									"end": {
+										"line": 2,
+										"column": 15
+									}
+								},
+								"name": "c"
+							}
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

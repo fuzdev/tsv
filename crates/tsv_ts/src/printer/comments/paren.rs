@@ -140,7 +140,9 @@ pub(in crate::printer) fn left_side_child_is_parenthesized(
         ExpressionKind::CallExpression(_) => ParenContext::Callee,
         ExpressionKind::TaggedTemplateExpression(_) => ParenContext::TaggedTemplateTag,
         ExpressionKind::TSNonNullExpression(_) => ParenContext::NonNull,
-        ExpressionKind::AssignmentExpression(_) => ParenContext::AssignmentTarget,
+        ExpressionKind::AssignmentExpression(assign) => ParenContext::AssignmentTarget {
+            operator: assign.operator,
+        },
         ExpressionKind::BinaryExpression(binary) => ParenContext::BinaryLeft {
             parent_op: binary.operator,
         },
@@ -314,9 +316,12 @@ impl<'a> Printer<'a> {
                 expr.span.start < tagged.tag.span().start
                     && paren_pair_keeps_leading_run(tagged.tag)
             }
-            ExpressionKind::AssignmentExpression(assign) => {
-                self.needs_parens(assign.left, ParenContext::AssignmentTarget)
-            }
+            ExpressionKind::AssignmentExpression(assign) => self.needs_parens(
+                assign.left,
+                ParenContext::AssignmentTarget {
+                    operator: assign.operator,
+                },
+            ),
             _ => false,
         };
         (!retains).then_some(child)

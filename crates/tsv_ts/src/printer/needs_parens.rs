@@ -18,7 +18,8 @@
 // - `printPathNoParens`'s caller (`print/index.js`, the application layer)
 
 use crate::ast::internal::{
-    BinaryOperator, Expression, ExpressionKind, LiteralValue, UnaryOperator, UpdateOperator,
+    AssignmentOperator, BinaryOperator, Expression, ExpressionKind, LiteralValue, UnaryOperator,
+    UpdateOperator,
 };
 use crate::printer::class_expr_has_decorators;
 use crate::printer::comments::left_side_child_is_parenthesized;
@@ -155,8 +156,9 @@ pub enum ParenContext {
     /// destructuring default's target. Every left the grammar's
     /// `LeftHandSideExpression` does not derive bare keeps a pair — see the arm in
     /// [`needs_parens`]. Non-null `x!` is valid bare, so it isn't wrapped (matches
-    /// prettier).
-    AssignmentTarget,
+    /// prettier). `operator` is the assignment's own (`=` for a destructuring default):
+    /// an instantiation target keeps its pair only ahead of a `>`-led one.
+    AssignmentTarget { operator: AssignmentOperator },
 }
 
 /// Whether `expr` is an `in` binary expression — the operator that must be
@@ -489,8 +491,23 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         // Prettier strips all but the assertions (docs/conformance_prettier_ts.md
         // §TypeScript, "Non-LHS assignment target parens"). Non-null `x!` is a valid
         // bare target, so it isn't wrapped.
-        ParenContext::AssignmentTarget => {
-            is_type_assertion(expr)
+        //
+        // One more pair is kept by the JOIN of two tokens rather than by kind — the
+        // instantiation-tail rule of the binary-left arm, one operator family over: a
+        // target whose last printed token is a type argument list's `>` keeps its pair
+        // ahead of a `>`-led `>>=` / `>>>=`, before which tsc's grammar takes no type
+        // argument list (`f<T> >>= c` does not parse; `(f<T>) >>= c` does), and ahead of a
+        // `/=`, which can start a regular expression and so refuses the list on the same
+        // line (`f<T>⏎/= c` parses; the joined `f<T> /= c` does not). Prettier strips it
+        // too ("Instantiation expression parens").
+        ParenContext::AssignmentTarget { operator } => {
+            (matches!(
+                operator,
+                AssignmentOperator::RightShiftAssign
+                    | AssignmentOperator::UnsignedRightShiftAssign
+                    | AssignmentOperator::DivideAssign
+            ) && ends_with_instantiation_close(expr, in_for_init))
+                || is_type_assertion(expr)
                 || matches!(
                     expr.kind,
                     ExpressionKind::UnaryExpression(_)
@@ -801,7 +818,13 @@ pub(crate) fn leftmost_no_lookahead_reached<'a>(
             // cast kinds the walk goes on, matching it.
             ExpressionKind::AssignmentExpression(a) => {
                 if !is_type_assertion(a.left)
-                    && needs_parens(a.left, ParenContext::AssignmentTarget, false)
+                    && needs_parens(
+                        a.left,
+                        ParenContext::AssignmentTarget {
+                            operator: a.operator,
+                        },
+                        false,
+                    )
                 {
                     (expr, computed_member_object)
                 } else {
