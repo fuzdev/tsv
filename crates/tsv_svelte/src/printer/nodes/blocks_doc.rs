@@ -195,7 +195,7 @@ impl HeadCloser {
 /// pending body** (the binding is optional). Single classification shared by the head-clause
 /// builder and the tail builders (which skip the head-carried keyword) — so the two can't drift.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum AwaitShorthand {
+pub(super) enum AwaitShorthand {
     /// `{#await x then v}` / bare `{#await x then}` — no pending body, a `then` section.
     Then,
     /// `{#await x catch e}` / bare `{#await x catch}` — no pending, no `then`, a `catch` section.
@@ -209,7 +209,7 @@ enum AwaitShorthand {
 /// entirely — marker and binding — matching prettier, since the `value` binding is unused when
 /// nothing renders. (A `:catch` is *not* dropped when empty: an empty `{:catch}` still handles a
 /// rejection, so removing it would change semantics — see `conformance_prettier_svelte.md` §Svelte: Blocks.)
-fn then_has_content(block: &internal::AwaitBlock<'_>) -> bool {
+pub(super) fn then_has_content(block: &internal::AwaitBlock<'_>) -> bool {
     block
         .then
         .as_ref()
@@ -227,7 +227,7 @@ fn then_has_content(block: &internal::AwaitBlock<'_>) -> bool {
 ///
 /// An empty-body `:then` is not a survivor (it is dropped, see [`then_has_content`]), so the fold
 /// skips it to the `:catch`.
-fn await_shorthand(block: &internal::AwaitBlock<'_>) -> AwaitShorthand {
+pub(super) fn await_shorthand(block: &internal::AwaitBlock<'_>) -> AwaitShorthand {
     let has_pending_body = block.pending.as_ref().is_some_and(|p| {
         p.nodes
             .iter()
@@ -263,7 +263,7 @@ fn await_shorthand(block: &internal::AwaitBlock<'_>) -> AwaitShorthand {
 /// prints. `each_expr_comment_end` needs no such clamp only because an `{#each}` context is
 /// always written in its own head; a third narrowing here owes the same argument.
 /// Pinned by `svelte/blocks/await/catch_shorthand_body_comment_prettier_divergence`.
-fn await_expr_comment_end(block: &internal::AwaitBlock<'_>) -> u32 {
+pub(super) fn await_expr_comment_end(block: &internal::AwaitBlock<'_>) -> u32 {
     let head_end = block.opening_tag_span.end - 1;
     match await_shorthand(block) {
         AwaitShorthand::Then => block.value.as_ref().map_or(head_end, |v| v.span().start),
@@ -966,9 +966,15 @@ impl<'a> Printer<'a> {
         // `as pattern[, index][ (key)]` tail WITHOUT its leading space (added by
         // `build_block_head`); the degenerate index/key-without-`as` cases (not
         // valid Svelte) keep hugging the expression unchanged.
+        let mut clause_forced_break = key_forced_break;
         let (head_expr, clause) = if let Some(context) = block.context {
             let mut clause_parts: DocBuf = smallvec![d.text("as ")];
-            clause_parts.push(self.build_pattern_doc(context));
+            // A comment-broken binding pattern breaks the head the way a forced-open key does,
+            // and for the same reason the verdict is asked of the pattern's own doc here: the
+            // clause rides inside the dangle's `if_break`, which `will_break` cannot see into.
+            let pattern_doc = self.build_block_pattern_doc(context);
+            clause_forced_break |= d.will_break(pattern_doc);
+            clause_parts.push(pattern_doc);
             if let Some(index) = block.index {
                 clause_parts.push(d.text(", "));
                 clause_parts.push(d.text_pooled(index));
@@ -1016,7 +1022,7 @@ impl<'a> Printer<'a> {
             let multiline_tail = self.compose_each_tail(body, fallback, true);
             return self.build_expanding_construct(
                 head_doc,
-                key_forced_break,
+                clause_forced_break,
                 inline_tail,
                 multiline_tail,
                 gt_prefix,
@@ -1088,7 +1094,7 @@ impl<'a> Printer<'a> {
     /// The `{:then …}` keyword doc — `{:then value}` if a `then` value binds, else
     /// `{:then}` if the then-section has content, else `None`. Whether to emit it is the
     /// caller's decision: a `then`-shorthand carries it in the head instead.
-    fn await_then_keyword(&self, block: &internal::AwaitBlock<'_>) -> Option<DocId> {
+    pub(super) fn await_then_keyword(&self, block: &internal::AwaitBlock<'_>) -> Option<DocId> {
         // An empty-body `:then` is dropped entirely — no marker — matching prettier.
         if !then_has_content(block) {
             return None;
@@ -1097,7 +1103,7 @@ impl<'a> Printer<'a> {
         if let Some(value) = block.value {
             Some(d.concat(&[
                 d.text("{:then "),
-                self.build_pattern_doc(value),
+                self.build_block_pattern_doc(value),
                 d.text("}"),
             ]))
         } else {
@@ -1108,12 +1114,12 @@ impl<'a> Printer<'a> {
     /// The `{:catch …}` keyword doc — `{:catch error}` if an error binds, else `{:catch}`
     /// if the catch-section has content, else `None`. A `catch`-shorthand carries it in the
     /// head instead.
-    fn await_catch_keyword(&self, block: &internal::AwaitBlock<'_>) -> Option<DocId> {
+    pub(super) fn await_catch_keyword(&self, block: &internal::AwaitBlock<'_>) -> Option<DocId> {
         let d = self.d();
         if let Some(error) = block.error {
             Some(d.concat(&[
                 d.text("{:catch "),
-                self.build_pattern_doc(error),
+                self.build_block_pattern_doc(error),
                 d.text("}"),
             ]))
         } else if block.catch.as_ref().is_some_and(|c| !c.nodes.is_empty()) {
@@ -1123,10 +1129,29 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// The shorthand clause an await head carries — `then v` / bare `then`, or `catch e` /
+    /// bare `catch` — or `None` for the full form. Classified by [`await_shorthand`], the same
+    /// source [`Self::await_shorthand_flags`] reads to skip the head-carried keyword; shared by
+    /// the ordinary and the whitespace-sensitive builders.
+    pub(super) fn build_await_clause(&self, block: &internal::AwaitBlock<'_>) -> Option<DocId> {
+        let d = self.d();
+        match await_shorthand(block) {
+            AwaitShorthand::Then => Some(match block.value {
+                Some(value) => d.concat(&[d.text("then "), self.build_block_pattern_doc(value)]),
+                None => d.text("then"),
+            }),
+            AwaitShorthand::Catch => Some(match block.error {
+                Some(error) => d.concat(&[d.text("catch "), self.build_block_pattern_doc(error)]),
+                None => d.text("catch"),
+            }),
+            AwaitShorthand::None => None,
+        }
+    }
+
     /// Which shorthand carries its clause in the head, so the tail omits that keyword:
     /// `(then-shorthand, catch-shorthand)`. Derived from [`await_shorthand`] so it can't drift
     /// from the head-clause builder.
-    fn await_shorthand_flags(block: &internal::AwaitBlock<'_>) -> (bool, bool) {
+    pub(super) fn await_shorthand_flags(block: &internal::AwaitBlock<'_>) -> (bool, bool) {
         match await_shorthand(block) {
             AwaitShorthand::Then => (true, false),
             AwaitShorthand::Catch => (false, true),
@@ -1237,13 +1262,6 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Build a doc for an await block (no preceding context / sibling `>`).
-    ///
-    /// Uses same inline/multiline pattern as if blocks.
-    pub(super) fn build_await_block_doc(&self, block: &internal::AwaitBlock<'_>) -> DocId {
-        self.build_await_block_doc_with_full_context(block, false, false, None)
-    }
-
     /// Build await block doc with full context (multiline + preceding content).
     ///
     /// `gt_prefix`: a preceding inline-element sibling's split-off closing `>` to fold into
@@ -1297,17 +1315,11 @@ impl<'a> Printer<'a> {
         // `catch`; the full form has none. Built once, shared by the fast path and the
         // newline-authored tail. Classified by `await_shorthand`, the same source
         // `await_shorthand_flags` uses to skip the head-carried keyword.
-        let clause = match await_shorthand(block) {
-            AwaitShorthand::Then => Some(match block.value {
-                Some(value) => d.concat(&[d.text("then "), self.build_pattern_doc(value)]),
-                None => d.text("then"),
-            }),
-            AwaitShorthand::Catch => Some(match block.error {
-                Some(error) => d.concat(&[d.text("catch "), self.build_pattern_doc(error)]),
-                None => d.text("catch"),
-            }),
-            AwaitShorthand::None => None,
-        };
+        // A comment can break the clause's binding pattern; asked of the clause here, before
+        // the dangle wraps it in an `if_break` `will_break` cannot see into (the `{#each}`
+        // clause's verdict, for the same reason).
+        let clause = self.build_await_clause(block);
+        let clause_forced_break = clause.is_some_and(|c| d.will_break(c));
         // `comment_end` is bound at `expr_comment_end` (not the head end) so a line
         // comment *inside* a shorthand pattern isn't mistaken for a trailing line comment
         // on the awaited expression — that would drop the space before the `then`/`catch`
@@ -1329,8 +1341,7 @@ impl<'a> Printer<'a> {
             let multiline_tail = self.compose_await_tail(&pieces, true);
             return self.build_expanding_construct(
                 head_doc,
-                // An await clause is a binding pattern — it cannot break on its own.
-                false,
+                clause_forced_break,
                 inline_tail,
                 multiline_tail,
                 gt_prefix,
@@ -1346,13 +1357,6 @@ impl<'a> Printer<'a> {
         let tail = self.build_await_tail_newline(block, expand);
         // Non-expanding tail (newline-authored sections): fold a preceding sibling's `>`.
         self.dangle_gt(gt_prefix, d.concat(&[head_doc, tail]))
-    }
-
-    /// Build a doc for a key block (no preceding context / sibling `>`).
-    ///
-    /// Uses same inline/multiline pattern as if blocks.
-    pub(super) fn build_key_block_doc(&self, block: &internal::KeyBlock<'_>) -> DocId {
-        self.build_key_block_doc_with_full_context(block, false, false, None)
     }
 
     /// Build key block doc with full context (multiline + preceding content).
@@ -1406,29 +1410,10 @@ impl<'a> Printer<'a> {
         self.dangle_gt(gt_prefix, d.concat(&parts))
     }
 
-    /// Build a doc for a snippet block (no sibling `>` to fold).
-    pub(super) fn build_snippet_block_doc(&self, block: &internal::SnippetBlock<'_>) -> DocId {
-        self.build_snippet_block_doc_with_full_context(block, None)
-    }
-
-    /// Build a doc for a snippet block, optionally folding a preceding sibling's `>`.
-    ///
-    /// Uses same inline/multiline pattern as if blocks. Opening tag uses group() for
-    /// parameter wrapping when they exceed print width. Takes no context: the head wraps by
-    /// its own width (its opening-tag group), and the body-drop is likewise decided by
-    /// **width** (the `conditional_group` in `build_expanding_block`) — never by whether the
-    /// head may wrap, which would let a render-free boundary select the layout (see
-    /// `fragment_inline_authored`).
-    pub(super) fn build_snippet_block_doc_with_full_context(
-        &self,
-        block: &internal::SnippetBlock<'_>,
-        gt_prefix: Option<DocId>,
-    ) -> DocId {
+    /// The opening tag `{#snippet name<T>(params)}` — one group, so the body can expand when
+    /// the params wrap. Shared by the ordinary and the whitespace-sensitive builders.
+    pub(super) fn build_snippet_opening_doc(&self, block: &internal::SnippetBlock<'_>) -> DocId {
         let d = self.d();
-        // Inline-authored = no newline-authored boundary and no forced break; a
-        // space-only boundary is render-free and gets trimmed by the body builder.
-        let is_inline = self.fragment_inline_authored(&block.body);
-
         // Type parameters (generics). They route through tsv_ts's type-parameter printer
         // (constraints, defaults, modifiers, interior comments, width-based wrapping of a
         // long generic list — its own group, so it breaks independently of the parameter
@@ -1469,17 +1454,38 @@ impl<'a> Printer<'a> {
         let params_doc = d.group(params_inner);
 
         // Opening tag `{#snippet name<T>(params)}`, one group, so the body can expand when
-        // the params wrap (below).
+        // the params wrap.
         //   When fits: {#snippet name(a, b, c)}
         //   When wraps: {#snippet name(\n\ta,\n\tb,\n\tc\n)}
-        let opening_doc = d.group(d.concat(&[
+        d.group(d.concat(&[
             d.text("{#snippet "),
             // The snippet name, verbatim from the identifier expression's span.
             d.source_span(block.expression.span(), self.source),
             type_params_part,
             params_doc,
             d.text("}"),
-        ]));
+        ]))
+    }
+
+    /// Build a doc for a snippet block, optionally folding a preceding sibling's `>`.
+    ///
+    /// Uses same inline/multiline pattern as if blocks. Opening tag uses group() for
+    /// parameter wrapping when they exceed print width. Takes no context: the head wraps by
+    /// its own width (its opening-tag group), and the body-drop is likewise decided by
+    /// **width** (the `conditional_group` in `build_expanding_block`) — never by whether the
+    /// head may wrap, which would let a render-free boundary select the layout (see
+    /// `fragment_inline_authored`).
+    pub(super) fn build_snippet_block_doc_with_full_context(
+        &self,
+        block: &internal::SnippetBlock<'_>,
+        gt_prefix: Option<DocId>,
+    ) -> DocId {
+        let d = self.d();
+        // Inline-authored = no newline-authored boundary and no forced break; a
+        // space-only boundary is render-free and gets trimmed by the body builder.
+        let is_inline = self.fragment_inline_authored(&block.body);
+
+        let opening_doc = self.build_snippet_opening_doc(block);
 
         // Inline-authored body (boundary-trimmed): expand the body + `{/snippet}` onto
         // their own lines when the construct overflows (params wrap, or head + body

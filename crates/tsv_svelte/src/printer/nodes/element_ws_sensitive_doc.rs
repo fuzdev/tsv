@@ -9,7 +9,10 @@
 // look like Rust format args but are valid Svelte template syntax.
 #![allow(clippy::literal_string_with_formatting_args)]
 
-use super::blocks_doc::{EACH_BLOCK_OPEN, ELSE_IF_BLOCK_OPEN, IF_BLOCK_OPEN};
+use super::blocks_doc::{
+    AWAIT_BLOCK_OPEN, EACH_BLOCK_OPEN, ELSE_IF_BLOCK_OPEN, IF_BLOCK_OPEN, KEY_BLOCK_OPEN,
+    await_expr_comment_end, then_has_content,
+};
 use super::element_doc::{AttrListEmission, ElementAttrsDoc};
 use super::helpers::each_expr_comment_end;
 use crate::ast::internal::{self, Fragment, FragmentNode, is_collapsible_ws_char};
@@ -438,8 +441,10 @@ impl<'a> Printer<'a> {
     ///
     /// - **Text**: preserve raw whitespace (significant in pre/textarea).
     /// - **Elements**: recursively use whitespace-sensitive formatting (e.g., `<code>` inside `<pre>`).
-    /// - **If/Each blocks**: use inline ws-sensitive block formatting (no added whitespace,
-    ///   body nodes formatted whitespace-sensitively).
+    /// - **Blocks** (`{#if}`, `{#each}`, `{#await}`, `{#key}`, `{#snippet}`): inline
+    ///   ws-sensitive block formatting — the head may open around a comment, but no
+    ///   whitespace is added beside a section body, and body nodes are formatted
+    ///   whitespace-sensitively.
     /// - **Expressions and other blocks**: format normally; the per-container body-indent
     ///   level is applied collectively by `build_whitespace_sensitive_content_doc`, not here.
     fn build_whitespace_sensitive_node_doc(&self, node: &FragmentNode<'_>) -> DocId {
@@ -475,9 +480,9 @@ impl<'a> Printer<'a> {
             FragmentNode::Comment(comment) => self.build_html_comment_doc(comment),
             FragmentNode::IfBlock(block) => self.build_ws_sensitive_if_block_doc(block),
             FragmentNode::EachBlock(block) => self.build_ws_sensitive_each_block_doc(block),
-            FragmentNode::AwaitBlock(block) => self.build_await_block_doc(block),
-            FragmentNode::KeyBlock(block) => self.build_key_block_doc(block),
-            FragmentNode::SnippetBlock(block) => self.build_snippet_block_doc(block),
+            FragmentNode::AwaitBlock(block) => self.build_ws_sensitive_await_block_doc(block),
+            FragmentNode::KeyBlock(block) => self.build_ws_sensitive_key_block_doc(block),
+            FragmentNode::SnippetBlock(block) => self.build_ws_sensitive_snippet_block_doc(block),
             FragmentNode::HtmlTag(tag) => self.build_html_tag_doc(tag),
             FragmentNode::ConstTag(tag) => self.build_const_tag_doc(tag),
             FragmentNode::DeclarationTag(tag) => self.build_declaration_tag_doc(tag),
@@ -566,7 +571,7 @@ impl<'a> Printer<'a> {
 
         if let Some(context) = block.context {
             opening.push(d.text(" as "));
-            let pattern_doc = self.build_pattern_doc(context);
+            let pattern_doc = self.build_block_pattern_doc(context);
             opening.push(pattern_doc);
             if let Some(index) = block.index {
                 opening.push(d.text(", "));
@@ -601,5 +606,80 @@ impl<'a> Printer<'a> {
 
         parts.push(d.text("{/each}"));
         d.concat(&parts)
+    }
+
+    /// Build an await block doc for whitespace-sensitive context (inside `<pre>`).
+    ///
+    /// The ordinary builder's structure — the same shorthand fold, the same `{:then}` /
+    /// `{:catch}` keywords — with the whitespace-sensitive section bodies and nothing added
+    /// between a tag and a body. The ordinary builder expands every section once its head
+    /// breaks, and here a line break beside a body is rendered content; a head that opens
+    /// around a comment (in the awaited expression, or in a binding pattern) must open alone.
+    fn build_ws_sensitive_await_block_doc(&self, block: &internal::AwaitBlock<'_>) -> DocId {
+        let d = self.d();
+        // Pass false for in_multiline_context: expressions must not wrap in ws-sensitive context
+        let head = self.build_block_head_expr(
+            AWAIT_BLOCK_OPEN,
+            block.opening_tag_span,
+            block.expression,
+            await_expr_comment_end(block),
+            false,
+        );
+        let open_doc = self.head_open_doc(AWAIT_BLOCK_OPEN, head.layout.opens_own_line());
+        let mut parts: DocBuf = smallvec![open_doc, head.doc];
+        if let Some(clause) = self.build_await_clause(block) {
+            parts.push(d.text(" "));
+            parts.push(clause);
+        }
+        parts.push(d.text("}"));
+
+        let (is_then_shorthand, is_catch_shorthand) = Self::await_shorthand_flags(block);
+        if let Some(pending) = &block.pending {
+            parts.push(self.build_whitespace_sensitive_content_doc(pending.nodes));
+        }
+        if !is_then_shorthand && let Some(kw) = self.await_then_keyword(block) {
+            parts.push(kw);
+        }
+        // An empty-body `:then` is dropped (marker via `await_then_keyword` above, body here).
+        if then_has_content(block)
+            && let Some(then_block) = &block.then
+        {
+            parts.push(self.build_whitespace_sensitive_content_doc(then_block.nodes));
+        }
+        if !is_catch_shorthand && let Some(kw) = self.await_catch_keyword(block) {
+            parts.push(kw);
+        }
+        if let Some(catch_block) = &block.catch {
+            parts.push(self.build_whitespace_sensitive_content_doc(catch_block.nodes));
+        }
+        parts.push(d.text("{/await}"));
+        d.concat(&parts)
+    }
+
+    /// Build a key block doc for whitespace-sensitive context (inside `<pre>`): the head may
+    /// open around a comment, the body stays glued to its tags.
+    fn build_ws_sensitive_key_block_doc(&self, block: &internal::KeyBlock<'_>) -> DocId {
+        let d = self.d();
+        // Pass false for in_multiline_context: expressions must not wrap in ws-sensitive context
+        let head = self.build_block_head_expr(
+            KEY_BLOCK_OPEN,
+            block.opening_tag_span,
+            block.expression,
+            block.opening_tag_span.end - 1,
+            false,
+        );
+        let open_doc = self.head_open_doc(KEY_BLOCK_OPEN, head.layout.opens_own_line());
+        let body_doc = self.build_whitespace_sensitive_content_doc(block.fragment.nodes);
+        d.concat(&[open_doc, head.doc, d.text("}"), body_doc, d.text("{/key}")])
+    }
+
+    /// Build a snippet block doc for whitespace-sensitive context (inside `<pre>`): the
+    /// opening tag is the ordinary one (its parameters may open around a comment), the body
+    /// stays glued to its tags.
+    fn build_ws_sensitive_snippet_block_doc(&self, block: &internal::SnippetBlock<'_>) -> DocId {
+        let d = self.d();
+        let opening_doc = self.build_snippet_opening_doc(block);
+        let body_doc = self.build_whitespace_sensitive_content_doc(block.body.nodes);
+        d.concat(&[opening_doc, body_doc, d.text("{/snippet}")])
     }
 }
