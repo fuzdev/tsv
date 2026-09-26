@@ -289,10 +289,14 @@ impl<'arena> Literal<'arena> {
 ///
 /// `escaped` is `Some` only when the name text differs from the leading
 /// `raw_len` bytes at the node's span start — a `\u` unicode escape
-/// (`foo` → `foo`), or a name too long for `raw_len` (> `u16::MAX`
-/// bytes). It then carries the decoded name as an `&'arena str` (the parser's
-/// `current_decoded`, already arena-allocated), read directly at every
-/// consumer — no interner round-trip. Otherwise (`None`, >99.99% of
+/// (`\u0066oo` → `foo`), or a name too long for `raw_len` (> `u16::MAX`
+/// bytes) — or when those bytes need a JSON escape, which only a name the grammar
+/// does not vouch for can hold (a Svelte directive name like `a\b`; see below).
+/// It then carries the name as an `&'arena str`, read directly at every consumer
+/// — no interner round-trip: for an escape, the decoded name (the parser's
+/// `current_decoded`, already arena-allocated); for an oversized name, its raw
+/// text arena-copied; for a Svelte-synthesized name, its text arena-copied
+/// verbatim. Otherwise (`None`, >99.99% of
 /// identifiers) the name is the raw source slice
 /// `span.start .. span.start + raw_len` — nothing stored at all.
 ///
@@ -301,6 +305,15 @@ impl<'arena> Literal<'arena> {
 /// acorn parity), so the name is the leading `raw_len` bytes, never the whole
 /// span. When `escaped` is `Some`, `raw_len` is 0 and unused — read the
 /// `&'arena str` directly.
+///
+/// ⚠️ **`escaped: None` is also a claim about the bytes**: the raw slice holds no
+/// `"`, no `\` and no control byte, so the wire writer emits it without a JSON
+/// escape scan (`write_name_field`). A lexed `IdentifierName` satisfies it by the
+/// grammar — its characters are `ID_Start` / `ID_Continue`, `$`, ZWNJ and ZWJ,
+/// an escaped spelling always carries its decoded form, and a keyword token is
+/// never escaped. A constructor over a slice the grammar does not vouch for (a
+/// Svelte directive name, which may hold `\`) must check the bytes and fall back
+/// to `escaped: Some`; debug builds assert the claim at the write.
 #[derive(Debug, Clone, Copy)]
 pub struct IdentName<'arena> {
     pub escaped: Option<&'arena str>,
@@ -362,7 +375,8 @@ impl<'arena> IdentName<'arena> {
 pub struct Identifier<'arena> {
     /// The [`IdentName`] channel's escape hatch: the decoded name as an
     /// `&'arena str`, `Some` only for `\u`-escaped or `raw_len`-oversized
-    /// names. Stored flattened (beside `name_len`) rather than as a nested
+    /// names, and for a Svelte-synthesized name holding a JSON-escaped byte (see
+    /// [`IdentName`]). Stored flattened (beside `name_len`) rather than as a nested
     /// [`IdentName`] — the nested struct's tail padding would grow `Identifier`,
     /// and it is an *inline* `Expression` variant. (`Expression` is dominated by
     /// far larger variants, so the fat-pointer field does not move

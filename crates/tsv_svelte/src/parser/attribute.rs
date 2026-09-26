@@ -553,29 +553,46 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// caller's span is built to be — else the decoded name arena-copied as the
     /// `&'arena str` escape hatch, so a future caller whose name isn't a verbatim
     /// run can't silently emit the wrong text.
+    ///
+    /// ⚠️ Span-identity also promises the wire writer that the slice needs no JSON
+    /// escape (see [`IdentName`]), and not every name reaching here is an
+    /// `IdentifierName`: a directive name is an HTML attribute-name run, which may hold
+    /// bytes an identifier cannot — `class:a\b` names `a\b`, and a control byte other
+    /// than whitespace is kept too (the canonical parser agrees on both). So the bytes
+    /// are checked here, where `escaped: None` is minted, and a name holding such a byte
+    /// takes the escape hatch, where the writer escapes it.
     fn synthesized_ident_name(&self, name: &str, span: Span) -> IdentName<'arena> {
         let slice = &self.source[span.start as usize..span.end as usize];
         if slice == name && u16::try_from(name.len()).is_ok() {
-            IdentName {
-                escaped: None,
-                raw_len: name.len() as u16,
-                // Synthesized here rather than lexed, so the property is asked of the
-                // slice directly — in the printer's own class, since the name seam
-                // asserts this field against exactly that. ⚠️ No path spends it today
-                // (a shorthand's identifier does not reach that seam — verified by
-                // mutation: claiming `true` over a non-ASCII `{é}` / `bind:é` /
-                // `class:é` changes nothing), so this is measured rather than assumed
-                // for the day one does. A bare `false` would be the wrong shortcut: the
-                // seam's assertion is two-sided, so it would fail the moment the path
-                // opens on an ASCII name.
-                plain_ascii: !slice.bytes().any(tsv_lang::printing::is_width_relevant),
+            // A JSON-escaped byte (a control, `"`, `\`) disqualifies span-identity.
+            let escapes = |b: u8| b < 0x20 || b == b'"' || b == b'\\';
+            // One early-exit pass settles the common name — plain ASCII, nothing to
+            // escape — since the width class (`\t`, `\n`, non-ASCII) and the escape
+            // class together are "below `0x20`, non-ASCII, `"` or `\`"; only a name
+            // that stops it asks the two questions apart.
+            let settled = !slice.bytes().any(|b| escapes(b) || b >= 0x80);
+            if settled || !slice.bytes().any(escapes) {
+                return IdentName {
+                    escaped: None,
+                    raw_len: name.len() as u16,
+                    // Synthesized here rather than lexed, so the property is asked of
+                    // the slice directly — in the printer's own class, since the name
+                    // seam asserts this field against exactly that. ⚠️ No path spends
+                    // it today (a shorthand's identifier does not reach that seam —
+                    // verified by mutation: claiming `true` over a non-ASCII `{é}` /
+                    // `bind:é` / `class:é` changes nothing), so this is measured rather
+                    // than assumed for the day one does. A bare `false` would be the
+                    // wrong shortcut: the seam's assertion is two-sided, so it would
+                    // fail the moment the path opens on an ASCII name.
+                    plain_ascii: settled
+                        || !slice.bytes().any(tsv_lang::printing::is_width_relevant),
+                };
             }
-        } else {
-            IdentName {
-                escaped: Some(self.alloc_str_in(name)),
-                raw_len: 0,
-                plain_ascii: false,
-            }
+        }
+        IdentName {
+            escaped: Some(self.alloc_str_in(name)),
+            raw_len: 0,
+            plain_ascii: false,
         }
     }
 
