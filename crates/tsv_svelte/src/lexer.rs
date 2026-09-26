@@ -91,6 +91,74 @@ pub struct Token {
 // TS/CSS 16): the fieldless `TokenKind` is 1 byte, whereas theirs carries a `char` payload.
 const _: () = assert!(size_of::<Token>() == 12);
 
+/// The ASCII half of [`Lexer::scan_name_run`]'s character class, one entry per byte: the
+/// ASCII letters and digits, `_`, `$`, `-`, `:`, `|` and `.`. Every entry at or above 0x80
+/// is `false`, so a non-ASCII byte stops the table walk and the character question goes to
+/// [`name_run_end_from_non_ascii`].
+///
+/// The whole ASCII class, not a fast subset of it: the two Unicode classes the non-ASCII
+/// arm asks add nothing under U+0080 — `char::is_alphanumeric` agrees with
+/// `is_ascii_alphanumeric` there, and `is_pcen_char`'s only other ASCII members are `-`,
+/// `.` and `_` — so every other ASCII byte ends the run, Svelte whitespace included.
+const NAME_RUN_ASCII: [bool; 256] = {
+    let mut t = [false; 256];
+    let mut i = 0;
+    while i < 0x80 {
+        let b = i as u8;
+        t[i] = b.is_ascii_alphanumeric() || matches!(b, b'_' | b'$' | b'-' | b':' | b'|' | b'.');
+        i += 1;
+    }
+    t
+};
+
+/// [`Lexer::scan_name_run`] from a non-ASCII character at `i` onward: the end of the name
+/// run, the whole class asked a character at a time.
+///
+/// Cold and out of line — a non-ASCII name character is rare, and this arm's decode and
+/// Unicode tables would otherwise set up their constants and save their registers on every
+/// name the lexer scans.
+#[cold]
+#[inline(never)]
+fn name_run_end_from_non_ascii(source: &str, mut i: usize) -> usize {
+    let bytes = source.as_bytes();
+    while let Some(&b) = bytes.get(i) {
+        if NAME_RUN_ASCII[usize::from(b)] {
+            i += 1;
+            continue;
+        }
+        if b < 0x80 {
+            break;
+        }
+        let Some((ch, width)) = char_at(source, i) else {
+            break;
+        };
+        // Whitespace ends a name run before any name-char test, mirroring
+        // `read_until(regex)`, where the terminator wins over what the name
+        // grammar would otherwise admit. Not redundant with the classes below:
+        // two characters are both Svelte whitespace and custom-element name
+        // chars — U+FEFF, inside PCENChar's `[#xFDF0-#xFFFD]`, and U+1680 (the
+        // Ogham space mark), inside its `[#x37F-#x1FFF]`. Without this guard
+        // `</div\u{feff}>` lexes as the name `div\u{feff}` and fails to close its
+        // `div`.
+        if is_svelte_ws(ch) {
+            break;
+        }
+        // `is_alphanumeric` covers the non-ASCII Unicode *letters* the ASCII table
+        // leaves (so `<my-café>` works); `is_pcen_char` adds the non-alphanumeric
+        // members of the HTML custom-element name grammar (`·`, ZWNJ/ZWJ, astral
+        // emoji) so a whole custom-element name stays in one token. Both are asked
+        // only past U+007F, which is the whole of what either adds. Over-admitting
+        // (e.g. a PCENChar with no preceding hyphen) is harmless — the parser's
+        // `is_valid_tag_name` gate rejects any name that isn't valid.
+        if ch.is_alphanumeric() || tsv_html::is_pcen_char(ch) {
+            i += width;
+        } else {
+            break;
+        }
+    }
+    i
+}
+
 pub struct Lexer<'a> {
     source: &'a str,
     /// The cursor, as a byte offset into `source` — always on a character boundary. `source`
@@ -331,57 +399,22 @@ impl<'a> Lexer<'a> {
     /// `attribute_name_run_end` extends it past special chars (`a%b`) to Svelte's
     /// `read_tag` terminator set (`[\s=/>"']`), which differs from the tag-name set.
     /// Widen attribute-name coverage there, not this char class.
+    ///
+    /// The ASCII run is one [`NAME_RUN_ASCII`] load a byte; the first byte at or above
+    /// U+0080 hands the rest of the run to [`name_run_end_from_non_ascii`], out of line,
+    /// so the common path neither decodes nor pays that arm's constants and register saves.
     fn scan_name_run(&mut self) {
         let bytes = self.source.as_bytes();
         let mut i = self.position;
         while let Some(&b) = bytes.get(i) {
-            // The overwhelmingly common name char, and disjoint from every
-            // terminator below — so taking it first keeps the whitespace guard
-            // off the hot path without changing what the loop accepts.
-            if b.is_ascii_alphanumeric() {
+            if NAME_RUN_ASCII[usize::from(b)] {
                 i += 1;
                 continue;
             }
-            if b < 0x80 {
-                // The rest of the ASCII name class, and the whole of it: the two
-                // Unicode classes below add nothing under U+0080, since
-                // `char::is_alphanumeric` agrees with `is_ascii_alphanumeric`
-                // there and `is_pcen_char`'s only other ASCII members are `-`,
-                // `.` and `_`. So every other ASCII byte ends the run — Svelte
-                // whitespace included, which is what the guard below states for
-                // the characters that still reach it.
-                if matches!(b, b'_' | b'$' | b'-' | b':' | b'|' | b'.') {
-                    i += 1;
-                    continue;
-                }
-                break;
+            if b >= 0x80 {
+                i = name_run_end_from_non_ascii(self.source, i);
             }
-            let Some((ch, width)) = char_at(self.source, i) else {
-                break;
-            };
-            // Whitespace ends a name run before any name-char test, mirroring
-            // `read_until(regex)`, where the terminator wins over what the name
-            // grammar would otherwise admit. Not redundant with the classes below:
-            // PCENChar spans `[#xFDF0-#xFFFD]`, which contains U+FEFF — the one
-            // character that is both Svelte whitespace and a custom-element name
-            // char. Without this guard `</div\u{feff}>` lexes as the name
-            // `div\u{feff}` and fails to close its `div`.
-            if is_svelte_ws(ch) {
-                break;
-            }
-            // `is_alphanumeric` covers the non-ASCII Unicode *letters* the fast
-            // path above leaves (so `<my-café>` works); `is_pcen_char` adds the
-            // non-alphanumeric members of the HTML custom-element name grammar
-            // (`·`, ZWNJ/ZWJ, astral emoji) so a whole custom-element name stays in
-            // one token. Both are asked only past U+007F, which is the whole of
-            // what either adds. Over-admitting (e.g. a PCENChar with no preceding
-            // hyphen) is harmless — the parser's `is_valid_tag_name` gate rejects any
-            // name that isn't valid.
-            if ch.is_alphanumeric() || tsv_html::is_pcen_char(ch) {
-                i += width;
-            } else {
-                break;
-            }
+            break;
         }
         self.position = i;
     }
@@ -651,5 +684,103 @@ impl<'a> Lexer<'a> {
             end: self.position as u32,
         };
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Lexer, char_at, is_svelte_ws};
+
+    /// The name-run class as one character loop — the predicate the table walk and its
+    /// cold non-ASCII arm split between them, spelled whole so the split is graded
+    /// against something that never made it.
+    fn name_run_end_model(source: &str, mut i: usize) -> usize {
+        while let Some((ch, width)) = char_at(source, i) {
+            let continues = if ch.is_ascii() {
+                ch.is_ascii_alphanumeric() || matches!(ch, '_' | '$' | '-' | ':' | '|' | '.')
+            } else {
+                !is_svelte_ws(ch) && (ch.is_alphanumeric() || tsv_html::is_pcen_char(ch))
+            };
+            if !continues {
+                break;
+            }
+            i += width;
+        }
+        i
+    }
+
+    fn scan_from(source: &str, start: usize) -> usize {
+        let mut lexer = Lexer::new(source);
+        lexer.seek(start);
+        lexer.scan_name_run();
+        lexer.position
+    }
+
+    /// Every Unicode scalar — so every byte a UTF-8 character opens with — at each position
+    /// a name run meets it: first, behind an ASCII run, behind a non-ASCII one (the cold
+    /// arm's own loop), doubled, and followed by an ASCII name byte and by a terminator. Each
+    /// source starts behind a prefix, so no scan begins at offset 0.
+    #[test]
+    fn scan_name_run_matches_the_class_for_every_scalar() {
+        let mut checked = 0usize;
+        for cp in 0..=0x10_ffff_u32 {
+            let Some(c) = char::from_u32(cp) else {
+                continue;
+            };
+            for (prefix, body) in [
+                ("<", format!("{c}")),
+                ("<", format!("a{c}")),
+                ("<", format!("ab-{c}x")),
+                ("<", format!("é{c}")),
+                ("<", format!("\u{e9}a{c}{c}b")),
+                ("< ", format!("{c}=")),
+                ("<x ", format!("on:a|{c}>")),
+            ] {
+                let source = format!("{prefix}{body}");
+                let start = prefix.len();
+                assert_eq!(
+                    scan_from(&source, start),
+                    name_run_end_model(&source, start),
+                    "U+{cp:04X} in {source:?}"
+                );
+                checked += 1;
+            }
+        }
+        assert!(checked > 7_000_000, "the scalar walk ran ({checked} cases)");
+    }
+
+    /// The characters the class distinguishes by more than one rule, named: U+FEFF (Svelte
+    /// whitespace AND a custom-element name char — whitespace wins), NBSP and U+1680 (both
+    /// whitespace, the latter inside a PCENChar range), LS / PS, NEL (not JS `\s`, yet outside
+    /// this class too — the parser's longer name run is what carries it), a combining mark,
+    /// ZWNJ / ZWJ, `·` and an astral emoji.
+    #[test]
+    fn scan_name_run_named_boundary_characters() {
+        for (name, tail) in [
+            ("div", "\u{feff}>"),
+            ("div", "\u{a0}x"),
+            ("div", "\u{1680}x"),
+            ("div", "\u{2028}x"),
+            ("div", "\u{2029}x"),
+            ("div", "\u{85}x"),
+            ("e\u{301}t\u{301}e", "="),
+            ("a\u{200c}b\u{200d}c", "/"),
+            ("a\u{b7}b", " "),
+            ("my-\u{1f600}", ">"),
+            ("x-caf\u{e9}", ""),
+            ("on:click|once", "={f}"),
+            ("A.b$c_d", "\"x\""),
+            ("a", "\\b"),
+            ("a", "\u{1}b"),
+            ("a", "\"b"),
+        ] {
+            let source = format!("<{name}{tail}");
+            assert_eq!(scan_from(&source, 1), 1 + name.len(), "{source:?}");
+            assert_eq!(
+                name_run_end_model(&source, 1),
+                1 + name.len(),
+                "model: {source:?}"
+            );
+        }
     }
 }
