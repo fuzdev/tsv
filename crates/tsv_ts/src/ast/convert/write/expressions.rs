@@ -53,9 +53,13 @@ pub(super) enum ChainState {
 ///   omitted along the call/member spine.
 ///
 /// Both flags survive a `JsdocCast` unwrap (they act on the unwrapped inner
-/// expression) and die on any arm other than call/member — including a
-/// `ChainExpression` wrap, which they fall through without touching. `chain`
-/// does *not* survive the unwrap: a cast's parens seal the chain.
+/// expression) and die at a `ChainExpression` wrap ([`flags_after_wrap`]).
+/// `force_optional` is read by the call/member arms and by the `Identifier` arm — the
+/// bare callee of `a?.<T>(x)` is the node it marks optional — and `strip_optional` by
+/// the call/member arms alone. Every other arm drops both, save `TSInstantiationExpression`,
+/// which passes `strip_optional` through to its expression (a call-less decorator
+/// `@a.b<T>` wraps its member spine in one). `chain` does *not* survive the unwrap: a
+/// cast's parens seal the chain.
 #[derive(Clone, Copy, Default)]
 pub(super) struct ExprFlags {
     pub(super) chain: ChainState,
@@ -95,6 +99,16 @@ fn write_expression_holes<'a, 'arena: 'a>(
 
 /// Emit an expression's wire JSON, dispatching on its variant (chain flags
 /// threaded via `ExprFlags`).
+///
+/// The dispatch's front: the two leaf kinds — a literal and an identifier, more than
+/// half of all calls — are answered here, and every other kind goes on to
+/// [`write_expression_full_dispatch`], whose arms share one frame and six callee-saved
+/// registers that a leaf arm handing off to its writer would set up and tear down for
+/// nothing.
+///
+/// ⚠️ Out of line, and every arm a tail call, for one reason: the dispatch IS the
+/// expression recursion, so this function must add nothing to its frames.
+#[inline(never)]
 pub(super) fn write_expression_inner(
     w: &mut JsonWriter,
     expr: &internal::Expression<'_>,
@@ -102,8 +116,58 @@ pub(super) fn write_expression_inner(
     flags: ExprFlags,
 ) {
     match &expr.kind {
+        internal::ExpressionKind::Literal(lit) => write_literal(w, lit, ctx),
+        // A variable reference — no `?` (its own or a forced one), no binding extra — is
+        // the bare node `write_identifier_plain` writes, in a smaller frame than the
+        // general form.
+        internal::ExpressionKind::Identifier(id)
+            if id.extra.is_none() && !id.optional && !flags.force_optional =>
+        {
+            write_identifier_plain(w, id, ctx);
+        }
+        internal::ExpressionKind::Identifier(id) => {
+            write_expression_identifier(w, id, flags.force_optional, ctx);
+        }
+        _ => write_expression_full_dispatch(w, expr, ctx, flags),
+    }
+}
+
+/// An `Identifier` in expression position — the arm both dispatches share.
+/// `force_optional` is the acorn `?.<T>(...)` quirk ([`ExprFlags::force_optional`]).
+// Out of line so the front stays frameless: inlined, this arm's frame is set up on entry
+// to the front, ahead of its kind test, by every kind.
+#[inline(never)]
+fn write_expression_identifier(
+    w: &mut JsonWriter,
+    id: &internal::Identifier<'_>,
+    force_optional: bool,
+    ctx: &Ctx<'_>,
+) {
+    write_identifier_parts(
+        w,
+        id.span,
+        id.ident_name(),
+        id.optional || force_optional,
+        id.type_annotation(),
+        id.decorators(),
+        ctx,
+    );
+}
+
+/// Every expression kind's arm, the leaf kinds' included, so this is a total answer on
+/// its own; [`write_expression_inner`] answers the leaves before reaching it.
+// Out of line: inlined into its front, its frame would be paid by the leaf kinds the
+// front answers first.
+#[inline(never)]
+fn write_expression_full_dispatch(
+    w: &mut JsonWriter,
+    expr: &internal::Expression<'_>,
+    ctx: &Ctx<'_>,
+    flags: ExprFlags,
+) {
+    match &expr.kind {
         // JSDoc cast is internal-only: emit the inner expression (paren-free
-        // public AST). `in_chain = false` — the cast's parens seal any chain;
+        // public AST). `chain: ChainState::Unresolved` — the cast's parens seal any chain;
         // force/strip pass through (they act on the converted inner).
         internal::ExpressionKind::JsdocCast(cast) => {
             write_expression_inner(
@@ -128,17 +192,12 @@ pub(super) fn write_expression_inner(
             write_expression(w, paren.expression, ctx);
             close_node(w, "ParenthesizedExpression", expr.span, ctx);
         }
+        // Unreachable through the front (this function's only caller), which answers both
+        // kinds first; kept so the match stays total. Leaf behavior belongs in the front
+        // and the shared writers, or it never runs.
         internal::ExpressionKind::Literal(lit) => write_literal(w, lit, ctx),
         internal::ExpressionKind::Identifier(id) => {
-            write_identifier_parts(
-                w,
-                id.span,
-                id.ident_name(),
-                id.optional || flags.force_optional,
-                id.type_annotation(),
-                id.decorators(),
-                ctx,
-            );
+            write_expression_identifier(w, id, flags.force_optional, ctx);
         }
         internal::ExpressionKind::PrivateIdentifier(pid) => {
             node_header(w, "PrivateIdentifier", expr.span, ctx);
