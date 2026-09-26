@@ -636,12 +636,13 @@ section with it (prettier-plugin-svelte's region-end trail, matched exactly, pre
 included — pinned by the non-divergence fixtures
 [region_markers](../tests/fixtures/svelte/script/ordering/region_markers/) and
 [region_markers_spelling](../tests/fixtures/svelte/script/ordering/region_markers_spelling/)).
-The four places the two formatters part:
+The places the two formatters part:
 
-- Trailing comments after the last `<style>` — ◆prettier_bug (non-idempotent) — [trailing_comments_after_style](../tests/fixtures/svelte/script/ordering/trailing_comments_after_style_prettier_divergence/)
+- Trailing comments after the last `<style>` — ◆prettier_bug (non-idempotent) — [trailing_comments_after_style](../tests/fixtures/svelte/script/ordering/trailing_comments_after_style_prettier_divergence/), [lifted_run_region_trail_order](../tests/fixtures/svelte/script/ordering/lifted_run_region_trail_order_prettier_divergence/), [ignore_directive_template_end](../tests/fixtures/svelte/script/ordering/ignore_directive_template_end_prettier_divergence/), [lifted_run_region_trail_above_section](../tests/fixtures/svelte/script/ordering/lifted_run_region_trail_above_section_prettier_divergence/)
 - Region-end trail blank lines — ◆stable_quirk — [region_end_trail_blank_lines](../tests/fixtures/svelte/script/ordering/region_end_trail_blank_lines_prettier_divergence/)
 - Comment run above `<svelte:options>` — ◆comment_preservation — [options_leading_comment_run](../tests/fixtures/svelte/script/ordering/options_leading_comment_run_prettier_divergence/)
-- Template text the reorder leaves at the end of the document — ◆content_preservation — [template_tail_zwnbsp](../tests/fixtures/svelte/script/ordering/template_tail_zwnbsp_prettier_divergence/), [template_tail_nbsp](../tests/fixtures/svelte/script/ordering/template_tail_nbsp_prettier_divergence/), [template_tail_whitespace_run](../tests/fixtures/svelte/script/ordering/template_tail_whitespace_run_prettier_divergence/), [template_tail_line_separator](../tests/fixtures/svelte/script/ordering/template_tail_line_separator_prettier_divergence/), [template_tail_vertical_tab](../tests/fixtures/svelte/script/ordering/template_tail_vertical_tab_prettier_divergence/), [template_tail_form_feed](../tests/fixtures/svelte/script/ordering/template_tail_form_feed_prettier_divergence/), [template_tail_comment_carried](../tests/fixtures/svelte/script/ordering/template_tail_comment_carried_prettier_divergence/), [template_tail_ignore](../tests/fixtures/svelte/script/ordering/template_tail_ignore_prettier_divergence/), [template_tail_nbsp_long/fits](../tests/fixtures/svelte/script/ordering/template_tail_nbsp_long/fits_prettier_divergence/), [template_tail_nbsp_long/breaks](../tests/fixtures/svelte/script/ordering/template_tail_nbsp_long/breaks_prettier_divergence/)
+- Template text the reorder leaves at the end of the document — ◆content_preservation — [template_tail_zwnbsp](../tests/fixtures/svelte/script/ordering/template_tail_zwnbsp_prettier_divergence/), [template_tail_nbsp](../tests/fixtures/svelte/script/ordering/template_tail_nbsp_prettier_divergence/), [template_tail_whitespace_run](../tests/fixtures/svelte/script/ordering/template_tail_whitespace_run_prettier_divergence/), [template_tail_line_separator](../tests/fixtures/svelte/script/ordering/template_tail_line_separator_prettier_divergence/), [template_tail_vertical_tab](../tests/fixtures/svelte/script/ordering/template_tail_vertical_tab_prettier_divergence/), [template_tail_form_feed](../tests/fixtures/svelte/script/ordering/template_tail_form_feed_prettier_divergence/), [template_tail_comment_carried](../tests/fixtures/svelte/script/ordering/template_tail_comment_carried_prettier_divergence/), [template_tail_ignore](../tests/fixtures/svelte/script/ordering/template_tail_ignore_prettier_divergence/), [template_tail_nbsp_long/fits](../tests/fixtures/svelte/script/ordering/template_tail_nbsp_long/fits_prettier_divergence/), [template_tail_nbsp_long/breaks](../tests/fixtures/svelte/script/ordering/template_tail_nbsp_long/breaks_prettier_divergence/), [lifted_run_edge_tail/script](../tests/fixtures/svelte/script/ordering/lifted_run_edge_tail/script_prettier_divergence/)
+- Template nodes on either side of a hoisted section — ◆content_preservation, ◆prettier_bug, ◆stable_quirk, ◆design_choice — [lifted_run_glued_comment](../tests/fixtures/svelte/script/ordering/lifted_run_glued_comment_prettier_divergence/), [lifted_run_glued_comment_kinds](../tests/fixtures/svelte/script/ordering/lifted_run_glued_comment_kinds_prettier_divergence/), [lifted_run_text_whitespace](../tests/fixtures/svelte/script/ordering/lifted_run_text_whitespace_prettier_divergence/), [lifted_run_space_join](../tests/fixtures/svelte/script/ordering/lifted_run_space_join_prettier_divergence/), [lifted_run_comment_whitespace](../tests/fixtures/svelte/script/ordering/lifted_run_comment_whitespace_prettier_divergence/), [lifted_run_blank_inside](../tests/fixtures/svelte/script/ordering/lifted_run_blank_inside_prettier_divergence/), [lifted_run_blank_before](../tests/fixtures/svelte/script/ordering/lifted_run_blank_before_prettier_divergence/), [lifted_run_space_layout](../tests/fixtures/svelte/script/ordering/lifted_run_space_layout_prettier_divergence/), [lifted_run_glued_long/breaks](../tests/fixtures/svelte/script/ordering/lifted_run_glued_long/breaks_prettier_divergence/), [lifted_run_region_trails](../tests/fixtures/svelte/script/ordering/lifted_run_region_trails_prettier_divergence/)
 
 **Trailing comments after the last `<style>`**: a comment written after the `<style>` that ends
 the source is hoisted to the template's end by the reorder, where it stands directly above the
@@ -649,7 +650,12 @@ the source is hoisted to the template's end by the reorder, where it stands dire
 the next pass puts the section blank above it. tsv prints that final form in one pass (the run
 takes the section blank on its way in, and stands off the style's own leading run by a blank);
 prettier's first pass leaves the comment glued to the last template node and only its second
-pass adds the blank. Same fixed point, one pass against two.
+pass adds the blank. Same fixed point, one pass against two. The same two-pass shape reaches a
+comment the reorder leaves ending the template when the `<style>` was written earlier, between
+template nodes (a directive there included, which then stands above the style it did not freeze
+in the source — the style is formatted, and the output is its own fixed point), and a region-end
+trail the reorder leaves directly above another `<script>`, which that script then claims as its
+leading comment on prettier's second pass.
 
 **Region-end trail blank lines**: the gap between a section's closing tag and its `#endregion`
 trail. Both formatters keep one authored blank line there. prettier prints the trail's
@@ -665,6 +671,57 @@ glued to the tag (`stripSvelteOptionsComment`) and leaves an earlier comment in 
 which after the reorder prints *below* the tag — the two comments swap sides. tsv carries the
 whole run in authored order, as both formatters already do above a `<script>` or `<style>`
 ([§Comment Position Philosophy](./conformance_prettier.md#comment-position-philosophy)).
+
+**Template nodes on either side of a hoisted section**: the reorder takes a `<script>`, a
+`<style>` or `<svelte:options>` out of the template together with the comments that travel with it,
+and the template nodes written on either side of that run become neighbours. The compiler never
+saw the run between them either, so tsv joins them as if it had never been there. Whitespace
+anywhere between them — before the run, after it, or inside it — separates them: none at all
+keeps them glued (`x<!-- c --><script>…</script>y` renders `xy`), and some takes the ordinary
+space and newline rules, whatever layout the pair takes with no section between them (`{a} {b}`,
+`<A /> <B />`, `<b>x</b> <b>y</b>`). A blank line counts only where it is written BEFORE or AFTER
+the run, and there takes the ordinary blank-line rule for those neighbours — two elements keep
+one blank line, and prose text collapses it to a space, as `x⏎⏎y` does. A blank line inside the
+run — between two travelling comments, or between the last one and its section — belongs to the
+run: it prints there, and counts between the neighbours only as whitespace. The lines the section
+itself occupied are not a blank line either: a newline on each side of it is one line break. At
+width the glued neighbours are the welded unit they would be without the section, so the unit
+travels to a fresh line ([§Moving a run](#moving-a-run-break-before-travel-and-welded-units)) —
+the glued seam the section left never takes the break. The joins prettier agrees with are pinned
+by the non-divergence fixtures [lifted_run_glued](../tests/fixtures/svelte/script/ordering/lifted_run_glued/),
+[lifted_run_glued_kinds](../tests/fixtures/svelte/script/ordering/lifted_run_glued_kinds/),
+[lifted_run_blank_line](../tests/fixtures/svelte/script/ordering/lifted_run_blank_line/),
+[lifted_run_text_neighbour_whitespace](../tests/fixtures/svelte/script/ordering/lifted_run_text_neighbour_whitespace/),
+[lifted_run_glued_long/fits](../tests/fixtures/svelte/script/ordering/lifted_run_glued_long/fits/) and
+[lifted_run_trimmed_tail](../tests/fixtures/svelte/script/ordering/lifted_run_trimmed_tail/) (a
+character the parse trims from the end of the document stays trimmed when a section written
+before it moves out of the template) and
+[lifted_run_edge_tail/style](../tests/fixtures/svelte/script/ordering/lifted_run_edge_tail/style/)
+(one the parse kept, before a `<style>` that ended the document, stays). Prettier parts from them in these
+ways:
+
+- **A comment glued to a hoisted `<script>` or `<style>`** (`<!-- c --><script>`, anywhere in the
+  document, its start included) makes prettier drop nodes from the **end** of the template,
+  whatever and wherever they are — a `<b>y</b>` lines below the section, or the `<style>`'s own
+  leading comment when that comment ends the template — and more trailing nodes with each such
+  section. The output is prettier's own fixed point, so nothing reveals the loss; the `variant_*`
+  files pin it. A glued `prettier-ignore` drops the last node like any glued comment; where the
+  template ends in the `<style>`'s own leading comment it loses no content but opens a blank line
+  between that comment and the tag instead (`variant_style_comment_blank`).
+  ◆content_preservation.
+- **Whitespace written only in front of the section**, with the section glued to what follows —
+  `x <script>…</script>y`, `<b>x</b> <script>…</script>y` — or only inside the run, between a
+  travelling comment and its section (`x<!-- c -->⏎<script>…</script>y`), is deleted (`xy`), and
+  with it the rendered space. ◆prettier_bug.
+- **A blank line written above a hoisted section or its travelling comments**, with no blank line
+  below it (`<p>a</p>⏎⏎<script>…</script>⏎<p>b</p>`, `x⏎⏎<script>…</script> <p>b</p>`), is dropped;
+  written below the section it survives in both formatters. ◆stable_quirk.
+- **At width**, prettier keeps a welded unit on the word's line past 100 — dangling a global
+  element's `/>`, or breaking before the text after the unit — where tsv moves the whole unit to a
+  fresh line, with or without a section between its parts; and it splits a space-spelled pair of
+  tags or components onto two lines (the root pair of
+  [inline_tag_pair_space](../tests/fixtures/svelte/elements/inline_tag_pair_space_prettier_divergence/)),
+  where tsv keeps the space. The section changes neither layout. ◆design_choice.
 
 **Template text the reorder leaves at the end of the document**: Svelte's `parse` trims the end
 of the document with JavaScript's `trimEnd()` (ECMAScript `WhiteSpace` + `LineTerminator`), while
@@ -683,7 +740,9 @@ move is tsv's, and the respell completes it losslessly
 ([conformance_prettier_ignore.md](./conformance_prettier_ignore.md#format-ignore-directive)). Text
 already at the end of the source is not respelled — the parse had dropped the character before the
 printer saw it. Prettier drops the character: the form feed in one pass, the rest on its second,
-and a lone U+FEFF or a text before a carried comment as a whole text node. Where the text
+and a lone U+FEFF as a whole text node; a text before a glued carried comment goes whole too, as
+the template's last node (the first loss under [template nodes on either side of a hoisted
+section](#svelte-root-section-ordering)). Where the text
 starts the document instead, the byte-0 case is the load-bearing BOM
 ([conformance_prettier.md §Whitespace: BOM Handling](./conformance_prettier.md#whitespace-bom-handling)).
 

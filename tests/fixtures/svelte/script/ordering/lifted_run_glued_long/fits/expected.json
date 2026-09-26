@@ -1,0 +1,222 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 255,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 26,
+				"end": 73,
+				"raw": "\n\nwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww a",
+				"data": "\n\nwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww a"
+			},
+			{
+				"type": "SvelteDocument",
+				"start": 73,
+				"end": 92,
+				"name": "svelte:document",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 46,
+						"character": 74
+					},
+					"end": {
+						"line": 5,
+						"column": 61,
+						"character": 89
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 92,
+				"end": 96,
+				"raw": "bbbb",
+				"data": "bbbb"
+			},
+			{
+				"type": "SvelteWindow",
+				"start": 96,
+				"end": 113,
+				"name": "svelte:window",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 69,
+						"character": 97
+					},
+					"end": {
+						"line": 5,
+						"column": 82,
+						"character": 110
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 113,
+				"end": 129,
+				"raw": "ttttttttttttttt\n",
+				"data": "ttttttttttttttt\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 129,
+				"end": 137,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 6,
+						"column": 1,
+						"character": 130
+					},
+					"end": {
+						"line": 6,
+						"column": 2,
+						"character": 131
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 132,
+							"end": 133,
+							"raw": "c",
+							"data": "c"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 137,
+				"end": 231,
+				"raw": "\nwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww a",
+				"data": "\nwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww a"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 231,
+				"end": 234,
+				"expression": {
+					"type": "Identifier",
+					"start": 232,
+					"end": 233,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 94
+						},
+						"end": {
+							"line": 7,
+							"column": 95
+						}
+					},
+					"name": "c"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 234,
+				"end": 254,
+				"raw": "bbbb\nttttttttttttttt",
+				"data": "bbbb\nttttttttttttttt"
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 26,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 17,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 10,
+					"end": 16,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 14,
+							"end": 15,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 5
+								},
+								"end": {
+									"line": 2,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 14,
+								"end": 15,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 5
+									},
+									"end": {
+										"line": 2,
+										"column": 6
+									}
+								},
+								"name": "a"
+							},
+							"init": null
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

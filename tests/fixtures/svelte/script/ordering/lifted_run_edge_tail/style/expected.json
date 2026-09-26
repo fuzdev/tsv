@@ -1,0 +1,157 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 33,
+		"end": 71,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 42,
+					"end": 43,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 42,
+							"end": 43,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "p",
+											"start": 42,
+											"end": 43
+										}
+									],
+									"start": 42,
+									"end": 43
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 44,
+					"end": 62,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 48,
+							"end": 58,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 42,
+				"end": 62
+			}
+		],
+		"comments": [],
+		"content": {
+			"start": 40,
+			"end": 63,
+			"styles": "\n\tp {\n\t\tcolor: red;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 72,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 26,
+				"end": 33,
+				"raw": "\n\nxy \n\n",
+				"data": "\n\nxy \n\n"
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 26,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 17,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 10,
+					"end": 16,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 14,
+							"end": 15,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 5
+								},
+								"end": {
+									"line": 2,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 14,
+								"end": 15,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 5
+									},
+									"end": {
+										"line": 2,
+										"column": 6
+									}
+								},
+								"name": "a"
+							},
+							"init": null
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

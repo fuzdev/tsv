@@ -1,0 +1,383 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 106,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 26,
+				"end": 30,
+				"raw": "\n\nx ",
+				"data": "\n\nx "
+			},
+			{
+				"type": "RegularElement",
+				"start": 30,
+				"end": 38,
+				"name": "b",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 3,
+						"character": 31
+					},
+					"end": {
+						"line": 5,
+						"column": 4,
+						"character": 32
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 33,
+							"end": 34,
+							"raw": "y",
+							"data": "y"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 38,
+				"end": 39,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 39,
+				"end": 47,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 6,
+						"column": 1,
+						"character": 40
+					},
+					"end": {
+						"line": 6,
+						"column": 2,
+						"character": 41
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 42,
+							"end": 43,
+							"raw": "c",
+							"data": "c"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 47,
+				"end": 50,
+				"raw": "\nx ",
+				"data": "\nx "
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 50,
+				"end": 53,
+				"expression": {
+					"type": "Identifier",
+					"start": 51,
+					"end": 52,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 3
+						},
+						"end": {
+							"line": 7,
+							"column": 4
+						}
+					},
+					"name": "b"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 53,
+				"end": 54,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 54,
+				"end": 62,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 55
+					},
+					"end": {
+						"line": 8,
+						"column": 2,
+						"character": 56
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 57,
+							"end": 58,
+							"raw": "d",
+							"data": "d"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 62,
+				"end": 63,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 63,
+				"end": 71,
+				"name": "b",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 1,
+						"character": 64
+					},
+					"end": {
+						"line": 9,
+						"column": 2,
+						"character": 65
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 66,
+							"end": 67,
+							"raw": "x",
+							"data": "x"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 71,
+				"end": 74,
+				"raw": " y\n",
+				"data": " y\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 74,
+				"end": 82,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 75
+					},
+					"end": {
+						"line": 10,
+						"column": 2,
+						"character": 76
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 77,
+							"end": 78,
+							"raw": "e",
+							"data": "e"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 82,
+				"end": 85,
+				"raw": "\nx\n",
+				"data": "\nx\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 85,
+				"end": 93,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 1,
+						"character": 86
+					},
+					"end": {
+						"line": 12,
+						"column": 2,
+						"character": 87
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 88,
+							"end": 89,
+							"raw": "y",
+							"data": "y"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 93,
+				"end": 97,
+				"raw": "\nz\n\n",
+				"data": "\nz\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 97,
+				"end": 105,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 15,
+						"column": 1,
+						"character": 98
+					},
+					"end": {
+						"line": 15,
+						"column": 2,
+						"character": 99
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 100,
+							"end": 101,
+							"raw": "f",
+							"data": "f"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 26,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 17,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 10,
+					"end": 16,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 14,
+							"end": 15,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 5
+								},
+								"end": {
+									"line": 2,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 14,
+								"end": 15,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 5
+									},
+									"end": {
+										"line": 2,
+										"column": 6
+									}
+								},
+								"name": "a"
+							},
+							"init": null
+						}
+					],
+					"kind": "let"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

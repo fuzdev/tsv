@@ -533,6 +533,8 @@ cargo run --profile corpus -p tsv_debug --features audits fabrication_audit ../c
 
 **A section's leading comment run is rule 1 one step removed.** Comments travel with the section, so a glued `<div>block1</div>⏎<!-- comment -->⏎<style>` puts the section's **leading comment** where the tag would be, and the bracketing shape reads `</div` ⇢ `<!--` — a blank prettier emits too. The audit reads forward from the run (`leads_section`): one or more full-line comments (multi-line ones and blank lines between them allowed) ending at a `<script>` / `<style>` / `<svelte:options>` line excuse the run, and the seam blank *between* two comments of that run is the same run read from its middle. Anything else between the comments and the tag — content, or text on a comment's closing line — refuses, which is what keeps this narrower than "a blank before some comment" (a widening once refused for blinding the audit to a whole class of real fabrications). Surfaced by the `svelte/script/ordering` variants that author a comment glued to the last template node; before them an already-formatted corpus carried the blank in its input, so the counts matched and the gap was latent.
 
+**A section's region-end trail is the same rule from the other side.** A `#endregion` written directly below a section travels with it and prints below it, so the section seam's blank follows the trail instead of the closing tag and the run reads `<!--` ⇢ the template. The audit reads back from the run (`trails_section`): a full-line comment (multi-line allowed) that is a region-end marker (`tsv_lang::is_region_end_marker`, the formatter's own spelling), with nothing but blank lines between it and a `</script>` / `</style>` / `<svelte:options>` line, excuses the run. Any other comment there refuses — an ordinary comment below a section stays in the template, so a blank after it would be invented — and so does a comment below ordinary content. Surfaced by the `svelte/script/ordering/lifted_run_region_trails` variants, whose sections are written between template nodes with their trails glued to the next one.
+
 **Blind spots.**
 
 - **Net-zero.** The metric compares counts, so a run fabricated in one place while another is dropped elsewhere in the same file nets out and is missed. Closing it needs a position-preserving alignment between input and output, which reflow (and section hoisting, which relocates blanks wholesale) makes unavailable.
@@ -1538,7 +1540,9 @@ shared sweep's worker pool buys the most: ~14.6 s at `--jobs 1`).
 # output, take the NODE-POPULATION CENSUS of each (every node by `type`, minus the
 # wrappers and separators the formatter rewrites by design — whitespace Text, EmptyStatement,
 # union/intersection/paren/instantiation/chain shells, directive shorthand values — plus
-# every word of template text; `node_conservation_diff`'s table is the invariant), then
+# every word of template text, read across a fragment's text siblings as the page renders
+# them, so a word that straddles a hoisted section or a comment is one word;
+# `node_conservation_diff`'s table is the invariant), then
 # reduce each to a STRUCTURAL SKELETON (node-tree shape + `type`, erasing
 # reformattable leaf scalars, acorn `extra`, and per-node comment ATTACHMENT — the root
 # `comments` array still pins every comment's presence + kind, the leaf check its text),

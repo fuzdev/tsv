@@ -494,7 +494,7 @@ pub(crate) fn leaf_conservation_diff(input: &Value, output: &Value) -> Option<St
 /// | --- | --- | --- |
 /// | every object with a string `type` | **count** `n:<type>` | the population |
 /// | `Text` whose `data` is whitespace-only | **erase** | the formatter's own separator — appears and vanishes at every block boundary (the skeleton's noise) |
-/// | `Text` in a fragment `nodes` array | **count each whitespace-split word** of `data` as `w:<word>`, not the node | a text node's WORDS are what a content drop loses, and its node count is not conserved: hoisting a `<script>` / `<style>` out from between two texts leaves them adjacent, and they reparse as one. Excluded from the word count (node counted instead): the text of a `<script>` / `<style>` the parser keeps as an element (a non-JS `type=` script, a `lang=` style), whose JS / CSS the formatter reformats as code; attribute-value text likewise counts as a node only (a `style=""` value may be reformatted) |
+/// | `Text` in a fragment `nodes` array | **count each whitespace-split word** of `data` as `w:<word>`, not the node — read across the array's text siblings as the page renders them ([`FragmentWords`]) | a text node's WORDS are what a content drop loses, and its node count is not conserved: hoisting a `<script>` / `<style>` out from between two texts leaves them adjacent, and they reparse as one — as one WORD, where nothing separated them (`x<script>…</script>y` renders `xy`). Excluded from the word count (node counted instead): the text of a `<script>` / `<style>` the parser keeps as an element (a non-JS `type=` script, a `lang=` style), whose JS / CSS the formatter reformats as code; attribute-value text likewise counts as a node only (a `style=""` value may be reformatted) |
 /// | `Fragment` | **erase** | a container, one per owner; an `{#await}` branch's fragment appears and vanishes with the branch's authored form (`{:then value}` with an empty body is dropped, `{:catch}` folds to the `catch` shorthand) — its NODES still count |
 /// | `EmptyStatement` | **erase** | a stray `;` the formatter drops by design |
 /// | `TSParenthesizedType` / `TSUnionType` / `TSIntersectionType` / `TSInstantiationExpression` / `ChainExpression` | **erase** | wrapper shells the formatter strips or flattens by design (a redundant type paren, a single-member `\| A`, a nested `A \| (B \| C)`, a redundant `(a?.b)?.c` chain shell); acorn-typescript reads `Base<T>` in a class heritage as an instantiation expression or not by the SPELLING of what follows, so tsv's drop-in parse does too. The shell's operands still count |
@@ -507,10 +507,81 @@ pub(crate) fn leaf_conservation_diff(input: &Value, output: &Value) -> Option<St
 /// Walks generically on `type` plus the key a subtree was reached through, so a wire shape with
 /// none of the erased kinds (CSS) is simply counted whole. A `Comment` node in a Svelte fragment
 /// (a template `<!-- -->`) IS counted — it is a child node, never merged.
-pub(crate) fn node_census(wire: &Value) -> BTreeMap<CensusKey<'_>, usize> {
-    let mut ms: BTreeMap<CensusKey<'_>, usize> = BTreeMap::new();
-    collect_conserved_nodes(wire, None, false, &mut ms);
+///
+/// `names` holds the words the census joins across two text siblings ([`FragmentWords`]),
+/// which no single string of the wire spells.
+pub(crate) fn node_census<'a>(
+    wire: &'a Value,
+    names: &'a bumpalo::Bump,
+) -> BTreeMap<CensusKey<'a>, usize> {
+    let mut ms: BTreeMap<CensusKey<'a>, usize> = BTreeMap::new();
+    collect_conserved_nodes(wire, None, false, names, None, &mut ms);
     ms
+}
+
+/// The words of one fragment `nodes` array, read across its text siblings the way the page
+/// renders them: a `<!-- -->` sibling renders nothing and a hoisted `<script>` / `<style>` /
+/// `<svelte:options>` is not a sibling at all, so two texts with nothing but those between them
+/// are one run of text — and where neither side has whitespace at the seam, the word that
+/// straddles it is ONE word (`x<script>…</script>y` renders `xy`, and formats to the one text
+/// `xy`). Counting per text node would read `x` and `y` there and call the formatter's `xy` a
+/// loss; counting across the seam reads `xy` on both sides, and still sees a formatter that
+/// splits the word (`x⏎y`, which renders `x y`) as the loss it is.
+///
+/// Any other sibling — an element, a tag, a block, a whitespace-only text — ends the run.
+#[derive(Default)]
+struct FragmentWords<'a> {
+    /// The last word of the run so far, when its text ended on it (no trailing whitespace) — a
+    /// following text that opens on a word continues it.
+    open: Option<&'a str>,
+}
+
+/// What a fragment sibling is to [`FragmentWords`].
+enum FragmentSibling<'a> {
+    /// A text whose words the census counts.
+    Words(&'a str),
+    /// A comment: renders nothing, so the run continues through it.
+    Comment,
+    /// Anything else: the run ends.
+    Other,
+}
+
+impl<'a> FragmentWords<'a> {
+    fn sibling(
+        &mut self,
+        sibling: FragmentSibling<'a>,
+        names: &'a bumpalo::Bump,
+        out: &mut BTreeMap<CensusKey<'a>, usize>,
+    ) {
+        let data = match sibling {
+            FragmentSibling::Comment => return,
+            FragmentSibling::Other => {
+                self.open = None;
+                return;
+            }
+            FragmentSibling::Words(data) => data,
+        };
+        let mut words = data.split_whitespace();
+        let Some(first) = words.next() else {
+            self.open = None;
+            return;
+        };
+        let continues = !data.starts_with(char::is_whitespace);
+        let mut last = match self.open.take() {
+            Some(open) if continues => {
+                uncount(out, CensusKey::Word(open));
+                let joined: &'a str = names.alloc_str(&format!("{open}{first}"));
+                joined
+            }
+            _ => first,
+        };
+        count(out, CensusKey::Word(last));
+        for word in words {
+            count(out, CensusKey::Word(word));
+            last = word;
+        }
+        self.open = (!data.ends_with(char::is_whitespace)).then_some(last);
+    }
 }
 
 /// One entry of the node census — a conserved NODE, or a WORD of template text, the two things
@@ -645,40 +716,85 @@ fn census_count<'a>(out: &mut BTreeMap<CensusKey<'a>, usize>, entry: CensusEntry
 /// down), which is how a text node's role — fragment child vs attribute value — and a property
 /// key's position are told apart; `raw_island` is set inside a `<script>` / `<style>` element
 /// the parser kept as an element, whose text is code the formatter may reformat.
+///
+/// `words` is the enclosing fragment array's [`FragmentWords`] when `v` is one of its siblings.
 fn collect_conserved_nodes<'a>(
     v: &'a Value,
     key: Option<&str>,
     raw_island: bool,
+    names: &'a bumpalo::Bump,
+    words: Option<&mut FragmentWords<'a>>,
     out: &mut BTreeMap<CensusKey<'a>, usize>,
 ) {
     match v {
         Value::Object(map) => {
             let ty = map.get("type").and_then(Value::as_str);
-            census_count(
-                out,
-                census_entry(
-                    ty,
-                    key,
-                    raw_island,
-                    || map.get("data").and_then(Value::as_str),
-                    || map.get("value").is_some_and(Value::is_string),
-                ),
+            let entry = census_entry(
+                ty,
+                key,
+                raw_island,
+                || map.get("data").and_then(Value::as_str),
+                || map.get("value").is_some_and(Value::is_string),
             );
+            census_count_sibling(out, entry, ty, words, names);
             let raw_island =
                 raw_island || census_opens_raw_island(ty, map.get("name").and_then(Value::as_str));
             for (k, child) in map {
                 if census_skips_key(k, ty) {
                     continue;
                 }
-                collect_conserved_nodes(child, Some(k), raw_island, out);
+                collect_conserved_nodes(child, Some(k), raw_island, names, None, out);
             }
         }
         Value::Array(arr) => {
+            let mut fragment_words =
+                census_reads_fragment_words(key, raw_island).then(FragmentWords::default);
             for child in arr {
-                collect_conserved_nodes(child, key, raw_island, out);
+                collect_conserved_nodes(
+                    child,
+                    key,
+                    raw_island,
+                    names,
+                    fragment_words.as_mut(),
+                    out,
+                );
             }
         }
         _ => {}
+    }
+}
+
+/// Whether an array reached through `key` is a fragment's children, whose texts the census
+/// reads as one run ([`FragmentWords`]) — the arrays whose `Text`s [`census_entry`] counts by
+/// word.
+fn census_reads_fragment_words(key: Option<&str>, raw_island: bool) -> bool {
+    key == Some("nodes") && !raw_island
+}
+
+/// [`census_count`] for an object that may be a fragment sibling: inside a fragment array
+/// (`words`), a text's words and the run's seams go through [`FragmentWords`].
+fn census_count_sibling<'a>(
+    out: &mut BTreeMap<CensusKey<'a>, usize>,
+    entry: CensusEntry<'a>,
+    ty: Option<&'a str>,
+    words: Option<&mut FragmentWords<'a>>,
+    names: &'a bumpalo::Bump,
+) {
+    let Some(words) = words else {
+        census_count(out, entry);
+        return;
+    };
+    match entry {
+        CensusEntry::Words(data) => words.sibling(FragmentSibling::Words(data), names, out),
+        entry => {
+            let sibling = if ty == Some("Comment") {
+                FragmentSibling::Comment
+            } else {
+                FragmentSibling::Other
+            };
+            words.sibling(sibling, names, out);
+            census_count(out, entry);
+        }
     }
 }
 
@@ -687,12 +803,24 @@ fn count<'a>(out: &mut BTreeMap<CensusKey<'a>, usize>, key: CensusKey<'a>) {
     *out.entry(key).or_insert(0) += 1;
 }
 
+/// Take back one of `key`'s tally — [`FragmentWords`] re-reading a word it counted as the start
+/// of a longer one.
+fn uncount<'a>(out: &mut BTreeMap<CensusKey<'a>, usize>, key: CensusKey<'a>) {
+    if let Some(n) = out.get_mut(&key) {
+        *n -= 1;
+        if *n == 0 {
+            out.remove(&key);
+        }
+    }
+}
+
 /// `None` when every conserved node (and fragment word) survives `input` → `output`; otherwise a
 /// compact description — nodes lost from the input, nodes gained in the output. The gate-fatal
 /// signal every round-trip consumer files as a node-loss finding: a formatter never changes a
 /// document's node population, so there is no sanctioned reading of a difference here.
 pub(crate) fn node_conservation_diff(input: &Value, output: &Value) -> Option<String> {
-    census_verdict(&node_census(input), &node_census(output))
+    let names = bumpalo::Bump::new();
+    census_verdict(&node_census(input, &names), &node_census(output, &names))
 }
 
 /// [`node_conservation_diff`] over the wire BYTES, reading each side with
@@ -767,6 +895,7 @@ pub(crate) fn streamed_node_census<'a>(
         state: &mut state,
         key: None,
         raw_island: false,
+        words: None,
     }
     .deserialize(&mut de)
     .ok()?;
@@ -788,6 +917,8 @@ struct CensusSeed<'s, 'a> {
     state: &'s mut CensusState<'a>,
     key: Option<&'a str>,
     raw_island: bool,
+    /// The enclosing fragment array's [`FragmentWords`] when this value is one of its siblings.
+    words: Option<&'s mut FragmentWords<'a>>,
 }
 
 /// What a censused value turned out to be — the shape its parent needs to read its own fields
@@ -834,6 +965,7 @@ where
             state,
             key,
             raw_island,
+            words,
         } = self;
         let mut ty: Option<&'a str> = None;
         let mut name: Option<&'a str> = None;
@@ -850,6 +982,7 @@ where
                 state,
                 key: Some(field),
                 raw_island: child_island,
+                words: None,
             })?;
             match (field, &value) {
                 ("type", CensusValue::Str(s)) => {
@@ -869,10 +1002,8 @@ where
             }
             walked_subtree |= matches!(value, CensusValue::Subtree);
         }
-        census_count(
-            &mut state.out,
-            census_entry(ty, key, raw_island, || data, || value_is_string),
-        );
+        let entry = census_entry(ty, key, raw_island, || data, || value_is_string);
+        census_count_sibling(&mut state.out, entry, ty, words, state.names);
         Ok(CensusValue::Subtree)
     }
 
@@ -881,13 +1012,17 @@ where
             state,
             key,
             raw_island,
+            words: _,
         } = self;
+        let mut fragment_words =
+            census_reads_fragment_words(key, raw_island).then(FragmentWords::default);
         // An array hands its own key down, exactly as the `Value` walk does.
         while seq
             .next_element_seed(CensusSeed {
                 state,
                 key,
                 raw_island,
+                words: fragment_words.as_mut(),
             })?
             .is_some()
         {}
@@ -1132,13 +1267,34 @@ mod node_census_tests {
 
     #[test]
     fn adjacent_texts_merging_conserves() {
-        // `}<style>…</style>!` hoists the style out and leaves `}` and `!` one text.
+        // `}<style>…</style>!` hoists the style out and leaves `}` and `!` one text — one WORD,
+        // since nothing separated them: the page renders `}!`.
         let a = fragment(vec![
             json!({"type": "Text", "data": "}"}),
             json!({"type": "Text", "data": "!"}),
         ]);
-        let b = fragment(vec![json!({"type": "Text", "data": "}\n!"})]);
+        let b = fragment(vec![json!({"type": "Text", "data": "}!"})]);
         assert!(node_conservation_diff(&a, &b).is_none());
+        // Split, the word is gone: `}⏎!` renders `} !`.
+        let split = fragment(vec![json!({"type": "Text", "data": "}\n!"})]);
+        assert!(node_conservation_diff(&a, &split).is_some());
+    }
+
+    #[test]
+    fn a_word_runs_through_a_comment_and_stops_at_whitespace_or_a_node() {
+        let text = |d: &str| json!({"type": "Text", "data": d});
+        let comment = json!({"type": "Comment", "data": " c "});
+        // `x<!-- c --><script>…</script>y`: the comment travels with the script.
+        let a = fragment(vec![text("a x"), comment.clone(), text("y b")]);
+        let b = fragment(vec![comment, text("a xy b")]);
+        assert!(node_conservation_diff(&a, &b).is_none());
+        // Whitespace at the seam keeps two words.
+        let spaced = fragment(vec![text("x "), text("y")]);
+        assert!(node_conservation_diff(&spaced, &fragment(vec![text("x y")])).is_none());
+        // A node between them ends the run: `x<b>z</b>y` holds the words `x` and `y`.
+        let with_node = fragment(vec![text("x"), element("b", "z"), text("y")]);
+        let joined = fragment(vec![text("xy"), element("b", "z")]);
+        assert!(node_conservation_diff(&with_node, &joined).is_some());
     }
 
     #[test]
@@ -1285,7 +1441,8 @@ mod streamed_census_tests {
     }
 
     fn walked(value: &Value) -> BTreeMap<String, usize> {
-        node_census(value)
+        let names = bumpalo::Bump::new();
+        node_census(value, &names)
             .into_iter()
             .map(|(k, n)| (k.to_string(), n))
             .collect()
@@ -1399,8 +1556,9 @@ mod streamed_census_tests {
                 let streamed = streamed_node_census(&bytes, &names)
                     .unwrap_or_else(|| panic!("the streamed census declined {}", path.display()));
                 let value = crate::json::wire_value(&bytes);
+                let walk_names = bumpalo::Bump::new();
                 assert_eq!(
-                    census_verdict(&streamed, &node_census(&value)),
+                    census_verdict(&streamed, &node_census(&value, &walk_names)),
                     None,
                     "the two census walks disagree on {}",
                     path.display()
