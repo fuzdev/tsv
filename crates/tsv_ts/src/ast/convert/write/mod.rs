@@ -913,25 +913,58 @@ pub(super) fn write_export_kind_field(
     }
 }
 
-/// Emit an identifier name — the single name-emission funnel. Span-identity
-/// names are the raw source slice (the leading `raw_len` bytes at
+/// Emit an identifier's `,"name":` field — the single name-emission funnel.
+/// Span-identity names are the raw source slice (the leading `raw_len` bytes at
 /// `name_start`); escaped names are the decoded `&'arena str` (an escaped
 /// identifier's `\u{78}` source form decodes to `x`). Both arms write the wire
 /// value directly; no allocation.
-#[inline]
-pub(super) fn write_name(
+///
+/// The span-identity arm skips the escape scan: an `IdentName` with no
+/// `escaped` form promises its source bytes hold nothing JSON escapes (see
+/// [`internal::IdentName`] — a lexed `IdentifierName` by the grammar, any other
+/// slice by its constructor's check), so the key and the quoted name are one
+/// fixed-width append. The decoded arm keeps the scan — it is rare, and it is
+/// also where a constructor parks a name it cannot vouch for.
+///
+/// `inline(never)`, and the pair of choices is measured, not stylistic: this is
+/// the one out-of-line copy of the window write, and because both arms leave by
+/// tail call (the decoded one to [`write_escaped_name_field`], the window's cold
+/// grow and long paths to theirs) it saves no register at all. Left to the
+/// inliner, the body folded into its callers and reshaped THEIR inlining — the
+/// `Identifier` field writer came back out of line, a call and seven register
+/// saves per name — which cost ~0.45% of the parse→JSON path's instructions on
+/// TypeScript against this shape; `inline(always)` there was no better.
+#[inline(never)]
+pub(super) fn write_name_field(
     w: &mut JsonWriter,
     name: internal::IdentName<'_>,
     name_start: u32,
     ctx: &Ctx<'_>,
 ) {
     match name.escaped {
-        Some(s) => w.string(s),
+        Some(s) => write_escaped_name_field(w, s),
         None => {
             let start = name_start as usize;
-            w.string(&ctx.source[start..start + name.raw_len as usize]);
+            let end = start + name.raw_len as usize;
+            debug_assert!(
+                ctx.source.is_char_boundary(start) && ctx.source.is_char_boundary(end),
+                "a span-identity name covers whole characters"
+            );
+            w.string_escape_free_led(NAME_KEY, &ctx.source.as_bytes()[start..end]);
         }
     }
+}
+
+/// The `,"name":` key an identifier's name follows.
+const NAME_KEY: &[u8; 8] = b",\"name\":";
+
+/// [`write_name_field`]'s decoded arm, out of line: it is rare, and inline its
+/// key's append — a call on its grow path — made every name write keep its
+/// values in callee-saved registers.
+#[inline(never)]
+fn write_escaped_name_field(w: &mut JsonWriter, name: &str) {
+    w.raw_fixed(NAME_KEY);
+    w.string(name);
 }
 
 /// Emit a numeric literal value the way acorn's JSON does: non-finite as
@@ -1020,8 +1053,16 @@ pub(super) fn write_literal(w: &mut JsonWriter, lit: &internal::Literal<'_>, ctx
         internal::LiteralValue::Boolean(b) => w.bool(*b),
         internal::LiteralValue::Null => w.null(),
     }
-    w.raw(",\"raw\":");
-    w.string(lit.span.extract(ctx.source));
+    let raw = lit.span.extract(ctx.source);
+    if let internal::LiteralValue::String(_) = lit.value {
+        w.raw(",\"raw\":");
+        w.string(raw);
+    } else {
+        // A numeric, BigInt, boolean or `null` token is escape-free by grammar —
+        // digits, letters, `.`, `_`, and a sign only inside an exponent — so its
+        // raw text takes the name field's unscanned write.
+        w.string_escape_free_led(b",\"raw\":", raw.as_bytes());
+    }
     if let Some(decimal) = bigint {
         w.raw(",\"bigint\":");
         w.string(&decimal);
@@ -1069,8 +1110,8 @@ pub(super) fn write_identifier_parts_with_character(
         ctx,
     );
     attach_open("Identifier", span, ctx);
-    w.raw("{\"type\":\"Identifier\",\"name\":");
-    write_name(w, name, span.start, ctx);
+    w.raw("{\"type\":\"Identifier\"");
+    write_name_field(w, name, span.start, ctx);
     // `name` is escape-sensitive and precedes the positions, so it can't join
     // the staged run — the run opens after it and covers the positions alone.
     w.stage_begin();
@@ -1090,8 +1131,7 @@ fn write_identifier_fields(
     decorators: Option<&[internal::Decorator<'_>]>,
     ctx: &Ctx<'_>,
 ) {
-    w.raw(",\"name\":");
-    write_name(w, name, span.start, ctx);
+    write_name_field(w, name, span.start, ctx);
     write_identifier_tail(w, span, optional, type_annotation, decorators, ctx);
 }
 
@@ -1121,7 +1161,13 @@ fn write_identifier_tail(
 
 /// Emits a plain `Identifier` node: no optional flag, no type annotation, no
 /// decorators — regardless of what the binding carries.
-#[inline]
+///
+/// `inline(never)` to keep it out of the recursive writers' frames: once the name
+/// write went out of line this body became small enough to inline, and each inlined
+/// copy parked an `IdentName` in its caller's frame — `write_statement`'s grew from
+/// 88 to 168 bytes, a frame paid at every level of statement nesting. Kept out of
+/// line it costs ~0.03% of the parse→JSON path's instructions on TypeScript.
+#[inline(never)]
 pub(super) fn write_identifier_plain(
     w: &mut JsonWriter,
     id: &internal::Identifier<'_>,

@@ -14,7 +14,7 @@ use super::patterns::{
 use super::types::{write_type, write_type_parameter_instantiation};
 use super::{
     Ctx, JsonWriter, close_node, node_header, write_array, write_bare_node, write_identifier_parts,
-    write_identifier_plain, write_literal, write_name, write_type_annotation_field,
+    write_identifier_plain, write_literal, write_name_field, write_type_annotation_field,
     write_type_arguments_field,
 };
 use tsv_lang::Span;
@@ -142,10 +142,9 @@ pub(super) fn write_expression_inner(
         }
         internal::ExpressionKind::PrivateIdentifier(pid) => {
             node_header(w, "PrivateIdentifier", expr.span, ctx);
-            w.raw(",\"name\":");
             // The name excludes the leading `#` (the public shape): the
             // trailing `raw_len` bytes of the span.
-            write_name(w, pid.name, expr.span.end - pid.name.raw_len as u32, ctx);
+            write_name_field(w, pid.name, expr.span.end - pid.name.raw_len as u32, ctx);
             close_node(w, "PrivateIdentifier", expr.span, ctx);
         }
         internal::ExpressionKind::ObjectExpression(obj) => {

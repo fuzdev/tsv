@@ -7,7 +7,7 @@ use super::patterns::write_template_element;
 use super::{
     Ctx, JsonWriter, close_node, node_header, write_array, write_bare_node,
     write_function_flags_fields, write_identifier_parts, write_identifier_plain, write_literal,
-    write_name, write_or_null, write_type_annotation_field, write_type_arguments_field,
+    write_name_field, write_or_null, write_type_annotation_field, write_type_arguments_field,
     write_type_parameters_field,
 };
 use internal::TSKeywordKind;
@@ -165,8 +165,7 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &internal::TSType<'_>, ctx
             // struct span (which covers `K in C`).
             w.raw(",\"typeParameter\":");
             node_header(w, "TSTypeParameter", m.type_parameter.span, ctx);
-            w.raw(",\"name\":");
-            write_name(w, m.type_parameter.name, m.type_parameter.span.start, ctx);
+            write_name_field(w, m.type_parameter.name, m.type_parameter.span.start, ctx);
             w.raw(",\"constraint\":");
             write_type(w, m.type_parameter.constraint, ctx);
             close_node(w, "TSTypeParameter", m.type_parameter.span, ctx);
