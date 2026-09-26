@@ -8,7 +8,7 @@ use crate::printer::chain::tag_paren_leading_start;
 use crate::printer::comments::CommentSpacing;
 use crate::printer::ignore::FrozenOperandPair;
 use crate::printer::needs_parens::strip_non_null_wrappers;
-use crate::printer::{CommentVec, ParenContext, Printer};
+use crate::printer::{CommentVec, ParenContext, Printer, SecondTypeArgs};
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::TAB_WIDTH;
@@ -466,7 +466,14 @@ impl<'a> Printer<'a> {
                 || {
                     if let Some(sealed) = self.build_sealed_non_null_paren_doc(tagged.tag) {
                         sealed
-                    } else if self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag) {
+                    } else if self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag)
+                        || tagged.type_arguments.as_ref().is_some_and(|list| {
+                            self.instantiation_keeps_pair(
+                                tagged.tag,
+                                SecondTypeArgs::Template(list),
+                            )
+                        })
+                    {
                         d.parens(self.build_expression_doc(tagged.tag))
                     } else {
                         self.build_expression_doc(tagged.tag)

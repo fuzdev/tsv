@@ -42,7 +42,7 @@ pub(crate) use arg_comments::{
 pub(in crate::printer) use import_expr::{ImportOptionsArg, build_import_args_comment_layout};
 
 use super::chain::{self, ChainCall, call_callee_paren_leading_start};
-use super::{ArrowChainContext, ParenContext, Printer, is_curried_arrow_chain};
+use super::{ArrowChainContext, ParenContext, Printer, SecondTypeArgs, is_curried_arrow_chain};
 use crate::ast::internal;
 use arg_comments::{any_arg_empty_line, any_comment_forces_expansion, last_arg_has_comments};
 use arg_predicates::is_block_function;
@@ -487,7 +487,9 @@ pub(super) enum CalleeParens<'a> {
 
 impl<'a> CalleeParens<'a> {
     /// The pair `callee` prints in `context`, or `None` where it needs no pair. Ask before
-    /// building the body.
+    /// building the body. `second_type_args` is the call's or `new`'s own type argument
+    /// list with its arguments, when it has one: an instantiation callee straight ahead of
+    /// it keeps the pair [`Printer::instantiation_keeps_pair`] states.
     ///
     /// The `needs_parens` gate lives INSIDE the constructor so the type cannot exist for a
     /// callee that prints no pair — every one of its shapes is a claim about a pair, and a
@@ -496,8 +498,12 @@ impl<'a> CalleeParens<'a> {
         printer: &Printer<'_>,
         callee: &'a internal::Expression<'a>,
         context: ParenContext,
+        second_type_args: Option<SecondTypeArgs<'_>>,
     ) -> Option<Self> {
-        if !printer.needs_parens(callee, context) {
+        if !printer.needs_parens(callee, context)
+            && !second_type_args
+                .is_some_and(|follow| printer.instantiation_keeps_pair(callee, follow))
+        {
             return None;
         }
         Some(match &callee.kind {
