@@ -27,7 +27,7 @@ For a whole-construct freeze the `prettier-ignore` family matches prettier (both
 - the boundary **after** a frozen declaration tag, a space and a line break converged on the break — ◆stable_quirk ◆design_choice — [declaration_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/declaration_glued_before_prettier_divergence/)
 - a directive glued to the text in front of a frozen **block** element, kept glued — ◆design_choice — [block_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/block_glued_before_prettier_divergence/)
 - a frozen nested `<script>` / `<style>` glued to content on both sides, kept glued on both sides, where prettier never converges — ◆content_preservation — [nested_script_style_glued](../tests/fixtures/svelte/syntax/prettier_ignore/nested_script_style_glued_prettier_divergence/)
-- the boundary **after** a frozen nested `<script>` / `<style>` glued to the content before it, a line break, where prettier never converges — ◆content_preservation — [nested_script_style_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/nested_script_style_glued_before_prettier_divergence/)
+- the boundary **after** a frozen nested `<script>` / `<style>` glued to the content before it, a line break: before text, where prettier never converges — ◆content_preservation — [nested_script_style_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/nested_script_style_glued_before_prettier_divergence/); before an inline element, a component or an expression tag, where prettier breaks the frozen body open and keeps a space before an inline element as a second stable form, converged on the break — ◆content_preservation ◆stable_quirk — [nested_script_style_glued_before_tag_follower](../tests/fixtures/svelte/syntax/prettier_ignore/nested_script_style_glued_before_tag_follower_prettier_divergence/)
 - a directive followed by **text** inside an element body in `<pre>` freezes that text, where prettier reaches past it to the next non-text node — ◆design_choice — [pre_text_follower](../tests/fixtures/svelte/syntax/prettier_ignore/pre_text_follower_prettier_divergence/)
 - a frozen node whose bytes span lines, inside an inline element or a component: the element lays out block-style, where prettier also keeps a dangled form for a glued authoring — ◆stable_quirk ◆design_choice — [multiline_inline_parent_long](../tests/fixtures/svelte/syntax/prettier_ignore/multiline_inline_parent_long_prettier_divergence/)
 - a frozen node whose bytes span lines, inside a block body: the block lays out block-style, where prettier keeps a glued body hugged — ◆stable_quirk ◆design_choice — [multiline_block_body](../tests/fixtures/svelte/syntax/prettier_ignore/multiline_block_body_prettier_divergence/)
@@ -152,8 +152,13 @@ on the break ([declaration_glued_before](../tests/fixtures/svelte/syntax/prettie
 ◆stable_quirk. So does a frozen nested `<script>` / `<style>` glued to the text before it: the
 compiler keeps it, but it renders no box, so the content on its two sides meets across the
 whitespace after it just the same, and deleting that whitespace would weld the two
-(`…</script>text2` renders `text1text2`). Prettier breaks the frozen body open and never converges
-([nested_script_style_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/nested_script_style_glued_before_prettier_divergence/)).
+(`…</script>text2` renders `text1text2`). Prettier breaks the frozen body open; before text it then
+never converges
+([nested_script_style_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/nested_script_style_glued_before_prettier_divergence/)),
+and before an inline element, a component or an expression tag it converges, keeping a space before
+an inline element as a second stable form that tsv converges on the break — ◆stable_quirk. tsv
+keeps prettier's output as written: the bytes prettier moved into the body are frozen bytes to it
+([nested_script_style_glued_before_tag_follower](../tests/fixtures/svelte/syntax/prettier_ignore/nested_script_style_glued_before_tag_follower_prettier_divergence/)).
 
 **A frozen node whose bytes span lines breaks the fragment holding it.** The frozen bytes print
 as written, and a line break among them is a line break in the output, so the fragment holding the

@@ -1,0 +1,534 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 874,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 379,
+				"data": "\n\tA frozen nested `<script>` / `<style>` glued to the text before it, with whitespace after it\n\tand an element, a component or an expression tag following, takes the line break after it that\n\tthe same element takes unfrozen. It renders no box, so its neighbours meet across that\n\twhitespace and render one space either way; the directive glued in front of it stays glued.\n"
+			},
+			{
+				"type": "Text",
+				"start": 379,
+				"end": 381,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 381,
+				"end": 413,
+				"data": " an inline element after "
+			},
+			{
+				"type": "Text",
+				"start": 413,
+				"end": 414,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 414,
+				"end": 503,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 1,
+						"character": 415
+					},
+					"end": {
+						"line": 9,
+						"column": 4,
+						"character": 418
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 419,
+							"end": 426,
+							"raw": "\n\ttext5",
+							"data": "\n\ttext5"
+						},
+						{
+							"type": "Comment",
+							"start": 426,
+							"end": 450,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "RegularElement",
+							"start": 450,
+							"end": 480,
+							"name": "script",
+							"name_loc": {
+								"start": {
+									"line": 10,
+									"column": 31,
+									"character": 451
+								},
+								"end": {
+									"line": 10,
+									"column": 37,
+									"character": 457
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 458,
+										"end": 471,
+										"type": "Text",
+										"data": "let  b  =  2;",
+										"raw": "let  b  =  2;"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 480,
+							"end": 482,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 482,
+							"end": 496,
+							"name": "b",
+							"name_loc": {
+								"start": {
+									"line": 11,
+									"column": 2,
+									"character": 483
+								},
+								"end": {
+									"line": 11,
+									"column": 3,
+									"character": 484
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 485,
+										"end": 492,
+										"raw": "inline1",
+										"data": "inline1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 496,
+							"end": 497,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 503,
+				"end": 505,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 505,
+				"end": 546,
+				"data": " a style, an inline element after "
+			},
+			{
+				"type": "Text",
+				"start": 546,
+				"end": 547,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 547,
+				"end": 645,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 15,
+						"column": 1,
+						"character": 548
+					},
+					"end": {
+						"line": 15,
+						"column": 4,
+						"character": 551
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 552,
+							"end": 559,
+							"raw": "\n\ttext6",
+							"data": "\n\ttext6"
+						},
+						{
+							"type": "Comment",
+							"start": 559,
+							"end": 583,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "RegularElement",
+							"start": 583,
+							"end": 622,
+							"name": "style",
+							"name_loc": {
+								"start": {
+									"line": 16,
+									"column": 31,
+									"character": 584
+								},
+								"end": {
+									"line": 16,
+									"column": 36,
+									"character": 589
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 590,
+										"end": 614,
+										"type": "Text",
+										"data": "div  {  color:  blue;  }",
+										"raw": "div  {  color:  blue;  }"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 622,
+							"end": 624,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 624,
+							"end": 638,
+							"name": "b",
+							"name_loc": {
+								"start": {
+									"line": 17,
+									"column": 2,
+									"character": 625
+								},
+								"end": {
+									"line": 17,
+									"column": 3,
+									"character": 626
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 627,
+										"end": 634,
+										"raw": "inline2",
+										"data": "inline2"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 638,
+							"end": 639,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 645,
+				"end": 647,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 647,
+				"end": 673,
+				"data": " a component after "
+			},
+			{
+				"type": "Text",
+				"start": 673,
+				"end": 674,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 674,
+				"end": 757,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 21,
+						"column": 1,
+						"character": 675
+					},
+					"end": {
+						"line": 21,
+						"column": 4,
+						"character": 678
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 679,
+							"end": 686,
+							"raw": "\n\ttext7",
+							"data": "\n\ttext7"
+						},
+						{
+							"type": "Comment",
+							"start": 686,
+							"end": 710,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "RegularElement",
+							"start": 710,
+							"end": 740,
+							"name": "script",
+							"name_loc": {
+								"start": {
+									"line": 22,
+									"column": 31,
+									"character": 711
+								},
+								"end": {
+									"line": 22,
+									"column": 37,
+									"character": 717
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 718,
+										"end": 731,
+										"type": "Text",
+										"data": "let  c  =  3;",
+										"raw": "let  c  =  3;"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 740,
+							"end": 742,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 742,
+							"end": 750,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 23,
+									"column": 2,
+									"character": 743
+								},
+								"end": {
+									"line": 23,
+									"column": 6,
+									"character": 747
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 750,
+							"end": 751,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 757,
+				"end": 759,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 759,
+				"end": 791,
+				"data": " an expression tag after "
+			},
+			{
+				"type": "Text",
+				"start": 791,
+				"end": 792,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 792,
+				"end": 873,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 27,
+						"column": 1,
+						"character": 793
+					},
+					"end": {
+						"line": 27,
+						"column": 4,
+						"character": 796
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 797,
+							"end": 804,
+							"raw": "\n\ttext8",
+							"data": "\n\ttext8"
+						},
+						{
+							"type": "Comment",
+							"start": 804,
+							"end": 828,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "RegularElement",
+							"start": 828,
+							"end": 858,
+							"name": "script",
+							"name_loc": {
+								"start": {
+									"line": 28,
+									"column": 31,
+									"character": 829
+								},
+								"end": {
+									"line": 28,
+									"column": 37,
+									"character": 835
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 836,
+										"end": 849,
+										"type": "Text",
+										"data": "let  d  =  4;",
+										"raw": "let  d  =  4;"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 858,
+							"end": 860,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 860,
+							"end": 866,
+							"expression": {
+								"type": "Identifier",
+								"start": 861,
+								"end": 865,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 6
+									}
+								},
+								"name": "expr"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 866,
+							"end": 867,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

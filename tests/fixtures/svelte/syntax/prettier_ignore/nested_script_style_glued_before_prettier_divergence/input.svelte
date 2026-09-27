@@ -17,30 +17,6 @@
 	text4
 </div>
 
-<!-- an inline element after -->
-<div>
-	text5<!-- prettier-ignore --><script>let  b  =  2;</script>
-	<b>inline1</b>
-</div>
-
-<!-- a style, an inline element after -->
-<div>
-	text6<!-- prettier-ignore --><style>div  {  color:  blue;  }</style>
-	<b>inline2</b>
-</div>
-
-<!-- a component after -->
-<div>
-	text7<!-- prettier-ignore --><script>let  c  =  3;</script>
-	<Comp />
-</div>
-
-<!-- an expression tag after -->
-<div>
-	text8<!-- prettier-ignore --><script>let  d  =  4;</script>
-	{expr}
-</div>
-
 <!-- a block body -->
 {#if cond}
 	text9<!-- prettier-ignore --><script>let  e  =  5;</script>
