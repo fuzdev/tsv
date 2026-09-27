@@ -14,6 +14,7 @@ use tsv_ts::ast::internal::{Expression, ExpressionKind};
 use super::element_doc::{
     BoundaryMode, ElementContext, ElementKind, ElementLayout, ElementParts, MultilineCause,
 };
+use super::helpers::control_flow_sections;
 
 /// Whether each edge of an element's content is newline-authored.
 ///
@@ -56,12 +57,12 @@ struct MultilineInputs {
     is_empty: bool,
     /// Whether each content boundary is newline-authored
     boundary: BoundaryBreaks,
-    /// Whether block-flow children force this element multiline —
-    /// [`Printer::block_flow_forces_multiline`] gated on the element having any.
+    /// Whether block-flow children force this element multiline, and why —
+    /// [`Printer::block_flow_cause`] gated on the element having any.
     /// Cached by `analyze_element` rather than asked here: it is a non-trivial
     /// traversal, and the caller holds the `has_block_flow_children` gate that
     /// decides whether to run it at all.
-    block_flow_multiline: bool,
+    block_flow: MultilineCause,
     /// Whether all content children are text nodes
     only_text_content: bool,
 }
@@ -494,8 +495,11 @@ impl<'a> Printer<'a> {
         // traversal) and passed in, so the `any()` gate deciding whether to run it at all sits
         // beside it rather than inside `compute_multiline_cause`.
         let has_block_flow_children = nodes.iter().any(super::helpers::is_control_flow_block);
-        let block_flow_multiline =
-            has_block_flow_children && self.block_flow_forces_multiline(nodes);
+        let block_flow = if has_block_flow_children {
+            self.block_flow_cause(nodes)
+        } else {
+            MultilineCause::None
+        };
 
         // Any attribute doc that will_break (forces attr group break)
         let has_multiline_attr = attr_docs.iter().any(|&doc| self.d().will_break(doc));
@@ -518,7 +522,7 @@ impl<'a> Printer<'a> {
                     kind,
                     is_empty,
                     boundary,
-                    block_flow_multiline,
+                    block_flow,
                     only_text_content,
                 },
             )
@@ -548,7 +552,7 @@ impl<'a> Printer<'a> {
             kind,
             is_empty,
             boundary,
-            block_flow_multiline,
+            block_flow,
             only_text_content,
         } = inputs;
 
@@ -610,9 +614,11 @@ impl<'a> Printer<'a> {
             return MultilineCause::Structural;
         }
 
-        // Block flow forces multiline
-        if block_flow_multiline {
-            return MultilineCause::Structural;
+        // Block flow forces multiline — by structure (the last structural trigger), or by the
+        // sections' authored line breaks (the first authoring-derived one). One traversal yields
+        // either answer, so it sits at the seam between the two groups.
+        if block_flow.is_multiline() {
+            return block_flow;
         }
 
         // The authoring-derived trigger, skipped for text-only content — whitespace newlines
@@ -626,38 +632,61 @@ impl<'a> Printer<'a> {
         MultilineCause::None
     }
 
-    /// Check if block flow children force parent to multiline
-    fn block_flow_forces_multiline(&self, nodes: &[FragmentNode<'_>]) -> bool {
-        // Check if any block has non-inline content
-        let has_non_inline_block = nodes.iter().any(|n| match n {
-            FragmentNode::IfBlock(b) => !self.is_inline_fragment(&b.consequent),
-            FragmentNode::EachBlock(b) => !self.is_inline_fragment(&b.body),
-            FragmentNode::AwaitBlock(b) => {
-                b.pending
-                    .as_ref()
-                    .is_some_and(|f| !self.is_inline_fragment(f))
-                    || b.then.as_ref().is_some_and(|f| !self.is_inline_fragment(f))
-                    || b.catch
-                        .as_ref()
-                        .is_some_and(|f| !self.is_inline_fragment(f))
-            }
-            FragmentNode::KeyBlock(b) => !self.is_inline_fragment(&b.fragment),
-            FragmentNode::SnippetBlock(b) => !self.is_inline_fragment(&b.body),
-            _ => false,
+    /// Whether the element's control-flow children make it multiline, and why — the block-flow
+    /// half of [`MultilineCause`], answered the way each block reads its own sections.
+    ///
+    /// - [`MultilineCause::Structural`] — some section is forced open by its **content**
+    ///   ([`Self::block_sections_force_break`]): the block breaks its body however that body is
+    ///   authored, so reformatting cannot change the answer.
+    /// - [`MultilineCause::SourceBreaks`] — otherwise, some section's boundary is
+    ///   newline-authored ([`Self::is_inline_fragment`]). That is the block's own authoring, and
+    ///   the block-style output of every other cause prints exactly those section breaks — an
+    ///   `{#await}` glued to its section whose content breaks for width, or inside a child
+    ///   element, prints them on the first pass — so it is the authoring-derived cause.
+    ///
+    /// ⚠️ The split is what the sibling-`>` dangle reads ([`PreparedElement::gt_dangle_boundary`]):
+    /// a Structural element keeps its `>`, a SourceBreaks one sheds it like its width-broken
+    /// twin. Answering Structural from the section breaks would key the role on a signal the
+    /// dangle's own output writes: a one-line `<b>{#await p}…{/await}</b>{#if c}…` would shed its
+    /// `>` on the first pass, and the second pass would read the printed section breaks and take
+    /// it back. Whether the element is multiline at all is the same either way.
+    /// See conformance_prettier_svelte.md §Svelte: Blocks (Sibling `>` dangle).
+    ///
+    /// [`PreparedElement::gt_dangle_boundary`]: super::element_doc::PreparedElement::gt_dangle_boundary
+    fn block_flow_cause(&self, nodes: &[FragmentNode<'_>]) -> MultilineCause {
+        if self.block_sections_force_break(nodes) {
+            return MultilineCause::Structural;
+        }
+        let authored_section_break = nodes.iter().any(|n| {
+            control_flow_sections(n)
+                .into_iter()
+                .flatten()
+                .any(|f| !self.is_inline_fragment(f))
         });
+        if authored_section_break {
+            MultilineCause::SourceBreaks
+        } else {
+            MultilineCause::None
+        }
+    }
 
-        // Check if there's whitespace around EXPANDING block flow children (if/each/key)
-        // Await and snippet blocks don't force multiline when surrounded by whitespace
-        let has_expanding_blocks = nodes
-            .iter()
-            .any(super::helpers::is_expanding_control_flow_block);
-        let source = self.source;
-        let has_ws_around_blocks = has_expanding_blocks
-            && nodes.iter().any(|n| {
-                matches!(n, FragmentNode::Text(t) if t.is_collapsible_ws_only && !t.raw(source).is_empty())
-            });
-
-        has_non_inline_block || has_ws_around_blocks
+    /// Whether a section of a control-flow block in `nodes` is forced open by its own content —
+    /// the block builder's content test ([`Self::fragment_should_force_break_content`], which its
+    /// `fragment_inline_authored` asks beside the boundary spelling), so the element and the
+    /// block read one section the same way.
+    ///
+    /// The block is transparent all the way down its own sections: a section holding a block is
+    /// read through to that block's sections, recursively, since a forced body there forces the
+    /// section around it open too. The walk stops at an element — [`control_flow_sections`] is
+    /// empty for one — whose content is that element's own structure, answered by its own
+    /// analysis.
+    fn block_sections_force_break(&self, nodes: &[FragmentNode<'_>]) -> bool {
+        nodes.iter().any(|n| {
+            control_flow_sections(n).into_iter().flatten().any(|f| {
+                self.fragment_should_force_break_content(f.nodes)
+                    || self.block_sections_force_break(f.nodes)
+            })
+        })
     }
 
     /// Compute element layout from analyzed context

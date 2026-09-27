@@ -71,8 +71,9 @@ impl SiblingPosition {
 pub(super) struct TextChildContext {
     /// Whether the fragment is built on the convergence path (the multiline element arm, the only
     /// caller that routes blocks and control-flow blocks through their own dispatch) — and, when
-    /// it is, *why* the layout went multiline. The cause is read by the sibling-newline flow rule
-    /// alone; every other site asks only [`MultilineCause::is_multiline`].
+    /// it is, *why* the layout went multiline. The fragment builders ask only
+    /// [`MultilineCause::is_multiline`] of it; the cause itself is read off the element's
+    /// `ElementContext` by the sibling-`>` dangle's eligibility test, not here.
     pub(super) cause: MultilineCause,
     /// Whether this node's inline run holds prose — [`Printer::run_is_prose`] over the run's
     /// [`Printer::prose_words`] maximum — the prose gate of the sibling-newline flow rule at all

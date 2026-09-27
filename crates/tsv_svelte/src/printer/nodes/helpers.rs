@@ -4,7 +4,7 @@
 // builders shared by the block and tag builders, and source position tracking
 // used in inline run grouping and multiline formatting decisions.
 
-use crate::ast::internal::{EachBlock, EachKey, FragmentNode};
+use crate::ast::internal::{EachBlock, EachKey, Fragment, FragmentNode};
 use crate::printer::{CommentRun, HeadExpr, Printer};
 use smallvec::{SmallVec, smallvec};
 use std::borrow::Borrow;
@@ -133,6 +133,27 @@ pub(super) fn has_control_flow_after_sibling(nodes: &[FragmentNode<'_>]) -> bool
     false
 }
 
+/// The section fragments of a control-flow block, in source order — `{#if}`'s consequent and
+/// alternate, `{#each}`'s body and fallback, `{#await}`'s pending / `{:then}` / `{:catch}`
+/// sections, `{#key}`'s body and `{#snippet}`'s body. All `None` for any other node.
+///
+/// The one enumeration of "the fragments a block holds", for every reader that looks through a
+/// block at what it lays out: [`has_expanding_block_in_await`], and the element analysis's
+/// block-flow cause (`Printer::block_flow_cause`), which reads the sections the way the block
+/// builder does.
+pub(super) fn control_flow_sections<'n, 'a>(
+    node: &'n FragmentNode<'a>,
+) -> [Option<&'n Fragment<'a>>; 3] {
+    match node {
+        FragmentNode::IfBlock(b) => [Some(&b.consequent), b.alternate.as_ref(), None],
+        FragmentNode::EachBlock(b) => [Some(&b.body), b.fallback.as_ref(), None],
+        FragmentNode::AwaitBlock(b) => [b.pending.as_ref(), b.then.as_ref(), b.catch.as_ref()],
+        FragmentNode::KeyBlock(b) => [Some(&b.fragment), None, None],
+        FragmentNode::SnippetBlock(b) => [Some(&b.body), None, None],
+        _ => [None, None, None],
+    }
+}
+
 /// Check if any await block contains expanding blocks (if/each/key) in its content.
 ///
 /// Prettier treats expanding blocks inside await blocks as if they were directly
@@ -145,20 +166,11 @@ pub(super) fn has_control_flow_after_sibling(nodes: &[FragmentNode<'_>]) -> bool
 /// are also detected.
 fn has_expanding_block_in_await(nodes: &[FragmentNode<'_>]) -> bool {
     nodes.iter().any(|n| {
-        if let FragmentNode::AwaitBlock(block) = n {
-            // Check all branches of the await block for expanding blocks
-            // or recursively for nested awaits containing expanding blocks
-            let check_fragment = |f: &crate::ast::internal::Fragment<'_>| {
+        matches!(n, FragmentNode::AwaitBlock(_))
+            && control_flow_sections(n).into_iter().flatten().any(|f| {
                 f.nodes.iter().any(is_expanding_control_flow_block)
                     || has_expanding_block_in_await(f.nodes)
-            };
-            let has_in_pending = block.pending.as_ref().is_some_and(check_fragment);
-            let has_in_then = block.then.as_ref().is_some_and(check_fragment);
-            let has_in_catch = block.catch.as_ref().is_some_and(check_fragment);
-            has_in_pending || has_in_then || has_in_catch
-        } else {
-            false
-        }
+            })
     })
 }
 

@@ -310,11 +310,13 @@ pub(super) enum MultilineCause {
     /// Not multiline: the content collapses to one line, and width alone decides the layout.
     None,
     /// A property of the content itself forces it, however the source was authored — block
-    /// children, mixed block/inline content, an expanding control-flow block, block flow, or a
-    /// whitespace-collapsing container. Reformatting cannot change the answer.
+    /// children, mixed block/inline content, an expanding control-flow block, a control-flow
+    /// block whose section content forces its body open, or a whitespace-collapsing container.
+    /// Reformatting cannot change the answer.
     Structural,
-    /// The content's own authored newlines forced it (`has_source_breaks_in_content`) — the
-    /// Tier-2 element-expansion signal. Reformatting the content can add or remove those
+    /// The content's own authored newlines forced it (`has_source_breaks_in_content`, or a
+    /// control-flow child's newline-authored section boundary — `Printer::block_flow_cause`) —
+    /// the Tier-2 element-expansion signal. Reformatting the content can add or remove those
     /// newlines, so this decision is not stable across passes.
     SourceBreaks,
 }
@@ -915,10 +917,11 @@ impl<'a> Printer<'a> {
     /// inter-sibling whitespace trimmed (render-free — the compiler removes it). Its multiline
     /// decision is forced (see `analyze_element`), so `boundary` is always `Hard` there.
     ///
-    /// The multiline arm carries the *cause* (see [`MultilineCause`]), not just the fact: `Hard`
-    /// derived from the content's own authored newlines is a layout the next pass can re-decide,
-    /// which the sibling-newline flow rule has to know. `boundary` stays the source of the
-    /// multiline-ness itself, so a `Soft` boundary builds the inline shape.
+    /// The multiline arm passes the *cause* (see [`MultilineCause`]) down, though the fragment
+    /// builders ask only whether it is multiline; the cause's one reader is the sibling-`>`
+    /// dangle's eligibility test ([`PreparedElement::gt_dangle_boundary`]), off `ctx`. `boundary`
+    /// stays the source of the multiline-ness itself, so a `Soft` boundary builds the inline
+    /// shape.
     fn build_content_children_doc(
         &self,
         parts: &ElementParts<'_>,
