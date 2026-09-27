@@ -483,6 +483,25 @@ impl<'a> Printer<'a> {
     /// Text nodes preserve their exact whitespace (significant in all of them).
     /// Expressions, blocks, and other dynamic content are formatted normally
     /// (their internal whitespace is not significant).
+    ///
+    /// A `format-ignore` / `prettier-ignore` directive freezes the next node here as it does
+    /// in flow content — the same recognition ([`Printer::is_format_ignore_comment`]) and the
+    /// same reach: the next node that is not whitespace-only text, a text included.
+    /// Everything around the frozen node is already printed as authored here, so the freeze
+    /// has no gap or boundary of its own to answer: it only swaps the node's formatted doc for
+    /// its source bytes, which are also what its width is measured by. A frozen **text**
+    /// keeps the doc an unfrozen one gets, since its bytes are verbatim either way.
+    ///
+    /// ⚠️ The slice is an ordinary source span
+    /// ([`Printer::source_span_covering_comments_doc`]), **not** the flow freeze's
+    /// layout-opaque one ([`Printer::verbatim_source_doc`]). Its line breaks are rendered
+    /// content here, like a `<pre>` text's, so they break the groups around them exactly as
+    /// the unfrozen node's own content would. An opaque slice would keep an enclosing inline
+    /// element's tags whole around a frozen multi-line node where the same node unfrozen, or
+    /// frozen as text, opens them — one printed form, two layouts.
+    ///
+    /// Range markers stay ordinary comments here, as inside any element: a range takes effect
+    /// only at the top level of the template.
     pub(super) fn build_whitespace_sensitive_content_doc(
         &self,
         nodes: &[FragmentNode<'_>],
@@ -494,11 +513,24 @@ impl<'a> Printer<'a> {
         // await/key/snippet, which fall through to the normal (dangling) builders.
         let prev_dangle = self.set_block_dangle_allowed(false);
         let d = self.d();
-        let body = d.concat_iter(
-            nodes
-                .iter()
-                .map(|node| self.build_whitespace_sensitive_node_doc(node)),
-        );
+        let mut freeze_armed = false;
+        let body = d.concat_iter(nodes.iter().map(|node| {
+            if freeze_armed {
+                if let FragmentNode::Text(text) = node {
+                    // A text spends the freeze and prints as it would unfrozen; a
+                    // whitespace-only one is skipped, and the freeze carries past it.
+                    freeze_armed = text.is_collapsible_ws_only;
+                } else {
+                    // Any other node prints its source bytes. A directive frozen this way is
+                    // the node the freeze spends, so it arms nothing.
+                    freeze_armed = false;
+                    return self.source_span_covering_comments_doc(node.span());
+                }
+            } else if Self::is_format_ignore_comment(node, self.source) {
+                freeze_armed = true;
+            }
+            self.build_whitespace_sensitive_node_doc(node)
+        }));
         self.set_block_dangle_allowed(prev_dangle);
         // One body-indent level per container (element body, block body), matching
         // prettier's uniform "each container adds a level" model. Preserved text has

@@ -15,6 +15,7 @@ For a whole-construct freeze the `prettier-ignore` family matches prettier (both
 - `format-ignore` nested CSS — ◆design_choice — [css_nested](../tests/fixtures/svelte/syntax/format_ignore/css_nested_prettier_divergence/)
 - `format-ignore` at-rule-body declaration — ◆design_choice — [css_atrule_decl](../tests/fixtures/svelte/syntax/format_ignore/css_atrule_decl_prettier_divergence/)
 - `format-ignore-start` / `-end` range — ◆design_choice — [range](../tests/fixtures/svelte/syntax/format_ignore/range_prettier_divergence/)
+- `format-ignore` inside `<pre>` — ◆design_choice — [pre_content](../tests/fixtures/svelte/syntax/format_ignore/pre_content_prettier_divergence/)
 - `format-ignore` standalone `.ts` — ◆design_choice — [ts_standalone](../tests/fixtures/typescript/syntax/comments/format_ignore_prettier_divergence/)
 - `format-ignore` standalone `.css` — ◆design_choice — [css_standalone](../tests/fixtures/css/syntax/comments/format_ignore_prettier_divergence/)
 - comment beside a hoisted section **inside** a range — ◆design_choice — [range_interior_comment](../tests/fixtures/svelte/syntax/prettier_ignore/range_interior_comment_prettier_divergence/)
@@ -26,6 +27,27 @@ For a whole-construct freeze the `prettier-ignore` family matches prettier (both
 - a directive glued to the text in front of a frozen **block** element, kept glued — ◆design_choice — [block_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/block_glued_before_prettier_divergence/)
 - a frozen nested `<script>` / `<style>` glued to content on both sides, kept glued on both sides, where prettier never converges — ◆content_preservation — [nested_script_style_glued](../tests/fixtures/svelte/syntax/prettier_ignore/nested_script_style_glued_prettier_divergence/)
 - the boundary **after** a frozen nested `<script>` / `<style>` glued to the content before it, a line break, where prettier never converges — ◆content_preservation — [nested_script_style_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/nested_script_style_glued_before_prettier_divergence/)
+- a directive followed by **text** inside an element body in `<pre>` freezes that text, where prettier reaches past it to the next non-text node — ◆design_choice — [pre_text_follower](../tests/fixtures/svelte/syntax/prettier_ignore/pre_text_follower_prettier_divergence/)
+
+**Inside `<pre>` the directive keeps its reach.** A template directive freezes the next node
+inside a whitespace-significant element exactly as it does outside one — directly in the `<pre>`,
+inside an element, component, special element or block section there, at any depth — and prettier
+agrees ([pre_node_kinds](../tests/fixtures/svelte/syntax/prettier_ignore/pre_node_kinds/),
+[pre_hosts](../tests/fixtures/svelte/syntax/prettier_ignore/pre_hosts/),
+[pre_special_element_hosts](../tests/fixtures/svelte/syntax/prettier_ignore/pre_special_element_hosts/)).
+Every byte around the frozen node is already the author's there, so the freeze reformats nothing but
+the node's own tags and `{…}` heads. The one place the two formatters part is prettier's reach
+past a text: it copies the text children of an element inside `<pre>` straight from the source
+rather than printing them as nodes, so a text after the directive never takes the freeze and it
+falls to the next non-text node — while in a block section there, and everywhere outside `<pre>`,
+the text takes it. tsv gives the directive the one reach, the next node, a text that is not
+whitespace-only included (both formatters skip a whitespace-only one). The range markers
+`prettier-ignore-start` / `-end` and their `format-ignore` spellings stay ordinary comments inside
+`<pre>`, as inside any element, in both formatters — a range only takes effect at the top level of
+the template ([pre_node_kinds](../tests/fixtures/svelte/syntax/prettier_ignore/pre_node_kinds/)).
+A frozen node's width is its source text, so the line it sits on breaks where the node's own bytes
+put it past the print width, and a frozen node wider than the print width by itself is never
+broken ([pre_long](../tests/fixtures/svelte/syntax/prettier_ignore/pre_long/)).
 
 **The gap in front of a frozen node is the author's, and it is printed once.** A directive and
 the node it freezes are separated by whatever the author wrote there, and that gap reaches the

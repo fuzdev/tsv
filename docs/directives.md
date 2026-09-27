@@ -92,6 +92,12 @@ it survives as the one space it renders as. The gap in front of a frozen node is
 the author's: the formatter prints it once, never invents one, and never eats
 one.
 
+Inside a `<pre>` — directly, or nested in any element, component, special element or block
+there — a directive freezes the next node the same way, but no whitespace around the node
+moves: the whitespace there is rendered text, printed exactly as written with or without a
+freeze, so the directive stays wherever the author put it. As everywhere, a whitespace-only run
+between the directive and the node is skipped, and a text after it is the node it freezes.
+
 A template directive directly above a `<script>` or `<style>` freezes that section alone,
 wherever the canonical section order prints it: the section below keeps its source text, and
 the next section is formatted as usual, whichever order the sections were written in. Above
