@@ -447,14 +447,19 @@ pub(crate) struct Printer<'a> {
     /// correctly).
     block_dangle_allowed: Cell<bool>,
     /// How many fragments' children are being built right now — the root fragment counts
-    /// one, each container body inside it one more. Every container's body is indented one
-    /// level past the container (the uniform "each container adds a level" model — element
-    /// and component bodies, every block section, special elements), so while a fragment's
-    /// children are being built this is the indent level their bodies render at, which is
-    /// what a nested `<style>`'s CSS — written, not built as a doc — must be formatted at
-    /// ([`Printer::body_indent_level`]). Maintained in ONE place, the three fragment
-    /// builders every child list goes through ([`Printer::enter_fragment`]), never at the
-    /// indent sites, so a new container cannot forget it.
+    /// one, each container body inside it one more. A container's body is indented one level
+    /// past the container (the uniform "each container adds a level" model — element and
+    /// component bodies, every block section, special elements), so while a fragment's
+    /// children are being built this is the indent level their bodies are EXPECTED to render
+    /// at: the level a nested `<style>`'s CSS — written, not built as a doc — is formatted at
+    /// ([`Printer::body_indent_level`]). It is a count, not a measurement: a parent that hugs
+    /// its content without indenting it (`x<span><style>…</style></span>y`) renders shallower,
+    /// which is why `build_nested_style_body_doc` formats a second time one level deeper and
+    /// lets the host's renderer place each line rather than trusting this number — except
+    /// where the deeper format wraps differently, when the body keeps this count. Maintained
+    /// in ONE place, the three fragment builders every child list goes through
+    /// ([`Printer::enter_fragment`]), never at the indent sites, so a new container cannot
+    /// forget it.
     fragment_depth: Cell<usize>,
     /// The CSS printer's boundary-whitespace precondition over this whole document
     /// (`tsv_css::HostBoundaryScan`), taken on the first `<style>` island that asks and
@@ -598,9 +603,9 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// The indent level at which the body of an element being built right now renders: one
-    /// past the element's own, which is its parent fragment's depth. See
-    /// [`Printer::fragment_depth`].
+    /// The indent level at which the body of an element being built right now is expected to
+    /// render: one past the element's own, which is its parent fragment's depth. See
+    /// [`Printer::fragment_depth`] for when the element renders shallower than that.
     pub(crate) fn body_indent_level(&self) -> usize {
         self.indent_level + self.fragment_depth.get()
     }
@@ -1543,9 +1548,9 @@ fn print_document(
 /// `;`, so the second format never asks again.
 ///
 /// The respelled source differs from a source that parsed only by a character reference in
-/// template text, so the one way its parse can fail is the size limit (`ParseError`'s
-/// `FileTooLarge`), which the few added bytes can cross. The original is then printed
-/// unrespelled.
+/// template text, so its parse is expected to fail only on the size limit (`ParseError`'s
+/// `FileTooLarge`), which the few added bytes can cross — nothing proves that. Whatever the
+/// failure, the original is then printed unrespelled.
 fn format_respelled_tail(
     root: &internal::Root<'_>,
     source: &str,
@@ -1597,9 +1602,10 @@ fn format_respelled_tail(
 /// left to check it against. The one thing it cannot carry is a section's freeze: a directive
 /// is read off what stands above the section, which the rewrite changes, so the original's
 /// verdict (`frozen`) goes along with it. The rewrite only moves source text and respells
-/// whitespace between two template nodes, so its parse can fail only on the size limit
-/// (`ParseError`'s `FileTooLarge`), which the few added line breaks can cross; the original is
-/// then printed with its runs where they stand (`sections` is its classification).
+/// whitespace between two template nodes, so its parse is expected to fail only on the size
+/// limit (`ParseError`'s `FileTooLarge`), which the few added line breaks can cross — nothing
+/// proves that. Whatever the failure, the original is then printed with its runs where they
+/// stand (`sections` is its classification).
 fn format_lifted_runs(
     root: &internal::Root<'_>,
     source: &str,

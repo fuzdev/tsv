@@ -1703,8 +1703,9 @@ cargo run -p tsv_debug binding_audit --verbose ../svelte/packages/svelte/src
 # against the render key of format(source). The key is `svelte compile --generate
 # server` reduced to its visible render (baked template text, `${…}` holed out,
 # <script>/<style>/comments stripped, whitespace collapsed with block-boundary
-# whitespace dropped) — equal keys prove equal renders, and a <script>/<style>
-# reformatting that leaves the template alone is correctly ignored.
+# whitespace dropped) — equal keys prove equal renders (save the two misgrades
+# below), and a <script>/<style> reformatting that leaves the template alone is
+# correctly ignored.
 #
 # This is the CORPUS-SCALE arm of the fixture render-equivalence check (the R rules
 # in `fixtures:validate`). Those gate a CURATED corpus whose whitespace variants are
@@ -1745,6 +1746,17 @@ fuzz and round-trip are blind by construction, and the comment instruments (ledg
 swallow) count *comments*, never the whitespace beside them. Nothing but a fixture reaches this
 class, which is why a render-visible finding earns one even when every corpus gate is green
 ([inline_adjacent_comment_space](../tests/fixtures/svelte/elements/inline_adjacent_comment_space/)).
+
+**What it is blind to: two misgrades in the key itself**, one in each direction, both from
+reading the compiled template rather than a rendered page (mechanics beside `HOLE` in
+`crates/tsv_debug/src/deno/sidecar.ts`; the same key grades `render_compare` and the fixture R
+rules). A **nested `<script>` / `<style>`** is pushed as a template chunk of its own, so the
+whitespace on its two sides is never merged the way the browser merges it around an element
+with no box: `a<script>…</script> b` and `a⏎<script>…</script>⏎b` are the same page but key
+differently — a false finding, which triage must re-grade by hand. And a
+**`<svelte:element>`** carries its tag at runtime, so the key never sees a `this="pre"` and
+collapses that content as flow: a whitespace change inside it that the browser would render
+keys as equal — a missed finding, the direction the audit exists to refuse.
 
 ## Layout-Neutrality Audit (`neutrality_audit`)
 

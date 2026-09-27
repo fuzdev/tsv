@@ -37,7 +37,7 @@
 >text1   text2</slot
 >c</pre>
 
-<!-- an empty body prints like any empty element -->
+<!-- an empty body takes the empty layout it has outside `<pre>`, not an empty component's -->
 <pre>a<svelte:element this="b"
 ></svelte:element
 >c</pre>

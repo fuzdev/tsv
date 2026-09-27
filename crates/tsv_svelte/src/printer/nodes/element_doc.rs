@@ -1126,11 +1126,15 @@ impl<'a> Printer<'a> {
     ///
     /// This handles nested style/script elements (inside other elements like `<div>`)
     /// that need their content formatted as CSS/JS rather than as regular fragment nodes.
-    /// The body formats exactly as the top-level section's does, one indent level per
-    /// enclosing container deeper: parsed at host-absolute offsets and laid out at the column
-    /// it renders at, so width is measured from there and verbatim text — a template
-    /// literal's quasis, a comment interior, a `prettier-ignore` slice — keeps its authored
-    /// columns (the two positions are held equal by `tests/svelte_nested_raw_content_parity.rs`).
+    /// The body formats exactly as the top-level section's does, one indent level inside the
+    /// element's own tags: parsed at host-absolute offsets and placed by the host's renderer,
+    /// so verbatim text — a template literal's quasis, a comment interior, a
+    /// `prettier-ignore` slice — keeps its authored columns (the two positions are held equal
+    /// by `tests/svelte_nested_raw_content_parity.rs`). A script body is a doc embedded in
+    /// this one, so its width is measured from the column it lands at. A style body is
+    /// written at the level it is expected to render at and then placed line by line
+    /// ([`Printer::build_nested_style_body_doc`]), so its width is measured from that level —
+    /// deeper than where it lands when a parent hugs it without indenting its content.
     fn build_raw_content_element_doc(
         &self,
         kind: RawTextKind,
@@ -1284,6 +1288,13 @@ impl<'a> Printer<'a> {
     /// body, and each line that is verbatim text keeps its authored column behind a
     /// `literalline`. The two are told apart by formatting once more one level deeper — the
     /// printer's own lines move with the level, verbatim ones do not.
+    ///
+    /// Where the deeper format WRAPS differently (a line near the print width), the two have
+    /// no line-for-line correspondence, and the body keeps every later line at the counted
+    /// level — one level too deep in a hugged parent
+    /// (`x<span><style>a { grid-template-areas: '…' 'b'; }</style></span>y` with a long
+    /// value). A known layout gap, cosmetic and stable; `tsv_css` reporting the lines it
+    /// emits verbatim (the TODO in the body) would remove it with the second format.
     fn build_nested_style_body_doc(
         &self,
         stylesheet: &tsv_css::CssStyleSheet<'_>,

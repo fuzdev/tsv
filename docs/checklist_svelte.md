@@ -48,6 +48,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Block element spacing (blank lines preserved)
 - Inline element spacing (whitespace normalized)
 - Pre-sensitive whitespace (`<pre>`, `<textarea>`)
+- Special elements inside `<pre>` (`<svelte:element>`, `<svelte:component>`, `<svelte:self>`, `<svelte:boundary>`, `<svelte:fragment>`, `<slot>`) — content printed verbatim, laid out inline like a component (Svelte carries the ancestor's whitespace-preserving state into their fragments)
 - Text node normalization
 - Leading/trailing whitespace handling
 
@@ -637,6 +638,17 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Comments
 - Escape sequences in strings
 
+**Placement**:
+
+- Canonical section order (`<svelte:options>`, module script, instance script, template, `<style>`), each section with the comments that travel with it
+- A section written **between** two template nodes: the neighbours join as if the section and its travelling comments were absent — no whitespace keeps them glued, any whitespace is a space, any newline a line break, and a blank line only when it sits before or after the run (a blank inside the run travels with it)
+
+**Nested in markup** (`<script>` / `<style>` inside an element or a block):
+
+- Body formatted as the top-level section's is, one indent level inside its tags
+- Renders no box — keeps its glue where a line break beside it would render, and takes its own line only where a break is render-free (merging into whitespace that already renders, or at a line-box edge: a block element or a block parent's content edge)
+- Inside `<pre>`: body kept verbatim, and the closing tag never splits (Svelte ends a nested raw-text body at the first literal `</script>` / `</style>`), so a too-wide line breaks at the opening tag's `>` instead when the body opens on a visible byte
+
 ### Style Blocks
 
 **Basic Styles**:
@@ -676,6 +688,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - `@component` JSDoc (`<!-- @component -->`)
 - `format-ignore` / `prettier-ignore` directive (`<!-- format-ignore -->` emits the next node verbatim — see [directives.md](./directives.md))
 - `format-ignore-start` / `-end` range (`<!-- format-ignore-start -->` … `<!-- format-ignore-end -->` preserves a top-level range)
+- Directive directly above a `<script>` / `<style>` freezes that section alone, wherever the canonical section order prints it; above `<svelte:options>` it freezes nothing
 - Editor region markers around a hoisted section (`<!-- #region … -->` above a `<script>` / `<style>` / `<svelte:options>`, `<!-- #endregion -->` directly below it): the `#endregion` travels below its section through the canonical reorder, the author's blank line between them kept — prettier-plugin-svelte's region-end trail, precedence included (a following `<script>`/`<style>` still claims the marker as its leading comment; a following `<svelte:options>` does not)
 
 ---

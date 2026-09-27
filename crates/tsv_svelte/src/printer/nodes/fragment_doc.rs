@@ -763,9 +763,11 @@ impl<'a> Printer<'a> {
     ///
     /// ⚠️ **The one spelling of that exception.** Every reader that asks "does this sibling own a
     /// block line?" of a node it holds by POSITION asks [`Self::is_block_element_at`] (and a
-    /// flow reader [`Self::is_inline_el_or_comp_at`]), which consult this — a reader that asked
-    /// the node-only [`Self::is_block_element_node`] would give the element its line back on one
-    /// side of the seam and split the glued boundary the rest of the walk kept.
+    /// flow reader [`Self::is_inline_el_or_comp_at`]), which consult this through
+    /// [`Self::is_glued_block_exception`] — beside its twin for a nested `<script>` / `<style>`
+    /// that keeps its glue — so a reader that asked the node-only
+    /// [`Self::is_block_element_node`] would give the element its line back on one side of the
+    /// seam and split the glued boundary the rest of the walk kept.
     pub(super) fn is_glued_global_element(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
         matches!(&nodes[i], FragmentNode::SpecialElement(se) if se.kind.is_global())
             && self.glued_to_content(nodes, i, true)
@@ -780,7 +782,8 @@ impl<'a> Printer<'a> {
     }
 
     /// [`Self::is_block_element_node`] asked of the node at `i` in its sibling list — the same
-    /// answer, except for a [global element glued on both sides](Self::is_glued_global_element),
+    /// answer, except for a [glued block exception](Self::is_glued_block_exception) (a global
+    /// element glued on both sides, or a nested `<script>` / `<style>` that keeps its glue),
     /// which does not own a block line there.
     pub(super) fn is_block_element_at(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
         self.is_block_element_node(&nodes[i]) && !self.is_glued_block_exception(nodes, i)
@@ -793,8 +796,9 @@ impl<'a> Printer<'a> {
     }
 
     /// [`Self::is_inline_el_or_comp`] asked of the node at `i` in its sibling list: also true for
-    /// a [global element glued on both sides](Self::is_glued_global_element), which flows as an
-    /// inline element does.
+    /// a [glued block exception](Self::is_glued_block_exception) (a global element glued on both
+    /// sides, or a nested `<script>` / `<style>` that keeps its glue), which flows as an inline
+    /// element does.
     pub(super) fn is_inline_el_or_comp_at(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
         self.is_inline_el_or_comp(&nodes[i]) || self.is_glued_block_exception(nodes, i)
     }
@@ -1586,10 +1590,13 @@ impl<'a> Printer<'a> {
     /// ⚠️ **A frozen node owes it too.** The `format-ignore` arm emits the node's slice in place
     /// of its handler, but the follower is unfrozen and trims exactly as it does beside any node
     /// that owns its line — so the arm asks this, or the two nodes weld. The weld is
-    /// render-visible wherever the compiler hoists the frozen node, since its neighbours then
-    /// meet directly: a global `svelte:*` element
+    /// render-visible wherever the frozen node's neighbours meet directly across it: where the
+    /// compiler hoists it — a global `svelte:*` element
     /// (`syntax/prettier_ignore/global_glued_before_prettier_divergence`) and a declaration
-    /// (`syntax/prettier_ignore/declaration_glued_before_prettier_divergence`).
+    /// (`syntax/prettier_ignore/declaration_glued_before_prettier_divergence`) — and where it
+    /// renders no box, a nested `<script>` / `<style>` with a body, which the compiler keeps.
+    /// Each of the three owns its line only where that is render-free, never when glued to
+    /// content on both sides ([`Self::owns_own_line`]).
     fn owes_break_after(&self, trimmed_nodes: &[FragmentNode<'_>], i: usize) -> bool {
         debug_assert!(
             self.owns_own_line(trimmed_nodes, i),

@@ -188,7 +188,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a special element that sits **inside a whitespace-sensitive element** (`<pre>`,
-    /// directly or through any nesting of elements, components and blocks).
+    /// directly or through any nesting of elements, components, special elements and blocks).
     ///
     /// Every special element that can appear there renders its content in place —
     /// `<svelte:element>`, `<svelte:component>`, `<svelte:self>`, `<svelte:boundary>`,
@@ -208,8 +208,14 @@ impl<'a> Printer<'a> {
     /// prettier-plugin-svelte exempts from hugging outright — a per-kind rule with nothing in the
     /// render behind it.
     ///
-    /// An element with no content keeps the shared pipeline's empty and self-closing layouts:
-    /// with no content bytes there is nothing for the family's head to protect.
+    /// An element with no content keeps the shared pipeline's empty and self-closing layouts
+    /// (for an empty body, [`Self::build_special_empty_doc`]): with no content bytes there is
+    /// nothing for the family's head to protect. That is **not** the shape an empty component
+    /// takes in the same position — the whitespace-sensitive builder's empty-inline arm, which
+    /// hugs `></Comp>` onto the last attribute of a wrapped list as prettier does — so a long
+    /// head here drops its `>` to a line of its own (`⏎\t></svelte:boundary>`). Both breaks
+    /// land inside the tag, so the render is the same.
+    /// TODO: one empty-inline layout for both kinds.
     ///
     /// Pinned by the `svelte/elements/pre_special_element_*` fixtures;
     /// [`special_element_flow_content`](../../../../../tests/fixtures/svelte/special_elements/special_element_flow_content_prettier_divergence/)

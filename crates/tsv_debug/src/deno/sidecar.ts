@@ -71,7 +71,8 @@ const ParserWithTS = acorn.Parser.extend(tsPlugin() as any);
 //      collected, so a `<script>` reformatting (quotes, semicolons, parens) that leaves the
 //      template unchanged produces the SAME skeleton.
 //   2. renderKey — strip HTML comments (not visible), collapse ASCII whitespace runs to one
-//      space (the browser model), and trim. Two sources with equal keys render identically.
+//      space (the browser model), and trim. Two sources with equal keys render identically,
+//      save the blind spots listed at `HOLE` below.
 //
 // This is the methodology of ../test-svelte-prettier-whitespace/whitespace-safety-check.mjs.
 //
@@ -88,6 +89,19 @@ const ParserWithTS = acorn.Parser.extend(tsPlugin() as any);
 // the formatter never swaps an expression for a control character — so the collision is
 // unreachable today; escape literal `\x01` in the chunks before substitution if the key ever
 // grades adversarial pairs.
+//
+// ⚠️ Two known blind spots follow from reading the compiled TEMPLATE, and both are open:
+//
+// - Whitespace never merges across a nested `<script>` / `<style>`. The compiler pushes one as
+//   a template literal of its own (`$$renderer.push(`<script>…</script>`)`), so the chunks on
+//   either side are joined by HOLEs and `pushFlow` strips the element between them: the runs
+//   beside it are compared separately instead of as the one run the browser collapses.
+//   `a<script>…</script> b` and `a⏎<script>…</script>⏎b` render the same page (the element has
+//   no box), yet key as `a␁␁ b` against `a ␁␁ b` — a false VISIBLE.
+// - The key knows only the tags spelled in the template. A `<svelte:element this="pre">`
+//   compiles to a runtime tag name, so its content reaches `pushFlow` as flow text and is
+//   collapsed: `a   b` and `a b` inside it key equal although the browser preserves the run —
+//   a false same-render ("cosmetic"), the direction this oracle otherwise refuses.
 const HOLE = '\x01';
 
 function bakedSkeleton(code: string): string {
@@ -292,7 +306,8 @@ function visibleSegments(body: string): string[] {
 
 // The browser-visible render key of Svelte source: the baked template skeleton reduced to
 // its browser-visible flow segments (block-boundary whitespace dropped, inline whitespace and
-// text preserved). Two sources with equal keys render identically in a browser.
+// text preserved). Two sources with equal keys render identically in a browser, save the
+// blind spots listed at `HOLE`.
 function svelteRenderKey(source: string): string {
 	const compiled = svelteCompile(source, {
 		generate: 'server',

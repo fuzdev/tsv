@@ -16,6 +16,7 @@ does in [ws_sensitive_head_content_edges](../ws_sensitive_head_content_edges/).
 
 ## Reason
 
-Design choice, and content preservation in the `//` case, where prettier drops the body: inside `<pre>` a nested raw-text body is the author's text and tsv keeps it
-byte-for-byte; the closing tag stays whole because Svelte's parser requires it. See
+Design choice, and content preservation in the `//` case, where prettier drops the body:
+inside `<pre>` a nested raw-text body is the author's text and tsv keeps it byte-for-byte;
+the closing tag stays whole because Svelte's parser requires it. See
 [conformance_prettier_svelte.md §Svelte: Elements](../../../../../docs/conformance_prettier_svelte.md#svelte-elements).

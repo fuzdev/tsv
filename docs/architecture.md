@@ -533,21 +533,27 @@ value_normalization.rs  # Semantic value normalization (numbers, colors, whitesp
 **Svelte** (`tsv_svelte/src/printer/`):
 
 ```
-mod.rs              # Printer struct, entry points
-attributes.rs       # Attribute formatting
-text.rs             # Text node handling
-script_style.rs     # <script>/<style> formatting
-helpers.rs          # Shared utilities
-nodes/              # Element and fragment printing
-  element.rs        #   Element entry points (delegate to doc builders)
-  element_doc.rs    #   Doc construction for HTML/component elements
-  fragment_doc.rs   #   Doc construction for fragment content (text fill, node dispatch)
-  blocks_doc.rs     #   Doc construction for control flow blocks ({#if}, {#each}, etc.)
-  tags_doc.rs       #   Doc construction for template tags (@html, @const, {const}/{let}, @debug, @render)
-  special_doc.rs    #   Doc construction for svelte:* special elements
-  helpers.rs        #   Node-specific helpers
-classification/     # HTML element classification (delegates to tsv_html)
-  element.rs        #   Element type classification
+mod.rs                        # Printer struct, entry points, root fragment
+attributes.rs                 # Attribute formatting
+text.rs                       # Text node handling
+script_style.rs               # <script>/<style> formatting
+frozen_body.rs                # The verbatim body of a frozen-language <script>/<style>/<template>
+lifted_runs.rs                # A hoisted section written between template nodes: the source rewrite before layout
+helpers.rs                    # Shared utilities
+nodes/                        # Element and fragment printing
+  element_doc.rs              #   Doc construction for HTML/component elements (build half)
+  element_analysis.rs         #   Element analysis and layout classification (analyze/classify half)
+  element_ws_sensitive_doc.rs #   Whitespace-sensitive content (<pre>/<textarea> subtrees, head <title>)
+  fragment_doc.rs             #   Doc construction for fragment content (sibling walk, node dispatch)
+  fragment_text_doc.rs        #   Text-child handling and word fill
+  fragment_glue_doc.rs        #   Byte-glue predicates and glued-run construction
+  fragment_boxless.rs         #   Nested <script>/<style> glue analysis (renders no box)
+  blocks_doc.rs               #   Doc construction for control flow blocks ({#if}, {#each}, etc.)
+  tags_doc.rs                 #   Doc construction for template tags (@html, @const, {const}/{let}, @debug, @render)
+  special_doc.rs              #   Doc construction for svelte:* special elements
+  helpers.rs                  #   Node-specific helpers
+classification/               # HTML element classification (delegates to tsv_html)
+  element.rs                  #   Element type classification
 ```
 
 ### Hanging-Indent Layout (TypeScript)

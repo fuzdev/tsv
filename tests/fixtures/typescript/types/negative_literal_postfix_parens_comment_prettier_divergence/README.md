@@ -17,4 +17,7 @@ Prettier bug, and a Svelte-parser break: without the parens acorn-typescript, th
 Svelte uses, rejects the array form and reads the indexed-access form as the different
 literal type `-(1[K])`. The comment rides the kept pair.
 
-See [conformance_prettier_ts.md §TypeScript](../../../../../docs/conformance_prettier_ts.md#typescript).
+See [conformance_prettier_ts.md §TypeScript](../../../../../docs/conformance_prettier_ts.md#typescript)
+for the pair and
+[conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation)
+for the comments.

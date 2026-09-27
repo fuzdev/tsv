@@ -517,11 +517,11 @@ pub(in crate::printer) fn is_negative_literal(ts_type: &TSType<'_>) -> bool {
 /// Whether `ts_type` PRINTS starting with a negative literal's `-` — the literal itself,
 /// or a run of indexed accesses whose leftmost object is one printed without a pair.
 ///
-/// Read from the printed form, not the source: an object behind a paren shell prints a
-/// `(` first whichever way the shell resolves (kept, it is the pair; stripped, its inner
-/// does not lead with the literal, or it would have been kept), and an ARRAY run never
-/// qualifies — its leftmost literal always gains a pair
-/// ([`array_run_negative_literal`]).
+/// Read from the printed form, not the source: an object behind a paren shell never leads
+/// with a bare literal, whichever way the shell resolves. Kept, the shell prints its `(`
+/// first; stripped, it prints its inner, which does not lead with the literal (or the shell
+/// would have been kept). An ARRAY run never qualifies either — its leftmost literal always
+/// gains a pair ([`array_run_negative_literal`]).
 fn leads_with_bare_negative_literal(ts_type: &TSType<'_>) -> bool {
     match ts_type {
         TSType::Literal(TSLiteralType::UnaryExpression(_)) => true,

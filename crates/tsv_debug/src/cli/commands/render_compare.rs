@@ -20,6 +20,17 @@
 //! The key is derived statically from the baked template (no SSR execution), so
 //! sources with unresolvable imports — e.g. component-hosted cases — still grade.
 //!
+//! Two known misgrades follow from that, one in each direction (the sidecar's `HOLE`
+//! comment has the mechanics):
+//!
+//! - a false `visible` across a nested `<script>` / `<style>`: the compiler pushes it as a
+//!   template chunk of its own, so the whitespace on its two sides never merges in the key —
+//!   `a<script>…</script> b` against `a⏎<script>…</script>⏎b` is the same page, graded
+//!   different;
+//! - a false `cosmetic` inside a `<svelte:element>` whose runtime tag preserves whitespace:
+//!   the key sees no `<pre>` in the template, so it collapses the content as flow —
+//!   `this="pre"` with `a   b` against `a b` is graded the same page.
+//!
 //! Exit codes: 0 same render (`identical` / `cosmetic`), 1 `visible`, 2 error.
 
 use argh::FromArgs;

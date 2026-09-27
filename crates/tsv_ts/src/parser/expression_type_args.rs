@@ -22,7 +22,7 @@ use tsv_lang::source_scan::{TriviaProfile, skip_template_literal, skip_trivia};
 /// would emit from them against every parser that will read tsv's output — tsc, and tsv's
 /// own [`Parse`].
 ///
-/// **Four tokens the printer MOVES**, each a place the printed form is not the source:
+/// **Three tokens the printer MOVES**, each a place the printed form is not the source:
 ///
 /// - **a line break before a `[`, which the printer folds away.** A break there ends the type
 ///   to tsc and acorn-typescript alike (the loop in each is named in
@@ -31,9 +31,6 @@ use tsv_lang::source_scan::{TriviaProfile, skip_template_literal, skip_trivia};
 ///   folds that break (`tsv_lang::printing::normalize_carriage_returns`, plus the printer's
 ///   own soft-line joins) before the output is read back. [`type_operand_follow_commits`]'s
 ///   `[` arm, and [`continues_as_type`]'s index-chain twin.
-/// - **trivia between a numeric type's SIGN and its digits, likewise folded.** `fn<-⏎⏎1>(t)`
-///   is a comparison chain whose printed form is `fn < -1 > t`, one literal type in the
-///   region ([`skip_signed_numeric_literal`]).
 /// - **a paren shell, which the printer strips**, read at both ends of the region. Past an
 ///   operand, a `)` the region did not open is not in the printed form, so it neither ends
 ///   the operand nor ends the scan ([`skip_relex_operand_suffixes`], and
@@ -57,6 +54,12 @@ use tsv_lang::source_scan::{TriviaProfile, skip_template_literal, skip_trivia};
 ///   to answer, since no pair can end a region ahead of a token inside it. It takes a
 ///   LAYOUT answer instead: the printer never lets it end a line
 ///   (`BinaryExpression::may_close_type_arguments`).
+///
+/// Trivia between a numeric type's SIGN and its digits is not one of them, though the
+/// printer folds a line break there too: a literal type's `-` is a token of its own to tsc
+/// and acorn-typescript alike, so both readings step over the trivia
+/// ([`skip_signed_numeric_literal`]) and `fn<-⏎⏎1>(t)` is a generic call that prints as
+/// `fn<-1>(t)`.
 ///
 /// **One token the two ORACLES read differently**, no printer move involved: the non-null
 /// `!`. `T!` is tsc's `JSDocNonNullableType` — prefix and postfix — so `<b!>` is a
@@ -1331,7 +1334,8 @@ fn type_operand_follow_commits(bytes: &[u8], after_operand: usize, scan: TypeArg
 /// - `T[| A | B]`, `T[& A & B]`: a leading union/intersection bar opens only a type
 /// - `T[K]`, `T[0]`, `T[-1]`: indexed type
 /// - `T[A | B]`, `T[0 | 1]`, `T[A[B]]`, `T[A.B]`, `T[A<B>]`,
-///   `T[A extends B ? C : D]`: the index is itself a type, so the scan decides
+///   `T[A extends B ? C : D]`: what follows the index's first operand can only continue a
+///   type, so the index reads as one
 /// - `T[(A | B)[]]`, `T[(A)]`: a paren shell around any of the above
 /// - `a[b - 1]`, `a[0 + 1]`, `a[c || d]`, `a[c <= d]`: arithmetic, or a
 ///   logical/shift/relational operator — an expression, never a type → array access
@@ -1618,7 +1622,8 @@ fn continues_as_type(bytes: &[u8], operand_end: usize, closer: u8, scan: TypeArg
         // Type-continuation tokens: the index is a union or intersection (`T[A | B]`), a
         // nested index (`T[A[B]]`), a qualified name (`T[A.B]`), a generic reference
         // (`T[A<B>]`), or a conditional (`T[A extends B ? C : D]`). None of these can be
-        // arithmetic, so hand the decision to the caller's closing-`>` scan.
+        // arithmetic, so the index reads as a type; what follows its `]` is the follow
+        // loop's question ([`type_operand_follow_commits`]), as for the `closer` arm above.
         Some(b'[') => {
             !(scan.reads_source_as_written()
                 && has_line_terminator_between(bytes, operand_end, after_operand))
@@ -1626,7 +1631,7 @@ fn continues_as_type(bytes: &[u8], operand_end: usize, closer: u8, scan: TypeArg
         Some(b'|' | b'&' | b'.' | b'<') => true,
         Some(b'e') if is_word_at(bytes, after_operand, b"extends") => true,
         // Anything else after the operand (e.g. `b - 1]`) is arithmetic — an expression,
-        // never a type, and the one case the closing-`>` scan cannot arbitrate
+        // never a type, and the one case nothing after the `]` can arbitrate
         // (`a < arr[b - 1] > (c)` is grammatical both ways).
         _ => false,
     }
@@ -1670,9 +1675,9 @@ fn skip_relex_operand_suffixes(bytes: &[u8], mut pos: usize, scan: TypeArgScan) 
 /// It tolerates trivia between the sign and the digits, because the type grammar does: a
 /// literal type's `-` is a token of its own in tsc and acorn-typescript alike, so
 /// `f<- 1>(x)`, `f<A | -⏎1>(x)` and `f<A | - /* c */ 1>(x)` are generic calls to both. The
-/// printed form glues the two (`fn < -1 > t`), so both readings must also agree to read a
-/// spaced sign as the literal it prints as, or the pair a comparison needs is reached one
-/// pass late.
+/// printer glues whitespace trivia away (`f<-1>(x)`) and keeps a comment
+/// (`f<A | -/* c */ 1>(x)`), so both readings must also agree to read a spaced sign as the
+/// literal, or the pair a comparison needs is reached one pass late.
 ///
 /// A literal type takes ONE sign. What follows the first must be the digits (or a `.` that
 /// opens them); a second sign is no literal, so `a < - -1 > (c)` and `f<--1>(x)` skip

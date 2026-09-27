@@ -1,9 +1,11 @@
-// Doc-based formatting for whitespace-sensitive elements (pre, textarea)
+// Doc-based formatting for whitespace-sensitive content: `<pre>` / `<textarea>` and every
+// element, component and special element inside a `<pre>`, plus the verbatim content of a
+// head `<title>` (built through `build_verbatim_content_doc` from `special_doc.rs`).
 //
-// These elements preserve text whitespace exactly as authored, but still
-// format embedded expressions, blocks, and other dynamic content normally.
-// The nested if/each builders here hug their structure (no added whitespace)
-// so the block syntax does not inject rendered whitespace into <pre>/<textarea>.
+// This content preserves text whitespace exactly as authored, but still formats embedded
+// expressions, blocks, and other dynamic content normally. The nested block builders here
+// hug their structure (no added whitespace) so the block syntax does not inject rendered
+// whitespace into the content.
 
 // Allow Svelte block syntax like `{:else}`, `{:then}`, `{:catch}` which
 // look like Rust format args but are valid Svelte template syntax.
@@ -23,10 +25,15 @@ use tsv_lang::doc::{DocBuf, arena::DocId};
 
 /// Which of a whitespace-sensitive element's two delimiters its content lets move.
 ///
-/// Prettier's `shouldHugStart` / `shouldHugEnd`, which inside this family reduce to their
-/// last clause each (such an element is never `isBlockElement` to prettier's eye, and always
-/// has children when the pair is asked). Both are read off the content's **own** end: the
-/// first child for the opening `>`, the last for the closing one.
+/// Prettier's `shouldHugStart` / `shouldHugEnd` ask the same two questions, and for the
+/// inline members of this family they come down to their last clause each: whether the first
+/// child opens, and the last child ends, on whitespace. Both are read off the content's
+/// **own** end — the first child for the opening `>`, the last for the closing one — with one
+/// override, [`ContentEdges::with_whole_close`]. Two places where prettier's layout does not
+/// follow that clause are cataloged divergences rather than inputs here: prettier exempts
+/// `<svelte:boundary>` from hugging outright (an earlier clause of the pair), and it breaks
+/// both delimiters of an element holding an `{#if}` / `{#each}` / `{#key}` block among its
+/// content whatever the edges say (conformance_prettier_svelte.md §Svelte: Elements).
 ///
 /// ⚠️ **Two fields, not one.** The two ends are independent here, and coupling them is the
 /// bug this type exists to make unspellable: the printer used to key both on the *opening*
@@ -42,7 +49,8 @@ pub(super) struct ContentEdges {
     /// When it opens on collapsible whitespace the author already put a break-worthy byte
     /// right after the `>`, and a second break there buys nothing.
     hugs_open: bool,
-    /// The content ends on a visible byte, so the closing tag splits and its `>` dangles.
+    /// The closing tag may split and dangle its `>`: the content ends on a visible byte, and
+    /// the element's end tag is not one held whole ([`ContentEdges::with_whole_close`]).
     hugs_close: bool,
 }
 
@@ -70,7 +78,8 @@ impl ContentEdges {
 }
 
 impl<'a> Printer<'a> {
-    /// Build doc for whitespace-sensitive elements (pre, textarea, etc.)
+    /// Build doc for a whitespace-sensitive element — a `<pre>` / `<textarea>`, or any
+    /// element or component inside a `<pre>`.
     ///
     /// These elements preserve text whitespace exactly as-is, but still format
     /// expressions, blocks, and other dynamic content normally.
@@ -309,8 +318,9 @@ impl<'a> Printer<'a> {
     /// Read both content edges — the pair [`ContentEdges`] documents.
     ///
     /// Each end is a `Text` question and only a `Text` question: any other child (an `{expr}`
-    /// tag, a block, a nested element) is a visible byte, so it hugs. An empty fragment hugs
-    /// at both ends and is never asked.
+    /// tag, a block, a nested element) is a visible byte, so it hugs. An empty fragment
+    /// answers hug at both ends, an answer no layout reads: every caller routes an element
+    /// with no content to its empty layouts before it uses the edges.
     ///
     /// ⚠️ The closing edge is the **last child**, not the last text node — those differ
     /// exactly when an `{expr}` tag closes the content, and reading the last *text* node
@@ -466,9 +476,11 @@ impl<'a> Printer<'a> {
         d.group(d.concat(&[d.text("<"), name, attrs, hugged, self.end_tag(name)]))
     }
 
-    /// Build content for whitespace-sensitive elements (pre, textarea).
+    /// Build whitespace-sensitive content — a `<pre>` / `<textarea>`'s, every element's,
+    /// component's, special element's and block section's inside a `<pre>`, and a head
+    /// `<title>`'s.
     ///
-    /// Text nodes preserve their exact whitespace (significant for pre/textarea).
+    /// Text nodes preserve their exact whitespace (significant in all of them).
     /// Expressions, blocks, and other dynamic content are formatted normally
     /// (their internal whitespace is not significant).
     pub(super) fn build_whitespace_sensitive_content_doc(

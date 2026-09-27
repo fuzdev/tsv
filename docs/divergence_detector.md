@@ -329,7 +329,7 @@ half, and `long_line_rewrapped` bundles it for the five long-line patterns.
 **The forced overrun.** "Ours holds 100 everywhere" is too strong on its own, because
 [§Print Width Philosophy](./conformance_prettier.md#print-width-philosophy) sanctions a
 line tsv *cannot* break — *a line tsv can break is a line tsv does break*, so an
-unbreakable atom stands, and `width_audit_known.txt` pins ~34 such shapes. The middle
+unbreakable atom stands, and `width_audit_known.txt` pins each such shape. The middle
 term is `overrun_is_forced(line, regime)`: an over-width ours line is excused only when
 its content offers tsv **no seam at all**.
 

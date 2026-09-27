@@ -45,6 +45,10 @@
 //!   never a finding**: surfaced (as [`CommentFinding::skip_sites`]) only on a comment that
 //!   ends the format DROPPED, naming the builder whose gate broke the line-comment routing
 //!   promise; a skip whose comment another emitter prints stays invisible.
+//! - [`SuppressEmits`] — a guard under which the three recorders above record nothing, for
+//!   a printer that formats a region a second time only to MEASURE it (`tsv_svelte`'s nested
+//!   `<style>`, placed by comparing two formats of one body): the output is discarded, so the
+//!   comments it prints there were not printed at all.
 //! - [`take_comment_ledger`] — finalize: compute the findings, drain, clear.
 //!
 //! ## Scope

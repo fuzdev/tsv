@@ -360,17 +360,20 @@ impl<'a> Printer<'a> {
         self.is_boxless_raw_text_element(&nodes[i]) && self.fragment_glue(nodes).inline_laid[i]
     }
 
-    /// Index every fragment's [`FragmentGlue`] once per document, top down — a block tag's body
-    /// reads its edges from where the tag sits in its parent, so the parent is analysed first.
-    /// Only a fragment holding a node that asks is analysed: a nested `<script>` / `<style>`
-    /// with a body, a declaration, a global element, or a block tag whose bodies need edges.
+    /// Index every fragment's edges ([`EdgeFree`], beside its whitespace-only ends) once per
+    /// document, top down — a block tag's body reads its edges from where the tag sits in its
+    /// parent, so the parent is analysed first. Every non-empty fragment gets an entry; only a
+    /// fragment holding a node that asks has its [`FragmentGlue`] computed here, since that is
+    /// what its block tags' body edges are read from: a nested `<script>` / `<style>` with a
+    /// body, a declaration, a global element, or a block tag whose bodies need edges.
     ///
-    /// A document with no nested `<script>` / `<style>` ([`Root::holds_nested_raw_text`]) is not
-    /// indexed at all: every flag of a slice's [`FragmentGlue`] reads its edges only through a
-    /// boxless element in that slice (`inline_laid` marks nothing else, and the glue scans
-    /// defer to the edge scans only past one), and a block tag's body edges feed nothing but
-    /// that body's own flags. Without one, the edges that absorb nothing — what an unindexed
-    /// slice reads — give every flag the answer the index would.
+    /// A document with no nested `<script>` / `<style>` ([`Root::holds_nested_raw_text`], a
+    /// flag the parser sets) is not indexed at all: every flag of a slice's [`FragmentGlue`]
+    /// reads its edges only through a boxless element in that slice (`inline_laid` marks
+    /// nothing else, and the glue scans defer to the edge scans only past one), and a block
+    /// tag's body edges feed nothing but flags within that body's subtree. Without one, the
+    /// edges that absorb nothing — what an unindexed slice reads — give every flag the answer
+    /// the index would.
     pub(crate) fn index_fragment_edges(&self, root: &Root<'_>) {
         if root.holds_nested_raw_text {
             self.index_fragment(root.fragment.nodes, EdgeFree::default());
