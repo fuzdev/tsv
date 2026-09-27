@@ -2,19 +2,19 @@
 
 An inline element glued to text on **both** sides whose content breaks however it is laid out —
 a child element holding a control-flow block, an `{#await}` branch holding block elements, a
-snippet whose body breaks, a child whose attribute value spans lines, a multi-line comment — lays
-out **block-style**:
+snippet whose body breaks, a child whose attribute value spans lines, a multi-line comment, a
+`prettier-ignore`d child whose frozen bytes span lines — lays out **block-style**:
 both tags intact, the content on its own indented lines. That is the form its spaced twin, and an
 inline element holding the block directly, already take. The closing-`>` dangle a glued-both
 element otherwise takes keeps its content inline, so it has no form for content that cannot be.
 
-Around a breaking block, attribute or snippet prettier dangles every delimiter instead
+Around a breaking block, attribute, snippet or frozen child prettier dangles every delimiter instead
 (`<span⏎\t>text2 <strong⏎\t\t>{#if cond}…{/if}</strong⏎\t></span⏎>`); around a multi-line
 comment it keeps the hug as written (`text1<span>text2 <!-- a⏎b --> text3</span>text4`). It keeps
 the block-style form stable as well, so the divergence is one of normalization:
 
-- `unformatted_ours_compact.svelte` — each case authored on one line; tsv normalizes it to
-  `input.svelte`, prettier to its dangled form.
+- `unformatted_ours_compact.svelte` — each case authored on one line (bar the frozen bytes); tsv
+  normalizes it to `input.svelte`, prettier to its dangled form.
 - `unformatted_ours_spaces.svelte` — the same with padded content boundaries, which the compiler
   trims.
 - `unformatted_ours_hug.svelte` — the tags hugged around the break, the content at the
@@ -26,6 +26,9 @@ the block-style form stable as well, so the divergence is one of normalization:
   compact and spaced forms keep all three multi-line comment cases hugged; the hugged form keeps
   only the two where the comment is a direct child, and dangles the one inside `<em>`. tsv
   normalizes each to `input.svelte`.
+
+The frozen child beside prose is the case where the hugged form is not even stable: the prose
+wraps against the closing tag, and the next pass reads that line break as authored.
 
 Every form renders identically: the content boundaries are trimmed at compile, and every glued
 boundary stays glued.
@@ -42,3 +45,5 @@ Design choice: content that goes multiline lays out block-style whatever made it
   content that stays inline
 - [nested_script_style_glued_inline_edge_prettier_divergence](../nested_script_style_glued_inline_edge_prettier_divergence/)
   — the same bound reached by a nested `<script>` / `<style>` whose body breaks
+- [multiline_inline_parent_long](../../syntax/prettier_ignore/multiline_inline_parent_long_prettier_divergence/)
+  — a frozen node spanning lines in an inline element that is not glued to its siblings

@@ -1,0 +1,623 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 718,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 167,
+				"data": "\n\tA frozen node whose bytes span lines breaks the block element holding it: the content moves to\n\tits own indented line, and the frozen bytes print as written.\n"
+			},
+			{
+				"type": "Text",
+				"start": 167,
+				"end": 169,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 169,
+				"end": 200,
+				"data": " a frozen element first "
+			},
+			{
+				"type": "Text",
+				"start": 200,
+				"end": 201,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 201,
+				"end": 275,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 202
+					},
+					"end": {
+						"line": 7,
+						"column": 2,
+						"character": 203
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 204,
+							"end": 206,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 206,
+							"end": 230,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "RegularElement",
+							"start": 230,
+							"end": 265,
+							"name": "b",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 26,
+									"character": 231
+								},
+								"end": {
+									"line": 8,
+									"column": 27,
+									"character": 232
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 235,
+									"end": 252,
+									"name": "data-attr",
+									"name_loc": {
+										"start": {
+											"line": 8,
+											"column": 30,
+											"character": 235
+										},
+										"end": {
+											"line": 8,
+											"column": 39,
+											"character": 244
+										}
+									},
+									"value": [
+										{
+											"start": 246,
+											"end": 251,
+											"type": "Text",
+											"raw": "value",
+											"data": "value"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 254,
+										"end": 261,
+										"raw": "inline1",
+										"data": "inline1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 265,
+							"end": 271,
+							"raw": "text1\n",
+							"data": "text1\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 275,
+				"end": 277,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 277,
+				"end": 320,
+				"data": " a frozen element between two texts "
+			},
+			{
+				"type": "Text",
+				"start": 320,
+				"end": 321,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 321,
+				"end": 404,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 13,
+						"column": 1,
+						"character": 322
+					},
+					"end": {
+						"line": 13,
+						"column": 4,
+						"character": 325
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 326,
+							"end": 333,
+							"raw": "\n\ttext2",
+							"data": "\n\ttext2"
+						},
+						{
+							"type": "Comment",
+							"start": 333,
+							"end": 357,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "RegularElement",
+							"start": 357,
+							"end": 392,
+							"name": "b",
+							"name_loc": {
+								"start": {
+									"line": 14,
+									"column": 31,
+									"character": 358
+								},
+								"end": {
+									"line": 14,
+									"column": 32,
+									"character": 359
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 362,
+									"end": 379,
+									"name": "data-attr",
+									"name_loc": {
+										"start": {
+											"line": 14,
+											"column": 35,
+											"character": 362
+										},
+										"end": {
+											"line": 14,
+											"column": 44,
+											"character": 371
+										}
+									},
+									"value": [
+										{
+											"start": 373,
+											"end": 378,
+											"type": "Text",
+											"raw": "value",
+											"data": "value"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 381,
+										"end": 388,
+										"raw": "inline2",
+										"data": "inline2"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 392,
+							"end": 398,
+							"raw": "text3\n",
+							"data": "text3\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 404,
+				"end": 406,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 406,
+				"end": 443,
+				"data": " a frozen expression tag last "
+			},
+			{
+				"type": "Text",
+				"start": 443,
+				"end": 444,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 444,
+				"end": 493,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 19,
+						"column": 1,
+						"character": 445
+					},
+					"end": {
+						"line": 19,
+						"column": 2,
+						"character": 446
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 447,
+							"end": 454,
+							"raw": "\n\ttext4",
+							"data": "\n\ttext4"
+						},
+						{
+							"type": "Comment",
+							"start": 454,
+							"end": 478,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 478,
+							"end": 488,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 479,
+								"end": 487,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 31
+									},
+									"end": {
+										"line": 21,
+										"column": 3
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 479,
+									"end": 480,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 31
+										},
+										"end": {
+											"line": 20,
+											"column": 32
+										}
+									},
+									"name": "a"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 486,
+									"end": 487,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 2
+										},
+										"end": {
+											"line": 21,
+											"column": 3
+										}
+									},
+									"name": "b"
+								}
+							}
+						},
+						{
+							"type": "Text",
+							"start": 488,
+							"end": 489,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 493,
+				"end": 495,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 495,
+				"end": 545,
+				"data": " a frozen element on one line stays inline "
+			},
+			{
+				"type": "Text",
+				"start": 545,
+				"end": 546,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 546,
+				"end": 621,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 25,
+						"column": 1,
+						"character": 547
+					},
+					"end": {
+						"line": 25,
+						"column": 2,
+						"character": 548
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 549,
+							"end": 554,
+							"raw": "text5",
+							"data": "text5"
+						},
+						{
+							"type": "Comment",
+							"start": 554,
+							"end": 578,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "RegularElement",
+							"start": 578,
+							"end": 612,
+							"name": "b",
+							"name_loc": {
+								"start": {
+									"line": 25,
+									"column": 33,
+									"character": 579
+								},
+								"end": {
+									"line": 25,
+									"column": 34,
+									"character": 580
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 583,
+									"end": 600,
+									"name": "data-attr",
+									"name_loc": {
+										"start": {
+											"line": 25,
+											"column": 37,
+											"character": 583
+										},
+										"end": {
+											"line": 25,
+											"column": 46,
+											"character": 592
+										}
+									},
+									"value": [
+										{
+											"start": 594,
+											"end": 599,
+											"type": "Text",
+											"raw": "value",
+											"data": "value"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 601,
+										"end": 608,
+										"raw": "inline3",
+										"data": "inline3"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 612,
+							"end": 617,
+							"raw": "text6",
+							"data": "text6"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 621,
+				"end": 623,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 623,
+				"end": 667,
+				"data": " the same element unfrozen collapses "
+			},
+			{
+				"type": "Text",
+				"start": 667,
+				"end": 668,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 668,
+				"end": 717,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 28,
+						"column": 1,
+						"character": 669
+					},
+					"end": {
+						"line": 28,
+						"column": 2,
+						"character": 670
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 671,
+							"end": 676,
+							"raw": "text7",
+							"data": "text7"
+						},
+						{
+							"type": "RegularElement",
+							"start": 676,
+							"end": 708,
+							"name": "b",
+							"name_loc": {
+								"start": {
+									"line": 28,
+									"column": 9,
+									"character": 677
+								},
+								"end": {
+									"line": 28,
+									"column": 10,
+									"character": 678
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 679,
+									"end": 696,
+									"name": "data-attr",
+									"name_loc": {
+										"start": {
+											"line": 28,
+											"column": 11,
+											"character": 679
+										},
+										"end": {
+											"line": 28,
+											"column": 20,
+											"character": 688
+										}
+									},
+									"value": [
+										{
+											"start": 690,
+											"end": 695,
+											"type": "Text",
+											"raw": "value",
+											"data": "value"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 697,
+										"end": 704,
+										"raw": "inline4",
+										"data": "inline4"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 708,
+							"end": 713,
+							"raw": "text8",
+							"data": "text8"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -631,7 +631,8 @@ impl<'a> Printer<'a> {
     /// The format-ignore seam for a whole `<script>` / `<style>` section: the island's
     /// comments (which `Root.comments` holds) ride out inside the raw slice and never
     /// reach an emitter, so the ledger is told the range is covered. The doc-side
-    /// verbatim seams use [`Self::verbatim_source_doc`].
+    /// verbatim seams use [`Self::source_span_covering_comments_doc`] (a frozen template node,
+    /// a range) and [`Self::verbatim_source_doc`] (a frozen value inside a node).
     pub(crate) fn write_verbatim_span(&mut self, span: Span) {
         #[cfg(feature = "comment_check")]
         tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
@@ -639,15 +640,21 @@ impl<'a> Printer<'a> {
         self.write(span.extract(self.source));
     }
 
-    /// A doc emitting `span` of the source **verbatim** — the doc-side twin of
-    /// [`Self::write_verbatim_span`] (a format-ignored template node, a format-ignore
-    /// range).
+    /// A doc emitting `span` of the source **verbatim** and **layout-opaque** — the doc-side
+    /// twin of [`Self::write_verbatim_span`] for a freeze of a JavaScript-level value inside a
+    /// node: a braced head's value ([`Self::build_frozen_node_doc`]) and the `{@debug}`
+    /// identifier list.
+    ///
+    /// Opaque to `will_break`, as prettier's `printIgnored` string is. The opacity changes no
+    /// layout at these seams: a directive is honored there only on its own line in the head's
+    /// gap, so the head opens its own line ([`Self::indent_own_line_head`]) and that hardline,
+    /// not the slice, is what breaks the groups around the value. A frozen TEMPLATE node is not
+    /// one of them — it takes [`Self::source_span_covering_comments_doc`], whose line breaks
+    /// break the fragment holding it.
     pub(crate) fn verbatim_source_doc(&self, span: Span) -> DocId {
         #[cfg(feature = "comment_check")]
         tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
 
-        // `verbatim_source_span`, not `source_span`: a format-ignored slice's
-        // embedded newlines are source layout, opaque to `will_break`.
         self.d().verbatim_source_span(span, self.source)
     }
 
@@ -655,7 +662,9 @@ impl<'a> Printer<'a> {
     /// interior newline breaks the enclosing group, unlike [`Self::verbatim_source_doc`]'s
     /// layout-opaque one — that also registers every comment inside the span with the
     /// comment ledger as printed by the slice. For a slice whose bytes are printed as written
-    /// and can hold comments no comment emitter reaches.
+    /// and can hold comments no comment emitter reaches: a frozen template node (in flow
+    /// content and inside `<pre>` alike), and a format-ignore range, whose frozen line breaks
+    /// are line breaks in the output, as prettier-plugin-svelte's `literalline` makes them.
     pub(crate) fn source_span_covering_comments_doc(&self, span: Span) -> DocId {
         #[cfg(feature = "comment_check")]
         tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
@@ -960,8 +969,8 @@ impl<'a> Printer<'a> {
     /// run** needs it because pulling the comment up onto the prefix's line relocates it. The
     /// unprefixed `{…}` values reach the same shape through `wrap_in_block_structure`, and the
     /// hardline here is also what breaks the enclosing head group — a
-    /// [`Self::verbatim_source_doc`] slice is deliberately opaque to `will_break`, so a frozen
-    /// one cannot break anything by itself.
+    /// [`Self::verbatim_source_doc`] slice is opaque to `will_break`, so a frozen value cannot
+    /// break anything by itself.
     ///
     /// The caller supplies the prefix via [`Self::head_open_doc`] and its own closing token
     /// after the break.
@@ -2450,7 +2459,7 @@ impl<'a> Printer<'a> {
             .filter(|h| span.contains(*h))
             .collect();
         if sections.is_empty() {
-            return self.verbatim_source_doc(span);
+            return self.source_span_covering_comments_doc(span);
         }
         // `hoisted` is in canonical print order (options, module, instance, style), which is not
         // source order — the pieces must be emitted in source order.
@@ -2460,17 +2469,21 @@ impl<'a> Printer<'a> {
         let mut cursor = span.start;
         for cut in lifted_runs::range_cuts(self.source, span.start, &sections) {
             if cut.removed.start > cursor {
-                parts.push(self.verbatim_source_doc(Span::new(cursor, cut.removed.start)));
+                parts.push(
+                    self.source_span_covering_comments_doc(Span::new(cursor, cut.removed.start)),
+                );
             }
             match cut.seam {
-                lifted_runs::RangeSeam::Kept(seam) => parts.push(self.verbatim_source_doc(seam)),
+                lifted_runs::RangeSeam::Kept(seam) => {
+                    parts.push(self.source_span_covering_comments_doc(seam));
+                }
                 lifted_runs::RangeSeam::Space => parts.push(self.d().text(" ")),
                 lifted_runs::RangeSeam::Glued => {}
             }
             cursor = cut.removed.end;
         }
         if cursor < span.end {
-            parts.push(self.verbatim_source_doc(Span::new(cursor, span.end)));
+            parts.push(self.source_span_covering_comments_doc(Span::new(cursor, span.end)));
         }
         self.d().concat(&parts)
     }

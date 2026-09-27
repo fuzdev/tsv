@@ -43,3 +43,13 @@ b --> text3</span>text4</div>
 <!-- a multi-line comment alone -->
 <div>text1<span><!-- a
 b --></span>text2</div>
+
+<!-- a frozen child whose bytes span lines, alone -->
+<div>text1<span><!-- prettier-ignore --><i>
+  inline1
+</i></span>text2</div>
+
+<!-- a frozen child whose bytes span lines, beside prose -->
+<div>text1<span><!-- prettier-ignore --><i>
+  inline2
+</i> text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14 text15</span>text16</div>

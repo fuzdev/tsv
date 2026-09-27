@@ -758,13 +758,14 @@ pub(super) const LAYOUT_WIDTH_MAX: u32 = u32::MAX - 3;
 /// is unmeasured — 98.9% of its probes are already warm, so its miss path is
 /// thin.
 ///
-/// ⚠️ **A format-ignored verbatim slice is layout-opaque, and that is the
-/// opposite verdict from every other newline-bearing text.** Its embedded
-/// newlines are *source* layout, not a break the enclosing group must honor
-/// (prettier's `printIgnored` string is likewise invisible to `willBreak`), so
-/// it reports [`LAYOUT_BREAKS_SOFT`] — no single-line width, no forced break —
-/// where a line-continuation string reports [`LAYOUT_BREAKS_FORCED`]. The fits
-/// walk still sees the newline through the same width slot.
+/// ⚠️ **A format-ignored JavaScript-level verbatim slice is layout-opaque, and
+/// that is the opposite verdict from every other newline-bearing text.**
+/// prettier's `printIgnored` string is invisible to `willBreak`, so it reports
+/// [`LAYOUT_BREAKS_SOFT`] — no single-line width, no forced break — where a
+/// line-continuation string, or a frozen Svelte template node (which
+/// prettier-plugin-svelte joins with `literalline`), reports
+/// [`LAYOUT_BREAKS_FORCED`]. The fits walk still sees the newline through the
+/// same width slot.
 ///
 /// ⚠️ **Reading the width slot raw for the verbatim case is deliberate, and it
 /// is the third spelling tried.** All three were built and measured on fuz_app
@@ -2087,12 +2088,13 @@ impl DocArena {
         self.alloc(DocNode::Text(DocText::SourceSpan(span, w)))
     }
 
-    /// [`Self::source_span`] for a **format-ignored verbatim slice** (the
-    /// `prettier-ignore` freeze): emits [`DocText::VerbatimSpan`] — identical
-    /// in measurement and render, but opaque to `will_break` (full rationale on
-    /// the variant's doc). Use ONLY for ignore-directive slices; genuine
-    /// multi-line content (line-continuation strings, `<pre>` text) keeps
-    /// [`Self::source_span`] so it force-breaks.
+    /// [`Self::source_span`] for a **format-ignored verbatim slice** of a
+    /// JavaScript-level construct (the `prettier-ignore` freeze): emits
+    /// [`DocText::VerbatimSpan`] — identical in measurement and render, but
+    /// opaque to `will_break` (full rationale on the variant's doc). Use ONLY
+    /// for those slices; a frozen Svelte template node and genuine multi-line
+    /// content (line-continuation strings, `<pre>` text) keep
+    /// [`Self::source_span`] so they force-break.
     #[inline]
     pub fn verbatim_source_span(&self, span: Span, source: &str) -> DocId {
         let w = source_span_width(span, source);

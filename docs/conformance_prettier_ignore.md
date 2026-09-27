@@ -29,6 +29,9 @@ For a whole-construct freeze the `prettier-ignore` family matches prettier (both
 - a frozen nested `<script>` / `<style>` glued to content on both sides, kept glued on both sides, where prettier never converges — ◆content_preservation — [nested_script_style_glued](../tests/fixtures/svelte/syntax/prettier_ignore/nested_script_style_glued_prettier_divergence/)
 - the boundary **after** a frozen nested `<script>` / `<style>` glued to the content before it, a line break, where prettier never converges — ◆content_preservation — [nested_script_style_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/nested_script_style_glued_before_prettier_divergence/)
 - a directive followed by **text** inside an element body in `<pre>` freezes that text, where prettier reaches past it to the next non-text node — ◆design_choice — [pre_text_follower](../tests/fixtures/svelte/syntax/prettier_ignore/pre_text_follower_prettier_divergence/)
+- a frozen node whose bytes span lines, inside an inline element or a component: the element lays out block-style, where prettier also keeps a dangled form for a glued authoring — ◆stable_quirk ◆design_choice — [multiline_inline_parent_long](../tests/fixtures/svelte/syntax/prettier_ignore/multiline_inline_parent_long_prettier_divergence/)
+- a frozen node whose bytes span lines, inside a block body: the block lays out block-style, where prettier keeps a glued body hugged — ◆stable_quirk ◆design_choice — [multiline_block_body](../tests/fixtures/svelte/syntax/prettier_ignore/multiline_block_body_prettier_divergence/)
+- `format-ignore` over a node whose bytes span lines — ◆design_choice — [multiline](../tests/fixtures/svelte/syntax/format_ignore/multiline_prettier_divergence/)
 
 **Inside `<pre>` the directive keeps its reach.** A template directive freezes the next node
 inside a whitespace-significant element exactly as it does outside one — directly in the `<pre>`,
@@ -151,6 +154,36 @@ compiler keeps it, but it renders no box, so the content on its two sides meets 
 whitespace after it just the same, and deleting that whitespace would weld the two
 (`…</script>text2` renders `text1text2`). Prettier breaks the frozen body open and never converges
 ([nested_script_style_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/nested_script_style_glued_before_prettier_divergence/)).
+
+**A frozen node whose bytes span lines breaks the fragment holding it.** The frozen bytes print
+as written, and a line break among them is a line break in the output, so the fragment holding the
+node lays out as it does around any content that renders over several lines — which prettier
+states the same way, joining a frozen template node's lines with a `literalline`, a break every
+enclosing group sees. In a block element that is layout parity — the content moves to its own
+indented line — though the width of the line after the frozen bytes can still part, where prettier
+keeps a word past the print width that tsv wraps
+([multiline_block_parent](../tests/fixtures/svelte/syntax/prettier_ignore/multiline_block_parent/),
+a parity fixture). In an inline element or a component — every inline ancestor of the node, and
+one glued to text on both sides
+([conformance_prettier_svelte.md §Moving a run](./conformance_prettier_svelte.md#moving-a-run-break-before-travel-and-welded-units),
+its third bound) — and in a block body (`{#if}` / `{:else}` / `{#each}` / `{#snippet}` / `{#key}`
+/ an `{#await}` phase), it is the block-style layout tsv gives any content that renders multiline
+([conformance_prettier_svelte.md §Svelte: Inline content block-style](./conformance_prettier_svelte.md#svelte-inline-content-block-style),
+whose scope reaches block bodies): the content moves to its own indented line however the author
+wrote the content boundary, which the compiler trims. Prettier keeps that form too, but holds a
+second one for a glued authoring — it dangles an inline element's delimiters around the content,
+and keeps a block body hugged — where tsv converges the two
+([multiline_inline_parent_long](../tests/fixtures/svelte/syntax/prettier_ignore/multiline_inline_parent_long_prettier_divergence/),
+[multiline_block_body](../tests/fixtures/svelte/syntax/prettier_ignore/multiline_block_body_prettier_divergence/))
+— ◆stable_quirk ◆design_choice. The layout is read from the frozen bytes, not from whether the
+author broke the content boundary: a glued authoring laid out hugged would wrap the text after the
+frozen node against the closing delimiter, and the next pass would read those lines as authored
+and go block-style. Past the frozen bytes' last line break, the text after the node fills from the
+column where they end. A freeze whose bytes fit on one line leaves the fragment's layout to its
+other content. The `format-ignore` spelling takes the same layout, where prettier reformats the
+node onto one line and keeps the fragment as authored
+([multiline](../tests/fixtures/svelte/syntax/format_ignore/multiline_prettier_divergence/)) —
+◆design_choice.
 
 **A range does not pin a section's position.** A `<script>` / `<style>` / `<svelte:options>` written *inside* a range is still lifted to the component root and printed at its canonical position, and its bytes are cut out of the frozen slice — leaving them there emits the section twice, which the parser rejects (`Duplicate instance script found`). Prettier does the same, so the plain case needs no divergence ([range_section_hoist](../tests/fixtures/svelte/syntax/prettier_ignore/range_section_hoist/)); a comment sitting beside such a section diverges ([range_interior_comment](../tests/fixtures/svelte/syntax/prettier_ignore/range_interior_comment_prettier_divergence/)), and the seam the cut leaves behind follows the byte-verbatim rule ([range_glued](../tests/fixtures/svelte/syntax/prettier_ignore/range_glued_prettier_divergence/)): tsv freezes the whole slice including inter-node whitespace, where prettier freezes node *content* but re-lays out the whitespace between nodes. The cut takes the section together with the **weaker** of the two whitespace runs beside it, and the **stronger** one stays exactly as the author spelled it — a tab stays a tab — and whole: the weaker run goes whole too, so the indentation in front of the next node survives only when the run after the section is the one kept (`text1⏎⏎<style>…</style>⏎⇥⇥text2` → `text1⏎⏎text2`). Strength is the order the join outside a range reads ([conformance_prettier_svelte.md §Svelte: Root section ordering](./conformance_prettier_svelte.md#svelte-root-section-ordering)): a blank line, then a line break, then any other whitespace, then none; on a tie the run after the section stays. So whitespace written on one side only survives, which is what the render needs — a hoisted section renders nothing in place, and cutting the only run between `{a} <script>…</script>text2` would weld the two into `{a}text2` ([range_section_seam](../tests/fixtures/svelte/syntax/prettier_ignore/range_section_seam_prettier_divergence/), [range_section_seam_verbatim](../tests/fixtures/svelte/syntax/prettier_ignore/range_section_seam_verbatim_prettier_divergence/)). Sections with only whitespace between them are **one seam**, joined as if they were absent: every run in it competes — the one before the first section, the ones between sections, the one after the last — a run before or after the sections is kept as written, and a run between them prints as a plain space or line break, never as a blank line (a blank line between two sections is the sections' own, as outside a range), so a line break between them beats a space before them (`x <style>…</style>⏎<script>…</script>y` → `x⏎y`); on a tie a run before or after the sections wins over one between them. A range marker and a comment inside the range are neighbours like any other node, and the source rewrite that joins template nodes around a section outside a range cuts one inside a range the same way ([range_section_seam_edges](../tests/fixtures/svelte/syntax/prettier_ignore/range_section_seam_edges_prettier_divergence/)). Prettier re-lays out that seam, and when a text node neighbours the section it usually emits an invalid component instead (other neighbours do so far less often): it hoists the section and leaves a copy of it in the range, which Svelte rejects as a duplicate (`script_duplicate`, `style_duplicate`, `svelte_meta_duplicate`); a copied `<script>` / `<style>` also carries the placeholder prettier holds the section's code in (`<script ✂prettier:content✂="…">{}</script>`), and prettier's own second pass throws on it (`Attributes need to be unique`).
 

@@ -92,6 +92,11 @@ it survives as the one space it renders as. The gap in front of a frozen node is
 the author's: the formatter prints it once, never invents one, and never eats
 one.
 
+A frozen template node whose bytes span lines is content that renders over
+several lines, so the element or block holding it lays out over several lines
+too: its content moves to its own indented line, as it would around any other
+multi-line content, while the frozen bytes print exactly as written.
+
 Inside a `<pre>` — directly, or nested in any element, component, special element or block
 there — a directive freezes the next node the same way, but no whitespace around the node
 moves: the whitespace there is rendered text, printed exactly as written with or without a

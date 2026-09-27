@@ -728,13 +728,9 @@ impl<'a> Printer<'a> {
     /// (`has_source_breaks_in_content`) and goes block-style, so the hug is no fixed point. The
     /// decision reads what WILL be printed — the built children doc's forced break
     /// ([`tsv_lang::doc::arena::DocArena::will_break`], memoized) — and lays the element out as
-    /// its spaced twin does, reusing the one children doc.
-    ///
-    /// ⚠️ One break is not seen: a newline inside a FROZEN slice (a `prettier-ignore`d node,
-    /// `text<span><!-- prettier-ignore --><i>⏎  a⏎</i></span>more`) is verbatim text, which
-    /// `will_break` counts as a soft break, so such content still takes the inline state.
-    /// See conformance_prettier_svelte.md §Svelte: Inline content block-style (the glued-both
-    /// bounds) and `elements/inline_glued_both_breaking_content_prettier_divergence`.
+    /// its spaced twin does, reusing the one children doc. A frozen child whose bytes span
+    /// lines is such content too: its slice is an ordinary source span, whose line break is a
+    /// forced one (`elements/inline_glued_both_breaking_content_prettier_divergence`).
     pub(super) fn build_close_gt_dangle_doc(
         &self,
         parts: &ElementParts<'_>,
@@ -745,9 +741,6 @@ impl<'a> Printer<'a> {
         let block_state =
             self.build_collapsible_element_doc(parts, ctx, attr_docs, children_doc, false, None);
         let d = self.d();
-        // TODO: a frozen multi-line node in the content (a verbatim newline, which `will_break`
-        // reads as soft) still takes the inline state; stable alone, but beside long prose the
-        // fill's wrap reads back as authored on the next pass (F1).
         if d.will_break(children_doc) {
             return block_state;
         }

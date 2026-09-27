@@ -493,12 +493,13 @@ impl<'a> Printer<'a> {
     /// keeps the doc an unfrozen one gets, since its bytes are verbatim either way.
     ///
     /// ⚠️ The slice is an ordinary source span
-    /// ([`Printer::source_span_covering_comments_doc`]), **not** the flow freeze's
-    /// layout-opaque one ([`Printer::verbatim_source_doc`]). Its line breaks are rendered
-    /// content here, like a `<pre>` text's, so they break the groups around them exactly as
-    /// the unfrozen node's own content would. An opaque slice would keep an enclosing inline
-    /// element's tags whole around a frozen multi-line node where the same node unfrozen, or
-    /// frozen as text, opens them — one printed form, two layouts.
+    /// ([`Printer::source_span_covering_comments_doc`]), as the flow freeze's is, **not** the
+    /// layout-opaque one a frozen value inside a node takes ([`Printer::verbatim_source_doc`]).
+    /// Its line breaks are rendered content here, like a `<pre>` text's, so they break the
+    /// groups around them exactly as the unfrozen node's own content would. An opaque slice
+    /// would keep an enclosing inline element's tags whole around a frozen multi-line node
+    /// where the same node unfrozen, or frozen as text, opens them — one printed form, two
+    /// layouts.
     ///
     /// Range markers stay ordinary comments here, as inside any element: a range takes effect
     /// only at the top level of the template.

@@ -830,6 +830,17 @@ impl<'a> Printer<'a> {
     /// Takes the span rather than deriving it, because both callers need it for the gap
     /// question ([`Self::push_format_ignore_gap`]) before they need the doc, and deriving it in
     /// two places is two answers to [`Self::format_ignore_frozen_span`] waiting to disagree.
+    ///
+    /// The slice is an ordinary source span
+    /// ([`Printer::source_span_covering_comments_doc`]), so a line break among the frozen bytes
+    /// breaks every group around it: the fragment holding a frozen node that spans lines lays
+    /// out as it does around any content that renders multiline — block-style in an inline
+    /// element, a component or a block body. That is prettier-plugin-svelte's reading too,
+    /// which joins a frozen template node's lines with `literalline`. A slice opaque to
+    /// `will_break` would see the break only on the NEXT pass: the first would keep the content
+    /// hugged and wrap the text after the node against the closing delimiter, and the second
+    /// would read those lines as authored and go block-style
+    /// (`syntax/prettier_ignore/multiline_inline_parent_long_prettier_divergence`).
     fn format_ignore_raw_doc(&self, node: &FragmentNode<'_>, frozen: Span) -> Option<DocId> {
         if let FragmentNode::Text(text) = node
             && text.is_collapsible_ws_only
@@ -839,7 +850,7 @@ impl<'a> Printer<'a> {
         // The ignored node's subtree can hold `{expr}` / block-head comments (all in
         // `Root.comments`); they ride out inside the raw slice — see
         // `tsv_lang::comment_ledger`.
-        Some(self.verbatim_source_doc(frozen))
+        Some(self.source_span_covering_comments_doc(frozen))
     }
 
     /// The span a `format-ignore` freezes for `node` — its own span, less the one run that is

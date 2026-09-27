@@ -414,18 +414,31 @@ pub enum DocText {
     /// [`resolve_text`]; behaves identically to the pooled text it replaces in
     /// every doc transform (a `DocNode::Text` is matched generically).
     SourceSpan(Span, u16),
-    /// A format-ignored **verbatim slice** (the `prettier-ignore` freeze) —
-    /// [`SourceSpan`](DocText::SourceSpan) in every mechanical respect (same
-    /// eager width policy, same render resolution against `source`), but
-    /// **layout-opaque**: `will_break` does not report its embedded newlines as
-    /// a forced break. A frozen slice's newlines are *source* layout, not a
-    /// break the enclosing group must honor — prettier's `printIgnored` output
-    /// is a plain string doc its willBreak/propagateBreaks never see, and the
-    /// enclosing containers lay out as if the slice were flat. `fits()` is
-    /// unaffected (it keys on the width slot, where the newline flag still
-    /// ends the measured line). Built only via `verbatim_source_span`; genuine
-    /// multi-line content (line-continuation strings, `<pre>` text) must stay
-    /// [`SourceSpan`](DocText::SourceSpan) so it force-breaks.
+    /// A format-ignored **verbatim slice** of a JavaScript-level construct (the
+    /// `prettier-ignore` freeze of a statement, an expression, a type, a
+    /// Svelte braced head's value) — [`SourceSpan`](DocText::SourceSpan) in
+    /// every mechanical respect (same eager width policy, same render
+    /// resolution against `source`), but **layout-opaque**: `will_break` does
+    /// not report its embedded newlines as a forced break, as prettier's
+    /// `printIgnored` output is a plain string doc its willBreak/propagateBreaks
+    /// never see. `fits()` is unaffected (it keys on the width slot, where the
+    /// newline flag still ends the measured line). Where the opacity decides
+    /// a layout is a slice whose directive sits INSIDE it: `tsv_ts` freezes a
+    /// member expression from the chain base through the directive and the
+    /// member after it (`fn(2.0000)⏎// prettier-ignore⏎.c`), and the opacity is
+    /// what keeps every container around that slice in its own tight layout —
+    /// the call hugging it, a ternary holding it inline. Where the directive
+    /// sits OUTSIDE the slice, in a gap the printer lays out itself, a break
+    /// the printer emits before the slice can already break the groups around
+    /// it — a Svelte braced head's value and `{@debug}` list open their own
+    /// line, so the opacity changes nothing there — and a `tsv_ts` printer that
+    /// needs the slice's own newline to break a group asks for it explicitly
+    /// (the must-break signal of `build_frozen_node_doc`). Built only via
+    /// `verbatim_source_span`. A frozen
+    /// Svelte TEMPLATE node is not one of these: prettier-plugin-svelte joins
+    /// its lines with `literalline`, a break every enclosing group sees, so it
+    /// stays [`SourceSpan`](DocText::SourceSpan) like the rest of genuine
+    /// multi-line content (line-continuation strings, `<pre>` text).
     VerbatimSpan(Span, u16),
 }
 
