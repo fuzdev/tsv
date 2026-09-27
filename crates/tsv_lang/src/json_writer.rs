@@ -1069,6 +1069,25 @@ impl JsonWriter {
         self.buf.push(b'"');
     }
 
+    /// [`JsonWriter::string`] as one shared out-of-line copy of
+    /// [`JsonWriter::string_led`] with an empty lead — byte-identical output.
+    ///
+    /// A string shorter than a word is tested for escapes inline and, clean, written
+    /// as one fixed-width window append (`string_escape_free_led`); a longer one runs
+    /// the word loop behind a tail call (`string_led_long`), which writes a clean
+    /// string of up to [`SHORT_FRAGMENT_MAX`] bytes through the same window. The copy
+    /// makes no call on the short path and saves no register, where `string`'s clean
+    /// path pays a libc `memcpy` call.
+    ///
+    /// For the CSS wire writer, whose strings — property names, values, selector
+    /// names — are short and numerous. It is not `string` itself: measured on the
+    /// TypeScript and Svelte writers, the same shape saved instructions but cost
+    /// cycles, so it is a writer's choice per call site, not the default.
+    #[inline(never)]
+    pub fn string_outlined(&mut self, s: &str) {
+        self.string_led(&[], s.as_bytes());
+    }
+
     /// A dynamic string value the **caller** guarantees needs no escape,
     /// quoted, behind the constant fragment `lead` — byte-identical to
     /// `raw(lead)` then [`JsonWriter::string`] on such input, without the
@@ -1645,10 +1664,10 @@ mod tests {
         w.into_bytes()
     }
 
-    /// [`JsonWriter::string`] must be byte-identical to `serde_json`'s own
-    /// string serialization — the parity contract this module's whole doc
-    /// comment rests on — on both of its arms: the escape-free fast path and
-    /// the hand escaper.
+    /// [`JsonWriter::string`] and [`JsonWriter::string_outlined`] must be
+    /// byte-identical to `serde_json`'s own string serialization — the parity
+    /// contract this module's whole doc comment rests on — on both of their arms:
+    /// the escape-free fast path and the hand escaper.
     ///
     /// Graded exhaustively over [`escape_cases`], whose alphabet carries every
     /// byte `serde_json` escapes and the bytes adjacent to each boundary: the
@@ -1670,6 +1689,19 @@ mod tests {
                 String::from_utf8_lossy(&ours),
                 String::from_utf8_lossy(&theirs)
             );
+            // `string_outlined`, the CSS writer's spelling, into a writer with no spare
+            // room (its grow path) and one with room (its window path).
+            for cap in [0, 256] {
+                let mut w = JsonWriter::with_capacity(cap);
+                w.string_outlined(case);
+                let outlined = w.into_bytes();
+                assert_eq!(
+                    outlined,
+                    theirs,
+                    "string_outlined broke on {case:?} (capacity {cap}): {:?}",
+                    String::from_utf8_lossy(&outlined)
+                );
+            }
         }
     }
 
