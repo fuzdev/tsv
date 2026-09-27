@@ -16,7 +16,7 @@ governs every entry here live in [conformance_prettier.md](./conformance_prettie
 - Non-null parenthesized base — ◆design_choice — [non_null_paren_base_long](../tests/fixtures/typescript/expressions/member/non_null_paren_base_long_prettier_divergence/)
 - Parenthesized binary member base — ◆design_choice ◆print_width — [paren_binary_base_long](../tests/fixtures/typescript/expressions/member/paren_binary_base_long_prettier_divergence/)
 - Constrained infer extends-operand parens — ◆prettier_bug — [constrained_extends_parens](../tests/fixtures/typescript/types/infer/constrained_extends_parens_prettier_divergence/)
-- Negative literal postfix-operand parens — ◆prettier_bug ◆parser_compat — [negative_literal_postfix_parens](../tests/fixtures/typescript/types/negative_literal_postfix_parens_prettier_divergence/), [negative_literal_postfix_parens_comment](../tests/fixtures/typescript/types/negative_literal_postfix_parens_comment_prettier_divergence/)
+- Negative literal postfix-operand parens — ◆prettier_bug ◆parser_compat — [negative_literal_postfix_parens](../tests/fixtures/typescript/types/negative_literal_postfix_parens_prettier_divergence/), [negative_literal_postfix_parens_comment](../tests/fixtures/typescript/types/negative_literal_postfix_parens_comment_prettier_divergence/), [negative_literal_indexed_access](../tests/fixtures/typescript/types/negative_literal_indexed_access_svelte_prettier_divergence/)
 - Arrow type param trailing comma — ◆design_choice — [single_type_param](../tests/fixtures/typescript/expressions/arrow/generic/single_type_param_prettier_divergence/)
 - Empty-object comment bracket spacing — ◆design_choice — [empty_block_comment](../tests/fixtures/typescript/expressions/objects/empty_block_comment_prettier_divergence/), [destructure empty_comment](../tests/fixtures/typescript/expressions/destructuring/empty_comment_prettier_divergence/), [enum empty_comment](../tests/fixtures/typescript/declarations/enum/body_empty_comment_prettier_divergence/), [literal_body_empty](../tests/fixtures/typescript/types/comments/literal_body_empty_prettier_divergence/), [union_empty_object_member](../tests/fixtures/typescript/types/union_empty_object_member_prettier_divergence/), [call_type_arg_empty_comment](../tests/fixtures/typescript/typescript_specific/generics/call_type_arg_empty_comment_prettier_divergence/)
 - Optional rest parameter `?` — ◆design_choice — [rest_optional_param](../tests/fixtures/typescript/typescript_specific/rest_optional_param_prettier_divergence/)
@@ -490,11 +490,14 @@ or between them and the brackets kept where it was written, where prettier strip
 (and, for a trailing `//`, floats the comment past the `;`). A negative literal anywhere else
 needs no pair and strips in both formatters (`(-1) | 2`, `A[(-1)]`, `[(-1)?]`,
 [negative_literal_redundant_parens](../tests/fixtures/typescript/types/negative_literal_redundant_parens/)),
-as does a non-negative literal in these positions (`(1)[]`). The bare spellings are pinned in
-[tests/negative_literal_postfix_parens.rs](../tests/negative_literal_postfix_parens.rs): where
-acorn-typescript rejects the bare text (`-1[]`, `-1[K][]`, `readonly -1[]`) tsv REPAIRS it to
-the paired spelling every parser reads alike, and where both parsers accept it as different
-programs (`-1[K]`, and a pair around such a run, `(-1[K])[]`) tsv prints it as written.
+as does a non-negative literal in these positions (`(1)[]`). Where both parsers accept the bare text as different
+programs (`-1[K]`, and a pair around such a run, `(-1[K])[]`) tsv prints it as written, and
+prettier strips the pair around the run into a `-1[K][]` acorn-typescript rejects —
+[negative_literal_indexed_access](../tests/fixtures/typescript/types/negative_literal_indexed_access_svelte_prettier_divergence/),
+which also pins the parse divergence. Where acorn-typescript rejects the bare text (`-1[]`,
+`-1[K][]`, `readonly -1[]`) tsv REPAIRS it to the paired spelling every parser reads alike;
+no fixture input can hold those, since they are not tsv fixed points, so they are pinned in
+[tests/negative_literal_postfix_parens.rs](../tests/negative_literal_postfix_parens.rs).
 
 **Module path calls**: Prettier special-cases `require`/`import` identifiers:
 

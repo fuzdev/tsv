@@ -22,12 +22,67 @@
 //!   printing the pair every parser reads alike (`(-1)[]`), as it does `fn<T> >= 1` in the
 //!   mirror direction. The bare text is not a tsv fixed point, so it cannot be an
 //!   `input.*`; and a `.svelte` variant is graded by `svelte compile`, which rejects it.
+//!   This file is the only pin of these, the tree of `-1[]` included.
 //! - **both accept, as different programs** — a bare literal ahead of `[K]` runs only
 //!   (`-1[K]`), and a pair the author wrote AROUND such a run (`(-1[K])[]`). tsv prints each
 //!   as written, so neither parser's reading of the output differs from its reading of the
 //!   input; adding a pair at the literal would hand acorn tsc's program instead of the one
-//!   it read. tsv's own parse of these follows tsc rather than acorn, a separate parser
-//!   divergence, so no `expected.json` can pin them either.
+//!   it read. tsv's own parse of these follows tsc rather than acorn, a parser divergence
+//!   the fixture `typescript/types/negative_literal_indexed_access_svelte_prettier_divergence`
+//!   pins (both trees, and prettier stripping the pair around the run); they recur here
+//!   only as formatting claims on the standalone-TS path.
+//!
+//! The parser divergence is cataloged in `docs/conformance_svelte.md` §TypeScript
+//! Corrections.
+
+use serde_json::Value;
+
+fn parse_json(source: &str) -> Value {
+    let arena = bumpalo::Bump::new();
+    let program = tsv_ts::parse(source, &arena).expect("parse failed");
+    tsv_debug::json::wire_value(&tsv_ts::convert_ast_json_bytes(&program, source))
+}
+
+/// The `type` of the node at `pointer`, or `<none>` where nothing is.
+fn node_type(json: &Value, pointer: &str) -> String {
+    json.pointer(pointer)
+        .and_then(|n| n.get("type"))
+        .and_then(Value::as_str)
+        .map_or_else(|| "<none>".to_owned(), str::to_owned)
+}
+
+/// The alias's value is `postfix` over the negative literal type `-1`: the postfix node at
+/// `/body/0/typeAnnotation`, its operand at `operand_key`, and that operand tsc's
+/// `LiteralType(PrefixUnaryExpression(-, 1))` — acorn's wire shape for it.
+fn assert_postfix_over_negative_literal(source: &str, postfix: &str, operand_key: &str) {
+    let json = parse_json(source);
+    let value = "/body/0/typeAnnotation";
+    let operand = format!("{value}/{operand_key}");
+    let literal = format!("{operand}/literal");
+    assert_eq!(node_type(&json, value), postfix, "{source:?}");
+    assert_eq!(node_type(&json, &operand), "TSLiteralType", "{source:?}");
+    assert_eq!(node_type(&json, &literal), "UnaryExpression", "{source:?}");
+    assert_eq!(
+        json.pointer(&format!("{literal}/operator"))
+            .and_then(Value::as_str),
+        Some("-"),
+        "{source:?}"
+    );
+    assert_eq!(
+        node_type(&json, &format!("{literal}/argument")),
+        "Literal",
+        "{source:?}"
+    );
+}
+
+#[test]
+fn the_bare_array_form_parses_as_tsc_reads_it() {
+    // an array of the literal type, where acorn-typescript rejects at the `]` — the one tree
+    // no fixture can pin (the indexed-access trees are the `_svelte_prettier_divergence`
+    // fixture's)
+    assert_postfix_over_negative_literal("type A = -1[];\n", "TSArrayType", "elementType");
+    assert_postfix_over_negative_literal("type A = -1n[];\n", "TSArrayType", "elementType");
+}
 
 fn format(source: &str) -> String {
     let arena = bumpalo::Bump::new();

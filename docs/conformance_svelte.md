@@ -1116,6 +1116,29 @@ asserts the trees directly. **Upstream candidate**: acorn-typescript —
 `shouldParseArrow`'s return-type `tryParse` commits on `: type =>` alone, never
 asking whether the `:` is an enclosing conditional's.
 
+**A negative literal type as the operand of postfix brackets** — `type A = -1[];`,
+`type A = -1[K];`. tsc reads `-` as a negative literal type when a numeric or bigint
+literal follows, and then runs its postfix loop over the brackets: `-1[]` is an array of
+the literal type `-1`, and `-1[K]` an indexed access on it. acorn-typescript reads the
+literal with its **expression** parser (`parseMaybeUnary`, from `tsParseNonArrayType`'s
+`-` arm), which takes every `[…]` that follows as a computed member: `-1[]` is a syntax
+error at the `]`, and `-1[K]` is the literal type of the expression `-(1[K])`. tsv parses
+tsc's tree in both — `TSArrayType` over `TSLiteralType(-1)`, and `TSIndexedAccessType`
+with `TSLiteralType(-1)` as its object — so the first is a tsv acceptance acorn rejects
+and the second the same text read as a different tree. The formatter repairs `-1[]` to
+`(-1)[]`, the spelling every parser reads as tsc does, and prints `-1[K]` as written —
+a pair at the literal there would hand acorn tsc's program instead of the one it read
+([conformance_prettier_ts.md §TypeScript](./conformance_prettier_ts.md#typescript), whose
+[negative_literal_postfix_parens](../tests/fixtures/typescript/types/negative_literal_postfix_parens_prettier_divergence/)
+fixture holds the paired spellings). The indexed-access trees are pinned by
+[negative_literal_indexed_access](../tests/fixtures/typescript/types/negative_literal_indexed_access_svelte_prettier_divergence/),
+whose `(-1[K])[]` prettier strips into the rejected `-1[K][]`. The bare `-1[]` cannot be an
+`input.*` at all, since it is not a tsv fixed point, so its tree is pinned by
+[negative_literal_postfix_parens.rs](../tests/negative_literal_postfix_parens.rs).
+**Upstream candidate**: acorn-typescript — build the literal from the `-` and the
+numeric literal alone, as tsc's `parseLiteralTypeNode` does, rather than parsing a whole
+unary expression, so the type parser's postfix loop sees the brackets.
+
 **A type-argument region tsc claims and acorn-typescript abandons** —
 `a < (b = c) > (t, u)`, `a < (b << c) > (t, u)`, `a < [b as C] > (t, u)`,
 `a < { b: c(d) } > (t, u)`. A `<` opening on a `(` is a type-argument list only where
@@ -1363,6 +1386,7 @@ All corrections exist because of upstream bugs. If fixed upstream, tsv would rem
 - Anonymous class-expression `id` — omitted for implements-first heritage
 - `export default class implements I {}` — anonymous default class with implements-first heritage rejected (`implements` read as a reserved-word name)
 - Type assertion vs. generic arrow — `<T>` before any arrow (even a parenthesized one) reads as type parameters; the parenthesized-arrow abort check is dead code
+- Negative literal type before postfix brackets — `tsParseNonArrayType`'s `-` arm reads the literal with `parseMaybeUnary`, so `-1[]` is rejected at the `]` and `-1[K]` becomes the literal type `-(1[K])` where tsc reads an array type and an indexed access
 - Arrow return type in a conditional's consequent — `shouldParseArrow`'s return-type `tryParse` keeps `(b): c => d` in `a ? (b) : c => d`, then fails on the missing ternary `:`
 - Class-member `static` line break — `parseClassElement` folds `static` into the `tsParseModifiers` loop, whose uniform `tsTokenCanFollowModifier` → `!hasPrecedingLineBreak()` guard imposes a restriction ecma262's `ClassElement` does not have, so `class C { static⏎c = 3 }` ASI-splits into two members where tsc, prettier and plain acorn all read one static field. The `parseClassElement` it overrides already reads it right
 - `export default abstract` line break — `isAbstractClass`'s `this.lookahead().type === tt._class` omits the line-break test tsc's `nextTokenIsClassKeywordOnSameLine` makes, so `export default abstract⏎class Base {}` welds into one exported abstract class and the line terminator vanishes; its `async` neighbour in the same `parseExportDefaultDeclaration` already honours the restriction
