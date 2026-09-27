@@ -11,7 +11,6 @@
 // between its neighbours) and `handle_content_text_child` (a content text owns
 // a fill, and the questions are about its own two boundary runs).
 
-use super::element_doc::MultilineCause;
 use super::fragment_doc::{DeferredBoundary, text_starts_with_linebreak};
 use super::helpers::{is_control_flow_block, is_inline_content};
 use crate::ast::internal::{FragmentNode, Text, split_collapsible_ws, text_edge_newlines};
@@ -70,11 +69,8 @@ impl SiblingPosition {
 #[derive(Clone, Copy)]
 pub(super) struct TextChildContext {
     /// Whether the fragment is built on the convergence path (the multiline element arm, the only
-    /// caller that routes blocks and control-flow blocks through their own dispatch) — and, when
-    /// it is, *why* the layout went multiline. The fragment builders ask only
-    /// [`MultilineCause::is_multiline`] of it; the cause itself is read off the element's
-    /// `ElementContext` by the sibling-`>` dangle's eligibility test, not here.
-    pub(super) cause: MultilineCause,
+    /// caller that routes blocks and control-flow blocks through their own dispatch).
+    pub(super) multiline: bool,
     /// Whether this node's inline run holds prose — [`Printer::run_is_prose`] over the run's
     /// [`Printer::prose_words`] maximum — the prose gate of the sibling-newline flow rule at all
     /// three of its sites: the standalone separator, and a content text's leading and trailing
@@ -197,13 +193,12 @@ impl<'a> Printer<'a> {
         deferred: &mut DeferredBoundary,
     ) {
         let TextChildContext {
-            cause,
+            multiline,
             run_has_prose,
             content_bounds,
             prev_sibling_head,
             ..
         } = ctx;
-        let multiline = cause.is_multiline();
         // Sibling-kind facts, derived from the node's position in `trimmed_nodes` — this
         // handler's set; the content path derives its own overlapping one.
         let prev_idx = i.checked_sub(1);
@@ -580,14 +575,13 @@ impl<'a> Printer<'a> {
         handle_whitespace_of_prev_text: &mut bool,
     ) {
         let TextChildContext {
-            cause,
+            multiline,
             run_has_prose,
             content_bounds,
             glued_prefix,
             prev_sibling_head,
             ..
         } = ctx;
-        let multiline = cause.is_multiline();
         // Sibling-kind facts, derived from the node's position in `trimmed_nodes` — this
         // handler's set; the separator path derives its own overlapping one.
         let prev_idx = i.checked_sub(1);

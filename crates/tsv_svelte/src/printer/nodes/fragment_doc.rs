@@ -11,7 +11,6 @@
 // The byte-glue predicates and glued-run builders live in `fragment_glue_doc.rs`;
 // text-child handling and word-fill construction in `fragment_text_doc.rs`.
 
-use super::element_doc::MultilineCause;
 use super::fragment_text_doc::TextChildContext;
 use super::helpers::{is_control_flow_block, is_inline_content};
 use crate::ast::internal::{self, FragmentNode};
@@ -180,8 +179,8 @@ impl<'a> Printer<'a> {
     /// it — see conformance_prettier_svelte.md §Svelte: Inline content block-style.
     ///
     /// # Parameters
-    /// - `cause`: the convergence mode — [`MultilineCause::None`] is the inline arm; anything
-    ///   else is the multiline arm (`compute_multiline_cause`, or `Structural` from
+    /// - `multiline`: the convergence mode — `false` is the inline arm, `true` the multiline arm
+    ///   (an element whose `compute_multiline_cause` is multiline, or
     ///   [`Self::build_nodes_doc_multiline`] for block bodies, the root and special elements).
     ///   Multiline turns on the ported prettier-plugin-svelte printChildren handling that the
     ///   inline callers don't need (and would be churned by): block children via `handle_block_child` +
@@ -189,16 +188,16 @@ impl<'a> Printer<'a> {
     ///   boundary becomes a hardline/blank/bare-line); the `splitTextToDocs` leading-linebreak rule
     ///   (content text with a leading newline emits a hardline rather than folding into the prev
     ///   element); and the first/last whitespace-only boundary deferring to the parent's
-    ///   leading/trailing break (emit nothing) instead of the inline single space. The
-    ///   `Structural` / `SourceBreaks` split is read only by the sibling-newline flow rule in
-    ///   [`Self::handle_text_child`].
+    ///   leading/trailing break (emit nothing) instead of the inline single space. WHY an element
+    ///   went multiline ([`MultilineCause`](super::element_doc::MultilineCause)) is not an input
+    ///   here: nothing in the fragment reads it, and its one reader, the sibling-`>` dangle, reads
+    ///   it off the element's context.
     pub(super) fn build_nodes_doc_trimmed(
         &self,
         nodes: &[FragmentNode<'_>],
-        cause: MultilineCause,
+        multiline: bool,
     ) -> DocId {
         let _fragment = self.enter_fragment();
-        let multiline = cause.is_multiline();
         let d = self.d();
         if nodes.is_empty() {
             return d.empty();
@@ -417,7 +416,7 @@ impl<'a> Printer<'a> {
                     trimmed_nodes,
                     i,
                     TextChildContext {
-                        cause,
+                        multiline,
                         run_has_prose: Self::run_is_prose(run_words),
                         content_bounds,
                         glued_prefix: pending_glued_prefix.take(),
@@ -1695,10 +1694,7 @@ impl<'a> Printer<'a> {
     /// `splitTextToDocs` boundary hardlines, the control-flow-block `in_multiline_context` /
     /// root-inline-run dispatch, and the sibling-`>` dangle).
     pub(crate) fn build_nodes_doc_multiline(&self, nodes: &[FragmentNode<'_>]) -> DocId {
-        // `Structural`: these callers are the root fragment, block bodies, and special elements —
-        // none of them has an enclosing element whose multiline-ness the content's own newlines
-        // could flip, so the sibling-newline flow rule stays in force here.
-        self.build_nodes_doc_trimmed(nodes, MultilineCause::Structural)
+        self.build_nodes_doc_trimmed(nodes, true)
     }
 
     /// Build the content of a **whitespace-collapsing container** (`<table>`, `<select>`, … —

@@ -301,10 +301,10 @@ impl ThisClaim {
 /// [`Self::SourceBreaks`] decision is one tsv's **own output** rewrites, since converging an
 /// authoring to block-style adds or removes exactly those newlines. A layout keyed on it can
 /// therefore be re-decided on the next pass; a layout keyed on [`Self::Structural`] cannot.
-/// [`Printer::handle_separator_text_child`]'s sibling-newline flow rule is one consumer; the
-/// sibling-`>` dangle's eligibility test ([`PreparedElement::gt_dangle_boundary`]) is the other,
-/// and it admits every [`Self::SourceBreaks`] decision — the one multiline cause its own output
-/// can produce.
+/// Its one reader of the split is the sibling-`>` dangle's eligibility test
+/// ([`PreparedElement::gt_dangle_boundary`]), which admits every [`Self::SourceBreaks`] decision —
+/// the one multiline cause its own output can produce. The content builders ask only
+/// [`Self::is_multiline`].
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum MultilineCause {
     /// Not multiline: the content collapses to one line, and width alone decides the layout.
@@ -921,10 +921,7 @@ impl<'a> Printer<'a> {
     /// inter-sibling whitespace trimmed (render-free — the compiler removes it). Its multiline
     /// decision is forced (see `analyze_element`), so `boundary` is always `Hard` there.
     ///
-    /// The multiline arm passes the *cause* (see [`MultilineCause`]) down, though the fragment
-    /// builders ask only whether it is multiline; the cause's one reader is the sibling-`>`
-    /// dangle's eligibility test ([`PreparedElement::gt_dangle_boundary`]), off `ctx`. `boundary`
-    /// stays the source of the multiline-ness itself, so a `Soft` boundary builds the inline
+    /// `boundary` is the source of the multiline-ness, so a `Soft` boundary builds the inline
     /// shape.
     fn build_content_children_doc(
         &self,
@@ -935,12 +932,8 @@ impl<'a> Printer<'a> {
         if parts.collapses_child_ws {
             self.build_container_content_doc(parts.nodes)
         } else {
-            let cause = if boundary == BoundaryMode::Hard {
-                ctx.multiline
-            } else {
-                MultilineCause::None
-            };
-            self.build_nodes_doc_trimmed(parts.nodes, cause)
+            let multiline = boundary == BoundaryMode::Hard && ctx.multiline.is_multiline();
+            self.build_nodes_doc_trimmed(parts.nodes, multiline)
         }
     }
 

@@ -13,7 +13,6 @@ use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
-use super::element_doc::MultilineCause;
 use super::helpers::each_expr_comment_end;
 
 // Opening-tag literals for control-flow blocks. Every offset that locates the
@@ -1140,7 +1139,7 @@ impl<'a> Printer<'a> {
     /// authoring of the same body, so both reach one fixed point by construction.
     ///
     fn build_section_body_doc(&self, fragment: &Fragment<'_>) -> DocId {
-        self.build_nodes_doc_trimmed(fragment.nodes, MultilineCause::None)
+        self.build_nodes_doc_trimmed(fragment.nodes, false)
     }
 
     /// The `{:then …}` keyword doc — `{:then value}` if a `then` value binds, else
