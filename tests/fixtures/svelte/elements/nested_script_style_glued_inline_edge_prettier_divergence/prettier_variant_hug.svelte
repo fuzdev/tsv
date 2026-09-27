@@ -71,3 +71,30 @@
 		</script></span
 	>text3
 </p>
+
+<!-- a lone element, both edges inline -->
+<p>
+	x<span
+		><style>
+			.a {
+				color: red;
+			}
+		</style></span
+	>y
+</p>
+
+<!-- a block holding a pair, both edges inline (in a <div>, since a <div> cannot sit in a <p>) -->
+<div>
+	x<b
+		><div>
+			<script>
+				let a = 1;
+			</script>
+			<style>
+				.a {
+					color: red;
+				}
+			</style>
+		</div></b
+	>y
+</div>

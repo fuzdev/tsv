@@ -9,10 +9,16 @@ the element keeps its glue, laid out as a glued inline element whose body breaks
 through a comment (it renders nothing), between two such elements, in a component or a block body
 inside a line, and when the only whitespace on the far side reaches the parent's edge, where the
 compiler trims it. Its body breaks, so an inline parent glued to text on both sides lays out
-block-style around it, as it does around any content that cannot stay inline.
+block-style around it, as it does around any content that cannot stay inline — around a lone
+element between the parent's two edges, and around a block holding a pair of them, with each
+`<style>` body one level past its own tag.
 
-- `unformatted_ours_one_line.svelte` — each paragraph on one line, the last one with its authored
-  space before `</span>`; tsv normalizes it to `input.svelte`.
+- `unformatted_ours_one_line.svelte` — each case on one line, the trimmed-whitespace case with its
+  authored space before `</span>`; tsv normalizes it to `input.svelte`. The block's pair is written
+  `</script> <style>`, spaced: glued, it takes its own lines inside the block, which renders nothing
+  but reads as a render change to the validator's render key (whitespace never collapses across a
+  nested element there), so `tests/svelte_nested_script_style_own_line.rs` pins a glued pair in a
+  block parent.
 - `prettier_variant_dangle.svelte` — prettier's stable form of that authoring: it keeps the glue
   too, and dangles the inline parents' delimiters; tsv normalizes it to `input.svelte`. Prettier
   keeps `input.svelte` as written.

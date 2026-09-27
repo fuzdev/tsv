@@ -13,13 +13,11 @@
 //! answer is read through them. A declaration beside such an element answers the way the
 //! element does.
 //!
-//! The two glued-inline-parent cells pin the block-style layout a breaking nested body gives an
-//! inline parent glued to text on both sides, with the `<style>` body one level past its own tag.
-//!
 //! Not fixtures: several of these cells are render-equivalent to their output, but the fixture
 //! validator's render key joins the compiler's separate template chunks with a hole marker, so
-//! whitespace never collapses across the nested element there and a one-sided cell reads as a
-//! render change. Each cell pins the exact output and that the output is its own fixed point.
+//! whitespace never collapses across the nested element there — a one-sided cell, or whitespace
+//! the formatter adds between two nested elements, reads as a render change. Each cell pins the
+//! exact output and that the output is its own fixed point.
 
 fn format(source: &str) -> String {
     tsv_svelte::format_str(source).expect("svelte format_str")
@@ -454,46 +452,23 @@ fn declaration_after_glued_element_in_inline_block_body() {
     );
 }
 
-/// A lone style in an inline parent glued to text on both sides: its body breaks, so the parent
-/// lays out block-style around it, and the body indents one level past its own tag.
+/// A script and a style glued together inside a block parent each take their own line: the breaks
+/// at the block's content edges disappear, and the one between them shares its line with nothing
+/// that renders.
 #[test]
-fn lone_style_in_glued_inline_parent_lays_out_block_style() {
+fn glued_pair_in_block_parent_takes_own_lines() {
     assert_formats(
-        r"<p>x<span><style>.a { color: red; }</style></span>y</p>",
-        r"<p>
-	x<span>
-		<style>
-			.a {
-				color: red;
-			}
-		</style>
-	</span>y
-</p>
-",
-    );
-}
-
-/// A block holding a script and a style inside an inline parent glued to text on both sides: the
-/// parent lays out block-style around the breaking block, and the style body indents one level
-/// past its own tag.
-#[test]
-fn block_in_glued_inline_parent_lays_out_block_style() {
-    assert_formats(
-        r"<p>x<b><div><script>let a = 1;</script><style>.a { color: red; }</style></div></b>y</p>",
-        r"<p>
-	x<b>
-		<div>
-			<script>
-				let a = 1;
-			</script>
-			<style>
-				.a {
-					color: red;
-				}
-			</style>
-		</div>
-	</b>y
-</p>
+        r"<div><script>let a = 1;</script><style>.a { color: red; }</style></div>",
+        r"<div>
+	<script>
+		let a = 1;
+	</script>
+	<style>
+		.a {
+			color: red;
+		}
+	</style>
+</div>
 ",
     );
 }
