@@ -673,7 +673,8 @@ impl<'a> Printer<'a> {
     /// the flat hug-both (`Soft`) shape, the one all three states below lay out; `None` keeps the
     /// element intact so the caller falls back to the normal path. Narrower than the element and
     /// block followers ([`PreparedElement::gt_dangle_boundary`]): a multiline element never
-    /// takes the inline or dangle state, so there is no role for it to play here.
+    /// takes the inline or dangle state, so there is no role for it to play here — and neither
+    /// does a `Soft` element whose content will break anyway ([`Self::build_close_gt_dangle_doc`]).
     ///
     /// A three-state `conditional_group` — the renderer picks the first whose flat first line fits:
     /// 1. **inline** `<span>content</span>` — the element fits fully on the line;
@@ -705,6 +706,27 @@ impl<'a> Printer<'a> {
     /// (`Printer::build_special_close_gt_dangle`), which runs the same pipeline from a
     /// `SpecialElement`. The caller has already checked the layout is the flat hug-both (`Soft`)
     /// one all three states read.
+    ///
+    /// ⚠️ **Content that will break takes the block-style state alone.** `Soft` is decided before
+    /// the children are built, off the element's own multiline triggers
+    /// (`Printer::compute_multiline_cause`), none of which sees a forced break NESTED in the
+    /// content — a child element holding a control-flow block, an `{#await}` branch holding block
+    /// elements, a snippet body that breaks, a multi-line attribute value or comment. The inline
+    /// and dangle states keep the content inline, so they have no form for such content: the
+    /// renderer would take the inline state in break mode, hugging both tags around the break
+    /// with the content at the container's indent. The next pass reads that newline as authored
+    /// (`has_source_breaks_in_content`) and goes block-style, so the hug is no fixed point. The
+    /// decision reads what WILL be printed — the built children doc's forced break
+    /// ([`tsv_lang::doc::arena::DocArena::will_break`], memoized) — and lays the element out as
+    /// its spaced twin does, reusing the one children doc.
+    ///
+    /// ⚠️ One break is not seen: a newline inside a FROZEN slice (a `prettier-ignore`d node,
+    /// `text<span><!-- prettier-ignore --><i>⏎  a⏎</i></span>more`) is verbatim text, which
+    /// `will_break` counts as a soft break, so such content still takes the inline state.
+    /// That is stable on its own; with long prose beside it, it is the known open F1 class of a
+    /// frozen multi-line node in a hugged parent (the fill's wrap read back as authored).
+    /// See conformance_prettier_svelte.md §Svelte: Inline content block-style (the glued-both
+    /// bounds) and `elements/inline_glued_both_breaking_content_prettier_divergence`.
     pub(super) fn build_close_gt_dangle_doc(
         &self,
         parts: &ElementParts<'_>,
@@ -712,14 +734,17 @@ impl<'a> Printer<'a> {
         attr_docs: &[DocId],
     ) -> DocId {
         let children_doc = self.build_content_children_doc(parts, ctx, BoundaryMode::Soft);
+        let block_state =
+            self.build_collapsible_element_doc(parts, ctx, attr_docs, children_doc, false, None);
         let d = self.d();
+        if d.will_break(children_doc) {
+            return block_state;
+        }
         let name = parts.name;
         let opening = self.build_opening_tag(name, attr_docs, ctx.has_multiline_attr);
         let head = d.concat(&[opening, d.text(">"), children_doc, d.text("</"), name]);
         let inline_state = d.concat(&[head, d.text(">")]);
         let dangle_state = d.concat(&[head, d.hardline(), d.text(">")]);
-        let block_state =
-            self.build_collapsible_element_doc(parts, ctx, attr_docs, children_doc, false, None);
         d.conditional_group(&[inline_state, dangle_state, block_state])
     }
 
@@ -963,7 +988,9 @@ impl<'a> Printer<'a> {
     /// builder — that is what makes them converge. No hardline force is needed — every multiline
     /// trigger (an expanding control-flow block, block-flow children, any other [`MultilineCause`])
     /// already resolves the boundary to `Hard` in [`Printer::compute_element_layout`], so it never
-    /// reaches this builder.
+    /// reaches this builder; a forced break NESTED in the content (a child element's own block, a
+    /// multi-line attribute value or comment) does reach it, and breaks the group, so the content
+    /// drops to its own lines block-style exactly as the `Hard` layout prints it.
     ///
     /// When `sheds_gt` is true the element's own closing `>` is omitted — the caller emits
     /// it elsewhere. This powers the axis-3 sibling-`>` dangle: an inline element directly
@@ -1134,7 +1161,7 @@ impl<'a> Printer<'a> {
     /// this one, so its width is measured from the column it lands at. A style body is
     /// written at the level it is expected to render at and then placed line by line
     /// ([`Printer::build_nested_style_body_doc`]), so its width is measured from that level —
-    /// deeper than where it lands when a parent hugs it without indenting its content.
+    /// deeper than where it lands wherever a parent's layout does not indent its content.
     fn build_raw_content_element_doc(
         &self,
         kind: RawTextKind,
@@ -1279,11 +1306,12 @@ impl<'a> Printer<'a> {
     /// and verbatim text (a comment's interior, an escaped-newline string, a raw at-rule
     /// prelude) keeps its column.
     ///
-    /// That level is a count of the fragments open around the element, and the element does
-    /// not always render there: the parent it sits in may hug it without indenting its content —
-    /// a style glued inline (`text1<span><style>…</style>text2</span>`), a lone style in an inline
-    /// parent (`x<span><style>…</style></span>y`), a block holding one inside a hugged inline
-    /// parent. So the body is placed by the host's renderer rather than at that count: each line
+    /// That level is a count of the fragments open around the element, not the column the
+    /// element renders at. The two agree wherever the parent lays its content out block-style —
+    /// which a breaking body makes every inline parent do, a glued-both one included
+    /// ([`Printer::build_close_gt_dangle_doc`]) — and no spelling where they part is known to be
+    /// reachable; nothing about the count guarantees it, though, so the body is placed by the
+    /// host's renderer rather than at that count, as a guard: each line
     /// the CSS printer broke and indented itself rides a `hardline` at its indent relative to the
     /// body, and each line that is verbatim text keeps its authored column behind a
     /// `literalline`. The two are told apart by formatting once more one level deeper — the
@@ -1291,10 +1319,9 @@ impl<'a> Printer<'a> {
     ///
     /// Where the deeper format WRAPS differently (a line near the print width), the two have
     /// no line-for-line correspondence, and the body keeps every later line at the counted
-    /// level — one level too deep in a hugged parent
-    /// (`x<span><style>a { grid-template-areas: '…' 'b'; }</style></span>y` with a long
-    /// value). A known layout gap, cosmetic and stable; `tsv_css` reporting the lines it
-    /// emits verbatim (the TODO in the body) would remove it with the second format.
+    /// level — wrong only where that count and the rendered column part, which no known
+    /// spelling reaches, so the fallback too stands as a guard. `tsv_css` reporting the lines
+    /// it emits verbatim (the TODO in the body) would remove it with the second format.
     fn build_nested_style_body_doc(
         &self,
         stylesheet: &tsv_css::CssStyleSheet<'_>,

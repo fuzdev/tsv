@@ -205,7 +205,8 @@ impl<'a> Printer<'a> {
     /// byte-glued to content text on **both** sides — no whitespace either side, so the
     /// break-before rule cannot fire — build it as
     /// [`Printer::build_inline_element_close_gt_dangle`], the three-state group that dangles the
-    /// closing `>` onto the following text's line when that fits and block-styles otherwise. The
+    /// closing `>` onto the following text's line when that fits and block-styles otherwise —
+    /// and always block-styles content that will break however it is laid out. The
     /// text-follower analog of the element→element run ([`Self::try_build_glued_element_run`]) and
     /// the element→block dangle ([`Self::block_sibling_takes_gt`]). `None` unless the
     /// glued-both-text shape holds and the element is the flat hug-both (`Soft`) form.

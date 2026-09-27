@@ -8,19 +8,16 @@
 <!-- glued to text before, the inline parent's end after -->
 <p>
 	text1<span>
-		text2<script>
-			let a = 1;
-		</script>
-	</span>text3
+	text2<script>
+		let a = 1;
+	</script></span>text3
 </p>
 
 <!-- the inline parent's start before, glued to text after -->
 <p>
-	text1<span>
-		<script>
-			let b = 2;
-		</script>text2
-	</span>text3
+	text1<span><script>
+		let b = 2;
+	</script>text2</span>text3
 </p>
 
 <!-- a comment between the start and the element renders nothing -->
@@ -34,15 +31,13 @@
 
 <!-- two elements glued together, both edges inline -->
 <p>
-	text1<span>
-		<script>
-			let d = 4;
-		</script><style>
-			div {
-				color: red;
-			}
-		</style>
-	</span>text2
+	text1<span><script>
+		let d = 4;
+	</script><style>
+		div {
+			color: red;
+		}
+	</style></span>text2
 </p>
 
 <!-- a component parent -->
@@ -66,8 +61,7 @@
 <!-- whitespace that reaches only the inline parent's end is trimmed there -->
 <p>
 	text1<span>
-		text2<script>
-			let g = 7;
-		</script>
-	</span>text3
+	text2<script>
+		let g = 7;
+	</script></span>text3
 </p>

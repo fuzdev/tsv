@@ -13,8 +13,8 @@
 //! answer is read through them. A declaration beside such an element answers the way the
 //! element does.
 //!
-//! The two hugged-parent cells pin the nested `<style>` body placement: it indents from its own
-//! tag, wherever the parent puts that tag.
+//! The two glued-inline-parent cells pin the block-style layout a breaking nested body gives an
+//! inline parent glued to text on both sides, with the `<style>` body one level past its own tag.
 //!
 //! Not fixtures: several of these cells are render-equivalent to their output, but the fixture
 //! validator's render key joins the compiler's separate template chunks with a hole marker, so
@@ -454,40 +454,45 @@ fn declaration_after_glued_element_in_inline_block_body() {
     );
 }
 
-/// A lone style in an inline parent the line hugs: its body indents one level past its own tag,
-/// not past the count of fragments open around it.
+/// A lone style in an inline parent glued to text on both sides: its body breaks, so the parent
+/// lays out block-style around it, and the body indents one level past its own tag.
 #[test]
-fn lone_style_in_hugged_inline_parent_indents_from_its_tag() {
+fn lone_style_in_glued_inline_parent_lays_out_block_style() {
     assert_formats(
         r"<p>x<span><style>.a { color: red; }</style></span>y</p>",
         r"<p>
-	x<span><style>
-		.a {
-			color: red;
-		}
-	</style></span>y
-</p>
-",
-    );
-}
-
-/// A block holding a script and a style inside a hugged inline parent: the style body indents
-/// one level past its own tag.
-#[test]
-fn block_in_hugged_inline_parent_indents_style_from_its_tag() {
-    assert_formats(
-        r"<p>x<b><div><script>let a = 1;</script><style>.a { color: red; }</style></div></b>y</p>",
-        r"<p>
-	x<b><div>
-		<script>
-			let a = 1;
-		</script>
+	x<span>
 		<style>
 			.a {
 				color: red;
 			}
 		</style>
-	</div></b>y
+	</span>y
+</p>
+",
+    );
+}
+
+/// A block holding a script and a style inside an inline parent glued to text on both sides: the
+/// parent lays out block-style around the breaking block, and the style body indents one level
+/// past its own tag.
+#[test]
+fn block_in_glued_inline_parent_lays_out_block_style() {
+    assert_formats(
+        r"<p>x<b><div><script>let a = 1;</script><style>.a { color: red; }</style></div></b>y</p>",
+        r"<p>
+	x<b>
+		<div>
+			<script>
+				let a = 1;
+			</script>
+			<style>
+				.a {
+					color: red;
+				}
+			</style>
+		</div>
+	</b>y
 </p>
 ",
     );
