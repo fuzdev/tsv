@@ -1955,11 +1955,10 @@ fn capped_newline_count(rest: &[u8], newlines: usize) -> u8 {
 pub enum TextDecoding {
     /// Fragment/template text — decode with text-content rules.
     Fragment,
-    /// Quoted attribute value — decode with attribute-context rules
+    /// Attribute value, quoted or unquoted — decode with attribute-context rules
     /// (stricter semicolon handling for named entities).
     AttributeValue,
-    /// No decode — `data` is identical to `raw` (raw-content element text;
-    /// also unquoted attribute values, see the TODO at the construction site).
+    /// No decode — `data` is identical to `raw` (raw-content element text).
     Raw,
 }
 
@@ -2022,8 +2021,9 @@ impl Text {
     /// decode, or `raw` holds no `&` for one to start at.
     #[inline]
     pub(crate) fn data_is_raw(&self, raw: &str) -> bool {
-        // A raw made only of `[ \t\n\r]` holds no `&`, so the precomputed flag answers the
-        // search for most template texts (the indentation between tags) without it.
+        // A raw made only of `[ \t\n\r]` holds no `&`, so the precomputed flag spares
+        // `data()`'s callers the search on the indentation between tags. The wire writer
+        // routes those texts to its whitespace window and never asks it of one.
         debug_assert!(!self.is_collapsible_ws_only || !raw.contains('&'));
         self.is_collapsible_ws_only || self.decoding == TextDecoding::Raw || !raw.contains('&')
     }

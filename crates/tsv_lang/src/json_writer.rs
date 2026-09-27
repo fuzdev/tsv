@@ -669,19 +669,21 @@ const WS_PAIR_MAX: usize = 16;
 /// separator of up to 12 bytes — five 16-byte stores of the fill.
 const WS_PAIR_WINDOW: usize = 80;
 
-/// What each byte of the collapsible whitespace class `[ \t\n\r]` becomes inside
-/// a JSON string, indexed by the byte's low four bits: the two-byte short escapes
+/// The collapsible whitespace class `[ \t\n\r]`: the bytes
+/// [`JsonWriter::string_pair_whitespace`] takes, and the four [`WS_ESCAPE`] maps.
+const WS_CLASS: [u8; 4] = [b' ', b'\t', b'\n', b'\r'];
+
+/// What each byte of [`WS_CLASS`] becomes inside a JSON string, indexed by the byte's low four bits: the two-byte short escapes
 /// of `\t`, `\n` and `\r` (read from [`ESCAPE`], the one definition of an escape),
 /// and the space as itself, padded with a `"` — so the second byte a space's store
 /// writes is its string's closing quote when it is the last byte, and is
 /// overwritten by the next byte's store when it is not. The other twelve entries
 /// are never read.
 const WS_ESCAPE: [[u8; 2]; 16] = {
-    const CLASS: [u8; 4] = [b' ', b'\t', b'\n', b'\r'];
     let mut t = [[0; 2]; 16];
     let mut i = 0;
-    while i < CLASS.len() {
-        let byte = CLASS[i];
+    while i < WS_CLASS.len() {
+        let byte = WS_CLASS[i];
         // The four bytes' low nibbles index four distinct entries, so no class byte's
         // entry overwrites another's.
         assert!(
@@ -1069,25 +1071,6 @@ impl JsonWriter {
         self.buf.push(b'"');
     }
 
-    /// [`JsonWriter::string`] as one shared out-of-line copy of
-    /// [`JsonWriter::string_led`] with an empty lead — byte-identical output.
-    ///
-    /// A string shorter than a word is tested for escapes inline and, clean, written
-    /// as one fixed-width window append (`string_escape_free_led`); a longer one runs
-    /// the word loop behind a tail call (`string_led_long`), which writes a clean
-    /// string of up to [`SHORT_FRAGMENT_MAX`] bytes through the same window. The copy
-    /// makes no call on the short path and saves no register, where `string`'s clean
-    /// path pays a libc `memcpy` call.
-    ///
-    /// For the CSS wire writer, whose strings — property names, values, selector
-    /// names — are short and numerous. It is not `string` itself: measured on the
-    /// TypeScript and Svelte writers, the same shape saved instructions but cost
-    /// cycles, so it is a writer's choice per call site, not the default.
-    #[inline(never)]
-    pub fn string_outlined(&mut self, s: &str) {
-        self.string_led(&[], s.as_bytes());
-    }
-
     /// A dynamic string value the **caller** guarantees needs no escape,
     /// quoted, behind the constant fragment `lead` — byte-identical to
     /// `raw(lead)` then [`JsonWriter::string`] on such input, without the
@@ -1184,6 +1167,13 @@ impl JsonWriter {
     /// values rarely hold one — a Svelte attribute or component name. The bytes are
     /// taken as a slice, so the caller's source slice needs no char-boundary
     /// checks; it must still be whole UTF-8, which debug builds assert.
+    ///
+    /// With an empty lead it is `string`'s output, and the CSS wire writer spells
+    /// every dynamic string that way, through one out-of-line copy of its own: its
+    /// strings — property names, values, selector names — are short and numerous,
+    /// and a clean one shorter than a word is one window append with no call. It is
+    /// not `string` itself: measured on the TypeScript and Svelte writers, the same
+    /// shape saved instructions but cost cycles, so it is a writer's choice.
     ///
     /// A string shorter than a word — most names — is gathered and tested inline
     /// ([`short_needs_escape`]); a longer one leaves by tail call to
@@ -1325,8 +1315,17 @@ impl JsonWriter {
     pub fn string_pair(&mut self, s: &str, between: &str) {
         let start = self.buf.len();
         self.string(s);
+        self.repeat_value_from(start, between.as_bytes());
+    }
+
+    /// The second half of a string pair whose first value was written from `start`:
+    /// `between`, then a copy of the value's **emitted** bytes. `inline(always)` so a
+    /// constant `between` stays a fixed-width move at each caller.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    fn repeat_value_from(&mut self, start: usize, between: &[u8]) {
         let end = self.buf.len();
-        self.buf.extend_from_slice(between.as_bytes());
+        self.buf.extend_from_slice(between);
         self.buf.extend_from_within(start..end);
     }
 
@@ -1359,9 +1358,7 @@ impl JsonWriter {
     pub fn string_pair_whitespace<const K: usize>(&mut self, bytes: &[u8], between: &[u8; K]) {
         const { assert!(K + 4 * WS_PAIR_MAX + 4 <= WS_PAIR_WINDOW) };
         debug_assert!(
-            bytes
-                .iter()
-                .all(|b| matches!(b, b' ' | b'\t' | b'\n' | b'\r')),
+            bytes.iter().all(|b| WS_CLASS.contains(b)),
             "string_pair_whitespace takes collapsible whitespace: {bytes:?}"
         );
         if bytes.len() > WS_PAIR_MAX {
@@ -1417,9 +1414,7 @@ impl JsonWriter {
     fn string_pair_whitespace_long<const K: usize>(&mut self, bytes: &[u8], between: &[u8; K]) {
         let start = self.buf.len();
         self.string_escaped(bytes);
-        let end = self.buf.len();
-        self.raw_fixed(between);
-        self.buf.extend_from_within(start..end);
+        self.repeat_value_from(start, between);
     }
 
     /// A non-integral `f64` (the rare literal tail) — `serde_json`'s ryu
@@ -1664,8 +1659,8 @@ mod tests {
         w.into_bytes()
     }
 
-    /// [`JsonWriter::string`] and [`JsonWriter::string_outlined`] must be
-    /// byte-identical to `serde_json`'s own string serialization — the parity
+    /// [`JsonWriter::string`] and [`JsonWriter::string_led`] with an empty lead
+    /// (the CSS writer's spelling of a string) must be byte-identical to `serde_json`'s own string serialization — the parity
     /// contract this module's whole doc comment rests on — on both of their arms:
     /// the escape-free fast path and the hand escaper.
     ///
@@ -1689,17 +1684,17 @@ mod tests {
                 String::from_utf8_lossy(&ours),
                 String::from_utf8_lossy(&theirs)
             );
-            // `string_outlined`, the CSS writer's spelling, into a writer with no spare
-            // room (its grow path) and one with room (its window path).
+            // `string_led` with an empty lead, the CSS writer's spelling, into a writer
+            // with no spare room (its grow path) and one with room (its window path).
             for cap in [0, 256] {
                 let mut w = JsonWriter::with_capacity(cap);
-                w.string_outlined(case);
-                let outlined = w.into_bytes();
+                w.string_led(&[], case.as_bytes());
+                let led = w.into_bytes();
                 assert_eq!(
-                    outlined,
+                    led,
                     theirs,
-                    "string_outlined broke on {case:?} (capacity {cap}): {:?}",
-                    String::from_utf8_lossy(&outlined)
+                    "string_led with an empty lead broke on {case:?} (capacity {cap}): {:?}",
+                    String::from_utf8_lossy(&led)
                 );
             }
         }
@@ -1756,6 +1751,28 @@ mod tests {
         }
     }
 
+    /// [`whitespace_control_count`] against a byte-by-byte count, over every string to
+    /// [`WS_PAIR_MAX`] bytes of a space and a line feed — the two sides of the bit the
+    /// count reads, so every placement of a counted lane in every overlap the gathers make
+    /// (one or two words, one word's two halves, the three-byte pad) is graded, where the
+    /// window's own test reaches lengths past eight only by sampling. The per-byte
+    /// classification of `\t` and `\r` is graded there, over every mix to eight bytes.
+    #[test]
+    fn whitespace_control_count_matches_a_byte_count() {
+        let mut case = Vec::new();
+        for len in 0..=WS_PAIR_MAX {
+            for bits in 0..1u32 << len {
+                case.clear();
+                case.extend((0..len).map(|i| if bits >> i & 1 == 1 { b'\n' } else { b' ' }));
+                assert_eq!(
+                    whitespace_control_count(&case),
+                    bits.count_ones() as usize,
+                    "{case:?}"
+                );
+            }
+        }
+    }
+
     /// [`JsonWriter::string_pair_whitespace`] against [`JsonWriter::string_pair`] (graded
     /// against two `string` calls, and so against `serde_json`, above) over the collapsible
     /// whitespace class `[ \t\n\r]`: every string of it to eight bytes — every mix of the
@@ -1767,7 +1784,7 @@ mod tests {
     /// width, so the grow path and the window path both write it.
     #[test]
     fn string_pair_whitespace_matches_string_pair() {
-        const CLASS: [u8; 4] = [b' ', b'\t', b'\n', b'\r'];
+        const CLASS: [u8; 4] = WS_CLASS;
         fn grade<const K: usize>(between: &[u8; K], case: &[u8]) {
             let between_str = core::str::from_utf8(between).expect("the separator is UTF-8");
             let case_str = core::str::from_utf8(case).expect("whitespace is UTF-8");

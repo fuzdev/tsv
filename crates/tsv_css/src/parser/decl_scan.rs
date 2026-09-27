@@ -269,9 +269,8 @@ fn head_after_colon(bytes: &[u8], colon: usize, gap_comment: bool) -> Option<Dec
 /// is taken on from its `:` ([`head_after_colon`]) rather than walked again. Phase two is the
 /// shared value loop with the verdict latch on: it stops at the first paren-depth-0 `{` (a
 /// rule) and otherwise runs the value to its terminator, so the one walk answers both
-/// questions. `None` declines —
-/// exactly as the value byte scan does, for the same reasons — and hands the verdict back to
-/// `scan_rule_or_declaration_tokens`.
+/// questions. `None` declines — exactly as the value byte scan does, for the same reasons —
+/// and hands the verdict back to `scan_rule_or_declaration_tokens`.
 fn scan_rule_or_declaration_and_value_bytes(
     source: &str,
     head: DeclarationHead,
@@ -384,13 +383,11 @@ fn scan_rule_or_declaration_tokens(
 /// custom property's — opens a nested rule rather than a declaration.
 ///
 /// `color` is a property and `span` a type selector, and whether a `:` follows the name is
-/// the whole difference: so the property→colon gap is walked once ([`colon_after_trivia`]),
-/// and a `:` found there is where the rule-or-declaration scan's declaration head goes on
-/// from ([`head_after_colon`]), rather than a second walk of the same gap locating it again.
-/// A property name is followed by a `:`, so this is the path nearly every block child takes.
-/// With a `:` the child is still ambiguous — `color: red;` against `span:hover { }` — and
-/// [`scan_rule_or_declaration`] settles it by walking on to the first paren-depth-0 `{`
-/// (a rule) or `;`/`}` (a declaration).
+/// the whole difference. The property→colon gap is walked once ([`colon_after_trivia`]), and
+/// the declaration head goes on from the `:` it finds ([`head_after_colon`]). With a `:` —
+/// nearly every block child — the child is still ambiguous (`color: red;` against
+/// `span:hover { }`), and [`scan_rule_or_declaration`] settles it by walking on to the first
+/// paren-depth-0 `{` (a rule) or `;`/`}` (a declaration).
 ///
 /// Only the `:` is recognized from the bytes: whitespace and comments are trivia and get
 /// skipped, and **everything else declines**, including bytes whose token is perfectly
@@ -404,14 +401,13 @@ fn scan_rule_or_declaration_tokens(
 /// The whitespace the walk skips is ASCII, and that is a second decline, not a class: a
 /// boundary run (`a { color <NBSP>: red }`) is a non-ASCII byte to it, so it declines to the
 /// token lookahead, which steps the run — `read_declaration` ends the property at JS `\s`
-/// and `allow_whitespace()`s to the colon, so the gap is a juncture like any other. That
-/// lookahead is the boundary-aware one because the skip it predicts is boundary-aware: a run
-/// in the gap declines the declaration's byte head, so the gap is stepped by its token head
-/// (`lex_declaration_head`) with `skip_boundary_whitespace_and_comments`. A lookahead narrower
-/// than that skip reads the run as the identifier where the `:` is due, classifies the child
-/// a nested rule, and rejects the document. A `:` that lookahead finds past a gap the bytes
-/// declined is still a declaration head the bytes cannot locate, so the scan behind it runs on
-/// the token walk.
+/// and `allow_whitespace()`s to the colon, so the gap is a juncture like any other. The
+/// lookahead must be the boundary-aware one because the skip it predicts is: the declaration's
+/// token head (`lex_declaration_head`) steps such a gap with
+/// `skip_boundary_whitespace_and_comments`, and a narrower lookahead would read the run as the
+/// identifier where the `:` is due, classify the child a nested rule, and reject the document.
+/// A `:` found past a gap the bytes declined is a head the bytes cannot locate either, so the
+/// scan behind it runs on the token walk.
 ///
 /// In debug the token lookahead runs behind a `:` the bytes found and must agree, so the
 /// test suite proves the equivalence.
@@ -1196,39 +1192,6 @@ mod tests {
         // a non-ASCII value start declines the byte head past a `:` the gap walk found
         assert_eq!(identifier_child("color: \u{85}red;"), (false, false));
         assert_eq!(identifier_child("content: \u{e9};"), (false, false));
-    }
-
-    /// Whether the current identifier names a custom property, beside the resolved text it is
-    /// the question of: an escape-spelled `--` counts, a `--` its escapes spell otherwise
-    /// does not.
-    #[test]
-    fn custom_property_names_are_read_from_the_resolved_text() {
-        let cases = [
-            ("--x: 1", true),
-            ("--: 1", true),
-            ("-x: 1", false),
-            ("x--: 1", false),
-            ("-\\-x: 1", true),
-            ("\\2d\\2d x: 1", true),
-            ("\\2d x: 1", false),
-            ("-\\2d x: 1", true),
-            ("\\-x: 1", false),
-        ];
-        for (source, expected) in cases {
-            let arena = bumpalo::Bump::new();
-            let parser = CssParser::new(source, 0, &arena).expect("test source lexes");
-            assert_eq!(parser.current_kind(), TokenKind::Identifier, "{source:?}");
-            assert_eq!(
-                parser.current_identifier_is_custom_property(),
-                parser.current_identifier().starts_with("--"),
-                "{source:?}"
-            );
-            assert_eq!(
-                parser.current_identifier_is_custom_property(),
-                expected,
-                "{source:?}"
-            );
-        }
     }
 
     /// Both byte scans over the declaration `source` holds, graded exactly as the debug

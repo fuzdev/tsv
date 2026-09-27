@@ -22,9 +22,9 @@
 //! CSS public nodes carry only `start`/`end` (no `loc`/columns), so there is no
 //! `LocationTracker`: each position is translated independently via a
 //! `ByteToCharMap` (identity on ASCII). Dynamic strings are escaped by
-//! `JsonWriter::string_outlined` (byte-identical to `serde_json`, and to
-//! `JsonWriter::string`: one shared copy whose short clean path is a single window
-//! append, which pays on this writer's many short strings); static
+//! [`write_string`] (byte-identical to `serde_json`, and to `JsonWriter::string`:
+//! one shared copy of `JsonWriter::string_led` with an empty lead, whose short clean
+//! path is a single window append, which pays on this writer's many short strings); static
 //! structure/tokens are written verbatim; integers are hand-formatted.
 //!
 //! Node-header prefixes are single pre-fused `w.raw` literals per site,
@@ -163,6 +163,14 @@ pub fn write_css_comments(
     write_comments(w, comments, &ctx);
 }
 
+/// A dynamic string value, escaped byte-identical to `serde_json`: one shared out-of-line
+/// copy of [`JsonWriter::string_led`] with an empty lead, so a clean string shorter than a
+/// word is written as one window append with no call.
+#[inline(never)]
+fn write_string(w: &mut JsonWriter, s: &str) {
+    w.string_led(&[], s.as_bytes());
+}
+
 /// The standalone `StyleSheetFile` root: `type`, `start` (0), `end` (source
 /// length), `children`, `comments`.
 fn write_stylesheet_file(
@@ -232,7 +240,7 @@ fn write_comments(w: &mut JsonWriter, comments: &CssComments, ctx: &Ctx<'_>) {
         // between the delimiters it has already eaten.
         let interior = Span::new(c.span.start + 2, c.span.end - 2);
         w.raw("{\"type\":\"CSSComment\",\"value\":");
-        w.string_outlined(interior.extract(ctx.source));
+        write_string(w, interior.extract(ctx.source));
         w.start_end_field(ctx.pos(c.span.start), ctx.pos(c.span.end));
         if let Some(position) = c.position {
             w.raw(",\"position\":");
@@ -298,10 +306,10 @@ fn write_atrule(
     // Half-decoded from source, like a selector name: parseCss reads both with
     // `read_identifier`, so an identity escape keeps its backslash (`@a\?b` → `a\?b`)
     // where the internal `name` is fully decoded.
-    w.string_outlined(&raw_selector_name(ctx.source, atrule.name_span, 0));
+    write_string(w, &raw_selector_name(ctx.source, atrule.name_span, 0));
     w.raw(",\"prelude\":");
     let prelude = convert_prelude_to_string(&atrule.prelude, ctx.source);
-    w.string_outlined(&prelude);
+    write_string(w, &prelude);
     collect_prelude_comments(atrule, ctx.source, comments);
     w.raw(",\"block\":");
     write_or_null(w, atrule.block.as_ref(), |w, b| {
@@ -464,9 +472,9 @@ fn write_declaration(
     w.raw("{\"type\":\"Declaration\",\"start\":");
     w.start_end(ctx.pos(decl.span.start), ctx.pos(split.end));
     w.raw(",\"property\":");
-    w.string_outlined(trim_wire_end(split.property));
+    write_string(w, trim_wire_end(split.property));
     w.raw(",\"value\":");
-    w.string_outlined(&value);
+    write_string(w, &value);
     w.raw("}");
 }
 
@@ -610,18 +618,18 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             w.raw("{\"type\":\"AttributeSelector\",\"start\":");
             w.start_end(ctx.pos(span.start), ctx.pos(span.end));
             w.raw(",\"name\":");
-            w.string_outlined(&name);
+            write_string(w, &name);
             w.raw(",\"matcher\":");
             // `as_str()` is a static escape-free operator (`=`/`~=`/`|=`/…), like
             // the sibling `Combinator` name — skip the escape scan.
             write_or_null(w, matcher.as_ref(), |w, m| w.token(m.as_str()));
             w.raw(",\"value\":");
-            write_or_null(w, value.as_ref(), |w, v| w.string_outlined(v));
+            write_or_null(w, value.as_ref(), |w, v| write_string(w, v));
             w.raw(",\"flags\":");
-            write_or_null(w, flags.as_ref(), |w, f| w.string_outlined(f));
+            write_or_null(w, flags.as_ref(), |w, f| write_string(w, f));
             if let Some(ns) = &namespace {
                 w.raw(",\"namespace\":");
-                w.string_outlined(ns);
+                write_string(w, ns);
             }
             w.raw("}");
         }
@@ -636,7 +644,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             };
             let name = raw_selector_name(ctx.source, name_span, 0);
             w.raw("{\"type\":\"PseudoClassSelector\",\"name\":");
-            w.string_outlined(&name);
+            write_string(w, &name);
             w.raw(",\"args\":");
             write_or_null(w, args.as_ref(), |w, a| write_pseudo_args(w, a, ctx));
             w.start_end_field(ctx.pos(span.start), ctx.pos(span.end));
@@ -659,7 +667,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
                 0,
             );
             w.raw("{\"type\":\"PseudoElementSelector\",\"name\":");
-            w.string_outlined(&name);
+            write_string(w, &name);
             w.start_end_field(ctx.pos(span.start), ctx.pos(span.end));
             // `args` is emitted only when present — Svelte spreads the key in
             // conditionally (`...(args && { args })`), so an argument-less
@@ -678,7 +686,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
                 format!("{value}%")
             };
             w.raw("{\"type\":\"Percentage\",\"value\":");
-            w.string_outlined(&value_str);
+            write_string(w, &value_str);
             w.start_end_field(ctx.pos(span.start), ctx.pos(span.end));
             w.raw("}");
         }
@@ -691,7 +699,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             // here (only the dedicated `:nth-*()` path nests `S` under
             // `Nth.selector`).
             w.raw("{\"type\":\"Nth\",\"value\":");
-            w.string_outlined(span.extract(ctx.source));
+            write_string(w, span.extract(ctx.source));
             w.start_end_field(ctx.pos(span.start), ctx.pos(span.end));
             w.raw("}");
         }
@@ -736,9 +744,9 @@ fn write_type_selector(
         return;
     };
     w.raw("{\"type\":\"TypeSelector\",\"name\":");
-    w.string_outlined(name);
+    write_string(w, name);
     w.raw(",\"namespace\":");
-    w.string_outlined(&raw_selector_name(ctx.source, prefix, 0));
+    write_string(w, &raw_selector_name(ctx.source, prefix, 0));
     w.stage_begin();
     w.stage_raw(",\"start\":");
     w.stage_u32(ctx.pos(span.start));
@@ -763,7 +771,7 @@ fn write_named_selector(
     w.raw("{\"type\":\"");
     w.raw(node_type);
     w.raw("\",\"name\":");
-    w.string_outlined(name);
+    write_string(w, name);
     w.stage_begin();
     w.stage_raw(",\"start\":");
     w.stage_u32(ctx.pos(span.start));
@@ -802,7 +810,7 @@ fn write_pseudo_args(w: &mut JsonWriter, args: &internal::PseudoClassArgs<'_>, c
             let public_span = Span::new(value_span.start, content_end);
             write_wrap_single_selector(w, public_span, ctx, |w, ctx| {
                 w.raw("{\"type\":\"Nth\",\"value\":");
-                w.string_outlined(value);
+                write_string(w, value);
                 w.start_end_field(ctx.pos(public_span.start), ctx.pos(public_span.end));
                 if let Some(sel) = of_selector {
                     w.raw(",\"selector\":");

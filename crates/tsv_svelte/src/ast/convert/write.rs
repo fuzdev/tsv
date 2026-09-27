@@ -1093,8 +1093,9 @@ fn write_whitespace_raw_then_data(w: &mut JsonWriter, text: &internal::Text, ctx
 #[inline(never)]
 fn write_content_raw_then_data(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
     let raw = text.raw(ctx.source);
-    // Asked inline rather than through `data()`: this is every raw-first `Text` the writer
-    // emits (all but a raw-content element's, which `write_text` writes itself).
+    // Asked inline rather than through `data()`: this is every raw-first `Text` with
+    // content the writer emits (all but a raw-content element's, which `write_text`
+    // writes itself).
     if text.data_is_raw(raw) {
         w.string_pair(raw, ",\"data\":");
     } else {
@@ -2337,9 +2338,11 @@ mod tests {
     /// (element, component, special element, attribute, directive head with modifiers),
     /// each written directly before and after every line-terminator spelling of either
     /// class — `\n`, `\r`, `\r\n`, `<LS>`, `<PS>` — and after a multibyte name or a
-    /// multibyte line ahead of it: each end must share its start's line, at the start's
-    /// column plus the name's width. The writer's own debug assertion re-derives both
-    /// endpoints the unfused way on every name the test suite parses.
+    /// multibyte line ahead of it: each endpoint must sit at the line and column an
+    /// independent count over the source's UTF-16 units gives its `character` (a line
+    /// opens after each `\n`), and each end on its start's line. The oracle is the test's
+    /// own, so the grade holds without debug assertions; the writer's debug assertion also
+    /// re-derives both endpoints the unfused way on every name the test suite parses.
     #[test]
     fn name_loc_end_shares_its_start_line() {
         for term in ["\n", "\r", "\r\n", "\u{2028}", "\u{2029}", "\t", " "] {
@@ -2354,19 +2357,58 @@ mod tests {
                     format!("{lead}<div{term}{{x}}{term}{{é}}></div>"),
                 ];
                 for source in &sources {
+                    let units: Vec<u16> = source.encode_utf16().collect();
                     let mut locs = Vec::new();
                     name_locs(&convert_svelte(source), &mut locs);
                     assert!(!locs.is_empty(), "{source:?} carries a name_loc");
                     for (start, end) in locs {
                         assert_eq!(start["line"], end["line"], "{source:?}");
-                        let width = end["character"].as_u64().expect("character")
-                            - start["character"].as_u64().expect("character");
-                        assert_eq!(
-                            end["column"].as_u64().expect("column"),
-                            start["column"].as_u64().expect("column") + width,
-                            "{source:?}"
-                        );
+                        for point in [&start, &end] {
+                            let character =
+                                point["character"].as_u64().expect("character") as usize;
+                            let before = &units[..character];
+                            let line_start = before
+                                .iter()
+                                .rposition(|&u| u == u16::from(b'\n'))
+                                .map_or(0, |i| i + 1);
+                            let line =
+                                1 + before.iter().filter(|&&u| u == u16::from(b'\n')).count();
+                            assert_eq!(point["line"], line, "{source:?} {point}");
+                            assert_eq!(
+                                point["column"],
+                                character - line_start,
+                                "{source:?} {point}"
+                            );
+                        }
                     }
+                }
+            }
+        }
+    }
+
+    /// `write_raw_then_data` hands [`JsonWriter::string_pair_whitespace`] every text whose
+    /// `is_collapsible_ws_only` flag is set, and that window's escape table restates the
+    /// flag's class, `[ \t\n\r]`, because `tsv_lang` cannot see this crate's
+    /// [`is_collapsible_ws`](crate::ast::internal::is_collapsible_ws). Graded here, where
+    /// both are in reach: every byte the class admits must write byte-identical to
+    /// `serde_json` — a lone byte and a run on the window's arm, a run on its long arm, each
+    /// into a full buffer and one with room — so a widened class fails this test rather
+    /// than writing an unescaped control byte into a release build's wire.
+    #[test]
+    fn whitespace_window_covers_the_collapsible_class() {
+        for byte in (0..=u8::MAX).filter(|&b| crate::ast::internal::is_collapsible_ws(b)) {
+            for len in [1, 16, 17] {
+                let text = String::from_utf8(vec![byte; len]).expect("an ASCII run");
+                let quoted = serde_json::to_string(&text).expect("serde_json serializes a str");
+                let expected = format!("{quoted},\"data\":{quoted}");
+                for cap in [0, 256] {
+                    let mut w = super::JsonWriter::with_capacity(cap);
+                    w.string_pair_whitespace(text.as_bytes(), b",\"data\":");
+                    assert_eq!(
+                        String::from_utf8(w.into_bytes()).expect("UTF-8 wire"),
+                        expected,
+                        "{byte:#04x} x {len} (capacity {cap})"
+                    );
                 }
             }
         }

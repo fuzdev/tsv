@@ -53,11 +53,12 @@ pub(crate) struct CssParser<'a, 'arena> {
     /// A declaration located and measured speculatively by the rule/declaration
     /// disambiguation scan — its head and its value's facts — for the `parse_declaration`
     /// that immediately follows to take instead of lexing its head and re-walking its value.
-    /// Set (or cleared) at every disambiguation that reaches a `:` — by `decl_scan`'s
-    /// `scan_rule_or_declaration`, or cleared by its `rule_or_declaration_by_tokens` where a
-    /// byte walk declined — and keyed on the property's end offset —
-    /// [`take_declaration`](Self::take_declaration) states what the key guards.
-    /// `Cell` because the scan runs behind `&CssParser` (the disambiguation is a read-only
+    ///
+    /// Every disambiguation that reaches a `:` sets or clears it: `decl_scan`'s
+    /// `scan_rule_or_declaration` sets it for a declaration and clears it for a rule, and its
+    /// `rule_or_declaration_by_tokens` clears it where a byte walk declined. It is keyed on the property's end offset, and
+    /// [`take_declaration`](Self::take_declaration) states what the key guards. A `Cell`,
+    /// because the scan runs behind `&CssParser` (the disambiguation is a read-only
     /// lookahead).
     speculative_declaration: Cell<Option<(usize, ScannedDeclaration)>>,
 }
@@ -1016,4 +1017,42 @@ pub fn parse_css<'arena>(
 ) -> Result<CssStyleSheet<'arena>, ParseError> {
     let mut parser = CssParser::new(source, base_offset, arena)?;
     parser.parse()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Whether the current identifier names a custom property, beside the resolved text it is
+    /// the question of: an escape-spelled `--` counts, a `--` its escapes spell otherwise
+    /// does not.
+    #[test]
+    fn custom_property_names_are_read_from_the_resolved_text() {
+        let cases = [
+            ("--x: 1", true),
+            ("--: 1", true),
+            ("-x: 1", false),
+            ("x--: 1", false),
+            ("-\\-x: 1", true),
+            ("\\2d\\2d x: 1", true),
+            ("\\2d x: 1", false),
+            ("-\\2d x: 1", true),
+            ("\\-x: 1", false),
+        ];
+        for (source, expected) in cases {
+            let arena = Bump::new();
+            let parser = CssParser::new(source, 0, &arena).expect("test source lexes");
+            assert_eq!(parser.current_kind(), TokenKind::Identifier, "{source:?}");
+            assert_eq!(
+                parser.current_identifier_is_custom_property(),
+                parser.current_identifier().starts_with("--"),
+                "{source:?}"
+            );
+            assert_eq!(
+                parser.current_identifier_is_custom_property(),
+                expected,
+                "{source:?}"
+            );
+        }
+    }
 }

@@ -1503,6 +1503,10 @@ impl<'a> Printer<'a> {
     /// every character ahead of the first one reaches `data` as itself: a raw whose first
     /// non-whitespace character is anything else holds that word in `data` too, and a raw
     /// with none holds no `&` at all, so `data` is `raw`.
+    ///
+    /// It slices `raw` itself although both callers hold it: threading theirs in instead grew
+    /// the release build's `.text` by 114 bytes net (the callers grew by more than the slice
+    /// saved here).
     pub(super) fn text_is_separator_like(text: &internal::Text, source: &str) -> bool {
         let raw = text.raw(source);
         match raw.chars().find(|&c| !Self::is_separator_char(c)) {
