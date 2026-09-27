@@ -2,7 +2,7 @@
 
 A **form feed** (U+000C) is rendered content, not collapsible whitespace, so tsv preserves it
 verbatim wherever it appears in template text. Prettier rewrites every one of them to a plain
-space.
+space, except the `{#await}` pending branch, which it folds away with the form feed in it.
 
 ## Reason
 
@@ -46,6 +46,9 @@ form feed is exempt from that rule rather than from whitespace handling generall
   exactly as the trim stops at an NBSP, which is what "it is content" means operationally.
 - **root-level text** — the root fragment's edges trim like any other fragment's, and the interior
   form feed is untouched.
+- **`{#await}` pending branch** — a pending branch of ASCII whitespace renders nothing and folds
+  into the `then` head shorthand; one holding a form feed renders it while the promise is pending, so
+  the block keeps its full form (prettier folds it and deletes the form feed).
 
 ## Related
 

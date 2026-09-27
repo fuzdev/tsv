@@ -13,7 +13,7 @@
 
 use super::blocks_doc::{
     AWAIT_BLOCK_OPEN, EACH_BLOCK_OPEN, ELSE_IF_BLOCK_OPEN, IF_BLOCK_OPEN, KEY_BLOCK_OPEN,
-    await_expr_comment_end, then_has_content,
+    SectionWhitespace, await_expr_comment_end, await_shorthand, then_has_content,
 };
 use super::element_doc::{AttrListEmission, ElementAttrsDoc};
 use super::helpers::each_expr_comment_end;
@@ -722,33 +722,42 @@ impl<'a> Printer<'a> {
     /// between a tag and a body. The ordinary builder expands every section once its head
     /// breaks, and here a line break beside a body is rendered content; a head that opens
     /// around a comment (in the awaited expression, or in a binding pattern) must open alone.
+    ///
+    /// Every section decision reads [`SectionWhitespace::Preserved`]: here a whitespace-only
+    /// section is rendered text, so only a section with no nodes may fold into the head or drop.
     fn build_ws_sensitive_await_block_doc(&self, block: &internal::AwaitBlock<'_>) -> DocId {
         let d = self.d();
+        let ws = SectionWhitespace::Preserved;
+        let shorthand = await_shorthand(block, ws);
         // Pass false for in_multiline_context: expressions must not wrap in ws-sensitive context
         let head = self.build_block_head_expr(
             AWAIT_BLOCK_OPEN,
             block.opening_tag_span,
             block.expression,
-            await_expr_comment_end(block),
+            await_expr_comment_end(block, shorthand),
             false,
         );
         let open_doc = self.head_open_doc(AWAIT_BLOCK_OPEN, head.layout.opens_own_line());
         let mut parts: DocBuf = smallvec![open_doc, head.doc];
-        if let Some(clause) = self.build_await_clause(block) {
+        if let Some(clause) = self.build_await_clause(block, shorthand) {
             parts.push(d.text(" "));
             parts.push(clause);
         }
         parts.push(d.text("}"));
 
-        let (is_then_shorthand, is_catch_shorthand) = Self::await_shorthand_flags(block);
-        if let Some(pending) = &block.pending {
+        let (is_then_shorthand, is_catch_shorthand) = shorthand.head_keywords();
+        // A pending the head folded has no nodes here, so it prints nothing; gated anyway, so
+        // the rule is the ordinary builders' one.
+        if shorthand.prints_pending()
+            && let Some(pending) = &block.pending
+        {
             parts.push(self.build_whitespace_sensitive_content_doc(pending.nodes));
         }
-        if !is_then_shorthand && let Some(kw) = self.await_then_keyword(block) {
+        if !is_then_shorthand && let Some(kw) = self.await_then_keyword(block, ws) {
             parts.push(kw);
         }
         // An empty-body `:then` is dropped (marker via `await_then_keyword` above, body here).
-        if then_has_content(block)
+        if then_has_content(block, ws)
             && let Some(then_block) = &block.then
         {
             parts.push(self.build_whitespace_sensitive_content_doc(then_block.nodes));

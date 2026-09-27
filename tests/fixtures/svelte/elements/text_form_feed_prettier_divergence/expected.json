@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 952,
+	"end": 1090,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -422,9 +422,101 @@
 			{
 				"type": "Text",
 				"start": 939,
-				"end": 951,
-				"raw": "\ntext1\ftext2",
-				"data": "\ntext1\ftext2"
+				"end": 953,
+				"raw": "\ntext1\ftext2\n\n",
+				"data": "\ntext1\ftext2\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 953,
+				"end": 1043,
+				"data": " As an {#await} pending branch, where a whitespace-only branch folds into the head "
+			},
+			{
+				"type": "Text",
+				"start": 1043,
+				"end": 1044,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 1044,
+				"end": 1089,
+				"expression": {
+					"type": "Identifier",
+					"start": 1052,
+					"end": 1059,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 8
+						},
+						"end": {
+							"line": 27,
+							"column": 15
+						}
+					},
+					"name": "promise"
+				},
+				"value": {
+					"type": "Identifier",
+					"name": "value",
+					"start": 1068,
+					"end": 1073,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 24,
+							"character": 1068
+						},
+						"end": {
+							"line": 27,
+							"column": 29,
+							"character": 1073
+						}
+					}
+				},
+				"error": null,
+				"pending": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1060,
+							"end": 1061,
+							"raw": "\f",
+							"data": "\f"
+						}
+					]
+				},
+				"then": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 1074,
+							"end": 1081,
+							"expression": {
+								"type": "Identifier",
+								"start": 1075,
+								"end": 1080,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 31
+									},
+									"end": {
+										"line": 27,
+										"column": 36
+									}
+								},
+								"name": "value"
+							}
+						}
+					]
+				},
+				"catch": null
 			}
 		]
 	},

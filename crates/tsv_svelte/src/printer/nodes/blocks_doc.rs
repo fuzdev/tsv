@@ -191,9 +191,52 @@ impl HeadCloser {
     }
 }
 
+/// What the compiler does with an `{#await}` section's whitespace where the block is printed —
+/// which decides whether a section **renders nothing**, and so whether the formatter may drop
+/// it or fold it into the head shorthand.
+///
+/// Svelte's `clean_nodes` trims a fragment of ASCII whitespace (`[ \t\r\n]`) to nothing
+/// unless the block sits inside a `<pre>`, whose whitespace-preserving state reaches every
+/// descendant fragment — an inline element's, a component's, a special element's, a block's.
+/// There every character is rendered text. (A block inside `<textarea>` is a parse error, and
+/// tsv does not read `<svelte:options preserveWhitespace>`, which turns the trim off for the
+/// whole component — a known limitation of every whitespace rule, see `docs/cli.md`.)
+///
+/// The builder that prints the block names the context once, since it is the builder that
+/// decides how the sections print: the ordinary builder passes [`Self::Trimmed`], the
+/// whitespace-sensitive one [`Self::Preserved`]. Both "does this section render?" answers —
+/// [`then_has_content`] and [`await_shorthand`] — take it, and everything downstream reads the
+/// one [`AwaitShorthand`] the builder classified, so no decision can answer for a different
+/// context than the others.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum SectionWhitespace {
+    /// Outside a whitespace-preserving element: a section of ASCII whitespace renders nothing.
+    Trimmed,
+    /// Inside `<pre>`: only a section with no nodes at all renders nothing.
+    Preserved,
+}
+
+impl SectionWhitespace {
+    /// Whether a section holding `fragment` renders nothing here.
+    ///
+    /// Read from the **source** text, never its decoded value: `&#32;` decodes to a space the
+    /// compiler trims, yet dropping or folding the section would erase authored bytes, so it
+    /// is content here — as is an NBSP, a form feed (outside the compiler's class) or a comment.
+    fn renders_nothing(self, fragment: &Fragment<'_>) -> bool {
+        match self {
+            Self::Trimmed => fragment
+                .nodes
+                .iter()
+                .all(FragmentNode::is_whitespace_only_text),
+            Self::Preserved => fragment.nodes.is_empty(),
+        }
+    }
+}
+
 /// How an `{#await}` carries its first section in the head, keyed on the **absence of a
 /// pending body** (the binding is optional). Single classification shared by the head-clause
-/// builder and the tail builders (which skip the head-carried keyword) — so the two can't drift.
+/// builder and the tail builders (which skip the head-carried keyword, and print nothing for a
+/// pending the head folded) — so the two can't drift.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum AwaitShorthand {
     /// `{#await x then v}` / bare `{#await x then}` — no pending body, a `then` section.
@@ -204,38 +247,52 @@ pub(super) enum AwaitShorthand {
     None,
 }
 
-/// Whether an await block's `:then` section carries a printable body. An **empty-body** `:then`
-/// (`{#await p} {:then v}{/await}`, or the shorthand `{#await p then v}{/await}`) is dropped
-/// entirely — marker and binding — matching prettier, since the `value` binding is unused when
-/// nothing renders. (A `:catch` is *not* dropped when empty: an empty `{:catch}` still handles a
-/// rejection, so removing it would change semantics — see `conformance_prettier_svelte.md` §Svelte: Blocks.)
-pub(super) fn then_has_content(block: &internal::AwaitBlock<'_>) -> bool {
-    block
-        .then
-        .as_ref()
-        .is_some_and(|t| t.nodes.iter().any(|n| !n.is_whitespace_only_text()))
+impl AwaitShorthand {
+    /// Whether the pending section prints: only in the full form. A shorthand head folded the
+    /// pending away because it renders nothing, so it prints nothing in every layout — an
+    /// empty body there would still take its own line once the block expands.
+    pub(super) fn prints_pending(self) -> bool {
+        self == Self::None
+    }
+
+    /// Which section keyword the head carries, so the tail omits it:
+    /// `(then-shorthand, catch-shorthand)`.
+    pub(super) fn head_keywords(self) -> (bool, bool) {
+        (self == Self::Then, self == Self::Catch)
+    }
+}
+
+/// Whether an await block's `:then` section carries a printable body. A `:then` that renders
+/// nothing (`{#await p}x{:then v}{/await}`, `{#await p then v} {/await}` — see
+/// [`SectionWhitespace`]) is dropped entirely — marker and binding — matching prettier: an
+/// absent and an empty `then` both render nothing on resolve, and the `value` binding is unused.
+/// (A `:catch` is *not* dropped when empty: an empty `{:catch}` still handles a rejection, and
+/// without one the client runtime rethrows it — see [`Printer::await_catch_keyword`].)
+pub(super) fn then_has_content(block: &internal::AwaitBlock<'_>, ws: SectionWhitespace) -> bool {
+    block.then.as_ref().is_some_and(|t| !ws.renders_nothing(t))
 }
 
 /// Classify an await block's head shorthand. See [`AwaitShorthand`].
 ///
-/// A pending fragment that is empty **or space-only** (whitespace with no newline) carries no
-/// body, so — exactly like an absent pending — the first **surviving** section folds into the
-/// head shorthand (`then v` / `catch e`). This is what makes a space-only pending
-/// (`{#await p} {:then v}{/await}`) converge to the same fixed point as a truly-empty one instead
-/// of lingering as an un-folded full form. A **newline**-authored empty pending is left un-folded
-/// (its `is_boundary_break` node counts as a body) — it keeps the full multiline form.
+/// A pending section that renders nothing ([`SectionWhitespace`]) carries no body, so — exactly
+/// like an absent pending — the first **surviving** section folds into the head shorthand
+/// (`then v` / `catch e`). This is what makes a space-only pending (`{#await p} {:then v}{/await}`)
+/// converge to the same fixed point as a truly-empty one instead of lingering as an un-folded full
+/// form. A **newline**-authored pending is left un-folded (its `is_boundary_break` node counts as a
+/// body) — it keeps the full multiline form, the section the author opened.
 ///
 /// An empty-body `:then` is not a survivor (it is dropped, see [`then_has_content`]), so the fold
 /// skips it to the `:catch`.
-pub(super) fn await_shorthand(block: &internal::AwaitBlock<'_>) -> AwaitShorthand {
+pub(super) fn await_shorthand(
+    block: &internal::AwaitBlock<'_>,
+    ws: SectionWhitespace,
+) -> AwaitShorthand {
     let has_pending_body = block.pending.as_ref().is_some_and(|p| {
-        p.nodes
-            .iter()
-            .any(|n| !n.is_whitespace_only_text() || n.is_boundary_break())
+        !ws.renders_nothing(p) || p.nodes.iter().any(FragmentNode::is_boundary_break)
     });
     if has_pending_body {
         AwaitShorthand::None
-    } else if then_has_content(block) {
+    } else if then_has_content(block, ws) {
         AwaitShorthand::Then
     } else if block.error.is_some() || block.catch.is_some() {
         AwaitShorthand::Catch
@@ -263,9 +320,12 @@ pub(super) fn await_shorthand(block: &internal::AwaitBlock<'_>) -> AwaitShorthan
 /// prints. `each_expr_comment_end` needs no such clamp only because an `{#each}` context is
 /// always written in its own head; a third narrowing here owes the same argument.
 /// Pinned by `svelte/blocks/await/catch_shorthand_body_comment_prettier_divergence`.
-pub(super) fn await_expr_comment_end(block: &internal::AwaitBlock<'_>) -> u32 {
+pub(super) fn await_expr_comment_end(
+    block: &internal::AwaitBlock<'_>,
+    shorthand: AwaitShorthand,
+) -> u32 {
     let head_end = block.opening_tag_span.end - 1;
-    match await_shorthand(block) {
+    match shorthand {
         AwaitShorthand::Then => block.value.as_ref().map_or(head_end, |v| v.span().start),
         AwaitShorthand::Catch => block.error.as_ref().map_or(head_end, |e| e.span().start),
         AwaitShorthand::None => head_end,
@@ -1092,11 +1152,15 @@ impl<'a> Printer<'a> {
     }
 
     /// The `{:then …}` keyword doc — `{:then value}` if a `then` value binds, else
-    /// `{:then}` if the then-section has content, else `None`. Whether to emit it is the
-    /// caller's decision: a `then`-shorthand carries it in the head instead.
-    pub(super) fn await_then_keyword(&self, block: &internal::AwaitBlock<'_>) -> Option<DocId> {
+    /// `{:then}` — or `None` when the then-section renders nothing ([`then_has_content`]). Whether
+    /// to emit it is the caller's decision: a `then`-shorthand carries it in the head instead.
+    pub(super) fn await_then_keyword(
+        &self,
+        block: &internal::AwaitBlock<'_>,
+        ws: SectionWhitespace,
+    ) -> Option<DocId> {
         // An empty-body `:then` is dropped entirely — no marker — matching prettier.
-        if !then_has_content(block) {
+        if !then_has_content(block, ws) {
             return None;
         }
         let d = self.d();
@@ -1112,8 +1176,14 @@ impl<'a> Printer<'a> {
     }
 
     /// The `{:catch …}` keyword doc — `{:catch error}` if an error binds, else `{:catch}`
-    /// if the catch-section has content, else `None`. A `catch`-shorthand carries it in the
+    /// whenever the block has a catch section, else `None`. A `catch`-shorthand carries it in the
     /// head instead.
+    ///
+    /// An **empty** catch section is printed like any other: its presence is behavior, not
+    /// layout. With a catch section the compiled component hands the runtime a catch callback
+    /// and a rejection renders the (empty) section; without one Svelte's client runtime
+    /// rethrows the rejection. So a bare, body-less `{:catch}` is kept — and a whitespace-only
+    /// body, which trims to an empty one, keeps it on every later pass too.
     pub(super) fn await_catch_keyword(&self, block: &internal::AwaitBlock<'_>) -> Option<DocId> {
         let d = self.d();
         if let Some(error) = block.error {
@@ -1122,7 +1192,7 @@ impl<'a> Printer<'a> {
                 self.build_block_pattern_doc(error),
                 d.text("}"),
             ]))
-        } else if block.catch.as_ref().is_some_and(|c| !c.nodes.is_empty()) {
+        } else if block.catch.is_some() {
             Some(d.text("{:catch}"))
         } else {
             None
@@ -1130,12 +1200,15 @@ impl<'a> Printer<'a> {
     }
 
     /// The shorthand clause an await head carries — `then v` / bare `then`, or `catch e` /
-    /// bare `catch` — or `None` for the full form. Classified by [`await_shorthand`], the same
-    /// source [`Self::await_shorthand_flags`] reads to skip the head-carried keyword; shared by
-    /// the ordinary and the whitespace-sensitive builders.
-    pub(super) fn build_await_clause(&self, block: &internal::AwaitBlock<'_>) -> Option<DocId> {
+    /// bare `catch` — or `None` for the full form, per the builder's one [`AwaitShorthand`];
+    /// shared by the ordinary and the whitespace-sensitive builders.
+    pub(super) fn build_await_clause(
+        &self,
+        block: &internal::AwaitBlock<'_>,
+        shorthand: AwaitShorthand,
+    ) -> Option<DocId> {
         let d = self.d();
-        match await_shorthand(block) {
+        match shorthand {
             AwaitShorthand::Then => Some(match block.value {
                 Some(value) => d.concat(&[d.text("then "), self.build_block_pattern_doc(value)]),
                 None => d.text("then"),
@@ -1148,37 +1221,33 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Which shorthand carries its clause in the head, so the tail omits that keyword:
-    /// `(then-shorthand, catch-shorthand)`. Derived from [`await_shorthand`] so it can't drift
-    /// from the head-clause builder.
-    pub(super) fn await_shorthand_flags(block: &internal::AwaitBlock<'_>) -> (bool, bool) {
-        match await_shorthand(block) {
-            AwaitShorthand::Then => (true, false),
-            AwaitShorthand::Catch => (false, true),
-            AwaitShorthand::None => (false, false),
-        }
-    }
-
     /// Build each present await section's body + the un-shorthanded `{:then}` / `{:catch}`
     /// keyword **once** (mode-agnostic), for composition into both expanding-construct
     /// tails by [`Self::compose_await_tail`]. Bodies are the boundary-trimmed
     /// [`Self::build_section_body_doc`]; the per-mode indent wrapping is applied at
     /// composition.
-    fn build_await_pieces(&self, block: &internal::AwaitBlock<'_>) -> AwaitPieces {
-        let (is_then_shorthand, is_catch_shorthand) = Self::await_shorthand_flags(block);
+    fn build_await_pieces(
+        &self,
+        block: &internal::AwaitBlock<'_>,
+        ws: SectionWhitespace,
+        shorthand: AwaitShorthand,
+    ) -> AwaitPieces {
+        let (is_then_shorthand, is_catch_shorthand) = shorthand.head_keywords();
         AwaitPieces {
+            // A pending the head folded prints nothing, in either layout.
             pending: block
                 .pending
                 .as_ref()
+                .filter(|_| shorthand.prints_pending())
                 .map(|p| self.build_section_body_doc(p)),
             then_kw: (!is_then_shorthand)
-                .then(|| self.await_then_keyword(block))
+                .then(|| self.await_then_keyword(block, ws))
                 .flatten(),
             // An empty-body `:then` is dropped (marker + body); keep only a content body.
             then_body: block
                 .then
                 .as_ref()
-                .filter(|_| then_has_content(block))
+                .filter(|_| then_has_content(block, ws))
                 .map(|t| self.build_section_body_doc(t)),
             catch_kw: (!is_catch_shorthand)
                 .then(|| self.await_catch_keyword(block))
@@ -1227,24 +1296,42 @@ impl<'a> Printer<'a> {
     /// construct-wide (hug is all-or-nothing — see `fragment_inline_authored`), so every
     /// section boundary breaks together rather than keying on its own authored whitespace
     /// (the head is prepended by the caller).
-    fn build_await_tail_newline(&self, block: &internal::AwaitBlock<'_>, expand: bool) -> DocId {
+    ///
+    /// An expanded block whose every section drops — a newline-authored `{:then}` that renders
+    /// nothing (`{#await p then v}⏎{/await}`) — still prints the one empty body line, the form a
+    /// newline-authored empty pending prints (`{#await p}⏎⏎{/await}`) and an empty `{#if}` /
+    /// `{#each}` / `{#key}` body does. Without it the expanded form would be `{#await p}⏎{/await}`,
+    /// which the next pass reads as a newline-authored pending and prints with the blank line.
+    fn build_await_tail_newline(
+        &self,
+        block: &internal::AwaitBlock<'_>,
+        ws: SectionWhitespace,
+        shorthand: AwaitShorthand,
+        expand: bool,
+    ) -> DocId {
         let d = self.d();
-        let (is_then_shorthand, is_catch_shorthand) = Self::await_shorthand_flags(block);
+        let (is_then_shorthand, is_catch_shorthand) = shorthand.head_keywords();
         let mut parts: DocBuf = DocBuf::new();
-        if let Some(pending) = &block.pending {
+        let mut printed_body = false;
+        // A pending the head folded prints nothing, in either layout.
+        if shorthand.prints_pending()
+            && let Some(pending) = &block.pending
+        {
             parts.push(build_await_section_body(self, pending, expand));
+            printed_body = true;
         }
-        if !is_then_shorthand && let Some(kw) = self.await_then_keyword(block) {
+        if !is_then_shorthand && let Some(kw) = self.await_then_keyword(block, ws) {
             if expand {
                 parts.push(d.hardline());
             }
             parts.push(kw);
         }
         // An empty-body `:then` is dropped (marker via `await_then_keyword` above, body here).
-        if then_has_content(block)
+        if then_has_content(block, ws)
             && let Some(then_block) = &block.then
         {
             parts.push(build_await_section_body(self, then_block, expand));
+            printed_body = true;
         }
         if !is_catch_shorthand && let Some(kw) = self.await_catch_keyword(block) {
             if expand {
@@ -1254,6 +1341,10 @@ impl<'a> Printer<'a> {
         }
         if let Some(catch_block) = &block.catch {
             parts.push(build_await_section_body(self, catch_block, expand));
+            printed_body = true;
+        }
+        if expand && !printed_body {
+            parts.push(self.indent_body_expand(d.empty(), true));
         }
         if expand {
             parts.push(d.hardline());
@@ -1276,13 +1367,17 @@ impl<'a> Printer<'a> {
         gt_prefix: Option<DocId>,
     ) -> DocId {
         let d = self.d();
+        // Outside `<pre>`: a whitespace-only section renders nothing. Classified once; every
+        // section decision below reads this one answer.
+        let ws = SectionWhitespace::Trimmed;
+        let shorthand = await_shorthand(block, ws);
         // Build expression doc with context-dependent behavior
         let allow_wrapping = !has_preceding_breakable;
         let head = self.build_block_head_expr(
             AWAIT_BLOCK_OPEN,
             block.opening_tag_span,
             block.expression,
-            await_expr_comment_end(block),
+            await_expr_comment_end(block, shorthand),
             allow_wrapping || in_multiline_context,
         );
 
@@ -1292,13 +1387,25 @@ impl<'a> Printer<'a> {
         // other blocks. The head carries the `then v` / `catch e` clause; the section
         // bodies + `{:then}`/`{:catch}` keywords + `{/await}` all drop to their own
         // lines when the head wraps, chosen in one pass by `build_expanding_construct`.
+        //
+        // `has_section` reads what will PRINT: a pending the head folded and a `{:then}` that
+        // renders nothing are dropped, and a pending that renders nothing prints an empty body,
+        // so a block whose sections all print nothing is the section-less block and lays out as
+        // one (`{#await p then v} {/await}`, `{#await p} {:then v} {/await}` and
+        // `{#await p}{/await}` alike, at any head width). A `{:catch}` prints even when empty.
         let sections = [&block.pending, &block.then, &block.catch];
-        let has_section = sections
-            .iter()
-            .any(|f| f.as_ref().is_some_and(|f| !f.nodes.is_empty()));
+        let has_section = block
+            .pending
+            .as_ref()
+            .is_some_and(|p| shorthand.prints_pending() && !ws.renders_nothing(p))
+            || then_has_content(block, ws)
+            || block.catch.as_ref().is_some_and(|c| !c.nodes.is_empty());
         // A space-only section is inline-authored (its boundary is render-free and gets
         // trimmed by `build_section_body_doc`); only a newline-authored section falls
-        // through to the newline tail below.
+        // through to the newline tail below. This one reads every AUTHORED section, a dropped
+        // one included: a newline the author wrote keeps the block form, as it does for an
+        // empty `{#if}` / `{#each}` / `{#key}` body (`build_await_tail_newline` then prints the
+        // one empty body line).
         let all_sections_inline = sections
             .iter()
             .filter_map(|f| f.as_ref())
@@ -1313,12 +1420,12 @@ impl<'a> Printer<'a> {
         // does after a sibling in any other fragment.
         // Shorthand clause lives in the head: `then v` / bare `then`, or `catch e` / bare
         // `catch`; the full form has none. Built once, shared by the fast path and the
-        // newline-authored tail. Classified by `await_shorthand`, the same source
-        // `await_shorthand_flags` uses to skip the head-carried keyword.
+        // newline-authored tail. Classified by the one `shorthand` the tails also read to skip
+        // the head-carried keyword.
         // A comment can break the clause's binding pattern; asked of the clause here, before
         // the dangle wraps it in an `if_break` `will_break` cannot see into (the `{#each}`
         // clause's verdict, for the same reason).
-        let clause = self.build_await_clause(block);
+        let clause = self.build_await_clause(block, shorthand);
         let clause_forced_break = clause.is_some_and(|c| d.will_break(c));
         // `comment_end` is bound at `expr_comment_end` (not the head end) so a line
         // comment *inside* a shorthand pattern isn't mistaken for a trailing line comment
@@ -1336,7 +1443,7 @@ impl<'a> Printer<'a> {
         // blocks. The section bodies + `{:then}`/`{:catch}` keywords + `{/await}` all drop to
         // their own lines when the head wraps, chosen in one pass by `build_expanding_construct`.
         if has_section && all_sections_inline {
-            let pieces = self.build_await_pieces(block);
+            let pieces = self.build_await_pieces(block, ws, shorthand);
             let inline_tail = self.compose_await_tail(&pieces, false);
             let multiline_tail = self.compose_await_tail(&pieces, true);
             return self.build_expanding_construct(
@@ -1354,7 +1461,7 @@ impl<'a> Printer<'a> {
         // section-less await (`{#await p}{/await}` — every fragment empty), which stays
         // inline: nothing forces expansion.
         let expand = !all_sections_inline;
-        let tail = self.build_await_tail_newline(block, expand);
+        let tail = self.build_await_tail_newline(block, ws, shorthand, expand);
         // Non-expanding tail (newline-authored sections): fold a preceding sibling's `>`.
         self.dangle_gt(gt_prefix, d.concat(&[head_doc, tail]))
     }

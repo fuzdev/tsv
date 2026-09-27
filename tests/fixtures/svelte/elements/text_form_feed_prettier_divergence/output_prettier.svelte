@@ -22,3 +22,6 @@
 
 <!-- Root-level text, where the surrounding fragment edges trim -->
 text1 text2
+
+<!-- As an {#await} pending branch, where a whitespace-only branch folds into the head -->
+{#await promise then value}{value}{/await}
