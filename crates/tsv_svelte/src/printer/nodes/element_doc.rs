@@ -13,6 +13,7 @@
 
 use crate::ast::internal::{self, FragmentNode, is_collapsible_ws_char};
 use crate::printer::Printer;
+use crate::printer::classification::element::has_raw_content;
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -464,13 +465,13 @@ impl<'a> Printer<'a> {
             is_void: facts.is_void(),
             is_foreign: facts.is_foreign(),
             is_namespaced: facts.is_namespaced(),
-            raw_text: if facts.is_style() {
-                Some(RawTextKind::Style)
-            } else if facts.is_script() {
-                Some(RawTextKind::Script)
-            } else {
-                None
-            },
+            raw_text: facts.is_raw_text().then(|| {
+                if facts.is_style() {
+                    RawTextKind::Style
+                } else {
+                    RawTextKind::Script
+                }
+            }),
             is_ws_sensitive: facts.is_ws_sensitive(),
             collapses_child_ws: facts.collapses_child_whitespace(),
             is_declaration: facts.is_declaration(),
@@ -1150,16 +1151,13 @@ impl<'a> Printer<'a> {
         // Every arm below ends with it, so it is built once rather than at each of the five.
         let closing_tag = self.end_tag(name_doc);
 
-        // Get raw content from the single Text child
-        let text = element.fragment.nodes.first().and_then(|node| match node {
-            FragmentNode::Text(text) => Some(text),
-            _ => None,
-        });
-
-        // Nothing between the tags — the one arm that collapses. A body of *whitespace* is
-        // not this arm: it keeps a delimiter break at every other position and here too.
-        let Some(text) = text.filter(|t| !t.raw(self.source).is_empty()) else {
-            return d.concat(&[opening_tag, closing_tag]);
+        // Nothing between the tags (`has_raw_content`, the block classification's reading) —
+        // the one arm that collapses. A body of *whitespace* is not this arm: it keeps a
+        // delimiter break at every other position and here too. Otherwise the content is the
+        // single Text child.
+        let text = match element.fragment.nodes.first() {
+            Some(FragmentNode::Text(text)) if has_raw_content(element) => text,
+            _ => return d.concat(&[opening_tag, closing_tag]),
         };
 
         // A frozen-language body freezes before any parse is attempted — the shared

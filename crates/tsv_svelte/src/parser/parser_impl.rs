@@ -77,6 +77,11 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     /// attribute). Monotonic within a subtree (descendants inherit) but scoped to the template
     /// (restored for siblings). Suppresses `<slot>` → `SlotElement` (it stays a `RegularElement`).
     pub(crate) in_shadowroot_template: bool,
+    /// Set on reading a raw-text element nested in the markup — see
+    /// [`internal::Root::holds_nested_raw_text`]. Never cleared: a speculative read that is
+    /// later rewound can only leave it set for a document that holds none, which costs the
+    /// printer the analysis the flag gates and changes no answer.
+    pub(crate) holds_nested_raw_text: bool,
 }
 
 /// A point in the parser's embedded-parse ledgers to rewind to — see
@@ -179,6 +184,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             acorn_regions: BumpVec::new_in(arena),
             in_svelte_head: false,
             in_shadowroot_template: false,
+            holds_nested_raw_text: false,
         })
     }
 

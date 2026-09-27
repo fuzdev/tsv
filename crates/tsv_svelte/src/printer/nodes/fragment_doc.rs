@@ -772,19 +772,6 @@ impl<'a> Printer<'a> {
             && self.glued_to_content(nodes, i, false)
     }
 
-    /// Whether `node` is a nested `<script>` / `<style>` that is block-classified — one with a
-    /// body ([`Self::is_block_element`]'s raw-text overlay) — and so renders **no box** while the
-    /// printer would otherwise give it a line of its own. (An empty one is already inline.)
-    ///
-    /// The UA stylesheet gives both `display: none`, so the whitespace on either side of one stays
-    /// in the same inline formatting context: `a<script>…</script>b` renders `ab`, and a break on
-    /// either side renders a space. The block-boundary licence a block box earns does not reach
-    /// it.
-    pub(super) fn is_boxless_raw_text_element(&self, node: &FragmentNode<'_>) -> bool {
-        matches!(node, FragmentNode::Element(el)
-            if (el.facts.is_script() || el.facts.is_style()) && self.is_block_element(el))
-    }
-
     /// Whether the block-classified node at `i` does not own a block line there: a
     /// [global element glued on both sides](Self::is_glued_global_element) or a
     /// [nested `<script>` / `<style>` that keeps its glue](Self::is_glued_raw_text_element).
@@ -1541,9 +1528,8 @@ impl<'a> Printer<'a> {
     /// - **before** when the previous sibling exists, is not itself a block element, and is
     ///   either a non-text node or a text whose boundary whitespace was consumed (the
     ///   `prev_text_ws` snapshot) or trimmed away (no longer ends with ws).
-    /// - **after** when the next sibling exists and is either a non-text node, or content
-    ///   text (or an empty text immediately followed by an inline element) that does **not**
-    ///   start with a linebreak — a leading-linebreak text supplies its own break.
+    /// - **after** when [`Self::owes_break_after`] says the block owes it — the one answer
+    ///   every node that owns its line gives its follower.
     fn handle_block_child(
         &self,
         trimmed_nodes: &[FragmentNode<'_>],
@@ -1605,6 +1591,10 @@ impl<'a> Printer<'a> {
     /// (`syntax/prettier_ignore/global_glued_before_prettier_divergence`) and a declaration
     /// (`syntax/prettier_ignore/declaration_glued_before_prettier_divergence`).
     fn owes_break_after(&self, trimmed_nodes: &[FragmentNode<'_>], i: usize) -> bool {
+        debug_assert!(
+            self.owns_own_line(trimmed_nodes, i),
+            "only a node that owns its own line owes the break after it"
+        );
         if trimmed_nodes[i].is_declaration() {
             return trimmed_nodes
                 .get(i + 1)

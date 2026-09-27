@@ -182,12 +182,11 @@ impl<'a> Printer<'a> {
         // both tags — two whitespace-sensitive elements answering one question with two
         // layouts would be a distinction with no source in the elements.
         if (is_inline || emission.ends_with_line_comment) && has_content {
-            let content_doc = self.build_whitespace_sensitive_content_doc(element.fragment.nodes);
-            return self.build_ws_sensitive_head_with_content_doc(
+            return self.build_verbatim_content_doc(
                 name_doc,
+                element.fragment.nodes,
                 &attr_docs,
                 emission,
-                content_doc,
                 edges,
             );
         }
@@ -279,6 +278,32 @@ impl<'a> Printer<'a> {
         let content_doc = self.build_whitespace_sensitive_content_doc(element.fragment.nodes);
 
         d.concat(&[opening_tag, content_doc, self.end_tag(name_doc)])
+    }
+
+    /// Build an element whose content prints **verbatim** under the family's content-bearing
+    /// head — the family's single entry for that shape: the content through
+    /// [`Printer::build_whitespace_sensitive_content_doc`], the head through
+    /// [`Self::build_ws_sensitive_head_with_content_doc`] off `edges`, so the `>` hugs the last
+    /// list member and each delimiter reads its own content edge.
+    ///
+    /// Three callers, one shape: a `<pre>` / `<textarea>` (or an inline element inside one)
+    /// with content ([`Self::build_whitespace_sensitive_element_doc`], whose nested `<script>` /
+    /// `<style>` hands in edges with the closing tag held whole —
+    /// [`ContentEdges::with_whole_close`]), a head `<title>` (`build_title_content_doc`) and
+    /// every special element inside a whitespace-sensitive element
+    /// (`build_ws_sensitive_special_element_doc`), the last two off the content's own
+    /// [`Self::ws_sensitive_content_edges`]. Every caller gates on non-empty content first; an
+    /// empty element keeps its own empty layouts.
+    pub(super) fn build_verbatim_content_doc(
+        &self,
+        name: DocId,
+        nodes: &[FragmentNode<'_>],
+        attr_docs: &[DocId],
+        emission: AttrListEmission,
+        edges: ContentEdges,
+    ) -> DocId {
+        let content = self.build_whitespace_sensitive_content_doc(nodes);
+        self.build_ws_sensitive_head_with_content_doc(name, attr_docs, emission, content, edges)
     }
 
     /// Read both content edges — the pair [`ContentEdges`] documents.

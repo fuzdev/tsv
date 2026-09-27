@@ -13,7 +13,7 @@
 // backward pass ([`FragmentGlue`]), then read by position.
 
 use super::helpers::is_control_flow_block;
-use crate::ast::internal::{ElementKind, Fragment, FragmentNode};
+use crate::ast::internal::{ElementKind, FragmentNode, Root};
 use crate::printer::Printer;
 use std::rc::Rc;
 
@@ -38,6 +38,18 @@ use std::rc::Rc;
 pub(crate) struct EdgeFree {
     pub(crate) start: bool,
     pub(crate) end: bool,
+}
+
+/// One fragment's entry in the document's edge index ([`Printer::index_fragment_edges`]),
+/// keyed by the address of its first node.
+#[derive(Clone, Copy)]
+pub(crate) struct IndexedFragment {
+    /// The fragment's node count — the extent a run of it must fall inside.
+    len: usize,
+    /// How many whitespace-only nodes open and close it: what a boundary-trimmed run of it
+    /// drops at each end.
+    ws_ends: (usize, usize),
+    edges: EdgeFree,
 }
 
 /// Glue flags of one node slice, indexed like its nodes.
@@ -220,11 +232,15 @@ impl<'a> Printer<'a> {
     ///
     /// A reader may hold a whole fragment or a run of one — the boundary-trimmed children, or a
     /// root segment the section comments and ignore ranges split off — and the run is what it
-    /// prints, so the flags are the run's own: its ends are its edges. Where those ends are the
-    /// fragment's, the edges are the fragment's too ([`EdgeFree`], registered by the document
-    /// index), since the whitespace a trimmed run drops at its ends is the compiler's to trim; a
-    /// run no index covers — a printer that formatted no document — reads edges that absorb
-    /// nothing.
+    /// prints, so the flags are the run's own: its ends are its edges. Any run of an indexed
+    /// fragment reads that fragment's edges ([`EdgeFree`], registered by the document index) at
+    /// both of its ends, found by address: exact for the fragment itself and for its
+    /// boundary-trimmed children, since the whitespace a trimmed run drops at its ends is the
+    /// compiler's to trim, and moot for a root segment, since the root's edges absorb nothing.
+    /// No reader holds any other run that stops short of its fragment's ends — a debug
+    /// assertion checks it, since such a run would be handed an edge it does not have. A run
+    /// no index covers — a document the index skipped, or a printer that formatted no
+    /// document — reads edges that absorb nothing.
     fn fragment_glue(&self, nodes: &[FragmentNode<'_>]) -> Rc<FragmentGlue> {
         let addr = nodes.as_ptr() as usize;
         let key = (addr, nodes.len());
@@ -232,13 +248,26 @@ impl<'a> Printer<'a> {
             return Rc::clone(glue);
         }
         let size = size_of::<FragmentNode<'_>>();
-        let edges = self
-            .fragment_edges
-            .borrow()
+        let index = self.fragment_edges.borrow();
+        let fragment = index
             .range(..=addr)
             .next_back()
-            .filter(|&(&start, &(len, _))| (addr - start) / size + nodes.len() <= len)
-            .map_or_else(EdgeFree::default, |(_, &(_, edges))| edges);
+            .map(|(&start, &entry)| ((addr - start) / size, entry))
+            .filter(|&(offset, entry)| offset + nodes.len() <= entry.len);
+        debug_assert!(
+            nodes.is_empty() || index.is_empty() || fragment.is_some(),
+            "a glue slice lies outside every indexed fragment"
+        );
+        debug_assert!(
+            fragment.is_none_or(|(offset, entry)| {
+                let (lead, trail) = entry.ws_ends;
+                (!entry.edges.start && !entry.edges.end)
+                    || (offset <= lead && entry.len - offset - nodes.len() <= trail)
+            }),
+            "a run that stops short of its fragment's ends reads the fragment's edges"
+        );
+        let edges = fragment.map_or_else(EdgeFree::default, |(_, entry)| entry.edges);
+        drop(index);
         let glue = Rc::new(self.compute_fragment_glue(nodes, edges));
         self.fragment_glue_cache
             .borrow_mut()
@@ -304,6 +333,19 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Whether `node` is a nested `<script>` / `<style>` that is block-classified — one with a
+    /// body ([`Self::is_block_element`]'s raw-text overlay) — and so renders **no box** while the
+    /// printer would otherwise give it a line of its own. (An empty one is already inline.)
+    ///
+    /// The UA stylesheet gives both `display: none`, so the whitespace on either side of one stays
+    /// in the same inline formatting context: `a<script>…</script>b` renders `ab`, and a break on
+    /// either side renders a space. The block-boundary licence a block box earns does not reach
+    /// it.
+    pub(super) fn is_boxless_raw_text_element(&self, node: &FragmentNode<'_>) -> bool {
+        matches!(node, FragmentNode::Element(el)
+            if el.facts.is_raw_text() && self.is_block_element(el))
+    }
+
     /// Whether the node at `i` is a nested `<script>` / `<style>` with a body that **keeps its
     /// glue**: a line break on at least one side of it would render, so it lays out as a glued
     /// inline element whose body breaks rather than taking its own line.
@@ -322,8 +364,17 @@ impl<'a> Printer<'a> {
     /// reads its edges from where the tag sits in its parent, so the parent is analysed first.
     /// Only a fragment holding a node that asks is analysed: a nested `<script>` / `<style>`
     /// with a body, a declaration, a global element, or a block tag whose bodies need edges.
-    pub(crate) fn index_fragment_edges(&self, root: &Fragment<'_>) {
-        self.index_fragment(root.nodes, EdgeFree::default());
+    ///
+    /// A document with no nested `<script>` / `<style>` ([`Root::holds_nested_raw_text`]) is not
+    /// indexed at all: every flag of a slice's [`FragmentGlue`] reads its edges only through a
+    /// boxless element in that slice (`inline_laid` marks nothing else, and the glue scans
+    /// defer to the edge scans only past one), and a block tag's body edges feed nothing but
+    /// that body's own flags. Without one, the edges that absorb nothing — what an unindexed
+    /// slice reads — give every flag the answer the index would.
+    pub(crate) fn index_fragment_edges(&self, root: &Root<'_>) {
+        if root.holds_nested_raw_text {
+            self.index_fragment(root.fragment.nodes, EdgeFree::default());
+        }
     }
 
     fn index_fragment(&self, nodes: &[FragmentNode<'_>], edges: EdgeFree) {
@@ -336,9 +387,23 @@ impl<'a> Printer<'a> {
                 || matches!(node, FragmentNode::SpecialElement(se) if se.kind.is_global())
                 || self.is_boxless_raw_text_element(node)
         });
-        self.fragment_edges
-            .borrow_mut()
-            .insert(nodes.as_ptr() as usize, (nodes.len(), edges));
+        let ws_lead = nodes
+            .iter()
+            .take_while(|n| n.is_whitespace_only_text())
+            .count();
+        let ws_trail = nodes
+            .iter()
+            .rev()
+            .take_while(|n| n.is_whitespace_only_text())
+            .count();
+        self.fragment_edges.borrow_mut().insert(
+            nodes.as_ptr() as usize,
+            IndexedFragment {
+                len: nodes.len(),
+                ws_ends: (ws_lead, ws_trail),
+                edges,
+            },
+        );
         let glue = asks.then(|| self.fragment_glue(nodes));
         let outside = |i: usize| -> EdgeFree {
             glue.as_ref().map_or_else(EdgeFree::default, |g| EdgeFree {

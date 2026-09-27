@@ -151,18 +151,15 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Check if a fragment node is an HTML block element (not component, not control flow)
+    /// Whether the node at `i` is an HTML block element child (not a component, a `svelte:*`
+    /// element or a control-flow block) that owns a block line there — the positional
+    /// [`Self::is_block_element_at`] narrowed to regular elements.
     ///
     /// Used to detect when parent elements need multiline formatting due to
-    /// block-level children. Components and control flow blocks don't trigger
-    /// this - only actual HTML block elements like `<div>`, `<p>`, etc.
-    fn is_block_element_child(&self, node: &FragmentNode<'_>) -> bool {
-        match node {
-            // Defer to the one block-element adapter (component + script/style overlay).
-            FragmentNode::Element(el) => self.is_block_element(el),
-            // svelte:* elements and control flow don't trigger multiline
-            _ => false,
-        }
+    /// block-level children. Components, `svelte:*` elements and control flow blocks don't
+    /// trigger this - only actual HTML block elements like `<div>`, `<p>`, etc.
+    fn is_block_element_child_at(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+        matches!(nodes[i], FragmentNode::Element(_)) && self.is_block_element_at(nodes, i)
     }
 
     /// Whether the element's content is a **`fill` to reflow into** — the thing whose presence
@@ -577,13 +574,12 @@ impl<'a> Printer<'a> {
         // Asked by position: a nested `<script>` / `<style>` that keeps its glue lays out as a
         // glued inline element (`Printer::is_glued_raw_text_element`), so it forces the element
         // open only through its own body's breaks, never as a block child.
-        if (0..nodes.len()).any(|i| {
-            self.is_block_element_child(&nodes[i]) && !self.is_glued_raw_text_element(nodes, i)
-        }) && nodes
-            .iter()
-            .filter(|n| !n.is_whitespace_only_text())
-            .nth(1)
-            .is_some()
+        if (0..nodes.len()).any(|i| self.is_block_element_child_at(nodes, i))
+            && nodes
+                .iter()
+                .filter(|n| !n.is_whitespace_only_text())
+                .nth(1)
+                .is_some()
         {
             return MultilineCause::Structural;
         }

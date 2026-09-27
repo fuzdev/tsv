@@ -204,6 +204,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             options,
             comments,
             acorn_regions,
+            holds_nested_raw_text: self.holds_nested_raw_text,
         })
     }
 

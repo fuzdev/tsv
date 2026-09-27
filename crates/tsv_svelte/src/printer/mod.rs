@@ -30,7 +30,7 @@ mod text;
 use crate::ast::internal::{self, FragmentNode};
 use nodes::AttrGaps;
 use smallvec::SmallVec;
-use std::cell::{Cell, RefCell};
+use std::cell::{Cell, OnceCell, RefCell};
 use std::fmt::Write as _;
 use std::ops::{Index, IndexMut};
 use tsv_lang::doc::DocBuf;
@@ -140,6 +140,27 @@ impl IndexMut<HoistedSection> for HoistedComments {
     }
 }
 
+impl HoistedComments {
+    /// Which of the root fragment's `len` nodes travel with a hoisted section — a leading run
+    /// or a region-end trail — indexed like the nodes.
+    fn travelling(&self, len: usize) -> Vec<bool> {
+        let mut travels = vec![false; len];
+        for section in &self.0 {
+            for &i in section.leading.iter().chain(&section.trail) {
+                travels[i] = true;
+            }
+        }
+        travels
+    }
+}
+
+/// Append `ch` spelled as an uppercase-hex character reference (`&#xA0;`) — the one spelling
+/// both source rewrites use for a character the next parse would otherwise trim from the
+/// document's end ([`Printer::template_tail_respell`], `Printer::lifted_runs_source`).
+fn push_char_reference(out: &mut String, ch: char) {
+    let _ = write!(out, "&#x{:X};", u32::from(ch));
+}
+
 /// Whether each hoisted section is frozen by a format-ignore directive
 /// ([`Printer::section_is_frozen`]), in [`HoistedSection::ALL`] order. `<svelte:options>` is
 /// never frozen.
@@ -151,24 +172,29 @@ fn root_sections(root: &internal::Root<'_>) -> [(Option<Span>, HoistedSection); 
     HoistedSection::ALL.map(|section| (section.span_in(root), section))
 }
 
-/// The per-node facts [`Printer::classify_fragment_comment`] reads, taken for the whole
-/// fragment in one pass each way — so classifying every comment of a document is linear. Asked
-/// per comment instead, the range and barrier scans each walked the fragment again, which is
-/// quadratic in a comment-heavy template.
-struct CommentScan {
+/// The root fragment's `format-ignore` ranges, paired once per document
+/// ([`Printer::ignore_ranges`]) — the one pairing the freeze
+/// ([`Printer::print_root_fragment`]), the lifted-run rewrite, the comment classification and
+/// the region-end trail all read, so they cannot drift on which nodes a range holds.
+///
+/// A `…-start` opens a range when none is open, and the first `…-end` after it closes it: a
+/// start inside an open range is part of the frozen slice, an end with no range open is an
+/// ordinary comment, and a start no end follows (an unclosed one) freezes nothing — tsv
+/// prints it as an ordinary comment rather than letting it pin everything after it. One
+/// forward pass; every read is a lookup, where scanning from each start for its end is
+/// quadratic in a template of unclosed starts.
+struct IgnoreRanges {
     /// Each node's range marker ([`range_marker`]), `None` for every other node.
     markers: Vec<Option<RangeMarker>>,
-    /// Whether the node sits inside a frozen range — [`Printer::is_inside_ignore_range`]'s
-    /// answer: the nearest marker before it opens a range, and a closing marker follows.
-    inside_range: Vec<bool>,
-    /// The start of the first node after each one that pins a comment there to the template —
-    /// a node other than whitespace text or an ordinary comment (a range marker is one).
-    next_barrier: Vec<Option<u32>>,
+    /// Each range as its (start marker, end marker) fragment indices, in source order.
+    pairs: SmallVec<[(usize, usize); 2]>,
+    /// The address of the fragment's first node — which fragment this pairs, so a read against
+    /// another fails a debug assertion rather than answering for the wrong nodes.
+    nodes_addr: usize,
 }
 
-impl CommentScan {
-    fn new(fragment: &internal::Fragment<'_>, source: &str) -> Self {
-        let nodes = &fragment.nodes;
+impl IgnoreRanges {
+    fn new(nodes: &[FragmentNode<'_>], source: &str) -> Self {
         let markers: Vec<Option<RangeMarker>> = nodes
             .iter()
             .map(|n| match n {
@@ -176,25 +202,64 @@ impl CommentScan {
                 _ => None,
             })
             .collect();
-
-        let mut inside_range = vec![false; nodes.len()];
-        let mut opened = false;
+        let mut pairs = SmallVec::new();
+        let mut open = None;
         for (i, marker) in markers.iter().enumerate() {
-            inside_range[i] = opened;
-            if let Some(marker) = marker {
-                opened = *marker == RangeMarker::Start;
+            match (marker, open) {
+                (Some(RangeMarker::Start), None) => open = Some(i),
+                (Some(RangeMarker::End), Some(start)) => {
+                    pairs.push((start, i));
+                    open = None;
+                }
+                _ => {}
             }
         }
-        let mut closed_after = false;
+        Self {
+            markers,
+            pairs,
+            nodes_addr: nodes.as_ptr() as usize,
+        }
+    }
+
+    /// The end marker of the range the start marker at `i` opens — `None` when the node at `i`
+    /// opens none.
+    fn end_of(&self, i: usize) -> Option<usize> {
+        self.pairs
+            .binary_search_by_key(&i, |&(start, _)| start)
+            .ok()
+            .map(|k| self.pairs[k].1)
+    }
+
+    /// Whether the node at `i` sits **inside** a range — past its start marker, through its end
+    /// marker, the slice the freeze prints verbatim.
+    fn contains(&self, i: usize) -> bool {
+        let k = self.pairs.partition_point(|&(start, _)| start < i);
+        k > 0 && i <= self.pairs[k - 1].1
+    }
+}
+
+/// The per-node facts [`Printer::classify_fragment_comment`] reads, taken for the whole
+/// fragment in one pass — so classifying every comment of a document is linear. Asked per
+/// comment instead, the range and barrier scans each walked the fragment again, which is
+/// quadratic in a comment-heavy template.
+struct CommentScan<'r> {
+    /// The fragment's range markers and which nodes sit inside a range.
+    ranges: &'r IgnoreRanges,
+    /// The start of the first node after each one that pins a comment there to the template —
+    /// a node other than whitespace text or an ordinary comment (a range marker is one).
+    next_barrier: Vec<Option<u32>>,
+}
+
+impl<'r> CommentScan<'r> {
+    fn new(fragment: &internal::Fragment<'_>, ranges: &'r IgnoreRanges) -> Self {
+        let nodes = &fragment.nodes;
         let mut next_barrier = vec![None; nodes.len()];
         let mut barrier = None;
         for i in (0..nodes.len()).rev() {
-            closed_after |= markers[i] == Some(RangeMarker::End);
-            inside_range[i] &= closed_after;
             next_barrier[i] = barrier;
             let pins = match &nodes[i] {
                 FragmentNode::Text(t) => !t.is_collapsible_ws_only,
-                FragmentNode::Comment(_) => markers[i].is_some(),
+                FragmentNode::Comment(_) => ranges.markers[i].is_some(),
                 _ => true,
             };
             if pins {
@@ -202,8 +267,7 @@ impl CommentScan {
             }
         }
         Self {
-            markers,
-            inside_range,
+            ranges,
             next_barrier,
         }
     }
@@ -219,10 +283,10 @@ enum RangeMarker {
 
 /// Classify `comment` as a format-ignore range marker; `None` for every ordinary comment.
 ///
-/// The one spelling of the marker test — the freeze scan, the comment-classification barrier,
-/// and [`Printer::is_inside_ignore_range`] all ask it here, so they cannot drift on which
-/// comments count as markers. A free function (not a method) because
-/// [`Printer::print_root_fragment`]'s closures capture `source` alone to stay borrow-clean.
+/// The one spelling of the marker test — the range pairing ([`IgnoreRanges`], which the freeze
+/// scan, the comment-classification barrier and the lifted-run rewrite all read) and the
+/// region-end trail's exclusion ask it here, so they cannot drift on which comments count as
+/// markers. A free function (not a method) because [`IgnoreRanges::new`] needs `source` alone.
 fn range_marker(comment: &internal::HtmlComment, source: &str) -> Option<RangeMarker> {
     let content = comment.content(source);
     if is_format_ignore_range_start(content) {
@@ -419,13 +483,15 @@ pub(crate) struct Printer<'a> {
     /// asks in four, and nine of the islands' first searches in ten, lay inside a window
     /// already drawn.
     comment_free_gap: CommentFreeWindow<'a>,
-    /// Each fragment's node count and content-edge answer (`nodes::EdgeFree`), keyed by the
+    /// Each fragment's extent and content-edge answer (`nodes::IndexedFragment`), keyed by the
     /// address of its first node — indexed once per document, top down, by
     /// [`Printer::index_fragment_edges`], since a block tag's body reads its edges from where the
     /// tag sits in its parent. A run of a fragment finds its fragment by address.
-    fragment_edges: RefCell<std::collections::BTreeMap<usize, (usize, nodes::EdgeFree)>>,
+    fragment_edges: RefCell<std::collections::BTreeMap<usize, nodes::IndexedFragment>>,
     /// Each node slice's glue flags (`nodes::FragmentGlue`), computed on first ask.
     fragment_glue_cache: RefCell<FxHashMap<(usize, usize), std::rc::Rc<nodes::FragmentGlue>>>,
+    /// The root fragment's `format-ignore` range pairing ([`Self::ignore_ranges`]), on first ask.
+    ignore_ranges: OnceCell<IgnoreRanges>,
 }
 
 impl<'a> Printer<'a> {
@@ -485,6 +551,7 @@ impl<'a> Printer<'a> {
             comment_free_gap: CommentFreeWindow::new(comments),
             fragment_edges: RefCell::new(std::collections::BTreeMap::new()),
             fragment_glue_cache: RefCell::new(FxHashMap::default()),
+            ignore_ranges: OnceCell::new(),
         }
     }
 
@@ -1382,7 +1449,7 @@ fn format_root<'a>(
     );
     // Which fragment content edges are line-box edges — asked by the nested `<script>` /
     // `<style>` glue, and indexed before anything reads it.
-    printer.index_fragment_edges(&root.fragment);
+    printer.index_fragment_edges(root);
 
     // Which fragment comments travel with which section: asked once per document and shared by
     // the lifted-run rewrite, the tail respell and the print — a caller that already classified
@@ -1490,7 +1557,7 @@ fn format_respelled_tail(
 ) -> String {
     let mut respelled = String::with_capacity(source.len() + 10);
     respelled.push_str(&source[..at]);
-    let _ = write!(respelled, "&#x{:X};", u32::from(ch));
+    push_char_reference(&mut respelled, ch);
     respelled.push_str(&source[at + ch.len_utf8()..]);
 
     let bump = bumpalo::Bump::new();
@@ -1712,24 +1779,18 @@ impl<'a> Printer<'a> {
         })
     }
 
-    /// Whether the fragment node at `idx` sits **inside a frozen range** — the nearest range
-    /// marker before it opens one, and a closing marker follows.
-    ///
-    /// Mirrors the freeze condition in [`Self::print_root_fragment`] (a `…-start` counts only
-    /// once a matching `…-end` is found), so an *unclosed* `…-start` — which tsv prints as an
-    /// ordinary comment, freezing nothing — does not pin everything after it.
-    fn is_inside_ignore_range(&self, idx: usize, fragment: &internal::Fragment<'_>) -> bool {
-        let opened = fragment.nodes[..idx].iter().rev().find_map(|n| match n {
-            FragmentNode::Comment(c) => {
-                range_marker(c, self.source).map(|m| m == RangeMarker::Start)
-            }
-            _ => None,
-        });
-        opened == Some(true)
-            && fragment.nodes[idx..].iter().any(|n| {
-                matches!(n, FragmentNode::Comment(c)
-                    if range_marker(c, self.source) == Some(RangeMarker::End))
-            })
+    /// The root fragment's [`IgnoreRanges`], paired on first ask and kept for the document —
+    /// every reader asks of the one root this printer formats.
+    fn ignore_ranges(&self, root_fragment: &internal::Fragment<'_>) -> &IgnoreRanges {
+        let ranges = self
+            .ignore_ranges
+            .get_or_init(|| IgnoreRanges::new(root_fragment.nodes, self.source));
+        debug_assert_eq!(
+            ranges.nodes_addr,
+            root_fragment.nodes.as_ptr() as usize,
+            "the ignore ranges pair one root fragment per printer"
+        );
+        ranges
     }
 
     /// Classify which section a fragment comment should travel with during
@@ -1743,11 +1804,11 @@ impl<'a> Printer<'a> {
         comment: &internal::HtmlComment,
         comment_idx: usize,
         root: &internal::Root<'_>,
-        scan: &CommentScan,
+        scan: &CommentScan<'_>,
     ) -> Option<HoistedSection> {
         // format-ignore-start/end mark ranges within the template —
         // they must stay in the fragment so the range preservation logic sees them
-        if scan.markers[comment_idx].is_some() {
+        if scan.ranges.markers[comment_idx].is_some() {
             return None;
         }
 
@@ -1755,7 +1816,7 @@ impl<'a> Printer<'a> {
         // hoisting it prints it twice. The barrier below cannot see this on its own: when the
         // *section* is inside the range too, its start precedes the closing marker and wins the
         // nearest-start contest.
-        if scan.inside_range[comment_idx] {
+        if scan.ranges.contains(comment_idx) {
             return None;
         }
 
@@ -1835,7 +1896,7 @@ impl<'a> Printer<'a> {
                 .all(|&b| internal::is_collapsible_ws(b))
                 && is_region_end_marker(comment.content(self.source))
                 && range_marker(comment, self.source).is_none()
-                && !self.is_inside_ignore_range(idx, &root.fragment))
+                && !self.ignore_ranges(&root.fragment).contains(idx))
             .then_some(idx)
         })
     }
@@ -1947,7 +2008,7 @@ impl<'a> Printer<'a> {
     fn hoisted_comments(&self, root: &internal::Root<'_>) -> HoistedComments {
         let trails = self.region_end_trails(root);
         let mut sections = HoistedComments::default();
-        let scan = CommentScan::new(&root.fragment, self.source);
+        let scan = CommentScan::new(&root.fragment, self.ignore_ranges(&root.fragment));
 
         for (i, node) in root.fragment.nodes.iter().enumerate() {
             if let FragmentNode::Comment(comment) = node {
@@ -2014,13 +2075,8 @@ impl<'a> Printer<'a> {
         // template) or stays in the template, where it ends the document instead of the text.
         let is_comment = |i: usize| matches!(nodes[i], FragmentNode::Comment(_));
         if (idx + 1..nodes.len()).any(is_comment) {
-            let travels = |i: usize| {
-                sections
-                    .0
-                    .iter()
-                    .any(|s| s.leading.contains(&i) || s.trail == Some(i))
-            };
-            if (idx + 1..nodes.len()).any(|i| is_comment(i) && !travels(i)) {
+            let travels = sections.travelling(nodes.len());
+            if (idx + 1..nodes.len()).any(|i| is_comment(i) && !travels[i]) {
                 return None;
             }
         }
@@ -2051,21 +2107,14 @@ impl<'a> Printer<'a> {
             return run;
         }
         let nodes = &root.fragment.nodes;
-        let mut travels = vec![false; nodes.len()];
-        for section in &sections.0 {
-            for &i in section.leading.iter().chain(&section.trail) {
-                travels[i] = true;
-            }
-        }
-        let mut scan: Option<CommentScan> = None;
+        let travels = sections.travelling(nodes.len());
         for (i, node) in nodes.iter().enumerate().rev() {
             match node {
                 FragmentNode::Text(t) if t.is_collapsible_ws_only => {}
                 FragmentNode::Comment(_) if sections.0.iter().any(|s| s.trail == Some(i)) => {}
                 FragmentNode::Comment(_) if !travels[i] => {
-                    let scan =
-                        scan.get_or_insert_with(|| CommentScan::new(&root.fragment, self.source));
-                    if scan.markers[i].is_some() || scan.inside_range[i] {
+                    let ranges = self.ignore_ranges(&root.fragment);
+                    if ranges.markers[i].is_some() || ranges.contains(i) {
                         break;
                     }
                     run.push(i);
@@ -2285,7 +2334,6 @@ impl<'a> Printer<'a> {
         // `/[^ \t\r\n]/` matches U+00A0, so the node is not whitespace-only and survives:
         // `\u{a0}<div>block</div>` compiles to `<!---->\u{a0}<div>…`). prettier deletes it too,
         // so only the compiler oracle sees it — `svelte/elements/root_leading_nbsp_prettier_divergence`.
-        let source = self.source;
         let skippable = |i: usize, n: &FragmentNode<'_>| {
             skip_indices.contains(&i)
                 || matches!(n, FragmentNode::Text(t) if t.is_collapsible_ws_only)
@@ -2309,6 +2357,15 @@ impl<'a> Printer<'a> {
 
         // Mark single-line-run control-flow blocks so the shared builder inner-breaks them (B4).
         self.mark_root_inline_run_blocks(nodes);
+
+        // The ranges are paired over the whole fragment; the slice drops only whitespace text and
+        // section comments, and a range marker is never a section comment (it pins itself to the
+        // template), so every marker is in the slice and the pairing is the slice's own.
+        let ranges = self.ignore_ranges(fragment);
+        debug_assert!(
+            skip_indices.iter().all(|&k| ranges.markers[k].is_none()),
+            "a range marker never travels with a section"
+        );
 
         // Split at `format-ignore` ranges and at interior section comments (both rare); most
         // templates are one segment.
@@ -2337,16 +2394,7 @@ impl<'a> Printer<'a> {
                 i += 1;
                 continue;
             }
-            let is_range_start = matches!(
-                &nodes[i],
-                FragmentNode::Comment(c) if range_marker(c, source) == Some(RangeMarker::Start)
-            );
-            if is_range_start
-                && let Some(range_end) = (i + 1..nodes.len()).find(|&j| {
-                    matches!(&nodes[j],
-                        FragmentNode::Comment(c) if range_marker(c, source) == Some(RangeMarker::End))
-                })
-            {
+            if let Some(range_end) = ranges.end_of(start + i).map(|end| end - start) {
                 // Segment up to and including the start comment (it prints normally).
                 out.push(self.build_nodes_doc_multiline(&nodes[seg_start..=i]));
                 // Verbatim source from just after the start comment through the end

@@ -34,7 +34,7 @@ impl<'a> Printer<'a> {
         // formats on its own lines. An empty <script></script> / <style></style>
         // stays inline (prettier parity). The raw-text parser always emits one
         // (possibly empty) Text node, so node-presence alone is not "has content".
-        if (facts.is_script() || facts.is_style()) && has_raw_content(element) {
+        if facts.is_raw_text() && has_raw_content(element) {
             return true;
         }
 
@@ -47,10 +47,11 @@ impl<'a> Printer<'a> {
 /// (empty for `<script></script>`, which Svelte still gives that node), so node-presence is not
 /// "has content" and an empty `raw` means none.
 ///
-/// The one reading for both askers: the block classification above (a non-empty body is
-/// block) and the whitespace-sensitive head (`build_whitespace_sensitive_element_doc`, where an
-/// empty body takes the empty element's layouts). Two spellings of it would let the two answer
-/// differently for the same element.
+/// The one reading for every asker: the block classification above (a non-empty body is
+/// block), the nested body's own builder (`build_raw_content_element_doc`, where an empty body
+/// is the one arm that collapses) and the whitespace-sensitive head
+/// (`build_whitespace_sensitive_element_doc`, where an empty body takes the empty element's
+/// layouts). Two spellings of it would let them answer differently for the same element.
 pub(crate) fn has_raw_content(element: &internal::Element<'_>) -> bool {
     use crate::ast::internal::FragmentNode;
     element

@@ -31,7 +31,7 @@ mod special_doc;
 mod tags_doc;
 
 // Shared with the root-fragment printer (`crate::printer::mod`) for run detection.
-pub(crate) use fragment_boxless::{EdgeFree, FragmentGlue};
+pub(crate) use fragment_boxless::{FragmentGlue, IndexedFragment};
 pub(crate) use helpers::is_control_flow_block;
 
 // Shared with the `<svelte:options>` printer (`crate::printer::mod`) — the one tag head

@@ -371,9 +371,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 // Void and self-closing elements have no children or closing tag
                 // (classification lives in tsv_html, shared with the printer).
                 (&[], opening.after_gt as u32)
-            } else if tag_name == "style" || tag_name == "script" {
+            } else if facts.is_raw_text() {
                 // Nested <style>/<script> are raw text (not parsed as Svelte template) —
                 // per Svelte docs, "the <style> tag will be inserted as-is into the DOM".
+                self.holds_nested_raw_text = true;
                 let child_nodes = self.parse_raw_text_content(tag_name, opening.after_gt, start)?;
                 let end = self.parse_closing_tag(tag_name)?;
                 (child_nodes.into_bump_slice(), end)

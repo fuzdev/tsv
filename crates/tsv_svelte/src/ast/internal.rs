@@ -40,6 +40,11 @@ pub struct Root<'arena> {
     /// Every embedded acorn parse this component contains, ascending by
     /// [`AcornRegion::lex_start`] — see [`AcornRegion`].
     pub acorn_regions: &'arena [AcornRegion],
+    /// Whether the parser read a `<script>` / `<style>` nested in the markup — a raw-text
+    /// element anywhere in `fragment`, as opposed to the lifted top-level `instance` /
+    /// `module` / `css`. Recorded where the parser already knows it, so the printer can skip
+    /// analysis only such an element needs without walking the tree to ask. Not on the wire.
+    pub(crate) holds_nested_raw_text: bool,
 }
 
 /// One embedded **acorn parse**: where it began reading the component's own
@@ -1354,8 +1359,11 @@ impl TagFacts {
     pub(crate) fn is_style(self) -> bool {
         self.0 & Self::STYLE != 0
     }
-    pub(crate) fn is_script(self) -> bool {
-        self.0 & Self::SCRIPT != 0
+    /// A raw-text element — `<script>` or `<style>`, whose body Svelte reads verbatim up to
+    /// the first literal end tag rather than as template markup. The one definition the
+    /// parser's content regime and the printer's raw-text readers share.
+    pub(crate) fn is_raw_text(self) -> bool {
+        self.0 & (Self::SCRIPT | Self::STYLE) != 0
     }
     pub(crate) fn is_template(self) -> bool {
         self.0 & Self::TEMPLATE != 0
@@ -2503,7 +2511,11 @@ mod tests {
                 "namespaced: {tag:?}"
             );
             assert_eq!(facts.is_style(), tag == "style", "style: {tag:?}");
-            assert_eq!(facts.is_script(), tag == "script", "script: {tag:?}");
+            assert_eq!(
+                facts.is_raw_text(),
+                tag == "script" || tag == "style",
+                "raw text: {tag:?}"
+            );
             assert_eq!(facts.is_template(), tag == "template", "template: {tag:?}");
             assert_eq!(
                 facts.is_ws_sensitive(),

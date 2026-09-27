@@ -38,10 +38,10 @@
 //! verbatim slice cuts it (`Printer::build_ignore_range_doc`), so the range prints the same bytes.
 //! A document with no run between template nodes (≈ every component) is not rewritten at all.
 
-use super::{HoistedComments, HoistedSection, Printer, RangeMarker, range_marker, root_sections};
+use super::text::has_authored_blank_line;
+use super::{HoistedComments, HoistedSection, Printer, push_char_reference, root_sections};
 use crate::ast::internal::{self, FragmentNode};
 use smallvec::SmallVec;
-use std::fmt::Write as _;
 use tsv_lang::Span;
 
 /// One hoisted section with the comments that travel with it, as its source pieces in order.
@@ -70,11 +70,18 @@ struct GapFacts {
 impl GapFacts {
     /// Fold one whitespace segment in; `edge` is whether it is the segment before or after the
     /// run group, the only two a blank line counts from.
+    ///
+    /// An edge segment is collapsible whitespace by construction (the run's neighbours are cut
+    /// at it), so a blank line there is any second newline — what
+    /// [`has_authored_blank_line`] reads when no content byte can sit between the two.
     fn add(&mut self, segment: &str, edge: bool) {
+        debug_assert!(
+            !edge || internal::collapsible_ws_prefix_len(segment) == segment.len(),
+            "an edge segment is collapsible whitespace"
+        );
         self.whitespace |= !segment.is_empty();
-        let newlines = segment.bytes().filter(|&b| b == b'\n').count();
-        self.newline |= newlines > 0;
-        self.blank_line |= edge && newlines >= 2;
+        self.newline |= segment.contains('\n');
+        self.blank_line |= edge && has_authored_blank_line(segment);
     }
 
     /// The one gap that stands for the segments.
@@ -112,7 +119,13 @@ impl Printer<'_> {
         // A section inside a `format-ignore` range travels with no comments (the range keeps
         // every comment in it where it stands), and leaves the range the way the range's own
         // verbatim slice lets it go (`Printer::build_ignore_range_doc`).
-        let ranges = self.ignore_ranges(&root.fragment);
+        let nodes = &root.fragment.nodes;
+        let ranges: SmallVec<[Span; 2]> = self
+            .ignore_ranges(&root.fragment)
+            .pairs
+            .iter()
+            .map(|&(start, end)| Span::new(nodes[start].span().start, nodes[end].span().end))
+            .collect();
         for run in &mut runs {
             run.in_range = ranges.iter().any(|range| range.contains(run.section_span));
         }
@@ -139,6 +152,10 @@ impl Printer<'_> {
             out.push_str("\n\n");
         }
 
+        let ws_only_between = |a: &LiftedRun, b: &LiftedRun| {
+            let between = &source[a.extent.end as usize..b.extent.start as usize];
+            internal::collapsible_ws_prefix_len(between) == between.len()
+        };
         let mut template = String::with_capacity(source.len());
         let mut cursor = bom_len;
         let mut i = 0;
@@ -158,9 +175,7 @@ impl Printer<'_> {
             let mut j = i;
             while j + 1 < runs.len()
                 && !runs[j + 1].in_range
-                && is_collapsible_ws_str(
-                    &source[runs[j].extent.end as usize..runs[j + 1].extent.start as usize],
-                )
+                && ws_only_between(&runs[j], &runs[j + 1])
             {
                 j += 1;
             }
@@ -215,7 +230,7 @@ impl Printer<'_> {
                     Some(ch) if crate::whitespace::is_end_trimmed_content(ch) => {
                         let at = content.len() - ch.len_utf8();
                         out.push_str(&template[..at]);
-                        let _ = write!(out, "&#x{:X};", u32::from(ch));
+                        push_char_reference(&mut out, ch);
                         out.push_str(&template[at + ch.len_utf8()..]);
                     }
                     _ => out.push_str(&template),
@@ -233,12 +248,7 @@ impl Printer<'_> {
         sections: &HoistedComments,
     ) -> SmallVec<[LiftedRun; 4]> {
         let nodes = &root.fragment.nodes;
-        let mut travels = vec![false; nodes.len()];
-        for s in &sections.0 {
-            for &i in s.leading.iter().chain(&s.trail) {
-                travels[i] = true;
-            }
-        }
+        let travels = sections.travelling(nodes.len());
         let is_content =
             |i: usize, n: &FragmentNode<'_>| !(n.is_whitespace_only_text() || travels[i]);
         let content = nodes
@@ -292,31 +302,4 @@ impl Printer<'_> {
             in_range: false,
         }
     }
-
-    /// The top-level `format-ignore` ranges, from the start marker's start to the end marker's
-    /// end — the pairing `Printer::print_root_fragment` freezes.
-    fn ignore_ranges(&self, fragment: &internal::Fragment<'_>) -> SmallVec<[Span; 2]> {
-        let nodes = &fragment.nodes;
-        let marker = |i: usize, kind: RangeMarker| match &nodes[i] {
-            FragmentNode::Comment(c) => range_marker(c, self.source) == Some(kind),
-            _ => false,
-        };
-        let mut ranges = SmallVec::new();
-        let mut i = 0;
-        while i < nodes.len() {
-            if marker(i, RangeMarker::Start)
-                && let Some(end) = (i + 1..nodes.len()).find(|&j| marker(j, RangeMarker::End))
-            {
-                ranges.push(Span::new(nodes[i].span().start, nodes[end].span().end));
-                i = end + 1;
-            } else {
-                i += 1;
-            }
-        }
-        ranges
-    }
-}
-
-fn is_collapsible_ws_str(s: &str) -> bool {
-    s.bytes().all(internal::is_collapsible_ws)
 }
