@@ -51,6 +51,14 @@ pub(super) enum ElementLayout {
     WithContent(BoundaryMode),
 }
 
+impl ElementLayout {
+    /// Whether this is the flat hug-both (`Soft`) content layout — collapsed onto its tag line
+    /// when it fits, block-style when it does not.
+    pub(super) fn is_soft(self) -> bool {
+        matches!(self, Self::WithContent(BoundaryMode::Soft))
+    }
+}
+
 /// Element type classification
 ///
 /// Determines whitespace handling and formatting behavior.
@@ -384,10 +392,10 @@ impl PreparedElement<'_> {
         }
     }
 
-    /// Whether the element uses the flat hug-both (`Soft`) content layout — collapsed onto its
-    /// tag line when it fits, block-style when it does not.
+    /// Whether the element uses the flat hug-both (`Soft`) content layout
+    /// ([`ElementLayout::is_soft`]).
     fn is_soft(&self) -> bool {
-        matches!(self.layout, ElementLayout::WithContent(BoundaryMode::Soft))
+        self.layout.is_soft()
     }
 }
 
@@ -670,11 +678,28 @@ impl<'a> Printer<'a> {
     /// Build a glued-both inline element as the closing-`>` dangle onto glued following text —
     /// the axis-3 sibling-`>` dangle generalized from an element/block follower to a **text**
     /// follower (see fragment_doc's `try_build_glued_both_text_dangle`). Returns `Some` only for
-    /// the flat hug-both (`Soft`) shape, the one all three states below lay out; `None` keeps the
-    /// element intact so the caller falls back to the normal path. Narrower than the element and
-    /// block followers ([`PreparedElement::gt_dangle_boundary`]): a multiline element never
-    /// takes the inline or dangle state, so there is no role for it to play here — and neither
-    /// does a `Soft` element whose content will break anyway ([`Self::build_close_gt_dangle_doc`]).
+    /// the flat hug-both (`Soft`) shape, the one the dangle's states lay out
+    /// ([`Self::build_close_gt_dangle_doc`]); `None` keeps the element intact so the caller
+    /// falls back to the normal path. Narrower than the element and block followers
+    /// ([`PreparedElement::gt_dangle_boundary`]): a multiline element never takes the inline or
+    /// dangle state, so there is no role for it to play here.
+    pub(super) fn build_inline_element_close_gt_dangle(
+        &self,
+        element: &internal::Element<'_>,
+    ) -> Option<DocId> {
+        // Every state reads the flat hug-both (`Soft`) content layout; any other shape keeps
+        // the element and its `>` intact.
+        let prepared = self
+            .prepare_sibling_element(element)
+            .filter(PreparedElement::is_soft)?;
+        Some(self.build_close_gt_dangle_doc(&prepared.parts, &prepared.ctx, &prepared.attr_docs))
+    }
+
+    /// The closing-`>` dangle of [`Self::build_inline_element_close_gt_dangle`], built from an
+    /// element's analyzed parts — shared with the glued global `svelte:*` element
+    /// (`Printer::build_special_close_gt_dangle`), which runs the same pipeline from a
+    /// `SpecialElement`. The caller has already checked the layout is the flat hug-both (`Soft`)
+    /// one every state reads.
     ///
     /// A three-state `conditional_group` — the renderer picks the first whose flat first line fits:
     /// 1. **inline** `<span>content</span>` — the element fits fully on the line;
@@ -689,23 +714,6 @@ impl<'a> Printer<'a> {
     /// placement differs), and `children_doc` is shared with `block_state` too — a `conditional_group`
     /// candidate that never renders never records its comments (the print-once ledger keys on the
     /// rendered node), so the shared subtrees are sound.
-    pub(super) fn build_inline_element_close_gt_dangle(
-        &self,
-        element: &internal::Element<'_>,
-    ) -> Option<DocId> {
-        // All three states read the flat hug-both (`Soft`) content layout; any other shape keeps
-        // the element and its `>` intact.
-        let prepared = self
-            .prepare_sibling_element(element)
-            .filter(PreparedElement::is_soft)?;
-        Some(self.build_close_gt_dangle_doc(&prepared.parts, &prepared.ctx, &prepared.attr_docs))
-    }
-
-    /// The three-state closing-`>` dangle of [`Self::build_inline_element_close_gt_dangle`], built
-    /// from an element's analyzed parts — shared with the glued global `svelte:*` element
-    /// (`Printer::build_special_close_gt_dangle`), which runs the same pipeline from a
-    /// `SpecialElement`. The caller has already checked the layout is the flat hug-both (`Soft`)
-    /// one all three states read.
     ///
     /// ⚠️ **Content that will break takes the block-style state alone.** `Soft` is decided before
     /// the children are built, off the element's own multiline triggers
@@ -723,8 +731,6 @@ impl<'a> Printer<'a> {
     /// ⚠️ One break is not seen: a newline inside a FROZEN slice (a `prettier-ignore`d node,
     /// `text<span><!-- prettier-ignore --><i>⏎  a⏎</i></span>more`) is verbatim text, which
     /// `will_break` counts as a soft break, so such content still takes the inline state.
-    /// That is stable on its own; with long prose beside it, it is the known open F1 class of a
-    /// frozen multi-line node in a hugged parent (the fill's wrap read back as authored).
     /// See conformance_prettier_svelte.md §Svelte: Inline content block-style (the glued-both
     /// bounds) and `elements/inline_glued_both_breaking_content_prettier_divergence`.
     pub(super) fn build_close_gt_dangle_doc(
@@ -737,6 +743,9 @@ impl<'a> Printer<'a> {
         let block_state =
             self.build_collapsible_element_doc(parts, ctx, attr_docs, children_doc, false, None);
         let d = self.d();
+        // TODO: a frozen multi-line node in the content (a verbatim newline, which `will_break`
+        // reads as soft) still takes the inline state; stable alone, but beside long prose the
+        // fill's wrap reads back as authored on the next pass (F1).
         if d.will_break(children_doc) {
             return block_state;
         }
@@ -1311,10 +1320,9 @@ impl<'a> Printer<'a> {
     /// which a breaking body makes every inline parent do, a glued-both one included
     /// ([`Printer::build_close_gt_dangle_doc`]) — and no spelling where they part is known to be
     /// reachable; nothing about the count guarantees it, though, so the body is placed by the
-    /// host's renderer rather than at that count, as a guard: each line
-    /// the CSS printer broke and indented itself rides a `hardline` at its indent relative to the
-    /// body, and each line that is verbatim text keeps its authored column behind a
-    /// `literalline`. The two are told apart by formatting once more one level deeper — the
+    /// host's renderer rather than at that count, as a guard: each line the CSS printer broke
+    /// and indented itself rides a `hardline` at its indent relative to the body, and each line
+    /// that is verbatim text keeps its authored column behind a `literalline`. The two are told apart by formatting once more one level deeper — the
     /// printer's own lines move with the level, verbatim ones do not.
     ///
     /// Where the deeper format WRAPS differently (a line near the print width), the two have

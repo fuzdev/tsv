@@ -11,8 +11,8 @@ use crate::printer::Printer;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
 use super::element_doc::{
-    AttrGaps, AttrListEmission, BoundaryMode, ElementAttrsDoc, ElementContext, ElementKind,
-    ElementLayout, ElementParts, ThisClaim,
+    AttrGaps, AttrListEmission, ElementAttrsDoc, ElementContext, ElementKind, ElementLayout,
+    ElementParts, ThisClaim,
 };
 
 impl<'a> Printer<'a> {
@@ -125,11 +125,9 @@ impl<'a> Printer<'a> {
             .docs;
         let parts = Self::special_element_parts(element, name);
         let ctx = self.analyze_element(&parts, &attr_docs);
-        matches!(
-            self.compute_element_layout(&parts, &ctx),
-            ElementLayout::WithContent(BoundaryMode::Soft)
-        )
-        .then(|| self.build_close_gt_dangle_doc(&parts, &ctx, &attr_docs))
+        self.compute_element_layout(&parts, &ctx)
+            .is_soft()
+            .then(|| self.build_close_gt_dangle_doc(&parts, &ctx, &attr_docs))
     }
 
     /// Build `<title>…</title>` for a **head** `<title>` with content, which prints verbatim.

@@ -814,9 +814,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if a node is a format-ignore comment — the directive that pins the next node's
-    /// raw source instead of formatting it. Single recognition point for the two
-    /// accumulation loops ([`Self::build_nodes_doc_trimmed`],
-    /// [`Self::build_container_content_doc`]) and the glued-comment run scan.
+    /// raw source instead of formatting it. The template's single recognition point.
     ///
     // Recognition lives in `tsv_lang::is_format_ignore_directive` — the single source of
     // truth for the directive set, shared across all three language printers.

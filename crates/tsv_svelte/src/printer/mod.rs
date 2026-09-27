@@ -67,7 +67,7 @@ impl HoistedSection {
     /// hoists**: [`root_sections`] maps over it, [`Self::slot`] indexes into it (the agreement
     /// is asserted at compile time below), and [`HoistedComments`] is laid out by it — so the
     /// comment-classification table ([`Printer::classify_fragment_comment`]) and the
-    /// range-slice cuts ([`Printer::build_ignore_range_doc`], via `print_component`'s
+    /// range-slice cuts ([`Printer::build_ignore_range_doc`], via `print_root`'s
     /// `hoisted`) read one list, and a section kind cannot join one and silently miss the
     /// other (a kind the cut missed would re-open the duplicate-section emit for exactly that
     /// kind).
@@ -2463,11 +2463,9 @@ impl<'a> Printer<'a> {
                 parts.push(self.verbatim_source_doc(Span::new(cursor, cut.removed.start)));
             }
             match cut.seam {
-                lifted_runs::RangeSeam::Kept(seam) if seam.start < seam.end => {
-                    parts.push(self.verbatim_source_doc(seam));
-                }
-                lifted_runs::RangeSeam::Kept(_) => {}
+                lifted_runs::RangeSeam::Kept(seam) => parts.push(self.verbatim_source_doc(seam)),
                 lifted_runs::RangeSeam::Space => parts.push(self.d().text(" ")),
+                lifted_runs::RangeSeam::Glued => {}
             }
             cursor = cut.removed.end;
         }

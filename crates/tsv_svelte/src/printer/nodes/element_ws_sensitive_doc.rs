@@ -12,8 +12,8 @@
 #![allow(clippy::literal_string_with_formatting_args)]
 
 use super::blocks_doc::{
-    AWAIT_BLOCK_OPEN, EACH_BLOCK_OPEN, ELSE_IF_BLOCK_OPEN, IF_BLOCK_OPEN, KEY_BLOCK_OPEN,
-    SectionWhitespace, await_expr_comment_end, await_shorthand, then_has_content,
+    AWAIT_BLOCK_OPEN, AwaitSections, EACH_BLOCK_OPEN, ELSE_IF_BLOCK_OPEN, IF_BLOCK_OPEN,
+    KEY_BLOCK_OPEN, SectionWhitespace, await_expr_comment_end,
 };
 use super::element_doc::{AttrListEmission, ElementAttrsDoc};
 use super::helpers::each_expr_comment_end;
@@ -515,15 +515,13 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut freeze_armed = false;
         let body = d.concat_iter(nodes.iter().map(|node| {
-            if freeze_armed {
-                if let FragmentNode::Text(text) = node {
-                    // A text spends the freeze and prints as it would unfrozen; a
-                    // whitespace-only one is skipped, and the freeze carries past it.
-                    freeze_armed = text.is_collapsible_ws_only;
-                } else {
-                    // Any other node prints its source bytes. A directive frozen this way is
-                    // the node the freeze spends, so it arms nothing.
-                    freeze_armed = false;
+            // A whitespace-only text is skipped, and the freeze carries past it.
+            if freeze_armed && !node.is_whitespace_only_text() {
+                freeze_armed = false;
+                // A text spends the freeze and prints as it would unfrozen; any other node
+                // prints its source bytes. A directive frozen this way is the node the freeze
+                // spends, so it arms nothing.
+                if !matches!(node, FragmentNode::Text(_)) {
                     return self.source_span_covering_comments_doc(node.span());
                 }
             } else if Self::is_format_ignore_comment(node, self.source) {
@@ -727,47 +725,39 @@ impl<'a> Printer<'a> {
     /// section is rendered text, so only a section with no nodes may fold into the head or drop.
     fn build_ws_sensitive_await_block_doc(&self, block: &internal::AwaitBlock<'_>) -> DocId {
         let d = self.d();
-        let ws = SectionWhitespace::Preserved;
-        let shorthand = await_shorthand(block, ws);
+        let sections = AwaitSections::classify(block, SectionWhitespace::Preserved);
         // Pass false for in_multiline_context: expressions must not wrap in ws-sensitive context
         let head = self.build_block_head_expr(
             AWAIT_BLOCK_OPEN,
             block.opening_tag_span,
             block.expression,
-            await_expr_comment_end(block, shorthand),
+            await_expr_comment_end(block, sections.shorthand),
             false,
         );
         let open_doc = self.head_open_doc(AWAIT_BLOCK_OPEN, head.layout.opens_own_line());
         let mut parts: DocBuf = smallvec![open_doc, head.doc];
-        if let Some(clause) = self.build_await_clause(block, shorthand) {
+        if let Some(clause) = self.build_await_clause(block, sections.shorthand) {
             parts.push(d.text(" "));
             parts.push(clause);
         }
         parts.push(d.text("}"));
 
-        let (is_then_shorthand, is_catch_shorthand) = shorthand.head_keywords();
-        // A pending the head folded has no nodes here, so it prints nothing; gated anyway, so
-        // the rule is the ordinary builders' one.
-        if shorthand.prints_pending()
-            && let Some(pending) = &block.pending
-        {
-            parts.push(self.build_whitespace_sensitive_content_doc(pending.nodes));
-        }
-        if !is_then_shorthand && let Some(kw) = self.await_then_keyword(block, ws) {
-            parts.push(kw);
-        }
-        // An empty-body `:then` is dropped (marker via `await_then_keyword` above, body here).
-        if then_has_content(block, ws)
-            && let Some(then_block) = &block.then
-        {
-            parts.push(self.build_whitespace_sensitive_content_doc(then_block.nodes));
-        }
-        if !is_catch_shorthand && let Some(kw) = self.await_catch_keyword(block) {
-            parts.push(kw);
-        }
-        if let Some(catch_block) = &block.catch {
-            parts.push(self.build_whitespace_sensitive_content_doc(catch_block.nodes));
-        }
+        // Glued in print order, not through `compose_await_tail`: its inline form indents each
+        // body, and the body builder here already carries its own container indent.
+        let pieces = self.build_await_pieces(block, &sections, |f| {
+            self.build_whitespace_sensitive_content_doc(f.nodes)
+        });
+        parts.extend(
+            [
+                pieces.pending,
+                pieces.then_kw,
+                pieces.then_body,
+                pieces.catch_kw,
+                pieces.catch_body,
+            ]
+            .into_iter()
+            .flatten(),
+        );
         parts.push(d.text("{/await}"));
         d.concat(&parts)
     }

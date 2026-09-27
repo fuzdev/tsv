@@ -1750,6 +1750,12 @@ pub fn collapsible_ws_suffix_len(s: &str) -> usize {
     bytes.len() - i
 }
 
+/// Whether `s` is [`is_collapsible_ws`] throughout (an empty `s` is).
+#[inline]
+pub fn is_collapsible_ws_str(s: &str) -> bool {
+    collapsible_ws_prefix_len(s) == s.len()
+}
+
 /// `s.trim_start_matches(is_collapsible_ws_char)` on bytes — see [`is_collapsible_ws_char`].
 #[inline]
 pub fn trim_start_collapsible_ws(s: &str) -> &str {
