@@ -808,9 +808,17 @@ fn write_braced_island(
 /// where a separate `raw` costs the whole append protocol. That is also why the
 /// callers name this `_field` — it emits the key, so it may not be spliced into a
 /// position where some other key precedes the object.
+///
+/// A name never crosses a line, so only its start is resolved to one
+/// ([`LocationMapper::one_line_span_positions`]): the line table here is Svelte's,
+/// where only `\n` starts a line, and every name span stops at whitespace, which
+/// includes `\n` — an element or component name, an attribute name and a directive's
+/// head (`on:click|once`) are each read to Svelte whitespace, `/`, `>` or `=` at the
+/// latest, and a shorthand attribute's (`{x}`) is its identifier's span, which holds
+/// no whitespace at all.
 fn write_name_loc_field(w: &mut JsonWriter, span: Span, ctx: &Ctx<'_>) {
     let ((start_char, start_pos), (end_char, end_pos)) =
-        ctx.loc.span_positions(span.start, span.end);
+        ctx.loc.one_line_span_positions(span.start, span.end);
     w.stage_begin();
     w.stage_raw(",\"name_loc\":{\"start\":{\"line\":");
     w.stage_usize(start_pos.line);
@@ -2277,6 +2285,61 @@ mod tests {
         let ast = convert_svelte("{#snippet s()}{@const x = 1 }{/snippet}\n{/* c */ y}");
         let decl = &ast["fragment"]["nodes"][0]["body"]["nodes"][0]["declaration"];
         assert_eq!(decl["end"], 28);
+    }
+
+    /// Every node's `name_loc` from the wire, as `(start, end)` `{line, column, character}`.
+    fn name_locs(node: &Value, out: &mut Vec<(Value, Value)>) {
+        match node {
+            Value::Object(fields) => {
+                if let Some(loc) = fields.get("name_loc") {
+                    out.push((loc["start"].clone(), loc["end"].clone()));
+                }
+                fields.values().for_each(|v| name_locs(v, out));
+            }
+            Value::Array(items) => items.iter().for_each(|v| name_locs(v, out)),
+            _ => {}
+        }
+    }
+
+    /// `write_name_loc_field` resolves only a name's start to a line and derives the end
+    /// from it — sound because no name span holds a `\n`, the one byte Svelte's line table
+    /// opens a line at. Graded here over every name shape that carries a `name_loc`
+    /// (element, component, special element, attribute, directive head with modifiers),
+    /// each written directly before and after every line-terminator spelling of either
+    /// class — `\n`, `\r`, `\r\n`, `<LS>`, `<PS>` — and after a multibyte name or a
+    /// multibyte line ahead of it: each end must share its start's line, at the start's
+    /// column plus the name's width. The writer's own debug assertion re-derives both
+    /// endpoints the unfused way on every name the test suite parses.
+    #[test]
+    fn name_loc_end_shares_its_start_line() {
+        for term in ["\n", "\r", "\r\n", "\u{2028}", "\u{2029}", "\t", " "] {
+            for lead in ["", "é\n", "😀", "\r\n\n"] {
+                let sources = [
+                    format!("{lead}<div{term}class=\"a\"{term}id={term}b></div>"),
+                    format!("{lead}<Foo.Bar{term}x{term}/>"),
+                    format!("{lead}<svelte:head{term}></svelte:head>"),
+                    format!("{lead}<a{term}on:click|once|preventDefault={{f}}{term}>é</a>"),
+                    format!("{lead}<p{term}bind:value={{v}}{term}class:é={{c}}></p>"),
+                    format!("{lead}<input{term}data-é{term}/>"),
+                    format!("{lead}<div{term}{{x}}{term}{{é}}></div>"),
+                ];
+                for source in &sources {
+                    let mut locs = Vec::new();
+                    name_locs(&convert_svelte(source), &mut locs);
+                    assert!(!locs.is_empty(), "{source:?} carries a name_loc");
+                    for (start, end) in locs {
+                        assert_eq!(start["line"], end["line"], "{source:?}");
+                        let width = end["character"].as_u64().expect("character")
+                            - start["character"].as_u64().expect("character");
+                        assert_eq!(
+                            end["column"].as_u64().expect("column"),
+                            start["column"].as_u64().expect("column") + width,
+                            "{source:?}"
+                        );
+                    }
+                }
+            }
+        }
     }
 
     // A `{let}`/`{const}` DeclarationTag keeps acorn's declaration `end`

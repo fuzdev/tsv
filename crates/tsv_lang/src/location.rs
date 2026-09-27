@@ -575,6 +575,64 @@ impl<'a> LocationMapper<'a> {
             )
         }
     }
+
+    /// [`LocationMapper::span_positions`] for a span that lies on **one line** — which
+    /// the caller guarantees — resolving only `start`'s line: `end` shares it, and its
+    /// column is `start`'s plus the span's width in emitted units, since both columns
+    /// are measured from the same line start in the same space. Byte-identical to
+    /// `span_positions` on such a span (debug builds check it).
+    ///
+    /// For a name: every name span stops at whitespace, so it never crosses a line
+    /// under a line rule whose terminators are all whitespace. `inline(always)`, as
+    /// `span_positions` is, so the line cache's hit stays inline at the caller.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    pub fn one_line_span_positions(
+        &self,
+        start: u32,
+        end: u32,
+    ) -> ((u32, Position), (u32, Position)) {
+        let (line_idx, line_byte) = self.tracker.resolve_line(start as usize);
+        let line = line_idx + 1;
+        let positions = if self.map.has_multibyte() {
+            let start_pos = self.map.byte_to_char(start);
+            let end_pos = self.map.byte_to_char(end);
+            let column = (start_pos - self.map.byte_to_char(line_byte as u32)) as usize;
+            (
+                (start_pos, Position { line, column }),
+                (
+                    end_pos,
+                    Position {
+                        line,
+                        column: column + (end_pos - start_pos) as usize,
+                    },
+                ),
+            )
+        } else {
+            (
+                (
+                    start,
+                    Position {
+                        line,
+                        column: start as usize - line_byte,
+                    },
+                ),
+                (
+                    end,
+                    Position {
+                        line,
+                        column: end as usize - line_byte,
+                    },
+                ),
+            )
+        };
+        debug_assert_eq!(
+            positions,
+            self.span_positions(start, end),
+            "a one-line span must lie on one line"
+        );
+        positions
+    }
 }
 
 #[derive(Debug)]
