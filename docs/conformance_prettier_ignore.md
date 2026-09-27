@@ -25,6 +25,7 @@ For a whole-construct freeze the `prettier-ignore` family matches prettier (both
 - the boundary **after** a frozen declaration tag, a space and a line break converged on the break — ◆stable_quirk ◆design_choice — [declaration_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/declaration_glued_before_prettier_divergence/)
 - a directive glued to the text in front of a frozen **block** element, kept glued — ◆design_choice — [block_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/block_glued_before_prettier_divergence/)
 - a frozen nested `<script>` / `<style>` glued to content on both sides, kept glued on both sides, where prettier never converges — ◆content_preservation — [nested_script_style_glued](../tests/fixtures/svelte/syntax/prettier_ignore/nested_script_style_glued_prettier_divergence/)
+- the boundary **after** a frozen nested `<script>` / `<style>` glued to the content before it, a line break, where prettier never converges — ◆content_preservation — [nested_script_style_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/nested_script_style_glued_before_prettier_divergence/)
 
 **The gap in front of a frozen node is the author's, and it is printed once.** A directive and
 the node it freezes are separated by whatever the author wrote there, and that gap reaches the
@@ -80,12 +81,21 @@ the glue at an inline one ([block_glued_before](../tests/fixtures/svelte/syntax/
 **The boundary after a frozen node is the one the node gets unfrozen.** A freeze pins the node's
 bytes, not the whitespace between it and its follower: that boundary is the printer's, and it
 takes the form the same node takes there unfrozen. After a node that owns its line — a block
-element, or a declaration tag (`{let}` / `{const}` / `{@const}` / `{#snippet}`) not glued on both
-sides — that is a line break, however the author spelled the whitespace and whatever inline kind
-follows (text, an inline element, a component, a `<svelte:element>` / `<svelte:boundary>`) — the
-same break an expression tag or a block after it gets. After a frozen **inline** node it is the space it keeps unfrozen
-([inline_space_after](../tests/fixtures/svelte/syntax/prettier_ignore/inline_space_after/), a parity fixture whose no-break-space control is
-content rather than a separator). After a block element whose directive owns its line, the break is
+element, or a declaration tag (`{let}` / `{const}` / `{@const}` / `{#snippet}`) — that is a line
+break, however the author spelled the whitespace and whatever inline kind follows (text, an inline
+element, a component, a `<svelte:element>` / `<svelte:boundary>`) — the same break an expression
+tag or a block after it gets. Three kinds own their line only where that is render-free, which it
+never is when they are glued to content on both sides: a global `svelte:*` element, a declaration
+tag, and a nested `<script>` / `<style>` with a body (which keeps its glue in more places still —
+wherever a break beside it would render; see
+[conformance_prettier_svelte.md §Svelte: Inline content block-style](./conformance_prettier_svelte.md#svelte-inline-content-block-style)).
+After a frozen **inline** node it is the space it keeps unfrozen
+([inline_space_after](../tests/fixtures/svelte/syntax/prettier_ignore/inline_space_after/),
+a parity fixture whose no-break-space control is content rather than a separator) — with one
+known exception, a layout gap that renders the same: a `<svelte:element>` / `<svelte:boundary>`
+following a frozen `<svelte:element>` / `<svelte:boundary>` can lay out unlike its unfrozen twin.
+Depending on the pair and its container, a spaced follower takes a line break where the twin
+keeps the space, and a glued one expands its body or puts a break into the text after it. After a block element whose directive owns its line, the break is
 the parity layout ([block_space_after](../tests/fixtures/svelte/syntax/prettier_ignore/block_space_after/)); with the directive glued in front
 prettier also breaks before the element (above), and after it the two agree again. After a global
 `svelte:*` element (`<svelte:window>` / `<svelte:document>` / `<svelte:body>` / `<svelte:head>`)
@@ -113,7 +123,11 @@ A frozen **declaration** tag glued to the text before it takes the same break af
 nothing and the compiler hoists it, so the text on its two sides meets across that whitespace
 exactly as around a global element, and prettier keeps each spelling of it where tsv converges them
 on the break ([declaration_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/declaration_glued_before_prettier_divergence/)) —
-◆stable_quirk.
+◆stable_quirk. So does a frozen nested `<script>` / `<style>` glued to the text before it: the
+compiler keeps it, but it renders no box, so the content on its two sides meets across the
+whitespace after it just the same, and deleting that whitespace would weld the two
+(`…</script>text2` renders `text1text2`). Prettier breaks the frozen body open and never converges
+([nested_script_style_glued_before](../tests/fixtures/svelte/syntax/prettier_ignore/nested_script_style_glued_before_prettier_divergence/)).
 
 **A range does not pin a section's position.** A `<script>` / `<style>` / `<svelte:options>` written *inside* a range is still lifted to the component root and printed at its canonical position, and its bytes are cut out of the frozen slice — leaving them there emits the section twice, which the parser rejects (`Duplicate instance script found`). Prettier does the same, so the plain case needs no divergence ([range_section_hoist](../tests/fixtures/svelte/syntax/prettier_ignore/range_section_hoist/)); a comment sitting beside such a section diverges ([range_interior_comment](../tests/fixtures/svelte/syntax/prettier_ignore/range_interior_comment_prettier_divergence/)), and the seam the cut leaves behind follows the byte-verbatim rule ([range_glued](../tests/fixtures/svelte/syntax/prettier_ignore/range_glued_prettier_divergence/)): tsv freezes the whole slice including inter-node whitespace, where prettier freezes node *content* but re-lays out the whitespace between nodes.
 

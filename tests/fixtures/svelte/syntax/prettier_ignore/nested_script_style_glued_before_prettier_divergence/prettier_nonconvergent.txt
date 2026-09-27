@@ -1,0 +1,1 @@
+prettier adds a blank line before the parent's closing tag on every pass where text follows a frozen nested script or style

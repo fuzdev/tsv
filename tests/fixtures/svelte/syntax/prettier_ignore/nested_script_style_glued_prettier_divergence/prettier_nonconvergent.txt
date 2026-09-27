@@ -1,1 +1,1 @@
-prettier grows a blank line after a frozen glued nested script or style on every pass
+prettier adds a blank line before the parent's closing tag on every pass after a frozen glued nested script or style

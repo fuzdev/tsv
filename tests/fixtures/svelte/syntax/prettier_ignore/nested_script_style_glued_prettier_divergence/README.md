@@ -7,8 +7,8 @@ keeps both glued boundaries
 ([nested_script_style_glued](../../../elements/nested_script_style_glued/)), and frozen it does the
 same. A break after the element would render a space between `text1` and `text2`.
 
-Prettier breaks the frozen body open and then grows the gap after the element by a line on every
-pass, so it **never converges** here (`prettier_nonconvergent.txt`) and there is no oracle to
+Prettier breaks the frozen body open and then adds a blank line before the parent's closing tag
+on every pass, so it **never converges** here (`prettier_nonconvergent.txt`) and there is no oracle to
 compare against; tsv's claim is the one every fixture makes — `input.svelte` formats to itself.
 
 ## Reason
@@ -23,8 +23,8 @@ See
 
 - `unformatted_ours_spaces.svelte` — extra spaces at the parents' content boundaries; tsv
   normalizes it to `input.svelte`.
-- `prettier_nonconvergent.txt` — prettier grows the gap on every pass, so no
-  `output_prettier.svelte` exists.
+- `prettier_nonconvergent.txt` — prettier adds a blank line before the parent's closing tag on
+  every pass, so no `output_prettier.svelte` exists.
 
 ## Related
 
