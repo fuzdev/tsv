@@ -6,11 +6,9 @@ High-performance Rust parser as a drop-in replacement for Svelte's modern parser
 
 **Non-configurable by design**: Prettier defaults except printWidth=100, useTabs=true, singleQuote=true, trailingComma='none' — no config files, CLI flags, or runtime options, ever (opinionated like `gofmt` and Black). The one carve-out from that is file *scope*, not style (the parse goal, `--source-type`, is a grammar input rather than a setting — see [Configuration](#configuration)): `tsv format` honors `.gitignore` plus hierarchical `.formatignore` / `.prettierignore`. See [Configuration](#configuration).
 
-## Committing
+## Releases
 
-`git add` and `git commit` are denied by `.claude/settings.local.json` in this
-repo — make the edits and stop, the user commits. Version bumps and publishing
-are user-owned too.
+Version bumps and publishing are user-owned.
 
 **Do not edit `CHANGELOG.md`.** Like release version bumps, the changelog is the
 user's responsibility — agents make the source/doc/fixture edits and leave
