@@ -2378,10 +2378,7 @@ impl<'a> Printer<'a> {
         // pair of its own (`-1[K][]` → `(-1)[K][]`): recorded here, ahead of the element's
         // build, for the indexed-access object rule that prints it.
         if let Some(literal) = array_run_negative_literal(arr.element_type) {
-            let mut targets = self.negative_literal_pair_targets.borrow_mut();
-            if !targets.contains(&literal.span()) {
-                targets.push(literal.span());
-            }
+            self.negative_literal_pair_targets.mark(literal.span());
         }
         let suffix_doc = self.build_array_suffix_doc(arr);
         // The `[]` suffix rides OUTSIDE the required-pair decision — the shell may already

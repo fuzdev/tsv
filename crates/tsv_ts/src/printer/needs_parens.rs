@@ -279,9 +279,7 @@ fn chain_reads_bare_under_tsc(source: &str, head: &Expression<'_>) -> bool {
     let mut level = head;
     while let ExpressionKind::TSInstantiationExpression(inst) = &level.kind {
         let inner = inst.expression;
-        if !matches!(inner.kind, ExpressionKind::TSInstantiationExpression(_))
-            || paren_shell_close_after(source, inner.span().end).is_some()
-        {
+        if holds_first_list_of_chain(source, inner) {
             return first_list_reads_as_expression(source, &inst.type_arguments);
         }
         if !asserts_one_type(source, &inst.type_arguments) {
@@ -290,6 +288,14 @@ fn chain_reads_bare_under_tsc(source: &str, head: &Expression<'_>) -> bool {
         level = inner;
     }
     true
+}
+
+/// Whether the instantiation expression over `inner` carries the FIRST type argument list of
+/// its chain: `inner` is no instantiation itself, or it is one an authored paren shell closes
+/// (`(f<T>)<U>` starts a chain of its own at `<U>`).
+pub(crate) fn holds_first_list_of_chain(source: &str, inner: &Expression<'_>) -> bool {
+    !matches!(inner.kind, ExpressionKind::TSInstantiationExpression(_))
+        || paren_shell_close_after(source, inner.span().end).is_some()
 }
 
 /// Whether tsc's comparison reading of a chain's first list (`f<T>…` read as `f < T > …`)

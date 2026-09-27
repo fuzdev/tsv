@@ -38,6 +38,7 @@ use crate::ast::internal::{BinaryExpression, Expression, ExpressionKind, TSType}
 use crate::printer::ShareTag;
 use crate::printer::comments::{AsiOperandShell, CommentFilter, CommentSpacing};
 use crate::printer::ignore::FrozenOperandPair;
+use crate::printer::needs_parens::holds_first_list_of_chain;
 use crate::printer::types::TrailingBlock;
 use crate::printer::types::helpers::unwrap_parenthesized;
 use crate::printer::{
@@ -1537,10 +1538,7 @@ impl<'a> Printer<'a> {
         // An instantiation head keeps the pair a second list asks for. Whether the chain
         // of lists goes on past this one is this node's own owner's answer: it printed this
         // node bare ([`Printer::continued_instantiation_targets`]).
-        let continues = self
-            .continued_instantiation_targets
-            .borrow()
-            .contains(&span);
+        let continues = self.continued_instantiation_targets.is_marked(span);
         let second_list_pair = self.instantiation_keeps_pair(
             inst_expr.expression,
             SecondTypeArgs::Instantiation {
@@ -1566,13 +1564,8 @@ impl<'a> Printer<'a> {
         // The first list of a chain printed bare: tsc reads it as a comparison operand, so
         // an authored paren under a type operator in it stays
         // ([`Printer::first_list_keeps_maybe_parens`]).
-        let first_of_bare_chain = continues
-            && (!matches!(
-                inst_expr.expression.kind,
-                ExpressionKind::TSInstantiationExpression(_)
-            ) || self
-                .paren_shell_close_after(inst_expr.expression.span().end)
-                .is_some());
+        let first_of_bare_chain =
+            continues && holds_first_list_of_chain(self.source, inst_expr.expression);
         let saved = self
             .first_list_keeps_maybe_parens
             .replace(first_of_bare_chain);

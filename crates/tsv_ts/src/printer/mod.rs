@@ -78,7 +78,7 @@ use crate::PrinterInputs;
 use crate::ast::internal;
 use std::cell::{Cell, RefCell};
 use tsv_lang::{
-    CommentFreeWindow, EmbedContext, OutputBuffer, Span, TAB_WIDTH,
+    CommentFreeWindow, EmbedContext, FxHashSet, OutputBuffer, Span, TAB_WIDTH,
     doc::{
         self, ShareKey,
         arena::{DocArena, DocId},
@@ -128,6 +128,28 @@ impl ShareTag {
 const _: () = assert!(ShareTag::ArgExpression as u8 & ShareTag::STATE_BITS == 0);
 const _: () = assert!(ShareTag::ExpandLastBody as u8 & ShareTag::STATE_BITS == 0);
 const _: () = assert!(ShareTag::ArgExpression as u8 != ShareTag::ExpandLastBody as u8);
+
+/// A set of spans marked during one document's print and never consumed — what a printer
+/// cell keyed by span needs when one decision records a node for a reader that builds it
+/// later (possibly more than once, across conditional-group variants), and one node can be
+/// marked by several owners.
+///
+/// Hash-backed: a document marks and asks once per node of the kind it tracks, so a linear
+/// list made both quadratic in that count.
+#[derive(Default)]
+pub(crate) struct SpanMarks(RefCell<FxHashSet<(u32, u32)>>);
+
+impl SpanMarks {
+    /// Mark `span` (marking it again is a no-op).
+    pub(crate) fn mark(&self, span: Span) {
+        self.0.borrow_mut().insert((span.start, span.end));
+    }
+
+    /// Whether `span` was marked.
+    pub(crate) fn is_marked(&self, span: Span) -> bool {
+        self.0.borrow().contains(&(span.start, span.end))
+    }
+}
 
 /// The parent context that routes a curried arrow chain (`(a) => (b) => …`)
 /// through a flattened chain layout, mirroring prettier's
@@ -586,7 +608,7 @@ pub struct Printer<'a> {
     /// Keyed by span and never consumed, like the `*_target` cells above, so a head rebuilt
     /// across conditional-group variants answers the same way every time; a set rather than
     /// one cell because a chain nests one owner inside the next.
-    pub(crate) continued_instantiation_targets: RefCell<Vec<Span>>,
+    pub(crate) continued_instantiation_targets: SpanMarks,
     /// Spans of the bare negative literals an array type's element run of indexed accesses
     /// leads (`-1[K][]`), which the indexed-access object rule prints with a pair
     /// (`(-1)[K][]`; `array_run_negative_literal`). Recorded by the array
@@ -597,7 +619,7 @@ pub struct Printer<'a> {
     /// gate, the head-shell and open-pair gates) acts only on a paren SHELL, and the bare
     /// literal a span names has none, so an early reader's unrecorded answer is the answer
     /// it would give anyway.
-    pub(crate) negative_literal_pair_targets: RefCell<Vec<Span>>,
+    pub(crate) negative_literal_pair_targets: SpanMarks,
     /// Set while the FIRST type argument list of an instantiation chain printed bare is
     /// built (`f<keyof (A)><U>(x)`): tsc reads that list as the right operand of a `<`
     /// comparison, so every authored paren the decision that the chain prints bare reads
@@ -684,8 +706,8 @@ impl<'a> Printer<'a> {
             chain_arg_share_active: Cell::new(false),
             arrow_body_inject: Cell::new(None),
             chain_has_comments: Cell::new(true),
-            continued_instantiation_targets: RefCell::new(Vec::new()),
-            negative_literal_pair_targets: RefCell::new(Vec::new()),
+            continued_instantiation_targets: SpanMarks::default(),
+            negative_literal_pair_targets: SpanMarks::default(),
             first_list_keeps_maybe_parens: Cell::new(false),
             comment_free_gap,
         }
@@ -1007,10 +1029,7 @@ impl<'a> Printer<'a> {
             head.kind,
             internal::ExpressionKind::TSInstantiationExpression(_)
         ) {
-            let mut targets = self.continued_instantiation_targets.borrow_mut();
-            if !targets.contains(&head.span()) {
-                targets.push(head.span());
-            }
+            self.continued_instantiation_targets.mark(head.span());
         }
     }
 

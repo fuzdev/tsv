@@ -406,9 +406,7 @@ impl Printer<'_> {
         &self,
         ts_type: &TSType<'_>,
     ) -> bool {
-        self.negative_literal_pair_targets
-            .borrow()
-            .contains(&ts_type.span())
+        self.negative_literal_pair_targets.is_marked(ts_type.span())
     }
 
     /// [`unwrap_parenthesized`] short of a shell the first list of a chain printed bare
