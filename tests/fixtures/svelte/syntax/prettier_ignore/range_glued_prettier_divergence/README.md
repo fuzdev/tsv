@@ -27,11 +27,12 @@ emit raw.
 
 The same stance decides the seam left behind when a hoisted `<script>` / `<style>` /
 `<svelte:options>` is cut out of a range (see [range_section_hoist](../range_section_hoist/)):
-the cut removes the section's bytes plus the whitespace run immediately before it, and what
+the cut removes the section's bytes plus the weaker of the whitespace runs beside it, and what
 remains is joined verbatim — glued neighbours stay glued
 (`unformatted_ours_section_in_range.svelte`, which tsv normalizes to `input.svelte` while
-prettier re-lays out the seam). Since a hoisted section renders nothing in place, the glue
-preserves the authored render exactly; a fabricated newline between inline siblings would
-change it.
+prettier re-lays out the seam), and the stronger run survives as the author spelled it (see
+[range_section_seam](../range_section_seam_prettier_divergence/)). Since a hoisted section
+renders nothing in place, the glue preserves the authored render exactly; a fabricated newline
+between inline siblings would change it.
 
 See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

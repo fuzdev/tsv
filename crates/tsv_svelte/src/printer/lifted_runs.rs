@@ -34,8 +34,12 @@
 //!
 //! A run at the document's start or end (template content on one side only) has no pair of
 //! neighbours to join: the whitespace beside it stays where it is, at the fragment's edge, which
-//! trims it. A section inside a `format-ignore` range moves too, cut out the way the range's own
-//! verbatim slice cuts it (`Printer::build_ignore_range_doc`), so the range prints the same bytes.
+//! trims it. A section inside a `format-ignore` range moves too, cut out by [`range_cuts`] — the
+//! cuts the range's own verbatim slice makes (`Printer::build_ignore_range_doc`), so the range
+//! prints the same bytes either way. Those join the same facts as if the sections were absent, but
+//! a winning run before or after the sections is kept byte for byte, since the range's bytes are
+//! the author's; only a winning run between two sections is respelled — one of its line breaks,
+//! or a single space when it holds none, which renders the same.
 //! A document with no run between template nodes (≈ every component) is not rewritten at all.
 
 use super::text::has_authored_blank_line;
@@ -84,18 +88,134 @@ impl GapFacts {
         self.blank_line |= edge && has_authored_blank_line(segment);
     }
 
-    /// The one gap that stands for the segments.
-    fn spelling(&self) -> &'static str {
+    /// The facts of one segment.
+    fn of(segment: &str, edge: bool) -> Self {
+        let mut facts = Self::default();
+        facts.add(segment, edge);
+        facts
+    }
+
+    /// How strongly the segments separate the neighbours: a blank line, then a line break, then
+    /// any other whitespace, then none — the order [`Self::spelling`] reads.
+    fn strength(&self) -> u8 {
         if self.blank_line {
-            "\n\n"
+            3
         } else if self.newline {
-            "\n"
-        } else if self.whitespace {
-            " "
+            2
         } else {
-            ""
+            u8::from(self.whitespace)
         }
     }
+
+    /// The one gap that stands for the segments.
+    fn spelling(&self) -> &'static str {
+        match self.strength() {
+            3 => "\n\n",
+            2 => "\n",
+            1 => " ",
+            _ => "",
+        }
+    }
+}
+
+/// One cut a `format-ignore` range's slice makes to let the hoisted sections written in it go:
+/// the source it removes, and what stands in that place ([`range_cuts`]).
+pub(super) struct RangeCut {
+    /// The sections and the whitespace on either side of them.
+    pub(super) removed: Span,
+    pub(super) seam: RangeSeam,
+}
+
+/// What joins the two neighbours of a [`RangeCut`].
+pub(super) enum RangeSeam {
+    /// Source bytes printed as written: the run before or after the sections, or one line break
+    /// of a run between them (possibly empty, when nothing separates the neighbours).
+    Kept(Span),
+    /// A plain space, for a run between sections that holds no line break.
+    Space,
+}
+
+impl RangeSeam {
+    /// The seam's text.
+    pub(super) fn text<'s>(&self, source: &'s str) -> &'s str {
+        match self {
+            Self::Kept(span) => span.extract(source),
+            Self::Space => " ",
+        }
+    }
+}
+
+/// The cuts a `format-ignore` range makes for the hoisted `sections` written in it (in source
+/// order, every one past `floor` — the end of the range's start marker, or wherever the caller
+/// has already emitted to).
+///
+/// A range is frozen, but a section in it still moves to its canonical position, and the nodes on
+/// either side of it become neighbours. Sections with only whitespace between them are one seam,
+/// joined as if they had never been there, the way [`GapFacts`] joins a lifted run outside a
+/// range: of the run before the sections, the runs between them and the run after them, the
+/// STRONGEST ([`GapFacts::strength`]) stands for the whole seam, and the rest go with the
+/// sections. A run before or after is kept byte for byte, since the range's bytes are the
+/// author's, and wins a tie (the run after over the run before). A run between two sections is
+/// respelled: one of its line breaks, or a single space when it holds none (which renders the
+/// same as the tab or spaces it stands for). It never counts as a blank line — a blank line there
+/// belongs to the sections, as a blank inside a lifted run does — so it wins only where neither
+/// edge run holds what it does: whitespace alone, or a line break.
+///
+/// A run before the sections stops at `floor`, which is the start marker's end for the first
+/// cut; a run after them stops at the next non-whitespace byte, which the end marker guarantees
+/// comes before the range closes.
+pub(super) fn range_cuts(source: &str, floor: u32, sections: &[Span]) -> SmallVec<[RangeCut; 2]> {
+    let ws_only = |from: u32, to: u32| {
+        let run = &source[from as usize..to as usize];
+        internal::collapsible_ws_prefix_len(run) == run.len()
+    };
+    let mut cuts = SmallVec::new();
+    let mut floor = floor;
+    let mut i = 0;
+    while i < sections.len() {
+        let mut j = i;
+        while j + 1 < sections.len() && ws_only(sections[j].end, sections[j + 1].start) {
+            j += 1;
+        }
+        let first = sections[i].start;
+        let last = sections[j].end;
+        let before_len =
+            internal::collapsible_ws_suffix_len(&source[floor as usize..first as usize]);
+        let after_len = internal::collapsible_ws_prefix_len(&source[last as usize..]);
+        let before = Span::new(first - before_len as u32, first);
+        let after = Span::new(last, last + after_len as u32);
+
+        let mut seam = RangeSeam::Kept(after);
+        let mut strength = GapFacts::of(after.extract(source), true).strength();
+        let before_strength = GapFacts::of(before.extract(source), true).strength();
+        if before_strength > strength {
+            seam = RangeSeam::Kept(before);
+            strength = before_strength;
+        }
+        for pair in sections[i..=j].windows(2) {
+            let between = Span::new(pair[0].end, pair[1].start);
+            let text = between.extract(source);
+            let facts = GapFacts::of(text, false);
+            if facts.strength() > strength {
+                strength = facts.strength();
+                // The run is whitespace alone, so its first newline byte is its line break.
+                seam = match text.bytes().position(|b| b == b'\n') {
+                    Some(at) => {
+                        let at = between.start + at as u32;
+                        RangeSeam::Kept(Span::new(at, at + 1))
+                    }
+                    None => RangeSeam::Space,
+                };
+            }
+        }
+        cuts.push(RangeCut {
+            removed: Span::new(before.start, after.end),
+            seam,
+        });
+        floor = after.end;
+        i = j + 1;
+    }
+    cuts
 }
 
 impl Printer<'_> {
@@ -117,8 +237,8 @@ impl Printer<'_> {
             return None;
         }
         // A section inside a `format-ignore` range travels with no comments (the range keeps
-        // every comment in it where it stands), and leaves the range the way the range's own
-        // verbatim slice lets it go (`Printer::build_ignore_range_doc`).
+        // every comment in it where it stands), and leaves the range through the cuts the
+        // range's own verbatim slice makes ([`range_cuts`]).
         let nodes = &root.fragment.nodes;
         let ranges: SmallVec<[Span; 2]> = self
             .ignore_ranges(&root.fragment)
@@ -161,13 +281,20 @@ impl Printer<'_> {
         let mut i = 0;
         while i < runs.len() {
             if runs[i].in_range {
-                // Cut the way the range's verbatim slice cuts it — the section and the
-                // whitespace run before it — so the range prints the same bytes either way.
-                let first = runs[i].extent.start as usize;
-                let before = first - internal::collapsible_ws_suffix_len(&source[..first]);
-                template.push_str(&source[cursor..before.max(cursor)]);
-                cursor = runs[i].extent.end as usize;
-                i += 1;
+                // Cut the way the range's verbatim slice cuts it ([`range_cuts`]), so the range
+                // prints the same bytes either way.
+                let mut j = i;
+                while j + 1 < runs.len() && runs[j + 1].in_range {
+                    j += 1;
+                }
+                let sections: SmallVec<[Span; 4]> =
+                    runs[i..=j].iter().map(|run| run.extent).collect();
+                for cut in range_cuts(source, cursor as u32, &sections) {
+                    template.push_str(&source[cursor..cut.removed.start as usize]);
+                    template.push_str(cut.seam.text(source));
+                    cursor = cut.removed.end as usize;
+                }
+                i = j + 1;
                 continue;
             }
             // A group: consecutive runs with nothing but whitespace between them share one

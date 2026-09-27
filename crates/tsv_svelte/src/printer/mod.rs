@@ -2437,52 +2437,44 @@ impl<'a> Printer<'a> {
     /// *between* the hoisted spans. Prettier drops the section from its own ignored range the
     /// same way; the range freezes template formatting, it does not pin a section's position.
     ///
-    /// Each cut takes the section's span **plus the whitespace run immediately before it**, which
-    /// is what closes the line rather than leaving a blank one behind: source
-    /// `</div>⏎⏎<script>…</script>⏎⏎<p>` has two runs around the section and must end at
-    /// `</div>⏎⏎<p>`, so exactly one of them goes with it. Bounded by the slice start, so a
-    /// section glued to the start marker cuts nothing extra.
+    /// The cuts are [`lifted_runs::range_cuts`]'s — the source rewrite that joins the neighbours
+    /// of a section lifted out from between template nodes makes the same ones — and each takes
+    /// the sections with the whitespace around them, leaving the one run of the author's that
+    /// best separates the neighbours: source `</div>⏎⏎<script>…</script>⏎⏎<p>` ends at
+    /// `</div>⏎⏎<p>`, and `{a} <script>…</script>{b}` at `{a} {b}`, since the section renders
+    /// nothing where it was written and the space is all that separates the two.
     fn build_ignore_range_doc(&self, span: Span, hoisted: &[Span]) -> DocId {
-        let mut cuts: SmallVec<[Span; 4]> = hoisted
+        let mut sections: SmallVec<[Span; 4]> = hoisted
             .iter()
             .copied()
             .filter(|h| span.contains(*h))
             .collect();
-        if cuts.is_empty() {
+        if sections.is_empty() {
             return self.verbatim_source_doc(span);
         }
         // `hoisted` is in canonical print order (options, module, instance, style), which is not
         // source order — the pieces must be emitted in source order.
-        cuts.sort_unstable_by_key(|s| s.start);
+        sections.sort_unstable_by_key(|s| s.start);
 
         let mut parts: DocBuf = DocBuf::new();
         let mut cursor = span.start;
-        for cut in cuts {
-            let piece_end = self.trim_trailing_ws_back_to(cursor, cut.start);
-            if piece_end > cursor {
-                parts.push(self.verbatim_source_doc(Span::new(cursor, piece_end)));
+        for cut in lifted_runs::range_cuts(self.source, span.start, &sections) {
+            if cut.removed.start > cursor {
+                parts.push(self.verbatim_source_doc(Span::new(cursor, cut.removed.start)));
             }
-            cursor = cut.end;
+            match cut.seam {
+                lifted_runs::RangeSeam::Kept(seam) if seam.start < seam.end => {
+                    parts.push(self.verbatim_source_doc(seam));
+                }
+                lifted_runs::RangeSeam::Kept(_) => {}
+                lifted_runs::RangeSeam::Space => parts.push(self.d().text(" ")),
+            }
+            cursor = cut.removed.end;
         }
         if cursor < span.end {
             parts.push(self.verbatim_source_doc(Span::new(cursor, span.end)));
         }
         self.d().concat(&parts)
-    }
-
-    /// Walk `to` back over collapsible whitespace, stopping at `floor`.
-    ///
-    /// The class is [`internal::is_collapsible_ws`] — the byte spelling of
-    /// [`is_collapsible_ws_char`](internal::is_collapsible_ws_char), the same set every other boundary in this printer trims;
-    /// a form feed is content, so it stops the walk. A byte walk is exact here because the
-    /// whole class is ASCII, and an ASCII byte value in UTF-8 is always a standalone char.
-    fn trim_trailing_ws_back_to(&self, floor: u32, to: u32) -> u32 {
-        let bytes = self.source.as_bytes();
-        let mut end = to;
-        while end > floor && internal::is_collapsible_ws(bytes[end as usize - 1]) {
-            end -= 1;
-        }
-        end
     }
 
     /// Mark control-flow blocks in **single-line** root inline runs (`{x}{#if c}…{/if}` with no
