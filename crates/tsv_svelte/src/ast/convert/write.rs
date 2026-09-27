@@ -82,11 +82,13 @@
 //! `memmove` that reads them back.
 //!
 //! **A `Text`'s `raw` and `data` are escaped once** when `data` borrows `raw`
-//! — a text with no `&`, which is nearly all template text, and mostly the
-//! whitespace between tags, which needs escaping. `JsonWriter::string_pair`
+//! — a text with no `&`, which is nearly all template text; a text holding a line
+//! break needs escaping, so escaping it once matters. `JsonWriter::string_pair`
 //! escapes it once and copies the emitted bytes for the second field. The
-//! `raw`-first shapes reach it through [`write_raw_then_data`], which escapes
-//! two strings only for a text whose `data` is owned (one holding a `&`);
+//! `raw`-first shapes reach it through [`write_raw_then_data`], which first sends
+//! a text made only of collapsible whitespace to `JsonWriter::string_pair_whitespace`
+//! (every byte's escape known, no prescan), and escapes two strings only for a
+//! text whose `data` is owned (one holding a `&`);
 //! `write_text`'s raw-content arm (`data` first) calls it directly, since a
 //! `Raw` decoding is no decode at all and its two values are the same bytes
 //! even when the text holds a `&`.
@@ -1061,7 +1063,35 @@ fn write_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
 /// then the two values are the same bytes: [`JsonWriter::string_pair`] escapes them
 /// once and copies the escaped form. Only a text whose `data` is decoded escapes two
 /// strings.
+///
+/// A text made only of collapsible whitespace — the indentation between two tags,
+/// over half of all texts — takes [`JsonWriter::string_pair_whitespace`], which knows
+/// every byte's escape: `[ \t\n\r]` holds no `&`, so its `data` is its `raw`.
+///
+/// A flag test ahead of one of two out-of-line bodies, so neither pays for
+/// the other's registers: inlined here, either body took callee-saved registers that
+/// were saved at entry, ahead of the test, on every text.
 fn write_raw_then_data(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
+    if text.is_collapsible_ws_only {
+        write_whitespace_raw_then_data(w, text, ctx);
+    } else {
+        write_content_raw_then_data(w, text, ctx);
+    }
+}
+
+/// [`write_raw_then_data`] for a text made only of collapsible whitespace: `raw` and
+/// `data` as one [`JsonWriter::string_pair_whitespace`] window.
+#[inline(never)]
+fn write_whitespace_raw_then_data(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
+    // Bytes, not `raw`: a whitespace-only text is ASCII, so the `str` slice's
+    // char-boundary checks buy nothing.
+    w.string_pair_whitespace(&ctx.source.as_bytes()[text.raw_span.range()], b",\"data\":");
+}
+
+/// [`write_raw_then_data`] for a text that holds content: `raw` escaped once and copied
+/// when `data` borrows it, two strings when `data` is decoded.
+#[inline(never)]
+fn write_content_raw_then_data(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
     let raw = text.raw(ctx.source);
     // Asked inline rather than through `data()`: this is every raw-first `Text` the writer
     // emits (all but a raw-content element's, which `write_text` writes itself).

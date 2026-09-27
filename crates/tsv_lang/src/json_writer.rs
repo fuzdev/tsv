@@ -660,6 +660,78 @@ const ESCAPE_FREE_WINDOW: usize = SHORT_FRAGMENT_MAX + 2;
 /// 16-byte stores of the fill.
 const LED_ESCAPE_FREE_WINDOW: usize = 48;
 
+/// The longest string [`JsonWriter::string_pair_whitespace`] writes inline; its
+/// escaped form is at most twice as long.
+const WS_PAIR_MAX: usize = 16;
+
+/// [`JsonWriter::string_pair_whitespace`]'s window: two quoted copies of the
+/// escaped string at their widest, `2 * WS_PAIR_MAX + 2` bytes each, around a
+/// separator of up to 12 bytes — five 16-byte stores of the fill.
+const WS_PAIR_WINDOW: usize = 80;
+
+/// What each byte of the collapsible whitespace class `[ \t\n\r]` becomes inside
+/// a JSON string, indexed by the byte's low four bits: the two-byte short escapes
+/// of `\t`, `\n` and `\r` (read from [`ESCAPE`], the one definition of an escape),
+/// and the space as itself, padded with a `"` — so the second byte a space's store
+/// writes is its string's closing quote when it is the last byte, and is
+/// overwritten by the next byte's store when it is not. The other twelve entries
+/// are never read.
+const WS_ESCAPE: [[u8; 2]; 16] = {
+    const CLASS: [u8; 4] = [b' ', b'\t', b'\n', b'\r'];
+    let mut t = [[0; 2]; 16];
+    let mut i = 0;
+    while i < CLASS.len() {
+        let byte = CLASS[i];
+        // The four bytes' low nibbles index four distinct entries, so no class byte's
+        // entry overwrites another's.
+        assert!(
+            t[(byte & 0xF) as usize][0] == 0,
+            "the class's low nibbles collide"
+        );
+        t[(byte & 0xF) as usize] = if byte == b' ' {
+            [b' ', b'"']
+        } else {
+            [b'\\', ESCAPE[byte as usize]]
+        };
+        i += 1;
+    }
+    t
+};
+
+/// How many of `bytes` — at most [`WS_PAIR_MAX`] of them, every one in
+/// `[ \t\n\r]` — are control bytes, the ones whose escape takes two bytes: a word
+/// or two gathered so that every lane is one of the string's bytes or a pad byte,
+/// and a lane counted when its bit 5 (set in the space and in the pad `0xFF`, clear
+/// in `\t`, `\n` and `\r`) is clear.
+///
+/// Unlike [`short_needs_escape`]'s gather, the answer is a COUNT, so a byte must
+/// not sit in two lanes: where two chunks overlap, the second's already-counted
+/// lanes are overwritten with the pad.
+#[inline]
+fn whitespace_control_count(bytes: &[u8]) -> usize {
+    debug_assert!(bytes.len() <= WS_PAIR_MAX, "at most two words");
+    let n = bytes.len();
+    let (lo, hi) = if let (Some(lo), Some(hi)) = (bytes.first_chunk::<8>(), bytes.last_chunk::<8>())
+    {
+        // The last word's first `16 - n` lanes are the first word's last ones.
+        let seen = (!0u64).checked_shr(8 * (n - 8) as u32).unwrap_or(0);
+        (u64::from_le_bytes(*lo), u64::from_le_bytes(*hi) | seen)
+    } else if let (Some(lo), Some(hi)) = (bytes.first_chunk::<4>(), bytes.last_chunk::<4>()) {
+        // Likewise across two overlapping halves of one word.
+        let seen = (!0u32).checked_shr(8 * (n - 4) as u32).unwrap_or(0);
+        let word =
+            u64::from(u32::from_le_bytes(*lo)) | u64::from(u32::from_le_bytes(*hi) | seen) << 32;
+        (word, !0)
+    } else {
+        let byte = |i: usize| u64::from(bytes.get(i).copied().unwrap_or(0xFF));
+        (byte(0) | byte(1) << 8 | byte(2) << 16 | !0 << 24, !0)
+    };
+    // One per control lane in each word; the sum of two such words is at most 2 a
+    // lane, so the multiply's top byte is the total with no carry between lanes.
+    let lanes = (!lo >> 5 & splat(1)) + (!hi >> 5 & splat(1));
+    (lanes.wrapping_mul(splat(1)) >> 56) as usize
+}
+
 impl JsonWriter {
     /// A fresh writer over a buffer pre-sized to `cap` bytes.
     #[inline]
@@ -1144,20 +1216,20 @@ impl JsonWriter {
     /// two-byte short forms, `\u00XX` with lowercase hex for every other
     /// control byte, and everything else as itself.
     ///
-    /// ⚠️ It is not a rare arm. Over real Svelte components 16% of the strings
-    /// reaching `string` need escaping, holding 30% of the bytes — template text
-    /// is mostly the whitespace between tags (`"\n\t\t"`) — and over real
-    /// stylesheets it is 6% of the strings and 24% of the bytes. A per-byte loop
-    /// (`serde_json`'s) pays a table lookup and slice bookkeeping per byte and a
-    /// libc `memcpy` call per clean run between escapes.
+    /// ⚠️ It is not a rare arm: Svelte template text holding content carries its
+    /// line breaks and indentation (`"\n\t\tsome text\n\t"`), and stylesheets
+    /// their comments' and strings' — a Svelte text made only of whitespace, the
+    /// commonest escaping string of all, goes around it
+    /// ([`JsonWriter::string_pair_whitespace`]). A per-byte loop (`serde_json`'s)
+    /// pays a table lookup and slice bookkeeping per byte and a libc `memcpy` call
+    /// per clean run between escapes.
     ///
     /// The output goes into a **window** of the buffer — extended by a fixed
     /// width, written through a slice held in registers, then truncated to
     /// what was written — the shape [`JsonWriter::start_end`] uses, so no
     /// store pays `Vec`'s append protocol. [`escape_into`] fills it, clean
-    /// bytes a word at a time. A string shorter than a word, most escaping
-    /// template text, skips the word step for a byte loop into a narrower
-    /// window.
+    /// bytes a word at a time. A string shorter than a word skips the word step
+    /// for a byte loop into a narrower window.
     #[inline(never)]
     #[expect(clippy::expect_used)]
     fn string_escaped(&mut self, bytes: &[u8]) {
@@ -1213,11 +1285,12 @@ impl JsonWriter {
     ///
     /// For the node that carries one string twice: a Svelte `Text` emits its
     /// `raw` and its `data`, which are the same bytes whenever the text decodes
-    /// to itself — and most template text is the whitespace between tags
-    /// (`"\n\t\t"`), which needs escaping, so two [`JsonWriter::string`] calls
-    /// would run the escaper over it twice. The second field is instead a copy
-    /// of the first one's **emitted** bytes (`extend_from_within`), which is
-    /// correct by construction: the escaped form is a pure function of `s`.
+    /// to itself — and template text carries line breaks, which need escaping, so
+    /// two [`JsonWriter::string`] calls would run the escaper over it twice. The
+    /// second field is instead a copy of the first one's **emitted** bytes
+    /// (`extend_from_within`), which is correct by construction: the escaped form
+    /// is a pure function of `s`. A text made only of whitespace takes
+    /// [`JsonWriter::string_pair_whitespace`] instead.
     ///
     /// ⚠️ `inline(always)`, because `between` is only cheap as a constant. Under
     /// plain `inline` the release build outlined this body and tail-called it,
@@ -1235,6 +1308,98 @@ impl JsonWriter {
         self.string(s);
         let end = self.buf.len();
         self.buf.extend_from_slice(between.as_bytes());
+        self.buf.extend_from_within(start..end);
+    }
+
+    /// [`JsonWriter::string_pair`] for a string made only of collapsible whitespace
+    /// (`[ \t\n\r]`), which the **caller** guarantees — byte-identical to
+    /// `string(s); raw(between); string(s)` on such input — with `between` a
+    /// constant of at most 12 bytes.
+    ///
+    /// For a Svelte `Text` that is only the indentation between two tags (over
+    /// half of all template texts, nearly every one under 16 bytes): every byte of
+    /// it has a known escape, so it needs neither the escape prescan nor the
+    /// general escaper, and both copies land in one fixed-width window of the
+    /// buffer. A first pass counts the control bytes, which fixes the escaped
+    /// length and so where the second copy starts; a second writes each byte's
+    /// escape from [`WS_ESCAPE`] into **both** copies, one two-byte store each.
+    /// The window's `"` fill supplies the quotes the stores leave in place, and a
+    /// `truncate` cuts it after the second copy's closing quote. No libc `memcpy`
+    /// call is made and the escaper's window is never zero-filled.
+    ///
+    /// ⚠️ Nothing here reads the window back. Copying the first copy's bytes to the
+    /// second with one wide move read back the narrow stores that had just written
+    /// them, which the store buffer cannot forward: fewer instructions, and no
+    /// cycles saved.
+    ///
+    /// Like [`JsonWriter::string_escape_free_led`], the common path makes no call:
+    /// a longer string, or a buffer too full for the window, leaves by a tail call
+    /// to a cold body that does the whole write.
+    #[expect(clippy::inline_always, clippy::expect_used)]
+    #[inline(always)]
+    pub fn string_pair_whitespace<const K: usize>(&mut self, bytes: &[u8], between: &[u8; K]) {
+        const { assert!(K + 4 * WS_PAIR_MAX + 4 <= WS_PAIR_WINDOW) };
+        debug_assert!(
+            bytes
+                .iter()
+                .all(|b| matches!(b, b' ' | b'\t' | b'\n' | b'\r')),
+            "string_pair_whitespace takes collapsible whitespace: {bytes:?}"
+        );
+        if bytes.len() > WS_PAIR_MAX {
+            self.string_pair_whitespace_long(bytes, between);
+            return;
+        }
+        let base = self.buf.len();
+        if self.buf.capacity() - base < WS_PAIR_WINDOW {
+            self.string_pair_whitespace_grow(bytes, between);
+            return;
+        }
+        self.buf.extend_from_slice(&[b'"'; WS_PAIR_WINDOW]);
+        let window = self
+            .buf
+            .last_chunk_mut::<WS_PAIR_WINDOW>()
+            .expect("the window was just appended");
+        // One byte for the space, two for a control byte's short escape. The `min` is
+        // a no-op (at most `WS_PAIR_MAX` bytes, each escaped to at most two) that
+        // states the bound, so no index below needs a check.
+        let escaped = (bytes.len() + whitespace_control_count(bytes)).min(2 * WS_PAIR_MAX);
+        // The first copy's quotes sit at `0` and `escaped + 1`, the separator behind
+        // it, then the second copy's opening quote; its body starts at `second`.
+        let second = escaped + 3 + K;
+        window[escaped + 2..escaped + 2 + K].copy_from_slice(between);
+        let mut at = 0;
+        for &byte in bytes {
+            let form = WS_ESCAPE[usize::from(byte & 0xF)];
+            // A store starts at most `2 * (WS_PAIR_MAX - 1)` bytes in, so the mask is
+            // a no-op that states the bound.
+            let lane = at % (2 * WS_PAIR_MAX);
+            window[1 + lane..3 + lane].copy_from_slice(&form);
+            window[second + lane..second + lane + 2].copy_from_slice(&form);
+            at += 2 - usize::from(byte >> 5);
+        }
+        self.buf.truncate(base + second + escaped + 1);
+    }
+
+    /// [`JsonWriter::string_pair_whitespace`] with the buffer too full for its
+    /// window: grow it, then write. Out of line and whole, as
+    /// [`JsonWriter::string_escape_free_grow`] is.
+    #[cold]
+    #[inline(never)]
+    fn string_pair_whitespace_grow<const K: usize>(&mut self, bytes: &[u8], between: &[u8; K]) {
+        self.buf.reserve(WS_PAIR_WINDOW);
+        self.string_pair_whitespace(bytes, between);
+    }
+
+    /// [`JsonWriter::string_pair_whitespace`] past the inline width — a string
+    /// longer than [`WS_PAIR_MAX`] bytes, which few whitespace texts are: the
+    /// general escaper, then the separator and a copy of what it wrote.
+    #[cold]
+    #[inline(never)]
+    fn string_pair_whitespace_long<const K: usize>(&mut self, bytes: &[u8], between: &[u8; K]) {
+        let start = self.buf.len();
+        self.string_escaped(bytes);
+        let end = self.buf.len();
+        self.raw_fixed(between);
         self.buf.extend_from_within(start..end);
     }
 
@@ -1556,6 +1721,83 @@ mod tests {
                 String::from_utf8_lossy(&ours),
                 String::from_utf8_lossy(&theirs)
             );
+        }
+    }
+
+    /// [`JsonWriter::string_pair_whitespace`] against [`JsonWriter::string_pair`] (graded
+    /// against two `string` calls, and so against `serde_json`, above) over the collapsible
+    /// whitespace class `[ \t\n\r]`: every string of it to eight bytes — every mix of the
+    /// four bytes at every offset, so each byte's one- or two-byte store lands at every
+    /// position of the window and a trailing space's padded store closes the string — and,
+    /// for every length to 40, runs of each byte and a spread of pseudo-random mixes, past
+    /// [`WS_PAIR_MAX`] into the long arm. Each case goes behind separators of no, one, eight
+    /// and the widest twelve bytes, into buffers with spare room either side of the window's
+    /// width, so the grow path and the window path both write it.
+    #[test]
+    fn string_pair_whitespace_matches_string_pair() {
+        const CLASS: [u8; 4] = [b' ', b'\t', b'\n', b'\r'];
+        fn grade<const K: usize>(between: &[u8; K], case: &[u8]) {
+            let between_str = core::str::from_utf8(between).expect("the separator is UTF-8");
+            let case_str = core::str::from_utf8(case).expect("whitespace is UTF-8");
+            let prefix = "{\"type\":\"Text\",\"start\":0,\"end\":0,\"raw\":";
+            for spare in [
+                0,
+                1,
+                WS_PAIR_WINDOW - 1,
+                WS_PAIR_WINDOW,
+                WS_PAIR_WINDOW + 1,
+                256,
+            ] {
+                let mut ours = JsonWriter::with_capacity(prefix.len() + spare);
+                ours.raw(prefix);
+                ours.string_pair_whitespace(case, between);
+                let mut theirs = JsonWriter::with_capacity(0);
+                theirs.raw(prefix);
+                theirs.string_pair(case_str, between_str);
+                let (ours, theirs) = (ours.into_bytes(), theirs.into_bytes());
+                assert_eq!(
+                    ours,
+                    theirs,
+                    "string_pair_whitespace broke on {case_str:?} / {between_str:?}, spare {spare}: \
+                     ours {:?}, string_pair {:?}",
+                    String::from_utf8_lossy(&ours),
+                    String::from_utf8_lossy(&theirs)
+                );
+            }
+        }
+        fn grade_all(case: &[u8]) {
+            grade(b"", case);
+            grade(b",", case);
+            grade(b",\"data\":", case);
+            grade(b",\"raw\":\"ab\":", case);
+        }
+        let mut case = Vec::new();
+        for len in 0..=8u32 {
+            for n in 0..CLASS.len().pow(len) {
+                case.clear();
+                let mut rest = n;
+                for _ in 0..len {
+                    case.push(CLASS[rest % CLASS.len()]);
+                    rest /= CLASS.len();
+                }
+                grade_all(&case);
+            }
+        }
+        let mut state = 0x9e37_79b9_7f4a_7c15u64;
+        for len in 0..=40usize {
+            for &byte in &CLASS {
+                grade_all(&vec![byte; len]);
+            }
+            for _ in 0..64 {
+                case.clear();
+                for _ in 0..len {
+                    state = state
+                        .wrapping_mul(6_364_136_223_846_793_005)
+                        .wrapping_add(1_442_695_040_888_963_407);
+                    case.push(CLASS[(state >> 62) as usize]);
+                }
+                grade_all(&case);
+            }
         }
     }
 
