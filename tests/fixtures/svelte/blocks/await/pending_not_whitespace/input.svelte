@@ -9,3 +9,10 @@
 
 <!-- a comment-only catch body keeps the section as written -->
 {#await promise}text{:catch}<!-- c -->{/await}
+
+<!-- a catch-only block whose body is not ASCII whitespace keeps it -->
+{#await promise catch} {/await}
+
+{#await promise catch}&#32;{/await}
+
+{#await promise catch}<!-- c -->{/await}

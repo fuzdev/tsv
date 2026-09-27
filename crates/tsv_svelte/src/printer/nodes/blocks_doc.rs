@@ -1306,10 +1306,17 @@ impl<'a> Printer<'a> {
         // renders nothing are dropped, and a pending that renders nothing prints an empty body,
         // so a block whose sections all print nothing is the section-less block and lays out as
         // one (`{#await p then v} {/await}`, `{#await p} {:then v} {/await}` and
-        // `{#await p}{/await}` alike, at any head width). A `{:catch}` prints even when empty.
+        // `{#await p}{/await}` alike, at any head width). An empty `{:catch}` is kept, but a body
+        // that renders nothing prints nothing, so a glued and a render-free body
+        // (`{#await p catch}{/await}`, `{#await p catch} {/await}`) answer alike here. This only
+        // decides the fast path, which also needs `all_sections_inline`: a newline-authored
+        // section — the catch body, or a pending that keeps the full form and so prints
+        // `{:catch}` in the tail — still takes the block form below. On the fast path an empty
+        // catch is always the head's `catch` shorthand (the pending folded, the `{:then}`
+        // dropped), so a block with no other printed section is the section-less block.
         let has_section = sections.pending.is_some_and(|p| !ws.renders_nothing(p))
             || sections.then.is_some()
-            || sections.catch.is_some_and(|c| !c.nodes.is_empty());
+            || sections.catch.is_some_and(|c| !ws.renders_nothing(c));
         // A space-only section is inline-authored (its boundary is render-free and gets
         // trimmed by `build_section_body_doc`); only a newline-authored section falls
         // through to the newline tail below. This one reads every AUTHORED section, a dropped
@@ -1370,9 +1377,9 @@ impl<'a> Printer<'a> {
         // `{:then}` / `{:catch}` keywords, and `{/await}` (hug is all-or-nothing, see
         // `fragment_inline_authored`), so a section authored inline still drops to its own line
         // once any sibling section went multiline. Here `!all_sections_inline` is false only for
-        // a block whose every section prints nothing (`{#await p}{/await}`,
-        // `{#await p} {/await}`), which stays inline: nothing forces expansion, and there is no
-        // body to lay out.
+        // a block whose every section body prints nothing (`{#await p}{/await}`,
+        // `{#await p} {/await}`, `{#await p catch} {/await}`), which stays inline: nothing forces
+        // expansion, and there is no body to lay out.
         let expand = !all_sections_inline;
         let pieces = self.build_await_pieces(block, &sections, |f| {
             if expand {
@@ -1382,8 +1389,18 @@ impl<'a> Printer<'a> {
             }
         });
         let tail = self.compose_await_tail(&pieces, expand);
+        // A clause a comment forced open (`{#await p catch {⏎a, // c⏎b⏎}}{/await}`) sits inside
+        // the head's dangle `if_break`, which `will_break` cannot see into — the fast path hands
+        // the verdict to `build_expanding_construct`; here it must reach the enclosing groups
+        // itself, or an `{#if}` / inline parent stays hugged around a block that prints
+        // multiline. The block itself stays section-less: `{/await}` hugs the clause's `}`.
+        let block_doc = if clause_forced_break {
+            d.concat(&[head_doc, tail, d.break_parent()])
+        } else {
+            d.concat(&[head_doc, tail])
+        };
         // Non-expanding tail (newline-authored sections): fold a preceding sibling's `>`.
-        self.dangle_gt(gt_prefix, d.concat(&[head_doc, tail]))
+        self.dangle_gt(gt_prefix, block_doc)
     }
 
     /// Build key block doc with full context (multiline + preceding content).

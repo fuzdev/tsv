@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 408,
+	"end": 592,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -418,6 +418,150 @@
 							"type": "Comment",
 							"start": 389,
 							"end": 399,
+							"data": " c "
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 407,
+				"end": 409,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 409,
+				"end": 480,
+				"data": " a catch-only block whose body is not ASCII whitespace keeps it "
+			},
+			{
+				"type": "Text",
+				"start": 480,
+				"end": 481,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 481,
+				"end": 512,
+				"expression": {
+					"type": "Identifier",
+					"start": 489,
+					"end": 496,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 8
+						},
+						"end": {
+							"line": 14,
+							"column": 15
+						}
+					},
+					"name": "promise"
+				},
+				"value": null,
+				"error": null,
+				"pending": null,
+				"then": null,
+				"catch": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 503,
+							"end": 504,
+							"raw": " ",
+							"data": " "
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 512,
+				"end": 514,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 514,
+				"end": 549,
+				"expression": {
+					"type": "Identifier",
+					"start": 522,
+					"end": 529,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 8
+						},
+						"end": {
+							"line": 16,
+							"column": 15
+						}
+					},
+					"name": "promise"
+				},
+				"value": null,
+				"error": null,
+				"pending": null,
+				"then": null,
+				"catch": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 536,
+							"end": 541,
+							"raw": "&#32;",
+							"data": " "
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 549,
+				"end": 551,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 551,
+				"end": 591,
+				"expression": {
+					"type": "Identifier",
+					"start": 559,
+					"end": 566,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 8
+						},
+						"end": {
+							"line": 18,
+							"column": 15
+						}
+					},
+					"name": "promise"
+				},
+				"value": null,
+				"error": null,
+				"pending": null,
+				"then": null,
+				"catch": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Comment",
+							"start": 573,
+							"end": 583,
 							"data": " c "
 						}
 					]
