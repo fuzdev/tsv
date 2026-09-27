@@ -731,6 +731,17 @@ impl<'a> Printer<'a> {
     /// its spaced twin does, reusing the one children doc. A frozen child whose bytes span
     /// lines is such content too: its slice is an ordinary source span, whose line break is a
     /// forced one (`elements/inline_glued_both_breaking_content_prettier_divergence`).
+    ///
+    /// ⚠️ **So does an element whose OWN attribute forces the opening tag to break**
+    /// (`ElementContext::has_multiline_attr` — a block-bodied handler, a value, template literal
+    /// or comment spanning lines). Every state reads the same attr-keyed opening tag, so once it
+    /// has broken the `>` sits on a line of its own, and the inline and dangle states' flat first
+    /// line — `prefix<span` — still fits: the renderer would take the inline state and hug the
+    /// content onto that `>` (`⏎\t>content</span>text`), a form neither the spaced twin nor the
+    /// block-style state prints. The block-style state is the one that owns a broken tag: the `>`
+    /// alone, the content on its own line. Only a FORCED break counts — an attribute list that
+    /// merely wraps at print width has no forced break, and there the width decides, as for any
+    /// wide head (`elements/inline_glued_both_multiline_attr_prettier_divergence`).
     pub(super) fn build_close_gt_dangle_doc(
         &self,
         parts: &ElementParts<'_>,
@@ -741,7 +752,7 @@ impl<'a> Printer<'a> {
         let block_state =
             self.build_collapsible_element_doc(parts, ctx, attr_docs, children_doc, false, None);
         let d = self.d();
-        if d.will_break(children_doc) {
+        if d.will_break(children_doc) || ctx.has_multiline_attr {
             return block_state;
         }
         let name = parts.name;
@@ -1017,9 +1028,13 @@ impl<'a> Printer<'a> {
 
         // Opening is `<tag` (empty `attr_docs`) or the attr-keyed `build_opening_tag`, whose `>`
         // hugs the last attr when attrs fit and dedents to its own line when they wrap. The attr
-        // group and the content group stay SEPARATE, so attr-wrapping and content-wrapping
-        // decouple — the decoupling that makes the with-attrs case idempotent, since content no
-        // longer flows on the tag lines. See conformance_prettier_svelte.md.
+        // group nests inside this one, so the coupling runs one way only: content that breaks
+        // leaves the attributes on the tag's line when they fit there, while attributes that
+        // break — wrapped at print width or forced (`ElementContext::has_multiline_attr`) —
+        // break this group too, so the content drops to its own line block-style rather than
+        // flowing on the tag lines. That is the idempotent shape, and the one the glued-both
+        // dangle defers to for a forced break (`Printer::build_close_gt_dangle_doc`). See
+        // conformance_prettier_svelte.md.
         let opening = self.build_content_opening_tag(parts, ctx, attr_docs, gt_prefix);
 
         // A shed `>` is emitted elsewhere, so it collapses to nothing here.
