@@ -500,10 +500,12 @@ impl<'a> CalleeParens<'a> {
         context: ParenContext,
         second_type_args: Option<SecondTypeArgs<'_>>,
     ) -> Option<Self> {
-        if !printer.needs_parens(callee, context)
-            && !second_type_args
+        let pair = printer.needs_parens(callee, context)
+            || second_type_args
                 .is_some_and(|follow| printer.instantiation_keeps_pair(callee, follow))
-        {
+            || (matches!(context, ParenContext::NewCallee)
+                && printer.new_callee_holds_bare_call(callee, second_type_args));
+        if !pair {
             return None;
         }
         Some(match &callee.kind {

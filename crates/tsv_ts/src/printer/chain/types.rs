@@ -100,6 +100,13 @@ pub enum ChainNode<'a> {
         /// lists continues into the call's — recorded for the instantiation printer when
         /// the base is built ([`crate::printer::Printer::mark_continued_instantiation`]).
         continues_instantiation: bool,
+        /// This base is a pair the author wrote around an expression tsc reads as a
+        /// comparison ([`crate::printer::prints_as_tsc_comparison`], `(f<T><U>(x))()`),
+        /// kept by the linearizer because the access after it would otherwise join the
+        /// comparison's right side. The pair is settled by the SOURCE, so the callee
+        /// re-evaluation that recomputes every other base's pair from its kind leaves it
+        /// alone (`fix_callee_base_parens`).
+        comparison_pair: bool,
     },
     /// Call expression: ()
     Call {
@@ -198,6 +205,22 @@ impl<'a> ChainNode<'a> {
             paren_comment_end: None,
             followed_by_non_null: false,
             continues_instantiation: false,
+            comparison_pair: false,
+        }
+    }
+
+    /// A base the author parenthesized around an expression tsc reads as a comparison
+    /// (`(f<T><U>(x)).y`, `(f<T><U>(x))()`): its pair is kept whatever the chain after
+    /// it, see [`ChainNode::Base`]'s `comparison_pair`.
+    pub fn comparison_pair_base(expr: &'a internal::Expression<'a>) -> Self {
+        Self::Base {
+            expr,
+            needs_parens: true,
+            paren_leading_start: None,
+            paren_comment_end: None,
+            followed_by_non_null: false,
+            continues_instantiation: false,
+            comparison_pair: true,
         }
     }
 
@@ -213,6 +236,7 @@ impl<'a> ChainNode<'a> {
             paren_comment_end: None,
             followed_by_non_null: false,
             continues_instantiation: false,
+            comparison_pair: false,
         }
     }
 
@@ -235,6 +259,7 @@ impl<'a> ChainNode<'a> {
             paren_comment_end: Some(paren_comment_end),
             followed_by_non_null: true,
             continues_instantiation: false,
+            comparison_pair: false,
         }
     }
 

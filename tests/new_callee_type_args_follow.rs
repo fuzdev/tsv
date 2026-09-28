@@ -414,8 +414,9 @@ fn authored_pair_around_a_comparison_read_survives() {
     for (source, printed) in [
         ("new (f<T><U>`x`);", "new (f<T><U>`x`)();\n"),
         ("new (new f<T><U>(x));", "new (new f<T><U>(x))();\n"),
+        ("new (f<T><U>(x)`t`).y;", "new (f<T><U>(x)`t`).y();\n"),
     ] {
-        assert_eq!(format(source), printed);
+        assert_prints_fixed(source, printed);
     }
 }
 

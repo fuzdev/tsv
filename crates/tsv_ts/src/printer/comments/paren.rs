@@ -191,12 +191,19 @@ pub(crate) fn paren_pair_keeps_leading_run(expr: &internal::Expression<'_>) -> b
     )
 }
 
-/// The index of the next byte in `source` that is neither whitespace nor trivia, at or
-/// after `start` and before `end`; `None` when the range holds nothing else.
+/// The index of the next byte in `source` that is neither whitespace nor a comment, at
+/// or after `start` and before `end`; `None` when the range holds nothing else.
 ///
 /// The "what actually comes next in the source?" step every shell question asks. A
 /// comment occupies bytes even where nothing emits it, so a walk that stepped over
 /// whitespace alone would stop on the `/` and answer about the wrong token.
+///
+/// A string or template literal is a TOKEN, not trivia: the walk stops on its opening
+/// quote. Stepping over it answers about whatever follows the literal instead — a tag's
+/// own template read as nothing, so the `)` of an enclosing call's argument list after
+/// `` f<T><U>(x)`t` `` passed for a pair the author wrote around the tag
+/// ([`paren_shell_close_after`]) — and a run of literals is walked again for every
+/// operand that ends ahead of it.
 ///
 /// A free function over the source because the chain LINEARIZER asks it too, before any
 /// `Printer` method is reached — [`paren_shell_close_after`].
@@ -205,7 +212,7 @@ pub(crate) fn next_significant_byte(source: &str, start: u32, end: u32) -> Optio
     let end = end as usize;
     let mut i = start as usize;
     while i < end {
-        if let Some(next) = skip_trivia(bytes, i, end, TriviaProfile::JS) {
+        if let Some(next) = skip_trivia(bytes, i, end, TriviaProfile::COMMENTS) {
             i = next;
         } else if let Some(ws) = js_whitespace_at(source, i) {
             i += ws;
@@ -1263,8 +1270,9 @@ impl<'a> Printer<'a> {
         self.build_sequence_doc_value(seq, span, grouping_close, layout)
     }
 
-    /// The index of the next byte that is neither whitespace nor trivia, at or after
-    /// `start` and before `end`; `None` when the range holds nothing else.
+    /// The index of the next byte that is neither whitespace nor a comment, at or after
+    /// `start` and before `end`; `None` when the range holds nothing else (the free
+    /// [`next_significant_byte`], which says why a literal is not stepped over).
     ///
     /// The "what actually comes next in the source?" step both shell questions ask —
     /// [`Self::collapsed_grouping_close`] takes it once per `)`, and

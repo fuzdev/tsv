@@ -21,6 +21,7 @@ use crate::ast::internal::{
     AssignmentOperator, BinaryOperator, Expression, ExpressionKind, LiteralValue, TSKeywordKind,
     TSType, TSTypeParameterInstantiation, UnaryOperator, UpdateOperator,
 };
+use crate::printer::chain::child_stops_optional_chain;
 use crate::printer::class_expr_has_decorators;
 use crate::printer::comments::{
     left_side_child_is_parenthesized, next_significant_byte, paren_shell_close_after,
@@ -92,12 +93,13 @@ pub enum ParenContext {
     /// All type assertions need parens here
     AngleBracketAssertion,
 
-    /// Expression in TSInstantiationExpression: `<expr><T>`. `second_list_pair` is the
-    /// printer's answer for an instantiation `<expr>` — whether it keeps a pair ahead of
-    /// this second list ([`instantiation_keeps_pair_before_type_args`]), which reads the
-    /// source and whether this node's own owner continues its chain, facts the printer
-    /// holds and the node alone does not.
-    InstantiationExpression { second_list_pair: bool },
+    /// Expression in TSInstantiationExpression: `<expr><T>`. `source_pair` is the
+    /// printer's answer where the SOURCE settles the pair, facts the printer holds and the
+    /// node alone does not: an instantiation `<expr>` that keeps a pair ahead of this second
+    /// list ([`instantiation_keeps_pair_before_type_args`], which reads whether this node's
+    /// own owner continues its chain), or an optional chain an authored pair seals
+    /// ([`instantiation_operand_is_sealed_chain`]).
+    InstantiationExpression { source_pair: bool },
 
     /// Argument of a unary operator: `!<expr>`, `typeof <expr>`, `-<expr>`.
     /// Carries the parent operator so a `+`/`-` operand that would re-tokenize
@@ -440,6 +442,28 @@ pub(crate) fn instantiation_keeps_pair_before_type_args(
                 && (matches!(follow, SecondTypeArgs::Heritage) || !ends_open_optional_chain(head))))
 }
 
+/// Whether an instantiation expression starting at `inst_start` instantiates an optional
+/// chain the author SEALED with a pair — `(a?.b)<T>`, or its non-null spelling
+/// `(a?.b)!<T>` — which the printer keeps.
+///
+/// The pair is where the chain ends. Bare, the type arguments join the chain
+/// (`a?.b<T>`), and so does whatever follows the instantiation: a tag or a `new` callee
+/// written that way is a syntax error (`` a?.b<T>`t` ``, `new a?.b()<T>()`), and a plain
+/// call joins it too (`a?.b<T>()` short-circuits the call). Where nothing follows, or an
+/// optional link does, the two spellings behave alike at runtime and type alike to tsc, but
+/// acorn-typescript — whose tree Svelte compiles — reads them as two trees
+/// (`((a?.b)<T>)?.()` printed `a?.b<T>?.()` is one chain where the author wrote two).
+pub(crate) fn instantiation_operand_is_sealed_chain(
+    inst_start: u32,
+    operand: &Expression<'_>,
+) -> bool {
+    child_stops_optional_chain(inst_start, false, operand)
+        || matches!(
+            &operand.kind,
+            ExpressionKind::TSNonNullExpression(non_null) if non_null.seals_optional_chain(operand.span)
+        )
+}
+
 /// Whether the instantiation chain `head` is built on an optional chain no authored pair
 /// has sealed (`a?.b<T>`, not `(a?.b)<T>`).
 fn ends_open_optional_chain(head: &Expression<'_>) -> bool {
@@ -580,13 +604,11 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
                 if matches!(expr.kind, ExpressionKind::ClassExpression(_)) {
                     return true;
                 }
-                // A `new` callee containing a call needs parens so the arguments
-                // bind to the `new`, not to the inner call: `new (f())()`,
-                // `new (a.b())()`, `new (f().C)()`, `new (a?.b())()`. Without them
-                // `new f()()` parses as `(new f())()` — different semantics.
-                if new_callee_has_call(expr) {
-                    return true;
-                }
+                // A `new` callee holding a call on its left spine that no pair encloses
+                // takes one too, so the arguments bind to the `new` rather than to the
+                // inner call (`new (f())()`). That rule reads which pairs the printer keeps
+                // for a reason the source settles, so it is the printer's to answer
+                // (`Printer::new_callee_holds_bare_call`), not this function's.
             }
             // A `new` callee or template tag may NOT be an (unsealed) optional chain
             // per spec — `new a?.b()` / `` a?.b`x` `` are syntax errors. So the parens
@@ -594,11 +616,14 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
             // cases, which depend on what follows the chain). The plain call `Callee`
             // context is excluded: `(a?.b)()` strips to the valid `a?.b()`. A non-null
             // assertion that seals the chain (`(a?.b)!`) is handled by the sealed-base
-            // rendering, not here (`has_optional_in_chain` returns false for it).
+            // rendering, not here (`has_optional_in_chain` returns false for it). An
+            // instantiation of an open chain is still that chain (`new (a?.b<T>)()`,
+            // `` (a?.b()?.k<T>)`t` ``), so the test reads through its lists
+            // ([`ends_open_optional_chain`]).
             if matches!(
                 ctx,
                 ParenContext::NewCallee | ParenContext::TaggedTemplateTag
-            ) && expr.has_optional_in_chain()
+            ) && ends_open_optional_chain(expr)
             {
                 return true;
             }
@@ -736,8 +761,8 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         // Ternary/binary/assignment need parens to preserve semantics:
         // `(a ? b : c)<T>` vs `a ? b : c<T>` (different - ternary result vs alternate instantiated)
         // An instantiation instantiated again takes the pair the printer decided.
-        ParenContext::InstantiationExpression { second_list_pair } => {
-            second_list_pair
+        ParenContext::InstantiationExpression { source_pair } => {
+            source_pair
                 || is_await_or_yield(expr)
                 || is_type_assertion(expr)
                 || is_function_like(expr)
@@ -1063,22 +1088,6 @@ fn ends_with_instantiation_close(expr: &Expression<'_>, in_for_init: bool) -> bo
             !needs_parens(assertion.expression, ctx, in_for_init)
                 && ends_with_instantiation_close(assertion.expression, in_for_init)
         }
-        _ => false,
-    }
-}
-
-/// Whether a `new` callee contains a call expression in its leftmost
-/// member/non-null chain. Prettier parenthesizes such a callee so the `new`
-/// arguments bind to the `new` rather than the inner call: `new (f())()`,
-/// `new (a.b())()`, `new (f().C)()`, `new (a?.b())()`. Mirrors prettier's
-/// `NewExpression` callee rule (`parentheses/needs-parentheses.js`). Member access walks the
-/// object (the call must be to the left of `new`'s argument list to be
-/// captured), so `new a[b]()` — no inner call — stays unparenthesized.
-fn new_callee_has_call(expr: &Expression<'_>) -> bool {
-    match &expr.kind {
-        ExpressionKind::CallExpression(_) => true,
-        ExpressionKind::MemberExpression(member) => new_callee_has_call(member.object),
-        ExpressionKind::TSNonNullExpression(non_null) => new_callee_has_call(non_null.expression),
         _ => false,
     }
 }

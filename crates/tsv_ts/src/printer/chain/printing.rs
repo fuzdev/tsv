@@ -104,6 +104,7 @@ pub(crate) fn print_node_inner<'a>(
             paren_comment_end,
             followed_by_non_null,
             continues_instantiation,
+            comparison_pair: _,
         } => {
             if *continues_instantiation {
                 printer.mark_continued_instantiation(expr);

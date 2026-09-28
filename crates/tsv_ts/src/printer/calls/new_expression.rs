@@ -25,10 +25,15 @@ use super::arg_wrapping::{
 };
 use super::expand_last::{ArgOwner, try_expand_last_arg};
 use crate::ast::internal;
+use crate::printer::chain::{child_stops_optional_chain, tag_paren_leading_start};
 use crate::printer::expressions::functions::{
     arrow_signature_has_breaking_comments, prepend_leading,
 };
-use crate::printer::{ParenContext, Printer, SecondTypeArgs, prints_as_tsc_comparison};
+use crate::printer::needs_parens::instantiation_operand_is_sealed_chain;
+use crate::printer::{
+    ParenContext, Printer, SecondTypeArgs, instantiation_keeps_pair_before_type_args,
+    prints_as_tsc_comparison,
+};
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -101,8 +106,16 @@ impl<'a> Printer<'a> {
         &self,
         callee: &internal::Expression<'_>,
         frozen: Span,
+        new_list: Option<SecondTypeArgs<'_>>,
     ) -> DocId {
-        let doc = self.build_frozen_value_doc(callee, frozen, ParenContext::NewCallee);
+        // The position's pair also covers a call the callee holds bare
+        // ([`Self::new_callee_holds_bare_call`]) — one pair either way.
+        let doc = if self.new_callee_holds_bare_call(callee, new_list) {
+            self.d()
+                .parens(self.build_frozen_expression_doc(callee, frozen))
+        } else {
+            self.build_frozen_value_doc(callee, frozen, ParenContext::NewCallee)
+        };
         if self.frozen_new_slice_absorbs_tail(callee) {
             self.d().parens(doc)
         } else {
@@ -139,19 +152,17 @@ impl<'a> Printer<'a> {
         // through three of them — bare (`new a.b.C()`), parenthesized where the callee
         // holds a call (`new (fn(k).a.B)()`), and frozen, where the mark is simply inert.
         self.mark_new_callee_member_lookups(new_expr.callee);
+        let new_list = new_expr
+            .type_arguments
+            .as_ref()
+            .map(|list| SecondTypeArgs::Arguments(list, new_expr.arguments));
         let callee = if let Some(frozen) = frozen {
-            self.build_frozen_new_callee_doc(new_expr.callee, frozen)
+            self.build_frozen_new_callee_doc(new_expr.callee, frozen, new_list)
         } else if let Some(sealed) = self.build_sealed_non_null_paren_doc(new_expr.callee) {
             sealed
-        } else if let Some(parens) = super::CalleeParens::of(
-            self,
-            new_expr.callee,
-            ParenContext::NewCallee,
-            new_expr
-                .type_arguments
-                .as_ref()
-                .map(|list| SecondTypeArgs::Arguments(list, new_expr.arguments)),
-        ) {
+        } else if let Some(parens) =
+            super::CalleeParens::of(self, new_expr.callee, ParenContext::NewCallee, new_list)
+        {
             // The pair's shape and the operand's builder off ONE derivation of the callee's
             // kind — a `new` callee and a call callee are the same position to prettier, so
             // both read it from [`super::CalleeParens`].
@@ -796,5 +807,97 @@ impl<'a> Printer<'a> {
         span: Span,
     ) -> DocId {
         self.build_new_doc_with_wrapping(new_expr, span)
+    }
+
+    /// Whether a `new` callee holds a call on its left spine that no pair the printer keeps
+    /// encloses. Such a callee takes a pair so the `new`'s arguments bind to the `new` rather
+    /// than to the inner call: `new (f())()`, `new (a.b())()`, `new (f().C)()`,
+    /// `new (a?.b())()` — bare, `new f()()` is `(new f())()`. The spine is prettier's
+    /// `NewExpression` callee rule (`parentheses/needs-parentheses.js`): a member's object, a
+    /// `!`'s operand, a tag. The call must be to the left of the `new`'s argument list to be
+    /// captured, so `new a[b]()` — no inner call — stays bare.
+    ///
+    /// The walk goes on through an instantiation expression's operand, where prettier's
+    /// stops: `new (f()<T>)()` printed bare is `new f()<T>()`, a call — with the type
+    /// arguments — on the constructed `f`.
+    ///
+    /// It stops at a node the printer prints INSIDE a pair of its own, since the call in
+    /// there can no longer take the `new`'s argument list — and it asks each position the
+    /// question that position's own builder asks, so the two cannot disagree: an operand
+    /// that takes a pair by kind (`new (f()<T>).k()`, `new (a + b()).k()`), an authored pair
+    /// around a comparison read (`new (f<T><U>(x)<T>)`t`()`, [`prints_as_tsc_comparison`]),
+    /// an instantiation head ahead of a second type argument list
+    /// ([`instantiation_keeps_pair_before_type_args`]), and an optional chain an authored
+    /// pair seals, which every position on this spine keeps (`new (a?.b()).c()`,
+    /// `new ((a?.b())!<T>)()`). A missed pair costs a second one outside it, which moves the
+    /// point where tsc's comparison ends — never a harmless redundancy.
+    ///
+    /// `new_list` is the `new`'s own type argument list, which decides whether an
+    /// instantiation callee's chain of lists continues into it.
+    pub(in crate::printer) fn new_callee_holds_bare_call(
+        &self,
+        callee: &internal::Expression<'_>,
+        new_list: Option<SecondTypeArgs<'_>>,
+    ) -> bool {
+        let continues = new_list.is_some_and(|follow| {
+            !instantiation_keeps_pair_before_type_args(self.source, callee, follow)
+        });
+        self.spine_holds_bare_call(callee, continues)
+    }
+
+    /// [`Self::new_callee_holds_bare_call`]'s walk. `continues` is whether `expr`'s owner
+    /// prints it bare ahead of a list of its own, the fact an instantiation's second-list
+    /// pair reads (`SecondTypeArgs::Instantiation`).
+    fn spine_holds_bare_call(&self, expr: &internal::Expression<'_>, continues: bool) -> bool {
+        use internal::ExpressionKind as E;
+        match &expr.kind {
+            E::CallExpression(_) => true,
+            E::MemberExpression(member) => {
+                !self.needs_parens(member.object, ParenContext::ChainBase)
+                    && !child_stops_optional_chain(expr.span.start, member.optional, member.object)
+                    && self.spine_holds_bare_call(member.object, false)
+            }
+            E::TSNonNullExpression(non_null) => {
+                !self.needs_parens(non_null.expression, ParenContext::NonNull)
+                    && !non_null.seals_optional_chain(expr.span)
+                    && self.spine_holds_bare_call(non_null.expression, false)
+            }
+            E::TaggedTemplateExpression(tagged) => {
+                let list = tagged.type_arguments.as_ref();
+                let keeps_pair = self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag)
+                    || tag_paren_leading_start(tagged, expr.span).is_some()
+                    || matches!(
+                        &tagged.tag.kind,
+                        E::TSNonNullExpression(non_null)
+                            if non_null.seals_optional_chain(tagged.tag.span())
+                    )
+                    || list.is_some_and(|list| {
+                        instantiation_keeps_pair_before_type_args(
+                            self.source,
+                            tagged.tag,
+                            SecondTypeArgs::Template(list),
+                        )
+                    });
+                !keeps_pair && self.spine_holds_bare_call(tagged.tag, list.is_some())
+            }
+            E::TSInstantiationExpression(inst) => {
+                let operand = inst.expression;
+                let second_list_pair = instantiation_keeps_pair_before_type_args(
+                    self.source,
+                    operand,
+                    SecondTypeArgs::Instantiation {
+                        list: &inst.type_arguments,
+                        continues,
+                    },
+                );
+                let source_pair = second_list_pair
+                    || instantiation_operand_is_sealed_chain(expr.span.start, operand);
+                !self.needs_parens(
+                    operand,
+                    ParenContext::InstantiationExpression { source_pair },
+                ) && self.spine_holds_bare_call(operand, true)
+            }
+            _ => false,
+        }
     }
 }

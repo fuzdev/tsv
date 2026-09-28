@@ -269,18 +269,27 @@ fn template_preempts_chain_redirect(call: &internal::CallExpression<'_>, source:
 /// the `Callee` rules so a function/arrow IIFE keeps its parens when the result
 /// is member-accessed (`(function () {})().p`, `(() => 1)().p`), matching
 /// prettier and the bare-callee path in `call_formatting.rs`.
+///
+/// A pair the linearizer kept around a comparison read (`ChainNode::Base`'s
+/// `comparison_pair`, `(f<T><U>(x))()`) is not a kind rule and is left as it is:
+/// recomputed from the callee's kind it would strip, and the call after it would join
+/// the comparison's right side in tsc's reading (`f<T><U>(x)()`).
 fn fix_callee_base_parens(nodes: &mut [ChainNode<'_>], source: &str) {
     if let [
         ChainNode::Base {
             expr,
             needs_parens: np,
             continues_instantiation,
+            comparison_pair,
             ..
         },
         ChainNode::Call { call, .. },
         ..,
     ] = nodes
     {
+        if *comparison_pair {
+            return;
+        }
         // A parenthesized optional-chain callee (`(a?.b)()`, `(a?.())()`) keeps its
         // parens — they terminate the chain so the call isn't absorbed into it.
         // The `Callee` rules don't model that boundary (it depends on the stripped
@@ -447,9 +456,10 @@ fn push_sealed_chain_base<'a>(
 
 /// Linearize the left-spine child of a chain node whose span is `parent`: a member's
 /// object, a call's callee, a `!` operand. A child the author parenthesized that tsc reads
-/// as a comparison ([`prints_as_tsc_comparison`], `(f<T><U>(x)).y`) keeps its pair as a
-/// base of its own — flattened, the access after it would join the comparison's right
-/// side in tsc's reading. Every other child recurses.
+/// as a comparison ([`prints_as_tsc_comparison`], `(f<T><U>(x)).y`, `(f<T><U>(x))()`)
+/// keeps its pair as a base of its own ([`ChainNode::comparison_pair_base`]) — flattened,
+/// the access after it would join the comparison's right side in tsc's reading. Every
+/// other child recurses.
 fn linearize_chain_child<'a>(
     child: &'a Expression<'_>,
     parent: Span,
@@ -458,7 +468,7 @@ fn linearize_chain_child<'a>(
     paren_gaps: &mut Vec<ParenGap>,
 ) {
     if parent.start < child.span().start && prints_as_tsc_comparison(input.source, child) {
-        nodes.push(ChainNode::base(child, true));
+        nodes.push(ChainNode::comparison_pair_base(child));
     } else {
         linearize_recursive(child, input, nodes, paren_gaps);
     }

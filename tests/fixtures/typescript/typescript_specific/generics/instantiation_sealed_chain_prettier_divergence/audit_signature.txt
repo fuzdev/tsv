@@ -1,0 +1,24 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(output_prettier.<ext>).
+# This file exists when prettier is non-idempotent on output_prettier.* — it pins
+# the full chain so the audit recognizes the case and the validator catches drift.
+# See docs/fixture_overview.md (rule F4) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// an optional chain the author sealed keeps its pair ahead of type arguments
+	x = a?.b<T>;
+	x = a?.b()<T>;
+	a?.b<T>?.();
+	// the non-null spelling, which prettier keeps too
+	x = (a?.b)!<T>;
+	// a tag or a `new` callee, where the bare spelling does not parse
+	new (a?.b())<T>`t`();
+	new (a?.b())!() < T > <T>`t`();
+</script>
+
+{a?.b<T>}
+{a?.b<T>?.()}
+{new (a?.b())!<T>()<T>`t`()}

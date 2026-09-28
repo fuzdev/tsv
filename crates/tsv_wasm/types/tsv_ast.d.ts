@@ -625,7 +625,7 @@ export interface SpreadElement extends AcornCommentAttachment {
 	argument: Expression;
 }
 
-export interface TemplateLiteral {
+export interface TemplateLiteral extends AcornCommentAttachment {
 	type: 'TemplateLiteral';
 	start: number;
 	end: number;

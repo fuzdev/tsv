@@ -38,7 +38,9 @@ use crate::ast::internal::{BinaryExpression, Expression, ExpressionKind, TSType}
 use crate::printer::ShareTag;
 use crate::printer::comments::{AsiOperandShell, CommentFilter, CommentSpacing};
 use crate::printer::ignore::FrozenOperandPair;
-use crate::printer::needs_parens::holds_first_list_of_chain;
+use crate::printer::needs_parens::{
+    holds_first_list_of_chain, instantiation_operand_is_sealed_chain,
+};
 use crate::printer::types::TrailingBlock;
 use crate::printer::types::helpers::unwrap_parenthesized;
 use crate::printer::{
@@ -1546,11 +1548,25 @@ impl<'a> Printer<'a> {
                 continues,
             },
         );
-        parts.push(self.build_shell_operand_doc(
-            span.start,
-            inst_expr.expression,
-            ParenContext::InstantiationExpression { second_list_pair },
-        ));
+        // An optional chain the author sealed keeps its pair, `!` spelling included
+        // ([`instantiation_operand_is_sealed_chain`]): bare, the list and whatever follows
+        // it join the chain.
+        let sealed = instantiation_operand_is_sealed_chain(span.start, inst_expr.expression);
+        parts.push(
+            match self
+                .build_sealed_non_null_paren_doc(inst_expr.expression)
+                .filter(|_| sealed)
+            {
+                Some(sealed_doc) => sealed_doc,
+                None => self.build_shell_operand_doc(
+                    span.start,
+                    inst_expr.expression,
+                    ParenContext::InstantiationExpression {
+                        source_pair: second_list_pair || sealed,
+                    },
+                ),
+            },
+        );
         // Preserve comments between expression and type args: `fn/* c */ <string>`
         let expr_end = inst_expr.expression.span().end;
         let ta_start = inst_expr.type_arguments.span.start;

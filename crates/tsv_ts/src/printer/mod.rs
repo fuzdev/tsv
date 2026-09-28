@@ -978,7 +978,15 @@ impl<'a> Printer<'a> {
     /// `expr` as a comparison ([`prints_as_tsc_comparison`]). Asked only at a position
     /// [`ParenContext::binds_tighter_than_a_comparison`] names: one side of the operand is
     /// always the parent's own operator or postfix there, so a `(` right before and a `)`
-    /// right after are the operand's own pair.
+    /// right after are the operand's own pair. "Right after" is the next TOKEN, a literal
+    /// included: a tag's own template follows the call in `` g(f<T><U>(x)`t`) ``, so the
+    /// `)` past it closes the argument list and is no pair around the tag
+    /// ([`next_significant_byte`]).
+    ///
+    /// A callee reached through a member chain (`(f<T><U>(x))()`, `(f<T><U>(x)).y`) is not
+    /// asked here: the chain linearizer keeps that pair as a base of its own, and the
+    /// callee re-evaluation that follows leaves it alone (`ChainNode::Base`'s
+    /// `comparison_pair`).
     fn authored_pair_holds_comparison(&self, expr: &internal::Expression<'_>) -> bool {
         paren_shell_close_after(self.source, expr.span().end).is_some()
             && prints_as_tsc_comparison(self.source, expr)
