@@ -16,7 +16,7 @@ use super::blocks_doc::{
     KEY_BLOCK_OPEN, SectionWhitespace, await_expr_comment_end,
 };
 use super::element_doc::{AttrListEmission, ElementAttrsDoc};
-use super::helpers::each_expr_comment_end;
+use super::helpers::{HeadTail, each_expr_comment_end};
 use crate::ast::internal::{self, Fragment, FragmentNode, is_collapsible_ws_char};
 use crate::printer::Printer;
 use crate::printer::classification::element::has_raw_content;
@@ -612,6 +612,7 @@ impl<'a> Printer<'a> {
             block.test,
             block.opening_tag_span.end - 1,
             false,
+            HeadTail::Delimiter,
         );
 
         let body_doc = self.build_whitespace_sensitive_content_doc(block.consequent.nodes);
@@ -670,6 +671,7 @@ impl<'a> Printer<'a> {
             block.expression,
             expr_comment_end,
             false,
+            HeadTail::of_each(block),
         );
 
         let open_doc = self.head_open_doc(EACH_BLOCK_OPEN, head.layout.opens_own_line());
@@ -734,6 +736,7 @@ impl<'a> Printer<'a> {
             block.expression,
             await_expr_comment_end(block, sections.shorthand),
             false,
+            HeadTail::of_await(sections.shorthand),
         );
         let open_doc = self.head_open_doc(AWAIT_BLOCK_OPEN, head.layout.opens_own_line());
         let mut parts: DocBuf = smallvec![open_doc, head.doc];
@@ -774,6 +777,7 @@ impl<'a> Printer<'a> {
             block.expression,
             block.opening_tag_span.end - 1,
             false,
+            HeadTail::Delimiter,
         );
         let open_doc = self.head_open_doc(KEY_BLOCK_OPEN, head.layout.opens_own_line());
         let body_doc = self.build_whitespace_sensitive_content_doc(block.fragment.nodes);

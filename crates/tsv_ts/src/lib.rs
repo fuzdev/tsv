@@ -1249,6 +1249,22 @@ fn with_program_printer<R>(
 // break-after-operator rules as our own assignment printer.
 pub use printer::{conditional_should_break_after_op, should_inline_logical_expression};
 
+/// Whether `expression`, printed at a position that adds no pair of its own, ENDS on the
+/// closing `>` of an instantiation expression's type argument list — `f<T>`, or a node
+/// whose rightmost printed child does (`-f<T>`, `a ?? f<T>`, `c ? a : f<T>`,
+/// `() => f<T>`, `await f<T>`).
+///
+/// An embedder asks it where its own syntax puts a WORD right after the expression:
+/// acorn-typescript, the parser Svelte hands a block head to, reads a type argument list
+/// only where the next token cannot start an expression on the same line, so a bare
+/// `{#each f<T> as item}` is the comparison `f < T > as` and does not parse. `tsv_svelte`
+/// wraps an `{#each}` head and a shorthand `{#await}` head in a pair when this answers
+/// `true`, the block-head twin of the pair the left of `as` / `satisfies` keeps.
+#[must_use]
+pub fn prints_ending_on_instantiation_close(expression: &Expression<'_>) -> bool {
+    printer::ends_with_instantiation_close(expression, false)
+}
+
 // The ECMAScript identifier grammar, for embedders that read an identifier out of
 // their OWN syntax rather than through this crate's lexer: a `{#snippet}` name and
 // an `{#each}` index are JS identifiers that Svelte reads with acorn's

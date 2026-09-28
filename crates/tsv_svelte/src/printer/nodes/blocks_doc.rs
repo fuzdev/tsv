@@ -14,7 +14,7 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 use super::fragment_doc::LeadingEdge;
-use super::helpers::each_expr_comment_end;
+use super::helpers::{HeadTail, each_expr_comment_end};
 
 // Opening-tag literals for control-flow blocks. Every offset that locates the
 // embedded expression past the opening tag derives from `.len()` of these, so
@@ -742,6 +742,7 @@ impl<'a> Printer<'a> {
             block.test,
             block.opening_tag_span.end - 1,
             allow_wrapping || in_multiline_context,
+            HeadTail::Delimiter,
         );
 
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
@@ -848,6 +849,7 @@ impl<'a> Printer<'a> {
             else_if.test,
             else_if.opening_tag_span.end - 1,
             in_multiline_context,
+            HeadTail::Delimiter,
         )
     }
 
@@ -997,6 +999,7 @@ impl<'a> Printer<'a> {
             block.expression,
             expr_comment_end,
             allow_wrapping || in_multiline_context,
+            HeadTail::of_each(block),
         );
 
         let key_doc = self.build_each_key_doc(block, allow_wrapping, in_multiline_context);
@@ -1298,6 +1301,7 @@ impl<'a> Printer<'a> {
             block.expression,
             await_expr_comment_end(block, sections.shorthand),
             allow_wrapping || in_multiline_context,
+            HeadTail::of_await(sections.shorthand),
         );
 
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
@@ -1422,6 +1426,7 @@ impl<'a> Printer<'a> {
             block.expression,
             block.opening_tag_span.end - 1,
             allow_wrapping || in_multiline_context,
+            HeadTail::Delimiter,
         );
 
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);

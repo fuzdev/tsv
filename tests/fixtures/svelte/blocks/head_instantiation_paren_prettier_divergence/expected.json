@@ -1,0 +1,4244 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1704,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 27,
+				"end": 29,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 29,
+				"end": 280,
+				"data": " A block head followed by a word of the block's own keeps the pair around an instantiation\n\texpression: Svelte's parser hands the head to acorn-typescript, which reads the `as` / `then`\n\tafter a bare `f<T>` as the continuation of a comparison. "
+			},
+			{
+				"type": "Text",
+				"start": 280,
+				"end": 281,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 281,
+				"end": 316,
+				"expression": {
+					"type": "TSInstantiationExpression",
+					"start": 289,
+					"end": 293,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 8
+						},
+						"end": {
+							"line": 6,
+							"column": 12
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 289,
+						"end": 290,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 8
+							},
+							"end": {
+								"line": 6,
+								"column": 9
+							}
+						},
+						"name": "f"
+					},
+					"typeArguments": {
+						"type": "TSTypeParameterInstantiation",
+						"start": 290,
+						"end": 293,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 9
+							},
+							"end": {
+								"line": 6,
+								"column": 12
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeReference",
+								"start": 291,
+								"end": 292,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 10
+									},
+									"end": {
+										"line": 6,
+										"column": 11
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 291,
+									"end": 292,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 10
+										},
+										"end": {
+											"line": 6,
+											"column": 11
+										}
+									},
+									"name": "T"
+								}
+							}
+						]
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 303,
+							"end": 309,
+							"expression": {
+								"type": "Identifier",
+								"start": 304,
+								"end": 308,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 23
+									},
+									"end": {
+										"line": 6,
+										"column": 27
+									}
+								},
+								"name": "item"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 298,
+					"end": 302,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 17,
+							"character": 298
+						},
+						"end": {
+							"line": 6,
+							"column": 21,
+							"character": 302
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 316,
+				"end": 317,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 317,
+				"end": 361,
+				"expression": {
+					"type": "TSInstantiationExpression",
+					"start": 325,
+					"end": 331,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 8
+						},
+						"end": {
+							"line": 7,
+							"column": 14
+						}
+					},
+					"expression": {
+						"type": "MemberExpression",
+						"start": 325,
+						"end": 328,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 8
+							},
+							"end": {
+								"line": 7,
+								"column": 11
+							}
+						},
+						"object": {
+							"type": "Identifier",
+							"start": 325,
+							"end": 326,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 8
+								},
+								"end": {
+									"line": 7,
+									"column": 9
+								}
+							},
+							"name": "a"
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 327,
+							"end": 328,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 10
+								},
+								"end": {
+									"line": 7,
+									"column": 11
+								}
+							},
+							"name": "b"
+						},
+						"computed": false,
+						"optional": false
+					},
+					"typeArguments": {
+						"type": "TSTypeParameterInstantiation",
+						"start": 328,
+						"end": 331,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 11
+							},
+							"end": {
+								"line": 7,
+								"column": 14
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeReference",
+								"start": 329,
+								"end": 330,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 12
+									},
+									"end": {
+										"line": 7,
+										"column": 13
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 329,
+									"end": 330,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 12
+										},
+										"end": {
+											"line": 7,
+											"column": 13
+										}
+									},
+									"name": "T"
+								}
+							}
+						]
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 348,
+							"end": 354,
+							"expression": {
+								"type": "Identifier",
+								"start": 349,
+								"end": 353,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 32
+									},
+									"end": {
+										"line": 7,
+										"column": 36
+									}
+								},
+								"name": "item"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 336,
+					"end": 340,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 19,
+							"character": 336
+						},
+						"end": {
+							"line": 7,
+							"column": 23,
+							"character": 340
+						}
+					}
+				},
+				"index": "i",
+				"key": {
+					"type": "Identifier",
+					"start": 345,
+					"end": 346,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 28
+						},
+						"end": {
+							"line": 7,
+							"column": 29
+						}
+					},
+					"name": "i"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 361,
+				"end": 362,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 362,
+				"end": 395,
+				"expression": {
+					"type": "TSInstantiationExpression",
+					"start": 371,
+					"end": 375,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 9
+						},
+						"end": {
+							"line": 8,
+							"column": 13
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 371,
+						"end": 372,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 9
+							},
+							"end": {
+								"line": 8,
+								"column": 10
+							}
+						},
+						"name": "f"
+					},
+					"typeArguments": {
+						"type": "TSTypeParameterInstantiation",
+						"start": 372,
+						"end": 375,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 10
+							},
+							"end": {
+								"line": 8,
+								"column": 13
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeReference",
+								"start": 373,
+								"end": 374,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 11
+									},
+									"end": {
+										"line": 8,
+										"column": 12
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 373,
+									"end": 374,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 11
+										},
+										"end": {
+											"line": 8,
+											"column": 12
+										}
+									},
+									"name": "T"
+								}
+							}
+						]
+					}
+				},
+				"value": {
+					"type": "Identifier",
+					"name": "v",
+					"start": 382,
+					"end": 383,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 20,
+							"character": 382
+						},
+						"end": {
+							"line": 8,
+							"column": 21,
+							"character": 383
+						}
+					}
+				},
+				"error": null,
+				"pending": null,
+				"then": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 384,
+							"end": 387,
+							"expression": {
+								"type": "Identifier",
+								"start": 385,
+								"end": 386,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 23
+									},
+									"end": {
+										"line": 8,
+										"column": 24
+									}
+								},
+								"name": "v"
+							}
+						}
+					]
+				},
+				"catch": null
+			},
+			{
+				"type": "Text",
+				"start": 395,
+				"end": 397,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 397,
+				"end": 480,
+				"data": " The pair wraps a head that ENDS on the close, whatever node ends it there. "
+			},
+			{
+				"type": "Text",
+				"start": 480,
+				"end": 481,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 481,
+				"end": 515,
+				"expression": {
+					"type": "UnaryExpression",
+					"start": 489,
+					"end": 494,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 8
+						},
+						"end": {
+							"line": 11,
+							"column": 13
+						}
+					},
+					"operator": "-",
+					"prefix": true,
+					"argument": {
+						"type": "TSInstantiationExpression",
+						"start": 490,
+						"end": 494,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 9
+							},
+							"end": {
+								"line": 11,
+								"column": 13
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 490,
+							"end": 491,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 9
+								},
+								"end": {
+									"line": 11,
+									"column": 10
+								}
+							},
+							"name": "f"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 491,
+							"end": 494,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 10
+								},
+								"end": {
+									"line": 11,
+									"column": 13
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 492,
+									"end": 493,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 11
+										},
+										"end": {
+											"line": 11,
+											"column": 12
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 492,
+										"end": 493,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 11
+											},
+											"end": {
+												"line": 11,
+												"column": 12
+											}
+										},
+										"name": "T"
+									}
+								}
+							]
+						}
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 505,
+							"end": 508,
+							"expression": {
+								"type": "Identifier",
+								"start": 506,
+								"end": 507,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 25
+									},
+									"end": {
+										"line": 11,
+										"column": 26
+									}
+								},
+								"name": "a"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "ObjectPattern",
+					"start": 499,
+					"end": 504,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 19
+						},
+						"end": {
+							"line": 11,
+							"column": 24
+						}
+					},
+					"properties": [
+						{
+							"type": "Property",
+							"start": 501,
+							"end": 502,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 21
+								},
+								"end": {
+									"line": 11,
+									"column": 22
+								}
+							},
+							"method": false,
+							"shorthand": true,
+							"computed": false,
+							"key": {
+								"type": "Identifier",
+								"start": 501,
+								"end": 502,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 21
+									},
+									"end": {
+										"line": 11,
+										"column": 22
+									}
+								},
+								"name": "a"
+							},
+							"value": {
+								"type": "Identifier",
+								"start": 501,
+								"end": 502,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 21
+									},
+									"end": {
+										"line": 11,
+										"column": 22
+									}
+								},
+								"name": "a"
+							},
+							"kind": "init"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 515,
+				"end": 516,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 516,
+				"end": 555,
+				"expression": {
+					"type": "BinaryExpression",
+					"start": 524,
+					"end": 532,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 8
+						},
+						"end": {
+							"line": 12,
+							"column": 16
+						}
+					},
+					"left": {
+						"type": "Identifier",
+						"start": 524,
+						"end": 525,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 8
+							},
+							"end": {
+								"line": 12,
+								"column": 9
+							}
+						},
+						"name": "a"
+					},
+					"operator": "*",
+					"right": {
+						"type": "TSInstantiationExpression",
+						"start": 528,
+						"end": 532,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 12
+							},
+							"end": {
+								"line": 12,
+								"column": 16
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 528,
+							"end": 529,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 12
+								},
+								"end": {
+									"line": 12,
+									"column": 13
+								}
+							},
+							"name": "f"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 529,
+							"end": 532,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 13
+								},
+								"end": {
+									"line": 12,
+									"column": 16
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 530,
+									"end": 531,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 14
+										},
+										"end": {
+											"line": 12,
+											"column": 15
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 530,
+										"end": 531,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 14
+											},
+											"end": {
+												"line": 12,
+												"column": 15
+											}
+										},
+										"name": "T"
+									}
+								}
+							]
+						}
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 542,
+							"end": 548,
+							"expression": {
+								"type": "Identifier",
+								"start": 543,
+								"end": 547,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 27
+									},
+									"end": {
+										"line": 12,
+										"column": 31
+									}
+								},
+								"name": "item"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 537,
+					"end": 541,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 21,
+							"character": 537
+						},
+						"end": {
+							"line": 12,
+							"column": 25,
+							"character": 541
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 555,
+				"end": 556,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 556,
+				"end": 596,
+				"expression": {
+					"type": "LogicalExpression",
+					"start": 564,
+					"end": 573,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 8
+						},
+						"end": {
+							"line": 13,
+							"column": 17
+						}
+					},
+					"left": {
+						"type": "Identifier",
+						"start": 564,
+						"end": 565,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 8
+							},
+							"end": {
+								"line": 13,
+								"column": 9
+							}
+						},
+						"name": "a"
+					},
+					"operator": "??",
+					"right": {
+						"type": "TSInstantiationExpression",
+						"start": 569,
+						"end": 573,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 13
+							},
+							"end": {
+								"line": 13,
+								"column": 17
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 569,
+							"end": 570,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 13
+								},
+								"end": {
+									"line": 13,
+									"column": 14
+								}
+							},
+							"name": "f"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 570,
+							"end": 573,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 14
+								},
+								"end": {
+									"line": 13,
+									"column": 17
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 571,
+									"end": 572,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 15
+										},
+										"end": {
+											"line": 13,
+											"column": 16
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 571,
+										"end": 572,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 15
+											},
+											"end": {
+												"line": 13,
+												"column": 16
+											}
+										},
+										"name": "T"
+									}
+								}
+							]
+						}
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 583,
+							"end": 589,
+							"expression": {
+								"type": "Identifier",
+								"start": 584,
+								"end": 588,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 28
+									},
+									"end": {
+										"line": 13,
+										"column": 32
+									}
+								},
+								"name": "item"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 578,
+					"end": 582,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 22,
+							"character": 578
+						},
+						"end": {
+							"line": 13,
+							"column": 26,
+							"character": 582
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 596,
+				"end": 597,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 597,
+				"end": 635,
+				"expression": {
+					"type": "TSTypeAssertion",
+					"start": 605,
+					"end": 612,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 8
+						},
+						"end": {
+							"line": 14,
+							"column": 15
+						}
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 606,
+						"end": 607,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 9
+							},
+							"end": {
+								"line": 14,
+								"column": 10
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 606,
+							"end": 607,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 9
+								},
+								"end": {
+									"line": 14,
+									"column": 10
+								}
+							},
+							"name": "U"
+						}
+					},
+					"expression": {
+						"type": "TSInstantiationExpression",
+						"start": 608,
+						"end": 612,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 11
+							},
+							"end": {
+								"line": 14,
+								"column": 15
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 608,
+							"end": 609,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 11
+								},
+								"end": {
+									"line": 14,
+									"column": 12
+								}
+							},
+							"name": "f"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 609,
+							"end": 612,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 12
+								},
+								"end": {
+									"line": 14,
+									"column": 15
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 610,
+									"end": 611,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 13
+										},
+										"end": {
+											"line": 14,
+											"column": 14
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 610,
+										"end": 611,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 13
+											},
+											"end": {
+												"line": 14,
+												"column": 14
+											}
+										},
+										"name": "T"
+									}
+								}
+							]
+						}
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 622,
+							"end": 628,
+							"expression": {
+								"type": "Identifier",
+								"start": 623,
+								"end": 627,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 26
+									},
+									"end": {
+										"line": 14,
+										"column": 30
+									}
+								},
+								"name": "item"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 617,
+					"end": 621,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 20,
+							"character": 617
+						},
+						"end": {
+							"line": 14,
+							"column": 24,
+							"character": 621
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 635,
+				"end": 636,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 636,
+				"end": 679,
+				"expression": {
+					"type": "ConditionalExpression",
+					"start": 644,
+					"end": 656,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 8
+						},
+						"end": {
+							"line": 15,
+							"column": 20
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 644,
+						"end": 645,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 8
+							},
+							"end": {
+								"line": 15,
+								"column": 9
+							}
+						},
+						"name": "c"
+					},
+					"consequent": {
+						"type": "Identifier",
+						"start": 648,
+						"end": 649,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 12
+							},
+							"end": {
+								"line": 15,
+								"column": 13
+							}
+						},
+						"name": "a"
+					},
+					"alternate": {
+						"type": "TSInstantiationExpression",
+						"start": 652,
+						"end": 656,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 16
+							},
+							"end": {
+								"line": 15,
+								"column": 20
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 652,
+							"end": 653,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 16
+								},
+								"end": {
+									"line": 15,
+									"column": 17
+								}
+							},
+							"name": "f"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 653,
+							"end": 656,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 17
+								},
+								"end": {
+									"line": 15,
+									"column": 20
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 654,
+									"end": 655,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 18
+										},
+										"end": {
+											"line": 15,
+											"column": 19
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 654,
+										"end": 655,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 18
+											},
+											"end": {
+												"line": 15,
+												"column": 19
+											}
+										},
+										"name": "T"
+									}
+								}
+							]
+						}
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 666,
+							"end": 672,
+							"expression": {
+								"type": "Identifier",
+								"start": 667,
+								"end": 671,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 31
+									},
+									"end": {
+										"line": 15,
+										"column": 35
+									}
+								},
+								"name": "item"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 661,
+					"end": 665,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 25,
+							"character": 661
+						},
+						"end": {
+							"line": 15,
+							"column": 29,
+							"character": 665
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 679,
+				"end": 680,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 680,
+				"end": 721,
+				"expression": {
+					"type": "ArrowFunctionExpression",
+					"start": 688,
+					"end": 698,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 8
+						},
+						"end": {
+							"line": 16,
+							"column": 18
+						}
+					},
+					"id": null,
+					"expression": true,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "TSInstantiationExpression",
+						"start": 694,
+						"end": 698,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 14
+							},
+							"end": {
+								"line": 16,
+								"column": 18
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 694,
+							"end": 695,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 14
+								},
+								"end": {
+									"line": 16,
+									"column": 15
+								}
+							},
+							"name": "f"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 695,
+							"end": 698,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 15
+								},
+								"end": {
+									"line": 16,
+									"column": 18
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 696,
+									"end": 697,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 16
+										},
+										"end": {
+											"line": 16,
+											"column": 17
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 696,
+										"end": 697,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 16
+											},
+											"end": {
+												"line": 16,
+												"column": 17
+											}
+										},
+										"name": "T"
+									}
+								}
+							]
+						}
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 708,
+							"end": 714,
+							"expression": {
+								"type": "Identifier",
+								"start": 709,
+								"end": 713,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 29
+									},
+									"end": {
+										"line": 16,
+										"column": 33
+									}
+								},
+								"name": "item"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 703,
+					"end": 707,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 23,
+							"character": 703
+						},
+						"end": {
+							"line": 16,
+							"column": 27,
+							"character": 707
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 721,
+				"end": 722,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 722,
+				"end": 756,
+				"expression": {
+					"type": "UnaryExpression",
+					"start": 731,
+					"end": 736,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 9
+						},
+						"end": {
+							"line": 17,
+							"column": 14
+						}
+					},
+					"operator": "-",
+					"prefix": true,
+					"argument": {
+						"type": "TSInstantiationExpression",
+						"start": 732,
+						"end": 736,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 10
+							},
+							"end": {
+								"line": 17,
+								"column": 14
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 732,
+							"end": 733,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 10
+								},
+								"end": {
+									"line": 17,
+									"column": 11
+								}
+							},
+							"name": "f"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 733,
+							"end": 736,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 11
+								},
+								"end": {
+									"line": 17,
+									"column": 14
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 734,
+									"end": 735,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 12
+										},
+										"end": {
+											"line": 17,
+											"column": 13
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 734,
+										"end": 735,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 12
+											},
+											"end": {
+												"line": 17,
+												"column": 13
+											}
+										},
+										"name": "T"
+									}
+								}
+							]
+						}
+					}
+				},
+				"value": {
+					"type": "Identifier",
+					"name": "v",
+					"start": 743,
+					"end": 744,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 21,
+							"character": 743
+						},
+						"end": {
+							"line": 17,
+							"column": 22,
+							"character": 744
+						}
+					}
+				},
+				"error": null,
+				"pending": null,
+				"then": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 745,
+							"end": 748,
+							"expression": {
+								"type": "Identifier",
+								"start": 746,
+								"end": 747,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 24
+									},
+									"end": {
+										"line": 17,
+										"column": 25
+									}
+								},
+								"name": "v"
+							}
+						}
+					]
+				},
+				"catch": null
+			},
+			{
+				"type": "Text",
+				"start": 756,
+				"end": 757,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 757,
+				"end": 798,
+				"expression": {
+					"type": "ConditionalExpression",
+					"start": 766,
+					"end": 778,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 9
+						},
+						"end": {
+							"line": 18,
+							"column": 21
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 766,
+						"end": 767,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 9
+							},
+							"end": {
+								"line": 18,
+								"column": 10
+							}
+						},
+						"name": "c"
+					},
+					"consequent": {
+						"type": "Identifier",
+						"start": 770,
+						"end": 771,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 13
+							},
+							"end": {
+								"line": 18,
+								"column": 14
+							}
+						},
+						"name": "a"
+					},
+					"alternate": {
+						"type": "TSInstantiationExpression",
+						"start": 774,
+						"end": 778,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 17
+							},
+							"end": {
+								"line": 18,
+								"column": 21
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 774,
+							"end": 775,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 17
+								},
+								"end": {
+									"line": 18,
+									"column": 18
+								}
+							},
+							"name": "f"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 775,
+							"end": 778,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 18
+								},
+								"end": {
+									"line": 18,
+									"column": 21
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 776,
+									"end": 777,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 19
+										},
+										"end": {
+											"line": 18,
+											"column": 20
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 776,
+										"end": 777,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 19
+											},
+											"end": {
+												"line": 18,
+												"column": 20
+											}
+										},
+										"name": "T"
+									}
+								}
+							]
+						}
+					}
+				},
+				"value": {
+					"type": "Identifier",
+					"name": "v",
+					"start": 785,
+					"end": 786,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 28,
+							"character": 785
+						},
+						"end": {
+							"line": 18,
+							"column": 29,
+							"character": 786
+						}
+					}
+				},
+				"error": null,
+				"pending": null,
+				"then": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 787,
+							"end": 790,
+							"expression": {
+								"type": "Identifier",
+								"start": 788,
+								"end": 789,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 31
+									},
+									"end": {
+										"line": 18,
+										"column": 32
+									}
+								},
+								"name": "v"
+							}
+						}
+					]
+				},
+				"catch": null
+			},
+			{
+				"type": "Text",
+				"start": 798,
+				"end": 799,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 799,
+				"end": 844,
+				"expression": {
+					"type": "LogicalExpression",
+					"start": 807,
+					"end": 821,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 8
+						},
+						"end": {
+							"line": 19,
+							"column": 22
+						}
+					},
+					"left": {
+						"type": "LogicalExpression",
+						"start": 807,
+						"end": 813,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 8
+							},
+							"end": {
+								"line": 19,
+								"column": 14
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 807,
+							"end": 808,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 8
+								},
+								"end": {
+									"line": 19,
+									"column": 9
+								}
+							},
+							"name": "a"
+						},
+						"operator": "??",
+						"right": {
+							"type": "Identifier",
+							"start": 812,
+							"end": 813,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 13
+								},
+								"end": {
+									"line": 19,
+									"column": 14
+								}
+							},
+							"name": "b"
+						}
+					},
+					"operator": "??",
+					"right": {
+						"type": "TSInstantiationExpression",
+						"start": 817,
+						"end": 821,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 18
+							},
+							"end": {
+								"line": 19,
+								"column": 22
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 817,
+							"end": 818,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 18
+								},
+								"end": {
+									"line": 19,
+									"column": 19
+								}
+							},
+							"name": "f"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 818,
+							"end": 821,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 19
+								},
+								"end": {
+									"line": 19,
+									"column": 22
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 819,
+									"end": 820,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 20
+										},
+										"end": {
+											"line": 19,
+											"column": 21
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 819,
+										"end": 820,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 20
+											},
+											"end": {
+												"line": 19,
+												"column": 21
+											}
+										},
+										"name": "T"
+									}
+								}
+							]
+						}
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 831,
+							"end": 837,
+							"expression": {
+								"type": "Identifier",
+								"start": 832,
+								"end": 836,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 33
+									},
+									"end": {
+										"line": 19,
+										"column": 37
+									}
+								},
+								"name": "item"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 826,
+					"end": 830,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 27,
+							"character": 826
+						},
+						"end": {
+							"line": 19,
+							"column": 31,
+							"character": 830
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 844,
+				"end": 845,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 845,
+				"end": 890,
+				"expression": {
+					"type": "LogicalExpression",
+					"start": 853,
+					"end": 867,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 8
+						},
+						"end": {
+							"line": 20,
+							"column": 22
+						}
+					},
+					"left": {
+						"type": "LogicalExpression",
+						"start": 853,
+						"end": 859,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 8
+							},
+							"end": {
+								"line": 20,
+								"column": 14
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 853,
+							"end": 854,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 8
+								},
+								"end": {
+									"line": 20,
+									"column": 9
+								}
+							},
+							"name": "a"
+						},
+						"operator": "&&",
+						"right": {
+							"type": "Identifier",
+							"start": 858,
+							"end": 859,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 13
+								},
+								"end": {
+									"line": 20,
+									"column": 14
+								}
+							},
+							"name": "b"
+						}
+					},
+					"operator": "&&",
+					"right": {
+						"type": "TSInstantiationExpression",
+						"start": 863,
+						"end": 867,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 18
+							},
+							"end": {
+								"line": 20,
+								"column": 22
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 863,
+							"end": 864,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 18
+								},
+								"end": {
+									"line": 20,
+									"column": 19
+								}
+							},
+							"name": "f"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 864,
+							"end": 867,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 19
+								},
+								"end": {
+									"line": 20,
+									"column": 22
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 865,
+									"end": 866,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 20
+										},
+										"end": {
+											"line": 20,
+											"column": 21
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 865,
+										"end": 866,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 20
+											},
+											"end": {
+												"line": 20,
+												"column": 21
+											}
+										},
+										"name": "T"
+									}
+								}
+							]
+						}
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 877,
+							"end": 883,
+							"expression": {
+								"type": "Identifier",
+								"start": 878,
+								"end": 882,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 33
+									},
+									"end": {
+										"line": 20,
+										"column": 37
+									}
+								},
+								"name": "item"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 872,
+					"end": 876,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 27,
+							"character": 872
+						},
+						"end": {
+							"line": 20,
+							"column": 31,
+							"character": 876
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 890,
+				"end": 891,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 891,
+				"end": 936,
+				"expression": {
+					"type": "LogicalExpression",
+					"start": 899,
+					"end": 913,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 8
+						},
+						"end": {
+							"line": 21,
+							"column": 22
+						}
+					},
+					"left": {
+						"type": "LogicalExpression",
+						"start": 899,
+						"end": 905,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 8
+							},
+							"end": {
+								"line": 21,
+								"column": 14
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 899,
+							"end": 900,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 8
+								},
+								"end": {
+									"line": 21,
+									"column": 9
+								}
+							},
+							"name": "a"
+						},
+						"operator": "||",
+						"right": {
+							"type": "Identifier",
+							"start": 904,
+							"end": 905,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 13
+								},
+								"end": {
+									"line": 21,
+									"column": 14
+								}
+							},
+							"name": "b"
+						}
+					},
+					"operator": "||",
+					"right": {
+						"type": "TSInstantiationExpression",
+						"start": 909,
+						"end": 913,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 18
+							},
+							"end": {
+								"line": 21,
+								"column": 22
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 909,
+							"end": 910,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 18
+								},
+								"end": {
+									"line": 21,
+									"column": 19
+								}
+							},
+							"name": "f"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 910,
+							"end": 913,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 19
+								},
+								"end": {
+									"line": 21,
+									"column": 22
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 911,
+									"end": 912,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 20
+										},
+										"end": {
+											"line": 21,
+											"column": 21
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 911,
+										"end": 912,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 20
+											},
+											"end": {
+												"line": 21,
+												"column": 21
+											}
+										},
+										"name": "T"
+									}
+								}
+							]
+						}
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 923,
+							"end": 929,
+							"expression": {
+								"type": "Identifier",
+								"start": 924,
+								"end": 928,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 33
+									},
+									"end": {
+										"line": 21,
+										"column": 37
+									}
+								},
+								"name": "item"
+							}
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 918,
+					"end": 922,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 27,
+							"character": 918
+						},
+						"end": {
+							"line": 21,
+							"column": 31,
+							"character": 922
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 936,
+				"end": 937,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 937,
+				"end": 980,
+				"expression": {
+					"type": "LogicalExpression",
+					"start": 946,
+					"end": 960,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 9
+						},
+						"end": {
+							"line": 22,
+							"column": 23
+						}
+					},
+					"left": {
+						"type": "LogicalExpression",
+						"start": 946,
+						"end": 952,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 9
+							},
+							"end": {
+								"line": 22,
+								"column": 15
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 946,
+							"end": 947,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 9
+								},
+								"end": {
+									"line": 22,
+									"column": 10
+								}
+							},
+							"name": "a"
+						},
+						"operator": "??",
+						"right": {
+							"type": "Identifier",
+							"start": 951,
+							"end": 952,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 14
+								},
+								"end": {
+									"line": 22,
+									"column": 15
+								}
+							},
+							"name": "b"
+						}
+					},
+					"operator": "??",
+					"right": {
+						"type": "TSInstantiationExpression",
+						"start": 956,
+						"end": 960,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 19
+							},
+							"end": {
+								"line": 22,
+								"column": 23
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 956,
+							"end": 957,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 19
+								},
+								"end": {
+									"line": 22,
+									"column": 20
+								}
+							},
+							"name": "f"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 957,
+							"end": 960,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 20
+								},
+								"end": {
+									"line": 22,
+									"column": 23
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 958,
+									"end": 959,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 21
+										},
+										"end": {
+											"line": 22,
+											"column": 22
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 958,
+										"end": 959,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 21
+											},
+											"end": {
+												"line": 22,
+												"column": 22
+											}
+										},
+										"name": "T"
+									}
+								}
+							]
+						}
+					}
+				},
+				"value": {
+					"type": "Identifier",
+					"name": "v",
+					"start": 967,
+					"end": 968,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 30,
+							"character": 967
+						},
+						"end": {
+							"line": 22,
+							"column": 31,
+							"character": 968
+						}
+					}
+				},
+				"error": null,
+				"pending": null,
+				"then": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 969,
+							"end": 972,
+							"expression": {
+								"type": "Identifier",
+								"start": 970,
+								"end": 971,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 33
+									},
+									"end": {
+										"line": 22,
+										"column": 34
+									}
+								},
+								"name": "v"
+							}
+						}
+					]
+				},
+				"catch": null
+			},
+			{
+				"type": "Text",
+				"start": 980,
+				"end": 981,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 981,
+				"end": 1024,
+				"expression": {
+					"type": "LogicalExpression",
+					"start": 990,
+					"end": 1004,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 9
+						},
+						"end": {
+							"line": 23,
+							"column": 23
+						}
+					},
+					"left": {
+						"type": "LogicalExpression",
+						"start": 990,
+						"end": 996,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 9
+							},
+							"end": {
+								"line": 23,
+								"column": 15
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 990,
+							"end": 991,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 9
+								},
+								"end": {
+									"line": 23,
+									"column": 10
+								}
+							},
+							"name": "a"
+						},
+						"operator": "&&",
+						"right": {
+							"type": "Identifier",
+							"start": 995,
+							"end": 996,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 14
+								},
+								"end": {
+									"line": 23,
+									"column": 15
+								}
+							},
+							"name": "b"
+						}
+					},
+					"operator": "&&",
+					"right": {
+						"type": "TSInstantiationExpression",
+						"start": 1000,
+						"end": 1004,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 19
+							},
+							"end": {
+								"line": 23,
+								"column": 23
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 1000,
+							"end": 1001,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 19
+								},
+								"end": {
+									"line": 23,
+									"column": 20
+								}
+							},
+							"name": "f"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 1001,
+							"end": 1004,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 20
+								},
+								"end": {
+									"line": 23,
+									"column": 23
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 1002,
+									"end": 1003,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 21
+										},
+										"end": {
+											"line": 23,
+											"column": 22
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 1002,
+										"end": 1003,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 21
+											},
+											"end": {
+												"line": 23,
+												"column": 22
+											}
+										},
+										"name": "T"
+									}
+								}
+							]
+						}
+					}
+				},
+				"value": {
+					"type": "Identifier",
+					"name": "v",
+					"start": 1011,
+					"end": 1012,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 30,
+							"character": 1011
+						},
+						"end": {
+							"line": 23,
+							"column": 31,
+							"character": 1012
+						}
+					}
+				},
+				"error": null,
+				"pending": null,
+				"then": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 1013,
+							"end": 1016,
+							"expression": {
+								"type": "Identifier",
+								"start": 1014,
+								"end": 1015,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 33
+									},
+									"end": {
+										"line": 23,
+										"column": 34
+									}
+								},
+								"name": "v"
+							}
+						}
+					]
+				},
+				"catch": null
+			},
+			{
+				"type": "Text",
+				"start": 1024,
+				"end": 1025,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 1025,
+				"end": 1068,
+				"expression": {
+					"type": "LogicalExpression",
+					"start": 1034,
+					"end": 1048,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 9
+						},
+						"end": {
+							"line": 24,
+							"column": 23
+						}
+					},
+					"left": {
+						"type": "LogicalExpression",
+						"start": 1034,
+						"end": 1040,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 9
+							},
+							"end": {
+								"line": 24,
+								"column": 15
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 1034,
+							"end": 1035,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 9
+								},
+								"end": {
+									"line": 24,
+									"column": 10
+								}
+							},
+							"name": "a"
+						},
+						"operator": "||",
+						"right": {
+							"type": "Identifier",
+							"start": 1039,
+							"end": 1040,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 14
+								},
+								"end": {
+									"line": 24,
+									"column": 15
+								}
+							},
+							"name": "b"
+						}
+					},
+					"operator": "||",
+					"right": {
+						"type": "TSInstantiationExpression",
+						"start": 1044,
+						"end": 1048,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 19
+							},
+							"end": {
+								"line": 24,
+								"column": 23
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 1044,
+							"end": 1045,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 19
+								},
+								"end": {
+									"line": 24,
+									"column": 20
+								}
+							},
+							"name": "f"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 1045,
+							"end": 1048,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 20
+								},
+								"end": {
+									"line": 24,
+									"column": 23
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 1046,
+									"end": 1047,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 21
+										},
+										"end": {
+											"line": 24,
+											"column": 22
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 1046,
+										"end": 1047,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 21
+											},
+											"end": {
+												"line": 24,
+												"column": 22
+											}
+										},
+										"name": "T"
+									}
+								}
+							]
+						}
+					}
+				},
+				"value": {
+					"type": "Identifier",
+					"name": "v",
+					"start": 1055,
+					"end": 1056,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 30,
+							"character": 1055
+						},
+						"end": {
+							"line": 24,
+							"column": 31,
+							"character": 1056
+						}
+					}
+				},
+				"error": null,
+				"pending": null,
+				"then": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 1057,
+							"end": 1060,
+							"expression": {
+								"type": "Identifier",
+								"start": 1058,
+								"end": 1059,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 33
+									},
+									"end": {
+										"line": 24,
+										"column": 34
+									}
+								},
+								"name": "v"
+							}
+						}
+					]
+				},
+				"catch": null
+			},
+			{
+				"type": "Text",
+				"start": 1068,
+				"end": 1070,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1070,
+				"end": 1240,
+				"data": " `catch` does not continue a comparison for acorn-typescript, but tsv's own parser refuses a\n\tbare `f<T>` ahead of it, so the pair keeps the head readable to tsv. "
+			},
+			{
+				"type": "Text",
+				"start": 1240,
+				"end": 1241,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 1241,
+				"end": 1277,
+				"expression": {
+					"type": "TSInstantiationExpression",
+					"start": 1250,
+					"end": 1256,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 9
+						},
+						"end": {
+							"line": 28,
+							"column": 15
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 1250,
+						"end": 1253,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 9
+							},
+							"end": {
+								"line": 28,
+								"column": 12
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 1250,
+							"end": 1251,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 9
+								},
+								"end": {
+									"line": 28,
+									"column": 10
+								}
+							},
+							"name": "f"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"typeArguments": {
+						"type": "TSTypeParameterInstantiation",
+						"start": 1253,
+						"end": 1256,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 12
+							},
+							"end": {
+								"line": 28,
+								"column": 15
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeReference",
+								"start": 1254,
+								"end": 1255,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 13
+									},
+									"end": {
+										"line": 28,
+										"column": 14
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1254,
+									"end": 1255,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 13
+										},
+										"end": {
+											"line": 28,
+											"column": 14
+										}
+									},
+									"name": "T"
+								}
+							}
+						]
+					}
+				},
+				"value": null,
+				"error": {
+					"type": "Identifier",
+					"name": "e",
+					"start": 1264,
+					"end": 1265,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 23,
+							"character": 1264
+						},
+						"end": {
+							"line": 28,
+							"column": 24,
+							"character": 1265
+						}
+					}
+				},
+				"pending": null,
+				"then": null,
+				"catch": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 1266,
+							"end": 1269,
+							"expression": {
+								"type": "Identifier",
+								"start": 1267,
+								"end": 1268,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 26
+									},
+									"end": {
+										"line": 28,
+										"column": 27
+									}
+								},
+								"name": "e"
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1277,
+				"end": 1278,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 1278,
+				"end": 1308,
+				"expression": {
+					"type": "TSInstantiationExpression",
+					"start": 1287,
+					"end": 1291,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 9
+						},
+						"end": {
+							"line": 29,
+							"column": 13
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 1287,
+						"end": 1288,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 9
+							},
+							"end": {
+								"line": 29,
+								"column": 10
+							}
+						},
+						"name": "f"
+					},
+					"typeArguments": {
+						"type": "TSTypeParameterInstantiation",
+						"start": 1288,
+						"end": 1291,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 10
+							},
+							"end": {
+								"line": 29,
+								"column": 13
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeReference",
+								"start": 1289,
+								"end": 1290,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 11
+									},
+									"end": {
+										"line": 29,
+										"column": 12
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1289,
+									"end": 1290,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 11
+										},
+										"end": {
+											"line": 29,
+											"column": 12
+										}
+									},
+									"name": "T"
+								}
+							}
+						]
+					}
+				},
+				"value": null,
+				"error": null,
+				"pending": null,
+				"then": null,
+				"catch": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1299,
+							"end": 1300,
+							"raw": "a",
+							"data": "a"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1308,
+				"end": 1310,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1310,
+				"end": 1386,
+				"data": " Inside `<pre>` the head prints on one line and takes the same pair. "
+			},
+			{
+				"type": "Text",
+				"start": 1386,
+				"end": 1387,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1387,
+				"end": 1433,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 32,
+						"column": 1,
+						"character": 1388
+					},
+					"end": {
+						"line": 32,
+						"column": 4,
+						"character": 1391
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "EachBlock",
+							"start": 1392,
+							"end": 1427,
+							"expression": {
+								"type": "TSInstantiationExpression",
+								"start": 1400,
+								"end": 1404,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 13
+									},
+									"end": {
+										"line": 32,
+										"column": 17
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 1400,
+									"end": 1401,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 13
+										},
+										"end": {
+											"line": 32,
+											"column": 14
+										}
+									},
+									"name": "f"
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 1401,
+									"end": 1404,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 14
+										},
+										"end": {
+											"line": 32,
+											"column": 17
+										}
+									},
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 1402,
+											"end": 1403,
+											"loc": {
+												"start": {
+													"line": 32,
+													"column": 15
+												},
+												"end": {
+													"line": 32,
+													"column": 16
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 1402,
+												"end": 1403,
+												"loc": {
+													"start": {
+														"line": 32,
+														"column": 15
+													},
+													"end": {
+														"line": 32,
+														"column": 16
+													}
+												},
+												"name": "T"
+											}
+										}
+									]
+								}
+							},
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 1414,
+										"end": 1420,
+										"expression": {
+											"type": "Identifier",
+											"start": 1415,
+											"end": 1419,
+											"loc": {
+												"start": {
+													"line": 32,
+													"column": 28
+												},
+												"end": {
+													"line": 32,
+													"column": 32
+												}
+											},
+											"name": "item"
+										}
+									}
+								]
+							},
+							"context": {
+								"type": "Identifier",
+								"name": "item",
+								"start": 1409,
+								"end": 1413,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 22,
+										"character": 1409
+									},
+									"end": {
+										"line": 32,
+										"column": 26,
+										"character": 1413
+									}
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1433,
+				"end": 1434,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1434,
+				"end": 1478,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 33,
+						"column": 1,
+						"character": 1435
+					},
+					"end": {
+						"line": 33,
+						"column": 4,
+						"character": 1438
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "AwaitBlock",
+							"start": 1439,
+							"end": 1472,
+							"expression": {
+								"type": "TSInstantiationExpression",
+								"start": 1448,
+								"end": 1452,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 14
+									},
+									"end": {
+										"line": 33,
+										"column": 18
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 1448,
+									"end": 1449,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 14
+										},
+										"end": {
+											"line": 33,
+											"column": 15
+										}
+									},
+									"name": "f"
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 1449,
+									"end": 1452,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 15
+										},
+										"end": {
+											"line": 33,
+											"column": 18
+										}
+									},
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 1450,
+											"end": 1451,
+											"loc": {
+												"start": {
+													"line": 33,
+													"column": 16
+												},
+												"end": {
+													"line": 33,
+													"column": 17
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 1450,
+												"end": 1451,
+												"loc": {
+													"start": {
+														"line": 33,
+														"column": 16
+													},
+													"end": {
+														"line": 33,
+														"column": 17
+													}
+												},
+												"name": "T"
+											}
+										}
+									]
+								}
+							},
+							"value": {
+								"type": "Identifier",
+								"name": "v",
+								"start": 1459,
+								"end": 1460,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 25,
+										"character": 1459
+									},
+									"end": {
+										"line": 33,
+										"column": 26,
+										"character": 1460
+									}
+								}
+							},
+							"error": null,
+							"pending": null,
+							"then": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 1461,
+										"end": 1464,
+										"expression": {
+											"type": "Identifier",
+											"start": 1462,
+											"end": 1463,
+											"loc": {
+												"start": {
+													"line": 33,
+													"column": 28
+												},
+												"end": {
+													"line": 33,
+													"column": 29
+												}
+											},
+											"name": "v"
+										}
+									}
+								]
+							},
+							"catch": null
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1478,
+				"end": 1480,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1480,
+				"end": 1602,
+				"data": " Where the head's own `}` or `,` follows, nothing is joined to the close, and the pair strips\n\tin both formatters. "
+			},
+			{
+				"type": "Text",
+				"start": 1602,
+				"end": 1603,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "AwaitBlock",
+				"start": 1603,
+				"end": 1637,
+				"expression": {
+					"type": "TSInstantiationExpression",
+					"start": 1611,
+					"end": 1615,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 8
+						},
+						"end": {
+							"line": 37,
+							"column": 12
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 1611,
+						"end": 1612,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 8
+							},
+							"end": {
+								"line": 37,
+								"column": 9
+							}
+						},
+						"name": "f"
+					},
+					"typeArguments": {
+						"type": "TSTypeParameterInstantiation",
+						"start": 1612,
+						"end": 1615,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 9
+							},
+							"end": {
+								"line": 37,
+								"column": 12
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeReference",
+								"start": 1613,
+								"end": 1614,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 10
+									},
+									"end": {
+										"line": 37,
+										"column": 11
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1613,
+									"end": 1614,
+									"loc": {
+										"start": {
+											"line": 37,
+											"column": 10
+										},
+										"end": {
+											"line": 37,
+											"column": 11
+										}
+									},
+									"name": "T"
+								}
+							}
+						]
+					}
+				},
+				"value": {
+					"type": "Identifier",
+					"name": "v",
+					"start": 1624,
+					"end": 1625,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 21,
+							"character": 1624
+						},
+						"end": {
+							"line": 37,
+							"column": 22,
+							"character": 1625
+						}
+					}
+				},
+				"error": null,
+				"pending": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1616,
+							"end": 1617,
+							"raw": "a",
+							"data": "a"
+						}
+					]
+				},
+				"then": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 1626,
+							"end": 1629,
+							"expression": {
+								"type": "Identifier",
+								"start": 1627,
+								"end": 1628,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 24
+									},
+									"end": {
+										"line": 37,
+										"column": 25
+									}
+								},
+								"name": "v"
+							}
+						}
+					]
+				},
+				"catch": null
+			},
+			{
+				"type": "Text",
+				"start": 1637,
+				"end": 1638,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "KeyBlock",
+				"start": 1638,
+				"end": 1656,
+				"expression": {
+					"type": "TSInstantiationExpression",
+					"start": 1644,
+					"end": 1648,
+					"loc": {
+						"start": {
+							"line": 38,
+							"column": 6
+						},
+						"end": {
+							"line": 38,
+							"column": 10
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 1644,
+						"end": 1645,
+						"loc": {
+							"start": {
+								"line": 38,
+								"column": 6
+							},
+							"end": {
+								"line": 38,
+								"column": 7
+							}
+						},
+						"name": "f"
+					},
+					"typeArguments": {
+						"type": "TSTypeParameterInstantiation",
+						"start": 1645,
+						"end": 1648,
+						"loc": {
+							"start": {
+								"line": 38,
+								"column": 7
+							},
+							"end": {
+								"line": 38,
+								"column": 10
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeReference",
+								"start": 1646,
+								"end": 1647,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 8
+									},
+									"end": {
+										"line": 38,
+										"column": 9
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1646,
+									"end": 1647,
+									"loc": {
+										"start": {
+											"line": 38,
+											"column": 8
+										},
+										"end": {
+											"line": 38,
+											"column": 9
+										}
+									},
+									"name": "T"
+								}
+							}
+						]
+					}
+				},
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1649,
+							"end": 1650,
+							"raw": "a",
+							"data": "a"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1656,
+				"end": 1657,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 1657,
+				"end": 1677,
+				"expression": {
+					"type": "TSInstantiationExpression",
+					"start": 1664,
+					"end": 1668,
+					"loc": {
+						"start": {
+							"line": 39,
+							"column": 7
+						},
+						"end": {
+							"line": 39,
+							"column": 11
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 1664,
+						"end": 1665,
+						"loc": {
+							"start": {
+								"line": 39,
+								"column": 7
+							},
+							"end": {
+								"line": 39,
+								"column": 8
+							}
+						},
+						"name": "f"
+					},
+					"typeArguments": {
+						"type": "TSTypeParameterInstantiation",
+						"start": 1665,
+						"end": 1668,
+						"loc": {
+							"start": {
+								"line": 39,
+								"column": 8
+							},
+							"end": {
+								"line": 39,
+								"column": 11
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeReference",
+								"start": 1666,
+								"end": 1667,
+								"loc": {
+									"start": {
+										"line": 39,
+										"column": 9
+									},
+									"end": {
+										"line": 39,
+										"column": 10
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1666,
+									"end": 1667,
+									"loc": {
+										"start": {
+											"line": 39,
+											"column": 9
+										},
+										"end": {
+											"line": 39,
+											"column": 10
+										}
+									},
+									"name": "T"
+								}
+							}
+						]
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1669,
+							"end": 1670,
+							"raw": "a",
+							"data": "a"
+						}
+					]
+				},
+				"context": null
+			},
+			{
+				"type": "Text",
+				"start": 1677,
+				"end": 1678,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 1678,
+				"end": 1703,
+				"expression": {
+					"type": "TSInstantiationExpression",
+					"start": 1685,
+					"end": 1689,
+					"loc": {
+						"start": {
+							"line": 40,
+							"column": 7
+						},
+						"end": {
+							"line": 40,
+							"column": 11
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 1685,
+						"end": 1686,
+						"loc": {
+							"start": {
+								"line": 40,
+								"column": 7
+							},
+							"end": {
+								"line": 40,
+								"column": 8
+							}
+						},
+						"name": "f"
+					},
+					"typeArguments": {
+						"type": "TSTypeParameterInstantiation",
+						"start": 1686,
+						"end": 1689,
+						"loc": {
+							"start": {
+								"line": 40,
+								"column": 8
+							},
+							"end": {
+								"line": 40,
+								"column": 11
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeReference",
+								"start": 1687,
+								"end": 1688,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 9
+									},
+									"end": {
+										"line": 40,
+										"column": 10
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1687,
+									"end": 1688,
+									"loc": {
+										"start": {
+											"line": 40,
+											"column": 9
+										},
+										"end": {
+											"line": 40,
+											"column": 10
+										}
+									},
+									"name": "T"
+								}
+							}
+						]
+					}
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 1693,
+							"end": 1696,
+							"expression": {
+								"type": "Identifier",
+								"start": 1694,
+								"end": 1695,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 16
+									},
+									"end": {
+										"line": 40,
+										"column": 17
+									}
+								},
+								"name": "i"
+							}
+						}
+					]
+				},
+				"context": null,
+				"index": "i"
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 27,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 18,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 1,
+					"column": 27
+				}
+			},
+			"body": [],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

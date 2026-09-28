@@ -4,6 +4,7 @@
 // builders shared by the block and tag builders, and source position tracking
 // used in inline run grouping and multiline formatting decisions.
 
+use super::blocks_doc::AwaitShorthand;
 use crate::ast::internal::{EachBlock, EachKey, Fragment, FragmentNode};
 use crate::printer::{CommentRun, HeadExpr, Printer};
 use smallvec::{SmallVec, smallvec};
@@ -13,6 +14,46 @@ use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Comment, Span};
 use tsv_ts::{Expression, ExpressionKind};
+
+/// What a block head's own syntax prints right after its expression — the question the
+/// instantiation pair asks of the host ([`Printer::build_expression_doc_for_block`]).
+///
+/// A WORD there — the `{#each}` block's `as`, a shorthand `{#await}` block's `then` /
+/// `catch` — makes a head that prints ending on an instantiation's closing `>` take a pair
+/// ([`tsv_ts::prints_ending_on_instantiation_close`]): acorn-typescript, the parser Svelte
+/// reads the head with, gives up a type argument list ahead of a same-line word, so a bare
+/// `{#each f<T> as item}` is the comparison `f < T > as` and does not parse. (`catch` does
+/// not continue a comparison for acorn, but tsv's own parser refuses the bare head there,
+/// so the pair keeps tsv's output reparseable.) The constructors are the one statement of
+/// which heads are followed by a word.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum HeadTail {
+    /// The head's own syntax continues with a word.
+    Keyword,
+    /// A delimiter follows — the head's own `}`, or an `{#each}` with no `as` binding's
+    /// `,` — which joins nothing to the close.
+    Delimiter,
+}
+
+impl HeadTail {
+    /// An `{#each}` head is followed by its `as` exactly when it binds a context.
+    pub(super) fn of_each(block: &EachBlock<'_>) -> Self {
+        if block.context.is_some() {
+            Self::Keyword
+        } else {
+            Self::Delimiter
+        }
+    }
+
+    /// An `{#await}` head is followed by `then` / `catch` exactly in the shorthand forms.
+    pub(super) fn of_await(shorthand: AwaitShorthand) -> Self {
+        if shorthand == AwaitShorthand::None {
+            Self::Delimiter
+        } else {
+            Self::Keyword
+        }
+    }
+}
 
 /// Trailing-comment range end for an `{#each}` head expression: the start of whatever
 /// the head puts after the iterable — the `as`-pattern when there is one, else the
@@ -842,6 +883,7 @@ impl<'a> Printer<'a> {
     /// - `opening_offset` - Characters before the expression (e.g., 5 for `{#if `). Used to
     ///   calculate `first_line_offset` for width estimation.
     /// - `in_multiline_context` - Whether the block is on its own line (multiline) or inline
+    /// - `tail` - What the head's own syntax prints right after the expression ([`HeadTail`]).
     ///
     /// The embed and `remove_lines` above are all this builder owns; the comment runs, their
     /// hang verdict and the indent are [`Printer::assemble_head_expr`]'s.
@@ -857,6 +899,7 @@ impl<'a> Printer<'a> {
         span_end: u32,
         opening_offset: usize,
         in_multiline_context: bool,
+        tail: HeadTail,
     ) -> HeadExpr {
         let d = self.d();
         let frozen = self.honored_directive_in_gap(span_start, expr.span().start);
@@ -882,7 +925,14 @@ impl<'a> Printer<'a> {
 
         // Build expression doc tree
         let inner_doc = self.build_head_value_doc(expr, frozen, &embed);
-        let expr_doc = self.wrap_value_clarity_parens(expr, inner_doc);
+        // The instantiation pair and the assignment clarity pair are exclusive: the walk
+        // never descends into an assignment, so at most one of the two wraps the head.
+        let expr_doc =
+            if tail == HeadTail::Keyword && tsv_ts::prints_ending_on_instantiation_close(expr) {
+                d.parens(inner_doc)
+            } else {
+                self.wrap_value_clarity_parens(expr, inner_doc)
+            };
 
         // Apply remove_lines() only in INLINE contexts to prevent the condition
         // from being the first thing to break when there's other content on the line.
@@ -914,6 +964,7 @@ impl<'a> Printer<'a> {
         expr: &Expression<'_>,
         comment_end: u32,
         wrapping: bool,
+        tail: HeadTail,
     ) -> HeadExpr {
         self.build_expression_doc_for_block(
             expr,
@@ -921,6 +972,7 @@ impl<'a> Printer<'a> {
             comment_end,
             open.len(),
             wrapping,
+            tail,
         )
     }
 
@@ -937,6 +989,7 @@ impl<'a> Printer<'a> {
             key.span.end - 1,   // before ")"
             1,                  // "(" = 1 char (key is inside parens)
             wrapping,
+            HeadTail::Delimiter,
         )
     }
 

@@ -68,6 +68,7 @@ use expressions::assignment::{
 pub(crate) use expressions::assignment::{
     is_curried_arrow_chain, is_curried_arrow_chain_that_breaks,
 };
+pub(crate) use needs_parens::ends_with_instantiation_close;
 use needs_parens::{
     ParenContext, SecondTypeArgs, instantiation_keeps_pair_before_type_args, is_in_binary,
     needs_parens, prints_as_tsc_comparison,

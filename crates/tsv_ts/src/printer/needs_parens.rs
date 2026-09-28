@@ -18,14 +18,16 @@
 // - `printPathNoParens`'s caller (`print/index.js`, the application layer)
 
 use crate::ast::internal::{
-    AssignmentOperator, BinaryOperator, Expression, ExpressionKind, LiteralValue, TSKeywordKind,
-    TSType, TSTypeParameterInstantiation, UnaryOperator, UpdateOperator,
+    ArrowFunctionBody, AssignmentOperator, BinaryOperator, Expression, ExpressionKind,
+    LiteralValue, TSKeywordKind, TSType, TSTypeParameterInstantiation, UnaryOperator,
+    UpdateOperator,
 };
 use crate::printer::chain::child_stops_optional_chain;
 use crate::printer::class_expr_has_decorators;
 use crate::printer::comments::{
     left_side_child_is_parenthesized, next_significant_byte, paren_shell_close_after,
 };
+use crate::printer::expressions::conditional::ternary_branch_needs_parens;
 
 /// Context for parenthesization decisions
 ///
@@ -696,8 +698,19 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         // Arrow functions need parens because `(...args) => x as T` parses as `(...args) => (x as T)`
         // Ternary/assignment need parens: `(a ? b : c) as T` vs `a ? b : c as T` (different semantics)
         // Only angle-bracket assertions need parens here (as/satisfies are left-associative)
+        //
+        // One more pair is kept by the JOIN of two tokens rather than by kind — the
+        // instantiation-tail rule of the binary-left arm, with the keyword as the follower:
+        // an operand whose last printed token is a type argument list's `>` keeps its pair
+        // (`(f<T>) as T`, `(-f<T>) satisfies T`). tsc takes the list ahead of any binary
+        // operator, `as` and `satisfies` included, but acorn-typescript — the parser Svelte
+        // compiles with — gives it up ahead of any token that can start an expression on the
+        // same line, and a word can: bare, `f<T> as T` does not parse there (nor under tsv's
+        // own parser), and `f<T> as [T]` is the comparison `f < T > as[T]`. Prettier strips
+        // it ("Instantiation expression parens").
         ParenContext::TypeAssertion => {
             is_await_or_yield(expr)
+                || ends_with_instantiation_close(expr, in_for_init)
                 || matches!(
                     expr.kind,
                     ExpressionKind::BinaryExpression(_)
@@ -748,8 +761,9 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         // after the `>` — so `++(f<T>)` still strips. A BARE instantiation is the only
         // operand this clause can ever see: the precedence clauses ahead of it already
         // parenthesize every composite operand, so the join axis — the operand's
-        // rightmost printed token, `ends_with_instantiation_close` — is stated once at
-        // the binary rule, the one place it is live.
+        // rightmost printed token, `ends_with_instantiation_close` — is read only where a
+        // composite operand can reach it bare (a joining binary left, the left of `as` /
+        // `satisfies`, a `>`-led or `/=` assignment target).
         ParenContext::UpdateArgument { postfix } => {
             is_lower_precedence(expr)
                 || is_unary_or_update(expr)
@@ -1051,25 +1065,70 @@ pub(in crate::printer) const fn joins_a_trailing_angle_bracket(op: BinaryOperato
 
 /// Whether the LAST token `expr` prints is the closing `>` of an instantiation
 /// expression's type argument list — the instantiation itself, or a node whose
-/// rightmost child prints bare at its end (a binary's right operand, a prefix
-/// operator's argument, an angle-bracket assertion's operand). A child that takes its
-/// own pair BY PRECEDENCE in that position ends the operand on a `)` instead, so the
-/// walk stops there; every other node ends on a token of its own (`!`, `)`, `]`, a
+/// rightmost child prints bare at its end (a binary's printed right operand — the
+/// innermost one of a rebalanced same-operator logical chain — a prefix
+/// operator's argument, an angle-bracket assertion's operand, a conditional's
+/// alternate, an arrow's expression body, an `await` / `yield` argument). A child that
+/// takes its own pair in that position ends the operand on a `)` instead, so the walk
+/// stops there; every other node ends on a token of its own (`!`, `)`, `]`, `}`, a
 /// name, a literal). A shell the PRINTER retains for a comment is invisible here —
 /// the walk asks `needs_parens`, which does not see that decision — so such an
 /// operand takes a redundant outer pair, at this arm and at every other alike. The
 /// `new X<T>` spelling ends on the `()` the printer always emits, so it is not in
 /// the class, and `as` / `satisfies` end on a TYPE rather than on an expression, so
 /// nothing can re-lex their tail.
-fn ends_with_instantiation_close(expr: &Expression<'_>, in_for_init: bool) -> bool {
+///
+/// The conditional, arrow, `await` and `yield` descents are live only at a position
+/// that pairs none of those kinds — a Svelte block head, asked through
+/// [`crate::prints_ending_on_instantiation_close`]. Every `ParenContext` arm that reads
+/// this walk (a joining binary left, a `>`-led or `/=` assignment target, the left of
+/// `as` / `satisfies`) already pairs all four by kind, so there the walk only agrees
+/// with a pair the arm takes anyway: one pair, never two. An arrow's CONDITIONAL body is
+/// the one layout-dependent end — flat, the arrow prints it in a pair of its own, and
+/// broken it prints it bare — so the walk takes the broken answer, which costs a
+/// redundant outer pair in the flat layout and is sound in both.
+pub(crate) fn ends_with_instantiation_close(expr: &Expression<'_>, in_for_init: bool) -> bool {
     match &expr.kind {
         ExpressionKind::TSInstantiationExpression(_) => true,
+        ExpressionKind::ConditionalExpression(conditional) => {
+            !ternary_branch_needs_parens(conditional.alternate)
+                && ends_with_instantiation_close(conditional.alternate, in_for_init)
+        }
+        ExpressionKind::ArrowFunctionExpression(arrow) => match arrow.body {
+            // A sequence body prints its own pair; a conditional one takes the arrow's
+            // pair only when flat (see above), so it counts as bare.
+            ArrowFunctionBody::Expression(body) => {
+                let bare = matches!(body.kind, ExpressionKind::ConditionalExpression(_))
+                    || (!needs_parens(body, ParenContext::ArrowBody, in_for_init)
+                        && !matches!(body.kind, ExpressionKind::SequenceExpression(_)));
+                bare && ends_with_instantiation_close(body, in_for_init)
+            }
+            ArrowFunctionBody::BlockStatement(_) => false,
+        },
+        ExpressionKind::AwaitExpression(await_expr) => {
+            !needs_parens(
+                await_expr.argument,
+                ParenContext::AwaitArgument,
+                in_for_init,
+            ) && ends_with_instantiation_close(await_expr.argument, in_for_init)
+        }
+        ExpressionKind::YieldExpression(yield_expr) => {
+            yield_expr.argument.is_some_and(|argument| {
+                !needs_parens(argument, ParenContext::YieldArgument, in_for_init)
+                    && ends_with_instantiation_close(argument, in_for_init)
+            })
+        }
+        // The PRINTED right operand: a same-operator logical chain nested to the right
+        // (`a ?? (b ?? f<T>)`) prints rebalanced, with no pair (`a ?? b ?? f<T>`), so its
+        // last operand is the innermost right one (`rebalanced_right`, the view the binary
+        // printer reads). Every other operator's right operand is its own.
         ExpressionKind::BinaryExpression(binary) => {
+            let right = binary.rebalanced_right();
             let ctx = ParenContext::BinaryRight {
                 parent_op: binary.operator,
             };
-            !needs_parens(binary.right, ctx, in_for_init)
-                && ends_with_instantiation_close(binary.right, in_for_init)
+            !needs_parens(right, ctx, in_for_init)
+                && ends_with_instantiation_close(right, in_for_init)
         }
         ExpressionKind::UnaryExpression(unary) => {
             let ctx = ParenContext::UnaryArgument {

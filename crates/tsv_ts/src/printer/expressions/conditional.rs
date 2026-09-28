@@ -26,8 +26,9 @@ fn is_nullish_coalescing(expr: &internal::Expression<'_>) -> bool {
 /// needs-parentheses.js, the `ConditionalExpression` parent case). `as`/`satisfies`
 /// and an assignment bind tighter than `?:` so the parens are pure clarity (same
 /// AST); `??` is always parenthesized under a conditional. Shared by the inline and
-/// line-comment layouts so both branch paths agree.
-fn ternary_branch_needs_parens(expr: &internal::Expression<'_>) -> bool {
+/// line-comment layouts so both branch paths agree, and read by the instantiation-close
+/// walk (`ends_with_instantiation_close`), which descends into an alternate that prints bare.
+pub(in crate::printer) fn ternary_branch_needs_parens(expr: &internal::Expression<'_>) -> bool {
     matches!(
         expr.kind,
         internal::ExpressionKind::TSAsExpression(_)

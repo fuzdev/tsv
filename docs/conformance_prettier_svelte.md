@@ -841,6 +841,31 @@ the pair.
 
 - logical and conditional tails — [ts_head_paren_tail](../tests/fixtures/svelte/blocks/each/ts_head_paren_tail_svelte_prettier_divergence/)
 
+## Svelte: block-head instantiation before a head keyword
+
+**◆prettier_bug.** An `{#each}` head, or a shorthand `{#await … then}` head, that ends on an
+instantiation expression's closing `>` keeps the pair the author wrote in tsv: `{#each (f<T>) as
+item}`, `{#await (c ? a : f<T>) then v}`. prettier-plugin-svelte strips it, and the head's own
+keyword then follows the `>` — a word, which acorn-typescript (the parser Svelte hands the head
+to) reads as the continuation of a comparison: `{#each f<T> as item}` does not parse
+(`expected_token`), and prettier's own next pass throws on it. It is the head-keyword twin of
+the pair ahead of `as` / `satisfies` in an expression ([conformance_prettier_ts.md
+§TypeScript](./conformance_prettier_ts.md#typescript), "Instantiation expression parens"), read
+from what the head prints last: a prefix operator's argument, a binary's right operand, an
+angle-bracket assertion's operand, a conditional's alternate, an arrow's expression body, an
+`await` argument and the last operand of a right-nested same-operator logical chain (`a ?? (b ??
+f<T>)`, which prints rebalanced as `a ?? b ?? f<T>`) all end on the close, so the pair wraps the
+whole head (`{#each (-f<T>) as { a }}`). Where the head's own `}` or a `,` follows — a full-form
+`{#await}`, a `{#key}`, an `{#each}` with no `as` — the pair strips in both formatters.
+
+**◆design_choice.** A shorthand `{#await … catch}` head keeps its pair too (`{#await (f()<T>)
+catch e}`), but that cell is **not** a prettier bug: `catch` does not continue a comparison for
+acorn-typescript, so prettier's `{#await f()<T> catch e}` is the same tree to Svelte. tsv's own
+parser refuses the bare instantiation there (a tsv over-rejection), and the pair keeps tsv's
+output reparseable by tsv.
+
+- `{#each}` and shorthand `{#await}` heads — [head_instantiation_paren](../tests/fixtures/svelte/blocks/head_instantiation_paren_prettier_divergence/)
+
 ## Svelte: empty destructuring brace spacing
 
 **◆design_choice.** Non-empty object-destructure patterns in `{#each … as}`, `{#await … then}`, `{:then}`, and `{:catch}` binding positions space their braces in both formatters (`{a}` → `{ a }`), matching prettier-plugin-svelte under `bracketSpacing`. The lone remaining divergence is the **empty** pattern: tsv keeps tight braces (`{}`), prettier-plugin-svelte inserts a space (`{ }`). tsv's empty object braces stay tight everywhere — `bracketSpacing` only spaces braces around content, and an empty pattern has none — so this binding position follows the same universal empty-braces rule as an empty object literal (`{}`) and a TypeScript empty destructure (`const {} = x`, where both formatters already agree on `{}`).

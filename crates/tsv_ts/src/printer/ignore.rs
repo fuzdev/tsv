@@ -793,8 +793,9 @@ impl<'a> Printer<'a> {
     /// The sibling **instantiation** slice (`f<T>`) ends in `>` too and joins the same
     /// tails, but needs nothing here: its printed form carries the same bytes as the slice
     /// (there is no argument list to add), so the unfrozen verdict this seam ORs with —
-    /// `ends_with_instantiation_close` at a binary left, `NonNull`, a postfix update, a
-    /// chain base — already keeps the pair at every joining tail, frozen or not.
+    /// `ends_with_instantiation_close` at a binary left and at the left of `as` /
+    /// `satisfies`, `NonNull`, a postfix update, a chain base — already keeps the pair at
+    /// every joining tail, frozen or not.
     fn frozen_slice_absorbs_left_binding_suffix(
         &self,
         operand: &internal::Expression<'_>,

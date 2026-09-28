@@ -44,11 +44,28 @@
 //! from both ends: the followers a bare instantiation KEEPS as its `input.svelte`, and the
 //! ones neither parser admits (`f<T> > 1`, `f<T> >> 1`, `f<T> >>> 1`, `f<T>!`, and the
 //! `typeof f<T> > 1` that ends an operand on the same close) as its `input_invalid_*`.
+//!
+//! The same join with a WORD as the follower — `as` / `satisfies`, and a Svelte block head's
+//! own `as` / `then` — has the opposite parser split: tsc takes the list ahead of a binary
+//! operator, while acorn-typescript gives it up ahead of any same-line token that can start an
+//! expression. Where the bare spelling does not parse, the oracle-backed side is the fixtures
+//! `typescript_specific/generics/instantiation_paren_assertion_follow_prettier_divergence` and
+//! `svelte/blocks/head_instantiation_paren_prettier_divergence`. The spellings here are the
+//! ones whose bare form DOES parse — as a comparison (`f<T> as [T]` is `f < T > as[T]`,
+//! `{#await f<T> then}` a block with no `then` section) — so prettier's stripped output is
+//! no tsv fixed point and cannot be an `output_prettier.*`; plus an inner pair around a
+//! conditional's alternate in an `{#each}` head, whose prettier output loses a `)` and so
+//! lands on no documented form; plus an `await` head, which `svelte compile` refuses without
+//! `experimental.async`, leaving a variant's render check no oracle.
 
 fn format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse(source, &arena).expect("parse failed");
     tsv_ts::format(&program, source)
+}
+
+fn format_svelte(source: &str) -> String {
+    tsv_svelte::format_str(source).expect("format failed")
 }
 
 fn parses(source: &str) -> bool {
@@ -93,4 +110,72 @@ fn a_follower_that_re_lexes_is_not_repaired() {
             "the printed chain must reparse: {bare}"
         );
     }
+}
+
+#[test]
+fn an_assertion_keeps_the_pair_its_bare_spelling_would_misread() {
+    // Each pair is a fixed point, and each bare twin is a DIFFERENT program to tsv (and to
+    // acorn-typescript): the word after the close continues a comparison, and the type
+    // reads as an expression — an index, a subtraction, a tagged template.
+    for (kept, bare, misread) in [
+        (
+            "x = (f<T>) as [T];\n",
+            "x = f<T> as [T];\n",
+            "x = (f < T) > as[T];\n",
+        ),
+        (
+            "x = (f<T>) as -1;\n",
+            "x = f<T> as -1;\n",
+            "x = (f < T) > as - 1;\n",
+        ),
+        (
+            "x = (f<T>) as `t`;\n",
+            "x = f<T> as `t`;\n",
+            "x = (f < T) > as`t`;\n",
+        ),
+    ] {
+        assert_eq!(format(kept), kept, "the pair ahead of `as` must stay");
+        assert_eq!(format(bare), misread, "the bare spelling is a comparison");
+    }
+}
+
+#[test]
+fn a_block_head_keeps_the_pair_its_keyword_would_join() {
+    const HEAD: &str = "<script lang=\"ts\"></script>\n\n";
+    // The value-less `then`: bare, the head is the comparison `f < T > then`, a block
+    // with no `then` section at all.
+    let kept = format!("{HEAD}{{#await (f<T>) then}}a{{/await}}\n");
+    assert_eq!(
+        format_svelte(&kept),
+        kept,
+        "the pair ahead of `then` must stay"
+    );
+    let bare = format!("{HEAD}{{#await f<T> then}}a{{/await}}\n");
+    let misread = format!("{HEAD}{{#await (f < T) > then}}a{{/await}}\n");
+    assert_eq!(
+        format_svelte(&bare),
+        misread,
+        "the bare head is a comparison"
+    );
+
+    // An inner pair around a conditional's alternate moves out to the whole head, which
+    // is what the head prints last.
+    let inner = format!("{HEAD}{{#each c ? a : (f<T>) as item}}{{item}}{{/each}}\n");
+    let outer = format!("{HEAD}{{#each (c ? a : f<T>) as item}}{{item}}{{/each}}\n");
+    assert_eq!(
+        format_svelte(&inner),
+        outer,
+        "the pair wraps the whole head"
+    );
+    assert_eq!(format_svelte(&outer), outer, "and holds");
+
+    // An `await` head ends on its argument's close too. (Not a fixture cell: `svelte
+    // compile` refuses a template `await` without `experimental.async`, so the render
+    // check a variant needs has no oracle.)
+    let awaited = format!("{HEAD}{{#each (await f<T>) as item}}{{item}}{{/each}}\n");
+    assert_eq!(
+        format_svelte(&awaited),
+        awaited,
+        "the pair ahead of `as` must stay"
+    );
 }
