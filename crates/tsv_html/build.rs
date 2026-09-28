@@ -71,6 +71,18 @@ fn main() {
     }
 
     writeln!(f, "}};").unwrap();
+
+    // The longest name bounds the decoder's longest-prefix search, which would otherwise try
+    // every prefix of an arbitrarily long alphanumeric run.
+    let longest = entities.keys().map(String::len).max().unwrap();
+    writeln!(f).unwrap();
+    writeln!(
+        f,
+        "/// The byte length of the longest name in [`ENTITIES`] — no reference is longer, so a"
+    )
+    .unwrap();
+    writeln!(f, "/// name search need not look past it.").unwrap();
+    writeln!(f, "const LONGEST_ENTITY_NAME: usize = {longest};").unwrap();
 }
 
 /// Append one character to a Rust string literal body, escaped so the generated map

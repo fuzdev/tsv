@@ -214,12 +214,17 @@ fn decode_named_entity(rest: &str, is_attribute_value: bool) -> Option<(usize, &
     }
 
     // Otherwise (and for a semicolon that closed no reference — `&notit;` is `&not` + `it;`)
-    // the longest prefix of the run that names one wins.
-    let (longest_len, characters) = (1..=run_len).rev().find_map(|len| {
-        ENTITIES
-            .get(&run[..len])
-            .map(|&characters| (len, characters))
-    })?;
+    // the longest prefix of the run that names one wins. No name is longer than
+    // `LONGEST_ENTITY_NAME`, so the search starts there rather than at the run's end: from the
+    // end it hashed every prefix of the run, quadratic in a long alphanumeric run.
+    let (longest_len, characters) =
+        (1..=run_len.min(LONGEST_ENTITY_NAME))
+            .rev()
+            .find_map(|len| {
+                ENTITIES
+                    .get(&run[..len])
+                    .map(|&characters| (len, characters))
+            })?;
 
     // Check if we should decode in attribute context: don't decode if followed by '=' or an
     // ASCII alphanumeric — the spec's named-character-reference state, verbatim. The class is
@@ -315,6 +320,37 @@ mod tests {
         }
         assert_eq!(ENTITIES.len(), 2231);
         assert_eq!(two_character, 93);
+    }
+
+    /// `LONGEST_ENTITY_NAME` bounds the name search, so it must be the table's longest key:
+    /// shorter and a long name stops decoding.
+    #[test]
+    fn test_longest_entity_name() {
+        assert_eq!(
+            ENTITIES.keys().map(|name| name.len()).max(),
+            Some(LONGEST_ENTITY_NAME)
+        );
+        assert_eq!(
+            LONGEST_ENTITY_NAME,
+            "CounterClockwiseContourIntegral;".len()
+        );
+        assert_eq!(
+            decode_character_references("&CounterClockwiseContourIntegral;", false),
+            "\u{2233}"
+        );
+    }
+
+    /// A long alphanumeric run after an `&` names no reference and decodes to itself; the
+    /// search is bounded by the longest name, not the run.
+    #[test]
+    fn test_long_name_run() {
+        let text = format!("&{}", "a".repeat(10_000));
+        assert_eq!(decode_character_references(&text, false), text);
+        let text = format!("&amp{}", "a".repeat(10_000));
+        assert_eq!(
+            decode_character_references(&text, false),
+            format!("&{}", "a".repeat(10_000))
+        );
     }
 
     #[test]
