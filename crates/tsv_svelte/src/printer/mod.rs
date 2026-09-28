@@ -155,8 +155,11 @@ impl HoistedComments {
 }
 
 /// Append `ch` spelled as an uppercase-hex character reference (`&#xA0;`) — the one spelling
-/// both source rewrites use for a character the next parse would otherwise trim from the
-/// document's end ([`Printer::template_tail_respell`], `Printer::lifted_runs_source`).
+/// every respell the format path makes uses: a character the next parse would otherwise trim
+/// from the document's end ([`Printer::template_tail_respell`], `Printer::lifted_runs_source`),
+/// and the first character after a glued seam that would otherwise complete a reference the
+/// text before it left open (`lifted_runs::glued_seam_respell`, written by the lifted-run
+/// rewrite and by [`Printer::build_ignore_range_doc`]).
 fn push_char_reference(out: &mut String, ch: char) {
     let _ = write!(out, "&#x{:X};", u32::from(ch));
 }
@@ -2474,7 +2477,10 @@ impl<'a> Printer<'a> {
     /// the sections with the whitespace around them, leaving the one run of the author's that
     /// best separates the neighbours: source `</div>⏎⏎<script>…</script>⏎⏎<p>` ends at
     /// `</div>⏎⏎<p>`, and `{a} <script>…</script>{b}` at `{a} {b}`, since the section renders
-    /// nothing where it was written and the space is all that separates the two.
+    /// nothing where it was written and the space is all that separates the two. A glued cut
+    /// whose two texts would join into a character reference neither spelled writes the first
+    /// character after it as a reference instead (`x&amp` + `;y` → `x&amp&#x3B;y`,
+    /// [`lifted_runs::RangeCut::respell`]) — the one byte of the slice's text the cut changes.
     fn build_ignore_range_doc(&self, span: Span, hoisted: &[Span]) -> DocId {
         let mut sections: SmallVec<[Span; 4]> = hoisted
             .iter()
@@ -2503,7 +2509,13 @@ impl<'a> Printer<'a> {
                 lifted_runs::RangeSeam::Space => parts.push(self.d().text(" ")),
                 lifted_runs::RangeSeam::Glued => {}
             }
-            cursor = cut.removed.end;
+            // The text after the cut would complete a reference with the text before it.
+            if let Some(ch) = cut.respell {
+                let mut reference = String::new();
+                push_char_reference(&mut reference, ch);
+                parts.push(self.d().text_pooled(&reference));
+            }
+            cursor = cut.resume();
         }
         if cursor < span.end {
             parts.push(self.source_span_covering_comments_doc(Span::new(cursor, span.end)));

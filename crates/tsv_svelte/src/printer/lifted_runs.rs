@@ -32,6 +32,13 @@
 //!   — and the lines the section itself occupied are not a blank line either, so a newline on
 //!   each side of it is one line break.
 //!
+//! A glued seam joins two texts into one, and a text is decoded whole, so the join can complete
+//! a character reference neither half spelled: `x&amp` + `;y` rendered `x&;y` read apart and
+//! reads `x&y` joined. The first character after such a seam is spelled as a reference
+//! ([`glued_seam_respell`]), which decodes to itself and whose `&` ends the reference in front of
+//! it, so the joined text decodes as the halves did — asked of the text joined so far, since one
+//! text can run through several seams.
+//!
 //! A run at the document's start or end (template content on one side only) has no pair of
 //! neighbours to join: the whitespace beside it stays where it is, at the fragment's edge, which
 //! trims it. A section inside a `format-ignore` range moves too, cut out by [`range_cuts`] — the
@@ -134,12 +141,86 @@ fn ws_only_between(source: &str, a: Span, b: Span) -> bool {
     internal::is_collapsible_ws_str(&source[a.end as usize..b.start as usize])
 }
 
+/// Whether `b` can continue a character reference an `&` has opened: a name's letters and
+/// digits, or the `#` of a numeric one.
+fn continues_reference(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'#'
+}
+
+/// The character reference `text` leaves open at its end — the run from its last `&`, when every
+/// byte after that `&` could still continue one — or `""` when none is open.
+fn open_reference(text: &str) -> &str {
+    match text.bytes().rposition(|b| !continues_reference(b)) {
+        Some(at) if text.as_bytes()[at] == b'&' => &text[at..],
+        _ => "",
+    }
+}
+
+/// Advance `open` — the reference a joined text leaves open so far ([`open_reference`]) — past
+/// the next `piece` of that text.
+fn extend_open_reference(open: &mut String, piece: &str) {
+    if piece.bytes().all(continues_reference) {
+        // The piece continues whatever reference is open, and opens none of its own.
+        if !open.is_empty() {
+            open.push_str(piece);
+        }
+    } else {
+        open.clear();
+        open.push_str(open_reference(piece));
+    }
+}
+
+/// The character to spell as a reference at a glued seam ([module docs](self)): `right`'s first
+/// character, when the reference `left` leaves open would read on into `right` once the two are
+/// one text.
+///
+/// Svelte decodes each text node on its own, so two texts the join glues decoded apart: `x&amp`
+/// and `;y` rendered `x&;y`, and `x&am` and `p;y` rendered `x&amp;y`. Joined, the next parse
+/// decodes them as one text, and both read `x&y`. Spelled as a reference (`x&amp&#x3B;y`,
+/// `x&am&#x70;;y`), the first character after the seam decodes to itself, and the `&` that opens
+/// it ends the reference in front of it, so the joined text decodes as the two did.
+///
+/// The test is whether the two sides decode differently joined than apart, over the open
+/// reference and the run at `right`'s head of bytes that could continue one: nothing outside
+/// those two windows can take part, since a reference consumes no byte outside that class and
+/// the `&` opening another ends it. `left` is the text joined so far, not the neighbour alone, so
+/// a reference split across several seams is caught at the one that completes it.
+///
+/// The test reads tsv's decoder, which reads a reference at least as far as Svelte's does, so it
+/// never misses a seam Svelte's would complete; it can only answer yes where Svelte's would not.
+/// That happens for one code, zero: Svelte leaves `&#0…` as literal text (its `!code` guard)
+/// where tsv decodes it to NUL, so `x&#0` + `0y` is respelled `x&#0&#x30;y` although Svelte reads
+/// the join as it reads the halves. The respell decodes to the character it replaces, so the page
+/// is the same either way.
+fn glued_seam_respell(left: &str, right: &str) -> Option<char> {
+    let open = open_reference(left);
+    if open.is_empty() {
+        return None;
+    }
+    let continuation_len = right
+        .bytes()
+        .position(|b| !(continues_reference(b) || b == b';'))
+        .unwrap_or(right.len());
+    if continuation_len == 0 {
+        return None;
+    }
+    let continuation = &right[..continuation_len];
+    let decode = |text: &str| tsv_html::decode_character_references(text, false);
+    let apart = decode(open) + &decode(continuation);
+    // The continuation is ASCII, so its first byte is `right`'s first character.
+    (decode(&format!("{open}{continuation}")) != apart).then(|| char::from(right.as_bytes()[0]))
+}
+
 /// One cut a `format-ignore` range's slice makes to let the hoisted sections written in it go:
 /// the source it removes, and what stands in that place ([`range_cuts`]).
 pub(super) struct RangeCut {
     /// The sections and the whitespace on either side of them.
     pub(super) removed: Span,
     pub(super) seam: RangeSeam,
+    /// The character after `removed`, spelled as a reference in its place and stepped over, when
+    /// the seam is glued and the text before the cut leaves open a reference that character would
+    /// continue ([`glued_seam_respell`]).
+    pub(super) respell: Option<char>,
 }
 
 /// What joins the two neighbours of a [`RangeCut`].
@@ -151,6 +232,14 @@ pub(super) enum RangeSeam {
     Space,
     /// Nothing: no whitespace separates the neighbours.
     Glued,
+}
+
+impl RangeCut {
+    /// Where the slice resumes after the cut: past `removed`, and past the character `respell`
+    /// has written in its place.
+    pub(super) fn resume(&self) -> u32 {
+        self.removed.end + self.respell.map_or(0, |ch| ch.len_utf8() as u32)
+    }
 }
 
 impl RangeSeam {
@@ -180,12 +269,22 @@ impl RangeSeam {
 /// inside a lifted run does — so it wins only where neither edge run holds what it does:
 /// whitespace alone, or a line break.
 ///
+/// A glued seam joins the texts on its two sides into one, so the first character after it is
+/// spelled as a reference when the text joined so far leaves one open that the character would
+/// continue ([`RangeCut::respell`], [`glued_seam_respell`]) — asked across the range's cuts, since
+/// one text can run through several.
+///
 /// A run before the sections stops at `floor`, which is the start marker's end for the first
 /// cut; a run after them stops at the next non-whitespace byte, which the end marker guarantees
-/// comes before the range closes.
+/// comes before the range closes. Nothing before `floor` can take part in a seam's reference:
+/// the range's start marker stands between it and the first section.
 pub(super) fn range_cuts(source: &str, floor: u32, sections: &[Span]) -> SmallVec<[RangeCut; 2]> {
     let mut cuts = SmallVec::new();
     let mut floor = floor;
+    // The reference the joined slice leaves open so far, and where the slice's next uncut piece
+    // starts.
+    let mut open = String::new();
+    let mut piece_start = floor;
     let mut i = 0;
     while i < sections.len() {
         let j = group_end(sections, i, |&a, &b| ws_only_between(source, a, b));
@@ -221,10 +320,25 @@ pub(super) fn range_cuts(source: &str, floor: u32, sections: &[Span]) -> SmallVe
                 };
             }
         }
-        cuts.push(RangeCut {
+        extend_open_reference(
+            &mut open,
+            &source[piece_start as usize..before.start as usize],
+        );
+        let respell = match seam {
+            RangeSeam::Glued => glued_seam_respell(&open, &source[after.end as usize..]),
+            RangeSeam::Kept(_) | RangeSeam::Space => None,
+        };
+        // Whitespace ends the open reference, and so does the respell's closing `;`.
+        if !matches!(seam, RangeSeam::Glued) || respell.is_some() {
+            open.clear();
+        }
+        let cut = RangeCut {
             removed: Span::new(before.start, after.end),
             seam,
-        });
+            respell,
+        };
+        piece_start = cut.resume();
+        cuts.push(cut);
         floor = after.end;
         i = j + 1;
     }
@@ -239,7 +353,9 @@ impl Printer<'_> {
     /// in that order, then the template with every run taken out, then the `<style>` run. The
     /// document's end reads the way the original's did: what the original parse trimmed from it
     /// (JavaScript's `trimEnd`, [`tsv_lang::trim_end_js_whitespace`]) stays out, and a character
-    /// the original rendered that the template now ends on is spelled as a reference.
+    /// the original rendered that the template now ends on is spelled as a reference. A character
+    /// after a glued seam that would complete a reference the text before it left open is
+    /// spelled as one too ([`glued_seam_respell`]).
     pub(super) fn lifted_runs_source(
         &self,
         root: &internal::Root<'_>,
@@ -308,7 +424,10 @@ impl Printer<'_> {
                 for cut in range_cuts(source, cursor as u32, &sections) {
                     template.push_str(&source[cursor..cut.removed.start as usize]);
                     template.push_str(cut.seam.text(source));
-                    cursor = cut.removed.end as usize;
+                    if let Some(ch) = cut.respell {
+                        push_char_reference(&mut template, ch);
+                    }
+                    cursor = cut.resume() as usize;
                 }
                 i = j + 1;
                 continue;
@@ -338,6 +457,13 @@ impl Printer<'_> {
                 template.push_str(&source[cursor..before.start as usize]);
                 template.push_str(sep.spelling());
                 cursor = after.end as usize;
+                // The seam glues two texts into one; the text joined so far is `template`.
+                if sep == Separation::Glued
+                    && let Some(ch) = glued_seam_respell(&template, &source[cursor..])
+                {
+                    push_char_reference(&mut template, ch);
+                    cursor += ch.len_utf8();
+                }
             } else {
                 template.push_str(&source[cursor..first as usize]);
                 cursor = last as usize;

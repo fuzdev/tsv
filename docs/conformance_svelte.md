@@ -439,7 +439,10 @@ them an upstream candidate:
 - **A zero code** — `if (!code) return match` guards the decode against an unknown or
   unparseable reference and catches a code of `0` as the other falsy value, so `&#0;` (any
   spelling) stays literal text. tsv decodes it, to NUL — the sentinel above, rather than the
-  spec's U+FFFD, so that a zero code and a surrogate half keep the same answer.
+  spec's U+FFFD, so that a zero code and a surrogate half keep the same answer. The formatter's
+  glued-seam respell asks the same decoder, so a zero code split by a hoisted section is
+  respelled where Svelte would read the join as it reads the halves
+  ([lifted_run_glued_entity_zero_code](../tests/fixtures/svelte/script/ordering/lifted_run_glued_entity_zero_code_svelte_prettier_divergence/)).
 - **An omitted plane** — the spec replaces only a surrogate half and a value past U+10FFFF;
   Svelte's `validate_code` enumerates the planes it will emit (0–2, plus two ranges of plane
   14) and drops the rest to NUL, destroying assigned characters — `&#x30000;` is CJK
