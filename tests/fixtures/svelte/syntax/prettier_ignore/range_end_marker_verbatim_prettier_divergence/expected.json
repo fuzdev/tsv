@@ -1,0 +1,198 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 411,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 90,
+				"data": " Whitespace before the end marker is part of the range, and the marker stays on it "
+			},
+			{
+				"type": "Text",
+				"start": 90,
+				"end": 91,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Comment",
+				"start": 91,
+				"end": 121,
+				"data": " prettier-ignore-start "
+			},
+			{
+				"type": "RegularElement",
+				"start": 121,
+				"end": 140,
+				"name": "b",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 31,
+						"character": 122
+					},
+					"end": {
+						"line": 2,
+						"column": 32,
+						"character": 123
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 125,
+							"end": 136,
+							"raw": "text1 text2",
+							"data": "text1 text2"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 140,
+				"end": 141,
+				"raw": " ",
+				"data": " "
+			},
+			{
+				"type": "Comment",
+				"start": 141,
+				"end": 169,
+				"data": " prettier-ignore-end "
+			},
+			{
+				"type": "Text",
+				"start": 169,
+				"end": 182,
+				"raw": "text3 text4\n\n",
+				"data": "text3 text4\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 182,
+				"end": 212,
+				"data": " prettier-ignore-start "
+			},
+			{
+				"type": "RegularElement",
+				"start": 212,
+				"end": 255,
+				"name": "b",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 31,
+						"character": 213
+					},
+					"end": {
+						"line": 4,
+						"column": 32,
+						"character": 214
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 216,
+							"end": 251,
+							"raw": "text1 text2 text3 text4 text5 text6",
+							"data": "text1 text2 text3 text4 text5 text6"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 255,
+				"end": 256,
+				"raw": " ",
+				"data": " "
+			},
+			{
+				"type": "Comment",
+				"start": 256,
+				"end": 284,
+				"data": " prettier-ignore-end "
+			},
+			{
+				"type": "Text",
+				"start": 284,
+				"end": 297,
+				"raw": "text7\ntext8\n\n",
+				"data": "text7\ntext8\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 297,
+				"end": 327,
+				"data": " prettier-ignore-start "
+			},
+			{
+				"type": "RegularElement",
+				"start": 327,
+				"end": 370,
+				"name": "b",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 31,
+						"character": 328
+					},
+					"end": {
+						"line": 7,
+						"column": 32,
+						"character": 329
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 331,
+							"end": 366,
+							"raw": "text1 text2 text3 text4 text5 text6",
+							"data": "text1 text2 text3 text4 text5 text6"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 370,
+				"end": 371,
+				"raw": "\t",
+				"data": "\t"
+			},
+			{
+				"type": "Comment",
+				"start": 371,
+				"end": 399,
+				"data": " prettier-ignore-end "
+			},
+			{
+				"type": "Text",
+				"start": 399,
+				"end": 410,
+				"raw": "text7\ntext8",
+				"data": "text7\ntext8"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

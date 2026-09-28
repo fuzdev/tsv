@@ -620,6 +620,16 @@ In Svelte templates, a pair of range markers preserves every node between them:
 <!-- format-ignore-end -->
 ```
 
+Everything from the start marker through the end marker is printed byte for byte,
+the whitespace in front of the end marker included — with two exceptions: a
+`<script>`, `<style>` or `<svelte:options>` written inside the range still moves to
+its usual place in the component, cut out of the range together with the weaker of
+the whitespace runs beside it, and line endings are folded to `\n` as everywhere
+else. The whitespace after the end marker is laid out as it is after any comment:
+inline content glued to the marker stays glued, a space before inline content stays
+a space while the line fits, a block element takes its own line whether glued or
+spaced, and a line break or blank line is kept.
+
 A range only takes effect at the top level of the template; markers nested inside
 an element are treated as ordinary comments.
 

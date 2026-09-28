@@ -2325,9 +2325,10 @@ impl<'a> Printer<'a> {
     ///   shared builder builds them in inline context (see `root_inline_run_block_starts`).
     /// - **`format-ignore` ranges (B6):** `<!-- format-ignore-start -->` … `-end` is a
     ///   *root-only* directive (it does not activate inside an element), so the content is
-    ///   split at top-level ranges: each range emits its source verbatim, the surrounding
-    ///   segments go through the shared builder. (Single-node `format-ignore` is handled by
-    ///   the shared builder itself.)
+    ///   split at top-level ranges: each range emits its source verbatim up to its end marker,
+    ///   and the surrounding segments go through the shared builder — the end marker heading the
+    ///   segment after it, glued to the slice ([`Printer::build_range_tail_doc`]). (Single-node
+    ///   `format-ignore` is handled by the shared builder itself.)
     fn print_root_fragment(
         &mut self,
         fragment: &internal::Fragment<'_>,
@@ -2383,6 +2384,9 @@ impl<'a> Printer<'a> {
         // templates are one segment.
         let mut out: DocBuf = DocBuf::new();
         let mut seg_start = 0;
+        // Whether the segment starting at `seg_start` is a range's tail — headed by its end
+        // marker, and so glued to the frozen slice before it (`build_range_tail_doc`).
+        let mut seg_is_range_tail = false;
         let mut i = 0;
         while i < nodes.len() {
             // A comment printed with its (hoisted) section — `skip_indices` indexes the full
@@ -2391,47 +2395,66 @@ impl<'a> Printer<'a> {
             // sitting **mid-template** (template content on both sides) leaves its comment
             // interior to the slice. Drop it here so the shared builder doesn't re-emit it as
             // template content (it is already printed with its section). The gap is re-bridged
-            // with the same boundary-aware separator the `format-ignore` range path uses.
+            // with `hoisted_comment_separator`.
             if skip_indices.contains(&(start + i)) {
                 if nodes[seg_start..i]
                     .iter()
                     .any(|n| !n.is_whitespace_only_text())
                 {
-                    out.push(self.build_nodes_doc_multiline(&nodes[seg_start..i]));
-                    if let Some(sep) = self.range_trailing_separator(nodes, i) {
+                    out.push(self.build_segment_doc(&nodes[seg_start..i], seg_is_range_tail));
+                    // TODO: this bridge still reads the hoisted comment's follower through
+                    // `hoisted_comment_separator`, which answers adjacency with a hardline — a
+                    // rendered space between two glued neighbours. It is reachable only when the
+                    // lifted-runs rewrite declines (`LiftRuns::Declined`: the rewritten source
+                    // fails to parse, in practice only past the size limit), since the rewrite
+                    // otherwise takes every mid-template section and its comments out of the
+                    // template. The range tail answers the same question by letting the shared
+                    // builder lay out the gap (`build_range_tail_doc`); this one needs its own
+                    // fixture cycle.
+                    if let Some(sep) = self.hoisted_comment_separator(nodes, i) {
                         out.push(sep);
                     }
                 }
+                seg_is_range_tail = false;
                 seg_start = i + 1;
                 i += 1;
                 continue;
             }
             if let Some(range_end) = ranges.end_of(start + i).map(|end| end - start) {
                 // Segment up to and including the start comment (it prints normally).
-                out.push(self.build_nodes_doc_multiline(&nodes[seg_start..=i]));
-                // Verbatim source from just after the start comment through the end
-                // comment — emit the slice as a span, no allocation.
+                out.push(self.build_segment_doc(&nodes[seg_start..=i], seg_is_range_tail));
+                // Verbatim source from just after the start comment up to the end comment —
+                // emit the slice as a span, no allocation.
                 let raw_start = nodes[i].span().end;
-                let raw_end = nodes[range_end].span().end;
+                let raw_end = nodes[range_end].span().start;
                 out.push(self.build_ignore_range_doc(Span::new(raw_start, raw_end), hoisted));
-                // The whitespace after the end comment is trimmed by the next segment's
-                // boundary, so re-emit it as the separator before that segment.
-                if let Some(sep) = self.range_trailing_separator(nodes, range_end) {
-                    out.push(sep);
-                }
-                seg_start = range_end + 1;
+                // The end comment heads the next segment rather than ending the slice, so the
+                // shared builder lays out the whitespace after it — the only bytes of the range's
+                // boundary that are the printer's — exactly as it does after any comment.
+                seg_start = range_end;
+                seg_is_range_tail = true;
                 i = range_end + 1;
                 continue;
             }
             i += 1;
         }
         if seg_start < nodes.len() {
-            out.push(self.build_nodes_doc_multiline(&nodes[seg_start..]));
+            out.push(self.build_segment_doc(&nodes[seg_start..], seg_is_range_tail));
         }
 
         if !out.is_empty() {
             let doc = self.d().concat(&out);
             self.render_doc_immediate(doc);
+        }
+    }
+
+    /// One root segment's doc: a range's tail ([`Printer::build_range_tail_doc`]) when its end
+    /// marker heads it, else the shared multiline builder.
+    fn build_segment_doc(&self, nodes: &[FragmentNode<'_>], range_tail: bool) -> DocId {
+        if range_tail {
+            self.build_range_tail_doc(nodes)
+        } else {
+            self.build_nodes_doc_multiline(nodes)
         }
     }
 
@@ -2517,29 +2540,29 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// The separator to emit after a `format-ignore` range, before the next segment: the
-    /// whitespace immediately following the end comment (which the next segment's boundary
-    /// trim would otherwise drop). A blank line → `literalline` (the un-indented blank) +
-    /// `hardline`; a single newline / adjacency → `hardline`. `None` when nothing follows.
+    /// The separator bridging a mid-template hoisted-section comment the root segmentation
+    /// dropped, before the next segment: the whitespace immediately following the comment (which
+    /// the next segment's boundary trim would otherwise drop). A blank line → `literalline` (the
+    /// un-indented blank) + `hardline`; a single newline / adjacency → `hardline`. `None` when
+    /// nothing follows.
     ///
     /// "Immediately following" is the whole rule, so the blank is read off the next node's
     /// **leading** whitespace run ([`text::has_leading_blank_line`]) rather than its text as a
     /// whole. A total newline count answers a different question and fabricates: trailing text
-    /// that merely spans two lines (`…-end -->⏎text1⏎text2`) reaches 2 newlines without the
-    /// author writing a blank, and a blank *inside* that text (`…-end -->⏎text1⏎⏎text2`) belongs
-    /// to the text — relaying it here would relocate the author's blank onto the seam. The
-    /// behavior matches an ordinary preceding comment, which is the parity target.
-    fn range_trailing_separator(
+    /// that merely spans two lines (`-->⏎text1⏎text2`) reaches 2 newlines without the author
+    /// writing a blank, and a blank *inside* that text (`-->⏎text1⏎⏎text2`) belongs to the text —
+    /// relaying it here would relocate the author's blank onto the seam.
+    fn hoisted_comment_separator(
         &self,
         nodes: &[FragmentNode<'_>],
-        range_end: usize,
+        comment_idx: usize,
     ) -> Option<DocId> {
-        if range_end + 1 >= nodes.len() {
+        if comment_idx + 1 >= nodes.len() {
             return None;
         }
         let d = self.d();
         let blank = matches!(
-            &nodes[range_end + 1],
+            &nodes[comment_idx + 1],
             FragmentNode::Text(t) if text::has_leading_blank_line(t.raw(self.source))
         );
         Some(if blank {

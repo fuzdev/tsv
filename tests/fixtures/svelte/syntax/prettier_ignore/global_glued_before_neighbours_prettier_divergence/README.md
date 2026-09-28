@@ -3,14 +3,16 @@
 A frozen global `svelte:*` element with whitespace after it, whatever stands in front of its
 directive: the directive starting its line after a block element, a component glued to the
 directive, a space before the directive. In each the boundary after the element is a line
-break, as it is after the element unfrozen; a `prettier-ignore-start` / `-end` range around the
-element is the control that already takes that break.
+break, as it is after the element unfrozen. A `prettier-ignore-start` / `-end` range around the
+element is not this rule's: the range ends at its end marker, a comment, and a space after a
+comment is kept while the line fits
+([range_end_space_follower](../range_end_space_follower_prettier_divergence/)).
 
 Prettier keeps each spelling of that whitespace as its own stable form; tsv converges them on the
 break.
 
-- `prettier_variant_space_after.svelte` — every element, and the range, followed by a space:
-  prettier keeps it, tsv normalizes it to `input.svelte`.
+- `prettier_variant_space_after.svelte` — every element followed by a space: prettier keeps it,
+  tsv normalizes it to `input.svelte`.
 
 Both render identically.
 

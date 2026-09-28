@@ -11,6 +11,7 @@
 // in `element_analysis.rs`. The shared types (`BoundaryMode`, `ElementLayout`,
 // `ElementKind`, `ElementContext`) are defined here and used by both.
 
+use super::fragment_doc::LeadingEdge;
 use crate::ast::internal::{self, FragmentNode, is_collapsible_ws_char};
 use crate::printer::Printer;
 use crate::printer::classification::element::has_raw_content;
@@ -933,7 +934,7 @@ impl<'a> Printer<'a> {
             self.build_container_content_doc(parts.nodes)
         } else {
             let multiline = boundary == BoundaryMode::Hard && ctx.multiline.is_multiline();
-            self.build_nodes_doc_trimmed(parts.nodes, multiline)
+            self.build_nodes_doc_trimmed(parts.nodes, multiline, LeadingEdge::Trimmed)
         }
     }
 

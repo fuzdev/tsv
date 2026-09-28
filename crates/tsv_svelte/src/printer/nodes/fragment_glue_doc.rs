@@ -8,6 +8,7 @@
 // dispatches into these at each glued boundary it meets.
 
 use super::element_doc::{BoundaryMode, PreparedElement};
+use super::fragment_doc::LeadingEdge;
 use super::helpers::is_control_flow_block;
 use crate::ast::internal::{FragmentNode, is_collapsible_ws_char};
 use crate::printer::Printer;
@@ -79,18 +80,20 @@ impl<'a> Printer<'a> {
     /// whitespace sits at its edge *inside* it. Asking only the first is the mistake
     /// [`Self::glued_comment_run_text`] documents from the other direction.
     ///
-    /// Two positions are never glued however the bytes fall: the fragment's own content edge
-    /// (`idx <= content_start`), whose boundary belongs to the parent and is trimmed, and a
-    /// predecessor that owns its own line ([`Self::is_own_line_declaration`]), which supplies the
-    /// break itself.
+    /// The fragment's own content edge (`idx <= content_start`) is not a byte question: its
+    /// boundary is the one `leading_edge` names — the parent's, trimmed and never glued, or the
+    /// frozen slice a root range tail continues, always glued ([`LeadingEdge`]). A predecessor
+    /// that owns its own line ([`Self::is_own_line_declaration`]) is never glued either, since it
+    /// supplies the break itself.
     pub(super) fn leading_boundary_glued(
         &self,
         nodes: &[FragmentNode<'_>],
         idx: usize,
         content_start: usize,
+        leading_edge: LeadingEdge,
     ) -> bool {
         if idx <= content_start {
-            return false;
+            return leading_edge == LeadingEdge::Glued;
         }
         let Some(j) = idx.checked_sub(1) else {
             return false;

@@ -11,7 +11,7 @@
 // between its neighbours) and `handle_content_text_child` (a content text owns
 // a fill, and the questions are about its own two boundary runs).
 
-use super::fragment_doc::{DeferredBoundary, text_starts_with_linebreak};
+use super::fragment_doc::{DeferredBoundary, LeadingEdge, text_starts_with_linebreak};
 use super::helpers::{is_control_flow_block, is_inline_content};
 use crate::ast::internal::{FragmentNode, Text, split_collapsible_ws, text_edge_newlines};
 use crate::printer::Printer;
@@ -91,6 +91,10 @@ pub(super) struct TextChildContext {
     /// Carried on the context rather than recomputed per child: the question is per-FRAGMENT, and
     /// asking it per node would rescan the sibling list at every text (O(n²) on a long fragment).
     pub(super) content_bounds: (usize, usize),
+    /// What stands in front of the fragment's first content node — per-fragment like
+    /// `content_bounds`, and read with it wherever the boundary in front of a unit is asked
+    /// ([`Printer::leading_boundary_glued`]).
+    pub(super) leading_edge: LeadingEdge,
     /// A byte-glued HTML-comment run immediately preceding this text
     /// ([`Printer::glued_comment_run_text`]), already built as one doc by the caller and **not**
     /// pushed as a sibling — this handler fuses it into the fill's first item instead, so the unit
@@ -196,6 +200,7 @@ impl<'a> Printer<'a> {
             multiline,
             run_has_prose,
             content_bounds,
+            leading_edge,
             prev_sibling_head,
             ..
         } = ctx;
@@ -229,8 +234,12 @@ impl<'a> Printer<'a> {
         // Both arms below ask it, so one run's interior does not depend on WHY its container
         // went multiline — a hold in one arm alone is the two-pass cycle `bug371` hit.
         let arm_hold = |child_docs: &mut DocBuf, deferred: &mut DeferredBoundary| {
-            if !self.leading_boundary_glued(trimmed_nodes, prev_sibling_head, content_bounds.0)
-                && let Some(last_doc) = child_docs.pop()
+            if !self.leading_boundary_glued(
+                trimmed_nodes,
+                prev_sibling_head,
+                content_bounds.0,
+                leading_edge,
+            ) && let Some(last_doc) = child_docs.pop()
             {
                 let d = self.d();
                 let flagged = self.rejoin_inside_leading_wrap(last_doc, |el| {
@@ -578,6 +587,7 @@ impl<'a> Printer<'a> {
             multiline,
             run_has_prose,
             content_bounds,
+            leading_edge,
             glued_prefix,
             prev_sibling_head,
             ..
@@ -777,8 +787,12 @@ impl<'a> Printer<'a> {
             // are skipped, so a blank-line run can arrive too — the exact count keeps a blank
             // out of the layout-keyed rule, which is defined over the single-newline spelling.
             let authored_newline = leading_newlines == 1;
-            let glued_head =
-                self.leading_boundary_glued(trimmed_nodes, prev_sibling_head, content_bounds.0);
+            let glued_head = self.leading_boundary_glued(
+                trimmed_nodes,
+                prev_sibling_head,
+                content_bounds.0,
+                leading_edge,
+            );
             if authored_newline && !prev_is_tag && !separator_like_text && !glued_head {
                 // AN AUTHORED NEWLINE AFTER AN ELEMENT/COMPONENT FOLLOWS THE UNIT'S RENDERED
                 // LAYOUT. The boundary builds exactly like the space spelling — the run's own
@@ -1125,7 +1139,12 @@ impl<'a> Printer<'a> {
         // carry the shape.
         let unit_head = glued_prefix.map_or(i, |(_, head)| head);
         let glued_lead = (glued_prefix.is_some() || !has_leading_ws)
-            && self.leading_boundary_glued(trimmed_nodes, unit_head, content_bounds.0);
+            && self.leading_boundary_glued(
+                trimmed_nodes,
+                unit_head,
+                content_bounds.0,
+                leading_edge,
+            );
 
         // Build fill for this text node's words.
         // leading_line: fill starts with line() (text after expression tag)

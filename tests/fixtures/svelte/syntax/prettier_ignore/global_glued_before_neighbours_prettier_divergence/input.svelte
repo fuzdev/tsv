@@ -15,7 +15,3 @@ text2
 <!-- a space before the directive -->
 text3 <!-- prettier-ignore --><svelte:head>  <title>text4</title>  </svelte:head>
 text5
-
-<!-- control: a range around the element -->
-text6<!-- prettier-ignore-start --><svelte:body /><!-- prettier-ignore-end -->
-text7

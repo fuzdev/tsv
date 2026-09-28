@@ -19,6 +19,22 @@ use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::is_format_ignore_directive;
 
+/// What stands in front of a fragment's first content node — the one fact about the fragment's
+/// leading boundary its own nodes cannot say. Read by [`Printer::leading_boundary_glued`] at the
+/// content edge, the one position its byte test cannot answer.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum LeadingEdge {
+    /// The parent's boundary, trimmed: nothing is printed against the first node, so a break may
+    /// land in front of it. Every element, block body and special element, and the template root.
+    Trimmed,
+    /// The first node continues bytes already printed on its line: the root segment that a
+    /// `format-ignore` range's end marker heads ([`Printer::build_range_tail_doc`]). The marker
+    /// is part of the freeze, the last bytes of the range, so nothing may separate it from the
+    /// frozen slice before it — a break there would rewrite the range, and inject a rendered
+    /// space wherever the slice ends in content.
+    Glued,
+}
+
 /// The treatment of an inline child doc's LEADING boundary, decided at the unit's head — the
 /// argument to [`Printer::push_inline_child_doc`]. Five mutually exclusive cases. The SPACED ones
 /// are one boundary told apart by the FOLLOWER — whether it owns a fill for the separator to be
@@ -192,10 +208,13 @@ impl<'a> Printer<'a> {
     ///   went multiline ([`MultilineCause`](super::element_doc::MultilineCause)) is not an input
     ///   here: nothing in the fragment reads it, and its one reader, the sibling-`>` dangle, reads
     ///   it off the element's context.
+    /// - `leading_edge`: what stands in front of the first content node ([`LeadingEdge`]) —
+    ///   [`LeadingEdge::Trimmed`] for every caller but the root range tail.
     pub(super) fn build_nodes_doc_trimmed(
         &self,
         nodes: &[FragmentNode<'_>],
         multiline: bool,
+        leading_edge: LeadingEdge,
     ) -> DocId {
         let _fragment = self.enter_fragment();
         let d = self.d();
@@ -419,6 +438,7 @@ impl<'a> Printer<'a> {
                         multiline,
                         run_has_prose: Self::run_is_prose(run_words),
                         content_bounds,
+                        leading_edge,
                         glued_prefix: pending_glued_prefix.take(),
                         prev_sibling_head,
                     },
@@ -481,7 +501,12 @@ impl<'a> Printer<'a> {
                     LeadBoundary::SpacedHeld
                 } else if prev_text_ws {
                     LeadBoundary::Spaced
-                } else if self.leading_boundary_glued(trimmed_nodes, i, content_bounds.0) {
+                } else if self.leading_boundary_glued(
+                    trimmed_nodes,
+                    i,
+                    content_bounds.0,
+                    leading_edge,
+                ) {
                     LeadBoundary::Glued
                 } else {
                     LeadBoundary::Plain
@@ -1694,7 +1719,20 @@ impl<'a> Printer<'a> {
     /// `splitTextToDocs` boundary hardlines, the control-flow-block `in_multiline_context` /
     /// root-inline-run dispatch, and the sibling-`>` dangle).
     pub(crate) fn build_nodes_doc_multiline(&self, nodes: &[FragmentNode<'_>]) -> DocId {
-        self.build_nodes_doc_trimmed(nodes, true)
+        self.build_nodes_doc_trimmed(nodes, true, LeadingEdge::Trimmed)
+    }
+
+    /// Build the root segment a `format-ignore` range's **end marker** heads — the marker and the
+    /// template after it, up to the next range or the end.
+    ///
+    /// The marker is an HTML comment, so the boundary after it is laid out exactly as the shared
+    /// builder lays out the boundary after any comment: a glued follower stays glued, a space is
+    /// the follower's own per-width wrap, a line break or blank is kept. What differs is the
+    /// boundary IN FRONT of it: the marker belongs to the freeze, so it stays on the line the
+    /// frozen slice ends on ([`LeadingEdge::Glued`]), and a text fused behind it breaks at its
+    /// first internal space instead of dropping the marker to a fresh line.
+    pub(crate) fn build_range_tail_doc(&self, nodes: &[FragmentNode<'_>]) -> DocId {
+        self.build_nodes_doc_trimmed(nodes, true, LeadingEdge::Glued)
     }
 
     /// Build the content of a **whitespace-collapsing container** (`<table>`, `<select>`, … —

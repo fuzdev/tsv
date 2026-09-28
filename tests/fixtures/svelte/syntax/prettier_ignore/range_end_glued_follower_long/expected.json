@@ -1,0 +1,253 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 926,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 218,
+				"data": " Text glued to a range's end marker: the marker and the first word stay on the line the frozen\nslice ends on, and the run wraps at its first space. The whole line fits at exactly 100; at 101\nthe last word wraps "
+			},
+			{
+				"type": "Text",
+				"start": 218,
+				"end": 219,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Comment",
+				"start": 219,
+				"end": 249,
+				"data": " prettier-ignore-start "
+			},
+			{
+				"type": "RegularElement",
+				"start": 249,
+				"end": 280,
+				"name": "b",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 31,
+						"character": 250
+					},
+					"end": {
+						"line": 4,
+						"column": 32,
+						"character": 251
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 253,
+							"end": 276,
+							"raw": "text1 text2 text3 text4",
+							"data": "text1 text2 text3 text4"
+						}
+					]
+				}
+			},
+			{
+				"type": "Comment",
+				"start": 280,
+				"end": 308,
+				"data": " prettier-ignore-end "
+			},
+			{
+				"type": "Text",
+				"start": 308,
+				"end": 321,
+				"raw": "text5 text6\n\n",
+				"data": "text5 text6\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 321,
+				"end": 351,
+				"data": " prettier-ignore-start "
+			},
+			{
+				"type": "RegularElement",
+				"start": 351,
+				"end": 383,
+				"name": "b",
+				"name_loc": {
+					"start": {
+						"line": 6,
+						"column": 31,
+						"character": 352
+					},
+					"end": {
+						"line": 6,
+						"column": 32,
+						"character": 353
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 355,
+							"end": 379,
+							"raw": "text1 text2 text3 text4x",
+							"data": "text1 text2 text3 text4x"
+						}
+					]
+				}
+			},
+			{
+				"type": "Comment",
+				"start": 383,
+				"end": 411,
+				"data": " prettier-ignore-end "
+			},
+			{
+				"type": "Text",
+				"start": 411,
+				"end": 424,
+				"raw": "text5\ntext6\n\n",
+				"data": "text5\ntext6\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 424,
+				"end": 498,
+				"data": " A longer run wraps again, with content glued before the range too "
+			},
+			{
+				"type": "Text",
+				"start": 498,
+				"end": 504,
+				"raw": "\ntext0",
+				"data": "\ntext0"
+			},
+			{
+				"type": "Comment",
+				"start": 504,
+				"end": 534,
+				"data": " prettier-ignore-start "
+			},
+			{
+				"type": "RegularElement",
+				"start": 534,
+				"end": 559,
+				"name": "b",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 36,
+						"character": 535
+					},
+					"end": {
+						"line": 10,
+						"column": 37,
+						"character": 536
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 538,
+							"end": 555,
+							"raw": "text1 text2 text3",
+							"data": "text1 text2 text3"
+						}
+					]
+				}
+			},
+			{
+				"type": "Comment",
+				"start": 559,
+				"end": 587,
+				"data": " prettier-ignore-end "
+			},
+			{
+				"type": "Text",
+				"start": 587,
+				"end": 687,
+				"raw": "text4 text5\ntext6 text7 text8 text9 text10 text11 text12 text13 text14 text15 text16 text17 text18\n\n",
+				"data": "text4 text5\ntext6 text7 text8 text9 text10 text11 text12 text13 text14 text15 text16 text17 text18\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 687,
+				"end": 778,
+				"data": " A frozen slice past the print width: the glued first word still has no break point "
+			},
+			{
+				"type": "Text",
+				"start": 778,
+				"end": 779,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Comment",
+				"start": 779,
+				"end": 809,
+				"data": " prettier-ignore-start "
+			},
+			{
+				"type": "RegularElement",
+				"start": 809,
+				"end": 884,
+				"name": "b",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 31,
+						"character": 810
+					},
+					"end": {
+						"line": 14,
+						"column": 32,
+						"character": 811
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 813,
+							"end": 880,
+							"raw": "text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11",
+							"data": "text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11"
+						}
+					]
+				}
+			},
+			{
+				"type": "Comment",
+				"start": 884,
+				"end": 912,
+				"data": " prettier-ignore-end "
+			},
+			{
+				"type": "Text",
+				"start": 912,
+				"end": 925,
+				"raw": "text12\ntext13",
+				"data": "text12\ntext13"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

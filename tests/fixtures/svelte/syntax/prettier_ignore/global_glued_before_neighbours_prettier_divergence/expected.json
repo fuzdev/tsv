@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 650,
+	"end": 519,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -342,64 +342,9 @@
 			{
 				"type": "Text",
 				"start": 512,
-				"end": 520,
-				"raw": "\ntext5\n\n",
-				"data": "\ntext5\n\n"
-			},
-			{
-				"type": "Comment",
-				"start": 520,
-				"end": 564,
-				"data": " control: a range around the element "
-			},
-			{
-				"type": "Text",
-				"start": 564,
-				"end": 570,
-				"raw": "\ntext6",
-				"data": "\ntext6"
-			},
-			{
-				"type": "Comment",
-				"start": 570,
-				"end": 600,
-				"data": " prettier-ignore-start "
-			},
-			{
-				"type": "SvelteBody",
-				"start": 600,
-				"end": 615,
-				"name": "svelte:body",
-				"name_loc": {
-					"start": {
-						"line": 20,
-						"column": 36,
-						"character": 601
-					},
-					"end": {
-						"line": 20,
-						"column": 47,
-						"character": 612
-					}
-				},
-				"attributes": [],
-				"fragment": {
-					"type": "Fragment",
-					"nodes": []
-				}
-			},
-			{
-				"type": "Comment",
-				"start": 615,
-				"end": 643,
-				"data": " prettier-ignore-end "
-			},
-			{
-				"type": "Text",
-				"start": 643,
-				"end": 649,
-				"raw": "\ntext7",
-				"data": "\ntext7"
+				"end": 518,
+				"raw": "\ntext5",
+				"data": "\ntext5"
 			}
 		]
 	},
