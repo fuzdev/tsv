@@ -255,6 +255,37 @@ pub enum DocNode {
     /// Force any pending LineSuffix content to be flushed
     LineSuffixBoundary,
 
+    /// The END of an embedded document: past this node the line belongs to the HOST
+    /// (a Svelte template island's closer, a block head's `as`), so a
+    /// [`LineSuffix`](DocNode::LineSuffix) still pending here has no line end of this
+    /// document left to flush at.
+    ///
+    /// Render: with a suffix pending it flushes the run and, when the run ends in a `//`,
+    /// ends the line at this node's indent — the host token that follows then opens the
+    /// next line, shedding the one separator space it would have had after the value.
+    /// With nothing pending it is inert.
+    ///
+    /// Fits: with a suffix pending it is the hard line the flush will render, so a group
+    /// measured FLAT across it does not fit (the group enclosing the island breaks, as a
+    /// `//` the author wrote there breaks it), while a group that closes BEFORE it — the
+    /// value's own groups — measures to it with the pending suffix's width charged, and
+    /// fits if that does: the line ends here. That second half is where it parts from
+    /// [`LineSuffixBoundary`](DocNode::LineSuffixBoundary), whose look-ahead answer is
+    /// "does not fit" and would break every group the deferred run sits in.
+    ///
+    /// The run's shape is read statically when the node is built
+    /// ([`DocArena::pending_run_at_end`]), since the fits walk resolves no text:
+    /// `run_width` is what the flush puts on the line it ends, and `run_breaks` whether the
+    /// flush holds a `//` at all — a run of blocks alone flushes inline and ends nothing.
+    ///
+    /// The render records whether a run flushed here under the node's own id, which an
+    /// [`DocArena::if_break_with_id`] reads ([`DocArena::embed_end`]).
+    EmbedEnd {
+        run_width: u16,
+        run_breaks: bool,
+        dedent_closer: bool,
+    },
+
     /// Force parent group to break
     BreakParent,
 
@@ -1154,6 +1185,299 @@ const PRELUDE: &[(&str, u16)] = &[
     (" &", 2),
     ("=>", 2),
 ];
+
+/// The static shape of a deferred run still pending at a doc's end
+/// ([`DocArena::pending_run_at_end`]), as an [`DocNode::EmbedEnd`] flushes it: every comment
+/// behind no `//` glued onto the line (an own-line one loses its break), every comment behind
+/// a `//` on a line of its own.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PendingRun {
+    /// Columns the flush puts on the line it starts on — through the first `//`, which
+    /// ends that line.
+    pub width: u16,
+    /// The run holds a `//`: flushing it ends a line.
+    pub has_line_comment: bool,
+    /// The run's last comment is a `//`: the host's closer cannot follow it on its line.
+    pub ends_in_line_comment: bool,
+    /// No layout can flush the run before the doc's end: no breakable line follows it, in
+    /// any `if_break` arm or conditional-group state. `false` — the run reaches the end
+    /// only in SOME layouts (a hugged last argument whose list may still break) — is a
+    /// verdict only the render can settle.
+    pub certain: bool,
+}
+
+/// Where the walk stands with respect to a deferred run.
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+enum RunQueue {
+    /// Nothing is queued, or every queued run met a flush point.
+    #[default]
+    Empty,
+    /// A run is queued and no layout has flushed it since.
+    Pending,
+    /// A run is queued, and some layout may have flushed it already: a breakable line
+    /// passed, or an `if_break` arm or a conditional-group state flushes it.
+    MaybeFlushed,
+}
+
+/// The state [`DocArena::pending_run_at_end`]'s walk threads in emission order.
+#[derive(Clone, Copy, Default)]
+struct SuffixWalk {
+    queue: RunQueue,
+    /// A [`DocNode::FlushBreak`] was passed: the next soft or normal line breaks.
+    flush_armed: bool,
+    /// The pending run's shape so far.
+    run: PendingRun,
+    /// The run's first line is complete (a `//` ended it): later widths are not on it.
+    width_done: bool,
+}
+
+impl SuffixWalk {
+    fn pending(self) -> bool {
+        self.queue != RunQueue::Empty
+    }
+
+    /// Join the outcomes of two alternative layouts from one starting state.
+    fn either(a: Self, b: Self) -> Self {
+        match (a.pending(), b.pending()) {
+            (true, true) if a.queue == RunQueue::Pending && b.queue == RunQueue::Pending => a,
+            (true, _) => Self {
+                queue: RunQueue::MaybeFlushed,
+                ..a
+            },
+            (false, true) => Self {
+                queue: RunQueue::MaybeFlushed,
+                ..b
+            },
+            (false, false) => a,
+        }
+    }
+}
+
+/// What [`DocArena::may_end_on_comment_text`]'s walk has seen last.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum LastLeaf {
+    /// No printed leaf yet.
+    Nothing,
+    /// Code.
+    Code,
+    /// A comment, in at least one layout.
+    Comment,
+}
+
+impl LastLeaf {
+    /// Join two alternative layouts from one starting state, toward [`Self::Comment`].
+    fn either(a: Self, b: Self) -> Self {
+        if a == Self::Comment || b == Self::Comment {
+            Self::Comment
+        } else if a == Self::Code || b == Self::Code {
+            Self::Code
+        } else {
+            Self::Nothing
+        }
+    }
+}
+
+/// The arena storage [`DocArena::pending_run_at_end`] reads.
+struct WalkStore<'a> {
+    nodes: &'a [DocNode],
+    children: &'a [DocId],
+    pool: &'a str,
+    source: &'a str,
+}
+
+impl WalkStore<'_> {
+    fn suffix_walk(&self, id: DocId, mut state: SuffixWalk) -> SuffixWalk {
+        match &self.nodes[id.index()] {
+            DocNode::LineSuffix(inner) => {
+                if !state.pending() {
+                    state.run = PendingRun::default();
+                    state.width_done = false;
+                }
+                state.queue = RunQueue::Pending;
+                self.suffix_payload(*inner, &mut state);
+            }
+            DocNode::Line(LineKind::Hard | LineKind::Literal)
+            | DocNode::MultilineText { .. }
+            | DocNode::LineSuffixBoundary => {
+                state.queue = RunQueue::Empty;
+                state.flush_armed = false;
+            }
+            DocNode::Line(LineKind::Soft | LineKind::Normal) => {
+                if state.flush_armed {
+                    state.queue = RunQueue::Empty;
+                    state.flush_armed = false;
+                } else if state.pending() {
+                    state.queue = RunQueue::MaybeFlushed;
+                }
+            }
+            DocNode::FlushBreak => state.flush_armed = true,
+            DocNode::Indent(inner) | DocNode::Dedent(inner) => {
+                state = self.suffix_walk(*inner, state);
+            }
+            DocNode::AlignRoot { contents, .. }
+            | DocNode::Align { contents, .. }
+            | DocNode::IndentIfBreak { contents, .. }
+            | DocNode::GatedState { contents, .. } => {
+                state = self.suffix_walk(*contents, state);
+            }
+            DocNode::Group {
+                contents,
+                expanded_states,
+                ..
+            } => {
+                let start = state;
+                state = self.suffix_walk(*contents, start);
+                for &alt in expanded_states.resolve(self.children) {
+                    state = SuffixWalk::either(state, self.suffix_walk(alt, start));
+                }
+            }
+            DocNode::WithContext { doc, .. } => {
+                state = self.suffix_walk(*doc, state);
+            }
+            DocNode::IfBreak {
+                break_doc,
+                flat_doc,
+                ..
+            } => {
+                let broken = self.suffix_walk(*break_doc, state);
+                let flat = self.suffix_walk(*flat_doc, state);
+                state = SuffixWalk::either(flat, broken);
+            }
+            DocNode::Concat(range) | DocNode::Fill(range) => {
+                for &kid in range.resolve(self.children) {
+                    state = self.suffix_walk(kid, state);
+                }
+            }
+            DocNode::Text(_)
+            | DocNode::EmbedEnd { .. }
+            | DocNode::BreakParent
+            | DocNode::FlowProbeEnd => {}
+        }
+        state
+    }
+
+    fn last_leaf(&self, id: DocId, state: LastLeaf) -> LastLeaf {
+        match &self.nodes[id.index()] {
+            DocNode::Text(t) => {
+                let text = super::types::resolve_text(t, Some(self.source), self.pool);
+                let text = text.trim_start();
+                if text.is_empty() {
+                    state
+                } else if text.starts_with("/*") || text.starts_with("//") {
+                    LastLeaf::Comment
+                } else {
+                    LastLeaf::Code
+                }
+            }
+            DocNode::MultilineText { .. } => LastLeaf::Comment,
+            DocNode::Indent(inner) | DocNode::Dedent(inner) => self.last_leaf(*inner, state),
+            DocNode::AlignRoot { contents, .. }
+            | DocNode::Align { contents, .. }
+            | DocNode::IndentIfBreak { contents, .. }
+            | DocNode::GatedState { contents, .. } => self.last_leaf(*contents, state),
+            DocNode::Group {
+                contents,
+                expanded_states,
+                ..
+            } => {
+                let mut out = self.last_leaf(*contents, state);
+                for &alt in expanded_states.resolve(self.children) {
+                    out = LastLeaf::either(out, self.last_leaf(alt, state));
+                }
+                out
+            }
+            DocNode::WithContext { doc, .. } => self.last_leaf(*doc, state),
+            DocNode::IfBreak {
+                break_doc,
+                flat_doc,
+                ..
+            } => LastLeaf::either(
+                self.last_leaf(*break_doc, state),
+                self.last_leaf(*flat_doc, state),
+            ),
+            DocNode::Concat(range) | DocNode::Fill(range) => {
+                let mut state = state;
+                for &kid in range.resolve(self.children) {
+                    state = self.last_leaf(kid, state);
+                }
+                state
+            }
+            DocNode::LineSuffix(_)
+            | DocNode::Line(_)
+            | DocNode::LineSuffixBoundary
+            | DocNode::EmbedEnd { .. }
+            | DocNode::BreakParent
+            | DocNode::FlushBreak
+            | DocNode::FlowProbeEnd => state,
+        }
+    }
+
+    /// Read one suffix payload into the run: its leaves in order, a leading break dropped
+    /// (with a space in its place) when the payload glues — nothing, or no `//`, ahead of it.
+    fn suffix_payload(&self, id: DocId, state: &mut SuffixWalk) {
+        let glues = !state.run.ends_in_line_comment;
+        let mut leaves: SmallVec<[DocId; 8]> = SmallVec::new();
+        self.leaves(id, &mut leaves);
+        let mut opening = true;
+        for leaf in leaves {
+            match &self.nodes[leaf.index()] {
+                DocNode::Line(_) => {
+                    if !(opening && glues) {
+                        state.width_done = true;
+                    }
+                }
+                DocNode::Text(t) => {
+                    let text = super::types::resolve_text(t, Some(self.source), self.pool);
+                    if text.is_empty() {
+                        continue;
+                    }
+                    if opening && glues && !state.width_done && !text.starts_with(' ') {
+                        // The glued comment's separator, standing in for its dropped break.
+                        state.run.width = state.run.width.saturating_add(1);
+                    }
+                    opening = false;
+                    let is_line = text.starts_with("//");
+                    if !state.width_done {
+                        let w = match t.cached_width() {
+                            CachedWidth::Width(w) => w,
+                            CachedWidth::HasNewline { first_width } => first_width,
+                        };
+                        state.run.width = state.run.width.saturating_add(w);
+                    }
+                    if !text.trim().is_empty() {
+                        state.run.ends_in_line_comment = is_line;
+                    }
+                    if is_line {
+                        state.run.has_line_comment = true;
+                        state.width_done = true;
+                    }
+                }
+                _ => {
+                    opening = false;
+                    state.run.ends_in_line_comment = false;
+                    state.width_done = true;
+                }
+            }
+        }
+    }
+
+    /// The emitted leaves of a suffix payload, in order.
+    fn leaves(&self, id: DocId, out: &mut SmallVec<[DocId; 8]>) {
+        match &self.nodes[id.index()] {
+            DocNode::Concat(range) | DocNode::Fill(range) => {
+                for &kid in range.resolve(self.children) {
+                    self.leaves(kid, out);
+                }
+            }
+            DocNode::Indent(inner) | DocNode::Dedent(inner) => self.leaves(*inner, out),
+            DocNode::AlignRoot { contents, .. }
+            | DocNode::Align { contents, .. }
+            | DocNode::Group { contents, .. } => self.leaves(*contents, out),
+            DocNode::BreakParent | DocNode::FlushBreak | DocNode::FlowProbeEnd => {}
+            _ => out.push(id),
+        }
+    }
+}
 
 /// Fixed ids of the singleton nodes seeded ahead of [`PRELUDE`]'s statics, in seeding order.
 const PRELUDE_EMPTY: u32 = 0;
@@ -2838,6 +3162,125 @@ impl DocArena {
         DocId(PRELUDE_LINE_SUFFIX_BOUNDARY)
     }
 
+    /// The end of an embedded document ([`DocNode::EmbedEnd`]): a pending
+    /// [`Self::line_suffix`] flushes here and ends the line, since past this point the line
+    /// is the host's.
+    ///
+    /// `run` is the pending run's static shape ([`Self::pending_run_at_end`]); `None` — a
+    /// run the static reading did not see — measures as a zero-width run that breaks.
+    /// `dedent_closer` puts the break that ends the run one level out from the node's own
+    /// indent: the closer that follows sits outside an indent the value is in.
+    ///
+    /// The returned id names the node ([`GroupId::doc`] is the doc to place) and keys what
+    /// the render found there: an [`Self::if_break_with_id`] on it takes its break arm
+    /// exactly when a run flushed at this node — when the value, as rendered, ends on a
+    /// comment (a host's terminator that must stand between a comment and its closer).
+    pub fn embed_end(&self, run: Option<PendingRun>, dedent_closer: bool) -> GroupId {
+        let (run_width, run_breaks) = run.map_or((0, true), |r| (r.width, r.has_line_comment));
+        GroupId::of(self.alloc(DocNode::EmbedEnd {
+            run_width,
+            run_breaks,
+            dedent_closer,
+        }))
+    }
+
+    /// Whether `id`'s last printed leaf can be a COMMENT — a text that opens `/*` or `//`,
+    /// or a multi-line text (a block comment's reprint) — in some layout, as opposed to
+    /// code. Deferred runs ([`DocNode::LineSuffix`]) are not leaves here: where they flush
+    /// is [`Self::pending_run_at_end`]'s question. A static reading, conservative toward
+    /// "yes": each alternative (an `if_break` arm, a conditional group's state) is read,
+    /// and one ending on a comment answers for all.
+    pub fn may_end_on_comment_text(&self, id: DocId, source: &str) -> bool {
+        let nodes = self.nodes.borrow();
+        let children = self.children.borrow();
+        let pool = self.text_pool.borrow();
+        let store = WalkStore {
+            nodes: &nodes,
+            children: &children,
+            pool: &pool,
+            source,
+        };
+        store.last_leaf(id, LastLeaf::Nothing) == LastLeaf::Comment
+    }
+
+    /// Whether `id`'s subtree holds a [`DocNode::LineSuffix`] — a deferred run that may
+    /// still be pending when the subtree ends. A plain walk, for a caller that has already
+    /// established the subtree holds a comment at all.
+    pub fn holds_line_suffix(&self, id: DocId) -> bool {
+        let nodes = self.nodes.borrow();
+        let children = self.children.borrow();
+        let mut stack: SmallVec<[DocId; 16]> = SmallVec::new();
+        stack.push(id);
+        while let Some(id) = stack.pop() {
+            match &nodes[id.index()] {
+                DocNode::LineSuffix(_) => return true,
+                DocNode::Indent(inner) | DocNode::Dedent(inner) => stack.push(*inner),
+                DocNode::AlignRoot { contents, .. }
+                | DocNode::Align { contents, .. }
+                | DocNode::IndentIfBreak { contents, .. } => stack.push(*contents),
+                DocNode::GatedState { contents, .. } => stack.push(*contents),
+                DocNode::Group {
+                    contents,
+                    expanded_states,
+                    ..
+                } => {
+                    stack.push(*contents);
+                    stack.extend_from_slice(expanded_states.resolve(&children));
+                }
+                DocNode::IfBreak {
+                    break_doc,
+                    flat_doc,
+                    ..
+                } => {
+                    stack.push(*break_doc);
+                    stack.push(*flat_doc);
+                }
+                DocNode::Concat(range) | DocNode::Fill(range) => {
+                    stack.extend_from_slice(range.resolve(&children));
+                }
+                DocNode::WithContext { doc, .. } => stack.push(*doc),
+                DocNode::Text(_)
+                | DocNode::MultilineText { .. }
+                | DocNode::Line(_)
+                | DocNode::LineSuffixBoundary
+                | DocNode::EmbedEnd { .. }
+                | DocNode::BreakParent
+                | DocNode::FlushBreak
+                | DocNode::FlowProbeEnd => {}
+            }
+        }
+        false
+    }
+
+    /// The deferred run that may still be PENDING when `id` ends — `None` when every
+    /// [`DocNode::LineSuffix`] in it meets a line end the doc guarantees first.
+    ///
+    /// A static reading of the render's flush points, in emission order: a hard line (and a
+    /// multi-line text, which is hard lines), a [`DocNode::LineSuffixBoundary`], and a soft
+    /// or normal line behind a [`DocNode::FlushBreak`] (which exists to make that line break)
+    /// all flush the run; any other line is width-dependent and is read as not breaking. An
+    /// `if_break`'s two arms and a conditional group's states are each read, and joined: a
+    /// run pending in any of them is pending, and `certain` only when pending in all. The run's shape is read as an [`DocNode::EmbedEnd`] flushes
+    /// it — each comment behind no `//` glued onto the line (see
+    /// [`PendingRun`]) — which is also how a host lays out the same comments written after
+    /// its value, the reason a host asks.
+    pub fn pending_run_at_end(&self, id: DocId, source: &str) -> Option<PendingRun> {
+        let nodes = self.nodes.borrow();
+        let children = self.children.borrow();
+        let pool = self.text_pool.borrow();
+        let store = WalkStore {
+            nodes: &nodes,
+            children: &children,
+            pool: &pool,
+            source,
+        };
+        let state = store.suffix_walk(id, SuffixWalk::default());
+        state.pending().then_some(PendingRun {
+            certain: state.queue == RunQueue::Pending,
+            ..state.run
+        })
+    }
+
     /// Force parent group to break — a prelude singleton (stateless, like
     /// [`Self::line`]: one shared node per document, at a fixed id).
     #[inline]
@@ -3372,7 +3815,9 @@ impl DocArena {
             // the fits walk needs (a boundary with a suffix pending doesn't fit), and
             // a memoized width would hide them from it. SOFT means "walk it", never
             // "it breaks" — the walk's own arms charge them 0 columns.
-            DocNode::LineSuffix(_) | DocNode::LineSuffixBoundary => LAYOUT_BREAKS_SOFT,
+            DocNode::LineSuffix(_) | DocNode::LineSuffixBoundary | DocNode::EmbedEnd { .. } => {
+                LAYOUT_BREAKS_SOFT
+            }
             DocNode::BreakParent => LAYOUT_BREAKS_FORCED,
             // Forces only the group its deferred run flushes in — decided by the
             // fits walk's pending-flush state, not by this subtree query, so a
@@ -3475,7 +3920,7 @@ impl DocArena {
             // deliberately newline-blind, unlike `subtree_layout_fill`: canBreak asks
             // "is there a breakable `line` in here?", and a Text's embedded newline
             // (line-continuation string, verbatim slice) is content, not a break point
-            DocNode::Text(_) | DocNode::LineSuffixBoundary => false,
+            DocNode::Text(_) | DocNode::LineSuffixBoundary | DocNode::EmbedEnd { .. } => false,
             DocNode::BreakParent => true,
             // No line of its own; whether a line follows is positional, which a
             // subtree query cannot see.
@@ -3575,9 +4020,10 @@ impl DocArena {
         let info = {
             let nodes = self.nodes.borrow();
             match &nodes[id.index()] {
-                DocNode::Text(_) | DocNode::LineSuffixBoundary | DocNode::FlowProbeEnd => {
-                    Info::Keep
-                }
+                DocNode::Text(_)
+                | DocNode::LineSuffixBoundary
+                | DocNode::EmbedEnd { .. }
+                | DocNode::FlowProbeEnd => Info::Keep,
                 // `MultilineText`'s `\n`s are hard lines pre-joined into one body, so it
                 // follows `mode` for the same reason a `Line(Hard)` does — see the fn docs.
                 DocNode::MultilineText { span, .. } => match mode {

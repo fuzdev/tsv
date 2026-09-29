@@ -319,6 +319,28 @@ pub(super) fn arena_fits_with_lookahead(
                         return false;
                     }
                 }
+                // The end of an embedded document: with a suffix pending, the flush it
+                // renders here, charged its static width. A flush holding a `//` ends a
+                // line: flat, a group measured across it does not fit (the group
+                // enclosing the island must break, as a `//` written at the island's end
+                // breaks it); in a break-mode look-ahead the measure ends here. A flush of
+                // blocks alone stays on the line and the measure goes on.
+                DocNode::EmbedEnd {
+                    run_width,
+                    run_breaks,
+                    ..
+                } => {
+                    if has_line_suffix {
+                        if *run_breaks && current_mode == Mode::Flat {
+                            return false;
+                        }
+                        remaining -= *run_width as isize;
+                        if *run_breaks {
+                            return remaining >= 0;
+                        }
+                        has_line_suffix = false;
+                    }
+                }
                 DocNode::BreakParent => return false,
                 // Zero columns; arms the pending-flush veto above. Not an
                 // unconditional "doesn't fit" — a group with no line

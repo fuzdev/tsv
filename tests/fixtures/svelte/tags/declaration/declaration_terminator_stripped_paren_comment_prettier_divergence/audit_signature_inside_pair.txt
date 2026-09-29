@@ -1,0 +1,72 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<!-- an own-line block, glued onto the value's line -->
+{let b =
+	x ||
+	y}
+	/* c1 */
+
+<!-- a hugged arrow's body: the comment rides out past the call -->
+{let c = f(
+	() =>
+		x ||
+		y
+		/* c2 */
+)}
+
+{let d = f(
+	() =>
+		x ||
+		y // c3
+)}
+
+<!-- the comment flushes inside the value: nothing ends it on a comment, and no `;` -->
+{let g = f(
+	x ||
+		y, // c4
+	1
+)}
+
+{let h = `${
+	x +
+	y // c5
+}`}
+
+<!-- the bare control: no comment, no `;` -->
+{let q = x || y}
+
+%%PASS=2 (fixed point)%%
+<!-- an own-line block, glued onto the value's line -->
+{let b = x || y}
+/* c1 */
+
+<!-- a hugged arrow's body: the comment rides out past the call -->
+{let c = f(
+	() => x || y
+	/* c2 */
+)}
+
+{let d = f(
+	() => x || y // c3
+)}
+
+<!-- the comment flushes inside the value: nothing ends it on a comment, and no `;` -->
+{let g = f(
+	x || y, // c4
+	1
+)}
+
+{let h = `${
+	x + y // c5
+}`}
+
+<!-- the bare control: no comment, no `;` -->
+{let q = x || y}

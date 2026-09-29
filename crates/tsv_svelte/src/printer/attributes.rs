@@ -396,6 +396,16 @@ impl<'a> Printer<'a> {
     /// not already ended the output line: a trailing `//` has, its doc closing with a
     /// hardline, so after one the break is skipped — pushed unconditionally it doubled the
     /// `//`'s own break, manufacturing a blank line the author never wrote.
+    ///
+    /// `prev_doc` is the item just pushed, when it may defer a run to its own end (a stripped
+    /// pair's interior `//`): the run flushes at an embed end behind the comma
+    /// ([`Self::value_trailing_docs`] states the node), ahead of this gap's comments, which
+    /// print inline — left to the next line end it lands behind them, welded onto the last
+    /// one's line (`a, // d // c`). With the gap bare it is still the embed end that charges
+    /// the run's width to the comma's line, as the comment the next pass reads there is
+    /// charged; the spacer's break flushing it would charge nothing, and the item before it
+    /// broke a pass late.
+    #[expect(clippy::too_many_arguments)]
     pub(in crate::printer) fn push_list_separator(
         &self,
         items: &mut DocBuf,
@@ -404,6 +414,7 @@ impl<'a> Printer<'a> {
         after: &[&Comment],
         next_start: u32,
         spacer: DocId,
+        prev_doc: Option<DocId>,
     ) {
         let d = self.d();
         let hoist_at = before
@@ -419,6 +430,12 @@ impl<'a> Printer<'a> {
         items.push(d.text(","));
 
         let gap: CommentRun<'_> = hoisted.iter().chain(after).copied().collect();
+        if let Some(prev) = prev_doc
+            && d.holds_line_suffix(prev)
+        {
+            let pending = d.pending_run_at_end(prev, self.source);
+            items.push(d.embed_end(pending, false).doc());
+        }
         if gap.iter().all(|c| c.is_block) {
             items.push(spacer);
             items.extend(self.leading_comment_run_docs(&gap, next_start));
@@ -1101,20 +1118,18 @@ impl<'a> Printer<'a> {
         // Reads to the PRINTED start ([`Printer::head_gap_end`]) — a hoisted left-spine shell
         // run lands in this gap too. The two scans above keep `value_start`: they emit.
         let layout = self.head_layout(gap_start, self.head_gap_end(expr), frozen);
-        let (trailing_comments, ends_with_line_comment) = self.trailing_comment_docs(
+        let trailing = self.value_trailing_docs(
+            expr_doc,
+            expr.span(),
             expr.span().end,
             span.end - 1,
             layout.indents_content() || host.always_block(),
         );
 
         HeadExpr {
-            doc: self.concat_with_surrounding_comments(
-                leading_comments,
-                expr_doc,
-                trailing_comments,
-            ),
+            doc: self.concat_with_surrounding_comments(leading_comments, expr_doc, trailing.docs),
             layout,
-            ends_with_line_comment,
+            ends_with_line_comment: trailing.ends_with_line_comment,
             // An `OpensOwnLine` head takes the block form at every caller, whose `indent(…)`
             // IS the continuation indent — so the debt is already settled and claiming it
             // again would double the level. `HangsAfterOpen` keeps the debt: its caller emits
@@ -1323,9 +1338,9 @@ impl<'a> Printer<'a> {
         // the pair. The whole reason this builder is reached for a trailing-only comment: the
         // comment-blind path has no emitter for this gap at all, and a freeze does not own
         // the gap between its slice and the value's `}` either.
-        let (trailing_docs, ends_with_line_comment) =
-            self.trailing_comment_docs(tail_from, tag_span.end - 1, true);
-        content.extend(trailing_docs);
+        let trailing = self.value_trailing_docs(sequence, span, tail_from, tag_span.end - 1, true);
+        let ends_with_line_comment = trailing.ends_with_line_comment;
+        content.extend(trailing.docs);
 
         // Same bare block structure as the comment-free path: flat `{a, b}`, broken
         // `{\n\ta,\n\tb\n}`. Comment hardlines force the break; a lone inline block
@@ -1344,6 +1359,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let bytes = self.source.as_bytes();
         let mut items: DocBuf = DocBuf::new();
+        let mut prev_doc = None;
         for (i, sub_expr) in seq.expressions.iter().enumerate() {
             // Rule A: an honored directive in the comma gap freezes this operand. The
             // first operand has no such gap — a directive before it is the value head,
@@ -1374,12 +1390,15 @@ impl<'a> Printer<'a> {
                     &after,
                     cur_start,
                     d.line(),
+                    prev_doc,
                 );
             }
 
             // Rule A resolved the operand's own freeze, so this is the ordinary value stage
             // under the host's embed — the operand is measured where it sits.
-            items.push(self.build_head_value_doc(sub_expr, frozen, &self.embed));
+            let doc = self.build_head_value_doc(sub_expr, frozen, &self.embed);
+            items.push(doc);
+            prev_doc = Some(doc);
         }
         d.group(d.concat(&items))
     }

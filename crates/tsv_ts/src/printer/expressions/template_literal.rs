@@ -117,16 +117,6 @@ impl<'a> Printer<'a> {
                         (CommentVec::new(), CommentVec::new())
                     };
 
-                // Combine expression with comments — one path, whose leading run goes
-                // through the shared leading-comment emitter.
-                let (full_expr_doc, leading_forces_break) = self
-                    .build_template_comments_and_expr_doc(
-                        &leading_comments,
-                        expr_doc,
-                        &trailing_comments,
-                        expr.span().start,
-                    );
-
                 // The LAYOUT question, asked on the **on-page** axis rather than read off the
                 // collects above — those are the emit axis, and they print. A glued block
                 // comment is OWNED, so the emit axis skips it while it still occupies the
@@ -140,6 +130,24 @@ impl<'a> Printer<'a> {
                         || self
                             .has_comments_on_page_between(expr.span().end, next_quasi.span.start));
                 let has_trailing_line_comment = trailing_comments.iter().any(|c| !c.is_block);
+                // Whether a broken interpolation wraps its value in `${`/`}` breaks — the
+                // closing one is a line end a deferred run can take (below).
+                let use_softline_wrap = has_trailing_line_comment
+                    || Self::is_template_softline_expression(
+                        expr,
+                        interpolation_has_comment_on_page,
+                    );
+
+                // Combine expression with comments — one path, whose leading run goes
+                // through the shared leading-comment emitter.
+                let (full_expr_doc, leading_forces_break) = self
+                    .build_template_comments_and_expr_doc(
+                        &leading_comments,
+                        expr_doc,
+                        &trailing_comments,
+                        expr.span().start,
+                        use_softline_wrap,
+                    );
 
                 // Prettier's `interpolationHasNewline` gate (template-literal.js
                 // `printTemplateExpression`): an interpolation stays on one line
@@ -169,11 +177,6 @@ impl<'a> Printer<'a> {
                     // wrapping at ${/} boundaries so the group can break there.
                     // Non-qualifying types keep the expression doc as-is (no ${/}
                     // softlines) so ${ hugs while the expression breaks internally.
-                    let use_softline_wrap = has_trailing_line_comment
-                        || Self::is_template_softline_expression(
-                            expr,
-                            interpolation_has_comment_on_page,
-                        );
                     if use_softline_wrap {
                         // The interpolation's CLOSING edge, through the shared obligation
                         // seam ([`Printer::obligated_break`], which carries the rule): a
@@ -378,15 +381,19 @@ impl<'a> Printer<'a> {
     /// `propagateBreaks`, so a hardline buried in the run is invisible to the `${…}` group
     /// that has to open for it.
     ///
-    /// Trailing comments keep their own loop: each is emitted after the value with a leading
-    /// space, and the LAST one takes no hardline — the closing `}`'s own `literalline`
-    /// provides that newline.
+    /// Trailing comments keep their own loop: the first glues onto the value's line, each
+    /// later one follows a space — or a break, behind a `//` — and the LAST one takes no
+    /// break after it, since the closing `}`'s own break ends its line.
+    ///
+    /// `closer_breaks` says the interpolation wraps its value in `${`/`}` breaks when it
+    /// breaks, so its closer is a line end a run the value defers to its end can take.
     fn build_template_comments_and_expr_doc(
         &self,
         leading_comments: &[&crate::ast::internal::Comment],
         expr_doc: DocId,
         trailing_comments: &[&crate::ast::internal::Comment],
         expr_start: u32,
+        closer_breaks: bool,
     ) -> (DocId, bool) {
         let d = self.d();
         let mut parts = DocBuf::new();
@@ -402,15 +409,33 @@ impl<'a> Printer<'a> {
         // Expression
         parts.push(expr_doc);
 
-        // Trailing comments - don't add hardline after the last one since the
-        // closing `}` has its own literalline that provides the newline
-        let last_idx = trailing_comments.len().saturating_sub(1);
-        for (i, comment) in trailing_comments.iter().enumerate() {
-            parts.push(d.text(" "));
+        // A run the value DEFERS to its own end (a stripped pair's interior comment, a hugged
+        // arrow's body) flushes at the interpolation's own line end, as the host prints a run
+        // written after the value: an own-line comment glues onto the value's line, and a
+        // `//` ends it. Left to the closer's break instead, it rides past the comments
+        // written after the value, which print inline here, and welds onto the last one's
+        // line (`a || b // d // c`, one comment lost) — or, alone, keeps an own-line break
+        // the next pass reads as a glued comment. With no written run the embed end's break
+        // is the closer's, one level out — which needs the closer to BE a break: a value the
+        // interpolation hugs (`closer_breaks` false) breaks inside itself to flush the run
+        // instead, as with no comment after it.
+        if (closer_breaks || !trailing_comments.is_empty()) && d.holds_line_suffix(expr_doc) {
+            let pending = d.pending_run_at_end(expr_doc, self.source);
+            parts.push(d.embed_end(pending, trailing_comments.is_empty()).doc());
+        }
+
+        // Trailing comments: the separator goes BEFORE each one — a space, or a break after
+        // a `//`, which nothing can follow on its line. The last takes none after it: the
+        // closing `}`'s own break ends its line.
+        let mut after_line_comment = false;
+        for comment in trailing_comments {
+            parts.push(if after_line_comment {
+                d.hardline()
+            } else {
+                d.text(" ")
+            });
             parts.push(self.build_comment_doc(comment));
-            if !comment.is_block && i < last_idx {
-                parts.push(d.hardline());
-            }
+            after_line_comment = !comment.is_block;
         }
 
         (d.concat(&parts), forces_break)

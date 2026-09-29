@@ -33,9 +33,14 @@ use tsv_ts::{Expression, ExpressionKind};
 pub(super) enum HeadTail {
     /// The head's own syntax continues with a word.
     Keyword,
-    /// A delimiter follows — the head's own `}`, or an `{#each}` with no `as` binding's
-    /// `,` — which joins nothing to the close.
+    /// The head's own `}` follows, which joins nothing to the close.
     Delimiter,
+    /// A delimiter Svelte reads right behind the value, with no comment allowed in between
+    /// — the `}` or `,` of an `{#each}` with no `as` binding (`{#each a /* c */}` does not
+    /// parse). A value built to end on a comment is built again under
+    /// `EmbedContext::value_end_takes_no_comment`, which keeps the author's grouping pair
+    /// holding it.
+    CommentlessDelimiter,
 }
 
 impl HeadTail {
@@ -44,7 +49,7 @@ impl HeadTail {
         if block.context.is_some() {
             Self::Keyword
         } else {
-            Self::Delimiter
+            Self::CommentlessDelimiter
         }
     }
 
@@ -819,11 +824,26 @@ impl<'a> Printer<'a> {
     /// the `AssignmentPattern` (default-value binding) and `AssignmentExpression`
     /// pattern arms. Comments around the `=` stay on the side the author wrote
     /// them (`a /* c */ = 1` vs `a = /* c */ 1`) via `build_pattern_delim_gap`.
+    ///
+    /// A default value can DEFER a comment to its own end — a block the author put on its own
+    /// line inside the value's stripped grouping pair (`{ v = a || (b⏎/* c */⏎) }`) — and the
+    /// inline pattern has no line end before the head's `}`: left pending, the comment flushes
+    /// past it into the block's body. An embed end behind the value
+    /// ([`Printer::value_trailing_docs`] states the node) flushes it there, glued onto the
+    /// value's line (`{ v = a || b /* c */ }`) — the same-line block the next pass reads, which
+    /// the inline pattern keeps. A `//` never reaches this: it breaks the pattern into its
+    /// twin's layout first ([`Self::build_block_pattern_doc`]).
     fn build_pattern_assignment(&self, left: &Expression<'_>, right: &Expression<'_>) -> DocId {
         let d = self.d();
         let left_doc = self.build_pattern_doc(left);
         let eq = self.build_pattern_delim_gap(left.span().end, right.span().start, b'=', " = ");
         let right_doc = self.build_pattern_doc(right);
+        if !self.gap_known_comment_free(right.span().start, right.span().end)
+            && d.holds_line_suffix(right_doc)
+        {
+            let pending = d.pending_run_at_end(right_doc, self.source);
+            return d.concat(&[left_doc, eq, right_doc, d.embed_end(pending, false).doc()]);
+        }
         d.concat(&[left_doc, eq, right_doc])
     }
 
@@ -927,7 +947,26 @@ impl<'a> Printer<'a> {
         };
 
         // Build expression doc tree
-        let inner_doc = self.build_head_value_doc(expr, frozen, &embed);
+        let mut inner_doc = self.build_head_value_doc(expr, frozen, &embed);
+        // A head that takes no comment at its end, built so it ends on one — a run the
+        // value defers to its end, or a comment it prints there inline — is built again with
+        // the author's grouping pairs kept around those comments
+        // (`EmbedContext::value_end_takes_no_comment`). Asked of the built doc rather than
+        // of the source, so a run the value flushes inside itself (at a list's comma, a
+        // broken call's closer) keeps the ordinary strip.
+        if tail == HeadTail::CommentlessDelimiter
+            && !frozen
+            && !self.gap_known_comment_free(expr.span().start, expr.span().end)
+            && ((d.holds_line_suffix(inner_doc)
+                && d.pending_run_at_end(inner_doc, self.source).is_some())
+                || d.may_end_on_comment_text(inner_doc, self.source))
+        {
+            let embed = tsv_lang::EmbedContext {
+                value_end_takes_no_comment: true,
+                ..embed
+            };
+            inner_doc = self.build_head_value_doc(expr, frozen, &embed);
+        }
         // The instantiation pair and the assignment clarity pair are exclusive: the walk
         // never descends into an assignment, so at most one of the two wraps the head.
         let expr_doc =

@@ -773,20 +773,20 @@ impl<'a> Printer<'a> {
     /// (`Printer::build_declarator_init_doc`): the broke-after block run, the
     /// comment-forced break ([`Self::build_eq_comment_break_rhs`], which keeps a `//` on the
     /// operator's line), then the indentable hang with the run hoisted out of the value. Each
-    /// prints the gap's whole run, so the host prints none of it. `build_suffix` is built
-    /// once, only on `Some`, and rides after the value inside whatever indent the arm opened.
+    /// prints the gap's whole run, so the host prints none of it. `build_suffix` is handed
+    /// the value's doc, only on `Some`, and what it returns rides after the value inside
+    /// whatever indent the arm opened.
     pub(crate) fn build_stacked_curried_chain_rhs_doc(
         &self,
         expression: &internal::Expression<'_>,
         operator_pos: u32,
-        build_suffix: impl FnOnce() -> DocId,
+        build_suffix: impl Fn(DocId) -> DocId,
     ) -> Option<DocId> {
         let gap_start = operator_pos + 1;
         if !self.seam_break_stacks_curried_chain(expression, gap_start) {
             return None;
         }
         let d = self.d();
-        let suffix = build_suffix();
         self.mark_assignment_value(expression);
         let value_start = expression.span().start;
         let hoisted_run = self.hoisted_owned_value_gap_run_opt(gap_start, expression, false);
@@ -796,7 +796,7 @@ impl<'a> Printer<'a> {
                     self.build_root_expression_doc(expression)
                 })
             });
-            d.concat(&[value, suffix])
+            d.concat(&[value, build_suffix(value)])
         };
         let emit_run = self.build_comments_between_filtered_opt(
             gap_start,

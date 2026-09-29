@@ -34,7 +34,7 @@ use std::cell::{Cell, OnceCell, RefCell};
 use std::fmt::Write as _;
 use std::ops::{Index, IndexMut};
 use tsv_lang::doc::DocBuf;
-use tsv_lang::doc::arena::{DocArena, DocId};
+use tsv_lang::doc::arena::{DocArena, DocId, GroupId};
 use tsv_lang::printing::LineBreaks;
 use tsv_lang::{
     Comment, CommentFreeWindow, EmbedContext, INDENT, LayoutMode, OutputBuffer, Span, TAB_WIDTH,
@@ -352,6 +352,19 @@ pub(in crate::printer) struct HeadExpr {
     pub(in crate::printer) layout: HeadLayout,
     pub(in crate::printer) ends_with_line_comment: bool,
     pub(in crate::printer) owes_continuation_indent: bool,
+}
+
+/// An island value's trailing run ([`Printer::value_trailing_docs`]).
+pub(in crate::printer) struct ValueTrailing {
+    /// The run's docs, led by the embed end when there is one.
+    pub(in crate::printer) docs: DocBuf,
+    /// The `[from, to)` gap holds a comment: the run prints one after the value.
+    pub(in crate::printer) gap_run: bool,
+    /// The run's last comment is a `//` ([`HeadExpr::ends_with_line_comment`]).
+    pub(in crate::printer) ends_with_line_comment: bool,
+    /// The embed end ahead of the run, when the value may defer a run to its end — an
+    /// `if_break_with_id` on it breaks exactly when a run flushed there.
+    pub(in crate::printer) embed_end: Option<GroupId>,
 }
 
 /// How a braced head's content sits between its delimiters — the three states
@@ -1008,6 +1021,71 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// The trailing run of an island value — [`Self::trailing_comment_docs`] over
+    /// `[from, to)` — led by an **embed end** ([`DocArena::embed_end`]) when the value's own
+    /// doc may carry a deferred run to its end.
+    ///
+    /// ⚠️ **A deferred run must not leave the island it was written in.** `tsv_ts` defers a
+    /// comment it cannot print in place — a stripped redundant pair's interior run
+    /// (`a || (b // c⏎)`), the sole hugged arrow's body — to wherever the enclosing line
+    /// ends, and in a `<script>` that is the statement's own end. An island owns no such
+    /// line: past its value the line is markup, so the run would flush as page text
+    /// (`<p>{a || b}</p> // c`). The embed end is the last line end the value's document
+    /// owns: a run still pending there flushes and, when it ends in a `//`, the closer drops
+    /// below it — exactly the form the same code prints when the author writes the comment
+    /// after the value (`{a || b // c⏎}`), which is what the next pass reads it as.
+    ///
+    /// Its break is the closer's when the run is empty — dedented under `closer_owns_break`,
+    /// the same answer the run's last `//` takes — and the run's otherwise: a trailing
+    /// comment behind it opens its line at the content's level, as the run's interior breaks
+    /// do.
+    ///
+    /// The host's layout is answered statically, from [`DocArena::pending_run_at_end`]: a
+    /// `//` that reaches the value's end in EVERY layout breaks the enclosing groups as a
+    /// written trailing `//` does, while a run only SOME layouts carry there (a hugged last
+    /// argument whose list may still break) leaves the host's ordinary layout in place, and
+    /// the embed end sheds the host separator the render made redundant.
+    pub(in crate::printer) fn value_trailing_docs(
+        &self,
+        value_doc: DocId,
+        value_span: Span,
+        from: u32,
+        to: u32,
+        closer_owns_break: bool,
+    ) -> ValueTrailing {
+        let (mut docs, ends_with_line_comment) =
+            self.trailing_comment_docs(from, to, closer_owns_break);
+        let d = self.d();
+        let run_empty = docs.is_empty();
+        if self.gap_known_comment_free(value_span.start, value_span.end)
+            || !d.holds_line_suffix(value_doc)
+        {
+            return ValueTrailing {
+                docs,
+                gap_run: !run_empty,
+                ends_with_line_comment,
+                embed_end: None,
+            };
+        }
+        let pending = d.pending_run_at_end(value_doc, self.source);
+        let end = d.embed_end(pending, run_empty && closer_owns_break);
+        if let Some(run) = pending
+            && run.certain
+            && run.has_line_comment
+        {
+            // The value ends on its deferred `//`: the enclosing groups break as a `//`
+            // the author wrote after the value breaks them.
+            docs.insert(0, d.break_parent());
+        }
+        docs.insert(0, end.doc());
+        ValueTrailing {
+            docs,
+            gap_run: !run_empty,
+            ends_with_line_comment,
+            embed_end: Some(end),
+        }
+    }
+
     /// The **tail every braced head shares**: the leading run over the `head`→value gap, the
     /// value, the trailing run up to the closer, and the indent ladder — assembled from ONE
     /// `hangs` verdict, taken above the trailing run it governs and fed to both
@@ -1038,13 +1116,18 @@ impl<'a> Printer<'a> {
         // stops at the span start, since the value's own doc prints a hoisted shell run.
         let layout = self.head_layout(gap_start, self.head_gap_end(value), frozen);
         let leading_docs = self.leading_comment_docs(gap_start, span.start);
-        let (trailing_docs, ends_with_line_comment) =
-            self.trailing_comment_docs(span.end, content_end, layout.indents_content());
-        let body = self.concat_with_surrounding_comments(leading_docs, value_doc, trailing_docs);
+        let trailing = self.value_trailing_docs(
+            value_doc,
+            span,
+            span.end,
+            content_end,
+            layout.indents_content(),
+        );
+        let body = self.concat_with_surrounding_comments(leading_docs, value_doc, trailing.docs);
         HeadExpr {
             doc: self.indent_head_content(body, layout),
             layout,
-            ends_with_line_comment,
+            ends_with_line_comment: trailing.ends_with_line_comment,
             owes_continuation_indent: false,
         }
     }

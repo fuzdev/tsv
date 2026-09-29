@@ -1,0 +1,191 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script>
+	// the same pair in a `<script>`: the statement's own line end takes the comment
+	const q =
+		x +
+		y * z; // c0
+</script>
+
+<p>
+	{a ||
+		b ||
+		c} // c1
+</p>
+
+<div
+	data-a={x +
+		y * z} // c2
+></div>
+
+{#if x + y * z} // c3
+	<p>t</p>
+{/if}
+
+{#each a instanceof b as item} // c4
+	<p>{item}</p>
+{/each}
+
+{#if cond}
+	{@const r =
+		x +
+		y * z} // c5
+	{r}
+{/if}
+
+{let s =
+	x +
+	y * z} // c6
+
+{@html a ||
+	b} // c7
+
+<p>
+	{f(
+		() =>
+			x +
+			y // c8
+	)}
+</p>
+
+<p>
+	{a ||
+		b} // c9
+</p>
+
+{#each f(() => x + y) as item} // c10
+	<p>{item}</p>
+{/each}
+
+<input
+	bind:value={
+		() => v,
+		(w) =>
+			x -
+			y // c11
+	}
+/>
+
+<input
+	bind:value={
+		() =>
+			x ||
+			y, // c12
+		(w) => (x = w)
+	}
+/>
+
+{#if cond}
+	{@const f = // lead
+		(a) => (b) =>
+			x ||
+			y} // c13
+	{f}
+{/if}
+
+<input
+	bind:value={
+		() =>
+			x ||
+			y, // c14 // d14
+		(w) => (x = w)
+	}
+/>
+
+<!-- the run reaches the value's end only while the member chain stays flat -->
+<p
+	class={(
+		a ||
+		b // c15
+	).m}
+>
+	t
+</p>
+
+%%PASS=2 (fixed point)%%
+<script>
+	// the same pair in a `<script>`: the statement's own line end takes the comment
+	const q = x + y * z; // c0
+</script>
+
+<p>
+	{a || b || c} // c1
+</p>
+
+<div
+	data-a={x + y * z} // c2
+></div>
+
+{#if x + y * z}
+	// c3
+	<p>t</p>
+{/if}
+
+{#each a instanceof b as item}
+	// c4
+	<p>{item}</p>
+{/each}
+
+{#if cond}
+	{@const r = x + y * z} // c5
+	{r}
+{/if}
+
+{let s = x + y * z} // c6
+
+{@html a || b} // c7
+
+<p>
+	{f(
+		() => x + y // c8
+	)}
+</p>
+
+<p>
+	{a || b} // c9
+</p>
+
+{#each f(() => x + y) as item}
+	// c10
+	<p>{item}</p>
+{/each}
+
+<input bind:value={() => v, (w) => x - y} />
+
+<input
+	bind:value={
+		() => x || y, // c12
+		(w) => (x = w)
+	}
+/>
+
+{#if cond}
+	{@const f = // lead
+		(a) => (b) => x || y} // c13
+	{f}
+{/if}
+
+<input
+	bind:value={
+		() => x || y, // c14 // d14
+		(w) => (x = w)
+	}
+/>
+
+<!-- the run reaches the value's end only while the member chain stays flat -->
+<p
+	class={(
+		a || b
+	) // c15
+	.m}
+>
+	t
+</p>

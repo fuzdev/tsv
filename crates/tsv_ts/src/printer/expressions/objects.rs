@@ -1183,6 +1183,9 @@ impl<'a> Printer<'a> {
         // Build the body (key + any key→`]` trailing comments) into a buffer; the shared
         // bracket-break helper owns the `[`→key line-comment prefix and the break shell.
         let mut body_parts: DocBuf = smallvec![key_doc];
+        if self.has_comments_to_emit_between(key_end, bracket_end) {
+            self.push_deferred_run_end(&mut body_parts, key_doc);
+        }
         let mut prev = key_end;
         for comment in self.comments_to_emit_between(key_end, bracket_end) {
             if self.is_same_line(prev, comment.span.start) {

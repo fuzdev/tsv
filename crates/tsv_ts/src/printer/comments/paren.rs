@@ -658,6 +658,22 @@ impl<'a> Printer<'a> {
         d.concat(&[doc, d.flush_break()])
     }
 
+    /// Push an **embed end** behind `value` when its doc may defer a run to its own end — a
+    /// stripped pair's interior comment, a hugged arrow's body — for a caller about to print
+    /// the comments the author wrote AFTER the value inline, ahead of its closer's break
+    /// (a computed bracket's key→`]` run, a template interpolation's `${…}` run). Left
+    /// pending, the deferred run rides past them to that break and lands behind them on one
+    /// line, where two `//` weld into one comment (`a || b // d // c`). At the embed end it
+    /// flushes first, in authored order, and the written run follows on the next line
+    /// (`tsv_lang::doc::arena::DocArena::embed_end`).
+    pub(crate) fn push_deferred_run_end(&self, parts: &mut DocBuf, value: DocId) {
+        let d = self.d();
+        if d.holds_line_suffix(value) {
+            let pending = d.pending_run_at_end(value, self.source);
+            parts.push(d.embed_end(pending, false).doc());
+        }
+    }
+
     /// Whether `span` holds a list element that breaks its list
     /// ([`Self::build_list_element_doc`]) — the element itself, or one nested at any depth
     /// inside it (`o.aaaa().bbbb(g(x + (y // c⏎)), 1)`, whose `g(…)` argument carries the

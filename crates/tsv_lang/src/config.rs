@@ -50,8 +50,9 @@ pub enum LayoutMode {
 /// ⚠️ **The width fields are read at render, not at doc-build.** The three width fields are
 /// consumed by the renderer, so they act only on the context handed to `arena_print_doc_*`.
 /// The context handed to a `build_*_doc` call reaches nothing but [`LayoutMode`],
-/// [`Self::jsdoc_cast_cannot_hang`], [`Self::root_sequence_indents`] and
-/// [`Self::printer_owns_line`] (the four build-time fields): that doc is rendered
+/// [`Self::jsdoc_cast_cannot_hang`], [`Self::root_sequence_indents`],
+/// [`Self::printer_owns_line`] and [`Self::value_end_takes_no_comment`] (the five build-time
+/// fields): that doc is rendered
 /// later, under whatever context its host passes — so a width set there is inert, and a
 /// layout choice that looks keyed to one is really keyed to `mode`. (Same reason a
 /// build-time `current_column()` is always 0: build-time width state is disconnected from
@@ -62,6 +63,7 @@ pub enum LayoutMode {
 /// on the embedding entry points — folding one in here would force a lifetime
 /// onto every `EmbedContext` holder.
 #[derive(Debug, Clone, Copy)]
+#[expect(clippy::struct_excessive_bools)] // independent build-time axes, each read at its own seam
 pub struct EmbedContext {
     /// Base indent offset for width calculations.
     /// Used when formatting nested content (e.g., CSS inside Svelte) where
@@ -141,6 +143,22 @@ pub struct EmbedContext {
     /// escaped comment is a fixed point, reparses, and is printed exactly once, so no gate in
     /// `check` sees it.
     pub printer_owns_line: bool,
+    /// Whether the host's grammar **rejects a comment at this value's END** — `false`
+    /// everywhere but Svelte's `{#each}` head with no `as` binding, whose parser reads its
+    /// `}` / `,` right behind the value and fails on a comment in between
+    /// (`{#each a /* c */}` and `{#each a /* c */, i}` are syntax errors;
+    /// `{#each a || (b /* c */)}` is not). The fifth build-time field.
+    ///
+    /// Its reader is the binary chain's last operand (`tsv_ts`'s `build_chain_end_operand`):
+    /// the outermost grouping pair the author wrote around it is KEPT when a comment sits
+    /// before its `)`, even where the pair is redundant. Stripped, the comment could end the
+    /// value — inline, or flushed there as a deferred run — and the output would not parse;
+    /// kept, the pair is the one place the comment can stand. The host builds a value under
+    /// it only when the ordinary build ends on a comment, so a run the value flushes inside
+    /// itself (a list's comma, a broken call's closer) strips as ever. Everywhere else a
+    /// host takes the comment the value ends on (a `//` ends the island's line before its
+    /// closer, `DocNode::EmbedEnd`), so the pair strips as in a `<script>`.
+    pub value_end_takes_no_comment: bool,
 }
 
 impl Default for EmbedContext {
@@ -153,6 +171,7 @@ impl Default for EmbedContext {
             jsdoc_cast_cannot_hang: false,
             root_sequence_indents: false,
             printer_owns_line: false,
+            value_end_takes_no_comment: false,
         }
     }
 }

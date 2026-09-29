@@ -1,0 +1,98 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),
+# the same-suffix source beside this file. It exists when prettier's output from
+# that source is claimed by no single-form marker — a chain with two or more
+# distinct intermediates, or a fixed point no documented stable form holds.
+# See docs/fixture_overview.md (rule N12) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=1%%
+<script>
+	// the pair's `//` flushes where the value ends, ahead of the comment written after it
+	const a = `${
+		x ||
+		y // c1 // d1
+	}`;
+
+	const b = `${
+		f(
+			() =>
+				x ||
+				y // c2
+		) // d2
+	}`;
+
+	const c = `${
+		x ||
+		y /* d3 */ // c3
+	}`;
+
+	// no comment after the value: the closer's own break takes it
+	const d = `${
+		x ||
+		y // c4
+	}`;
+
+	// a hugged arrow the interpolation does not wrap: the call breaks and takes it
+	const e = `${f(
+		() =>
+			x ||
+			y // c6
+	)}`;
+</script>
+
+<p>
+	{`${
+		x ||
+		y // c5 // d5
+	}`}
+</p>
+
+<p>
+	{`${f(
+		() =>
+			x ||
+			y // c7
+	)}`}
+</p>
+
+%%PASS=2 (fixed point)%%
+<script>
+	// the pair's `//` flushes where the value ends, ahead of the comment written after it
+	const a = `${
+		x || y // c1 // d1
+	}`;
+
+	const b = `${
+		f(
+			() => x || y // c2
+		) // d2
+	}`;
+
+	const c = `${
+		x || y /* d3 */ // c3
+	}`;
+
+	// no comment after the value: the closer's own break takes it
+	const d = `${
+		x || y // c4
+	}`;
+
+	// a hugged arrow the interpolation does not wrap: the call breaks and takes it
+	const e = `${f(
+		() => x || y // c6
+	)}`;
+</script>
+
+<p>
+	{`${
+		x || y // c5 // d5
+	}`}
+</p>
+
+<p>
+	{`${f(
+		() => x || y // c7
+	)}`}
+</p>

@@ -1040,16 +1040,17 @@ pub fn build_assignment_value_expression_doc(
 ///
 /// `operator_pos` is the `=`'s byte offset; the gap runs from past it to the value. On
 /// `Some` the returned doc prints every comment in that gap, so the host must print none
-/// of them. `build_suffix` (the host's trailing run) is called once, only on `Some`, and
-/// its doc is placed after the value inside the indent the value stands at — the host's
-/// closer follows the returned doc directly, one level out.
+/// of them. `build_suffix` (the host's trailing run) is handed the value's doc, only on
+/// `Some` — the run may have to flush what the value defers to its end — and its doc is
+/// placed after the value inside the indent the value stands at; the host's closer follows
+/// the returned doc directly, one level out.
 pub fn build_stacked_curried_chain_rhs_doc(
     arena: &DocArena,
     expression: &Expression<'_>,
     inputs: &PrinterInputs<'_>,
     embed: EmbedContext,
     operator_pos: u32,
-    build_suffix: impl FnOnce() -> DocId,
+    build_suffix: impl Fn(DocId) -> DocId,
 ) -> Option<DocId> {
     with_doc_printer(arena, inputs, embed, |printer| {
         printer.build_stacked_curried_chain_rhs_doc(expression, operator_pos, build_suffix)

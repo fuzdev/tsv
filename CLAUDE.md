@@ -475,7 +475,7 @@ Settings that diverge from Prettier's defaults (everything else, e.g. tabWidth=2
 
 There is no runtime configuration. Print width / tab width / indent are compile-time `pub const`s in `tsv_lang::config` (`PRINT_WIDTH`, `TAB_WIDTH`, `INDENT`), read directly by the renderer — not threaded through any signature. Quote preference is likewise hardcoded (single quotes) in `tsv_lang::printing` — the `optimal_string_quote` tie-break that `format_string_literal` applies. The doc-builder unit tests exercise smaller widths via the internal `RenderConfig` seam (`doc::render_config`, `pub(crate)`), never at runtime.
 
-One type carries genuine per-input *state* (not configuration), threaded only where it varies: `tsv_lang::EmbedContext { base_indent_offset, first_line_offset, suffix_width, mode: LayoutMode, jsdoc_cast_cannot_hang, root_sequence_indents, printer_owns_line }` — embedding state for nested formatting (CSS in `<style>`, Svelte template expressions). `LayoutMode { Standalone, Embedded }` controls the expression-ROOT binary indent style (nested expressions format context-free); `root_sequence_indents` is its sequence counterpart, set by the Svelte **block head** alone (the one braced head prettier never width-wraps). The three width fields are read at **render** (they act only on the context passed to an `arena_print_doc_*` call); on a `build_*_doc` call only the four build-time fields — `mode`, `jsdoc_cast_cannot_hang`, `root_sequence_indents` and `printer_owns_line` — survive, so a width set there is inert.
+One type carries genuine per-input *state* (not configuration), threaded only where it varies: `tsv_lang::EmbedContext { base_indent_offset, first_line_offset, suffix_width, mode: LayoutMode, jsdoc_cast_cannot_hang, root_sequence_indents, printer_owns_line, value_end_takes_no_comment }` — embedding state for nested formatting (CSS in `<style>`, Svelte template expressions). `LayoutMode { Standalone, Embedded }` controls the expression-ROOT binary indent style (nested expressions format context-free); `root_sequence_indents` is its sequence counterpart, set by the Svelte **block head** alone (the one braced head prettier never width-wraps). The three width fields are read at **render** (they act only on the context passed to an `arena_print_doc_*` call); on a `build_*_doc` call only the five build-time fields — `mode`, `jsdoc_cast_cannot_hang`, `root_sequence_indents`, `printer_owns_line` and `value_end_takes_no_comment` — survive, so a width set there is inert.
 
 TypeScript formatting is identical for standalone `.ts` and Svelte-embedded TS, so there is a single entry point: `tsv_ts::format(&ast, source)`.
 
@@ -1075,7 +1075,10 @@ full in docs/comments.md; here is the seam to reach for:
   flush-scoped (`DocArena::flush_break`, not `break_parent`). The **flush must end the line** (a
   `lineSuffixBoundary` belongs only where nothing else does; `arena_fits` treats a boundary with
   a suffix pending as not fitting), and the flush is itself a run owing the separator
-  (`doc::arena_render_suffix`). [same section].
+  (`doc::arena_render_suffix`). A Svelte template island's closer is such a construct end: its
+  trailing run is led by an **embed end** (`DocArena::embed_end`, placed by `tsv_svelte`'s
+  `Printer::value_trailing_docs`), where a run the value deferred flushes before the `}` rather
+  than past it into markup. [same section].
 - **Own-line-ness is a SOURCE question** (`Printer::comment_follows_content_on_its_line` /
   `comment_hugs_next`), never an item-boundary `is_same_line(prev_end, …)`: a stripped `)`, the
   comma, and another comment all sit outside item spans.

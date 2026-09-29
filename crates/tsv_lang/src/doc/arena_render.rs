@@ -8,7 +8,9 @@ use smallvec::SmallVec;
 use super::arena::{ArenaCommand, CmdStack, DocArena, DocId, DocNode, LineSuffixBuf, RenderIndent};
 use super::arena_fits::arena_fits_with_lookahead;
 use super::arena_render_fill::render_fill_iterative;
-use super::arena_render_suffix::{flush_line_suffix, flush_line_suffix_tail_is_line_comment};
+use super::arena_render_suffix::{
+    flush_line_suffix, flush_line_suffix_as_host_run, flush_line_suffix_tail_is_line_comment,
+};
 use super::render_config::RenderConfig;
 #[cfg(feature = "comment_check")]
 use super::render_config::RenderPurpose;
@@ -799,6 +801,183 @@ fn render_doc_iterative(
     flush_line_suffix(ctx, &mut line_suffix, output, pos, &mut should_remeasure);
 }
 
+/// A [`DocNode::EmbedEnd`]: record under its id whether a run is pending, and with one
+/// pending flush it as the host's own run — when the run ends in a `//`, ending the line at
+/// the closer's level (`dedent_closer` puts it one out from `cmd`'s indent) and shedding the
+/// host's next separator ([`shed_host_separator`]). Off the hot loop: the node exists only
+/// in a comment-bearing island.
+#[cold]
+#[inline(never)]
+#[expect(clippy::too_many_arguments)]
+fn render_embed_end<P: RenderPolicy>(
+    ctx: &RenderCtx<'_>,
+    nodes: &[DocNode],
+    children_vec: &[DocId],
+    pool: &str,
+    commands: &mut CmdStack,
+    output: &mut String,
+    pos: &mut usize,
+    line_suffix: &mut LineSuffixBuf,
+    should_remeasure: &mut bool,
+    cmd: ArenaCommand,
+    dedent_closer: bool,
+    policy: &mut P,
+    #[cfg(feature = "comment_check")] ledger_on: bool,
+) {
+    let flushes = !line_suffix.is_empty();
+    ctx.arena
+        .record_keyed_group(cmd.doc, if flushes { Mode::Break } else { Mode::Flat });
+    let mode = cmd.mode();
+    if !flushes
+        || !flush_line_suffix_as_host_run(
+            ctx,
+            line_suffix,
+            output,
+            pos,
+            should_remeasure,
+            cmd.indent(),
+            mode,
+        )
+    {
+        return;
+    }
+    let closer = if dedent_closer {
+        cmd.indent().dedented()
+    } else {
+        cmd.indent()
+    };
+    // The hard line [`render_line_node`] renders, with the buffer already drained.
+    if mode == Mode::Flat {
+        *should_remeasure = true;
+    }
+    render_line_break(
+        LineKind::Hard,
+        mode,
+        closer,
+        output,
+        pos,
+        ctx.render,
+        ctx.embed,
+    );
+    shed_host_separator(
+        ctx,
+        nodes,
+        children_vec,
+        pool,
+        commands,
+        output,
+        pos,
+        policy,
+        #[cfg(feature = "comment_check")]
+        ledger_on,
+    );
+}
+
+/// Shed the ONE separator the host placed between an island's value and what follows it,
+/// once a fired [`DocNode::EmbedEnd`] has already ended the line there.
+///
+/// The host lays out its closer for a value that ends inline: a space before a head's
+/// ` as` / ` then` / a trailing comment, or a break of its own before a closer it drops
+/// (a block head's dangle, a prefixed head's `}`). Behind the embed end's break that
+/// separator has nothing left to separate — a space would lead the new line, a break would
+/// open a blank one — so the next thing the loop would emit is inspected here and its
+/// separator consumed: a line (whatever its kind or mode), or the leading space of a text
+/// (the rest of the text renders). The walk steps into concats, keyed and unkeyed
+/// `if_break`s (resolved as the loop resolves them), indents and the render-inert markers;
+/// anything else goes back on the stack untouched.
+#[cold]
+#[inline(never)]
+#[expect(clippy::too_many_arguments)]
+fn shed_host_separator<P: RenderPolicy>(
+    ctx: &RenderCtx<'_>,
+    nodes: &[DocNode],
+    children_vec: &[DocId],
+    pool: &str,
+    commands: &mut CmdStack,
+    output: &mut String,
+    pos: &mut usize,
+    policy: &mut P,
+    #[cfg(feature = "comment_check")] ledger_on: bool,
+) {
+    #[cfg(not(feature = "swallow_check"))]
+    let _ = &policy;
+    let arena = ctx.arena;
+    let Some(mut next) = commands.pop() else {
+        return;
+    };
+    loop {
+        #[cfg(feature = "comment_check")]
+        let record = |id: DocId| {
+            if ledger_on && let Some((span, key)) = arena.comment_doc_tag(id) {
+                comment_ledger::record_emitted_keyed(key, span);
+            }
+        };
+        match &nodes[next.doc.index()] {
+            DocNode::Concat(range) => {
+                #[cfg(feature = "comment_check")]
+                record(next.doc);
+                let kids = range.resolve(children_vec);
+                let Some((&first, rest)) = kids.split_first() else {
+                    match commands.pop() {
+                        Some(n) => {
+                            next = n;
+                            continue;
+                        }
+                        None => return,
+                    }
+                };
+                for &child in rest.iter().rev() {
+                    commands.push(next.with_doc(child));
+                }
+                next = next.with_doc(first);
+            }
+            DocNode::IfBreak {
+                break_doc,
+                flat_doc,
+                group_id,
+            } => {
+                let broke = match group_id {
+                    Some(gid) => arena.keyed_group_broke(*gid),
+                    None => next.mode() == Mode::Break,
+                };
+                next = next.with_doc(if broke { *break_doc } else { *flat_doc });
+            }
+            DocNode::Indent(inner) => next = next.indented(*inner),
+            DocNode::Dedent(inner) => next = next.dedented(*inner),
+            DocNode::BreakParent | DocNode::FlushBreak | DocNode::EmbedEnd { .. } => {
+                match commands.pop() {
+                    Some(n) => next = n,
+                    None => return,
+                }
+            }
+            // The host's own break: the embed end already made it.
+            DocNode::Line(_) => return,
+            DocNode::Text(t) => {
+                let (CachedWidth::Width(w), Some(rest)) = (
+                    t.cached_width(),
+                    resolve_text(t, ctx.source, pool).strip_prefix(' '),
+                ) else {
+                    commands.push(next);
+                    return;
+                };
+                #[cfg(feature = "comment_check")]
+                record(next.doc);
+                #[cfg(feature = "swallow_check")]
+                if policy.swallow_enabled() {
+                    policy.swallow_on_text(arena.is_line_comment(next.doc), rest, output);
+                }
+                output.push_str(rest);
+                *pos += (w as usize).saturating_sub(1);
+                return;
+            }
+            _ => {
+                commands.push(next);
+                return;
+            }
+        }
+    }
+}
+
 /// The shared command-stack render loop with look-ahead — the single
 /// implementation behind [`render_doc_iterative`] and
 /// [`render_single_doc_inner`], parameterized by [`RenderPolicy`]. Pending
@@ -1270,6 +1449,34 @@ fn render_doc_core<P: RenderPolicy>(
                         policy.tracking_suffix(),
                         line_suffix,
                         should_remeasure,
+                    );
+                }
+            }
+
+            DocNode::EmbedEnd { dedent_closer, .. } => {
+                // Inert with nothing pending. With a run pending, this is the last line
+                // end the embedded document owns: flush it here as the host's own run, and
+                // when it ends in a `//` end the line too — at the closer's level — and shed
+                // the one separator the host put before what follows (a space, or its own
+                // break), which the break has made redundant. Whether it flushed is
+                // recorded under the node's own id, which a host's `if_break_with_id`
+                // reads ([`DocArena::embed_end`]): the value then ENDS on a comment.
+                if policy.tracking_suffix() {
+                    render_embed_end(
+                        ctx,
+                        nodes,
+                        children_vec,
+                        pool,
+                        commands,
+                        output,
+                        pos,
+                        line_suffix,
+                        should_remeasure,
+                        cmd,
+                        *dedent_closer,
+                        policy,
+                        #[cfg(feature = "comment_check")]
+                        ledger_on,
                     );
                 }
             }

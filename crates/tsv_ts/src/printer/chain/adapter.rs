@@ -83,6 +83,9 @@ impl<'a> Printer<'a> {
         // index→`]`: a same-line comment trails the index, an own-line one keeps its line.
         let mut body_parts = DocBuf::new();
         body_parts.push(inner);
+        if self.has_comments_to_emit_between(prop_end, bracket_end) {
+            self.push_deferred_run_end(&mut body_parts, inner);
+        }
         let mut prev = prop_end;
         for comment in self.comments_to_emit_between(prop_end, bracket_end) {
             if self.is_same_line(prev, comment.span.start) {

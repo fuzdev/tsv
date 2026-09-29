@@ -1464,6 +1464,7 @@ impl<'a> Printer<'a> {
         // preserves right-side parens).
         if let ExpressionKind::BinaryExpression(right_binary) = &expr.right.kind
             && expr.operator.rebalances_with(right_binary.operator)
+            && !(ends_chain && self.value_end_kept_pair(expr.right).is_some())
         {
             self.collect_binary_chain_with_spans(
                 right_binary,
@@ -1519,13 +1520,46 @@ impl<'a> Printer<'a> {
         // `)` right after. A pair the printer mints for clarity (`p && q || r && s`) has no
         // `)` of its own in the source, and the next one belongs to an enclosing construct
         // (`void(… r && s // c⏎)`) whose own trailing emitter prints that run.
-        if self.needs_parens(operand, ctx)
-            && let Some(open) = self
+        let kept_for_value_end = self.value_end_kept_pair(operand);
+        let keeps_for_value_end = kept_for_value_end.is_some();
+        if let Some((open, close)) = kept_for_value_end.or_else(|| {
+            if !self.needs_parens(operand, ctx) {
+                return None;
+            }
+            let open = self
                 .prev_significant_pos(span.start)
-                .filter(|&at| self.source.as_bytes()[at as usize] == b'(')
-            && let Some(close) = self.paren_shell_close_after(span.end)
-            && self.pair_trailing_run_defers(span.end, close)
-        {
+                .filter(|&at| self.source.as_bytes()[at as usize] == b'(')?;
+            Some((open, self.paren_shell_close_after(span.end)?))
+        }) {
+            // A kept pair whose `(`→operand gap holds a comment takes the opened shape
+            // below, which owns that gap too.
+            let leading_run =
+                keeps_for_value_end && self.has_comments_to_emit_between(open + 1, span.start);
+            if !leading_run && !self.pair_trailing_run_defers(span.end, close) {
+                if keeps_for_value_end {
+                    // A run of same-line blocks stays inline, inside the kept pair.
+                    let d = self.d();
+                    let mut body: DocBuf = smallvec![d.text("(")];
+                    body.push(self.build_value_with_outermost_owned_comment(operand, || {
+                        self.build_chain_aware_operand_doc(operand)
+                    }));
+                    self.push_anchored_trailing_run(
+                        &mut body,
+                        span.end,
+                        close,
+                        RunLeadingBlank::Keep,
+                    );
+                    body.push(d.text(")"));
+                    return ChainOperand {
+                        doc: d.concat(&body),
+                        span: Span::new(open, close),
+                    };
+                }
+                return ChainOperand {
+                    doc: self.build_binary_operand_doc(operand, parent_op, true),
+                    span,
+                };
+            }
             // The opened pair owns BOTH its gaps, as every required pair in the family
             // does: a `//` the author glued to the `(` keeps the `(` line (the
             // opening-delimiter rule), and the rest of the `(`→operand run leads the
@@ -1565,6 +1599,39 @@ impl<'a> Printer<'a> {
             prev_end = comment.span.end;
             defers
         })
+    }
+
+    /// The author's pair around `operand` — a chain's last operand — that must be KEPT
+    /// because the host rejects a comment at the value's end
+    /// (`EmbedContext::value_end_takes_no_comment`), as `(open, close)` with `close` past its
+    /// `)`: the OUTERMOST pair the author wrote around the operand, when a comment sits
+    /// between the operand and that pair's `)`. Stripped, the comment could end the value
+    /// (`{#each a || (b // c⏎)}` would print `{#each a || b // c⏎}`, which Svelte rejects);
+    /// kept, the pair is the one place the comment can stand. Whatever follows the pair —
+    /// `.m`, `[i]`, a call's `)` — does not matter: the host builds under the field only
+    /// when the value's ordinary build ends on a comment, and the kept pair is valid either
+    /// way. Nested redundant pairs (`((b // c1⏎) // c2⏎)`) keep the outermost one, holding
+    /// every comment the layers held.
+    fn value_end_kept_pair(&self, operand: &Expression<'_>) -> Option<(u32, u32)> {
+        if !self.embed.value_end_takes_no_comment {
+            return None;
+        }
+        let bytes = self.source.as_bytes();
+        let span = operand.span();
+        let (mut start, mut end) = (span.start, span.end);
+        let mut pair = None;
+        while let Some(open) = self
+            .prev_significant_pos(start)
+            .filter(|&at| bytes[at as usize] == b'(')
+            && let Some(close) = self.paren_shell_close_after(end)
+        {
+            pair = Some((open, close));
+            start = open;
+            end = close;
+        }
+        let (open, close) = pair?;
+        self.has_comments_to_emit_between(span.end, close)
+            .then_some((open, close))
     }
 
     /// The left operand of `expr` as the binary this chain FLATTENS into, if it does:

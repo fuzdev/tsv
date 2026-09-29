@@ -77,20 +77,35 @@ impl<'a> Printer<'a> {
         // `closer_owns_break` is false: this run is emitted at the tag's own level, outside
         // whatever `indent(…)` the declarator list built, so a `//`'s own `hardline` is
         // already the break the `;}` needs.
-        let (trailing_docs, _) = self.trailing_comment_docs(gap.start, gap.end, false);
-        // A lone declarator with no initializer keeps its `;` (prettier's rule). A comment
-        // in the gap forces one back on at every other shape — it is the comment's own
-        // terminator, and without it the comment abuts the `}`, which Svelte rejects.
-        let emit_semicolon = (decl.declarations.len() == 1 && decl.declarations[0].init.is_none())
-            || !trailing_docs.is_empty();
         let inner = tsv_ts::build_variable_declaration_doc(d, decl, &self.ts_inputs(), self.embed);
+        // The declaration is the island's value: a run it defers to its own end flushes
+        // ahead of the gap's run, as the gap's own comment would print there.
+        let trailing = self.value_trailing_docs(inner, decl.span, gap.start, gap.end, false);
+        // A lone declarator with no initializer keeps its `;` (prettier's rule). A comment
+        // the declaration ENDS on forces one back on at every other shape — it is the
+        // comment's own terminator, and without it the comment abuts the `}`, which Svelte
+        // rejects. Three things end it on one: a comment in the gap; one the value prints
+        // inline at its own end (a same-line block from a stripped pair,
+        // `{let r = a || b /* c */;}`); and a run the value defers to the embed end, which
+        // only the render settles — a hugged arrow's run reaches it only while its call
+        // stays flat — so that `;` is keyed on whether the embed end flushed.
+        let bare_declarator = decl.declarations.len() == 1 && decl.declarations[0].init.is_none();
+        let semicolon = if bare_declarator
+            || trailing.gap_run
+            || !self.gap_known_comment_free(decl.span.start, decl.span.end)
+                && d.may_end_on_comment_text(inner, self.source)
+        {
+            Some(d.text(";"))
+        } else {
+            trailing
+                .embed_end
+                .map(|end| d.if_break_with_id(d.text(";"), d.empty(), end))
+        };
         let mut parts = DocBuf::new();
         parts.push(d.text("{"));
         parts.push(inner);
-        parts.extend(trailing_docs);
-        if emit_semicolon {
-            parts.push(d.text(";"));
-        }
+        parts.extend(trailing.docs);
+        parts.extend(semicolon);
         parts.push(d.text("}"));
         d.concat(&parts)
     }
@@ -158,10 +173,15 @@ impl<'a> Printer<'a> {
                 &self.ts_inputs(),
                 self.const_init_embed(),
                 operator_pos,
-                || {
-                    let (trailing_docs, _) =
-                        self.trailing_comment_docs(init.span().end, span.end - 1, true);
-                    d.concat(&trailing_docs)
+                |value| {
+                    let trailing = self.value_trailing_docs(
+                        value,
+                        init.span(),
+                        init.span().end,
+                        span.end - 1,
+                        true,
+                    );
+                    d.concat(&trailing.docs)
                 },
             )
         {
@@ -385,9 +405,10 @@ impl<'a> Printer<'a> {
         // The run's last comment supplies the break the tag's `}` reuses —
         // `build_assignment_tag_doc` places that `}` in all three of its layouts, and
         // `closer_owns_break` says which of them indented the init out from under it.
-        let (trailing_docs, _) = self.trailing_comment_docs(expr_end, span_end, closer_owns_break);
+        let trailing =
+            self.value_trailing_docs(expr_doc, expr.span(), expr_end, span_end, closer_owns_break);
 
-        self.concat_with_surrounding_comments(leading_docs, expr_doc, trailing_docs)
+        self.concat_with_surrounding_comments(leading_docs, expr_doc, trailing.docs)
     }
 
     /// The [`tsv_lang::EmbedContext`] a `{@const}` init is built under. `mode` stays the
@@ -553,7 +574,15 @@ impl<'a> Printer<'a> {
                 let after: CommentRun<'_> = self
                     .comments_in_source_between(last_end, id_start)
                     .collect();
-                self.push_list_separator(&mut parts, &before, comma, &after, id_start, d.text(" "));
+                self.push_list_separator(
+                    &mut parts,
+                    &before,
+                    comma,
+                    &after,
+                    id_start,
+                    d.text(" "),
+                    None,
+                );
             } else {
                 // Comments after the keyword lead the first identifier.
                 parts.extend(self.leading_comment_docs_in_source(last_end, id_start));

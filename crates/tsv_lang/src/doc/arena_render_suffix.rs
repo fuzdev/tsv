@@ -22,7 +22,9 @@
 //! token. Whether two deferred comments share an output line is a layout fact only this
 //! module has.
 
-use super::arena::{ArenaCommand, DocArena, DocId, DocNode, LineSuffixBuf};
+use smallvec::SmallVec;
+
+use super::arena::{ArenaCommand, DocArena, DocId, DocNode, LineSuffixBuf, RenderIndent};
 use super::arena_render::{RenderCtx, render_line_break, render_single_doc_inner};
 use super::types::{LineKind, Mode, resolve_text};
 
@@ -103,6 +105,87 @@ pub(super) fn flush_line_suffix_tail_is_line_comment(
     flush_line_suffix_run(ctx, line_suffix, output, pos, should_remeasure).is_some_and(|last| {
         with_doc_store(ctx, |docs| docs.ends_in_line_comment(last.doc, last.mode()))
     })
+}
+
+/// The flush an **embed end** takes ([`DocNode::EmbedEnd`]), returning whether the run ends
+/// in a `//`.
+///
+/// The run lands as the host's own trailing run over the same comments would — the form the
+/// next pass reads it back as: every comment behind no `//` GLUED onto the line (an own-line
+/// one drops the break it carries and takes a space instead), and every comment behind a `//`
+/// on a line of its own at `indent`, the island content's level, with any break it carried
+/// (an author blank included) replaced by that one. That is the rule a Svelte island's
+/// trailing run spells (`trailing_comment_run_docs`: a comment starts its line only after a
+/// `//`, and the run keeps no blank). The ordinary flush places a suffix at the indent it
+/// was QUEUED at instead — correct where the reparse finds the comment inside the construct
+/// that queued it, and wrong here, where the reparse finds it in the host's run.
+pub(super) fn flush_line_suffix_as_host_run(
+    ctx: &RenderCtx<'_>,
+    line_suffix: &mut LineSuffixBuf,
+    output: &mut String,
+    pos: &mut usize,
+    should_remeasure: &mut bool,
+    indent: RenderIndent,
+    mode: Mode,
+) -> bool {
+    let mut after_line_comment = false;
+    for suffix_cmd in std::mem::take(line_suffix) {
+        // The payload without the break(s) it opens with, when it opens with any.
+        let (opens, body): (bool, SmallVec<[DocId; 4]>) = with_doc_store(ctx, |docs| {
+            let doc = suffix_cmd.doc;
+            if !docs.opens_its_own_line(doc, suffix_cmd.mode()) {
+                return (false, smallvec::smallvec![doc]);
+            }
+            let DocNode::Concat(range) = &docs.nodes[doc.index()] else {
+                return (false, smallvec::smallvec![doc]);
+            };
+            let rest: SmallVec<[DocId; 4]> = range
+                .resolve(docs.children)
+                .iter()
+                .copied()
+                .skip_while(|kid| matches!(docs.nodes[kid.index()], DocNode::Line(_)))
+                .collect();
+            (true, rest)
+        });
+        let content_start = if after_line_comment {
+            render_line_break(
+                LineKind::Hard,
+                mode,
+                indent,
+                output,
+                pos,
+                ctx.render,
+                ctx.embed,
+            );
+            output.len()
+        } else {
+            if opens {
+                output.push(' ');
+                *pos += 1;
+            }
+            usize::MAX
+        };
+        let body_start = output.len();
+        for doc in body {
+            render_single_doc_inner(
+                ctx,
+                doc,
+                output,
+                pos,
+                indent,
+                suffix_cmd.mode(),
+                None,
+                should_remeasure,
+            );
+        }
+        if content_start == body_start && !opens {
+            drop_line_head_space(output, pos, content_start);
+        }
+        after_line_comment = with_doc_store(ctx, |docs| {
+            docs.ends_in_line_comment(suffix_cmd.doc, suffix_cmd.mode())
+        });
+    }
+    after_line_comment
 }
 
 /// The flush loop both entry points share, returning the LAST suffix it rendered (`None`
@@ -314,7 +397,8 @@ impl<'a> DocStore<'a> {
             DocNode::BreakParent
             | DocNode::FlushBreak
             | DocNode::FlowProbeEnd
-            | DocNode::LineSuffixBoundary => None,
+            | DocNode::LineSuffixBoundary
+            | DocNode::EmbedEnd { .. } => None,
         }
     }
 
