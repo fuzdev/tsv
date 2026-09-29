@@ -553,7 +553,18 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// set-diff between a pre-change `--profile corpus` FFI build and the tip over the whole
 	// gates view: those two files are the only movers in any bucket of any language, `safety`
 	// stays 0, and the two CLIs' outputs for them differ in that one hunk each.
-	typescript: 5184,
+	//
+	// 5184 → 5190: four `new`-callee files arrive from `unknown`, byte-identical to prettier's
+	// output — `prettier/tests/format/js/chain-expression/new-expression.js`,
+	// `…/js/new-expression/new_expression.js`, `…/typescript/chain-expression/new-expression.ts`
+	// and `…/typescript/non-null/parens.ts` — by the `new`-callee pair rule
+	// (`Printer::new_callee_holds_bare_call`: a pair exactly where the callee holds a call on its
+	// left spine that no pair the printer keeps encloses). The other two of the six were already
+	// matching before this change, headroom above the old minimum (the baseline reads 5186).
+	// Measured by an `--all --json` bucket set-diff between a baseline `--profile corpus` FFI
+	// build and the tip: those four are the only movers in `unknown`, `partial` and `safety` of
+	// any language.
+	typescript: 5190,
 	// ⚠️ A short `svelte_styles` cache understates every css count at once and reads exactly
 	// like a regression: the harvest is a CORPUS INPUT, not a measurement of tsv, and a
 	// standalone `corpus:compare:format --all` is the one entry point that does not chain it
@@ -994,7 +1005,10 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// 64 → 63: `prettier/tests/format/typescript/arrow/issue-14563.ts` leaves for `match` — the
 	// curried chain under an operator-line `//`. Reasoning and the bucket set-diff on
 	// `CORPUS_FORMAT_MATCH_MIN`.
-	typescript: 63,
+	//
+	// 63 → 59: the four `new`-callee files named on `CORPUS_FORMAT_MATCH_MIN` leave for
+	// `match`. Reasoning and the bucket set-diff there.
+	typescript: 59,
 	// 23 → 18: five files LEAVE for `match` (`match` 133 → 138), all of them one language
 	// question — which reader prettier hands an at-rule prelude to, and what that reader
 	// does with the text inside a feature expression.
