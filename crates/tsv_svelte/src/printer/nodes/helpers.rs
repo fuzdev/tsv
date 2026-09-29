@@ -26,6 +26,9 @@ use tsv_ts::{Expression, ExpressionKind};
 /// not continue a comparison for acorn, but tsv's own parser refuses the bare head there,
 /// so the pair keeps tsv's output reparseable.) The constructors are the one statement of
 /// which heads are followed by a word.
+// TODO: the `catch` pair exists only for tsv's own over-rejection of a bare
+// `{#await f<T> catch e}` (Svelte accepts it); once the parser accepts that head,
+// `of_await` can answer `Delimiter` for the `catch` shorthand and the pair goes with it.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum HeadTail {
     /// The head's own syntax continues with a word.

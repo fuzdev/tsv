@@ -283,6 +283,16 @@ impl<'arena> Expression<'arena> {
             _ => false,
         }
     }
+
+    /// True when this is a non-null assertion sealing a parenthesized optional chain
+    /// (`(a?.b)!`) — [`TSNonNullExpression::seals_optional_chain`] asked of the node that
+    /// holds it.
+    pub fn is_sealing_non_null(&self) -> bool {
+        matches!(
+            &self.kind,
+            ExpressionKind::TSNonNullExpression(n) if n.seals_optional_chain(self.span)
+        )
+    }
 }
 
 /// JSDoc type cast: `/** @type {T} */ (inner)`.

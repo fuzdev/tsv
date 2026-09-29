@@ -866,11 +866,7 @@ impl<'a> Printer<'a> {
                 let list = tagged.type_arguments.as_ref();
                 let keeps_pair = self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag)
                     || tag_paren_leading_start(tagged, expr.span).is_some()
-                    || matches!(
-                        &tagged.tag.kind,
-                        E::TSNonNullExpression(non_null)
-                            if non_null.seals_optional_chain(tagged.tag.span())
-                    )
+                    || tagged.tag.is_sealing_non_null()
                     || list.is_some_and(|list| {
                         instantiation_keeps_pair_before_type_args(
                             self.source,

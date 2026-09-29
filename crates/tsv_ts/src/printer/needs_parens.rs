@@ -459,11 +459,7 @@ pub(crate) fn instantiation_operand_is_sealed_chain(
     inst_start: u32,
     operand: &Expression<'_>,
 ) -> bool {
-    child_stops_optional_chain(inst_start, false, operand)
-        || matches!(
-            &operand.kind,
-            ExpressionKind::TSNonNullExpression(non_null) if non_null.seals_optional_chain(operand.span)
-        )
+    child_stops_optional_chain(inst_start, false, operand) || operand.is_sealing_non_null()
 }
 
 /// Whether the instantiation chain `head` is built on an optional chain no authored pair

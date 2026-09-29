@@ -1548,25 +1548,25 @@ impl<'a> Printer<'a> {
                 continues,
             },
         );
-        // An optional chain the author sealed keeps its pair, `!` spelling included
+        // An optional chain the author sealed keeps its pair
         // ([`instantiation_operand_is_sealed_chain`]): bare, the list and whatever follows
-        // it join the chain.
-        let sealed = instantiation_operand_is_sealed_chain(span.start, inst_expr.expression);
-        parts.push(
-            match self
-                .build_sealed_non_null_paren_doc(inst_expr.expression)
-                .filter(|_| sealed)
-            {
-                Some(sealed_doc) => sealed_doc,
-                None => self.build_shell_operand_doc(
+        // it join the chain. The `!` spelling (`(a?.b)!<T>`) is the sealed shell's own
+        // builder; every other operand asks the position.
+        let operand_doc = match self.build_sealed_non_null_paren_doc(inst_expr.expression) {
+            Some(sealed_doc) => sealed_doc,
+            None => {
+                let sealed =
+                    instantiation_operand_is_sealed_chain(span.start, inst_expr.expression);
+                self.build_shell_operand_doc(
                     span.start,
                     inst_expr.expression,
                     ParenContext::InstantiationExpression {
                         source_pair: second_list_pair || sealed,
                     },
-                ),
-            },
-        );
+                )
+            }
+        };
+        parts.push(operand_doc);
         // Preserve comments between expression and type args: `fn/* c */ <string>`
         let expr_end = inst_expr.expression.span().end;
         let ta_start = inst_expr.type_arguments.span.start;
