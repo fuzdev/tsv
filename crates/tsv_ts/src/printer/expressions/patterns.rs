@@ -1083,6 +1083,17 @@ impl<'a> Printer<'a> {
     /// String keys that are valid identifiers are normalized to unquoted form:
     /// `{"key": value}` → `{key: value}`
     fn build_object_pattern_property_doc(&self, prop: &ObjectPatternProperty<'_>) -> DocId {
+        // A property is a list element: a run its default deferred out of a stripped pair
+        // flushes at its comma.
+        self.build_list_element_doc(prop.span().start, || {
+            self.build_object_pattern_property_doc_uncounted(prop)
+        })
+    }
+
+    fn build_object_pattern_property_doc_uncounted(
+        &self,
+        prop: &ObjectPatternProperty<'_>,
+    ) -> DocId {
         let d = self.d();
         match prop {
             ObjectPatternProperty::Property(p) => {
@@ -1322,7 +1333,9 @@ impl<'a> Printer<'a> {
                     parts.push(leading_comments);
                 }
 
-                parts.push(self.build_expression_doc(e));
+                parts.push(
+                    self.build_list_element_doc(e.span().start, || self.build_expression_doc(e)),
+                );
 
                 // Unguarded for the same reason as the object pattern's grouped twin: a
                 // freeze needs a directive comment, which routes the pattern to the
@@ -1433,7 +1446,9 @@ impl<'a> Printer<'a> {
                 let frozen_span = self.element_frozen_span(arr_span.start + 1, arr.elements, i);
                 let element_doc = match frozen_span {
                     Some(frozen) => self.build_frozen_arg_doc(e, frozen),
-                    None => self.build_expression_doc(e),
+                    None => {
+                        self.build_list_element_doc(e.span().start, || self.build_expression_doc(e))
+                    }
                 };
                 parts.push(self.build_list_element_group_from_comments(
                     leading_comments.iter().copied(),

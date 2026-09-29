@@ -3194,9 +3194,13 @@ impl<'a> Printer<'a> {
         if let Some(frozen) = list_frozen {
             return self.build_frozen_span_doc(frozen);
         }
-        self.build_frozen_param_binding_doc(param)
-            // FunctionParameter context for object patterns
-            .unwrap_or_else(|| self.build_function_parameter_doc(param))
+        // A parameter is a list element: a run its default deferred out of a stripped pair
+        // flushes at its comma.
+        self.build_list_element_doc(param.span().start, || {
+            self.build_frozen_param_binding_doc(param)
+                // FunctionParameter context for object patterns
+                .unwrap_or_else(|| self.build_function_parameter_doc(param))
+        })
     }
 
     /// Shared implementation for building params doc with comment handling

@@ -574,15 +574,19 @@ impl<'a> Printer<'a> {
     /// return/throw's non-hanging paths — use `split_terminator_gap_comments` instead.
     /// return/throw's hanging layout uses **both**: this method for the region inside the
     /// retained parens, then that one for anything past the `)`.
-    /// Returns whether the run **deferred** — whether anything went out on a
-    /// `line_suffix` rather than inline. A caller whose construct has no break of its own
-    /// to flush against needs that answer: a deferred run rides to the end of the output
-    /// line, and where that line ends outside the construct the comment re-binds there
-    /// (the `{#snippet}` head floated a `//` past `{/snippet}`, into template text). Such
-    /// a caller pushes a flush-scoped break on `true` — and only on `true`, since forcing
-    /// it for an inline block breaks a construct that had no reason to open, which the
-    /// reparse then closes again. Callers that already end the line — the operand shells,
-    /// whose deferral lands past their own terminator — ignore it.
+    ///
+    /// ⚠️ **A run that DEFERS is counted** ([`Printer::deferred_paren_runs`]). The pair this
+    /// gap sat in is gone from the output (or, for a sequence, closes before the run), so
+    /// nothing here ends the line: the suffix rides to wherever the ENCLOSING line ends. A
+    /// statement's line ends past its `;` (`const r = x + y * z; // c`, prettier's fixed
+    /// point too), and so does a chain or a `return` hang inside it — every layout there
+    /// is the one the comment-free operand takes. A comma list's line would end past the
+    /// list's `)` and whatever follows it, outside the construct the run was written in
+    /// (`docs/comments.md` §Trailing and dangling runs), so the list reads the count
+    /// around each element ([`Self::build_list_element_doc`]) and breaks, flushing the run
+    /// at the element's comma: `f(⏎\tx + y * z, // c⏎\t1⏎)`.
+    ///
+    /// Returns whether the run deferred.
     pub(crate) fn append_trailing_paren_comments(
         &self,
         parts: &mut DocBuf,
@@ -615,7 +619,75 @@ impl<'a> Printer<'a> {
             deferred_run |= own_line || !comment.is_block;
             prev_end = comment.span.end;
         }
+        if deferred_run {
+            self.deferred_paren_runs
+                .set(self.deferred_paren_runs.get() + 1);
+        }
         deferred_run
+    }
+
+    /// Build one element of a comma LIST, and end it with a flush-scoped break when its
+    /// build deferred a run out of a stripped grouping pair
+    /// ([`Self::append_trailing_paren_comments`], counted in
+    /// [`Printer::deferred_paren_runs`]).
+    ///
+    /// The deferred `//` rides a `line_suffix` to wherever its line ends, and a list that
+    /// stays flat ends it past the list's `)` / `]` — outside the construct it was written
+    /// in (`docs/comments.md` §Trailing and dangling runs). The break placed AFTER the
+    /// element arms in the `fits` walk and fails the list's own next line opportunity —
+    /// the separator behind the element, or the closer's softline — so the list breaks and
+    /// the run flushes at the element's comma, where the reparse finds it as the element's
+    /// trailing comment. That is prettier's shape too: its trailing line comment carries a
+    /// `breakParent` to the list. Content inside the element stays flat when it fits, since
+    /// the break arms only past it.
+    ///
+    /// `element_start` records the element as one that forces its list
+    /// ([`Self::span_holds_forced_list_break`]), for a layout that has to know it before
+    /// measuring. The count is restored once read, so an enclosing list does not break for
+    /// a run this one already flushes.
+    pub(crate) fn build_list_element_doc(
+        &self,
+        element_start: u32,
+        build: impl FnOnce() -> DocId,
+    ) -> DocId {
+        let before = self.deferred_paren_runs.get();
+        let doc = build();
+        if self.deferred_paren_runs.get() == before {
+            return doc;
+        }
+        self.deferred_paren_runs.set(before);
+        self.forced_list_elements.borrow_mut().push(element_start);
+        let d = self.d();
+        d.concat(&[doc, d.flush_break()])
+    }
+
+    /// Whether `span` holds a list element that breaks its list
+    /// ([`Self::build_list_element_doc`]) — the element itself, or one nested at any depth
+    /// inside it (`o.aaaa().bbbb(g(x + (y // c⏎)), 1)`, whose `g(…)` argument carries the
+    /// forced break of its own inner list). Asked after the doc covering `span` is built.
+    ///
+    /// The break is a `flush_break`, which `DocArena::will_break` does not see and which
+    /// fails a flat measure only past the element: a layout that picks a state by
+    /// measuring the WHOLE list flat reads the list as unable to fit anywhere, where the
+    /// reparse — the comment then sitting in the element's comma gap, a real break —
+    /// reads it as broken. The member chain is that layout: its one-line state is the
+    /// reparse's answer (`o.aaaa().bbbb(⏎\tx + y, // c⏎\t1⏎)`), and it asks this to see
+    /// the break the reparse sees.
+    pub(crate) fn span_holds_forced_list_break(&self, span: Span) -> bool {
+        self.forced_list_elements
+            .borrow()
+            .iter()
+            .any(|&start| span.start <= start && start < span.end)
+    }
+
+    /// Run `build` and discard any run count it added: the construct it builds ends its
+    /// own line, so a run deferred inside it flushes there and no enclosing list owes it a
+    /// break ([`Self::build_list_element_doc`]). A statement is that construct.
+    pub(crate) fn with_line_ending_construct<T>(&self, build: impl FnOnce() -> T) -> T {
+        let before = self.deferred_paren_runs.get();
+        let built = build();
+        self.deferred_paren_runs.set(before);
+        built
     }
 
     /// Split the trailing comments in a statement terminator's content→`;` gap

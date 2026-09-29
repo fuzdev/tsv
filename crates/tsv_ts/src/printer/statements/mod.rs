@@ -204,6 +204,16 @@ impl<'a> Printer<'a> {
         statement: &Statement<'_>,
         ctx: StatementContext,
     ) -> DocId {
+        // A statement ends its own line, so a run its value deferred out of a stripped
+        // pair flushes there, never at an enclosing list's comma.
+        self.with_line_ending_construct(|| self.build_statement_doc_uncounted(statement, ctx))
+    }
+
+    fn build_statement_doc_uncounted(
+        &self,
+        statement: &Statement<'_>,
+        ctx: StatementContext,
+    ) -> DocId {
         let d = self.d();
         match &statement.kind {
             StatementKind::ExpressionStatement(stmt) => {

@@ -335,6 +335,24 @@ pub struct Printer<'a> {
     /// It is the *list* that goes flat, never a parameter's own doc — a destructured pattern
     /// still expands on its own, which is why this is not a `remove_lines` over the signature.
     pub(crate) test_call_flat_params: Cell<bool>,
+    /// How many trailing runs [`Self::append_trailing_paren_comments`] has DEFERRED out of a
+    /// grouping pair the printer strips (`x + (y * z // c⏎)`): a `line_suffix` that no
+    /// break inside the operand ends, so it rides to wherever the enclosing line ends.
+    ///
+    /// A comma list reads it around each element's build ([`Self::build_list_element_doc`])
+    /// and breaks when the element deferred, so the run flushes at that element's comma —
+    /// prettier's mechanism, whose trailing line comment carries its `breakParent` to the
+    /// list. Only a list asks: a statement ends the line on its own and discards what its
+    /// build added ([`Self::with_line_ending_construct`]), and every other construct leaves
+    /// the run to its enclosing list or statement. A counter rather than a flag so a list
+    /// can tell ITS elements' runs from those built before it.
+    pub(crate) deferred_paren_runs: Cell<u32>,
+    /// The start of every list element whose build deferred such a run, so the list
+    /// breaks around it ([`Self::build_list_element_doc`]) — the element's own record of
+    /// the fact, which a doc built once and SHARED across layout states cannot re-report
+    /// through the counter. Read by [`Self::span_holds_forced_list_break`]; empty in almost
+    /// every document.
+    pub(crate) forced_list_elements: RefCell<Vec<u32>>,
     /// Span of the node at the leftmost position of an arrow body that must be wrapped in
     /// parens because a concise body cannot start with its first token — an object's `{`
     /// (read as a block body) or a decorated class's `@`: `() => ({}) as Logger`,
@@ -689,6 +707,8 @@ impl<'a> Printer<'a> {
             skip_arrow_chain: Cell::new(false),
             expand_last_arg_flat_params: Cell::new(false),
             test_call_flat_params: Cell::new(false),
+            deferred_paren_runs: Cell::new(0),
+            forced_list_elements: RefCell::new(Vec::new()),
             arrow_body_leftmost_parens_target: Cell::new(None),
             expr_stmt_paren_target: Cell::new(None),
             ternary_hang_target: Cell::new(None),
@@ -997,8 +1017,14 @@ impl<'a> Printer<'a> {
     /// The byte before `pos` once whitespace — the lexer's JavaScript class — and comments
     /// are stepped over backwards: the reverse of [`next_significant_byte`], reading the
     /// comment table rather than the bytes to know where a comment began.
-    fn prev_significant_byte(&self, mut pos: u32) -> Option<u8> {
-        let bytes = self.source.as_bytes();
+    fn prev_significant_byte(&self, pos: u32) -> Option<u8> {
+        self.prev_significant_pos(pos)
+            .map(|at| self.source.as_bytes()[at as usize])
+    }
+
+    /// Where [`Self::prev_significant_byte`]'s byte sits — the offset of the last byte
+    /// before `pos` that is neither whitespace nor comment text.
+    pub(crate) fn prev_significant_pos(&self, mut pos: u32) -> Option<u32> {
         loop {
             while let Some(c) = self.source[..pos as usize].chars().next_back()
                 && tsv_lang::is_js_whitespace(c)
@@ -1011,7 +1037,7 @@ impl<'a> Printer<'a> {
             let before = self.comments.partition_point(|c| c.span.start < pos);
             match before.checked_sub(1).map(|i| self.comments[i].span) {
                 Some(comment) if comment.end >= pos => pos = comment.start,
-                _ => return Some(bytes[pos as usize - 1]),
+                _ => return Some(pos - 1),
             }
         }
     }

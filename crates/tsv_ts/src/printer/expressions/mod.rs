@@ -809,7 +809,11 @@ impl<'a> Printer<'a> {
         // field doc). The key carries the builder and the `expandLastArg` state, so a hit
         // is byte-identical to a rebuild.
         let key = self.chain_share_key(expr, ShareTag::ArgExpression);
-        self.chain_shared_doc(key, || self.build_arg_expression_doc_uncached(expr))
+        self.chain_shared_doc(key, || {
+            self.build_list_element_doc(expr.span().start, || {
+                self.build_arg_expression_doc_uncached(expr)
+            })
+        })
     }
 
     fn build_arg_expression_doc_uncached(&self, expr: &Expression<'_>) -> DocId {

@@ -738,7 +738,13 @@ impl<'a> Printer<'a> {
         // Collect all operands (with spans) and operators in the chain
         let mut operands: OperandBuf = OperandBuf::new();
         let mut operators: OperatorBuf = OperatorBuf::new();
-        self.collect_binary_chain_with_spans(binary, &mut operands, &mut operators, span.start);
+        self.collect_binary_chain_with_spans(
+            binary,
+            &mut operands,
+            &mut operators,
+            span.start,
+            true,
+        );
 
         if operands.len() <= 1 {
             // Single operand, shouldn't happen but handle gracefully
@@ -1402,17 +1408,29 @@ impl<'a> Printer<'a> {
     ///
     /// Uses `should_flatten()` to determine which operators can be chained together.
     /// Flattens both left and right sides when operators are compatible (e.g., `&&`, `||`).
+    ///
+    /// `ends_chain` says whether `expr`'s right operand is the chain's LAST operand — true
+    /// at the root, carried through a rebalanced right side, false down a flattened left
+    /// one — which is the one operand whose pair can hold a run nothing after it in the
+    /// chain can end ([`Self::build_chain_end_operand`]).
     fn collect_binary_chain_with_spans(
         &self,
         expr: &internal::BinaryExpression<'_>,
         operands: &mut OperandBuf,
         operators: &mut OperatorBuf,
         chain_start: u32,
+        ends_chain: bool,
     ) {
         // Recursively flatten left side if it can be chained with current operator
         match self.flattenable_left(expr) {
             Some(left_binary) => {
-                self.collect_binary_chain_with_spans(left_binary, operands, operators, chain_start);
+                self.collect_binary_chain_with_spans(
+                    left_binary,
+                    operands,
+                    operators,
+                    chain_start,
+                    false,
+                );
             }
             None => {
                 let left = expr.left;
@@ -1447,15 +1465,106 @@ impl<'a> Printer<'a> {
         if let ExpressionKind::BinaryExpression(right_binary) = &expr.right.kind
             && expr.operator.rebalances_with(right_binary.operator)
         {
-            self.collect_binary_chain_with_spans(right_binary, operands, operators, chain_start);
+            self.collect_binary_chain_with_spans(
+                right_binary,
+                operands,
+                operators,
+                chain_start,
+                ends_chain,
+            );
             return;
         }
 
         // Right operand can't be flattened - add as-is
-        operands.push(ChainOperand {
-            doc: self.build_binary_operand_doc(expr.right, expr.operator, true),
-            span: expr.right.span(),
+        operands.push(if ends_chain {
+            self.build_chain_end_operand(expr.right, expr.operator)
+        } else {
+            ChainOperand {
+                doc: self.build_binary_operand_doc(expr.right, expr.operator, true),
+                span: expr.right.span(),
+            }
         });
+    }
+
+    /// The chain's LAST operand, when the pair its position requires holds a run that
+    /// would defer: a `//`, a multi-line block, or a comment the author gave its own line,
+    /// between the operand and the pair's `)` (`x - (y - z // c⏎)`).
+    ///
+    /// Every other operand's pair is followed by an operator, and the operand→operator gap
+    /// emitter ends the line there. The last one's is followed by nothing the chain owns:
+    /// left to [`Self::wrap_chain_with_paren_comments`], the run defers past the pair's
+    /// `)` to the end of the ENCLOSING line — flushed inside an enclosing list, but past a
+    /// statement's `;` (merging with a comment already there, in prettier) and past a
+    /// Svelte tag's `}` into rendered page text. A deferred run must not leave the
+    /// construct it was written in (`docs/comments.md` §Trailing and dangling runs), and
+    /// this pair is still in the output to hold it, so the pair keeps the run and opens
+    /// around it: the operand one indent in, the run behind it in authored order, the `)`
+    /// back out on its own line — the expanded shell every required pair in the family
+    /// takes (the unary comment-holder, the non-null operand, the return and export
+    /// operands).
+    ///
+    /// The opened pair owns its `(`→operand gap too, so the returned span covers the
+    /// whole pair: the chain's operator→operand gap ends at the `(`, and its own
+    /// trailing-paren emitter starts after the `)`, neither printing a run a second time. A
+    /// run of same-line single-line blocks prints inline and cannot escape, so it keeps the
+    /// ordinary path.
+    fn build_chain_end_operand(
+        &self,
+        operand: &Expression<'_>,
+        parent_op: BinaryOperator,
+    ) -> ChainOperand {
+        let span = operand.span();
+        let ctx = ParenContext::BinaryRight { parent_op };
+        // The pair must be the AUTHOR's, around this operand: a `(` right before it and a
+        // `)` right after. A pair the printer mints for clarity (`p && q || r && s`) has no
+        // `)` of its own in the source, and the next one belongs to an enclosing construct
+        // (`void(… r && s // c⏎)`) whose own trailing emitter prints that run.
+        if self.needs_parens(operand, ctx)
+            && let Some(open) = self
+                .prev_significant_pos(span.start)
+                .filter(|&at| self.source.as_bytes()[at as usize] == b'(')
+            && let Some(close) = self.paren_shell_close_after(span.end)
+            && self.pair_trailing_run_defers(span.end, close)
+        {
+            // The opened pair owns BOTH its gaps, as every required pair in the family
+            // does: a `//` the author glued to the `(` keeps the `(` line (the
+            // opening-delimiter rule), and the rest of the `(`→operand run leads the
+            // operand inside the pair. Left to the operator→operand gap, that run printed
+            // AHEAD of the `(` (`x - // c⏎(⏎y - z …`), so the span reported to the chain
+            // opens at the `(` — the operator gap ends there.
+            let (paren_trailing, run_start) =
+                self.split_open_delimiter_glued_run(open + 1, span.start);
+            let mut body = DocBuf::new();
+            if let Some(run) = self.build_rhs_comments_opt(run_start, span.start) {
+                body.push(run);
+            }
+            body.push(self.build_value_with_outermost_owned_comment(operand, || {
+                self.build_chain_aware_operand_doc(operand)
+            }));
+            self.push_anchored_trailing_run(&mut body, span.end, close, RunLeadingBlank::Keep);
+            return ChainOperand {
+                doc: self.compose_expanded_shell_doc(paren_trailing, &body, ")"),
+                span: Span::new(open, close),
+            };
+        }
+        ChainOperand {
+            doc: self.build_binary_operand_doc(operand, parent_op, true),
+            span,
+        }
+    }
+
+    /// Whether the run in `[start, end)` holds a comment the trailing emitters DEFER — a
+    /// `//`, a multi-line block, or one the author gave a line of its own — as opposed to
+    /// a run of same-line single-line blocks, which prints inline where it stands.
+    fn pair_trailing_run_defers(&self, start: u32, end: u32) -> bool {
+        let mut prev_end = start;
+        self.comments_to_emit_between(start, end).any(|comment| {
+            let defers = !comment.is_block
+                || comment.multiline
+                || self.comment_has_newline_between(prev_end, comment.span.start);
+            prev_end = comment.span.end;
+            defers
+        })
     }
 
     /// The left operand of `expr` as the binary this chain FLATTENS into, if it does:

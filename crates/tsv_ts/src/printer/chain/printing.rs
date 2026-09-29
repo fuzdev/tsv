@@ -534,11 +534,35 @@ fn print_group_inner<'a>(
     skip_first_comments: bool,
 ) -> DocId {
     let d = printer.arena();
-    d.concat_iter(group.nodes.iter().enumerate().map(|(i, n)| {
+    let doc = d.concat_iter(group.nodes.iter().enumerate().map(|(i, n)| {
         // Skip comments only for the first member node
         let skip_comments = skip_first_comments && i == 0 && n.is_member();
         print_node_inner(n, printer, expanded, skip_comments)
-    }))
+    }));
+    // A call whose argument list breaks for a run an argument deferred — at the argument
+    // or in a list nested inside it ([`Printer::span_holds_forced_list_break`]) — is a
+    // group that breaks, as it is on the
+    // reparse, where the comment sits in the argument's comma gap: every question the
+    // chain asks of its flat groups — `will_break`, and the one-line state's measure,
+    // which a broken group ends at its first line — then reads it the way the reparse
+    // does, and the chain keeps the one-line state
+    // (`o.aaaa().bbbb(⏎\tx + y, // c⏎\t1⏎)`) instead of expanding for it.
+    if !expanded && group_forces_list_break(group, printer) {
+        return d.group_break(doc);
+    }
+    doc
+}
+
+/// Whether a call in `group` has an argument holding a list element that breaks its list
+/// ([`Printer::span_holds_forced_list_break`]).
+fn group_forces_list_break(group: &ChainGroup<'_>, printer: &Printer<'_>) -> bool {
+    !printer.forced_list_elements.borrow().is_empty()
+        && group
+            .nodes
+            .iter()
+            .filter_map(ChainNode::as_call_expression)
+            .flat_map(|call| call.arguments.iter())
+            .any(|arg| printer.span_holds_forced_list_break(arg.span()))
 }
 
 //
