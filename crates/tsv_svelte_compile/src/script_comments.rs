@@ -722,7 +722,7 @@ fn census_expr(expr: &Expression<'_>, census: &mut BlockCensus) {
             }
         }
         ExpressionKind::JsdocCast(j) => census_expr(j.inner, census),
-        ExpressionKind::ParenthesizedExpression(p) => census_expr(p.expression, census),
+        ExpressionKind::ParenthesizedExpression(p) => census_expr(p.unreachable_contents(), census),
         // Leaves — no children, no blocks.
         ExpressionKind::Literal(_)
         | ExpressionKind::Identifier(_)

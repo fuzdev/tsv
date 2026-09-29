@@ -427,30 +427,6 @@ impl<'a> Printer<'a> {
         d.concat(&[lead, self.build_trailing_comments_hang_next(start, end)])
     }
 
-    /// [`Self::build_continuation_indent`] for a caller sitting in a **value slot** —
-    /// one whose separator, and the space after it, is already emitted by whoever handed
-    /// it the slot.
-    ///
-    /// The keyword form owns that space because its callers emit their keyword bare; a
-    /// value slot's caller does not, and calling the keyword form there renders the
-    /// separator's space twice. Same hanging run, same indent, one seam
-    /// ([`Self::build_trailing_comments_hang_next`]) — only the separator differs, which
-    /// is why this is a sibling entry rather than a `bool` on the other.
-    ///
-    /// Its one site is a preserved grouping pair's `(`→inner run
-    /// (`build_expression_doc`'s `ParenthesizedExpression` arm): the pair is erased, so
-    /// the reparse reads that run through the enclosing value gap and this must land
-    /// where that gap's own continuation does.
-    pub(crate) fn build_value_slot_continuation_indent(
-        &self,
-        start: u32,
-        end: u32,
-        tail: DocId,
-    ) -> DocId {
-        let d = self.d();
-        d.indent(d.concat(&[self.build_trailing_comments_hang_next(start, end), tail]))
-    }
-
     /// A gap whose comment run precedes `tail`, routed on the **line**-comment question
     /// alone.
     ///

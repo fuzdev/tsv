@@ -333,12 +333,31 @@ pub struct JsdocCast<'arena> {
 /// The holding `Expression`'s span covers the parentheses (`(`…`)`); `expression`
 /// keeps its own paren-free span. Unlike [`JsdocCast`], the parens are **not** semantically
 /// required — prettier re-derives them (`(b)`→`b`, but keeps `(2, 3)` because a
-/// sequence needs them), so the printer is **transparent**: it renders the
-/// inner, which re-derives whatever parens it needs. The wrapper only affects
-/// the serialized wire shape.
+/// sequence needs them) — so the node is a **wire** shape only: no printer or compiler
+/// ever reads a tree that holds one. `tsv_svelte` parses such a head twice and hands every
+/// other consumer the paren-free tree, the one a `function` signature with the same text
+/// parses to. A pair answers no paren question about its position, so a printer handed
+/// one prints `(x + y) * 2` as `x + y * 2`.
 #[derive(Debug, Clone)]
 pub struct ParenthesizedExpression<'arena> {
     pub expression: &'arena Expression<'arena>,
+}
+
+impl<'arena> ParenthesizedExpression<'arena> {
+    /// The pair's contents, for a consumer of the paren-free tree — which never holds one.
+    ///
+    /// The exhaustive matches in the printer and the compiler keep an arm for this node
+    /// only because they are exhaustive, and every such arm reads through here: a debug
+    /// build refuses a tree that breaks the wire-only contract, and a release build reads
+    /// through the pair rather than aborting the host.
+    #[track_caller]
+    pub fn unreachable_contents(&self) -> &'arena Expression<'arena> {
+        #[expect(clippy::unreachable)] // debug builds only: see the doc
+        if cfg!(debug_assertions) {
+            unreachable!("a ParenthesizedExpression reached a reader of the paren-free tree");
+        }
+        self.expression
+    }
 }
 
 #[derive(Debug, Clone)]

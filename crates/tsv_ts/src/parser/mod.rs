@@ -261,6 +261,12 @@ pub struct Parser<'a, 'arena> {
     /// `preserveParens: true` and skips `remove_parens`. Set via
     /// [`crate::parse_embedded_preserve_parens`].
     pub(crate) preserve_parens: bool,
+    /// Set when [`Parser::preserve_parens`] wrapped at least one grouping pair in a
+    /// `ParenthesizedExpression` — read by [`crate::parse_embedded_preserve_parens`], whose
+    /// caller then owes the paren-free tree a parse of its own. Never cleared, so a pair a
+    /// speculative parse built and a rewind abandoned leaves it set: an over-report costs
+    /// that caller one redundant parse and is never a wrong answer.
+    pub(crate) preserved_a_paren: bool,
     /// When `true`, every discarded grouping paren is recorded in
     /// [`Parser::grouping_parens`]. Set only while [`Parser::parse_binding_pattern`] reads
     /// its pattern as an array/object literal, the one place a paren the internal AST
@@ -562,6 +568,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             top_level_as_is_assertion: true, // Enable by default (TypeScript context)
             grouping_depth: 0,               // Not inside any grouping delimiters
             preserve_parens: false,          // Discard grouping parens (paren-free public AST)
+            preserved_a_paren: false,        // No pair wrapped yet
             record_grouping_parens: false,   // Only while a binding pattern is read
             grouping_parens: Vec::new(),     // Filled only while that flag is set
             in_ambient_context: false,       // Not in declare namespace/module

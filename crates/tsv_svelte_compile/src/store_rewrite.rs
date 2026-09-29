@@ -142,7 +142,6 @@ fn member_root<'e>(expr: &'e Expression<'e>) -> &'e Expression<'e> {
     loop {
         match &node.kind {
             ExpressionKind::MemberExpression(m) => node = m.object,
-            ExpressionKind::ParenthesizedExpression(p) => node = p.expression,
             _ => return node,
         }
     }
@@ -230,7 +229,6 @@ impl<'arena> StoreRewriter<'_, 'arena> {
         match &left.kind {
             ExpressionKind::Identifier(id) => self.store_base(id).is_some(),
             ExpressionKind::MemberExpression(m) => self.pattern_targets_store(m.object),
-            ExpressionKind::ParenthesizedExpression(p) => self.pattern_targets_store(p.expression),
             ExpressionKind::ObjectPattern(obj) => obj.properties.iter().any(|prop| match prop {
                 ObjectPatternProperty::Property(p) => self.pattern_targets_store(p.value),
                 ObjectPatternProperty::RestElement(rest) => {
@@ -1074,15 +1072,6 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                     })
                 }
             }
-            ExpressionKind::ParenthesizedExpression(paren) => {
-                self.expr_ref(paren.expression)?
-                    .map(|expression| Expression {
-                        span: expr.span,
-                        kind: ExpressionKind::ParenthesizedExpression(
-                            ast::ParenthesizedExpression { expression },
-                        ),
-                    })
-            }
 
             // ── Patterns (their DEFAULTS are reads) ────────────────────────
             ExpressionKind::ObjectPattern(pattern) => {
@@ -1147,6 +1136,9 @@ impl<'arena> StoreRewriter<'_, 'arena> {
             | ExpressionKind::TSNonNullExpression(_)
             | ExpressionKind::TSParameterProperty(_)
             | ExpressionKind::JsdocCast(_) => None,
+            ExpressionKind::ParenthesizedExpression(paren) => {
+                self.expr(paren.unreachable_contents())?
+            }
         })
     }
 

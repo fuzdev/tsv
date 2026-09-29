@@ -628,9 +628,6 @@ fn refuse_invalid_assign_target(target: &Expression<'_>, nc: &mut Nc<'_>, top: b
                 }
             }
         }
-        ExpressionKind::ParenthesizedExpression(p) => {
-            refuse_invalid_assign_target(p.expression, nc, top);
-        }
         ExpressionKind::TSNonNullExpression(t) => {
             refuse_invalid_assign_target(t.expression, nc, top);
         }
@@ -833,7 +830,6 @@ fn root_of<'e>(expr: &'e Expression<'e>) -> &'e Expression<'e> {
     loop {
         match &node.kind {
             ExpressionKind::MemberExpression(m) => node = m.object,
-            ExpressionKind::ParenthesizedExpression(p) => node = p.expression,
             ExpressionKind::TSAsExpression(t) => node = t.expression,
             ExpressionKind::TSSatisfiesExpression(t) => node = t.expression,
             ExpressionKind::TSNonNullExpression(t) => node = t.expression,
@@ -1104,7 +1100,7 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
             walk_opt(i.options, nc);
         }
         ExpressionKind::JsdocCast(j) => walk_expr(j.inner, nc),
-        ExpressionKind::ParenthesizedExpression(p) => walk_expr(p.expression, nc),
+        ExpressionKind::ParenthesizedExpression(p) => walk_expr(p.unreachable_contents(), nc),
     }
 }
 

@@ -466,73 +466,17 @@ impl<'a> Printer<'a> {
                 self.build_ts_parameter_property_doc(param_prop, expr.span)
             }
             ExpressionKind::JsdocCast(cast) => self.build_jsdoc_cast_doc(cast, expr.span),
-            // Preserved grouping parens — see [`Self::build_preserved_paren_doc`].
+            // Unreachable by construction: the one parse that builds this node — a
+            // `{#snippet}` head's `preserve_parens` parse — feeds the Svelte wire writer
+            // alone, and the printer is handed that head's paren-free parse instead
+            // (`tsv_svelte`'s `SnippetBlock::parameters`). A release build prints the inner
+            // (`ParenthesizedExpression::unreachable_contents`), which is no layout, since a
+            // pair printed through here drops every paren its position needed.
             ExpressionKind::ParenthesizedExpression(paren) => {
                 self.is_expression_statement.set(was_expr_stmt);
-                self.build_preserved_paren_doc(paren, expr.span)
+                self.build_expression_doc(paren.unreachable_contents())
             }
         }
-    }
-
-    /// Build a Doc for a preserved grouping pair (`ParenthesizedExpression`).
-    ///
-    /// The pair is layout-transparent: the inner renders and re-derives whatever parens
-    /// it needs, matching prettier, which strips redundant parens and re-adds required
-    /// ones. Only the wire AST keeps the node, and a Svelte `{#snippet}` parameter is the
-    /// one place tsv parses one.
-    ///
-    /// ⚠️ **The erased pair still brackets TWO gaps.** Rendering only the inner left both
-    /// with no emitter anywhere — the node's span hides them from whatever encloses it,
-    /// and the inner's span ends before them (`docs/comments.md` hazard 4; the leading
-    /// half was masked by ownership, a glued block surviving inside the inner's own doc).
-    /// They take the same stripped-shell emitters the TypeScript path's own erased parens
-    /// take, which is the whole target here: **a snippet parameter list must format
-    /// identically to the equivalent function signature.**
-    ///
-    /// Both halves answer to the REPARSE, where the pair is gone and the enclosing gap
-    /// reads the run instead:
-    ///
-    /// - The `(`→inner run takes the keyword→value gate's split
-    ///   ([`Printer::comments_force_own_line_between`]: hang, or trail inline), the only
-    ///   split that reproduces what that gap settles on. Emitting it at its authored
-    ///   separators kept an own-line block's hardline against a value that pulls up, which
-    ///   is not idempotent on its own output. The hang is
-    ///   [`Printer::build_value_slot_continuation_indent`], never the keyword seam
-    ///   ([`Printer::append_keyword_value_line_comments`]): the slot's separator is someone
-    ///   else's, so that seam's own leading hardline would be a second break.
-    /// - The inner→`)` run defers, and a deferred run must not leave the construct it was
-    ///   written in — this pair prints no closer of its own to end the line, so a `//`
-    ///   rode out past the whole `{#snippet …}` head and re-parsed there as template TEXT.
-    ///   The flush-scoped break opens just the group the suffix flushes in, the parameter
-    ///   list, which is where the TypeScript twin lands it too. It is gated on the
-    ///   emitter's own report of whether it deferred: forcing the break for an inline
-    ///   block opens a list that had no reason to open, and the reparse closes it again.
-    fn build_preserved_paren_doc(
-        &self,
-        paren: &crate::ast::internal::ParenthesizedExpression<'_>,
-        span: Span,
-    ) -> DocId {
-        let d = self.d();
-        let inner_span = paren.expression.span();
-        let inner = self.build_expression_doc(paren.expression);
-        let inner = if self.comments_force_own_line_between(span.start, inner_span.start) {
-            self.build_value_slot_continuation_indent(span.start, inner_span.start, inner)
-        } else {
-            match self
-                .build_inline_comments_between_doc_trailing_space_opt(span.start, inner_span.start)
-            {
-                Some(run) => d.concat(&[run, inner]),
-                None => inner,
-            }
-        };
-        if !self.has_comments_to_emit_between(inner_span.end, span.end) {
-            return inner;
-        }
-        let mut parts: DocBuf = smallvec![inner];
-        if self.append_trailing_paren_comments(&mut parts, inner_span.end, span.end) {
-            parts.push(d.flush_break());
-        }
-        d.concat(&parts)
     }
 
     /// The cast's owned comment plus the separator it owes its own `(`.

@@ -497,7 +497,7 @@ pub(crate) fn leaf_conservation_diff(input: &Value, output: &Value) -> Option<St
 /// | `Text` in a fragment `nodes` array | **count each whitespace-split word** of `data` as `w:<word>`, not the node — read across the array's text siblings as the page renders them ([`FragmentWords`]) | a text node's WORDS are what a content drop loses, and its node count is not conserved: hoisting a `<script>` / `<style>` out from between two texts leaves them adjacent, and they reparse as one — as one WORD, where nothing separated them (`x<script>…</script>y` renders `xy`). Excluded from the word count (node counted instead): the text of a `<script>` / `<style>` the parser keeps as an element (a non-JS `type=` script, a `lang=` style), whose JS / CSS the formatter reformats as code; attribute-value text likewise counts as a node only (a `style=""` value may be reformatted) |
 /// | `Fragment` | **erase** | a container, one per owner; an `{#await}` branch's fragment appears and vanishes with the branch's authored form (`{:then value}` with an empty body is dropped, `{:catch}` folds to the `catch` shorthand) — its NODES still count |
 /// | `EmptyStatement` | **erase** | a stray `;` the formatter drops by design |
-/// | `TSParenthesizedType` / `TSUnionType` / `TSIntersectionType` / `TSInstantiationExpression` / `ChainExpression` | **erase** | wrapper shells the formatter strips or flattens by design (a redundant type paren, a single-member `\| A`, a nested `A \| (B \| C)`, a redundant `(a?.b)?.c` chain shell); acorn-typescript reads `Base<T>` in a class heritage as an instantiation expression or not by the SPELLING of what follows, so tsv's drop-in parse does too. The shell's operands still count |
+/// | `TSParenthesizedType` / `ParenthesizedExpression` / `TSUnionType` / `TSIntersectionType` / `TSInstantiationExpression` / `ChainExpression` | **erase** | wrapper shells the formatter strips or flattens by design (a redundant type paren, a redundant grouping pair the `{#snippet}`-parameter wire keeps as a node, a single-member `\| A`, a nested `A \| (B \| C)`, a redundant `(a?.b)?.c` chain shell); acorn-typescript reads `Base<T>` in a class heritage as an instantiation expression or not by the SPELLING of what follows, so tsv's drop-in parse does too. The shell's operands still count |
 /// | a string `Literal` or an `Identifier` reached through `key` | **conflate** as `n:key` | the quote-props rewrite (`{"a": 1}` ↔ `{a: 1}`) flips the node type of a property key; the leaf check conserves the text across it |
 /// | a `*Directive`'s `value` / `expression` | **skip the subtree** | shorthand normalization (`style:color={color}` → `style:color`, `let:x={x}` → `let:x`) drops the expression node; the directive and its name still count |
 /// | an `AwaitBlock`'s `value` / `error` | **skip the subtree** | the binding rides the branch's authored form (above) |
@@ -645,6 +645,7 @@ fn census_entry<'a>(
         | Some(
             "EmptyStatement"
             | "TSParenthesizedType"
+            | "ParenthesizedExpression"
             | "TSUnionType"
             | "TSIntersectionType"
             | "TSInstantiationExpression"
@@ -1350,6 +1351,12 @@ mod node_census_tests {
         // …but a dropped MEMBER is not a shell.
         let a = ty(json!({"type": "TSUnionType", "types": [inner, {"type": "TSNumberKeyword"}]}));
         assert!(node_conservation_diff(&a, &b).is_some());
+        // `{#snippet s(a = ((x)))}` → `a = x`: the snippet-parameter wire keeps a grouping
+        // pair as a node, and the formatter drops a redundant one.
+        let default = |v: Value| json!({"type": "AssignmentPattern", "right": v});
+        let x = json!({"type": "Identifier", "name": "x"});
+        let a = default(json!({"type": "ParenthesizedExpression", "expression": x}));
+        assert!(node_conservation_diff(&a, &default(x)).is_none());
     }
 
     #[test]

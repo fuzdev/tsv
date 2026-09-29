@@ -24,8 +24,8 @@
 use bumpalo::collections::Vec as BumpVec;
 use tsv_ts::ast::internal::{
     ArrayExpression, BinaryExpression, CallExpression, ConditionalExpression, Expression,
-    ExpressionKind, MemberExpression, NewExpression, ParenthesizedExpression, SequenceExpression,
-    SpreadElement, TemplateLiteral, UnaryExpression,
+    ExpressionKind, MemberExpression, NewExpression, SequenceExpression, SpreadElement,
+    TemplateLiteral, UnaryExpression,
 };
 
 use crate::analyze::NameSet;
@@ -245,7 +245,6 @@ fn contains_rewrite_target(
             contains(c.test) || contains(c.consequent) || contains(c.alternate)
         }
         ExpressionKind::UnaryExpression(u) => contains(u.argument),
-        ExpressionKind::ParenthesizedExpression(p) => contains(p.expression),
         ExpressionKind::SequenceExpression(s) => s.expressions.iter().copied().any(&contains),
         ExpressionKind::SpreadElement(s) => contains(s.argument),
         ExpressionKind::ArrayExpression(a) => a.elements.iter().any(|e| e.is_some_and(&contains)),
@@ -344,15 +343,6 @@ fn rebuild_value<'arena>(
                 argument,
                 ..u.clone()
             })
-        }
-        ExpressionKind::ParenthesizedExpression(p) => {
-            let expression = rewrite_template_value(env, p.expression)?;
-            Expression {
-                span: expr.span,
-                kind: ExpressionKind::ParenthesizedExpression(ParenthesizedExpression {
-                    expression,
-                }),
-            }
         }
         ExpressionKind::SequenceExpression(s) => {
             let expressions = rewrite_value_slice(env, s.expressions)?;

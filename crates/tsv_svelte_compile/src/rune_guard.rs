@@ -190,9 +190,6 @@ fn dollar_callee_root<'s>(callee: &Expression<'_>, source: &'s str) -> Option<&'
         ExpressionKind::TSInstantiationExpression(inst) => {
             dollar_callee_root(inst.expression, source)
         }
-        ExpressionKind::ParenthesizedExpression(paren) => {
-            dollar_callee_root(paren.expression, source)
-        }
         _ => None,
     }
 }
@@ -259,9 +256,6 @@ pub(crate) fn assign_target_roots(target: &Expression<'_>, source: &str, out: &m
         ExpressionKind::TSAsExpression(t) => assign_target_roots(t.expression, source, out),
         ExpressionKind::TSSatisfiesExpression(t) => assign_target_roots(t.expression, source, out),
         ExpressionKind::TSTypeAssertion(t) => assign_target_roots(t.expression, source, out),
-        ExpressionKind::ParenthesizedExpression(p) => {
-            assign_target_roots(p.expression, source, out);
-        }
         ExpressionKind::ObjectPattern(obj) => {
             for prop in obj.properties {
                 match prop {
@@ -344,9 +338,6 @@ fn refuse_derived_write_target(
         }
         ExpressionKind::RestElement(rest) => {
             refuse_derived_write_target(rest.argument, ctx)?;
-        }
-        ExpressionKind::ParenthesizedExpression(paren) => {
-            refuse_derived_write_target(paren.expression, ctx)?;
         }
         _ => {}
     }
@@ -1147,6 +1138,8 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
             }
         }
         ExpressionKind::JsdocCast(j) => walk_expression(j.inner, ctx),
-        ExpressionKind::ParenthesizedExpression(p) => walk_expression(p.expression, ctx),
+        ExpressionKind::ParenthesizedExpression(p) => {
+            walk_expression(p.unreachable_contents(), ctx)
+        }
     }
 }

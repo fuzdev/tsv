@@ -1395,10 +1395,6 @@ fn export_default_leftmost<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
 ///   separator — so this is belt-and-braces, and it is here because the rule is about the
 ///   printed `(`, not about which reading happens to reach it.)
 ///
-/// A preserved grouping pair is neither: `ParenthesizedExpression` is layout-transparent
-/// (`Printer::build_preserved_paren_doc` renders the inner, which re-derives whatever parens
-/// it needs), so it is peeled and the question is the inner's.
-///
 /// **Where the spine STOPS, and why that is a grammar fact rather than an accident.** A `(`
 /// only opens a *type-argument* region if the type grammar can carry on past its matching
 /// `)`, and the only postfix a parenthesized type takes is `[`…`]`. So the walk descends
@@ -1428,7 +1424,7 @@ fn export_default_leftmost<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
 fn relational_region_opens_on_a_kept_shell(operand: &Expression<'_>, in_for_init: bool) -> bool {
     // The root's own pair is the one its POSITION derives — the same `needs_parens` call
     // `Printer::build_binary_operand_doc` makes for a `<`'s right operand.
-    let mut node = peel_preserved_parens(operand);
+    let mut node = operand;
     if prints_its_own_paren_pair(node)
         || needs_parens(
             node,
@@ -1447,7 +1443,7 @@ fn relational_region_opens_on_a_kept_shell(operand: &Expression<'_>, in_for_init
         if !member.computed || member.optional {
             return false;
         }
-        let child = peel_preserved_parens(member.object);
+        let child = member.object;
         if prints_its_own_paren_pair(child)
             || left_side_child_is_parenthesized(node, child, in_for_init)
         {
@@ -1466,16 +1462,6 @@ fn prints_its_own_paren_pair(expr: &Expression<'_>) -> bool {
         expr.kind,
         ExpressionKind::JsdocCast(_) | ExpressionKind::SequenceExpression(_)
     )
-}
-
-/// Step past every preserved grouping pair, which the printer renders through rather than
-/// as a pair of its own (`Printer::build_preserved_paren_doc`).
-fn peel_preserved_parens<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
-    let mut expr = expr;
-    while let ExpressionKind::ParenthesizedExpression(paren) = &expr.kind {
-        expr = paren.expression;
-    }
-    expr
 }
 
 /// Binary operand: `<expr> op y` or `x op <expr>`. `in_for_init` is the ambient

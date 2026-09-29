@@ -2009,7 +2009,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         //   here regardless (a same-line cast comment is owned by both, harmlessly).
         // - **Snippet-parameter sub-parse** (`preserve_parens`) — acorn's
         //   `preserveParens` without Svelte's `remove_parens`; wraps in a
-        //   layout-transparent `ParenthesizedExpression` so only the wire shape moves.
+        //   `ParenthesizedExpression` for the wire alone — the printer and the compiler
+        //   read a second, paren-free parse of the same head.
         // Every other comment stays located positionally at print time.
         let paren_span = Span::new(paren_start as u32, paren_end as u32);
         let expr = if let Some(idx) = cast_comment_idx {
@@ -2023,6 +2024,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }),
             })
         } else if self.preserve_parens {
+            self.preserved_a_paren = true;
             self.alloc(Expression {
                 span: paren_span,
                 kind: ExpressionKind::ParenthesizedExpression(ParenthesizedExpression {

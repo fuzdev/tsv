@@ -67,6 +67,10 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     /// arena hands the finished run straight over (`into_bump_slice`), where a
     /// heap `Vec` owes a malloc, a free, and a copy into the arena at the end.
     pub(crate) acorn_regions: BumpVec<'arena, internal::AcornRegion>,
+    /// The wire-only parameter lists of the `{#snippet}` heads that hold a grouping pair,
+    /// in read order — which is source order, since a head is read before its body. See
+    /// [`internal::SnippetWireParameters`].
+    pub(crate) snippet_wire_parameters: BumpVec<'arena, internal::SnippetWireParameters<'arena>>,
     /// True while the nearest *element* ancestor is `<svelte:head>` — mirrors Svelte's
     /// `parent_is_head` (`1-parse/state/element.js`): set entering a head's children, reset by a
     /// nested RegularElement/Component, transparent through other special elements and blocks.
@@ -90,6 +94,7 @@ pub(crate) struct SvelteParser<'a, 'arena> {
 pub(crate) struct EmbeddedParseMark {
     comments: usize,
     acorn_regions: usize,
+    snippet_wire_parameters: usize,
 }
 
 /// Svelte's reserved-word list (`RESERVED_WORDS`, `svelte/src/utils.js`): the JS
@@ -182,6 +187,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             peek: None,
             expression_comments: Vec::new(),
             acorn_regions: BumpVec::new_in(arena),
+            snippet_wire_parameters: BumpVec::new_in(arena),
             in_svelte_head: false,
             in_shadowroot_template: false,
             holds_nested_raw_text: false,
@@ -803,19 +809,21 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         });
     }
 
-    /// How far both of the ledgers an embedded parse appends to had filled before
-    /// it ran, so a **re-parse over the same region** can rewind them together.
+    /// How far every ledger an embedded parse appends to had filled before it ran,
+    /// so a **re-parse over the same region** can rewind them together.
     ///
-    /// One value rather than two marks because the two ledgers fail differently
-    /// and only one of the failures is loud: a comment registered twice is
-    /// printed twice, while a repeated [`internal::AcornRegion`] is (today) an
-    /// exact duplicate that `partition_point` resolves to the same seed — so
-    /// rewinding one and forgetting the other reads as correct until the regions
-    /// stop being identical.
+    /// One value rather than a mark per ledger because the ledgers fail differently
+    /// and only one of the failures is loud: a comment registered twice is printed
+    /// twice, while a repeated [`internal::AcornRegion`] is (today) an exact duplicate
+    /// that `partition_point` resolves to the same seed, and a repeated
+    /// [`internal::SnippetWireParameters`] entry is a second list under one key that the
+    /// writer's binary search may or may not pick — so rewinding one and forgetting
+    /// another reads as correct until the entries stop being identical.
     pub(crate) fn embedded_parse_mark(&self) -> EmbeddedParseMark {
         EmbeddedParseMark {
             comments: self.expression_comments.len(),
             acorn_regions: self.acorn_regions.len(),
+            snippet_wire_parameters: self.snippet_wire_parameters.len(),
         }
     }
 
@@ -824,6 +832,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     pub(crate) fn rewind_embedded_parses(&mut self, mark: EmbeddedParseMark) {
         self.expression_comments.truncate(mark.comments);
         self.acorn_regions.truncate(mark.acorn_regions);
+        self.snippet_wire_parameters
+            .truncate(mark.snippet_wire_parameters);
     }
 
     /// Parse a TypeScript statement (the body of a `{const}`/`{let}` tag is a

@@ -40,11 +40,31 @@ pub struct Root<'arena> {
     /// Every embedded acorn parse this component contains, ascending by
     /// [`AcornRegion::lex_start`] — see [`AcornRegion`].
     pub acorn_regions: &'arena [AcornRegion],
+    /// The wire's parameter lists for the `{#snippet}` heads that hold a grouping pair,
+    /// ascending by [`SnippetWireParameters::snippet_start`] — see
+    /// [`SnippetWireParameters`].
+    pub snippet_wire_parameters: &'arena [SnippetWireParameters<'arena>],
     /// Whether the parser read a `<script>` / `<style>` nested in the markup — a raw-text
     /// element anywhere in `fragment`, as opposed to the lifted top-level `instance` /
     /// `module` / `css`. Recorded where the parser already knows it, so the printer can skip
     /// analysis only such an element needs without walking the tree to ask. Not on the wire.
     pub(crate) holds_nested_raw_text: bool,
+}
+
+/// A `{#snippet}` head's parameters as Svelte's parse shapes them: acorn's
+/// `preserveParens`, so each grouping pair is a `ParenthesizedExpression`. Read by the wire
+/// writer alone — every other consumer reads [`SnippetBlock::parameters`], the paren-free
+/// tree of the same text.
+///
+/// Recorded only for a head that holds a pair; for every other head the two trees are one,
+/// and the writer emits [`SnippetBlock::parameters`]. A side table on [`Root`] rather than a
+/// field on the block because `SnippetBlock` sets `FragmentNode`'s width, which every
+/// template node pays, for a list no printer reads.
+#[derive(Debug, Clone, Copy)]
+pub struct SnippetWireParameters<'arena> {
+    /// The snippet block's `span.start` — the key the writer finds the list by.
+    pub snippet_start: u32,
+    pub parameters: &'arena [Expression<'arena>],
 }
 
 /// One embedded **acorn parse**: where it began reading the component's own
@@ -376,7 +396,11 @@ pub struct SnippetBlock<'arena> {
     /// always set when generics are present. Feeds the public AST's `typeParams`
     /// string, matching Svelte's parser (which stores it raw too).
     pub type_params_raw: Option<&'arena str>,
-    pub parameters: &'arena [Expression<'arena>], // Function parameters (patterns)
+    /// Function parameters (patterns), **paren-free**: the tree a `function` signature
+    /// with the same text parses to, so the printer and the compiler read the head exactly
+    /// as they read that signature, re-deriving every grouping pair from precedence. The
+    /// wire's own shape of a head that holds a pair is [`Root::snippet_wire_parameters`].
+    pub parameters: &'arena [Expression<'arena>],
     /// Source span of the parameter parens: `start` is the `(`, `end` is the `)`
     /// (for leading / dangling / trailing comment lookup when printing parameters).
     /// `None` only if no `(` was found (malformed).

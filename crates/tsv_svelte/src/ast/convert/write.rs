@@ -238,6 +238,7 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
             map: &map,
         },
         acorn_prefixes: internal::AcornPrefixes::new(root.acorn_regions),
+        snippet_wire_parameters: root.snippet_wire_parameters,
         acorn: acorn_seeds_needed.then(|| AcornLines {
             // acorn's own table when it exists; otherwise the LF one, which the
             // classes-agree probe has just certified is byte-identical to it.
@@ -317,6 +318,9 @@ struct Ctx<'a> {
     /// `svelte_manufactured_multiline_comment_dedent` is its pin. `Ctx::acorn_seed`
     /// indexes its seeds parallel to this ledger's regions.
     acorn_prefixes: internal::AcornPrefixes<'a>,
+    /// `Root::snippet_wire_parameters`: the preserved-paren parameter lists the wire emits
+    /// in place of a head's paren-free `SnippetBlock::parameters`.
+    snippet_wire_parameters: &'a [internal::SnippetWireParameters<'a>],
     /// Template comments, sorted by position (empty on the common no-comment
     /// template — the whole spine then fuses).
     comments: &'a [&'a Comment],
@@ -337,6 +341,19 @@ impl<'a> Ctx<'a> {
     #[inline]
     fn pos(&self, byte: u32) -> u32 {
         self.loc.pos(byte)
+    }
+
+    /// The preserved-paren parameter list of the `{#snippet}` block starting at
+    /// `snippet_start`, when its head holds a grouping pair (`Root::snippet_wire_parameters`,
+    /// ascending by that key).
+    fn snippet_wire_parameters(
+        &self,
+        snippet_start: u32,
+    ) -> Option<&'a [tsv_ts::ast::internal::Expression<'a>]> {
+        let wire = self.snippet_wire_parameters;
+        wire.binary_search_by_key(&snippet_start, |entry| entry.snippet_start)
+            .ok()
+            .map(|i| wire[i].parameters)
     }
 
     /// The mapper an **acorn-owned** position answers through: acorn's line
@@ -1253,7 +1270,14 @@ fn write_snippet_block(w: &mut JsonWriter, block: &internal::SnippetBlock<'_>, c
         w.string(type_params);
     }
     w.raw(",\"parameters\":");
-    write_snippet_parameters(w, block.parameters, block.span.start, range_end, ctx);
+    write_snippet_parameters(
+        w,
+        ctx.snippet_wire_parameters(block.span.start)
+            .unwrap_or(block.parameters),
+        block.span.start,
+        range_end,
+        ctx,
+    );
     w.raw(",\"body\":");
     write_fragment(w, &block.body, ctx);
     w.raw("}");

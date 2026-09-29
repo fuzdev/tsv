@@ -682,7 +682,7 @@ impl<'s> Collector<'s> {
                 }
             }
             ExpressionKind::JsdocCast(j) => self.expr(j.inner),
-            ExpressionKind::ParenthesizedExpression(p) => self.expr(p.expression),
+            ExpressionKind::ParenthesizedExpression(p) => self.expr(p.unreachable_contents()),
             ExpressionKind::Literal(_)
             | ExpressionKind::PrivateIdentifier(_)
             | ExpressionKind::RegexLiteral(_)

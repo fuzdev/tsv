@@ -196,6 +196,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let acorn_regions = std::mem::replace(&mut self.acorn_regions, BumpVec::new_in(self.arena))
             .into_bump_slice();
 
+        let snippet_wire_parameters = std::mem::replace(
+            &mut self.snippet_wire_parameters,
+            BumpVec::new_in(self.arena),
+        )
+        .into_bump_slice();
+
         Ok(Root {
             fragment,
             instance,
@@ -204,6 +210,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             options,
             comments,
             acorn_regions,
+            snippet_wire_parameters,
             holds_nested_raw_text: self.holds_nested_raw_text,
         })
     }

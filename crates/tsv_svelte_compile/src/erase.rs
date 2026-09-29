@@ -1523,10 +1523,11 @@ impl<'arena> Eraser<'arena, '_> {
     /// static fold. Patterns and binding identifiers **field-drop** their
     /// annotations and `?`/`!` markers.
     ///
-    /// Parens are not a hazard: `tsv_ts` parses with `preserve_parens: false`
-    /// and re-derives them from precedence, exactly as the oracle's printer
-    /// does — so `(x as T).y` erases to `x.y` and `(a + b as T) * c` keeps the
-    /// parens it needs.
+    /// Parens are not a hazard: every tree the compiler reads is paren-free — a
+    /// `{#snippet}` head included, whose `preserveParens` parse is kept for the wire
+    /// alone (`Root::snippet_wire_parameters`) — and the printer re-derives them from
+    /// precedence, exactly as the oracle's printer does — so `(x as T).y` erases to
+    /// `x.y` and `(a + b as T) * c` keeps the parens it needs.
     #[expect(clippy::too_many_lines)]
     fn expr(
         &mut self,
@@ -1920,13 +1921,7 @@ impl<'arena> Eraser<'arena, '_> {
                 Some(self.expr(cast.inner)?.unwrap_or_else(|| cast.inner.clone()))
             }
             ExpressionKind::ParenthesizedExpression(paren) => {
-                self.expr_ref(paren.expression)?
-                    .map(|expression| Expression {
-                        span: expr.span,
-                        kind: ExpressionKind::ParenthesizedExpression(
-                            tsv_ts::ast::internal::ParenthesizedExpression { expression },
-                        ),
-                    })
+                self.expr(paren.unreachable_contents())?
             }
 
             // ── Leaves ─────────────────────────────────────────────────────

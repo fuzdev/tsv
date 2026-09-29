@@ -246,6 +246,17 @@ fn each_binding_separator(s: &str, s_offset: usize, arena: &Bump) -> EachHeadSpl
     }
 }
 
+/// The `function f…` declaration a `{#snippet}` head's wrapper parses to. `None` only for a
+/// wrapper that produced no such statement, which the caller reports as an error.
+fn snippet_signature<'arena>(
+    program: &tsv_ts::Program<'arena>,
+) -> Option<&'arena tsv_ts::ast::internal::FunctionDeclaration<'arena>> {
+    match program.body.first().map(|stmt| &stmt.kind) {
+        Some(tsv_ts::StatementKind::FunctionDeclaration(func)) => Some(*func),
+        _ => None,
+    }
+}
+
 /// Return type for parse_each_binding: (context, index, key, consumed_end).
 /// `consumed_end` is the absolute source offset just past the last token the binding
 /// consumed — the caller rejects any non-whitespace between it and the closing `}`.
@@ -1408,9 +1419,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             const WRAPPER_PREFIX: &str = "function f";
             let wrapper = format!("{WRAPPER_PREFIX}{head_slice} {{}}");
             let base = (content_offset + head_start).saturating_sub(WRAPPER_PREFIX.len());
-            // Snippet parameters preserve grouping parens (acorn's `preserveParens`,
-            // without Svelte's `remove_parens`), so a default like `c = (2, 3)` keeps
-            // its `ParenthesizedExpression` — matching Svelte's snippet-param AST.
             // Svelte's own prelude is `replace(/\S/g, ' ')` — it blanks the
             // non-whitespace and keeps every terminator — so acorn counted the
             // ECMAScript class over the whole prefix, exactly as for the raw
@@ -1427,19 +1435,63 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 // ECMAScript terminator standing, which is the line class it derives.
                 AcornPrefixText::WhitespaceKept,
             );
-            let program = tsv_ts::parse_embedded_preserve_parens(&wrapper, base, self.arena)?;
-            self.expression_comments.extend_from_slice(program.comments);
-            // The wrapper is literally a `function` declaration, so the match holds by
-            // construction — stated as an error rather than an `if let` so a head whose
-            // pieces went nowhere can never reach the printer as a silently empty
+            // Two trees, one per reader. Svelte keeps acorn's `preserveParens` here (and,
+            // unlike every other template expression, skips `remove_parens`), so the WIRE
+            // holds a `ParenthesizedExpression` for each grouping pair — `c = (2, 3)` keeps
+            // one. Everything else reads the head the way it reads a function signature:
+            // paren-free, the parens re-derived from precedence — which is what makes a
+            // snippet parameter list format (and compile) exactly as its `function` twin
+            // does. Printing the wire tree would lose every pair: a
+            // `ParenthesizedExpression` matches no precedence rule, so `(x + y) * 2`
+            // prints as `x + y * 2`.
+            //
+            // The preserved parse is Svelte's own reader, so it alone decides acceptance.
+            // It is also the only parse a head without a pair needs — the two trees are
+            // then the same tree.
+            let (preserved, preserved_a_paren) =
+                tsv_ts::parse_embedded_preserve_parens(&wrapper, base, self.arena)?;
+            // The wrapper is literally a `function` declaration, so the signature is
+            // there by construction — stated as an error rather than an `if let` so a head
+            // whose pieces went nowhere can never reach the printer as a silently empty
             // signature (the shape a raw-text fallback would produce).
-            let Some(tsv_ts::StatementKind::FunctionDeclaration(func)) =
-                program.body.first().map(|stmt| &stmt.kind)
-            else {
-                return Err(
-                    self.error_expected_at("snippet signature", content_offset + head_start)
+            let signature_error =
+                || self.error_expected_at("snippet signature", content_offset + head_start);
+            let (program, func) = if preserved_a_paren {
+                // Grouping parens change no production the grammar accepts, so a head the
+                // preserved parse read reads paren-free too. If it does not, that is a
+                // parser bug, and it surfaces as the paren-free parse's own error rather
+                // than as a silent fallback to the wire tree (which prints a pair's
+                // contents bare).
+                let plain = tsv_ts::parse_embedded(&wrapper, base, self.arena)?;
+                // The same comments, though not the same claims on them: `owned_by_node`
+                // binds a glued block to the node its token begins, and a pair's `(` begins
+                // a node only in the preserved tree (`/* c */ (x + y)`). The wire reads no
+                // claim, so the printer's tree supplies them all.
+                debug_assert!(
+                    plain.comments.len() == preserved.comments.len()
+                        && plain
+                            .comments
+                            .iter()
+                            .zip(preserved.comments)
+                            .all(|(a, b)| a.span == b.span),
+                    "a snippet head's paren-free and preserved parses collected different comments"
                 );
+                let wire = snippet_signature(&preserved)
+                    .ok_or_else(signature_error)?
+                    .params;
+                let func = snippet_signature(&plain).ok_or_else(signature_error)?;
+                self.snippet_wire_parameters.push(SnippetWireParameters {
+                    snippet_start: start as u32,
+                    parameters: wire,
+                });
+                (plain, func)
+            } else {
+                let func = snippet_signature(&preserved).ok_or_else(signature_error)?;
+                (preserved, func)
             };
+            // The comments (and their `owned_by_node` claims) are the paren-free tree's —
+            // the tree the printer walks — and are merged once.
+            self.expression_comments.extend_from_slice(program.comments);
             type_parameters.clone_from(&func.type_parameters);
             parameters = func.params;
         }

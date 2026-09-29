@@ -585,14 +585,12 @@ impl<'a> Printer<'a> {
     /// (`docs/comments.md` §Trailing and dangling runs), so the list reads the count
     /// around each element ([`Self::build_list_element_doc`]) and breaks, flushing the run
     /// at the element's comma: `f(⏎\tx + y * z, // c⏎\t1⏎)`.
-    ///
-    /// Returns whether the run deferred.
     pub(crate) fn append_trailing_paren_comments(
         &self,
         parts: &mut DocBuf,
         argument_end: u32,
         span_end: u32,
-    ) -> bool {
+    ) {
         // Whether anything has been deferred yet — a `//`, or an own-line comment.
         let mut deferred_run = false;
         // What physically precedes the next comment: an **in-source** cursor, so it
@@ -623,7 +621,6 @@ impl<'a> Printer<'a> {
             self.deferred_paren_runs
                 .set(self.deferred_paren_runs.get() + 1);
         }
-        deferred_run
     }
 
     /// Build one element of a comma LIST, and end it with a flush-scoped break when its

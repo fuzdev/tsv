@@ -1676,9 +1676,10 @@ struct GatherSet {
 /// ⚠️ This list MUST stay exhaustive against `erase.rs`'s wrapper arms (the five
 /// `TS*` + `JsdocCast`) — a forgotten wrapper variant falls to `else → UNKNOWN →
 /// assume-match` and re-introduces an over-match MISMATCH for that variant.
-/// (`ParenthesizedExpression` is deliberately absent: template expressions parse with
-/// `preserve_parens: false`, so no paren node reaches here.) A pure reference-follow,
-/// no allocation.
+/// (`ParenthesizedExpression` is deliberately absent: every tree the compiler reads is
+/// paren-free — a `{#snippet}` head's `preserveParens` parse is kept for the wire alone,
+/// `Root::snippet_wire_parameters` — so no paren node reaches here.) A pure
+/// reference-follow, no allocation.
 fn strip_ts_wrappers<'a, 'arena>(mut node: &'a Expression<'arena>) -> &'a Expression<'arena> {
     loop {
         node = match &node.kind {

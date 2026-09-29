@@ -35,7 +35,7 @@
 # known bugs.
 #
 # Format: KIND<TAB>POSITION
-# shapes: 32
+# shapes: 33
 UNHONORED	ArrowFunctionExpression.body
 UNHONORED	ArrowFunctionExpression.typeParameters
 UNHONORED	AssignmentExpression.left
@@ -52,6 +52,7 @@ UNHONORED	LogicalExpression.left
 UNHONORED	LogicalExpression.right
 UNHONORED	MemberExpression.object
 UNHONORED	MethodDefinition.value
+UNHONORED	ParenthesizedExpression.expression
 UNHONORED	TSAsExpression.expression
 UNHONORED	TSImportEqualsDeclaration.moduleReference
 UNHONORED	TSInstantiationExpression.expression

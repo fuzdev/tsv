@@ -268,6 +268,12 @@ pub fn parse_with_goal_or_fallback<'arena>(
 /// present in the AST and its wire JSON. The binding audit uses this to reparse
 /// formatted output and see which parenthesized subtree a glued comment binds to
 /// — a re-binding is invisible in the paren-free public AST.
+///
+/// ⚠️ The tree is for the **wire** (`convert_ast_json_*`) and for walks that read it,
+/// never for [`format()`] or any other printer entry point: a `ParenthesizedExpression`
+/// answers no paren question about its position, so the printer refuses one in a debug
+/// build and prints its contents bare in a release one — dropping every pair the
+/// position needs (`(x + y) * 2` → `x + y * 2`). Format the [`parse`] tree instead.
 pub fn parse_preserve_parens<'arena>(
     source: &str,
     arena: &'arena bumpalo::Bump,
@@ -581,14 +587,23 @@ fn with_embedding_parser<'arena, T>(
 /// expression — skips `remove_parens`, so its public AST keeps the parens. All
 /// other embedded parses ([`parse_embedded`], expression/pattern parses)
 /// stay paren-free, matching acorn/Svelte.
+///
+/// The tree is a **wire** shape only: nothing prints or compiles a
+/// `ParenthesizedExpression`. The returned `bool` reports whether any pair was
+/// wrapped — when it is `true` the caller parses the same source again with
+/// [`parse_embedded`] for every other consumer, and when it is `false` the two
+/// parses would build the same tree, so this one serves both. It may over-report (a
+/// pair a speculative parse built and then abandoned), which costs that second parse
+/// and nothing else.
 pub fn parse_embedded_preserve_parens<'arena>(
     source: &str,
     base_offset: usize,
     arena: &'arena bumpalo::Bump,
-) -> Result<Program<'arena>> {
+) -> Result<(Program<'arena>, bool)> {
     with_embedding_parser(source, base_offset, arena, |parser| {
         parser.preserve_parens = true;
-        parser.parse()
+        let program = parser.parse()?;
+        Ok((program, parser.preserved_a_paren))
     })
 }
 

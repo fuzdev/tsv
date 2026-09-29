@@ -132,9 +132,8 @@ pub(crate) fn build_snippet_function<'arena>(
     Ok((fn_decl, name))
 }
 
-/// Unwrap a `{@render}` expression to the call it applies, tolerating a single
-/// layer of parentheses around the call (`{@render (foo)(x)}`); `None` for a
-/// non-call.
+/// The call a `{@render}` expression applies; `None` for a non-call. Grouping parens
+/// never reach here — the parser strips them, so `{@render (s(x))}` is the call itself.
 ///
 /// This is the oracle's **parse-time** shape rule, decided on the RAW (un-erased)
 /// node: a TypeScript wrapper AROUND the call (`{@render (s(x) as T)}`,
@@ -154,10 +153,6 @@ pub(crate) fn render_call_expression<'a, 'arena>(
 ) -> Option<&'a CallExpression<'arena>> {
     match &expr.kind {
         ExpressionKind::CallExpression(call) => Some(call),
-        ExpressionKind::ParenthesizedExpression(paren) => match &paren.expression.kind {
-            ExpressionKind::CallExpression(call) => Some(call),
-            _ => None,
-        },
         _ => None,
     }
 }
