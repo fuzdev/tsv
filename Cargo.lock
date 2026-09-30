@@ -739,6 +739,7 @@ dependencies = [
  "serde_json",
  "smallvec",
  "thiserror",
+ "unicode-ident",
  "unicode-segmentation",
  "unicode-width",
 ]

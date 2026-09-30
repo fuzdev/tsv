@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 262,
+	"end": 283,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -500,6 +500,206 @@
 								"column": 12
 							}
 						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 261,
+				"end": 263,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 263,
+				"end": 273,
+				"expression": {
+					"type": "BinaryExpression",
+					"start": 264,
+					"end": 272,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 9
+						}
+					},
+					"left": {
+						"type": "TSInstantiationExpression",
+						"start": 264,
+						"end": 268,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 1
+							},
+							"end": {
+								"line": 21,
+								"column": 5
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 264,
+							"end": 265,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 1
+								},
+								"end": {
+									"line": 21,
+									"column": 2
+								}
+							},
+							"name": "f"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 265,
+							"end": 268,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 2
+								},
+								"end": {
+									"line": 21,
+									"column": 5
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 266,
+									"end": 267,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 3
+										},
+										"end": {
+											"line": 21,
+											"column": 4
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 266,
+										"end": 267,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 3
+											},
+											"end": {
+												"line": 21,
+												"column": 4
+											}
+										},
+										"name": "T"
+									}
+								}
+							]
+						}
+					},
+					"operator": "/",
+					"right": {
+						"type": "Literal",
+						"start": 271,
+						"end": 272,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 8
+							},
+							"end": {
+								"line": 21,
+								"column": 9
+							}
+						},
+						"value": 2,
+						"raw": "2"
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 273,
+				"end": 274,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 274,
+				"end": 282,
+				"expression": {
+					"type": "BinaryExpression",
+					"start": 275,
+					"end": 281,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 7
+						}
+					},
+					"left": {
+						"type": "TSNonNullExpression",
+						"start": 275,
+						"end": 277,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 1
+							},
+							"end": {
+								"line": 22,
+								"column": 3
+							}
+						},
+						"expression": {
+							"type": "Identifier",
+							"start": 275,
+							"end": 276,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 1
+								},
+								"end": {
+									"line": 22,
+									"column": 2
+								}
+							},
+							"name": "x"
+						}
+					},
+					"operator": "/",
+					"right": {
+						"type": "Literal",
+						"start": 280,
+						"end": 281,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 6
+							},
+							"end": {
+								"line": 22,
+								"column": 7
+							}
+						},
+						"value": 2,
+						"raw": "2"
 					}
 				}
 			}

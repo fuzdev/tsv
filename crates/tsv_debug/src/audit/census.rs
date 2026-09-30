@@ -293,7 +293,34 @@ struct TsScanner<'a, 'o> {
     /// Whether a `/` at the cursor would start a REGEX (true after an operator,
     /// an opening bracket, a regex-preceding keyword, or at entry) or DIVISION
     /// (after a value: identifier, literal, `)`, `]`, `}`, postfix `++`/`--`).
+    /// A `!` leaves it as it was — postfix after a value, prefix after an
+    /// operator — and so does a numeric literal's trailing `.` (`1. / 2`).
     regex_allowed: bool,
+    /// The bracket nesting of every `<` that may have opened a type-argument list,
+    /// innermost last — the census's own reading of one, so a `>` closing it ends a value
+    /// and the `/` after it divides (`f<T> / 2`).
+    ///
+    /// **Read from the canonical SPELLING, not the grammar.** A `<` GLUED to the value
+    /// before it (`f<`, nothing between the operand's last byte and the `<`) opens a list,
+    /// and a `>` glued to the byte before it closes one; a spaced `<` or `>` is an
+    /// operator. The printer, like prettier, prints every type-argument list glued and
+    /// every comparison spaced, so the formatted side of the diff reads each one right by
+    /// construction, whatever sits between the two delimiters: a comparison's `>` is never
+    /// taken for a list's close there (which would read the regex after it as a division,
+    /// scan its body as code, and let a quote in it swallow a real comment), and the
+    /// printer's paren-stripped `f<T> / 2` divides as the authored `(f<T>) / 2` does. The
+    /// residue is an author's own non-canonical spelling: see `docs/audits.md` §census.
+    ///
+    /// **Scoped to the brackets and the statement it opened in.** A list never outlives
+    /// either, so an entry is dropped when the nesting falls below its own (the `)` of
+    /// `if (a<b)`) and at a `;` or line break at its own nesting (`let k = a<b;`,
+    /// [`Self::end_angle_scope`]) — else an authored glued comparison waits to be
+    /// "closed" by a later statement's `>`. A logical `&&`, `||` or `??`, which no type
+    /// spells, drops every entry.
+    angle_opens: Vec<u32>,
+    /// Bracket nesting — every `(`, `[`, `{` and template `${` open, across template
+    /// interpolations (which reset `depth`) — the scope [`Self::angle_opens`] keys on.
+    nesting: u32,
     /// Brace depth of the current code context (relative to the scan entry or
     /// the innermost template interpolation).
     depth: u32,
@@ -312,6 +339,8 @@ impl<'a, 'o> TsScanner<'a, 'o> {
             bytes: src.as_bytes(),
             pos: 0,
             regex_allowed: true,
+            angle_opens: Vec::new(),
+            nesting: 0,
             depth: 0,
             frames: Vec::new(),
             bucket,
@@ -321,6 +350,45 @@ impl<'a, 'o> TsScanner<'a, 'o> {
 
     fn peek(&self, ahead: usize) -> Option<u8> {
         self.bytes.get(self.pos + ahead).copied()
+    }
+
+    /// A bracket (or template interpolation) opened.
+    fn open_nesting(&mut self) {
+        self.nesting += 1;
+    }
+
+    /// A `;` or a line break at the current nesting: every `<` tracked at this nesting is
+    /// out of scope ([`Self::angle_opens`]).
+    ///
+    /// The line break is the ASI half of the `;`: an authored glued comparison ended by a
+    /// newline alone (`let k = a<b⏎let m = c>/'/.test(d)`) would otherwise be closed by the
+    /// next statement's `>` on the input side only (the printer spaces both and
+    /// terminates the first statement). The cost is a type-argument list broken across
+    /// lines at its own nesting and followed straight by a `/` (`f<⏎A⏎> / 2`), which then
+    /// reads as a comparison — an instantiation expression divided, which nothing real
+    /// writes, let alone broken.
+    fn end_angle_scope(&mut self) {
+        let nesting = self.nesting;
+        self.angle_opens.retain(|&at| at < nesting);
+    }
+
+    /// A bracket (or template interpolation) closed: every `<` tracked inside it is out
+    /// of scope ([`Self::angle_opens`]).
+    fn close_nesting(&mut self) {
+        self.nesting = self.nesting.saturating_sub(1);
+        let nesting = self.nesting;
+        self.angle_opens.retain(|&at| at <= nesting);
+    }
+
+    /// Whether whitespace or a block comment sits right before the cursor — whether the
+    /// token here is SPACED from the one before it rather than glued to it.
+    fn follows_trivia(&self) -> bool {
+        let before = &self.src[..self.pos];
+        before.ends_with("*/")
+            || before
+                .chars()
+                .next_back()
+                .is_some_and(tsv_lang::is_js_whitespace)
     }
 
     /// The main code loop. With `expression_mode`, returns (cursor ON the brace)
@@ -347,6 +415,7 @@ impl<'a, 'o> TsScanner<'a, 'o> {
                 }
                 b'{' => {
                     self.depth += 1;
+                    self.open_nesting();
                     self.pos += 1;
                     self.regex_allowed = true;
                 }
@@ -357,6 +426,7 @@ impl<'a, 'o> TsScanner<'a, 'o> {
                             // the template's content.
                             self.pos += 1;
                             self.depth = depth;
+                            self.close_nesting();
                             self.template_content();
                         } else if expression_mode {
                             return;
@@ -368,17 +438,28 @@ impl<'a, 'o> TsScanner<'a, 'o> {
                         }
                     } else {
                         self.depth -= 1;
+                        self.close_nesting();
                         self.pos += 1;
                         self.regex_allowed = false;
                     }
                 }
                 b'(' | b'[' => {
+                    self.open_nesting();
                     self.pos += 1;
                     self.regex_allowed = true;
                 }
                 b')' | b']' => {
+                    self.close_nesting();
                     self.pos += 1;
                     self.regex_allowed = false;
+                }
+                // A statement ends every `<` tracked at its own nesting (an object type's
+                // `;` sits one bracket deeper, so a list around it survives); so does a
+                // line break (`end_angle_scope`).
+                b';' => {
+                    self.end_angle_scope();
+                    self.pos += 1;
+                    self.regex_allowed = true;
                 }
                 // Postfix `++` / `--` leave a value, so division follows
                 // (`x++ / 2`). The prefix form is never directly followed by
@@ -391,7 +472,48 @@ impl<'a, 'o> TsScanner<'a, 'o> {
                     self.pos += 2;
                     self.regex_allowed = false;
                 }
-                b' ' | b'\t' | b'\r' | b'\n' | 0x0b | 0x0c => self.pos += 1,
+                // A logical operator, which no type spells: every `<` still tracked
+                // around it was a comparison's (`i<n && j>/'/`).
+                b'&' | b'|' | b'?' if self.peek(1) == Some(b) => {
+                    self.angle_opens.clear();
+                    self.pos += 2;
+                    self.regex_allowed = true;
+                }
+                b' ' | b'\t' | 0x0b | 0x0c => self.pos += 1,
+                b'\r' | b'\n' => {
+                    self.end_angle_scope();
+                    self.pos += 1;
+                }
+                // A postfix non-null leaves the value before it; a prefix `!` leaves the
+                // operator before it — either way the state is the one it found.
+                b'!' if self.peek(1) != Some(b'=') => self.pos += 1,
+                // A numeric literal's trailing `.` (`1.`) ends the value it belongs to.
+                b'.' if self.pos > 0 && self.bytes[self.pos - 1].is_ascii_digit() => {
+                    self.pos += 1;
+                }
+                // A `<` glued to a value opens a type-argument list, and a `>` glued to what
+                // it closes (and no arrow's) ends a value. Both are operators otherwise (see
+                // `angle_opens`).
+                b'<' => {
+                    if !self.regex_allowed && !self.follows_trivia() {
+                        self.angle_opens.push(self.nesting);
+                    }
+                    self.pos += 1;
+                    self.regex_allowed = true;
+                }
+                b'>' => {
+                    // Only a `<` at this `>`'s own nesting can be its list's opener: a list
+                    // closes inside the brackets it opened in. Any `>` there answers it, so a
+                    // spaced one retires it without closing a list.
+                    let arrow = self.pos > 0 && self.bytes[self.pos - 1] == b'=';
+                    let answers = !arrow && self.angle_opens.last() == Some(&self.nesting);
+                    if answers {
+                        self.angle_opens.pop();
+                    }
+                    let closes = answers && !self.follows_trivia();
+                    self.pos += 1;
+                    self.regex_allowed = !closes;
+                }
                 _ if b.is_ascii_alphanumeric() || matches!(b, b'_' | b'$' | b'#') => self.word(),
                 _ if b < 0x80 => {
                     // Any other ASCII punctuator: an operator, so regex position.
@@ -469,6 +591,7 @@ impl<'a, 'o> TsScanner<'a, 'o> {
                 }
                 b'$' if self.peek(1) == Some(b'{') => {
                     self.pos += 2;
+                    self.open_nesting();
                     self.frames.push(self.depth);
                     self.depth = 0;
                     self.regex_allowed = true;
@@ -958,6 +1081,110 @@ mod tests {
         );
         // After a regex-preceding keyword, regex; its `//` is body, not comment.
         assert!(ts("return /a\\/\\/b/;").is_empty());
+    }
+
+    #[test]
+    fn ts_division_after_the_grammar_owned_operand_ends() {
+        // A `/` after a type-argument list's `>`, a postfix `!` or a numeric
+        // literal's trailing `.` divides, so the `//` after it is a real comment.
+        let real = vec![(CensusBucket::Ts, CensusKind::Line, " real".into(), 1)];
+        assert_eq!(ts("x = f<T> / 2; // real\n"), real);
+        assert_eq!(ts("x = f<A<B>> / 2; // real\n"), real);
+        assert_eq!(ts("x = a! / 2; // real\n"), real);
+        assert_eq!(ts("x = a! /* c */ / 2; // real\n").len(), 2);
+        assert_eq!(ts("x = 1. / 2; // real\n"), real);
+        // A glued `<`…`>` is a type-argument list whatever it holds — every shape the
+        // printer may strip a pair around, spelled as the printer prints it.
+        for src in [
+            "x = f<'a'> / 2; // real\n",
+            "x = f<() => void> / 2; // real\n",
+            "x = f<{ a: T }> / 2; // real\n",
+            "x = f<-1> / 2; // real\n",
+            "x = f<A extends B ? C : D> / 2; // real\n",
+            "x = f<A<B extends C ? D : E>> / 2; // real\n",
+            "x = f<{ a?: T; b: U }> / 2; // real\n",
+            "x = f<[a?: T]> / 2; // real\n",
+            "x = f<'a?:'> / 2; // real\n",
+            "x = f<-1 | +2> / 2; // real\n",
+            "x = f<(a: T) => U> / 2; // real\n",
+            "x = f<{ -readonly [K in T]-?: U }> / 2; // real\n",
+            "x = f<{ [K in T as `k${K}`]: U }> / 2; // real\n",
+            "x = f<{ m(): T; n?(a: U): V; new (): W; (): X }> / 2; // real\n",
+            "x = f<keyof (A | B)> / 2; // real\n",
+            "x = f<new () => T> / 2; // real\n",
+            "x = f<abstract new (a: T) => U> / 2; // real\n",
+            "x = f<(x: unknown) => asserts x is T> / 2; // real\n",
+            "x = f<T extends (infer U)[] ? U : never> / 2; // real\n",
+            "x = f<typeof import('./a')> / 2; // real\n",
+            "x = f<Parameters<typeof g>> / 2; // real\n",
+            "x = f<{ m(): void }['m']> / 2; // real\n",
+            "x = f<A | B & C> / 2; // real\n",
+            "x = f<| A | B> / 2; // real\n",
+            // A line break or `;` one bracket deeper leaves the list open.
+            "x = f<{\n\ta: T;\n\tb: U\n}> / 2; // real\n",
+        ] {
+            assert_eq!(ts(src), real, "{src:?}");
+        }
+        // A comment inside the list is trivia (it counts, and so does the real one).
+        assert_eq!(ts("x = f</* c */ T> / 2; // real\n").len(), 2);
+        // A comparison is spaced, so its `>` opens a regex whose `//` is body, whatever
+        // sits between the two operators; so do an arrow's `>` and a prefix `!`.
+        for src in [
+            "x = a > /b\\/\\/c/;",
+            "x = (s) => /b\\/\\/c/;",
+            "x = !/b\\/\\/c/;",
+            "x = a < b ? c : d > /b\\/\\/c/;",
+            "x = a < b ? c<d> : e > /b\\/\\/c/;",
+            "x = a < b + c > /b\\/\\/c/;",
+            "x = a < b in c > /b\\/\\/c/;",
+            "x = a < b && c > /b\\/\\/c/;",
+            "x = a < b() > /b\\/\\/c/;",
+            "x = a < b.c(d) > /b\\/\\/c/;",
+            "x = a < typeof (b) > /b\\/\\/c/;",
+            "x = a < infer(b) > /b\\/\\/c/;",
+            "x = a < asserts(b) > /b\\/\\/c/;",
+            "x = a < abstract(b) > /b\\/\\/c/;",
+            "x = a < is(b) > /b\\/\\/c/;",
+            "x = a < { m(b) {} }.m > /b\\/\\/c/;",
+            "x = a < readonly(b) > /b\\/\\/c/;",
+            "x = a < new b() > /b\\/\\/c/;",
+            "if (i < n && j > /b\\/\\/c/.test(s)) {}",
+            // A spaced `>` retires a glued `<` without closing it.
+            "x = a<b && c > /b\\/\\/c/;",
+            "x = a<b() > /b\\/\\/c/;",
+        ] {
+            assert!(ts(src).is_empty(), "{src:?}");
+        }
+        // An author's GLUED `<` does not outlive the brackets, the statement or the line it
+        // opened in, nor a logical operator, which no type spells — so a later glued `>`
+        // still opens a regex.
+        for src in [
+            "if (a<b) c = d>/b\\/\\/c/;",
+            "let k = a<b; let m = c>/b\\/\\/c/;",
+            "let k = a<b\nlet m = c>/b\\/\\/c/",
+            "f(a<b)(c>/b\\/\\/c/);",
+            "x = a<b && c>/b\\/\\/c/;",
+            "x = a<b || c>/b\\/\\/c/;",
+            "x = a<b ?? c>/b\\/\\/c/;",
+        ] {
+            assert!(ts(src).is_empty(), "{src:?}");
+        }
+    }
+
+    #[test]
+    fn ts_non_canonical_angle_spellings_are_the_documented_residue() {
+        // The type-argument rule reads the printer's spelling, so an author's own
+        // non-canonical one is misread (docs/audits.md §census). A fully glued comparison
+        // reads as a list: the regex after its `>` divides and its `//` is a phantom.
+        assert!(ts("x = a < b() > /[//]/;").is_empty());
+        assert_eq!(
+            ts("x = a<b()>/[//]/;"),
+            vec![(CensusBucket::Ts, CensusKind::Line, "]/;".into(), 1)]
+        );
+        // A spaced list reads as a comparison: the division after its `>` opens a regex
+        // that swallows the real comment.
+        assert!(ts("x = f < T > / 2; // real\n").is_empty());
+        assert!(ts("x = f<T > / 2; // real\n").is_empty());
     }
 
     #[test]

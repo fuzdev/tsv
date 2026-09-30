@@ -462,6 +462,11 @@ pub(crate) struct Printer<'a> {
     /// restores the previous value on the way out (so nested contexts reset
     /// correctly).
     block_dangle_allowed: Cell<bool>,
+    /// Whether the fragment being built is a `<textarea>`'s content — RCDATA, which Svelte
+    /// reads with `read_sequence`, where a `{/` opens an expression rather than closing a
+    /// block. Read by [`Printer::build_text_expression_tag_doc`]; set (and restored) by the
+    /// whitespace-sensitive element builder around a `<textarea>`.
+    in_textarea_content: Cell<bool>,
     /// How many fragments' children are being built right now — the root fragment counts
     /// one, each container body inside it one more. A container's body is indented one level
     /// past the container (the uniform "each container adds a level" model — element and
@@ -566,6 +571,7 @@ impl<'a> Printer<'a> {
             has_format_ignore,
             line_breaks,
             block_dangle_allowed: Cell::new(true),
+            in_textarea_content: Cell::new(false),
             fragment_depth: Cell::new(0),
             css_host_scan_cache: Cell::new(None),
             root_inline_run_block_starts: RefCell::new(FxHashSet::default()),
@@ -604,6 +610,13 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(crate) fn set_block_dangle_allowed(&self, allowed: bool) -> bool {
         self.block_dangle_allowed.replace(allowed)
+    }
+
+    /// Whether the fragment being built is a `<textarea>`'s content
+    /// ([`Printer::in_textarea_content`]).
+    #[inline]
+    pub(crate) fn in_textarea_content(&self) -> bool {
+        self.in_textarea_content.get()
     }
 
     /// Open one fragment's child build for [`Printer::fragment_depth`]; the depth returns to
@@ -969,11 +982,17 @@ impl<'a> Printer<'a> {
         expr: &Expression<'_>,
         value_doc: DocId,
     ) -> DocId {
-        if matches!(expr.kind, ExpressionKind::AssignmentExpression(_)) {
+        if Self::value_takes_clarity_parens(expr) {
             self.d().parens(value_doc)
         } else {
             value_doc
         }
+    }
+
+    /// Whether [`Self::wrap_value_clarity_parens`] gives the value its pair — so the
+    /// value's printed form opens on a `(` of the host's own.
+    pub(in crate::printer) fn value_takes_clarity_parens(expr: &Expression<'_>) -> bool {
+        matches!(expr.kind, ExpressionKind::AssignmentExpression(_))
     }
 
     /// An own-line head's content, broken onto its own indented lines: a hardline, then the

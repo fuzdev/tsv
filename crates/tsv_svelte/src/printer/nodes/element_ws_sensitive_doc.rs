@@ -121,6 +121,20 @@ impl<'a> Printer<'a> {
         element: &internal::Element<'_>,
         attrs: ElementAttrsDoc,
     ) -> DocId {
+        // A `<textarea>`'s content is RCDATA, read as a sequence (see
+        // `Printer::in_textarea_content`); it holds no element, so the flag cannot leak.
+        let textarea = element.name(self.source) == "textarea";
+        let outer = self.in_textarea_content.replace(textarea);
+        let doc = self.build_whitespace_sensitive_element_doc_inner(element, attrs);
+        self.in_textarea_content.set(outer);
+        doc
+    }
+
+    fn build_whitespace_sensitive_element_doc_inner(
+        &self,
+        element: &internal::Element<'_>,
+        attrs: ElementAttrsDoc,
+    ) -> DocId {
         let ElementAttrsDoc {
             docs: attr_docs,
             emission,
@@ -582,7 +596,7 @@ impl<'a> Printer<'a> {
             // Expressions and blocks: format normally. The body-indent level is
             // applied collectively by build_whitespace_sensitive_content_doc, so each
             // node sits at the container's body level without its own wrapper.
-            FragmentNode::ExpressionTag(tag) => self.build_expression_tag_doc(tag),
+            FragmentNode::ExpressionTag(tag) => self.build_text_expression_tag_doc(tag),
             FragmentNode::Comment(comment) => self.build_html_comment_doc(comment),
             FragmentNode::IfBlock(block) => self.build_ws_sensitive_if_block_doc(block),
             FragmentNode::EachBlock(block) => self.build_ws_sensitive_each_block_doc(block),

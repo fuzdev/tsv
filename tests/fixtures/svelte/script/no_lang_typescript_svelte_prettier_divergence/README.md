@@ -3,8 +3,9 @@
 A component whose only `<script>` carries **no** `lang` attribute, using TypeScript syntax
 in every island: type annotations in the script itself (`let x: number`), a generic and
 typed snippet head (`{#snippet fn<T>(a: T)}`), a typed `{#each}` binding
-(`as item: string`), a type assertion in an `{#await}` head (`p as Promise<string>`), and
-`satisfies` / `as` casts in expression tags.
+(`as item: string`), a type assertion in an `{#await}` head (`p as Promise<string>`),
+`satisfies` / `as` casts in expression tags, and a division after an instantiation's `>` or a
+postfix `!` (`{f<T> / 2}`, `{x! / 2}`).
 
 ## What each side does
 

@@ -640,6 +640,11 @@ pub struct OperandAnchor {
     at_boundary: usize,
     /// Where the current run of significant bytes begins; the backward walk's floor.
     segment_start: usize,
+    /// Where the last literal [`Self::skipped_operand`] recorded ends. The anchor
+    /// landing exactly there means the literal is the operand before the `/` — which
+    /// the byte there cannot say for a regex without flags, whose last byte is its own
+    /// closing `/` (`/a/ / 2` divides).
+    literal_end: Option<usize>,
 }
 
 impl OperandAnchor {
@@ -650,19 +655,7 @@ impl OperandAnchor {
         Self {
             at_boundary: start,
             segment_start: start,
-        }
-    }
-
-    /// A scan whose loop begins at `segment_start` with the anchor already resolved
-    /// to `at_boundary` — the shape of a caller that consumes an opening delimiter
-    /// and skips the leading trivia itself before entering its loop, so the bytes
-    /// between the two are not the walk's to cross.
-    #[inline]
-    #[must_use]
-    pub fn resumed(at_boundary: usize, segment_start: usize) -> Self {
-        Self {
-            at_boundary,
-            segment_start,
+            literal_end: None,
         }
     }
 
@@ -671,18 +664,27 @@ impl OperandAnchor {
     /// A string or template ends an operand, so the anchor lands past it; a comment
     /// is transparent, so the operand *before* it still governs — and that pending
     /// lazy answer must be resolved here, while the run it belongs to is still
-    /// reachable.
+    /// reachable — by the same `lower_bound` and `grammar` the scan's
+    /// [`Self::starts_regex`] asks with (a `!` glued to a `)` before the comment may be a
+    /// statement header's, [`OperandGrammar::closes_statement_header`]).
     ///
     /// ⚠️ **The two assignments below are ordered**: resolving the comment case reads
     /// `segment_start`, so moving the floor first would resolve it against the wrong
     /// run and report the anchor from before the *previous* boundary — `abc /* c */
     /// /x/` would then read its division as a regex.
     #[inline]
-    pub fn skipped_trivia(&mut self, bytes: &[u8], i: usize, past: usize) {
+    pub fn skipped_trivia(
+        &mut self,
+        bytes: &[u8],
+        i: usize,
+        past: usize,
+        lower_bound: usize,
+        grammar: OperandGrammar,
+    ) {
         self.at_boundary = if trivia_ends_operand(bytes, i) {
             past
         } else {
-            self.at(bytes, i)
+            self.at(bytes, i, lower_bound, grammar)
         };
         self.segment_start = past;
     }
@@ -693,20 +695,25 @@ impl OperandAnchor {
     pub fn skipped_operand(&mut self, past: usize) {
         self.at_boundary = past;
         self.segment_start = past;
+        self.literal_end = Some(past);
     }
 
-    /// The anchor at `pos`: just past the last significant non-whitespace byte the
-    /// scan consumed before it.
+    /// The anchor at `pos`: just past the last significant byte the scan consumed
+    /// before it that is not whitespace — stepping back over a `!` run that is a
+    /// postfix non-null ([`Self::postfix_non_null_start`]).
     ///
     /// Private on purpose: [`Self::starts_regex`] is the only question this answers,
     /// and routing every caller through it is what keeps a scan from reconstructing
     /// the eager anchor by hand.
     #[inline]
     #[must_use]
-    fn at(&self, bytes: &[u8], pos: usize) -> usize {
+    fn at(&self, bytes: &[u8], pos: usize, lower_bound: usize, grammar: OperandGrammar) -> usize {
         let mut j = pos;
         while j > self.segment_start && bytes[j - 1].is_ascii_whitespace() {
             j -= 1;
+        }
+        if j > self.segment_start && bytes[j - 1] == b'!' {
+            j = self.postfix_non_null_start(bytes, j, lower_bound, grammar);
         }
         if j > self.segment_start {
             j
@@ -715,24 +722,183 @@ impl OperandAnchor {
         }
     }
 
+    /// Where the `!` run ending at `run_end` begins when it is a POSTFIX non-null
+    /// (`a! / 2`, `f()!! / 2`), so the operand before it is the anchor and the `/`
+    /// divides; `run_end` itself when it is a PREFIX logical not (`!/re/`), which leaves
+    /// the `!` as the anchor's last byte and the `/` opening a regex.
+    ///
+    /// **Glued means postfix.** Both readings put the run right after something, so the
+    /// bytes cannot say which `!` it is — but a non-null is written against its operand,
+    /// and a prefix `!` after an operand is always separated from it: `if (c) !/re/`,
+    /// `a⏎!/re/` (ASI), a block keyword `{#if !/re/…}`. So the run steps only when nothing
+    /// but more `!`s sits between it and the byte before — an operand's end, an operator
+    /// (`a &&!/re/`, where stepping reads the operator and the answer is the same), or,
+    /// when the run opens the scan's current segment, the trivia or literal the scan just
+    /// stepped over (`a /* c */! / 2`, `'s'! / 2`). Whitespace before the run is never
+    /// crossed; the spaced `a ! / 2`, which no formatter prints, reads as the regex.
+    ///
+    /// **A line break is never glued.** TypeScript takes no postfix `!` after one (its
+    /// `hasPrecedingLineBreak`), so the run begins a new statement there (ASI). That is a
+    /// line comment, whose terminator the scan consumes (`a // c⏎!/re/`), and a block
+    /// comment that spans lines (`a /* c⏎*/!/re/`), which counts as the line break it
+    /// holds.
+    ///
+    /// **Nor is a statement header's `)`.** The run glued to it is a prefix `!` — a
+    /// statement begins after the header (`if (c)!/re/`) — where after any other `)` it is
+    /// postfix (`f()! / 2`). The bytes cannot tell the two `)`s apart, so the scan's
+    /// grammar is asked ([`OperandGrammar::closes_statement_header`]), for that glued `)`
+    /// alone.
+    ///
+    /// The step lives in this walk rather than in [`is_regex_start_after`] because only
+    /// the walk knows where the scan's significant bytes stop: a raw backward walk from a
+    /// `!` glued to a comment would read the comment's `*/` as the operator before it.
+    #[cold]
+    fn postfix_non_null_start(
+        &self,
+        bytes: &[u8],
+        run_end: usize,
+        lower_bound: usize,
+        grammar: OperandGrammar,
+    ) -> usize {
+        let mut k = run_end - 1;
+        while k > self.segment_start && bytes[k - 1] == b'!' {
+            k -= 1;
+        }
+        // The byte before the run is whitespace inside the segment, and — when the run opens
+        // it — the last byte of whatever the scan stepped over, which is a line break exactly
+        // when that was a line comment or a block comment holding one.
+        let glued = if k > self.segment_start {
+            !bytes[k - 1].is_ascii_whitespace()
+        } else {
+            k == 0
+                || !(bytes[k - 1].is_ascii_whitespace()
+                    || line_terminator_ends_at(bytes, k)
+                    || self.multi_line_comment_ends_at(bytes, k, lower_bound))
+        };
+        if !glued {
+            return run_end;
+        }
+        // The operand the run is glued to ends at `k` inside the segment, or at the value
+        // the boundary resolved to when the run opens it.
+        let operand_end = if k > self.segment_start {
+            k
+        } else {
+            self.at_boundary
+        };
+        if operand_end > lower_bound
+            && bytes[operand_end - 1] == b')'
+            && (grammar.closes_statement_header)(bytes, operand_end - 1, lower_bound)
+        {
+            return run_end;
+        }
+        k
+    }
+
+    /// Whether a block comment spanning more than one line ends just before `end` — the
+    /// trivia the scan stepped over, when a segment begins at `end`. A regex literal can
+    /// end on the same `*/` bytes (`/a*/`), and is told apart by the literal record.
+    fn multi_line_comment_ends_at(&self, bytes: &[u8], end: usize, lower_bound: usize) -> bool {
+        end >= 2
+            && self.literal_end != Some(end)
+            && block_comment_start_before(bytes, end - 1, lower_bound)
+                .is_some_and(|open| (open..end).any(|i| is_line_terminator_at(bytes, i)))
+    }
+
     /// Whether the `/` at `pos` starts a regex literal — [`is_regex_start_after`]
     /// over the anchor this rebuilds, so a caller never handles the two separately.
+    /// `lower_bound` (the scan's start) bounds every walk, and `grammar` answers the
+    /// operand ends the bytes cannot ([`OperandGrammar`]).
     #[inline]
     #[must_use]
-    pub fn starts_regex(&self, bytes: &[u8], pos: usize, lower_bound: usize) -> bool {
-        is_regex_start_after(bytes, self.at(bytes, pos), lower_bound)
+    pub fn starts_regex(
+        &self,
+        bytes: &[u8],
+        pos: usize,
+        lower_bound: usize,
+        grammar: OperandGrammar,
+    ) -> bool {
+        let anchor = self.at(bytes, pos, lower_bound, grammar);
+        // A skipped literal ends an operand, whatever its last byte reads as.
+        if self.literal_end == Some(anchor) {
+            return false;
+        }
+        is_regex_start_after(bytes, anchor, lower_bound, grammar.closes_type_arguments)
     }
 }
+
+/// The two operand ends a raw byte scan cannot read from bytes, answered by the grammar
+/// that owns them — so a scan that finds where an expression ENDS before it is parsed
+/// reads each `/` the way the parser that follows it will.
+///
+/// The scanning crate does not answer either: the language crate that owns the grammar
+/// supplies both (`tsv_ts::OPERAND_GRAMMAR`), and every scan at a regex boundary carries
+/// them ([`OperandAnchor::starts_regex`], [`scan_to_matching_brace`],
+/// [`scan_to_matching_paren`], [`skip_template_literal`]). A resolver must read the region
+/// the way its parser will, so the scan and the parse agree on where an expression ends by
+/// construction.
+///
+/// Handed in at each ask rather than stored in the anchor: the anchor sits in the hot
+/// scan loops, and keeping it the three words it needs measured cheaper.
+#[derive(Clone, Copy, Debug)]
+pub struct OperandGrammar {
+    /// Whether a `>` closes a type-argument list ([`ClosesTypeArguments`]).
+    pub closes_type_arguments: ClosesTypeArguments,
+    /// Whether a `)` closes a statement header ([`ClosesStatementHeader`]).
+    pub closes_statement_header: ClosesStatementHeader,
+}
+
+impl OperandGrammar {
+    /// The answers the bytes alone give: every `>` is an operator (no type arguments),
+    /// and every `)` ends an operand (no statement header is looked for).
+    pub const BYTES_ONLY: Self = Self {
+        closes_type_arguments: never,
+        closes_statement_header: never,
+    };
+}
+
+/// The resolver that answers no to everything ([`OperandGrammar::BYTES_ONLY`]).
+fn never(_bytes: &[u8], _at: usize, _lower_bound: usize) -> bool {
+    false
+}
+
+/// Whether the `>` at `gt` closes a **type-argument list** — `f<T> / 2`, `a.b<T> / 2`,
+/// `new C<T> / 2` — so that the `/` after it divides, where after every other `>` (a
+/// comparison, a shift, an arrow's `=>`) it opens a regex (`a > /re/.test(b)`).
+///
+/// The one byte [`is_regex_start_after`] cannot read: the two `>`s are the same byte, and
+/// telling them apart is a question about the `<` that opened the list, which only a
+/// grammar with type arguments can answer ([`OperandGrammar`]).
+///
+/// Its arguments are the scanned bytes, the `>`'s offset, and the scan's lower bound, which
+/// bounds any backward reach.
+pub type ClosesTypeArguments = fn(bytes: &[u8], gt: usize, lower_bound: usize) -> bool;
+
+/// Whether the `)` at `rparen` closes a **statement header** — `if (c)`, `while (c)`,
+/// `for (…)`, `with (o)` — after which a statement begins, so a `!` glued to it is a
+/// prefix logical not (`if (c)!/re/`), where after every other `)` it is a postfix
+/// non-null (`f()! / 2`).
+///
+/// Asked only of a `)` a glued `!` run follows ([`OperandAnchor`]'s postfix step), never
+/// of a plain `) /` pair. Its arguments are the scanned bytes, the `)`'s offset, and the
+/// scan's lower bound, where a forward walk to the `)` may begin.
+pub type ClosesStatementHeader = fn(bytes: &[u8], rparen: usize, lower_bound: usize) -> bool;
 
 /// Whether a `/` starts a regex literal (rather than a division operator), given
 /// `operand_end` — the caller's scan position just past the last **non-trivia**
 /// byte it consumed before reaching the `/`.
 ///
 /// Decided by the last non-whitespace byte at or below `operand_end`: a `/`
-/// after something that *ends* an expression (identifier char, `)`, `]`, a
-/// postfix `++`/`--`, or a string/template closing quote `'` `"` `` ` ``) is
-/// division; after anything else — or with nothing significant before it — it is
-/// a regex. `lower_bound` bounds both walks.
+/// after something that *ends* an expression (an identifier character — ASCII or
+/// not — `)`, `]`, a postfix `++`/`--`, a string/template closing quote `'` `"`
+/// `` ` ``, a numeric literal's trailing `.`, or a `>` closing a type-argument list)
+/// is division; after anything else — or with nothing significant before it — it
+/// is a regex. `lower_bound` bounds every walk. A `!` never reaches here: the anchor
+/// steps over it ([`OperandAnchor`]'s `at`).
+///
+/// The `>` is the one byte whose answer the bytes do not hold — `f<T> / 2` divides
+/// where `a > /re/` does not — so `closes_type_arguments` is asked about it
+/// ([`ClosesTypeArguments`]). `=>` is settled first: an arrow's body is an
+/// expression, so a `/` after it opens a regex whatever grammar is scanned.
 ///
 /// The anchor is **handed in, never derived here by looking backward from the `/`** —
 /// which is the point: `bytes[operand_end - 1]` is a byte the caller's scan already
@@ -761,7 +927,12 @@ impl OperandAnchor {
 /// reads are only ones the scan already called significant, and the comment
 /// case is answered by the stored boundary value instead of by looking.
 #[inline]
-fn is_regex_start_after(bytes: &[u8], operand_end: usize, lower_bound: usize) -> bool {
+fn is_regex_start_after(
+    bytes: &[u8],
+    operand_end: usize,
+    lower_bound: usize,
+    closes_type_arguments: ClosesTypeArguments,
+) -> bool {
     // Nothing significant before it (start of the scanned region) → regex.
     if operand_end <= lower_bound {
         return true;
@@ -774,18 +945,55 @@ fn is_regex_start_after(bytes: &[u8], operand_end: usize, lower_bound: usize) ->
     if is_identifier_byte(b) {
         return word_before_regex(bytes, operand_end, lower_bound);
     }
-    // A postfix `++`/`--` ends an operand, so the `/` after it DIVIDES
-    // (`aa++ / bb`). A lone `+`/`-` is a binary or unary operator, after
-    // which a regex may start (`aa + /re/.test(b)`), so the doubling is
-    // the whole discriminator.
-    if matches!(b, b'+' | b'-') && j > lower_bound && bytes[j - 1] == b {
-        return false;
+    match b {
+        // A postfix `++`/`--` ends an operand, so the `/` after it DIVIDES
+        // (`aa++ / bb`). A lone `+`/`-` is a binary or unary operator, after
+        // which a regex may start (`aa + /re/.test(b)`), so the doubling is
+        // the whole discriminator.
+        b'+' | b'-' => !(j > lower_bound && bytes[j - 1] == b),
+        // Bytes that END an expression — a `/` after these is DIVISION. The
+        // string/template closing quotes (`'` `"` `` ` ``) belong here: after a
+        // literal like `'ab' / 2`, the `/` divides (the anchor sits past the whole
+        // string, so this quote can only be its close).
+        b')' | b']' | b'\'' | b'"' | b'`' => false,
+        // `=>` opens an arrow's expression body (`s => /re/.test(s)`); any other `>`
+        // divides only when it closes a type-argument list (`f<T> / 2`), which the
+        // grammar-owning resolver says — a comparison or shift (`a > /re/`) does not.
+        b'>' => {
+            (j > lower_bound && bytes[j - 1] == b'=')
+                || !closes_type_arguments(bytes, j, lower_bound)
+        }
+        // A numeric literal may end in its `.` (`1. / 2`), which no other token
+        // can: past a digit the `.` is the literal's, and anything else before
+        // it (`...` spread, a member `.` still waiting for its name) is no operand.
+        b'.' => !(j > lower_bound && bytes[j - 1].is_ascii_digit()),
+        // A non-ASCII identifier character ends an operand exactly as an ASCII one
+        // does (`é / 2`). No non-ASCII word is reserved, so no keyword walk follows.
+        0x80.. => !ends_with_identifier_char(bytes, operand_end, lower_bound),
+        _ => true,
     }
-    // Bytes that END an expression — a `/` after these is DIVISION. The
-    // string/template closing quotes (`'` `"` `` ` ``) belong here: after a
-    // literal like `'ab' / 2`, the `/` divides (the anchor sits past the whole
-    // string, so this quote can only be its close).
-    !(b == b')' || b == b']' || b == b'\'' || b == b'"' || b == b'`')
+}
+
+/// Whether the character ending at `end` (exclusive) is a **non-ASCII** identifier
+/// character — Unicode `XID_Continue`, plus ZWNJ and ZWJ, which ECMAScript admits in
+/// an `IdentifierPart` explicitly.
+///
+/// ⚠️ Conservative by a handful of code points: ECMAScript uses `ID_Continue`, and the
+/// few characters in it but not in `XID_Continue` (the NFKC-unstable letters `tsv_ts`'s
+/// lexer lists in `is_id_start_not_xid`) read as no identifier here, so a `/` after one
+/// still opens a regex — the pre-existing answer, and an over-rejection only.
+fn ends_with_identifier_char(bytes: &[u8], end: usize, lower_bound: usize) -> bool {
+    // Step back to the character's lead byte: at most three continuation bytes.
+    let mut lead = end - 1;
+    while lead > lower_bound && end - lead < 4 && bytes[lead] & 0xC0 == 0x80 {
+        lead -= 1;
+    }
+    std::str::from_utf8(&bytes[lead..end])
+        .ok()
+        .and_then(|s| s.chars().next())
+        .is_some_and(|ch| {
+            unicode_ident::is_xid_continue(ch) || matches!(ch, '\u{200C}' | '\u{200D}')
+        })
 }
 
 /// Whether the identifier ending at `word_end` (exclusive) is a reserved word an
@@ -829,6 +1037,14 @@ fn word_before_regex(bytes: &[u8], word_end: usize, lower_bound: usize) -> bool 
             | b"yield"
             | b"await"
     ) {
+        return false;
+    }
+    // A non-ASCII identifier character before the ASCII tail makes it one longer
+    // word (`éin / 2`, whose `in` is no keyword), and no such word is reserved.
+    if start > lower_bound
+        && bytes[start - 1] >= 0x80
+        && ends_with_identifier_char(bytes, start, lower_bound)
+    {
         return false;
     }
     // `.name` / `?.name` — a member access, so the word is an operand.
@@ -882,28 +1098,54 @@ fn block_comment_start_before(bytes: &[u8], j: usize, lower_bound: usize) -> Opt
 /// character class is a literal, not the terminator. An unterminated literal
 /// returns `end`.
 ///
+/// `None` when the body reaches a **line terminator** first: a regex literal
+/// cannot hold one — not in its body, its class, or behind a `\`
+/// (ecma262 `RegularExpressionNonTerminator`) — so the `/` opened no regex, and
+/// the caller reads it as the division it must then be and scans on from the
+/// byte after it. That bounds a misread slash to its own line: without it, a `/`
+/// the anchor rule wrongly calls a regex's opener swallows everything up to the
+/// next `/` in the source, closing brackets and braces included.
+///
 /// Pairs with [`is_regex_start_after`] — the caller confirms the `/` is a regex
 /// before skipping. Caller must ensure `start < end <= bytes.len()`.
 #[inline]
-pub fn skip_regex_literal(bytes: &[u8], start: usize, end: usize) -> usize {
+#[must_use]
+pub fn skip_regex_literal(bytes: &[u8], start: usize, end: usize) -> Option<usize> {
     let mut i = start + 1; // past the opening `/`
     while i < end {
+        if is_line_terminator_at(bytes, i) {
+            return None;
+        }
         match bytes[i] {
-            b'\\' if i + 1 < end => i += 2, // escape — skip the next byte
+            b'\\' if i + 1 < end => {
+                // Escape — skip the next byte, which may not be a line terminator.
+                if is_line_terminator_at(bytes, i + 1) {
+                    return None;
+                }
+                i += 2;
+            }
             b'/' => {
                 // Closing `/`; consume trailing flags (ASCII lowercase).
                 i += 1;
                 while i < end && bytes[i].is_ascii_lowercase() {
                     i += 1;
                 }
-                return i;
+                return Some(i);
             }
             b'[' => {
                 // Character class — a `/` inside is literal; skip to `]`.
                 i += 1;
                 while i < end {
+                    if is_line_terminator_at(bytes, i) {
+                        return None;
+                    }
                     match bytes[i] {
-                        b'\\' if i + 1 < end => i += 2,
+                        b'\\' if i + 1 < end => {
+                            if is_line_terminator_at(bytes, i + 1) {
+                                return None;
+                            }
+                            i += 2;
+                        }
                         b']' => {
                             i += 1;
                             break;
@@ -915,15 +1157,34 @@ pub fn skip_regex_literal(bytes: &[u8], start: usize, end: usize) -> usize {
             _ => i += 1,
         }
     }
-    end
+    Some(end)
 }
 
-/// The bytes [`scan_to_matching_brace`] hops between: its own braces, plus every
-/// [`TRIVIA_OPENERS`] byte (`` ` `` doubles as the template-literal opener).
-const HOP_NEEDLES: [u8; 6] = [b'{', b'}', b'"', b'\'', b'`', b'/'];
+/// Whether an ECMAScript `LineTerminator` ENDS just before `end` — the backward twin of
+/// [`is_line_terminator_at`]. LF and CR are ASCII whitespace too; this adds the three-byte
+/// U+2028 / U+2029.
+#[inline]
+fn line_terminator_ends_at(bytes: &[u8], end: usize) -> bool {
+    end >= 3 && matches!(bytes[end - 3..end], [0xE2, 0x80, 0xA8 | 0xA9])
+        || end >= 1 && matches!(bytes[end - 1], b'\n' | b'\r')
+}
 
-/// A hop may only skip bytes that cannot open trivia — see [`covers_trivia_openers`].
-const _: () = assert!(covers_trivia_openers(&HOP_NEEDLES));
+/// Whether an ECMAScript `LineTerminator` begins at `i` — LF, CR, or the UTF-8
+/// encodings of U+2028 / U+2029 (`E2 80 A8` / `E2 80 A9`).
+#[inline]
+fn is_line_terminator_at(bytes: &[u8], i: usize) -> bool {
+    match bytes[i] {
+        b'\n' | b'\r' => true,
+        0xE2 => matches!(bytes.get(i + 1..i + 3), Some([0x80, 0xA8 | 0xA9])),
+        _ => false,
+    }
+}
+
+/// The bytes [`scan_to_matching_close`] hops between: its own delimiter pair, plus every
+/// [`TRIVIA_OPENERS`] byte (`` ` `` doubles as the template-literal opener).
+const fn hop_needles(open: u8, close: u8) -> [u8; 6] {
+    [open, close, b'"', b'\'', b'`', b'/']
+}
 
 /// Scan from `scan_start` — the first byte inside an already-open `{` (counted as
 /// depth 1) — to that brace's matching `}`, returning the `}`'s offset, or `None`
@@ -937,14 +1198,54 @@ const _: () = assert!(covers_trivia_openers(&HOP_NEEDLES));
 /// skip below. A binding-PATTERN scanner (`match_bracket`) deliberately does **not**
 /// route through here — Svelte rejects a regex in that position, so the pattern
 /// scan stays regex-unaware — but it *does* share [`skip_template_literal`].
-pub fn scan_to_matching_brace(bytes: &[u8], scan_start: usize, end: usize) -> Option<usize> {
+///
+/// `grammar` settles the operand ends the bytes cannot ([`OperandGrammar`]); it is
+/// handed on to every nested template.
+pub fn scan_to_matching_brace(
+    bytes: &[u8],
+    scan_start: usize,
+    end: usize,
+    grammar: OperandGrammar,
+) -> Option<usize> {
+    scan_to_matching_close::<b'{', b'}'>(bytes, scan_start, end, grammar)
+}
+
+/// [`scan_to_matching_brace`] for a `(` — the same expression-context walk (strings,
+/// comments, templates and regex literals opaque) matching parens instead: the close of
+/// a paren-delimited EXPRESSION a caller must find before parsing it, such as a Svelte
+/// `{#each}` key. `scan_start` is the first byte inside the already-open `(`.
+pub fn scan_to_matching_paren(
+    bytes: &[u8],
+    scan_start: usize,
+    end: usize,
+    grammar: OperandGrammar,
+) -> Option<usize> {
+    scan_to_matching_close::<b'(', b')'>(bytes, scan_start, end, grammar)
+}
+
+/// The walk behind [`scan_to_matching_brace`] and [`scan_to_matching_paren`], one body
+/// over its delimiter pair so the two cannot drift.
+///
+/// Kept out of line (`inline(never)`), chosen by measurement: where this body lands moves
+/// the layout of the code around its callers, and out of line it measured the flattest
+/// whole run (parse and format together) against the single-delimiter scan it replaced —
+/// inlined, the format phase lost more than the parse phase gained.
+#[inline(never)]
+fn scan_to_matching_close<const OPEN: u8, const CLOSE: u8>(
+    bytes: &[u8],
+    scan_start: usize,
+    end: usize,
+    grammar: OperandGrammar,
+) -> Option<usize> {
+    // A hop may only skip bytes that cannot open trivia — see [`covers_trivia_openers`].
+    const { assert!(covers_trivia_openers(&hop_needles(OPEN, CLOSE))) };
     let mut depth: u32 = 1;
     let mut i = scan_start;
     // The anchor `is_regex_start_after` reads, rebuilt where a `/` asks for it. A
     // template literal ends an operand, as does a skipped regex.
     let mut anchor = OperandAnchor::new(scan_start);
     while i < end {
-        // Only `HOP_NEEDLES` can move this scan; every other byte reaches the
+        // Only the hop needles can move this scan; every other byte reaches the
         // `_ => {}` arm below and is stepped over one at a time, so the walk hops
         // between them a word at a time instead of reading each one. That is the
         // byte-scan ladder's top rung (`swar::next_byte_of`), chosen because the
@@ -966,28 +1267,32 @@ pub fn scan_to_matching_brace(bytes: &[u8], scan_start: usize, end: usize) -> Op
         // Callers routinely pass an `end` far short of the source end, and a
         // full-slice hop over a needle-free window would read to the end of the
         // file to learn what `end` already said.
-        i = crate::swar::next_byte_of(&bytes[..end], i, HOP_NEEDLES);
+        i = crate::swar::next_byte_of(&bytes[..end], i, hop_needles(OPEN, CLOSE));
         if i >= end {
             break;
         }
         if bytes[i] == b'`' {
-            i = skip_template_literal(bytes, i, end);
+            i = skip_template_literal(bytes, i, end, grammar);
             anchor.skipped_operand(i);
             continue;
         }
         if let Some(past) = skip_trivia(bytes, i, end, TriviaProfile::JS) {
-            anchor.skipped_trivia(bytes, i, past);
+            anchor.skipped_trivia(bytes, i, past, scan_start, grammar);
             i = past;
             continue;
         }
-        if bytes[i] == b'/' && i + 1 < end && anchor.starts_regex(bytes, i, scan_start) {
-            i = skip_regex_literal(bytes, i, end);
+        if bytes[i] == b'/'
+            && i + 1 < end
+            && anchor.starts_regex(bytes, i, scan_start, grammar)
+            && let Some(past) = skip_regex_literal(bytes, i, end)
+        {
+            i = past;
             anchor.skipped_operand(i);
             continue;
         }
         match bytes[i] {
-            b'{' => depth += 1,
-            b'}' => {
+            b if b == OPEN => depth += 1,
+            b if b == CLOSE => {
                 depth -= 1;
                 if depth == 0 {
                     return Some(i);
@@ -1013,7 +1318,14 @@ pub fn scan_to_matching_brace(bytes: &[u8], scan_start: usize, end: usize) -> Op
 /// of the input. So the brace matchers that need *exact* template extents (Svelte's
 /// `{…}` tag scanner and binding-pattern scanner) intercept `` ` `` and call this
 /// instead of delegating it to `skip_trivia`.
-pub fn skip_template_literal(bytes: &[u8], start: usize, end: usize) -> usize {
+///
+/// `grammar` is handed on to each interpolation's scan ([`scan_to_matching_brace`]).
+pub fn skip_template_literal(
+    bytes: &[u8],
+    start: usize,
+    end: usize,
+    grammar: OperandGrammar,
+) -> usize {
     let mut i = start + 1; // past the opening backtick
     while i < end {
         match bytes[i] {
@@ -1023,7 +1335,8 @@ pub fn skip_template_literal(bytes: &[u8], start: usize, end: usize) -> usize {
                 // `${…}` interpolation — skip its balanced-brace body (which may
                 // itself hold nested templates, strings, regex, and braces). Runs
                 // just past the matching `}`, or to `end` if unterminated.
-                i = scan_to_matching_brace(bytes, i + 2, end).map_or(end, |close| close + 1);
+                i = scan_to_matching_brace(bytes, i + 2, end, grammar)
+                    .map_or(end, |close| close + 1);
             }
             _ => i += 1,
         }
@@ -1189,7 +1502,9 @@ mod tests {
 
     #[test]
     fn skip_template_literal_basic() {
-        let s = |src: &str| skip_template_literal(src.as_bytes(), 0, src.len());
+        let s = |src: &str| {
+            skip_template_literal(src.as_bytes(), 0, src.len(), OperandGrammar::BYTES_ONLY)
+        };
         assert_eq!(s("`abc`"), 5); // whole literal
         assert_eq!(s("`abc`de"), 5); // stops at the close, not EOF
         assert_eq!(s(r"`a\`b`"), 6); // an escaped backtick is not the close
@@ -1197,7 +1512,9 @@ mod tests {
 
     #[test]
     fn skip_template_literal_interpolation_balances_braces() {
-        let s = |src: &str| skip_template_literal(src.as_bytes(), 0, src.len());
+        let s = |src: &str| {
+            skip_template_literal(src.as_bytes(), 0, src.len(), OperandGrammar::BYTES_ONLY)
+        };
         assert_eq!(s("`a${b}c`"), 8); // simple `${…}`
         assert_eq!(s("`${ {x: 1} }`"), 13); // an object literal `}` inside doesn't end it
         assert_eq!(s("`${ `}` }`"), 10); // a `}` inside a NESTED template isn't the close
@@ -1208,7 +1525,9 @@ mod tests {
         // The bug this fixes: `skip_trivia`'s opaque `` ` ``-to-`` ` `` scan mis-pairs
         // across a nested template. `skip_template_literal` recurses through `${…}`,
         // so a nested template — even one holding a lone quote — is skipped whole.
-        let s = |src: &str| skip_template_literal(src.as_bytes(), 0, src.len());
+        let s = |src: &str| {
+            skip_template_literal(src.as_bytes(), 0, src.len(), OperandGrammar::BYTES_ONLY)
+        };
         assert_eq!(s("`${`x`}`"), 8);
         assert_eq!(s(r#"`${`"`}`"#), 8); // nested template holding a `"`
         assert_eq!(s("`${`${`y`}`}`"), 13); // doubly nested
@@ -1216,7 +1535,9 @@ mod tests {
 
     #[test]
     fn skip_template_literal_unterminated_returns_end() {
-        let s = |src: &str| skip_template_literal(src.as_bytes(), 0, src.len());
+        let s = |src: &str| {
+            skip_template_literal(src.as_bytes(), 0, src.len(), OperandGrammar::BYTES_ONLY)
+        };
         assert_eq!(s("`abc"), 4); // no closing backtick
         assert_eq!(s("`${abc"), 6); // unterminated interpolation
     }
@@ -1241,15 +1562,36 @@ mod tests {
                 continue;
             }
             // The EAGER rule, stated here rather than borrowed from production: an
-            // anchor advances past every significant byte that is not whitespace,
-            // and whitespace leaves it alone. `OperandAnchor` rebuilds the same
-            // value lazily, so this loop is its independent oracle.
-            if !bytes[i].is_ascii_whitespace() {
+            // anchor advances past every significant byte that is not whitespace or
+            // a GLUED `!` run's `!`, and those leave it alone. `OperandAnchor` rebuilds
+            // the same value lazily, so this loop is its independent oracle.
+            if !bytes[i].is_ascii_whitespace() && !is_glued_bang(bytes, i, lower_bound) {
                 operand_end = i + 1;
             }
             i += 1;
         }
-        is_regex_start_after(bytes, operand_end, lower_bound)
+        is_regex_start_after(bytes, operand_end, lower_bound, never)
+    }
+
+    /// The eager statement of a glued `!` run: the `!` at `i` belongs to a run that
+    /// either opens the scan or sits right against a byte that is neither whitespace, nor
+    /// the end of a line terminator (a line comment's, which the trivia skip consumes),
+    /// nor the close of a block comment spanning lines.
+    fn is_glued_bang(bytes: &[u8], i: usize, lower_bound: usize) -> bool {
+        if bytes[i] != b'!' {
+            return false;
+        }
+        let mut k = i;
+        while k > lower_bound && bytes[k - 1] == b'!' {
+            k -= 1;
+        }
+        let multi_line_comment = k >= 2
+            && block_comment_start_before(bytes, k - 1, lower_bound)
+                .is_some_and(|open| bytes[open..k].contains(&b'\n'));
+        k == lower_bound
+            || !(bytes[k - 1].is_ascii_whitespace()
+                || line_terminator_ends_at(bytes, k)
+                || multi_line_comment)
     }
 
     /// The lazy anchor must agree with the eager rule at every `/` in a source —
@@ -1272,6 +1614,23 @@ mod tests {
             "(x++ / y)",
             "()/re/",
             "(`${a}` / b)",
+            "(a! / b)",
+            "(a /* c */! / b)",
+            "(a! /* c */ / b)",
+            "(!/re/)",
+            "(a && !!/re/)",
+            "(if (c) !/re/)",
+            "(a\n!/re/)",
+            "(a ! / b)",
+            "(a // c\n!/re/)",
+            "(a // c\u{2028}!/re/)",
+            "(a /* c */\n!/re/)",
+            "(a /* c\n*/!/re/)",
+            "(a /** d\n */!/re/)",
+            "(a /* c */!/re/)",
+            "('s'! / b)",
+            "(/a/ / b)",
+            "(x + /a/ /* c */ / b)",
         ];
         for src in sources {
             let bytes = src.as_bytes();
@@ -1282,31 +1641,33 @@ mod tests {
             while i < end {
                 if let Some(past) = skip_trivia(bytes, i, end, TriviaProfile::JS) {
                     assert_eq!(
-                        anchor.at(bytes, i),
+                        anchor.at(bytes, i, 0, OperandGrammar::BYTES_ONLY),
                         eager,
                         "{src:?}: anchor disagrees before trivia at {i}"
                     );
                     if trivia_ends_operand(bytes, i) {
                         eager = past;
                     }
-                    anchor.skipped_trivia(bytes, i, past);
+                    anchor.skipped_trivia(bytes, i, past, 0, OperandGrammar::BYTES_ONLY);
                     i = past;
                     continue;
                 }
                 if bytes[i] == b'/' {
                     assert_eq!(
-                        anchor.at(bytes, i),
+                        anchor.at(bytes, i, 0, OperandGrammar::BYTES_ONLY),
                         eager,
                         "{src:?}: anchor disagrees at the `/` at {i}"
                     );
-                    if is_regex_start_after(bytes, eager, 0) {
-                        i = skip_regex_literal(bytes, i, end);
+                    if is_regex_start_after(bytes, eager, 0, never)
+                        && let Some(past) = skip_regex_literal(bytes, i, end)
+                    {
+                        i = past;
                         eager = i;
                         anchor.skipped_operand(i);
                         continue;
                     }
                 }
-                if !bytes[i].is_ascii_whitespace() {
+                if !bytes[i].is_ascii_whitespace() && !is_glued_bang(bytes, i, 0) {
                     eager = i + 1;
                 }
                 i += 1;
@@ -1643,21 +2004,147 @@ mod tests {
     fn skip_regex_literal_handles_escapes_classes_and_flags() {
         // Plain literal: past the closing `/`.
         let src = b"/re/ x";
-        assert_eq!(skip_regex_literal(src, 0, src.len()), 4);
+        assert_eq!(skip_regex_literal(src, 0, src.len()), Some(4));
         // Trailing flags are consumed.
         let src = b"/re/gi x";
-        assert_eq!(skip_regex_literal(src, 0, src.len()), 6);
+        assert_eq!(skip_regex_literal(src, 0, src.len()), Some(6));
         // Escaped `/` does not terminate.
         let src = br"/a\/b/ x";
-        assert_eq!(skip_regex_literal(src, 0, src.len()), 6);
+        assert_eq!(skip_regex_literal(src, 0, src.len()), Some(6));
         // A `/` inside a character class is literal, not the terminator.
         let src = b"/[/)]/ x";
-        assert_eq!(skip_regex_literal(src, 0, src.len()), 6);
+        assert_eq!(skip_regex_literal(src, 0, src.len()), Some(6));
         // Parens inside are opaque — the returned slice covers the whole literal.
         let src = br"/\)/ y";
-        assert_eq!(skip_regex_literal(src, 0, src.len()), 4);
+        assert_eq!(skip_regex_literal(src, 0, src.len()), Some(4));
         // Unterminated → end.
         let src = b"/abc";
-        assert_eq!(skip_regex_literal(src, 0, src.len()), src.len());
+        assert_eq!(skip_regex_literal(src, 0, src.len()), Some(src.len()));
+    }
+
+    #[test]
+    fn skip_regex_literal_refuses_a_line_terminator() {
+        // A regex body, class or escape cannot hold a line terminator, so a `/` whose
+        // "body" reaches one opened no regex at all.
+        for src in [
+            "/ 2\n/",
+            "/ 2\r/",
+            "/ 2\u{2028}/",
+            "/ 2\u{2029}/",
+            "/[ 2\n]/",
+            "/\\\n/",
+            "/[\\\n]/",
+        ] {
+            let bytes = src.as_bytes();
+            assert_eq!(skip_regex_literal(bytes, 0, bytes.len()), None, "{src:?}");
+        }
+        // Any other non-ASCII character is ordinary body.
+        let src = "/\u{2027}/ x".as_bytes();
+        assert_eq!(skip_regex_literal(src, 0, src.len()), Some(5));
+    }
+
+    #[test]
+    fn a_skipped_regex_literal_ends_an_operand() {
+        // After a regex literal with no flags its closing `/` is the last byte, which
+        // alone reads as an operator; the anchor knows it closed a literal.
+        let src = b"x + /a/ /* c */ / 2 / 3";
+        let end = src.len();
+        let mut anchor = OperandAnchor::new(0);
+        assert!(anchor.starts_regex(src, 4, 0, OperandGrammar::BYTES_ONLY));
+        let past = skip_regex_literal(src, 4, end).unwrap();
+        assert_eq!(past, 7);
+        anchor.skipped_operand(past);
+        anchor.skipped_trivia(src, 8, 15, 0, OperandGrammar::BYTES_ONLY);
+        assert!(!anchor.starts_regex(src, 16, 0, OperandGrammar::BYTES_ONLY));
+    }
+
+    #[test]
+    fn is_regex_start_after_the_new_operand_ends() {
+        let div = |src: &str| !regex_at(src, src.len() - 1, 0);
+        // A postfix non-null ends no operand of its own — the operand before it does.
+        assert!(div("a! /"));
+        assert!(div("f()!! /"));
+        assert!(div("a /* c */! /"));
+        assert!(div("a! /* c */ /"));
+        // A prefix logical not starts none — the operator before it governs — and a `!`
+        // run with whitespace before it is prefix, whatever precedes the whitespace.
+        assert!(!div("!/"));
+        assert!(!div("a && !/"));
+        assert!(!div("return !/"));
+        assert!(!div("if (c) !/"));
+        assert!(!div("a\n!/"));
+        assert!(!div("a ! /"));
+        // A line comment ends a line, so a run after it is not glued to anything.
+        assert!(!div("a // c\n!/"));
+        assert!(!div("return a // c\n!/"));
+        assert!(!div("a // c\u{2028}!/"));
+        // A block comment does not, so a run glued to its close is postfix.
+        assert!(div("a /* c */! /"));
+        // A numeric literal's trailing dot ends an operand; a spread does not.
+        assert!(div("1. /"));
+        assert!(!div("[.../"));
+        // A non-ASCII identifier character ends an operand; a word it prefixes is no
+        // keyword.
+        assert!(div("é /"));
+        assert!(div("aé /"));
+        assert!(div("éin /"));
+        assert!(!div("in /"));
+        // A non-ASCII character that is no identifier part leaves the regex answer.
+        assert!(!div("\u{a0}/"));
+    }
+
+    #[test]
+    fn a_bang_glued_to_a_multi_line_block_comment_is_prefix() {
+        // The anchor as a scan leaves it after stepping over the comment opening at 2.
+        let regex = |src: &str| {
+            let bytes = src.as_bytes();
+            let open = 2;
+            let close = skip_trivia(bytes, open, bytes.len(), TriviaProfile::JS).unwrap();
+            let mut anchor = OperandAnchor::new(0);
+            anchor.skipped_trivia(bytes, open, close, 0, OperandGrammar::BYTES_ONLY);
+            anchor.starts_regex(bytes, bytes.len() - 1, 0, OperandGrammar::BYTES_ONLY)
+        };
+        // A comment that spans lines is a line break: the run begins a statement.
+        assert!(regex("a /* c\n*/!/"));
+        assert!(regex("a /** d\n */!/"));
+        assert!(regex("a /* c\u{2028}*/!/"));
+        // One that does not leaves the run glued to the operand before it.
+        assert!(!regex("a /* c */! /"));
+    }
+
+    #[test]
+    fn a_bang_glued_to_a_statement_headers_paren_asks_the_grammar() {
+        // A toy grammar whose only header is `if (c)`.
+        let header: ClosesStatementHeader =
+            |bytes, rparen, lower_bound| bytes[lower_bound..rparen].ends_with(b"if (c");
+        let grammar = OperandGrammar {
+            closes_type_arguments: never,
+            closes_statement_header: header,
+        };
+        let regex = |src: &str, grammar: OperandGrammar| {
+            let bytes = src.as_bytes();
+            OperandAnchor::new(0).starts_regex(bytes, bytes.len() - 1, 0, grammar)
+        };
+        // After a header's `)`, a glued run is a prefix `!` and the `/` opens a regex.
+        assert!(regex("if (c)!/", grammar));
+        assert!(regex("if (c)!!/", grammar));
+        // After any other `)` it is postfix, and the `/` divides.
+        assert!(!regex("f(c)! /", grammar));
+        assert!(!regex("f()! /", grammar));
+        // A grammar that finds no header reads every glued run as postfix.
+        assert!(!regex("if (c)!/", OperandGrammar::BYTES_ONLY));
+    }
+
+    #[test]
+    fn is_regex_start_after_a_gt_asks_the_resolver() {
+        let bytes = b"f<T> /";
+        let closes: ClosesTypeArguments = |_, gt, _| gt == 3;
+        // Without a type-argument grammar every `>` is an operator.
+        assert!(is_regex_start_after(bytes, 4, 0, never));
+        assert!(!is_regex_start_after(bytes, 4, 0, closes));
+        // An arrow's `=>` opens an expression whatever the resolver says.
+        let arrow = b"s => /";
+        let always: ClosesTypeArguments = |_, _, _| true;
+        assert!(is_regex_start_after(arrow, 4, 0, always));
     }
 }

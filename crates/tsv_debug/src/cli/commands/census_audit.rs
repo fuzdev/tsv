@@ -455,4 +455,193 @@ mod tests {
         );
         assert!(diff_censuses(&input, &input).is_empty());
     }
+
+    /// The `(content, direction)` of every delta between an input and a hand-written output.
+    fn deltas(input: &str, output: &str, parser: ParserType) -> Vec<(String, &'static str)> {
+        let input = comment_census(input, parser);
+        let output = comment_census(output, parser);
+        diff_censuses(&input, &output)
+            .iter()
+            .map(|d| (d.entry.content.clone(), d.direction().name()))
+            .collect()
+    }
+
+    #[test]
+    fn a_dropped_comment_after_an_earlier_statements_comparison_is_missing() {
+        // An earlier statement's comparison `<` must not wait to be "closed" by a later
+        // comparison `>`: the regex after that `>` would read as division, a quote in its
+        // body would open a string, and the comment after it would vanish from both sides —
+        // a drop the census could not see.
+        for (input, output, dropped) in [
+            (
+                "for (let i = 0; i < n; i++) {}\nconst ok = x > /'/.test(s); // DROPME1\nconst y = 'z';\n",
+                "for (let i = 0; i < n; i++) {}\nconst ok = x > /'/.test(s);\nconst y = 'z';\n",
+                " DROPME1",
+            ),
+            (
+                "if (a < b) {\n\tc = d > /\"/.test(e); /* DROPME5 */ f = \"g\";\n}\n",
+                "if (a < b) {\n\tc = d > /\"/.test(e);\n\tf = \"g\";\n}\n",
+                " DROPME5 ",
+            ),
+            (
+                "let k = a<b;\nlet m = c > /`/.test(d); // DROPME7\nlet n = `z`;\n",
+                "let k = a < b;\nlet m = c > /`/.test(d);\nlet n = `z`;\n",
+                " DROPME7",
+            ),
+            // A conditional expression's `?`/`:` between a comparison `<` and `>`.
+            (
+                "x = a < b ? c : d > /'/.test(e); // DROPME12\ny = 'z';\n",
+                "x = a < b ? c : d > /'/.test(e);\ny = 'z';\n",
+                " DROPME12",
+            ),
+            // A logical operator or a call between a comparison's `<` and `>`.
+            (
+                "if (i < n && j > /'/.test(s)) {} // DROPME13\nz = 'z';\n",
+                "if (i < n && j > /'/.test(s)) {\n}\nz = 'z';\n",
+                " DROPME13",
+            ),
+            (
+                "x = a < b || c > /'/.test(d); // DROPME14\nz = 'z';\n",
+                "x = a < b || c > /'/.test(d);\nz = 'z';\n",
+                " DROPME14",
+            ),
+            (
+                "x = a < b.c(d) > /'/.test(e); // DROPME15\nz = 'z';\n",
+                "x = a < b.c(d) > /'/.test(e);\nz = 'z';\n",
+                " DROPME15",
+            ),
+            (
+                "x = a < b[c()] > /'/.test(e); // DROPME16\nz = 'z';\n",
+                "x = a < b[c()] > /'/.test(e);\nz = 'z';\n",
+                " DROPME16",
+            ),
+            // A comparison whose `<`…`>` run holds a type keyword, a call or an object
+            // literal's method — spaced, as the printer spells every comparison.
+            (
+                "x = a < typeof (b) > /'/.test(d); // DROPME17\nz = 'z';\n",
+                "x = a < typeof b > /'/.test(d);\nz = 'z';\n",
+                " DROPME17",
+            ),
+            (
+                "x = a < infer(b) > /'/.test(d); // DROPME18\nz = 'z';\n",
+                "x = a < infer(b) > /'/.test(d);\nz = 'z';\n",
+                " DROPME18",
+            ),
+            (
+                "x = a < asserts(b) > /'/.test(d); // DROPME19\nz = 'z';\n",
+                "x = a < asserts(b) > /'/.test(d);\nz = 'z';\n",
+                " DROPME19",
+            ),
+            (
+                "x = a < abstract(b) > /'/.test(d); // DROPME20\nz = 'z';\n",
+                "x = a < abstract(b) > /'/.test(d);\nz = 'z';\n",
+                " DROPME20",
+            ),
+            (
+                "x = a < is(b) > /'/.test(d); // DROPME21\nz = 'z';\n",
+                "x = a < is(b) > /'/.test(d);\nz = 'z';\n",
+                " DROPME21",
+            ),
+            (
+                "x = a < { m(b) {} }.m > /'/.test(d); // DROPME22\nz = 'z';\n",
+                "x = a < { m(b) {} }.m > /'/.test(d);\nz = 'z';\n",
+                " DROPME22",
+            ),
+            (
+                "x = a < new (b) > /'/.test(d); // DROPME23\nz = 'z';\n",
+                "x = a < new b() > /'/.test(d);\nz = 'z';\n",
+                " DROPME23",
+            ),
+            // The same with no `;` to end the first statement (ASI), which the printer adds.
+            (
+                "let k = a < b\nlet m = c > /`/.test(d) // DROPME11\nlet n = `z`\n",
+                "let k = a < b;\nlet m = c > /`/.test(d);\nlet n = `z`;\n",
+                " DROPME11",
+            ),
+        ] {
+            assert_eq!(
+                deltas(input, output, ParserType::TypeScript),
+                vec![(dropped.to_string(), "MISSING")],
+                "{input:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_stripped_pair_around_a_type_argument_list_balances() {
+        // The printer strips the pair around an instantiation before a `/`, so the census
+        // must read `f<…> / 2` as the division the authored `(f<…>) / 2` is — a kept
+        // comment balances, and a dropped one is still MISSING.
+        for (authored, printed) in [
+            ("(f<'a'>) / 2", "f<'a'> / 2"),
+            ("(f<{ a: T }>) / 2", "f<{ a: T }> / 2"),
+            ("(f<() => void>) / 2", "f<() => void> / 2"),
+            ("(f<A extends B ? C : D>) / 2", "f<A extends B ? C : D> / 2"),
+            ("(f<-1>) / 2", "f<-1> / 2"),
+            (
+                "(f<typeof import('./a')>) / 2",
+                "f<typeof import('./a')> / 2",
+            ),
+            ("(f<{ m(): void }['m']>) / 2", "f<{ m(): void }['m']> / 2"),
+        ] {
+            let kept = deltas(
+                &format!("x = {authored}; // c\n"),
+                &format!("x = {printed}; // c\n"),
+                ParserType::TypeScript,
+            );
+            assert!(kept.is_empty(), "{authored:?}: {kept:?}");
+            let dropped = deltas(
+                &format!("x = {authored}; // DROPME\n"),
+                &format!("x = {printed};\n"),
+                ParserType::TypeScript,
+            );
+            assert_eq!(
+                dropped,
+                vec![(" DROPME".to_string(), "MISSING")],
+                "{authored:?}"
+            );
+        }
+        // The same in a Svelte document's template expression.
+        assert_eq!(
+            deltas(
+                "{(f<() => void>) / 2 /* DROPME */}\n",
+                "{f<() => void> / 2}\n",
+                ParserType::Svelte
+            ),
+            vec![(" DROPME ".to_string(), "MISSING")]
+        );
+    }
+
+    #[test]
+    fn a_non_canonical_angle_spelling_is_the_documented_residue() {
+        // The census reads a type-argument list off the printer's spelling (glued) and a
+        // comparison off its spacing, so an author's own spelling of either the other way
+        // is misread on the INPUT side alone (docs/audits.md §census): the kept comment
+        // reads EXTRA and a dropped one goes unseen.
+        for (authored, printed) in [
+            // A fully glued comparison, read as a list.
+            ("x = a<b()>/'/.test(d);", "x = a < b() > /'/.test(d);"),
+            // Spaced type arguments, read as a comparison.
+            ("x = f < T > / 2;", "x = f<T> / 2;"),
+        ] {
+            assert_eq!(
+                deltas(
+                    &format!("{authored} // c\nz = 'z';\n"),
+                    &format!("{printed} // c\nz = 'z';\n"),
+                    ParserType::TypeScript
+                ),
+                vec![(" c".to_string(), "EXTRA")],
+                "{authored:?}"
+            );
+            assert!(
+                deltas(
+                    &format!("{authored} // DROPME\nz = 'z';\n"),
+                    &format!("{printed}\nz = 'z';\n"),
+                    ParserType::TypeScript
+                )
+                .is_empty(),
+                "{authored:?}"
+            );
+        }
+    }
 }

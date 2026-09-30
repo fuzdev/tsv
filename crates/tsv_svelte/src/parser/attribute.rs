@@ -10,7 +10,9 @@ use crate::whitespace::{
 use tsv_lang::{ParseError, Span};
 use tsv_ts::ast::internal::{Expression, IdentName, Identifier};
 
-use super::expression_tag::{SequenceLocation, scan_to_matching_brace};
+use super::expression_tag::{
+    SequenceLocation, scan_head_to_matching_brace, scan_to_matching_brace,
+};
 use super::parser_impl::SvelteParser;
 
 // In an attribute value there is no block DISPATCH — blocks (`{#if}`, `{:else}`, `{/if}`)
@@ -509,6 +511,22 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         Ok(())
     }
 
+    /// Whether the current token opens a directive's `{…}` value.
+    ///
+    /// ⚠️ **A `{/` is one of them.** The lexer classifies a brace before it knows where it
+    /// stands, so a value whose expression opens on a regex (`style:color={/a/.source}`)
+    /// arrives as a [`TokenKind::BlockClose`]; Svelte's `read_sequence` refuses only a `#`
+    /// or `@` marker in a value and reads everything else as an expression. Testing
+    /// `LeftBrace` alone rejected every regex-led directive value, where a plain
+    /// attribute's raw-byte reader (`class={/a/}`) never saw the token at all. A `{/if}`
+    /// written here reaches the expression parser as Svelte's does, and fails there.
+    fn current_opens_directive_value(&self) -> bool {
+        matches!(
+            self.current_kind(),
+            TokenKind::LeftBrace | TokenKind::BlockClose
+        )
+    }
+
     /// Parse directive expression (the part after `=`)
     /// Returns the expression and the span of the expression tag (for comment lookup)
     ///
@@ -518,7 +536,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
     ) -> Result<(&'arena Expression<'arena>, Span), ParseError> {
         self.check_directive_value_placement()?;
-        if self.check(TokenKind::LeftBrace) {
+        if self.current_opens_directive_value() {
             // Standard form: {expr}
             let expr_tag = self.parse_expression_tag()?;
             Ok((expr_tag.expression, expr_tag.span))
@@ -622,7 +640,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
             self.check_directive_value_placement()?;
             // Style directive can have either expression {value} or string "value"
-            if self.check(TokenKind::LeftBrace) {
+            if self.current_opens_directive_value() {
                 let expr_tag = self.parse_expression_tag()?;
                 StyleDirectiveValue::ExpressionTag(expr_tag)
             } else if self.check(TokenKind::String) {
@@ -709,8 +727,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let marker_pos = brace_interior_start(self.source, start);
         let content_start = marker_pos + 1; // past the `@`
 
-        // Find the matching closing `}` (skips strings/comments/regex).
-        let Some(content_end) = scan_to_matching_brace(self.source.as_bytes(), content_start)
+        // Find the matching closing `}` (skips strings/comments/regex), scanning past the
+        // `attach` keyword, which is no operand.
+        let Some(content_end) = scan_head_to_matching_brace(self.source.as_bytes(), content_start)
         else {
             return Err(self.error_unclosed_at("{@attach} tag", start));
         };

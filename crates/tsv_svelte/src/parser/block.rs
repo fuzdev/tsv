@@ -11,7 +11,7 @@ use tsv_lang::source_scan::{TriviaProfile, skip_trivia_run};
 use tsv_lang::{ParseError, Span};
 use tsv_ts::{Expression, ExpressionKind, TopLevelAs};
 
-use super::expression_tag::scan_to_matching_brace;
+use super::expression_tag::{scan_head_to_matching_brace, scan_to_matching_paren};
 use super::parser_impl::{EmbeddedParseMark, SvelteParser};
 use super::{match_bracket, subslice_offset};
 
@@ -777,22 +777,17 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             }
         }
 
-        // Check for "(key)" — match the `)` with the trivia-aware bracket scanner so a
-        // `)` inside a string/comment in the key can't end it early, and any trailing
-        // junk after the real `)` is left for the caller's trailing check (not swallowed).
+        // Check for "(key)" — match the `)` with the expression scanner, so a `)` inside a
+        // string, comment, template or regex literal in the key (`(/[)]/.test(s))`) can't
+        // end it early, and any trailing junk after the real `)` is left for the caller's
+        // trailing check (not swallowed). The key is an expression, not a pattern, so the
+        // pattern scanner's regex-blindness (`match_bracket`) is wrong here.
         let rest_trimmed = rest.trim_start_matches(is_svelte_ws);
         let key = if rest_trimmed.starts_with('(') {
             let key_ws = rest.len() - rest_trimmed.len();
             let paren_start = rest_offset + key_ws; // absolute offset of '('
-            let close = match_bracket(
-                rest_trimmed.as_bytes(),
-                0,
-                rest_trimmed.len(),
-                b'(',
-                b')',
-                TriviaProfile::JS,
-            )
-            .ok_or_else(|| self.error_expected_at("')'", paren_start + rest_trimmed.len()))?;
+            let close = scan_to_matching_paren(rest_trimmed.as_bytes(), 1)
+                .ok_or_else(|| self.error_expected_at("')'", paren_start + rest_trimmed.len()))?;
             let key_str = &rest_trimmed[1..close];
             let key_offset = paren_start + 1; // after '('
             // Leading whitespace only — the trailing run may be a line comment's own text
@@ -1369,18 +1364,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             end: content_start as u32,
         };
 
-        // The `)` matching the opening `(` — depth- and trivia-aware, so a `)` inside a
-        // string/comment in a param default can't end the list early. Svelte requires the
-        // close (`eat(')', true)`); an unmatched `(` is rejected.
-        let close_paren = match_bracket(
-            content_bytes,
-            paren_pos,
-            content.len(),
-            b'(',
-            b')',
-            TriviaProfile::JS,
-        )
-        .ok_or_else(|| self.error_expected_at("')'", content_offset + content.len()))?;
+        // The `)` matching the opening `(`, found the way Svelte finds it
+        // (`snippet_params_close`). Svelte requires the close (`eat(')', true)`); an
+        // unmatched `(` is rejected.
+        let close_paren = snippet_params_close(content_bytes, paren_pos)
+            .ok_or_else(|| self.error_expected_at("')'", content_offset + content.len()))?;
 
         // Only whitespace may follow `)` before the closing `}` — Svelte's
         // `allow_whitespace` then `eat('}', true)`. `{#snippet fn() junk}` is rejected.
@@ -1550,9 +1538,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         start: usize,
     ) -> Result<(&'a str, usize), ParseError> {
         // Find the block tag's closing `}` (skips strings/comments/regex). `start`
-        // is just after the `{#…`/`{@…` keyword, so the opening `{` is the depth-1
-        // brace that `scan_to_matching_brace` matches.
-        let Some(end) = scan_to_matching_brace(self.source.as_bytes(), start) else {
+        // is just after the `{#`/`{:`/`{@`/`{/` marker (or a declaration tag's `{`), so the
+        // opening `{` is the depth-1 brace the scan matches; the scan itself starts past
+        // the head's keyword, which is no operand (`scan_head_to_matching_brace`).
+        let Some(end) = scan_head_to_matching_brace(self.source.as_bytes(), start) else {
             return Err(self.error_unclosed_at("block tag", start));
         };
 
@@ -1648,6 +1637,37 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             nodes: nodes.into_bump_slice(),
         })
     }
+}
+
+/// The `)` that closes a `{#snippet}` parameter list opened by the `(` at `open`, read the
+/// way Svelte reads it (`1-parse/state/tag.js`): a raw count of every `(` and `)` byte from
+/// the `(` on, whatever string, comment, template or regex literal holds it.
+///
+/// Deliberately naive, like the generic scan beside it (`find_matching_angle_bracket`),
+/// because Svelte then parses exactly the slice its count found: a scan that read the
+/// parameters as an expression would close `(a = /[)]/.test(s))` at its real `)` and accept
+/// a head Svelte rejects, and a pattern scan blind to regex literals reads the quote in
+/// `(a = /'/.test(s))` as a string's and rejects a head Svelte accepts. Counting the bytes
+/// Svelte counts agrees with it on both.
+///
+/// Out of line (`inline(never)`): a snippet head is rare, and inlined into the block
+/// parser this loop measurably moved the whole parse phase's layout.
+#[inline(never)]
+fn snippet_params_close(bytes: &[u8], open: usize) -> Option<usize> {
+    let mut depth = 0_u32;
+    for (i, &b) in bytes.iter().enumerate().skip(open) {
+        match b {
+            b'(' => depth += 1,
+            b')' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(i);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 #[cfg(test)]

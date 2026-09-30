@@ -1359,7 +1359,9 @@ cannot gate the parse), so it accepts TypeScript in **every** island of a no-`ts
 document — the script itself, `{#snippet}` heads (generics and typed params),
 `{#each}` / `{#await}` typed bindings, an `as` / `satisfies` assertion in an `{#each}` or
 `{#await}` head, `{@const}` annotations, casts in expression tags, attribute values and
-directives. Svelte rejects each of them, and prettier
+directives, and the `/` after an instantiation's `>` or a postfix `!` (`{f<T> / 2}`,
+`{x! / 2}`), which tsv's brace scan reads as a division because the parser that follows it
+does (`tsv_ts::closes_type_arguments`). Svelte rejects each of them, and prettier
 (prettier-plugin-svelte) inherits that verdict, so the fixture pins both oracles'
 failures at once — [script/no_lang_typescript](../tests/fixtures/svelte/script/no_lang_typescript_svelte_prettier_divergence/).
 
@@ -1370,7 +1372,13 @@ to an `input_invalid_*` case. It is the parser-level twin of the over-acceptance
 `tsv_svelte_compile` refuses at the compile level ("TypeScript in a document with no `ts`
 flag"), and one class across every TS-bearing position rather than a snippet bug. On the
 robustness bar it is degraded-but-safe: the accepted document formats to a faithful
-reprint of what the author wrote. Svelte's own suite has no no-`ts` TypeScript input, so
+reprint of what the author wrote. One corner is not: a no-`ts` document Svelte ACCEPTS whose
+JavaScript reading differs from the TypeScript one — a type-argument-shaped `<…>` followed by a
+`/`, where Svelte reads a comparison chain with a regex (`{f<T> /x/g}`) and tsv an
+instantiation divided — takes tsv's TypeScript reading, so its wire differs, and a reprint that
+moves the regex's own spacing (`{f<T>/2 // c` closed on the next line, printed `f<T> / 2 // c`)
+is a different JavaScript program. It needs TypeScript syntax in a JS document and retires
+with the gating. Svelte's own suite has no no-`ts` TypeScript input, so
 `conformance:svelte-fixtures`' pinned over-acceptance count cannot see it — this fixture
 is its only gate.
 

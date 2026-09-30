@@ -54,6 +54,7 @@ use analysis::{
     is_string_literal, next_printed_stmt, next_printed_stmt_start, object_pattern_should_expand,
     statement_gap_floor, template_literal_has_newlines,
 };
+pub(crate) use comments::leading_regex_start;
 use comments::{
     ClassMemberModifiers, CommentFilter, CommentSpacing, CommentVec, ContinuationValue,
     HeritageKeyword, LeadingGlue, MemberBlankScan, MemberBody, MemberFloor, MemberFreeze,
@@ -2446,7 +2447,7 @@ impl<'a> Printer<'a> {
                 }
             }
             if let Some(past) = skip_trivia(source, i, end, TriviaProfile::JS) {
-                anchor.skipped_trivia(source, i, past);
+                anchor.skipped_trivia(source, i, past, start as usize, crate::OPERAND_GRAMMAR);
                 i = past;
                 continue;
             }
@@ -2467,8 +2468,10 @@ impl<'a> Printer<'a> {
                 // paren. The scan reaches the literal's OPENING `/` first, whose
                 // next byte is never `/` or `*`, so `skip_trivia` can't claim it.
                 b'/' => {
-                    if anchor.starts_regex(source, i, start as usize) {
-                        i = skip_regex_literal(source, i, end);
+                    if anchor.starts_regex(source, i, start as usize, crate::OPERAND_GRAMMAR)
+                        && let Some(past) = skip_regex_literal(source, i, end)
+                    {
+                        i = past;
                         anchor.skipped_operand(i);
                         continue;
                     }

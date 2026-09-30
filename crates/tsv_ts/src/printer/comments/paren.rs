@@ -152,6 +152,66 @@ pub(in crate::printer) fn left_side_child_is_parenthesized(
     needs_parens(child, ctx, in_for_init)
 }
 
+/// The regex literal `expr` PRINTS FIRST, at a position that adds no pair of its own — the
+/// start of the literal whose opening `/` is the expression's first printed byte, or `None`
+/// when a pair the printer keeps (or any other token) comes first.
+///
+/// The walk descends the left spine as it will be PRINTED: at each step it asks the
+/// builder's own pair question for the child ([`left_side_child_is_parenthesized`]; for a
+/// cast, an instantiation and a postfix update, whose left side [`left_side_child`] leaves
+/// out, the context their builders pass), and stops at the first pair that stands. So
+/// `(/a/).test(s)` and `(/a/) ? b : c` reach the literal — the author's pair is not
+/// printed — while `(/a/ + b).c` stops at the member object's pair. An instantiation is
+/// asked as if its operand's pair were not the author's: a pair it keeps anyway only makes
+/// an asker's own wrap redundant, never wrong.
+///
+/// An embedder asks it where its own syntax gives a leading `/` another meaning: a Svelte
+/// `{…}` tag in text position reads `{/` as a block close, so `{/a/.test(s)}` does not parse.
+pub(crate) fn leading_regex_start(expr: &internal::Expression<'_>) -> Option<u32> {
+    use internal::ExpressionKind;
+    let mut node = expr;
+    loop {
+        let (child, parenthesized) = match &node.kind {
+            ExpressionKind::RegexLiteral(_) => return Some(node.span().start),
+            // A sequence at a value position prints its own envelope (`build_sequence_doc`'s
+            // default layout), so its `(` comes first.
+            ExpressionKind::SequenceExpression(_) => return None,
+            ExpressionKind::TSAsExpression(cast) => (
+                cast.expression,
+                needs_parens(cast.expression, ParenContext::TypeAssertion, false),
+            ),
+            ExpressionKind::TSSatisfiesExpression(cast) => (
+                cast.expression,
+                needs_parens(cast.expression, ParenContext::TypeAssertion, false),
+            ),
+            ExpressionKind::TSInstantiationExpression(inst) => (
+                inst.expression,
+                needs_parens(
+                    inst.expression,
+                    ParenContext::InstantiationExpression { source_pair: false },
+                    false,
+                ),
+            ),
+            ExpressionKind::UpdateExpression(update) if !update.prefix => (
+                update.argument,
+                needs_parens(
+                    update.argument,
+                    ParenContext::UpdateArgument { postfix: true },
+                    false,
+                ),
+            ),
+            _ => {
+                let child = left_side_child(node)?;
+                (child, left_side_child_is_parenthesized(node, child, false))
+            }
+        };
+        if parenthesized {
+            return None;
+        }
+        node = child;
+    }
+}
+
 /// Where a `SequenceExpression`'s OPERANDS stop — its last operand's end, which its span
 /// overshoots by the grouping shell the parser erased from that operand.
 ///

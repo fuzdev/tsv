@@ -1281,6 +1281,51 @@ pub fn prints_ending_on_instantiation_close(expression: &Expression<'_>) -> bool
     printer::ends_with_instantiation_close(expression, false)
 }
 
+/// Where the regex literal `expression` PRINTS FIRST begins — when its first printed byte,
+/// at a position that adds no pair of its own, is a regex literal's opening `/` (`/a/.test(s)`,
+/// `(/a/) ? b : c` once the author's pair is stripped); `None` when a kept pair or any other
+/// token comes first.
+///
+/// An embedder asks it where its own syntax reads a leading `/` another way: Svelte reads
+/// `{/` in text position as a block close, so `{/a/.test(s)}` does not parse. `tsv_svelte`
+/// wraps such a tag's expression in a pair, the text-position twin of the pair
+/// [`prints_ending_on_instantiation_close`] answers for a block head.
+#[must_use]
+pub fn leading_regex_start(expression: &Expression<'_>) -> Option<u32> {
+    printer::leading_regex_start(expression)
+}
+
+/// Whether the `>` at `gt` in `bytes` closes a type-argument list this crate's parser
+/// reads — `f<T> / 2`, where the `/` divides, against `a > /re/`, where it opens a regex.
+/// The TypeScript grammar's `tsv_lang::source_scan::ClosesTypeArguments`
+/// ([`OPERAND_GRAMMAR`]). `lower_bound` is the scan's own start, which bounds the walk.
+#[must_use]
+pub fn closes_type_arguments(bytes: &[u8], gt: usize, lower_bound: usize) -> bool {
+    parser::closes_type_arguments(bytes, gt, lower_bound)
+}
+
+/// Whether the `)` at `rparen` in `bytes` closes a statement header this crate's parser
+/// reads — `if (c)!/re/`, where the glued `!` is a prefix not and the `/` opens a regex,
+/// against `f()! / 2`, a postfix non-null divided. The TypeScript grammar's
+/// `tsv_lang::source_scan::ClosesStatementHeader` ([`OPERAND_GRAMMAR`]). `lower_bound` is
+/// the scan's own start, where its forward walk begins.
+#[must_use]
+pub fn closes_statement_header(bytes: &[u8], rparen: usize, lower_bound: usize) -> bool {
+    parser::closes_statement_header(bytes, rparen, lower_bound)
+}
+
+/// The TypeScript grammar's answers to the operand ends a raw byte scan cannot read
+/// ([`closes_type_arguments`], [`closes_statement_header`]).
+///
+/// The raw scans that find where an expression ENDS before it is parsed (`tsv_svelte`'s
+/// `{…}` island matcher, this crate's arrow-head lookahead and the printer's paren scan)
+/// take it, so each reads a `/` the way the parser that follows will.
+pub const OPERAND_GRAMMAR: tsv_lang::source_scan::OperandGrammar =
+    tsv_lang::source_scan::OperandGrammar {
+        closes_type_arguments,
+        closes_statement_header,
+    };
+
 // The ECMAScript identifier grammar, for embedders that read an identifier out of
 // their OWN syntax rather than through this crate's lexer: a `{#snippet}` name and
 // an `{#each}` index are JS identifiers that Svelte reads with acorn's

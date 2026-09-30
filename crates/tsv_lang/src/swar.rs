@@ -248,7 +248,18 @@ pub(crate) const fn lanes_less_than(v: u64, n: u8) -> u64 {
 /// **slice's** end, not the run's: callers pass the whole source, so even a
 /// two-byte run is answered by the word loop everywhere but the last word of the
 /// file.
-#[inline]
+///
+/// ⚠️ **`inline(always)`, not `inline`: every figure above assumes the needles
+/// reach the word loop as constants.** An out-of-line copy takes them as
+/// arguments, so each call pays a register-saving prologue and the splats, and a
+/// needle passed at run time loses the shared `not`. With `source_scan`'s
+/// matching-close scan instantiated twice (brace and paren) with differing
+/// delimiter needles, LLVM declines the plain hint and calls one shared copy from
+/// both — a call per hop, and that scan hops at least once per Svelte `{…}`
+/// island. The call alone reads **+0.15 points of `instructions:u`** on
+/// flowbite-svelte; forced, every call site inlines.
+#[expect(clippy::inline_always)]
+#[inline(always)]
 pub fn next_byte_of<const N: usize>(bytes: &[u8], from: usize, needles: [u8; N]) -> usize {
     let splats = needles.map(splat);
     let mut i = from;

@@ -1,0 +1,686 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 280,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 98,
+				"data": " the list closes where Svelte's paren count does: a quote or `//` in a regex opens nothing "
+			},
+			{
+				"type": "Text",
+				"start": 98,
+				"end": 99,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SnippetBlock",
+				"start": 99,
+				"end": 142,
+				"expression": {
+					"type": "Identifier",
+					"name": "a",
+					"start": 109,
+					"end": 110,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 10,
+							"character": 109
+						},
+						"end": {
+							"line": 2,
+							"column": 11,
+							"character": 110
+						}
+					}
+				},
+				"parameters": [
+					{
+						"type": "AssignmentPattern",
+						"start": 111,
+						"end": 126,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 12
+							},
+							"end": {
+								"line": 2,
+								"column": 27
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 111,
+							"end": 112,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 12
+								},
+								"end": {
+									"line": 2,
+									"column": 13
+								}
+							},
+							"name": "s"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 115,
+							"end": 126,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 16
+								},
+								"end": {
+									"line": 2,
+									"column": 27
+								}
+							},
+							"callee": {
+								"type": "MemberExpression",
+								"start": 115,
+								"end": 123,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 16
+									},
+									"end": {
+										"line": 2,
+										"column": 24
+									}
+								},
+								"object": {
+									"type": "Literal",
+									"start": 115,
+									"end": 118,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 16
+										},
+										"end": {
+											"line": 2,
+											"column": 19
+										}
+									},
+									"value": {},
+									"raw": "/'/",
+									"regex": {
+										"pattern": "'",
+										"flags": ""
+									}
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 119,
+									"end": 123,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 20
+										},
+										"end": {
+											"line": 2,
+											"column": 24
+										}
+									},
+									"name": "test"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 124,
+									"end": 125,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 25
+										},
+										"end": {
+											"line": 2,
+											"column": 26
+										}
+									},
+									"name": "t"
+								}
+							],
+							"optional": false
+						}
+					}
+				],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 128,
+							"end": 132,
+							"raw": "\n\tx\n",
+							"data": "\n\tx\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 142,
+				"end": 143,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SnippetBlock",
+				"start": 143,
+				"end": 195,
+				"expression": {
+					"type": "Identifier",
+					"name": "b",
+					"start": 153,
+					"end": 154,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 10,
+							"character": 153
+						},
+						"end": {
+							"line": 5,
+							"column": 11,
+							"character": 154
+						}
+					}
+				},
+				"parameters": [
+					{
+						"type": "AssignmentPattern",
+						"start": 155,
+						"end": 170,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 12
+							},
+							"end": {
+								"line": 5,
+								"column": 27
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 155,
+							"end": 156,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 12
+								},
+								"end": {
+									"line": 5,
+									"column": 13
+								}
+							},
+							"name": "s"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 159,
+							"end": 170,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 16
+								},
+								"end": {
+									"line": 5,
+									"column": 27
+								}
+							},
+							"callee": {
+								"type": "MemberExpression",
+								"start": 159,
+								"end": 167,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 16
+									},
+									"end": {
+										"line": 5,
+										"column": 24
+									}
+								},
+								"object": {
+									"type": "Literal",
+									"start": 159,
+									"end": 162,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 16
+										},
+										"end": {
+											"line": 5,
+											"column": 19
+										}
+									},
+									"value": {},
+									"raw": "/\"/",
+									"regex": {
+										"pattern": "\"",
+										"flags": ""
+									}
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 163,
+									"end": 167,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 20
+										},
+										"end": {
+											"line": 5,
+											"column": 24
+										}
+									},
+									"name": "test"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 168,
+									"end": 169,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 25
+										},
+										"end": {
+											"line": 5,
+											"column": 26
+										}
+									},
+									"name": "t"
+								}
+							],
+							"optional": false
+						}
+					},
+					{
+						"type": "AssignmentPattern",
+						"start": 172,
+						"end": 179,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 29
+							},
+							"end": {
+								"line": 5,
+								"column": 36
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 172,
+							"end": 173,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 29
+								},
+								"end": {
+									"line": 5,
+									"column": 30
+								}
+							},
+							"name": "u"
+						},
+						"right": {
+							"type": "Literal",
+							"start": 176,
+							"end": 179,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 33
+								},
+								"end": {
+									"line": 5,
+									"column": 36
+								}
+							},
+							"value": "\"",
+							"raw": "'\"'"
+						}
+					}
+				],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 181,
+							"end": 185,
+							"raw": "\n\tx\n",
+							"data": "\n\tx\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 195,
+				"end": 196,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SnippetBlock",
+				"start": 196,
+				"end": 239,
+				"expression": {
+					"type": "Identifier",
+					"name": "c",
+					"start": 206,
+					"end": 207,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 10,
+							"character": 206
+						},
+						"end": {
+							"line": 8,
+							"column": 11,
+							"character": 207
+						}
+					}
+				},
+				"parameters": [
+					{
+						"type": "AssignmentPattern",
+						"start": 208,
+						"end": 223,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 12
+							},
+							"end": {
+								"line": 8,
+								"column": 27
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 208,
+							"end": 209,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 12
+								},
+								"end": {
+									"line": 8,
+									"column": 13
+								}
+							},
+							"name": "s"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 212,
+							"end": 223,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 16
+								},
+								"end": {
+									"line": 8,
+									"column": 27
+								}
+							},
+							"callee": {
+								"type": "MemberExpression",
+								"start": 212,
+								"end": 220,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 16
+									},
+									"end": {
+										"line": 8,
+										"column": 24
+									}
+								},
+								"object": {
+									"type": "Literal",
+									"start": 212,
+									"end": 215,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 16
+										},
+										"end": {
+											"line": 8,
+											"column": 19
+										}
+									},
+									"value": {},
+									"raw": "/`/",
+									"regex": {
+										"pattern": "`",
+										"flags": ""
+									}
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 216,
+									"end": 220,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 20
+										},
+										"end": {
+											"line": 8,
+											"column": 24
+										}
+									},
+									"name": "test"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 221,
+									"end": 222,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 25
+										},
+										"end": {
+											"line": 8,
+											"column": 26
+										}
+									},
+									"name": "t"
+								}
+							],
+							"optional": false
+						}
+					}
+				],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 225,
+							"end": 229,
+							"raw": "\n\tx\n",
+							"data": "\n\tx\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 239,
+				"end": 240,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SnippetBlock",
+				"start": 240,
+				"end": 279,
+				"expression": {
+					"type": "Identifier",
+					"name": "d",
+					"start": 250,
+					"end": 251,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 10,
+							"character": 250
+						},
+						"end": {
+							"line": 11,
+							"column": 11,
+							"character": 251
+						}
+					}
+				},
+				"parameters": [
+					{
+						"type": "AssignmentPattern",
+						"start": 252,
+						"end": 263,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 12
+							},
+							"end": {
+								"line": 11,
+								"column": 23
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 252,
+							"end": 253,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 12
+								},
+								"end": {
+									"line": 11,
+									"column": 13
+								}
+							},
+							"name": "n"
+						},
+						"right": {
+							"type": "BinaryExpression",
+							"start": 256,
+							"end": 263,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 16
+								},
+								"end": {
+									"line": 11,
+									"column": 23
+								}
+							},
+							"left": {
+								"type": "Literal",
+								"start": 256,
+								"end": 259,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 16
+									},
+									"end": {
+										"line": 11,
+										"column": 19
+									}
+								},
+								"value": {},
+								"raw": "/r/",
+								"regex": {
+									"pattern": "r",
+									"flags": ""
+								}
+							},
+							"operator": "/",
+							"right": {
+								"type": "Literal",
+								"start": 262,
+								"end": 263,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 22
+									},
+									"end": {
+										"line": 11,
+										"column": 23
+									}
+								},
+								"value": 2,
+								"raw": "2"
+							}
+						}
+					}
+				],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 265,
+							"end": 269,
+							"raw": "\n\tx\n",
+							"data": "\n\tx\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -17,3 +17,6 @@
 {/await}
 
 {x as number}
+
+{f<T> / 2}
+{x! / 2}

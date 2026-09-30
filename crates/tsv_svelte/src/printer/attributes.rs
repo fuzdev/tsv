@@ -1434,16 +1434,51 @@ impl<'a> Printer<'a> {
     ///   condC}
     /// ```
     pub(super) fn build_expression_tag_doc(&self, tag: &internal::ExpressionTag<'_>) -> DocId {
+        self.build_expression_tag_doc_at(tag, TagSite::Sequence)
+    }
+
+    /// [`Self::build_expression_tag_doc`] for a tag in TEXT position — a fragment child
+    /// outside a `<textarea>`, whose RCDATA content Svelte reads as a sequence — where Svelte
+    /// reads a `{` followed by `/` as a block close (`{/if}`).
+    ///
+    /// So an expression whose first PRINTED byte would be a regex literal's `/` takes a pair
+    /// (`{(/a/.test(s))}`): the parser strips the author's own (`{(/a/).test(s)}`), and the
+    /// bare print is a document no parser accepts — tsv's included, so the next save would
+    /// fail. A comment printed ahead of the literal already keeps the `{` off the `/`
+    /// (`{/* c */ /a/.test(s)}` parses), so it takes none. Prettier prints the bare form.
+    /// See `docs/conformance_prettier_svelte.md` §Svelte: Regex-led expression tag.
+    pub(super) fn build_text_expression_tag_doc(&self, tag: &internal::ExpressionTag<'_>) -> DocId {
+        let site = if self.in_textarea_content() {
+            TagSite::Sequence
+        } else {
+            TagSite::Text
+        };
+        self.build_expression_tag_doc_at(tag, site)
+    }
+
+    fn build_expression_tag_doc_at(
+        &self,
+        tag: &internal::ExpressionTag<'_>,
+        site: TagSite,
+    ) -> DocId {
         let d = self.d();
         // The same value-head content every unprefixed `{…}` builds — the tag always has its
         // braces, so the span is never absent. Only the assembly below is the tag's own: it
         // hugs its braces where an attribute value chooses between hug and block — which is
         // why a leading cast cannot hang here (`UnprefixedHost::Tag`, the reflow).
-        let head = self.build_expression_content_with_comments(
+        let mut head = self.build_expression_content_with_comments(
             tag.expression,
             Some(tag.span),
             UnprefixedHost::Tag,
         );
+        // A value that takes the host's clarity pair already opens on its `(`.
+        if site == TagSite::Text
+            && !Self::value_takes_clarity_parens(tag.expression)
+            && tsv_ts::leading_regex_start(tag.expression)
+                .is_some_and(|start| !self.has_comments_on_page_between(tag.span.start + 1, start))
+        {
+            head.doc = d.concat(&[d.text("("), head.doc, d.text(")")]);
+        }
 
         if head.layout.opens_own_line() {
             // A value whose content opens on its own line takes the broken block form, which
@@ -1648,4 +1683,15 @@ mod tests {
         assert_eq!(normalize_class_text(" ", false), " ");
         assert_eq!(normalize_class_text("", true), "");
     }
+}
+
+/// Where a `{…}` expression tag stands, for the one question the two positions answer
+/// differently: whether a leading `/` may open it ([`Printer::build_text_expression_tag_doc`]).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TagSite {
+    /// A fragment child, where `{/` is a block close.
+    Text,
+    /// An attribute value's sequence, `this=`, or a `<textarea>`'s RCDATA content, where
+    /// Svelte's `read_sequence` reads `{/` as an expression.
+    Sequence,
 }

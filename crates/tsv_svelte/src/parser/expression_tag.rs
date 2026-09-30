@@ -36,8 +36,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// attribute-value sequence readers — use `parse_expression_tag_at`, which runs
     /// the same scan + parse without touching the lexer.
     pub(crate) fn parse_expression_tag(&mut self) -> Result<ExpressionTag<'arena>, ParseError> {
-        // Verify we're at opening brace
-        if !self.check(TokenKind::LeftBrace) {
+        // Verify we're at opening brace — a `{/` included, which the lexer calls a block
+        // close but a directive value reads as a regex-led expression
+        // (`current_opens_directive_value`).
+        if !matches!(
+            self.current_kind(),
+            TokenKind::LeftBrace | TokenKind::BlockClose
+        ) {
             return Err(self.error_expected_found("'{'"));
         }
 
@@ -172,8 +177,74 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 ///
 /// A thin wrapper over `tsv_lang::source_scan::scan_to_matching_brace` (the shared
 /// expression-context balanced-brace scanner, which the `${…}` template-interpolation
-/// skip also uses) with `end = bytes.len()`.
+/// skip also uses) with `end = bytes.len()` and the TypeScript grammar's answers to the
+/// operand ends bytes cannot settle (`tsv_ts::OPERAND_GRAMMAR`: whether a `>` closes a
+/// type-argument list, whether a `)` closes a statement header) — every island is parsed
+/// by `tsv_ts`, so its end must be found by the rules that parser reads `f<T> / 2` and
+/// `if (c)!/re/` with, or the scan misreads a `/` and runs past the island's `}`.
+/// The lexer's quoted-attribute arm takes it too, so no brace scan in the crate can be
+/// handed a different rule.
 #[inline]
 pub(crate) fn scan_to_matching_brace(bytes: &[u8], scan_start: usize) -> Option<usize> {
-    tsv_lang::source_scan::scan_to_matching_brace(bytes, scan_start, bytes.len())
+    tsv_lang::source_scan::scan_to_matching_brace(
+        bytes,
+        scan_start,
+        bytes.len(),
+        tsv_ts::OPERAND_GRAMMAR,
+    )
+}
+
+/// [`scan_to_matching_brace`]'s paren twin, `tsv_lang::source_scan::scan_to_matching_paren`
+/// with the same TypeScript resolver — for a paren that delimits an EXPRESSION, which may
+/// hold a regex literal (`{#each xs as item (/[)]/.test(s))}`), unlike a binding
+/// pattern's brackets (`match_bracket`). `scan_start` is the first byte inside the `(`.
+pub(crate) fn scan_to_matching_paren(bytes: &[u8], scan_start: usize) -> Option<usize> {
+    tsv_lang::source_scan::scan_to_matching_paren(
+        bytes,
+        scan_start,
+        bytes.len(),
+        tsv_ts::OPERAND_GRAMMAR,
+    )
+}
+
+/// [`scan_to_matching_brace`] for a block or tag HEAD — `{#if …}`, `{:else if …}`,
+/// `{#each …}`, `{@html …}`, `{@const …}`, `{@attach …}`, `{const …}` — whose content opens
+/// on a keyword: the scan starts AFTER it, at [`head_keyword_end`].
+///
+/// The keyword is no operand, but a scan that began on it would read it as one — an
+/// identifier byte before the first `/` — and take `{#if /}/.test(s)}`'s regex for a
+/// division, `{#if !/}/.test(s)}`'s `!` for a postfix non-null, and `{#if <T>/}/…}`'s
+/// assertion for a type-argument list, each ending the head at a `}` inside the regex.
+/// Started past the keyword, the head's first `/` stands where an expression begins,
+/// which is what it is to the parser that reads the head.
+pub(crate) fn scan_head_to_matching_brace(bytes: &[u8], scan_start: usize) -> Option<usize> {
+    scan_to_matching_brace(bytes, head_keyword_end(bytes, scan_start))
+}
+
+/// Where a block or tag head's keyword ends: past leading ASCII whitespace and the
+/// keyword's letters, and past a following `if` when the keyword is `else`
+/// (`{:else if …}`). A head with no keyword ends where it began.
+fn head_keyword_end(bytes: &[u8], start: usize) -> usize {
+    let skip_ws = |mut i: usize| {
+        while bytes.get(i).is_some_and(u8::is_ascii_whitespace) {
+            i += 1;
+        }
+        i
+    };
+    let skip_word = |mut i: usize| {
+        while bytes.get(i).is_some_and(u8::is_ascii_alphabetic) {
+            i += 1;
+        }
+        i
+    };
+    let word_start = skip_ws(start);
+    let word_end = skip_word(word_start);
+    if &bytes[word_start..word_end] == b"else" {
+        let if_start = skip_ws(word_end);
+        let if_end = skip_word(if_start);
+        if &bytes[if_start..if_end] == b"if" {
+            return if_end;
+        }
+    }
+    word_end
 }

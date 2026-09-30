@@ -22,6 +22,9 @@ mod tag;
 // Re-export parser implementation
 use parser_impl::SvelteParser;
 
+// The crate's one `{…}` brace matcher, for the lexer's quoted-attribute arm.
+pub(crate) use expression_tag::scan_to_matching_brace;
+
 /// Parse a Svelte file and return a Root AST node.
 ///
 /// `arena` owns the entire parsed graph (the template AST plus the embedded TS
@@ -494,7 +497,7 @@ pub(crate) fn match_bracket(
         // JS binding-pattern callers), matching where `skip_trivia` treats `` ` ``
         // as a string.
         if profile.strings && bytes[i] == b'`' {
-            i = skip_template_literal(bytes, i, end);
+            i = skip_template_literal(bytes, i, end, tsv_ts::OPERAND_GRAMMAR);
             continue;
         }
         if let Some(past) = skip_trivia(bytes, i, end, profile) {

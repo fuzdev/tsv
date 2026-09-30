@@ -875,6 +875,22 @@ output reparseable by tsv.
 
 - `{#each}` and shorthand `{#await}` heads — [head_instantiation_paren](../tests/fixtures/svelte/blocks/head_instantiation_paren_prettier_divergence/)
 
+## Svelte: Regex-led expression tag
+
+**◆parser_compat ◆prettier_bug.** An expression tag in text position whose expression prints
+first a regex literal — the literal, or the whole expression, written in a pair the printer
+strips (`{(/a/).test(b)}`, `{(/a/ ? b : c)}`) — keeps a pair in tsv: `{(/a/.test(b))}`.
+prettier-plugin-svelte strips it, and its `{/a/.test(b)}` does not parse: in text position Svelte
+reads `{/` as a block close, so neither Svelte, prettier's own next pass, nor tsv accepts the
+output. The pair wraps the whole expression, decided from what the tag PRINTS — the left spine is
+walked asking each position's own paren question, stopping at the first pair the printer keeps
+(`tsv_ts::leading_regex_start`) — so a pair the author wrote around the literal alone moves out
+to it. A comment printed ahead of the literal (`{/* c */ /a/.test(b)}`), every attribute value
+and a `<textarea>`'s content (Svelte's `read_sequence` takes `{/` as an expression) need no pair,
+and both formatters agree there.
+
+- Text-position `{…}` tags — [regex_led_tag](../tests/fixtures/svelte/expressions/regex_led_tag_prettier_divergence/)
+
 ## Svelte: empty destructuring brace spacing
 
 **◆design_choice.** Non-empty object-destructure patterns in `{#each … as}`, `{#await … then}`, `{:then}`, and `{:catch}` binding positions space their braces in both formatters (`{a}` → `{ a }`), matching prettier-plugin-svelte under `bracketSpacing`. The lone remaining divergence is the **empty** pattern: tsv keeps tight braces (`{}`), prettier-plugin-svelte inserts a space (`{ }`). tsv's empty object braces stay tight everywhere — `bracketSpacing` only spaces braces around content, and an empty pattern has none — so this binding position follows the same universal empty-braces rule as an empty object literal (`{}`) and a TypeScript empty destructure (`const {} = x`, where both formatters already agree on `{}`).

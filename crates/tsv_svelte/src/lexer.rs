@@ -1,7 +1,8 @@
 use std::fmt;
 // Shared lexer-error constructor: used by the unterminated/unexpected sites in the token scan.
-use tsv_lang::{ParseError, lex_err, source_scan};
+use tsv_lang::{ParseError, lex_err};
 
+use crate::parser::scan_to_matching_brace;
 use crate::whitespace::{brace_interior_start, char_at, is_svelte_ws, skip_svelte_ws};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -579,11 +580,8 @@ impl<'a> Lexer<'a> {
                         if BlockOrTagMarker::in_sequence_at(source, self.position).is_some() {
                             sequence_is_invalid = true;
                         } else {
-                            let Some(close) = source_scan::scan_to_matching_brace(
-                                bytes,
-                                self.position + 1,
-                                source.len(),
-                            ) else {
+                            let Some(close) = scan_to_matching_brace(bytes, self.position + 1)
+                            else {
                                 break false; // unterminated `{` — the value can't close
                             };
                             self.seek_to(close + '}'.len_utf8());

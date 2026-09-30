@@ -35,6 +35,8 @@ json = ["dep:serde_json"]
 [dependencies]
 smallvec.workspace = true
 thiserror.workspace = true
+# Only for the regex-vs-division rule's non-ASCII identifier arm (`source_scan`).
+unicode-ident.workspace = true
 unicode-segmentation.workspace = true
 unicode-width.workspace = true
 # Only for the `json` feature's wire-JSON writer, whose `f64` emitter delegates

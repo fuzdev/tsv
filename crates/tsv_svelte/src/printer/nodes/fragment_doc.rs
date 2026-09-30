@@ -1995,7 +1995,7 @@ impl<'a> Printer<'a> {
             ),
             FragmentNode::Element(element) => Some(self.build_element_doc(element)),
             FragmentNode::SpecialElement(element) => Some(self.build_special_element_doc(element)),
-            FragmentNode::ExpressionTag(tag) => Some(self.build_expression_tag_doc(tag)),
+            FragmentNode::ExpressionTag(tag) => Some(self.build_text_expression_tag_doc(tag)),
             FragmentNode::Comment(comment) => Some(self.build_html_comment_doc(comment)),
             FragmentNode::IfBlock(_)
             | FragmentNode::EachBlock(_)
