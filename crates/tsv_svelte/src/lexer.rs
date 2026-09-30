@@ -112,6 +112,62 @@ const NAME_RUN_ASCII: [bool; 256] = {
     t
 };
 
+/// The first `<` or `{` at or after `from` — the end of `bytes` when none follows: where a
+/// template-mode token can start ([`Lexer::skip_to_special_char`]).
+///
+/// Both needles are ASCII and UTF-8 is self-synchronising — every byte of a multi-byte
+/// character is at or above 0x80 — so a byte scan stops exactly where a character scan stops,
+/// and every stop is a character boundary. The step is an unconditional `+= 1`, which is the
+/// point: a width that depends on the byte's value puts the loop's own cursor downstream of
+/// the load.
+#[inline]
+fn special_byte_at_or_after(bytes: &[u8], from: usize) -> usize {
+    let mut i = from;
+    while let Some(&b) = bytes.get(i) {
+        if b == b'<' || b == b'{' {
+            break;
+        }
+        i += 1;
+    }
+    i
+}
+
+/// The ASCII half of [`is_svelte_ws`], one entry per byte: `<TAB>` through `<CR>` and `<SP>`.
+/// Every entry at or above 0x80 is `false`, so a non-ASCII byte stops the walk.
+const SVELTE_WS_ASCII: [bool; 256] = {
+    let mut t = [false; 256];
+    let mut i = 0;
+    while i < 0x80 {
+        t[i] = is_svelte_ws(i as u8 as char);
+        i += 1;
+    }
+    t
+};
+
+/// The end of the run of ASCII Svelte whitespace bytes ([`SVELTE_WS_ASCII`]) from `from` on —
+/// `from` itself when none is there. A table walk, one load and one compare a byte, where
+/// the class's own spelling is a subtract and two compares.
+#[inline]
+fn ascii_svelte_ws_run_end(bytes: &[u8], from: usize) -> usize {
+    let mut i = from;
+    while i < bytes.len() && SVELTE_WS_ASCII[usize::from(bytes[i])] {
+        i += 1;
+    }
+    i
+}
+
+/// The end of the run of [`NAME_RUN_ASCII`] bytes from `from` on — `from` itself when none is
+/// there. The run stops on any other byte, so a non-ASCII byte at the end it returns is where
+/// the name may go on.
+#[inline]
+fn ascii_name_run_end(bytes: &[u8], from: usize) -> usize {
+    let mut i = from;
+    while i < bytes.len() && NAME_RUN_ASCII[usize::from(bytes[i])] {
+        i += 1;
+    }
+    i
+}
+
 /// [`Lexer::scan_name_run`] from a non-ASCII character at `i` onward: the end of the name
 /// run, the whole class asked a character at a time.
 ///
@@ -407,26 +463,17 @@ impl<'a> Lexer<'a> {
     /// follow-up `skip_whitespace()` lands exactly here.
     #[inline]
     fn peek_past_whitespace(&self) -> usize {
-        // The ASCII half of `is_svelte_ws` inline, the rest delegated. This runs once per
-        // in-tag token over a mean of well under one byte of whitespace, so a plain
-        // `skip_svelte_ws(self.source, self.position)` — which is what this is, and reads
-        // better — spends most of its time on a per-CHARACTER call into that scan:
-        // `instructions:u` +0.294% on a 1,695-file Svelte corpus, and it loses cycles in
-        // every replicate of the layout group. The CLASS is still the one definition —
-        // only its ASCII arm is peeled, and the first byte at or above U+007F hands the
-        // rest of the run straight back to `skip_svelte_ws`.
+        // `skip_svelte_ws(self.source, self.position)` with its ASCII half peeled into a
+        // table walk: the run is ASCII on nearly every token, and that scan asks a character
+        // at a time. The CLASS is still the one definition — the first byte at or above
+        // U+007F hands the rest of the run straight back to `skip_svelte_ws`.
         let bytes = self.source.as_bytes();
-        let mut i = self.position;
-        while let Some(&b) = bytes.get(i) {
-            if b >= 0x80 {
-                return skip_svelte_ws(self.source, i);
-            }
-            if !is_svelte_ws(b as char) {
-                break;
-            }
-            i += 1;
+        let i = ascii_svelte_ws_run_end(bytes, self.position);
+        if bytes.get(i).is_some_and(|&b| b >= 0x80) {
+            skip_svelte_ws(self.source, i)
+        } else {
+            i
         }
-        i
     }
 
     /// Skip everything until we hit a special character (<, {)
@@ -435,30 +482,19 @@ impl<'a> Lexer<'a> {
     /// during expression tag parsing. This allows '}' in text (e.g., after {'{'}text})
     /// to be treated as plain text, matching Svelte's parser behavior.
     fn skip_to_special_char(&mut self) {
-        // Both needles are ASCII and UTF-8 is self-synchronising — every byte of a
-        // multi-byte character is at or above 0x80 — so a byte scan stops exactly where a
-        // character scan stops, and every stop is a character boundary. The step is an
-        // unconditional `+= 1`, which is the point: a width that depends on the byte's value
-        // puts the loop's own cursor downstream of the load.
-        let bytes = self.source.as_bytes();
-        let mut i = self.position;
-        while let Some(&b) = bytes.get(i) {
-            if b == b'<' || b == b'{' {
-                break;
-            }
-            i += 1;
-        }
-        self.position = i;
+        self.position = special_byte_at_or_after(self.source.as_bytes(), self.position);
     }
 
     /// Advance past the continuation characters of a tag/attribute name, the cursor
     /// already past the name's first character.
     ///
     /// Svelte's `read_tag` name run, and the one place its character class is spelled —
-    /// both name-opening arms of [`Lexer::next_token_into`] (ASCII-led and non-ASCII-led)
-    /// reach it, so the class cannot drift between them. ⚠️ Not the *unquoted numeric value*
-    /// run, which that function scans inline: a narrower class (`is_alphanumeric`, `_`, `-`)
-    /// answering to HTML's unquoted-attribute-value grammar rather than to `read_tag`.
+    /// both name-opening arms of [`Lexer::next_token_dispatch`] (ASCII-led and non-ASCII-led)
+    /// reach it, and the front's ASCII-led arm ([`Lexer::next_token_into`]) walks the same
+    /// [`ascii_name_run_end`] and hands on a run that reaches a non-ASCII byte, so the class
+    /// cannot drift between them. ⚠️ Not the *unquoted numeric value* run, which the dispatch
+    /// scans inline: a narrower class (`is_alphanumeric`, `_`, `-`) answering to HTML's
+    /// unquoted-attribute-value grammar rather than to `read_tag`.
     ///
     /// NOTE: for attribute/directive *names* this is only the LEADING run — the parser's
     /// `attribute_name_run_end` extends it past special chars (`a%b`) to Svelte's
@@ -470,18 +506,12 @@ impl<'a> Lexer<'a> {
     /// so the common path neither decodes nor pays that arm's constants and register saves.
     fn scan_name_run(&mut self) {
         let bytes = self.source.as_bytes();
-        let mut i = self.position;
-        while let Some(&b) = bytes.get(i) {
-            if NAME_RUN_ASCII[usize::from(b)] {
-                i += 1;
-                continue;
-            }
-            if b >= 0x80 {
-                i = name_run_end_from_non_ascii(self.source, i);
-            }
-            break;
-        }
-        self.position = i;
+        let i = ascii_name_run_end(bytes, self.position);
+        self.position = if bytes.get(i).is_some_and(|&b| b >= 0x80) {
+            name_run_end_from_non_ascii(self.source, i)
+        } else {
+            i
+        };
     }
 
     /// Lex the next token straight into `*dst` — the parser's current-token slot or its
@@ -490,9 +520,219 @@ impl<'a> Lexer<'a> {
     /// token, so writing through the caller's slot leaves only the error pointer to return.
     /// `*dst` is written only on success.
     ///
-    /// The dispatch yields only the token's KIND — every token spans `start` to the cursor —
-    /// so the one store at the end is the only write of `*dst`.
+    /// This is the scan's **front**: it lexes every token whose path makes no call — the gap
+    /// before it (template text up to a `<` or `{`, or an ASCII whitespace run in a tag), end
+    /// of input, the punctuation, a bare `{` and a marker glued to its brace, and a name whose
+    /// run stays ASCII, which together are nearly every token — and hands the rest to a
+    /// function that finishes the token, entered as the front's last act so the handoff
+    /// compiles to a jump: [`Lexer::string_token_into`] for a quoted value, and
+    /// [`Lexer::next_token_dispatch`] for a comment or `<!` declaration, a marker separated
+    /// from its brace, an unquoted numeric value, a non-ASCII byte anywhere the front reads
+    /// one, and the errors. Each finisher lexes the token from the cursor the front leaves
+    /// it, which is the token's first byte or, in a tag, a non-ASCII byte inside the
+    /// whitespace gap before it (the dispatch's gap skip finishes that gap). The split is what
+    /// keeps the front free of a frame: a function making the scanners' calls saves registers
+    /// on entry and restores them at every exit — on every token, the ones that call nothing
+    /// included.
+    ///
+    /// ⚠️ So nothing the front reaches may make a call it then continues past. A handoff must
+    /// stay in tail position and return this function's own `Result` (a one-word niche,
+    /// returned in a register); a callee that returns anything else puts the call and the
+    /// frame back. And the front runs on the caller-saved registers alone, so what it keeps
+    /// live is budgeted too: the quoted value's word loop is a finisher of its own for that
+    /// reason, a marker behind a gap is read by the dispatch rather than here (walking the
+    /// gap kept two registers more live than the front has), and the whitespace and name runs
+    /// are table walks over one cursor ([`ascii_svelte_ws_run_end`], [`ascii_name_run_end`]).
+    ///
+    /// `#[inline(never)]`: small and frame-free, the front would otherwise be a candidate for
+    /// inlining into its hot callers — `SvelteParser::advance`, `fill_peek` — and a lexer inlined
+    /// into a frame the parser's recursion stacks grows that frame.
+    ///
+    /// The match yields only the token's KIND — every token spans `start` to the cursor — so
+    /// the one store at the end is the only write of `*dst`.
+    #[inline(never)]
     pub fn next_token_into(&mut self, dst: &mut Token) -> Result<(), ParseError> {
+        let bytes = self.source.as_bytes();
+        let mut i = self.position;
+        if self.inside_tag {
+            // Tag mode: step over the whitespace between tokens, its ASCII half here. A
+            // non-ASCII byte may be Svelte whitespace too: it reaches the match below as a
+            // token's first byte, which hands it on, and the dispatch's own gap skip finishes
+            // the gap from it.
+            i = ascii_svelte_ws_run_end(bytes, i);
+        } else {
+            // Template mode: text content is a gap (`skip_to_special_char`).
+            i = special_byte_at_or_after(bytes, i);
+        }
+
+        let start = i;
+        let Some(&b) = bytes.get(start) else {
+            // The empty token at `start`.
+            self.position = start;
+            *dst = Token {
+                kind: TokenKind::Eof,
+                start: start as u32,
+                end: start as u32,
+            };
+            return Ok(());
+        };
+        // Every arm the front settles leaves `i` at the token's end; every handoff leaves the
+        // cursor at `start`.
+        macro_rules! hand_on {
+            () => {{
+                self.position = start;
+                return self.next_token_dispatch(dst);
+            }};
+        }
+        let kind = match b {
+            // `<!--` opens a comment and `<!` a declaration name; the dispatch reads both.
+            b'<' if bytes.get(start + 1) == Some(&b'!') => hand_on!(),
+            b'<' => {
+                self.inside_tag = true; // Enter tag mode
+                i = start + 1;
+                TokenKind::LeftAngle
+            }
+            b'>' => {
+                self.inside_tag = false; // Exit tag mode, back to template mode
+                i = start + 1;
+                TokenKind::RightAngle
+            }
+            b'/' => {
+                i = start + 1;
+                TokenKind::Slash
+            }
+            // A marker glued to its brace: the token runs one past the marker byte. A gap
+            // between the two goes to the dispatch, which reads the marker past it. End of
+            // input reads as a NUL, which is neither a marker nor whitespace — a bare `{`, as
+            // the dispatch has it — so no path of its own merges into the others.
+            b'{' => match bytes.get(start + 1).copied().unwrap_or(0) {
+                b'#' => {
+                    i = start + 2;
+                    TokenKind::BlockOpen
+                }
+                b':' => {
+                    i = start + 2;
+                    TokenKind::BlockContinue
+                }
+                b'/' if !matches!(bytes.get(start + 2), Some(b'*' | b'/')) => {
+                    i = start + 2;
+                    TokenKind::BlockClose
+                }
+                b'@' => {
+                    i = start + 2;
+                    TokenKind::TagOpen
+                }
+                c if c >= 0x80 || is_svelte_ws(c as char) => hand_on!(),
+                _ => {
+                    i = start + 1;
+                    TokenKind::LeftBrace
+                }
+            },
+            b'}' => {
+                i = start + 1;
+                TokenKind::RightBrace
+            }
+            b'=' => {
+                i = start + 1;
+                TokenKind::Equals
+            }
+            // A quoted value: `string_token_into`'s hop keeps more constants and cursors live
+            // than the front has caller-saved registers for.
+            b'\'' | b'"' => {
+                self.position = start;
+                return self.string_token_into(dst);
+            }
+            b'a'..=b'z' | b'A'..=b'Z' | b'_' | b'$' | b'-' | b'!' => {
+                // The dispatch's ASCII-led name, when its run stays ASCII (`scan_name_run`'s
+                // table walk, past the first byte — `!` opens a name but does not continue one).
+                i = ascii_name_run_end(bytes, start + 1);
+                if bytes.get(i).is_some_and(|&c| c >= 0x80) {
+                    hand_on!();
+                }
+                TokenKind::Identifier
+            }
+            // An unquoted numeric value, and every non-ASCII lead byte.
+            b'0'..=b'9' | 0x80..=0xFF => hand_on!(),
+            // Any other ASCII byte: the dispatch's single-character name.
+            _ => {
+                i = start + 1;
+                TokenKind::Identifier
+            }
+        };
+        self.position = i;
+        *dst = Token {
+            kind,
+            start: start as u32,
+            end: i as u32,
+        };
+        Ok(())
+    }
+
+    /// Lex the quoted attribute value whose opening quote is at the cursor into `*dst` — a
+    /// String token, from the quote through the closing one.
+    ///
+    /// Only two things matter here: the closing quote, and any `{expr}` tag — whose interior
+    /// is JS, where the attribute's quote character is just an ordinary byte
+    /// (`title="{a['\"']}"`). The first `{` hands the rest of the value to
+    /// `quoted_value_end_from_brace`, out of line: most values hold none, so the value is one
+    /// hop to the first of the two bytes, eight bytes a word (`tsv_lang::swar::next_byte_of`),
+    /// instantiated per quote kind so both needles reach the word loop as constants.
+    ///
+    /// Attribute-value text. HTML/Svelte attribute values have NO backslash escapes (unlike a
+    /// JS string inside `{expr}`), so `\` is a literal char: `a="{x}\"` closes at the `"` with
+    /// value `{x}\`, matching Svelte's parser. Treating `\` as an escape here read `\"` as an
+    /// escaped quote and ran past the close → "Unterminated string literal" (an
+    /// over-rejection of valid Svelte; the `fuzz` gate).
+    ///
+    /// Both needles are ASCII, so — as in [`special_byte_at_or_after`] — the hop cannot stop inside
+    /// a character.
+    ///
+    /// Out of line, and entered by both scans in tail position: the word loop's constants and
+    /// cursors are more than the front ([`Lexer::next_token_into`]) can hold without saving
+    /// registers, which it would then do on every token.
+    #[inline(never)]
+    fn string_token_into(&mut self, dst: &mut Token) -> Result<(), ParseError> {
+        let bytes = self.source.as_bytes();
+        let start = self.position;
+        let quote = bytes[start];
+        debug_assert!(matches!(quote, b'\'' | b'"'));
+        let from = start + 1; // past the opening quote, an ASCII byte
+        let stop = if quote == b'"' {
+            tsv_lang::swar::next_byte_of(bytes, from, [b'"', b'{'])
+        } else {
+            tsv_lang::swar::next_byte_of(bytes, from, [b'\'', b'{'])
+        };
+        let end = match bytes.get(stop) {
+            Some(b'{') => quoted_value_end_from_brace(self.source, stop, quote),
+            // The closing quote, and a value with no `{` in it.
+            Some(_) => {
+                self.plain_string_start = start as u32;
+                Some(stop + 1)
+            }
+            None => None,
+        };
+        let Some(end) = end else {
+            return Err(lex_err("Unterminated string literal in template", start));
+        };
+        self.position = end;
+        *dst = Token {
+            kind: TokenKind::String,
+            start: start as u32,
+            end: end as u32,
+        };
+        Ok(())
+    }
+
+    /// Lex the token at the cursor into `*dst` — every token the front
+    /// ([`Lexer::next_token_into`]) hands on, and the whole scan, gap included, from any
+    /// cursor: entered at a token's first byte the gap skip below is a no-op (a tag-mode token
+    /// does not open with whitespace, and a template-mode one opens with the `<` or `{` the
+    /// skip stops on), and entered inside a tag's whitespace gap it finishes the gap.
+    ///
+    /// `#[inline(never)]` because the front's frame-free shape depends on it: inlined, its
+    /// calls would put their register saves back on every token.
+    #[inline(never)]
+    fn next_token_dispatch(&mut self, dst: &mut Token) -> Result<(), ParseError> {
         // Template mode (outside tags): skip text content, only tokenize special chars
         // Tag mode (inside <...>): tokenize everything including identifiers
         if self.inside_tag {
@@ -527,21 +767,23 @@ impl<'a> Lexer<'a> {
                     TokenKind::Comment
                 } else {
                     self.inside_tag = true; // Enter tag mode
-                    self.advance();
+                    self.position = start + 1;
                     TokenKind::LeftAngle
                 }
             }
             Some(b'>') => {
                 self.inside_tag = false; // Exit tag mode, back to template mode
-                self.advance();
+                self.position = start + 1;
                 TokenKind::RightAngle
             }
             Some(b'/') => {
-                self.advance();
+                self.position = start + 1;
                 TokenKind::Slash
             }
             Some(b'{') => {
-                self.advance();
+                // Every byte this arm steps over is ASCII — the brace, and the marker the
+                // whitespace skip lands on — so each step is one byte.
+                self.position = start + 1;
                 // Check for block tokens: {#, {:, {/, {@ — Svelte's `tag()` runs
                 // `allow_whitespace()` right after `{`, so the marker may be separated
                 // from the brace by whitespace: `{ #if}` tokenizes like `{#if}`. (The
@@ -553,13 +795,11 @@ impl<'a> Lexer<'a> {
                 let marker = self.peek_past_whitespace();
                 match self.source.as_bytes().get(marker) {
                     Some(b'#') => {
-                        self.skip_whitespace();
-                        self.advance();
+                        self.position = marker + 1;
                         TokenKind::BlockOpen
                     }
                     Some(b':') => {
-                        self.skip_whitespace();
-                        self.advance();
+                        self.position = marker + 1;
                         TokenKind::BlockContinue
                     }
                     // `{/if}` close vs `{/* */}` / `{// }` comment expression: a `*`/`/`
@@ -571,66 +811,25 @@ impl<'a> Lexer<'a> {
                         ) =>
                     {
                         // Block close: {/if}, {/each}, etc
-                        self.skip_whitespace();
-                        self.advance();
+                        self.position = marker + 1;
                         TokenKind::BlockClose
                     }
                     Some(b'@') => {
-                        self.skip_whitespace();
-                        self.advance();
+                        self.position = marker + 1;
                         TokenKind::TagOpen
                     }
                     _ => TokenKind::LeftBrace,
                 }
             }
             Some(b'}') => {
-                self.advance();
+                self.position = start + 1;
                 TokenKind::RightBrace
             }
             Some(b'=') => {
-                self.advance();
+                self.position = start + 1;
                 TokenKind::Equals
             }
-            Some(quote @ (b'\'' | b'"')) => {
-                // Quoted attribute value. Only two things matter here: the closing quote,
-                // and any `{expr}` tag — whose interior is JS, where the attribute's quote
-                // character is just an ordinary byte (`title="{a['\"']}"`). The first `{`
-                // hands the rest of the value to `quoted_value_end_from_brace`, out of line:
-                // most values hold none, so the value is one hop to the first of the two
-                // bytes, eight bytes a word (`tsv_lang::swar::next_byte_of`), instantiated
-                // per quote kind so both needles reach the word loop as constants.
-                //
-                // Attribute-value text. HTML/Svelte attribute values have NO backslash
-                // escapes (unlike a JS string inside `{expr}`), so `\` is a literal char:
-                // `a="{x}\"` closes at the `"` with value `{x}\`, matching Svelte's parser.
-                // Treating `\` as an escape here read `\"` as an escaped quote and ran past
-                // the close → "Unterminated string literal" (an over-rejection of valid
-                // Svelte; the `fuzz` gate).
-                //
-                // Both needles are ASCII, so — as in `skip_to_special_char` — the hop
-                // cannot stop inside a character.
-                let bytes = self.source.as_bytes();
-                let from = self.position + 1; // past the opening quote, an ASCII byte
-                let stop = if quote == b'"' {
-                    tsv_lang::swar::next_byte_of(bytes, from, [b'"', b'{'])
-                } else {
-                    tsv_lang::swar::next_byte_of(bytes, from, [b'\'', b'{'])
-                };
-                let end = match bytes.get(stop) {
-                    Some(b'{') => quoted_value_end_from_brace(self.source, stop, quote),
-                    // The closing quote, and a value with no `{` in it.
-                    Some(_) => {
-                        self.plain_string_start = start as u32;
-                        Some(stop + 1)
-                    }
-                    None => None,
-                };
-                let Some(end) = end else {
-                    return Err(lex_err("Unterminated string literal in template", start));
-                };
-                self.position = end;
-                TokenKind::String
-            }
+            Some(b'\'' | b'"') => return self.string_token_into(dst),
             Some(b) if b.is_ascii_alphabetic() || matches!(b, b'_' | b'$' | b'-' | b'!') => {
                 // Tag names and identifiers.
                 // NOTE: for attribute/directive *names* this token is only the LEADING run —
@@ -713,7 +912,7 @@ impl<'a> Lexer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Lexer, Token, TokenKind, char_at, is_svelte_ws};
+    use super::{Lexer, ParseError, Token, TokenKind, char_at, is_svelte_ws};
 
     /// The brace-free fact [`Lexer::string_holds_no_brace`] answers: asked right after each
     /// String, it holds for the brace-free values and not for the one holding an expression
@@ -742,6 +941,122 @@ mod tests {
         }
         assert_eq!(answers, [true, false, true, true]);
         assert!(!lexer.string_holds_no_brace(first_string.unwrap()));
+    }
+
+    /// What one step leaves observable: the token's kind and span, then the cursor, the mode
+    /// and the brace-free String fact.
+    type Step = (TokenKind, u32, u32, usize, bool, u32);
+
+    /// Lex `source` to its end (or its first error) through the front or through the dispatch
+    /// alone, one step a token, recording each token with the lexer state the step leaves.
+    fn lex_all(source: &str, front: bool) -> Vec<Result<Step, ParseError>> {
+        let mut lexer = Lexer::new(source);
+        let mut token = Token {
+            kind: TokenKind::Eof,
+            start: 0,
+            end: 0,
+        };
+        let mut steps = Vec::new();
+        for _ in 0..=source.len() {
+            let step = if front {
+                lexer.next_token_into(&mut token)
+            } else {
+                lexer.next_token_dispatch(&mut token)
+            };
+            let failed = step.is_err();
+            steps.push(step.map(|()| {
+                (
+                    token.kind,
+                    token.start,
+                    token.end,
+                    lexer.position,
+                    lexer.inside_tag,
+                    lexer.plain_string_start,
+                )
+            }));
+            if failed {
+                break;
+            }
+            if token.kind == TokenKind::Eof {
+                break;
+            }
+        }
+        steps
+    }
+
+    /// The front ([`Lexer::next_token_into`]) lexes every source to the token stream the
+    /// dispatch alone produces — the tokens, the cursor, the mode and the brace-free String
+    /// fact after each step, and the error — message and position — a step stops at — whichever arm it settles and
+    /// wherever it hands on. Sources of up to three fragments over every byte class the front
+    /// branches on, each fragment reached in template mode and in a tag.
+    #[test]
+    fn front_matches_the_dispatch_on_every_fragment_sequence() {
+        let fragments = [
+            "<",
+            ">",
+            "/",
+            "=",
+            "}",
+            "{",
+            "{#",
+            "{ #",
+            "{:",
+            "{\t:",
+            "{/",
+            "{/*",
+            "{//",
+            "{@",
+            "{\u{a0}#",
+            "{\u{feff}",
+            "{é",
+            " ",
+            "\n\t",
+            "\u{a0}",
+            "\u{2028}",
+            "\u{feff}x",
+            "a",
+            "div",
+            "on:click|once",
+            "a.b",
+            "!DOCTYPE",
+            "<!--c-->",
+            "<!--",
+            "<!x",
+            "\"x\"",
+            "'y'",
+            "\"{x}\"",
+            "'{#if c}'",
+            "\"",
+            "'",
+            "\"a",
+            "12",
+            "3é",
+            "é",
+            "Ωmega",
+            "a\u{b7}b",
+            "x-café",
+            "%",
+            "[",
+            "\\",
+            "\u{1}",
+            "\0",
+            "{\0",
+            "text",
+        ];
+        for a in fragments {
+            for b in fragments {
+                for c in ["", "<", " ", "a", "{", "é", "\""] {
+                    for prefix in ["", "<x "] {
+                        let source = format!("{prefix}{a}{b}{c}");
+                        assert_eq!(
+                            lex_all(&source, true),
+                            lex_all(&source, false),
+                            "{source:?}"
+                        );
+                    }
+                }
+            }
+        }
     }
 
     /// The name-run class as one character loop — the predicate the table walk and its
