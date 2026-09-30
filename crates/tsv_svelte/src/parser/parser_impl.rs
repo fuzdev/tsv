@@ -221,12 +221,16 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     pub(crate) fn advance(&mut self) -> Result<(), ParseError> {
         match self.peek.take() {
-            Some(token) => self.current = token,
+            Some(token) => {
+                self.current = token;
+                Ok(())
+            }
             // Lexed straight into the current slot (`&mut self.current` is disjoint from
-            // `&mut self.lexer`), so no intermediate token is returned and re-scattered.
-            None => self.lexer.next_token_into(&mut self.current)?,
+            // `&mut self.lexer`), so no intermediate token is returned and re-scattered — and
+            // the lex's result is returned as is, so an out-of-line caller (`expect`) reaches
+            // the lexer by a tail jump.
+            None => self.lexer.next_token_into(&mut self.current),
         }
-        Ok(())
     }
 
     /// Lex the next token into the lookahead slot unless it is cached there already, in
@@ -281,11 +285,28 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         self.current_kind() == kind
     }
 
+    /// Out of line: with its miss cold ([`error_expected_kind`](Self::error_expected_kind)) it
+    /// is a frame-free check-and-advance, small enough that the inliner would otherwise take it
+    /// into its callers — the element parser among them, whose frame every level of element
+    /// nesting pays, and which an inlined advance grows.
+    #[inline(never)]
     pub(crate) fn expect(&mut self, kind: TokenKind) -> Result<(), ParseError> {
         if !self.check(kind) {
-            return Err(self.error_expected_found(&kind.to_string()));
+            return Err(self.error_expected_kind(kind));
         }
         self.advance()
+    }
+
+    /// [`expect`](Self::expect)'s miss: "Expected X, found Y" for a token kind.
+    ///
+    /// Cold and out of line, taking `kind` by value: formatted inline, the kind's `Display`
+    /// borrows it from a stack slot and `format!`'s arguments want a frame, so every
+    /// `expect` — a hit is all but every call — would save registers and spill `kind` for an
+    /// error it never builds.
+    #[cold]
+    #[inline(never)]
+    fn error_expected_kind(&self, kind: TokenKind) -> ParseError {
+        self.error_expected_found(&kind.to_string())
     }
 
     /// Check if the next tag matches the given name (e.g., "script", "style")
