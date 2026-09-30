@@ -574,7 +574,8 @@ fn with_embedding_parser<'arena, T>(
     arena: &'arena bumpalo::Bump,
     f: impl FnOnce(&mut parser::Parser<'_, 'arena>) -> std::result::Result<T, ParseError>,
 ) -> Result<T> {
-    let mut parser = parser::Parser::with_base_offset(source, base_offset, arena)?;
+    let mut parser = parser::Parser::with_base_offset(source, base_offset, arena);
+    parser.prime()?;
     f(&mut parser).map_err(|e| e.with_context(source))
 }
 

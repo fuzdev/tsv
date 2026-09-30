@@ -1735,10 +1735,10 @@ impl<'a> Lexer<'a> {
     }
 
     /// By-value next-token for every caller but the hot advance path: the parser's
-    /// bootstrap, its `peek_kind` lookahead, its cold re-lexes (the comment drain,
-    /// the regex relex, [`Lexer::seek_and_next_token`]'s compound-token split), and
-    /// `debug_token_stream`. The advance path uses [`Lexer::next_token_into`] to
-    /// write the parser's current token in place.
+    /// `peek_kind` lookahead, its cold re-lexes (the comment drain, the regex relex,
+    /// [`Lexer::seek_and_next_token`]'s compound-token split), and `debug_token_stream`.
+    /// The advance path and `Parser::prime` use [`Lexer::next_token_into`] to write the
+    /// parser's current token in place.
     pub fn next_token(&mut self) -> Result<Token, ParseError> {
         let mut tok = Token {
             kind: TokenKind::Eof,

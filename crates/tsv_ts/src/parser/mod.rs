@@ -447,10 +447,10 @@ pub struct Parser<'a, 'arena> {
 }
 
 impl<'a, 'arena> Parser<'a, 'arena> {
-    /// Create a parser against an explicit goal symbol. The standalone
-    /// `parse`/`parse_with_goal` paths use this; embedders go through
+    /// Create a parser against an explicit goal symbol, not yet [primed](Parser::prime). The
+    /// standalone `parse`/`parse_with_goal` paths use this; embedders go through
     /// [`Parser::with_base_offset`] (always `Module`).
-    fn new_with_goal(source: &'a str, goal: Goal, arena: &'arena Bump) -> Result<Self, ParseError> {
+    fn new_with_goal(source: &'a str, goal: Goal, arena: &'arena Bump) -> Self {
         Self::with_base_offset_and_goal(source, 0, goal, arena)
     }
 
@@ -514,71 +514,56 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         })
     }
 
-    /// Create a parser at a base offset (for embedded expressions).
-    /// Embedded contexts are always modules (Svelte `<script>` is a module), so this
-    /// defaults the goal.
+    /// Create a parser at a base offset (for embedded expressions), not yet
+    /// [primed](Parser::prime).
     ///
     /// Used when parsing embedded expressions/scripts in Svelte templates.
     /// base_offset is added to all span positions to get correct positions in full source.
     /// Embedded contexts are always modules (Svelte `<script>` is a module), so
     /// this defaults the goal; the goal-aware [`Parser::new_with_goal`] is the
     /// only `Script` entry.
-    pub fn with_base_offset(
-        source: &'a str,
-        base_offset: usize,
-        arena: &'arena Bump,
-    ) -> Result<Self, ParseError> {
+    pub fn with_base_offset(source: &'a str, base_offset: usize, arena: &'arena Bump) -> Self {
         Self::with_base_offset_and_goal(source, base_offset, Goal::Module, arena)
     }
 
     /// [`Parser::with_base_offset`] with an explicit goal symbol — the single
     /// constructor that actually builds the parser state.
+    ///
+    /// Infallible, and the first token is not lexed here: `current` holds an empty `Eof`
+    /// placeholder until [`Parser::prime`] replaces it. The split is what lets the state be
+    /// built where it lives. A constructor that lexes has to return `Result<Self, _>`, which
+    /// comes back through a temporary its caller then copies whole into its own local, and
+    /// the lexer it advances is built in a stack temporary of its own and copied in once the
+    /// token is read. Returned as a plain `Self`, every field is written straight into the
+    /// caller's local, and `prime` lexes into the parser's own lexer and `current`, as
+    /// [`Parser::advance`] does.
+    ///
+    /// `#[inline(never)]`: out of line it is a run of stores through the caller's pointer
+    /// and no frame of its own, where each of the embedded-parse entry points it would inline
+    /// into carries its own copy of those stores.
+    #[inline(never)]
     fn with_base_offset_and_goal(
         source: &'a str,
         base_offset: usize,
         goal: Goal,
         arena: &'arena Bump,
-    ) -> Result<Self, ParseError> {
-        // The lexer scans `source` (the island) but reports errors against the document
-        // it sits in, so it carries the same `base_offset` the spans below are shifted by.
-        let mut lexer = Lexer::at_offset(source, base_offset);
-        let mut current = lexer.next_token()?;
-        let mut decoded = lexer
-            .decoded_str()
-            .map(|s| -> &'arena str { arena.alloc_str(s) });
-
-        // Collect leading comment tokens
-        let mut comments = BumpVec::new_in(arena);
-        while let TokenKind::Comment {
-            is_block,
-            content_start,
-        } = &current.kind
-        {
-            let (comment, _) = comment_from_token(
-                source,
-                current.start as usize,
-                current.end as usize,
-                *content_start as usize,
-                *is_block,
-                base_offset,
-            );
-            comments.push(comment);
-            current = lexer.next_token()?;
-            decoded = lexer
-                .decoded_str()
-                .map(|s| -> &'arena str { arena.alloc_str(s) });
-        }
-
-        Ok(Self {
+    ) -> Self {
+        Self {
             arena,
             source,
-            lexer,
-            current,
-            current_decoded: decoded,
+            // The lexer scans `source` (the island) but reports errors against the document
+            // it sits in, so it carries the same `base_offset` the spans are shifted by.
+            lexer: Lexer::at_offset(source, base_offset),
+            current: Token {
+                kind: TokenKind::Eof,
+                start: 0,
+                end: 0,
+            },
+            current_decoded: None,
             peek: None,
             peek_decoded: None,
             base_offset,
-            comments,
+            comments: BumpVec::new_in(arena),
             had_line_terminator: false, // No line terminator before first token
             prev_end: 0,
             top_level_as_is_assertion: true, // Enable by default (TypeScript context)
@@ -611,7 +596,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             fn_type_disallowed: false, // Top level is a full-type position
             conditional_type_disallowed: false, // Top level allows conditional types
             pending_conditional_extends: None,
-        })
+        }
+    }
+
+    /// Lex the first token into `current`, collecting the comments ahead of it — the step
+    /// every constructor leaves to its caller ([`Parser::with_base_offset_and_goal`] says
+    /// why), owed exactly once before anything reads a token.
+    ///
+    /// The comment drain records a line terminator it crosses, as it does between two
+    /// tokens; ahead of the first token there is no previous token for one to separate
+    /// it from, so the flag is cleared again.
+    pub(crate) fn prime(&mut self) -> Result<(), ParseError> {
+        self.lexer.next_token_into(&mut self.current)?;
+        self.current_decoded = self.decoded_to_arena();
+        self.collect_comments()?;
+        self.had_line_terminator = false;
+        Ok(())
     }
 
     pub(super) fn advance(&mut self) -> Result<(), ParseError> {
@@ -2774,7 +2774,8 @@ fn parse_with<'arena, T>(
     arena: &'arena Bump,
     f: impl FnOnce(&mut Parser<'_, 'arena>) -> Result<T, ParseError>,
 ) -> Result<T, ParseError> {
-    let mut parser = Parser::new_with_goal(source, goal, arena)?;
+    let mut parser = Parser::new_with_goal(source, goal, arena);
+    parser.prime()?;
     f(&mut parser)
 }
 
