@@ -125,59 +125,87 @@ fn property_is_font_shorthand(property: &str) -> bool {
     property == "font" || property.starts_with("--")
 }
 
+/// Walk an important declaration's tail — from the value's end to its `;`/`}` — and
+/// hand `emit` each piece of its printed form, in order: ` !important` at the bang (the
+/// keyword itself skipped, so any spelling or casing prints one way), and a space plus
+/// the comment's verbatim text for each comment, wherever it sits relative to the bang.
+///
+/// The one spelling of the tail, shared by the width measure
+/// (`Printer::declaration_tail`) and the emit (`Printer::write_important_tail`).
+fn for_each_important_tail_piece(
+    source: &str,
+    decl: &internal::CssDeclaration<'_>,
+    mut emit: impl FnMut(&str),
+) {
+    let bytes = source.as_bytes();
+    let mut i = decl.span.end_usize();
+    while i < bytes.len() {
+        match bytes[i] {
+            b';' | b'}' => break,
+            b'/' if crate::comments::is_comment_start(bytes, i) => {
+                let end = crate::comments::comment_end(bytes, i);
+                emit(" ");
+                emit(&source[i..end]);
+                i = end;
+            }
+            b'!' => {
+                emit(" !important");
+                i += 1;
+            }
+            c if c.is_ascii_alphabetic() => {
+                // the `important` keyword itself — already emitted at the `!`
+                while i < bytes.len() && bytes[i].is_ascii_alphabetic() {
+                    i += 1;
+                }
+            }
+            _ => i += 1,
+        }
+    }
+}
+
 impl<'a> Printer<'a> {
-    /// Write the declaration ending: optional `!important` tail and the semicolon with newline.
-    ///
-    /// The value span ends before the `!important` region, so that region — and any
-    /// comments around it (`blue /* a */ !important /* b */;`) — is invisible to the
-    /// value printers. Re-emit it from source here with comments preserved in place
-    /// (like prettier) and `!`/`important` normalized to a single ` !important`.
     /// Build the declaration's trailing text after the value: the `!important`
     /// keyword (normalized to ` !important`) plus any comments trailing it, or
     /// empty when the declaration isn't important.
     ///
-    /// Single source of truth for the tail, shared by the emit
-    /// (`write_declaration_end`) and the function paths' inline-vs-wrap width
-    /// decisions — so the wrap check counts exactly the bytes the emit appends.
-    /// A value carrying `!important` therefore reserves the tail and wraps when it
-    /// would overrun the print width, matching prettier (the old measure pass
-    /// omitted the tail and overran by its width).
+    /// The function paths' inline-vs-wrap width decisions measure this string, and
+    /// the emit (`write_declaration_end`) writes the same pieces
+    /// (`for_each_important_tail_piece`) — so the wrap check counts exactly the bytes
+    /// the emit appends. A value carrying `!important` therefore reserves the tail and
+    /// wraps when it would overrun the print width, matching prettier.
     fn declaration_tail(&self, decl: &internal::CssDeclaration<'_>) -> String {
-        if !decl.is_important() {
-            return String::new();
-        }
-        let bytes = self.source.as_bytes();
-        let mut i = decl.span.end_usize();
         let mut out = String::new();
-        while i < bytes.len() {
-            match bytes[i] {
-                b';' | b'}' => break,
-                b'/' if crate::comments::is_comment_start(bytes, i) => {
-                    let end = crate::comments::comment_end(bytes, i);
-                    out.push(' ');
-                    out.push_str(&self.source[i..end]);
-                    i = end;
-                }
-                b'!' => {
-                    out.push_str(" !important");
-                    i += 1;
-                }
-                c if c.is_ascii_alphabetic() => {
-                    // the `important` keyword itself — already emitted at the `!`
-                    while i < bytes.len() && bytes[i].is_ascii_alphabetic() {
-                        i += 1;
-                    }
-                }
-                _ => i += 1,
-            }
+        if decl.is_important() {
+            for_each_important_tail_piece(self.source, decl, |piece| out.push_str(piece));
         }
         out
     }
 
+    /// Write the declaration ending: the optional `!important` tail and the semicolon
+    /// with newline.
+    ///
+    /// The value span ends before the `!important` region, so that region — and any
+    /// comments around it (`blue /* a */ !important /* b */;`) — is invisible to the
+    /// value printers. It is re-emitted from source here with comments preserved in
+    /// place (like prettier) and `!`/`important` normalized to a single ` !important`.
+    ///
+    /// Almost every declaration ends here and almost none is important, so the common case is
+    /// the flag test and the `;\n` write inline; the tail is written piece by piece into
+    /// the output from a cold body, with no intermediate `String`.
+    #[inline]
     fn write_declaration_end(&mut self, decl: &internal::CssDeclaration<'_>) {
-        let tail = self.declaration_tail(decl);
-        self.write(&tail);
+        if decl.is_important() {
+            self.write_important_tail(decl);
+        }
         self.write(";\n");
+    }
+
+    /// [`Self::write_declaration_end`]'s `!important` arm.
+    #[cold]
+    #[inline(never)]
+    fn write_important_tail(&mut self, decl: &internal::CssDeclaration<'_>) {
+        let source = self.source;
+        for_each_important_tail_piece(source, decl, |piece| self.write(piece));
     }
 
     /// Emit a format-ignored declaration verbatim from source. The value span excludes
@@ -639,8 +667,9 @@ impl<'a> Printer<'a> {
             // function group's fit decision (the property + `: ` + tail + `;` boundary).
             // Counting the tail makes an `!important` function wrap when the keyword
             // would push it past the print width, instead of overrunning — matching
-            // prettier. The tail comes from `declaration_tail`, the same string the
-            // emit appends, so measure and emit can't drift.
+            // prettier. The tail comes from `declaration_tail`, spelled by the same
+            // `for_each_important_tail_piece` walk the emit writes from, so measure and
+            // emit can't drift.
             let tail_width = visual_width(&self.declaration_tail(decl), TAB_WIDTH);
             self.write_arena_doc_reserving(doc, 1 + tail_width);
         }
@@ -696,7 +725,7 @@ impl<'a> Printer<'a> {
         let func_normalized = value_normalization::normalize_value_with_comments(func_source);
         // Visual width (not byte length) of `property: value !important;`. The multibyte
         // comment's byte inflation is excluded by `visual_width`; the ` !important` tail is
-        // counted via `declaration_tail` (the same string the emit appends) so an important
+        // counted via `declaration_tail` (the same pieces the emit writes) so an important
         // value wraps rather than overrunning the print width. `: ` is 2 cols, `;` is 1.
         let inline_len = visual_width(decl.property, TAB_WIDTH)
             + 2
