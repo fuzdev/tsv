@@ -75,21 +75,45 @@ impl UnprefixedHost {
     }
 }
 
+/// The delimiter pair an attribute value prints with — see
+/// [`Printer::attribute_value_delims`].
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum ValueDelims {
+    /// `="…"`, the default.
+    Double,
+    /// `='…'`, for a value whose text holds a `"`.
+    Single,
+    /// `=…`, for a value whose text holds both quotes.
+    Bare,
+}
+
 // Opening prefixes for brace-wrapped attribute expressions. `build_braced_expression_doc`
 // emits the prefix and derives the expression offset from its `.len()`, so these are the
 // single source for both the emitted text and the comment-scan anchor.
 const SPREAD_OPEN: &str = "{...";
 const ATTACH_TAG_OPEN: &str = "{@attach ";
 
-/// Whether `raw` is trivially already-normalized, so [`normalize_class_text`]
-/// would return it unchanged: single-line, no tabs, no collapsible space runs,
-/// no trailing space. Conservative — a `false` only means the `String` path
-/// runs (and decides for itself), so this can never change output; it only
-/// lets the common `class="a b c"` case skip the transient allocation.
-fn class_text_is_normalized(raw: &str) -> bool {
-    !raw.ends_with(' ')
-        && !raw.as_bytes().windows(2).any(|w| w == b"  ")
-        && !raw.contains(['\n', '\t'])
+/// Whether a SINGLE-LINE `raw` is trivially already-normalized, so
+/// [`normalize_class_text`] would return it unchanged: no tabs, no collapsible space
+/// runs, no trailing space. The caller answers the single-line half from the node's
+/// parse-time newline count ([`internal::Text::has_newline`]). Conservative — a `false`
+/// only means the `String` path runs (and decides for itself), so this can never change
+/// output; it only lets the common `class="a b c"` case skip the transient allocation.
+///
+/// One walk of the bytes answers all three: a space right after a space is a run, and a
+/// space as the last byte is the trailing one. Every byte it tests is ASCII, so a byte
+/// walk is the `char` walk exactly.
+fn class_text_is_normalized(raw: &[u8]) -> bool {
+    let mut after_space = false;
+    for &b in raw {
+        match b {
+            b' ' if after_space => return false,
+            b' ' => after_space = true,
+            b'\t' => return false,
+            _ => after_space = false,
+        }
+    }
+    !after_space
 }
 
 /// Normalize whitespace in a class attribute text value.
@@ -582,22 +606,61 @@ impl<'a> Printer<'a> {
     /// the static reader's value alternative is `[^>\s]+`, which admits both
     /// (`<script a=x'y"z>`). The unquoted form is always available for exactly that
     /// value: having come from that alternative, it holds no whitespace and no `>`.
+    ///
+    /// A value the author double-quoted answers without the scan: every reader that opens a
+    /// value on `"` ends its Text at the first `"` outside a `{…}` tag (the lexer's
+    /// quoted-value token, the static reader's `"([^"]*)"`), so none of its Text parts can
+    /// hold one — and the byte before the first part is that opening quote (an unquoted value
+    /// opens past a `=` or whitespace, a single-quoted one past a `'`). Nearly every value in
+    /// real markup is double-quoted, and the scan reads every byte of its text.
     fn attribute_value_delims(&self, parts: &[internal::AttributeValue<'_>]) -> (DocId, DocId) {
         let d = self.d();
+        let value_start = match parts.first() {
+            Some(internal::AttributeValue::Text(text)) => text.raw_span.start,
+            Some(internal::AttributeValue::ExpressionTag(tag)) => tag.span.start,
+            None => 0,
+        };
+        let opener = (value_start as usize).checked_sub(1);
+        if opener.and_then(|at| self.source.as_bytes().get(at)) == Some(&b'"') {
+            debug_assert_eq!(
+                self.scanned_attribute_value_delims(parts),
+                ValueDelims::Double,
+                "a double-quoted value holds no `\"` in its text"
+            );
+            return (d.text("=\""), d.text("\""));
+        }
+        // Each arm spells its literals, so the pair is a constant at the arm rather than a
+        // runtime `text()` at every attribute.
+        match self.scanned_attribute_value_delims(parts) {
+            ValueDelims::Double => (d.text("=\""), d.text("\"")),
+            ValueDelims::Bare => (d.text("="), d.text("")),
+            ValueDelims::Single => (d.text("='"), d.text("'")),
+        }
+    }
+
+    /// [`Printer::attribute_value_delims`]' answer from the value's text: the delimiter the
+    /// quotes its Text parts hold leave available.
+    ///
+    /// Out of line: its scan keeps more live than the double-quoted answer needs, and inlined
+    /// it would make every attribute save registers for a walk few of them take.
+    #[inline(never)]
+    fn scanned_attribute_value_delims(
+        &self,
+        parts: &[internal::AttributeValue<'_>],
+    ) -> ValueDelims {
         let mut texts = parts.iter().filter_map(|part| match part {
             internal::AttributeValue::Text(text) => Some(text.raw(self.source)),
             internal::AttributeValue::ExpressionTag(_) => None,
         });
-        // Each arm spells its literals, so the pair is a constant at the arm rather than a
-        // runtime `text()` at every attribute. A value with no `"` takes the double quotes
-        // whatever else it holds, so the `'` question is asked only of a value that has one.
-        // The `"` test walks a CLONE, so the `'` test below scans the parts from the start.
+        // A value with no `"` takes the double quotes whatever else it holds, so the `'`
+        // question is asked only of a value that has one. The `"` test walks a CLONE, so the
+        // `'` test below scans the parts from the start.
         if !texts.clone().any(|raw| raw.contains('"')) {
-            (d.text("=\""), d.text("\""))
+            ValueDelims::Double
         } else if texts.any(|raw| raw.contains('\'')) {
-            (d.text("="), d.text(""))
+            ValueDelims::Bare
         } else {
-            (d.text("='"), d.text("'"))
+            ValueDelims::Single
         }
     }
 
@@ -612,9 +675,7 @@ impl<'a> Printer<'a> {
     /// unless its host has a narrower one.
     fn build_attribute_value_doc(&self, value: &internal::AttributeValue<'_>) -> DocId {
         match value {
-            internal::AttributeValue::Text(text) => {
-                self.build_attribute_text_doc(text.raw(self.source), Some(text.raw_span))
-            }
+            internal::AttributeValue::Text(text) => self.build_attribute_text_doc(text, None),
             internal::AttributeValue::ExpressionTag(expr_tag) => {
                 self.build_expression_tag_doc(expr_tag)
             }
@@ -634,17 +695,28 @@ impl<'a> Printer<'a> {
         match value {
             internal::AttributeValue::Text(text) => {
                 let raw = text.raw(self.source);
-                if class_text_is_normalized(raw) {
-                    self.build_attribute_text_doc(raw, Some(text.raw_span))
+                if !text.has_newline() && class_text_is_normalized(raw.as_bytes()) {
+                    self.build_attribute_text_doc(text, None)
                 } else {
-                    let normalized = normalize_class_text(raw, is_last_part);
-                    self.build_attribute_text_doc(&normalized, None)
+                    self.build_normalized_class_text_doc(text, is_last_part)
                 }
             }
             internal::AttributeValue::ExpressionTag(expr_tag) => {
                 self.build_expression_tag_doc(expr_tag)
             }
         }
+    }
+
+    /// [`Printer::build_class_attribute_value_doc`] for a text the fast test could not clear:
+    /// normalized into an owned `String` first.
+    ///
+    /// Out of line: the `String` and its drop are more than an already-normalized text — nearly
+    /// every one — needs, and inlined they would make every class value save registers for
+    /// them.
+    #[inline(never)]
+    fn build_normalized_class_text_doc(&self, text: &internal::Text, is_last_part: bool) -> DocId {
+        let normalized = normalize_class_text(text.raw(self.source), is_last_part);
+        self.build_attribute_text_doc(text, Some(&normalized))
     }
 
     /// Push the docs for one part of a quoted `style:` value.
@@ -699,21 +771,42 @@ impl<'a> Printer<'a> {
     /// whitespace tsv reads rather than copies is a `style:` directive's — see
     /// [`Printer::push_style_value_part`], which routes only the parts it can prove separators
     /// and hands everything else back here.
-    fn build_attribute_text_doc(&self, raw: &str, raw_span: Option<Span>) -> DocId {
+    ///
+    /// `respelled` is a rewrite of `text`'s raw bytes that keeps every one of its newlines (a
+    /// `class` value's [`normalize_class_text`]); `None` prints the bytes themselves. Either
+    /// way the newline question is the node's parse-time count, not a scan.
+    fn build_attribute_text_doc(&self, text: &internal::Text, respelled: Option<&str>) -> DocId {
+        if text.has_newline() {
+            return self.build_multiline_attribute_text_doc(
+                respelled.unwrap_or_else(|| text.raw(self.source)),
+            );
+        }
         let d = self.d();
-        if raw.contains('\n') {
-            // Split at newlines, join with literalline to preserve literal newlines
-            // and trigger will_break on the attribute group
-            let line_docs: DocBuf = raw.split('\n').map(|part| d.text_pooled(part)).collect();
-            let sep = d.literalline();
-            d.join_doc(line_docs, sep)
-        } else if let Some(span) = raw_span {
-            // Verbatim source slice (`raw == source[span]`): emit without a pool copy.
-            d.source_span(span, self.source)
-        } else {
+        if let Some(raw) = respelled {
+            debug_assert!(!raw.contains('\n'));
             // Owned/normalized text (no source span): pool it.
             d.text_pooled(raw)
+        } else {
+            // Verbatim source slice: emit without a pool copy.
+            d.source_span(text.raw_span, self.source)
         }
+    }
+
+    /// [`Printer::build_attribute_text_doc`] for a value text holding a newline: each line
+    /// pooled, joined by `literalline`s.
+    ///
+    /// Out of line: the line buffer and the join are more than a single-line text needs, and
+    /// inlined they would make every attribute text save registers and reserve the buffer's
+    /// frame.
+    #[inline(never)]
+    fn build_multiline_attribute_text_doc(&self, raw: &str) -> DocId {
+        debug_assert!(raw.contains('\n'));
+        let d = self.d();
+        // Split at newlines, join with literalline to preserve literal newlines
+        // and trigger will_break on the attribute group
+        let line_docs: DocBuf = raw.split('\n').map(|part| d.text_pooled(part)).collect();
+        let sep = d.literalline();
+        d.join_doc(line_docs, sep)
     }
 
     /// Build a Doc for a spread attribute: `{...expr}`
@@ -1547,7 +1640,45 @@ impl<'a> Printer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::normalize_class_text;
+    use super::{class_text_is_normalized, normalize_class_text};
+
+    /// The one-walk fast test, graded against a plain spelling of its three conditions plus
+    /// the newline its caller answers — over EVERY string of up to seven characters from an
+    /// alphabet holding each byte the walk tests (space, tab, newline), a plain letter and a
+    /// multi-byte character — and against its reason to exist: a `true` must be a string the
+    /// normalizer returns unchanged, in either part position.
+    #[test]
+    fn class_text_fast_test_matches_the_plain_spelling() {
+        fn plain(raw: &str) -> bool {
+            !raw.ends_with(' ')
+                && !raw.as_bytes().windows(2).any(|w| w == b"  ")
+                && !raw.contains(['\n', '\t'])
+        }
+        const ALPHABET: [char; 5] = [' ', '\t', '\n', 'a', 'é'];
+        let mut raw = String::new();
+        let mut digits = Vec::new();
+        for len in 0..=7 {
+            digits.clear();
+            digits.resize(len, 0usize);
+            loop {
+                raw.clear();
+                raw.extend(digits.iter().map(|&i| ALPHABET[i]));
+                // The caller's newline half is the node's count, `\n` in `raw`.
+                let fast = !raw.contains('\n') && class_text_is_normalized(raw.as_bytes());
+                assert_eq!(fast, plain(&raw), "{raw:?}");
+                if fast {
+                    assert_eq!(normalize_class_text(&raw, true), raw, "{raw:?}");
+                    assert_eq!(normalize_class_text(&raw, false), raw, "{raw:?}");
+                }
+                // Next string of this length, odometer order.
+                let Some(i) = digits.iter().rposition(|&d| d + 1 < ALPHABET.len()) else {
+                    break;
+                };
+                digits[i] += 1;
+                digits[i + 1..].fill(0);
+            }
+        }
+    }
 
     /// Every comment emitter in this crate prints a comment as its **whole span**, so the
     /// span must reproduce the delimiters the old per-part spelling assembled by hand:
