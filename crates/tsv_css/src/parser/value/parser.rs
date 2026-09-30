@@ -299,6 +299,12 @@ impl<'a> ValueParser<'a> {
     /// `fast_scan`, whose comma arm splits the elements *inline* — knowing the class in
     /// advance would save that walk only by handing the split back to the two-pass path the
     /// fused one replaced, so the class is derived for all three and spent on two.
+    ///
+    /// The other callers classify an element they have already split:
+    /// [`Self::split_top_level`], whose whitespace elements are separator-free by
+    /// construction, and [`Self::push_comma_segment`], which records its segment's class
+    /// during the fused pass. [`Self::unclassified_path_builds_leaf`] is the claim a
+    /// `Some(None)` from any of them is held to.
     pub(crate) fn parse_classified<'arena>(
         &self,
         arena: &'arena Bump,
@@ -320,22 +326,23 @@ impl<'a> ValueParser<'a> {
             && !is_trim_boundary_ws(first)
             && !is_trim_boundary_ws(last)
         {
-            // The scan's answer, where it has one. `debug_assert` grades it against the
+            // The caller's answer, where it has one. `debug_assert` grades it against the
             // pass it replaces — the strongest oracle available, since it is the very
-            // function whose answer is being reused, and every CSS fixture re-proves it.
-            // Neither arm recurses, so running it twice in debug costs one extra walk.
+            // path whose answer is being skipped, and every CSS fixture re-proves it.
+            // Neither arm recurses, so the check costs a debug build a walk or two of
+            // `text`.
             match class {
                 Some(ValueSeparator::None) => {
                     debug_assert!(
-                        matches!(self.fast_scan(text, arena), FastScan::Leaf),
-                        "boundary scan called {text:?} separator-free, fast_scan disagreed"
+                        self.unclassified_path_builds_leaf(text, arena),
+                        "caller called {text:?} separator-free, the unclassified path disagreed"
                     );
                     return self.build_leaf(text, arena);
                 }
                 Some(ValueSeparator::Whitespace) => {
                     debug_assert!(
                         matches!(self.fast_scan(text, arena), FastScan::Whitespace),
-                        "boundary scan called {text:?} whitespace-separated, fast_scan disagreed"
+                        "caller called {text:?} whitespace-separated, fast_scan disagreed"
                     );
                     return self.parse_space_separated(arena);
                 }
@@ -371,6 +378,28 @@ impl<'a> ValueParser<'a> {
         }
     }
 
+    /// Would the unclassified path build `text` as one leaf? The claim a `Some(None)`
+    /// class makes to [`Self::parse_classified`], stated as the path it skips: `text` is
+    /// the range's own text, its boundary bytes ASCII and not whitespace.
+    ///
+    /// `fast_scan` answers `Leaf`, or `Comment` — it bails on a comment ANYWHERE outside
+    /// quotes, a parenthesized one included, where the two-pass path then trims (a no-op
+    /// on those boundary bytes) and asks `classify_separators`, whose `None` reaches
+    /// `parse_single` and so `build_leaf` over the same text. A whitespace list's element
+    /// takes that second arm whenever a comment sits inside its parens
+    /// (`f(a /* c */ b)`), which the declaration's boundary scan never reports (it
+    /// withholds the class on any comment). The debug-assertion oracle for every caller.
+    fn unclassified_path_builds_leaf(&self, text: &str, arena: &Bump) -> bool {
+        match self.fast_scan(text, arena) {
+            FastScan::Leaf => true,
+            FastScan::Comment => {
+                crate::escapes::trim_css(text).len() == text.len()
+                    && classify_separators(text) == ValueSeparator::None
+            }
+            FastScan::Comma(_) | FastScan::Whitespace => false,
+        }
+    }
+
     /// One fused pass over the (already-trimmed) value `text`, doing the work of
     /// `classify_separators` and the comma arm of `split_top_level` at once:
     ///
@@ -395,8 +424,14 @@ impl<'a> ValueParser<'a> {
 
         let mut values: BumpVec<'arena, CssValue<'arena>> = BumpVec::new_in(arena);
         let mut seg_start = 0usize; // start of the current comma segment
+        // The segment's separator class, recorded in passing so its element need not
+        // re-derive it: `lead_end` is where a top-level whitespace byte would still
+        // extend the segment's leading run (which the element trims off), and
+        // `seg_ws` is the first top-level whitespace byte past that run — inside the
+        // element when it falls before the element's trimmed end, trailing otherwise.
+        let mut lead_end = 0usize;
+        let mut seg_ws = usize::MAX;
         let mut any_comma = false;
-        let mut pushed = false; // any non-empty element emitted (for the leaf guard)
 
         let mut i = 0;
         while i < bytes.len() {
@@ -464,11 +499,20 @@ impl<'a> ValueParser<'a> {
                 b'(' if !in_quote => in_parens += 1,
                 b')' if !in_quote => in_parens = in_parens.saturating_sub(1),
                 b',' if top => {
-                    self.push_comma_segment(&mut values, text, seg_start, i, &mut pushed, arena);
+                    self.push_comma_segment(&mut values, text, seg_start, i, seg_ws, arena);
                     any_comma = true;
                     seg_start = i + 1;
+                    lead_end = i + 1;
+                    seg_ws = usize::MAX;
                 }
-                _ if top && b.is_ascii_whitespace() => ws_seen = true,
+                _ if top && b.is_ascii_whitespace() => {
+                    ws_seen = true;
+                    if i == lead_end {
+                        lead_end = i + 1;
+                    } else {
+                        seg_ws = seg_ws.min(i);
+                    }
+                }
                 _ => {}
             }
 
@@ -476,17 +520,10 @@ impl<'a> ValueParser<'a> {
         }
 
         if any_comma {
-            // Final segment runs to EOF (`ve_raw == text.len()`), which arms the
-            // leaf guard when it is the first non-empty element (a leading-comma
-            // value like `,a b`, matching `split_top_level`).
-            self.push_comma_segment(
-                &mut values,
-                text,
-                seg_start,
-                bytes.len(),
-                &mut pushed,
-                arena,
-            );
+            // Final segment runs to EOF (`ve_raw == text.len()`). Every comma-terminated
+            // segment pushed an element (an empty one the sentinel), so `values` is
+            // non-empty here and the leaf guard cannot arm.
+            self.push_comma_segment(&mut values, text, seg_start, bytes.len(), seg_ws, arena);
             FastScan::Comma(values.into_bump_slice())
         } else if ws_seen {
             FastScan::Whitespace
@@ -500,14 +537,18 @@ impl<'a> ValueParser<'a> {
     /// trailing whitespace, emit an empty element as the empty-identifier sentinel,
     /// and parse the first element that runs to EOF as a single leaf (the progress
     /// guard). `seg_end` is the `ve_raw` position — a comma index, or `text.len()` for
-    /// the final segment.
+    /// the final segment. `seg_ws` is the segment's first top-level whitespace byte past
+    /// its leading run (`usize::MAX` for none), which classifies the element: the segment
+    /// holds no comment (`fast_scan` returns at the first comment, before the segment
+    /// holding it is pushed) and no top-level comma, so a top-level whitespace byte inside
+    /// the element makes it a whitespace list and none makes it a single leaf.
     fn push_comma_segment<'arena>(
         &self,
         values: &mut BumpVec<'arena, CssValue<'arena>>,
         text: &str,
         seg_start: usize,
         seg_end: usize,
-        pushed: &mut bool,
+        seg_ws: usize,
         arena: &'arena Bump,
     ) {
         let seg = &text[seg_start..seg_end];
@@ -535,7 +576,6 @@ impl<'a> ValueParser<'a> {
                 values.push(CssValue::Identifier {
                     span: self.sub_parser(value_start, value_start).absolute_span(),
                 });
-                *pushed = true;
             }
             return;
         }
@@ -545,13 +585,17 @@ impl<'a> ValueParser<'a> {
         // reaches EOF is parsed as a single leaf (the classify/cursor disagreement
         // safety, reachable only via leading delimiters — `fast_scan` never runs on a
         // comment-bearing value).
-        let node = if !*pushed && seg_end == text.len() {
+        let node = if values.is_empty() && seg_end == text.len() {
             sub.parse_single(arena)
         } else {
-            sub.parse(arena)
+            let class = if seg_ws < value_end {
+                ValueSeparator::Whitespace
+            } else {
+                ValueSeparator::None
+            };
+            sub.parse_classified(arena, Some(class))
         };
         values.push(node);
-        *pushed = true;
     }
 
     /// Parse comma-separated values: "a, b, c"
@@ -615,6 +659,13 @@ impl<'a> ValueParser<'a> {
         F: Fn(char) -> bool,
     {
         let comment_is_element = kind == SplitKind::Whitespace;
+        // A whitespace element holds no top-level separator by construction: the walk
+        // below cuts it at every top-level whitespace run and comment boundary, and a
+        // whitespace list holds no top-level comma. So it is parsed with that class
+        // named, and `parse_classified` skips re-deriving it with `fast_scan` — a second
+        // walk of the element's bytes that could only answer `Leaf` (or bail on a
+        // parenthesized comment toward the same leaf).
+        let element_class = comment_is_element.then_some(ValueSeparator::None);
         let text = self.text();
         let bytes = text.as_bytes();
         let mut cursor = ValueCursor::new(text);
@@ -662,7 +713,8 @@ impl<'a> ValueParser<'a> {
                 let parsed = if values.is_empty() && value_end_raw == text.len() {
                     sub_parser.parse_single(arena)
                 } else {
-                    sub_parser.parse(arena) // Recursive, but same source!
+                    // Recursive, but same source!
+                    sub_parser.parse_classified(arena, element_class)
                 };
                 // An operator run is FLATTENED into the list around it, because the
                 // separator rule reads across the element boundary: `1.5 /2.5` is a
@@ -1365,6 +1417,30 @@ mod tests {
         assert_eq!(members.len(), 2);
         assert_eq!(members[0].span().extract(source), "/* ( */");
         assert!(matches!(values[1], CssValue::Identifier { .. }));
+    }
+
+    #[test]
+    fn whitespace_element_with_a_parenthesized_comment_is_one_leaf() {
+        // A whitespace list's element reaches `parse_classified` already classified
+        // separator-free, while `fast_scan` bails on this element's comment though it
+        // sits inside the parens — the case `unclassified_path_builds_leaf` grades (its
+        // `debug_assert` runs here). The element stays one member, its comment inside it.
+        let source = "f(a /* c */ b) x";
+        let span = Span {
+            start: 0,
+            end: source.len() as u32,
+        };
+        let parser = ValueParser::new(source, span);
+
+        let arena = Bump::new();
+        let value = parser.parse(&arena);
+        let CssValue::List { values, .. } = value else {
+            panic!("expected a space-separated list, got {value:?}");
+        };
+        assert_eq!(values.len(), 2);
+        assert_eq!(values[0].span().extract(source), "f(a /* c */ b)");
+        assert!(parser.unclassified_path_builds_leaf("f(a /* c */ b)", &arena));
+        assert_eq!(values[1].span().extract(source), "x");
     }
 
     #[test]
