@@ -117,19 +117,41 @@ const NAME_RUN_ASCII: [bool; 256] = {
 ///
 /// Both needles are ASCII and UTF-8 is self-synchronising — every byte of a multi-byte
 /// character is at or above 0x80 — so a byte scan stops exactly where a character scan stops,
-/// and every stop is a character boundary. The step is an unconditional `+= 1`, which is the
-/// point: a width that depends on the byte's value puts the loop's own cursor downstream of
-/// the load.
+/// and every stop is a character boundary.
+///
+/// The byte at `from` is tested first: the dispatch reaches this through `skip_to_special_char`
+/// with the cursor already on a token's first byte whenever the front handed it on, so the gap
+/// is usually empty there, and two compares retire it where the word hop's entry costs its
+/// constants. Past it the run is text, eight
+/// bytes a word (`tsv_lang::swar::next_byte_of`) — over the whole document, so only the last
+/// word of the file falls to the hop's byte tail.
 #[inline]
 fn special_byte_at_or_after(bytes: &[u8], from: usize) -> usize {
+    match bytes.get(from) {
+        None | Some(b'<' | b'{') => from,
+        Some(_) => tsv_lang::swar::next_byte_of(bytes, from + 1, [b'<', b'{']),
+    }
+}
+
+/// One past the first `-->` at or after `from` — the end of the HTML comment whose body starts
+/// there — or `None` when the comment never closes.
+///
+/// The body is hopped a word at a time to each `-` (`tsv_lang::swar::next_byte_of`), and only
+/// there are the next two bytes asked. Every byte of the needle is ASCII, so — as in
+/// [`special_byte_at_or_after`] — no stop falls inside a character.
+#[inline]
+fn html_comment_end(bytes: &[u8], from: usize) -> Option<usize> {
     let mut i = from;
-    while let Some(&b) = bytes.get(i) {
-        if b == b'<' || b == b'{' {
-            break;
+    loop {
+        i = tsv_lang::swar::next_byte_of(bytes, i, [b'-']);
+        if i >= bytes.len() {
+            return None;
+        }
+        if bytes[i..].starts_with(b"-->") {
+            return Some(i + b"-->".len());
         }
         i += 1;
     }
-    i
 }
 
 /// The ASCII half of [`is_svelte_ws`], one entry per byte: `<TAB>` through `<CR>` and `<SP>`.
@@ -437,8 +459,8 @@ impl<'a> Lexer<'a> {
     }
 
     /// Whether the source from the current position starts with `needle`.
-    /// Used for the ASCII comment delimiters (`<!--` / `-->`); a byte compare is
-    /// exact for ASCII needles and avoids the per-call UTF-8 char counting.
+    /// Used for the ASCII comment opener (`<!--`); a byte compare is exact for ASCII
+    /// needles and avoids the per-call UTF-8 char counting.
     #[inline]
     fn starts_with(&self, needle: &[u8]) -> bool {
         self.source.as_bytes()[self.position..].starts_with(needle)
@@ -521,15 +543,18 @@ impl<'a> Lexer<'a> {
     /// `*dst` is written only on success.
     ///
     /// This is the scan's **front**: it lexes every token whose path makes no call — the gap
-    /// before it (template text up to a `<` or `{`, or an ASCII whitespace run in a tag), end
+    /// before it (an empty one in template mode, or an ASCII whitespace run in a tag), end
     /// of input, the punctuation, a bare `{` and a marker glued to its brace, and a name whose
-    /// run stays ASCII, which together are nearly every token — and hands the rest to a
+    /// run stays ASCII, which together are most tokens — and hands the rest to a
     /// function that finishes the token, entered as the front's last act so the handoff
-    /// compiles to a jump: [`Lexer::string_token_into`] for a quoted value, and
+    /// compiles to a jump: [`Lexer::text_gap_then_token_into`] for template text ahead of the
+    /// token, which hops the text and re-enters the front at its end;
+    /// [`Lexer::string_token_into`] for a quoted value; and
     /// [`Lexer::next_token_dispatch`] for a comment or `<!` declaration, a marker separated
     /// from its brace, an unquoted numeric value, a non-ASCII byte anywhere the front reads
     /// one, and the errors. Each finisher lexes the token from the cursor the front leaves
-    /// it, which is the token's first byte or, in a tag, a non-ASCII byte inside the
+    /// it, which is the token's first byte, a byte inside the template text before it (the
+    /// text finisher's hop finishes that text), or, in a tag, a non-ASCII byte inside the
     /// whitespace gap before it (the dispatch's gap skip finishes that gap). The split is what
     /// keeps the front free of a frame: a function making the scanners' calls saves registers
     /// on entry and restores them at every exit — on every token, the ones that call nothing
@@ -539,10 +564,11 @@ impl<'a> Lexer<'a> {
     /// stay in tail position and return this function's own `Result` (a one-word niche,
     /// returned in a register); a callee that returns anything else puts the call and the
     /// frame back. And the front runs on the caller-saved registers alone, so what it keeps
-    /// live is budgeted too: the quoted value's word loop is a finisher of its own for that
-    /// reason, a marker behind a gap is read by the dispatch rather than here (walking the
-    /// gap kept two registers more live than the front has), and the whitespace and name runs
-    /// are table walks over one cursor ([`ascii_svelte_ws_run_end`], [`ascii_name_run_end`]).
+    /// live is budgeted too: the template text's and the quoted value's word loops are
+    /// finishers of their own for that reason, a marker behind a gap is read by the dispatch
+    /// rather than here (walking the gap kept two registers more live than the front has), and
+    /// the whitespace and name runs are table walks over one cursor
+    /// ([`ascii_svelte_ws_run_end`], [`ascii_name_run_end`]).
     ///
     /// `#[inline(never)]`: small and frame-free, the front would otherwise be a candidate for
     /// inlining into its hot callers — `SvelteParser::advance`, `fill_peek` — and a lexer inlined
@@ -560,9 +586,13 @@ impl<'a> Lexer<'a> {
             // token's first byte, which hands it on, and the dispatch's own gap skip finishes
             // the gap from it.
             i = ascii_svelte_ws_run_end(bytes, i);
-        } else {
-            // Template mode: text content is a gap (`skip_to_special_char`).
-            i = special_byte_at_or_after(bytes, i);
+        } else if !matches!(bytes.get(i), None | Some(b'<' | b'{')) {
+            // Template mode, and text before the next token: the gap `skip_to_special_char`
+            // skips, hopped out of line (`text_gap_then_token_into`). A token with text before
+            // it — most template tokens, formatted markup putting a newline and indent between
+            // them — hops the text out of line; one with none never leaves the front.
+            self.position = i + 1;
+            return self.text_gap_then_token_into(dst);
         }
 
         let start = i;
@@ -668,6 +698,22 @@ impl<'a> Lexer<'a> {
         Ok(())
     }
 
+    /// Skip the template text from the cursor — a byte past the first byte of the gap the front
+    /// ([`Lexer::next_token_into`]) found — to the next `<` or `{`, then lex the token there
+    /// into `*dst` by re-entering the front, which finds the gap empty.
+    ///
+    /// The text is hopped eight bytes a word (`tsv_lang::swar::next_byte_of`), whose constants
+    /// and cursors are more than the front can hold on the caller-saved registers, so the hop
+    /// lives here and the front enters it in tail position, as this function re-enters the
+    /// front: each handoff compiles to a jump, and only a token with text before it pays this
+    /// function's register saves.
+    #[inline(never)]
+    fn text_gap_then_token_into(&mut self, dst: &mut Token) -> Result<(), ParseError> {
+        self.position =
+            tsv_lang::swar::next_byte_of(self.source.as_bytes(), self.position, [b'<', b'{']);
+        self.next_token_into(dst)
+    }
+
     /// Lex the quoted attribute value whose opening quote is at the cursor into `*dst` — a
     /// String token, from the quote through the closing one.
     ///
@@ -749,21 +795,11 @@ impl<'a> Lexer<'a> {
             Some(b'<') => {
                 // Check for HTML comment: <!--
                 if self.starts_with(b"<!--") {
-                    self.position += b"<!--".len();
-
-                    // Scan until "-->". An ASCII needle again, so the scan steps a byte at
-                    // a time and still cannot stop inside a character.
-                    loop {
-                        if self.position >= self.source.len() {
-                            // Unterminated comment
-                            return Err(lex_err("Unterminated HTML comment", start));
-                        }
-                        if self.starts_with(b"-->") {
-                            self.position += b"-->".len();
-                            break;
-                        }
-                        self.position += 1;
-                    }
+                    let Some(end) = html_comment_end(self.source.as_bytes(), start + b"<!--".len())
+                    else {
+                        return Err(lex_err("Unterminated HTML comment", start));
+                    };
+                    self.position = end;
                     TokenKind::Comment
                 } else {
                     self.inside_tag = true; // Enter tag mode
@@ -912,7 +948,10 @@ impl<'a> Lexer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Lexer, ParseError, Token, TokenKind, char_at, is_svelte_ws};
+    use super::{
+        Lexer, ParseError, Token, TokenKind, char_at, html_comment_end, is_svelte_ws, lex_err,
+        special_byte_at_or_after,
+    };
 
     /// The brace-free fact [`Lexer::string_holds_no_brace`] answers: asked right after each
     /// String, it holds for the brace-free values and not for the one holding an expression
@@ -1149,6 +1188,167 @@ mod tests {
                 1 + name.len(),
                 "model: {source:?}"
             );
+        }
+    }
+
+    /// Every character boundary of `source`, its end included.
+    fn boundaries(source: &str) -> Vec<usize> {
+        (0..=source.len())
+            .filter(|&i| source.is_char_boundary(i))
+            .collect()
+    }
+
+    /// Text runs around the word hop's edges — every length from empty past two words — over
+    /// backgrounds of one-, two-, three- and four-byte characters and of the ASCII bytes the
+    /// lexer reads in template mode's neighbourhood (`}`, `>`, `-`, a newline), each run
+    /// followed by nothing (end of input), by a `<` or by a `{`.
+    fn text_run_sources() -> Vec<String> {
+        let mut sources = Vec::new();
+        for background in ["a", "é", "€", "\u{1f600}", "}", ">", "-", "\n", "\0"] {
+            for len in 0..=18 {
+                let run = background.repeat(len);
+                for tail in ["", "<", "{", "<{", "{<", "}"] {
+                    sources.push(format!("{run}{tail}"));
+                    sources.push(format!("{run}{tail}{run}"));
+                }
+            }
+        }
+        sources
+    }
+
+    /// [`special_byte_at_or_after`] against a plain byte loop, from every character boundary
+    /// of every text-run source ([`text_run_sources`]) — so every distance to the next `<` or
+    /// `{`, and to the end of input, on both sides of each word boundary.
+    #[test]
+    fn special_byte_at_or_after_matches_a_scalar_scan() {
+        fn scalar(bytes: &[u8], from: usize) -> usize {
+            let mut i = from;
+            while i < bytes.len() && !matches!(bytes[i], b'<' | b'{') {
+                i += 1;
+            }
+            i
+        }
+        for source in text_run_sources() {
+            let bytes = source.as_bytes();
+            for from in boundaries(&source) {
+                assert_eq!(
+                    special_byte_at_or_after(bytes, from),
+                    scalar(bytes, from),
+                    "{source:?} from {from}"
+                );
+            }
+        }
+    }
+
+    /// The template-mode token stream over text runs: through the front (which hops a
+    /// non-empty run out of line and re-enters) and through the dispatch alone, each token
+    /// starts at the first `<` or `{` the plain byte loop finds from the previous token's
+    /// end, and the stream ends in the empty `Eof` at the end of input. The sources hold
+    /// only text and `{`, so every token is a template-mode one.
+    #[test]
+    fn template_text_tokens_start_at_the_next_special_byte() {
+        for source in text_run_sources() {
+            if source.contains('<') {
+                continue;
+            }
+            let bytes = source.as_bytes();
+            let mut expected = Vec::new();
+            let mut i = 0;
+            loop {
+                while i < bytes.len() && bytes[i] != b'{' {
+                    i += 1;
+                }
+                if i == bytes.len() {
+                    expected.push((TokenKind::Eof, i, i));
+                    break;
+                }
+                expected.push((TokenKind::LeftBrace, i, i + 1));
+                i += 1;
+            }
+            for front in [true, false] {
+                let got: Vec<_> = lex_all(&source, front)
+                    .into_iter()
+                    .map(|step| {
+                        let (kind, start, end, ..) = step.unwrap();
+                        (kind, start as usize, end as usize)
+                    })
+                    .collect();
+                assert_eq!(got, expected, "{source:?} (front: {front})");
+            }
+        }
+    }
+
+    /// [`html_comment_end`] against a plain search for `-->`, over comment bodies built from
+    /// the fragments a `-`-hop could misread — lone and doubled dashes, a `->` and a `>`
+    /// with no dashes before them, the closer itself, non-ASCII characters — padded to put
+    /// each fragment on either side of a word boundary, from every character boundary.
+    /// Then the lexer: `<!--` followed by each body is one Comment token ending one past the
+    /// first `-->`, or the unterminated-comment error at the `<`, through the front and the
+    /// dispatch alike.
+    #[test]
+    fn html_comment_end_matches_a_scalar_search() {
+        fn scalar(bytes: &[u8], from: usize) -> Option<usize> {
+            bytes[from..]
+                .windows(3)
+                .position(|w| w == b"-->")
+                .map(|at| from + at + 3)
+        }
+        let fragments = [
+            "",
+            "-",
+            "--",
+            "->",
+            ">",
+            "-->",
+            "--->",
+            "a",
+            "é",
+            "<",
+            "\u{1f600}",
+        ];
+        let mut bodies = Vec::new();
+        for pad in [0, 1, 5, 6, 7, 8, 9, 13, 14, 15, 16, 17] {
+            for padding in ["a", "é", "-"] {
+                let lead = padding.repeat(pad);
+                for a in fragments {
+                    for b in fragments {
+                        for c in ["", "-", "-->", "a"] {
+                            bodies.push(format!("{lead}{a}{b}{c}"));
+                        }
+                    }
+                }
+            }
+        }
+        for body in &bodies {
+            let bytes = body.as_bytes();
+            for from in boundaries(body) {
+                assert_eq!(
+                    html_comment_end(bytes, from),
+                    scalar(bytes, from),
+                    "{body:?} from {from}"
+                );
+            }
+            for prefix in ["", "x", "<p>"] {
+                let source = format!("{prefix}<!--{body}");
+                let start = prefix.len();
+                let expected = scalar(source.as_bytes(), start + 4)
+                    .ok_or_else(|| lex_err("Unterminated HTML comment", start));
+                for front in [true, false] {
+                    let steps = lex_all(&source, front);
+                    let got = steps
+                        .iter()
+                        .find_map(|step| match step {
+                            Ok((TokenKind::Comment, s, e, ..)) => {
+                                assert_eq!(*s as usize, start, "{source:?}");
+                                Some(Ok(*e as usize))
+                            }
+                            Err(err) => Some(Err(err.clone())),
+                            Ok(_) => None,
+                        })
+                        .expect("a comment or an error");
+                    assert_eq!(got, expected, "{source:?} (front: {front})");
+                }
+            }
         }
     }
 }
