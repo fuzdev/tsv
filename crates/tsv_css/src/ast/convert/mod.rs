@@ -356,10 +356,35 @@ pub(super) fn selector_contains_invalid(complex: &internal::ComplexSelector<'_>)
 /// decoded backslash (`\5c`), which is spelled `\\` — while identity escapes (`\?`)
 /// keep the backslash. The internal AST stores the fully
 /// decoded spec form; this reconstructs Svelte's public form at the boundary.
+///
+/// Every selector, at-rule and attribute name the wire writes comes through here, and
+/// almost none holds an escape — so the common answer is asked of the **host** before the
+/// name is ever sliced: [`tsv_lang::swar::next_byte_below_or_of`] reads the document a
+/// word at a time over `[start, end)` and reports the first `\` or non-ASCII byte, and a
+/// name with neither is its own source slice, borrowed. A name that holds either goes to
+/// [`raw_selector_name_decode`], which asks the exact question (a non-ASCII name with no
+/// `\` is still borrowed there).
 pub(super) fn raw_selector_name(source: &str, span: Span, prefix_len: usize) -> Cow<'_, str> {
+    let (start, end) = (span.start as usize + prefix_len, span.end as usize);
+    if end <= source.len()
+        && tsv_lang::swar::next_byte_below_or_of(source.as_bytes(), start, end, 0, [b'\\']) == end
+    {
+        // No `\` and no byte at or above `0x80` in `[start, end)`: both ends sit on ASCII
+        // bytes or the document's end, so the slice is on char boundaries.
+        return Cow::Borrowed(&source[start..end]);
+    }
+    raw_selector_name_decode(source, span, prefix_len)
+}
+
+/// [`raw_selector_name`]'s arm for a name the host-word test did not clear — one holding a
+/// `\` or a non-ASCII byte. Outlined and cold so the host-word test is all that inlines
+/// where a writer asks for a name.
+#[cold]
+#[inline(never)]
+fn raw_selector_name_decode(source: &str, span: Span, prefix_len: usize) -> Cow<'_, str> {
     let raw = &source[span.start as usize + prefix_len..span.end as usize];
-    // Fast path: no backslash means no escapes to decode, so the name is the raw
-    // source slice verbatim — borrowed, no allocation. (The vast majority of names.)
+    // No backslash means no escapes to decode, so the name is the raw source slice
+    // verbatim — borrowed, no allocation (a non-ASCII name the host-word test refused).
     if !raw.contains('\\') {
         return Cow::Borrowed(raw);
     }
