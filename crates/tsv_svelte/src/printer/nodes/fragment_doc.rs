@@ -662,9 +662,24 @@ impl<'a> Printer<'a> {
     /// licenses — see [`internal::FragmentNode::is_hoisted_from_fragment`].
     ///
     /// See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
+    ///
+    /// A tag test ahead of a tail call, the glue question behind it in its own cold frame:
+    /// almost every node asked is not a declaration, and that answer then needs no register
+    /// saved, where the whole predicate in one body saved and restored callee-saved
+    /// registers to give it. Out of line on purpose — inlined, the head's conditional call
+    /// grew `build_nodes_doc_trimmed`'s frame, which is on the element-nesting recursion
+    /// path.
+    #[inline(never)]
     pub(super) fn is_own_line_declaration(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
-        nodes[i].is_declaration()
-            && !(self.glued_to_content(nodes, i, true) && self.glued_to_content(nodes, i, false))
+        nodes[i].is_declaration() && self.declaration_owns_its_line(nodes, i)
+    }
+
+    /// [`Self::is_own_line_declaration`]'s second half, for a declaration at `i`: whether it is
+    /// NOT glued to content on both sides.
+    #[cold]
+    #[inline(never)]
+    fn declaration_owns_its_line(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+        !(self.glued_to_content(nodes, i, true) && self.glued_to_content(nodes, i, false))
     }
 
     /// Whether the **whitespace-only separator** at `i` is a render-free *hoisted edge run* that
