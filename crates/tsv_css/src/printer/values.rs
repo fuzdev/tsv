@@ -319,6 +319,27 @@ impl<'a> Printer<'a> {
         self.print_css_value(value);
     }
 
+    /// Emit a value leaf that prints as its own source slice, for a caller that has
+    /// already PROVED the slice holds no byte the width depends on — no `\t`, no `\n`,
+    /// nothing at or above `0x80` — so its width is its byte length and
+    /// `DocArena::source_span_plain` need not measure it. Every caller knows it from a
+    /// fact it already had: a test it ran for its own reasons, or the leaf's grammar.
+    ///
+    /// ⚠️ **A wrong claim is a SILENT width error** — nothing downstream re-derives the
+    /// width, so it moves a fits verdict and changes no other observable. Every claim is
+    /// therefore graded against the slice's own bytes in every debug build.
+    fn plain_span_doc(&self, span: Span) -> DocId {
+        debug_assert!(
+            !span
+                .extract(self.source)
+                .bytes()
+                .any(tsv_lang::printing::is_width_relevant),
+            "a CSS leaf claimed plain holds a width-relevant byte: {:?}",
+            span.extract(self.source)
+        );
+        self.d().source_span_plain(span)
+    }
+
     //
     // Doc Builders - all formatting logic expressed as doc IR
     //
@@ -351,7 +372,8 @@ impl<'a> Printer<'a> {
             CssValue::Identifier { span } => self.build_identifier_doc(*span),
             // The operator's single byte, verbatim. Whether a space stands beside it is
             // the enclosing list's question, never this node's (`value_gap_is_glued`).
-            CssValue::Operator { span } => self.d().source_span(*span, self.source),
+            // The byte is one of `ValueOperator`'s ASCII spellings, so its width is 1.
+            CssValue::Operator { span } => self.plain_span_doc(*span),
             CssValue::String { content, span } => self.build_string_doc(content, *span),
             CssValue::Dimension { span } => self.build_dimension_doc(*span),
             CssValue::Color { color, span } => self.build_color_doc(color, *span),
@@ -405,8 +427,11 @@ impl<'a> Printer<'a> {
                 // corpus — is emitted as a zero-allocation `DocText::SourceSpan` (the same
                 // source borrow the number / dimension normalizers take) without the
                 // normalizer's own byte-at-a-time scan-skip test over the bare slice.
+                //
+                // The same test is the width proof: a no-op byte is ASCII and none of `\t` /
+                // `\n`, so the slice is one column a byte and is not measured again.
                 if value_normalization::normalize_is_noop_in(self.source, span) {
-                    return d.source_span(span, self.source);
+                    return self.plain_span_doc(span);
                 }
                 // Normalize whitespace for parenthesized expressions
                 // (e.g., "(  100%  -  40px  )" → "(100% - 40px)").
@@ -465,10 +490,22 @@ impl<'a> Printer<'a> {
     /// dimension (`10px`, `0.5rem`) borrows its source slice, so it emits a
     /// zero-allocation `source_span`; only a rewritten dimension allocates.
     /// Mirrors the TS literal path (`Printer::build_number_literal_doc`).
+    ///
+    /// The number half is ASCII by grammar, but the unit is an identifier, and an
+    /// identifier can carry a non-ASCII code point or a hex escape's `\t` / `\n`
+    /// terminator — so the slice's width is asked of its bytes here, a few of them
+    /// (`px`, `rem`, `%`), in line rather than through `DocArena::source_span`'s
+    /// outlined measure.
     fn build_dimension_doc(&self, span: Span) -> DocId {
         let raw = span.extract(self.source);
         match value_normalization::normalize_dimension_from_source(raw) {
-            Cow::Borrowed(_) => self.d().source_span(span, self.source),
+            Cow::Borrowed(_) => {
+                if raw.bytes().any(tsv_lang::printing::is_width_relevant) {
+                    self.d().source_span(span, self.source)
+                } else {
+                    self.plain_span_doc(span)
+                }
+            }
             Cow::Owned(s) => self.d().text_pooled(&s),
         }
     }
@@ -476,12 +513,21 @@ impl<'a> Printer<'a> {
     /// Build a doc for a color value
     ///
     /// Preserves color syntax (hex, rgb, hsl, etc.) from source.
+    ///
+    /// Kept out of line on purpose: inlined, the colour-function reconstruction lands in
+    /// [`Self::build_css_value_doc_in`]'s frame, which the value recursion re-enters at
+    /// every nested function (`calc(` inside `calc(`), and that frame is measurably
+    /// larger for it — for a leaf most values never reach.
+    #[inline(never)]
     fn build_color_doc(&self, color: &Color, span: Span) -> DocId {
-        // A verbatim named color comes back `Cow::Borrowed` (== source[span]) and is
-        // emitted as a zero-allocation `DocText::SourceSpan`, like the identifier /
-        // dimension paths; hex and function syntaxes own their reconstructed text.
+        // A verbatim named color, and a hex color already in lowercase, come back
+        // `Cow::Borrowed` (== source[span]) and are emitted as a zero-allocation
+        // `DocText::SourceSpan`, like the identifier / dimension paths; the function
+        // syntaxes own their reconstructed text. Both borrowed forms are ASCII by grammar —
+        // a named color is a run of letters (`is_named_color`), a hex color `#` and hex
+        // digits — so the slice is one column a byte and is not measured.
         match value_normalization::format_color_from_source(color, self.source, span) {
-            Cow::Borrowed(_) => self.d().source_span(span, self.source),
+            Cow::Borrowed(_) => self.plain_span_doc(span),
             Cow::Owned(s) => self.d().text_pooled(&s),
         }
     }

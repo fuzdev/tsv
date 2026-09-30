@@ -2402,6 +2402,10 @@ impl DocArena {
     /// width class out of that one pass for the price of one more lane kernel. Both
     /// arrive through `Printer::verbatim_literal_doc`.
     ///
+    /// The CSS printer's value leaves are a third class: an identifier its normalization
+    /// pass proved free of any byte below `!` or above `~`, an operator, a unit it scanned,
+    /// and a named or hex color, ASCII letters and digits by grammar.
+    ///
     /// ⚠️ **A wrong claim here is a SILENT width error.** Nothing downstream re-derives
     /// the width, so an over-claiming caller shifts a fits verdict and changes no other
     /// observable — invisible to a byte-identity sweep on any corpus whose names are
