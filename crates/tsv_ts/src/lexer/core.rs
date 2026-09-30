@@ -4,7 +4,7 @@ use super::comments;
 use super::escapes;
 use super::ident::{is_id_continue, is_id_start};
 use super::lex_err;
-use super::token::{Token, TokenKind, keyword_at};
+use super::token::{Token, TokenKind, WordLookup, keyword_at, keyword_at_in_word};
 use tsv_lang::ParseError;
 
 /// The one message for a `NumericLiteralSeparator` inside a leading-zero literal —
@@ -64,6 +64,17 @@ const fn is_ascii_id_start(b: u8) -> bool {
 #[inline]
 const fn is_ascii_id_continue(b: u8) -> bool {
     ID_CONTINUE_LUT[b as usize]
+}
+
+/// The end of the ASCII `IdentifierPart` run (`[a-zA-Z0-9_$]`) of the identifier whose
+/// ASCII `IdentifierStart` byte is `bytes[start]` — the first byte past it that is not one.
+#[inline]
+fn ascii_id_run_end(bytes: &[u8], start: usize) -> usize {
+    let mut end = start + 1;
+    while end < bytes.len() && is_ascii_id_continue(bytes[end]) {
+        end += 1;
+    }
+    end
 }
 
 /// The byte length of the `UnicodeEscapeSequence` beginning at `bytes[pos]`, or `0` when none
@@ -198,7 +209,8 @@ pub struct Lexer<'a> {
     template_depth: u32,
     /// True if a line terminator was encountered while skipping whitespace to reach
     /// the current token. Used for Automatic Semicolon Insertion (ASI).
-    /// Reset at start of skip_whitespace(), set when line terminators are found.
+    /// Reset once per token by `next_token_into`, set by the whitespace run ahead of it when
+    /// line terminators are found.
     had_line_terminator: bool,
     /// Out-of-band decoded value for the token just produced — populated only on the
     /// rare escape path (strings/templates with escapes, escaped identifiers). Kept
@@ -209,7 +221,7 @@ pub struct Lexer<'a> {
     /// per-literal `String` allocates — the escaped-string decode churn a fresh
     /// `String` (plus its `Box`) produced per token is gone. `has_decoded` is the
     /// presence flag `decoded_str` reads; it is cleared at the top of every
-    /// token-producing entry point (`next_token_into_local`, `continue_template_from_brace`,
+    /// token-producing entry point (`next_token_into`, `continue_template_from_brace`,
     /// `read_regex_literal`) so it reflects only the current token, and set by the
     /// escape paths. The scratch is never read while `has_decoded` is false, so its
     /// stale contents are inert.
@@ -337,14 +349,15 @@ pub(crate) fn is_es_line_terminator_at(bytes: &[u8], pos: usize) -> bool {
 /// a test beside them.
 pub(crate) const ES_LINE_TERMINATOR_LEADS: [u8; 3] = [b'\n', b'\r', 0xE2];
 
-/// [`Lexer::skip_whitespace`] from the non-ASCII byte at `pos` of `source` on: every
+/// The whitespace run ahead of a token, from the non-ASCII byte at `pos` of `source` on
+/// ([`Lexer::skip_ascii_whitespace`] took the ASCII part before it): every
 /// character is decoded and classified against the Unicode rules — LS / PS are the
 /// non-ASCII LineTerminators, NBSP / U+FEFF / the `Zs` spaces the non-ASCII WhiteSpace —
 /// until one is neither. Returns where that character starts and whether a LineTerminator
 /// was crossed on the way.
 ///
 /// A free function over the source rather than a `&mut self` method, so the call cannot
-/// write the lexer as far as the optimizer knows and the handoff keeps its slice and
+/// write the lexer as far as the optimizer knows and the caller keeps its slice and
 /// cursor across it; the caller records the crossing.
 #[cold]
 #[inline(never)]
@@ -543,11 +556,12 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// Advance the cursor past the ASCII byte under it — the dispatch's form of
-    /// [`Lexer::advance`], for a byte it has already matched. The dispatch matches the byte
-    /// [`Lexer::skip_whitespace`] handed it, not one it read through `self`, so `advance`'s
-    /// own read of the byte would no longer fold into the match: every punctuator would
-    /// re-read it and decode the length of a UTF-8 sequence it knows is one byte.
+    /// Advance the cursor past the ASCII byte under it — the front's form of
+    /// [`Lexer::advance`], for a byte it has already matched. The front matches the byte
+    /// [`Lexer::skip_ascii_whitespace`] handed it, not one it read through `self`, so
+    /// `advance`'s own read of the byte would no longer fold into the match: every
+    /// punctuator would re-read it and decode the length of a UTF-8 sequence it knows is
+    /// one byte.
     #[inline]
     fn advance_ascii(&mut self) {
         debug_assert!(self.bytes[self.position].is_ascii());
@@ -565,46 +579,101 @@ impl<'a> Lexer<'a> {
     }
 
     /// Lex the identifier-or-keyword token opened by the ASCII `IdentifierStart` byte at
-    /// `start` (`a-z A-Z _ $`) into `*dst` — the whole path of the common identifier.
+    /// `start` (`a-z A-Z _ $`) into `*dst` — the front's path for the common identifier.
     ///
     /// A table walk takes the ASCII `IdentifierPart` run (`[a-zA-Z0-9_$]`); its stop byte
     /// then settles the name: at end of input, or on an ASCII byte other than `\`, the
-    /// name ends at the run, escape-free (nothing to decode — the dispatch cleared
-    /// `has_decoded` before it got here), and one keyword lookup over its bytes gives the
-    /// kind. Only a `\` or a non-ASCII byte can continue it, and those go to the cold
-    /// [`Lexer::continue_ascii_identifier_into`]; when that byte turns out not to continue
-    /// the name either (`if\x`, `return` + NBSP), the name is still the ASCII run and is
-    /// finished here, keyword lookup included — so the reserved-word compare tree is
-    /// reached from this one place, and inlines into the dispatch with the
-    /// letter-and-length pre-filter. (Outlining the compare tree behind the inline
-    /// pre-filter measured slower: the pre-filter admits most names, and each admitted
-    /// name then paid a call.) The path relies on the plain `#[inline]` being honored:
-    /// it inlines into the dispatch, and a call here is the first thing to check if the
-    /// dispatch grows.
+    /// name ends at the run, escape-free (nothing to decode — [`Lexer::next_token_into`]
+    /// cleared `has_decoded`), and one keyword lookup over its bytes gives the
+    /// kind. The lookup is [`keyword_at_in_word`], the form that inlines with no call and
+    /// no loop: the letter-and-length pre-filter, then the compare tree over a key read in
+    /// one load. (Outlining the compare tree behind the inline pre-filter measured slower:
+    /// the pre-filter admits most names, and each admitted name then paid a call.)
     ///
-    /// `bytes` is the slice [`Lexer::skip_whitespace`] read the start byte from, passed
-    /// down rather than re-read from `self` so the run is walked against the same length
-    /// the handoff checked.
+    /// What the front cannot settle it hands to [`Lexer::next_token_dispatch_at`], which
+    /// lexes the name again from `start` ([`Lexer::finish_ascii_identifier_into`]): a `\`
+    /// or non-ASCII stop byte, which may continue the name, and a name whose keyword key
+    /// takes a byte loop to build (9 or 10 bytes and admitted by the pre-filter, or within
+    /// 8 bytes of the end of input). Re-walking a run that rare costs less than a handoff
+    /// that carries the run's end, which would be a call to a function that always
+    /// succeeds — and the optimizer, seeing that, computes the `Ok` in the front instead
+    /// of jumping, which puts the call and the frame back.
+    ///
+    /// `bytes` is the slice [`Lexer::skip_ascii_whitespace`] read the start byte from,
+    /// passed down rather than re-read from `self` so the run is walked against the same
+    /// length the handoff checked.
     #[inline]
-    fn scan_ascii_identifier_into(&mut self, bytes: &'a [u8], start: usize, dst: &mut Token) {
+    fn scan_ascii_identifier_into(
+        &mut self,
+        bytes: &'a [u8],
+        start: usize,
+        dst: &mut Token,
+    ) -> Result<(), ParseError> {
         // An index, not a `get`: the handoff proved `start` in bounds where the run's trip
         // count below cannot see it, and without the proof the run takes an extra
-        // instruction a byte and the keyword pre-filter re-checks its read of
-        // `bytes[start]`. The index restates it once, ahead of both.
+        // instruction a byte. The index restates it once, ahead of the run.
         let first = bytes[start];
         debug_assert!(is_ascii_id_start(first));
-        let mut end = start + 1;
-        while end < bytes.len() && is_ascii_id_continue(bytes[end]) {
-            end += 1;
-        }
+        let end = ascii_id_run_end(bytes, start);
+        let lookup = match bytes.get(end) {
+            Some(&stop) if stop >= 0x80 || stop == b'\\' => WordLookup::Deferred,
+            _ => keyword_at_in_word(bytes, start, end - start),
+        };
+        let WordLookup::Settled(keyword) = lookup else {
+            return self.next_token_dispatch_at(start, dst);
+        };
+        self.position = end;
+        *dst = Token {
+            kind: match keyword {
+                Some(kw) => TokenKind::Keyword(kw),
+                None => TokenKind::Identifier,
+            },
+            start: start as u32,
+            end: end as u32,
+        };
+        Ok(())
+    }
+
+    /// [`Lexer::next_token_dispatch`] entered with the cursor alone — the identifier front's
+    /// handoff for a name it cannot settle. Re-reading the slice and the first byte here
+    /// rather than passing them frees the three registers the front would otherwise hold
+    /// across its identifier run and keyword compare — more than the caller-saved set has
+    /// left there, so they would take callee-saved ones, and the front a frame.
+    #[cold]
+    #[inline(never)]
+    fn next_token_dispatch_at(&mut self, start: usize, dst: &mut Token) -> Result<(), ParseError> {
+        let bytes = self.bytes;
+        self.next_token_dispatch(bytes, start, bytes[start], dst)
+    }
+
+    /// The general reader for an identifier opened by an ASCII `IdentifierStart` byte,
+    /// whose ASCII run is `start..end` — every such name [`Lexer::scan_ascii_identifier_into`]
+    /// does not settle. When the run's stop byte is a `\` or a non-ASCII byte that
+    /// continues the name (a unicode escape decoding to an `IdentifierPart`, or a non-ASCII
+    /// `IdentifierPart` char), the rest of it is read through
+    /// [`Lexer::scan_identifier_tail`] and the token written by
+    /// [`Lexer::finish_general_identifier_into`]; otherwise the name is the ASCII run
+    /// (`if\x`, `return` + NBSP), and is finished here with the full [`keyword_at`].
+    #[cold]
+    #[inline(never)]
+    fn finish_ascii_identifier_into(
+        &mut self,
+        bytes: &'a [u8],
+        start: usize,
+        end: usize,
+        dst: &mut Token,
+    ) {
+        self.set_position(end);
         if bytes
             .get(end)
             .is_some_and(|&stop| stop >= 0x80 || stop == b'\\')
-            && self.continue_ascii_identifier_into(start, end, dst)
         {
-            return;
+            let decoded = self.scan_identifier_tail(start, None);
+            if self.position != end {
+                self.finish_general_identifier_into(start, decoded, dst);
+                return;
+            }
         }
-        self.position = end;
         *dst = Token {
             kind: match keyword_at(bytes, start, end - start) {
                 Some(kw) => TokenKind::Keyword(kw),
@@ -613,30 +682,6 @@ impl<'a> Lexer<'a> {
             start: start as u32,
             end: end as u32,
         };
-    }
-
-    /// [`Lexer::scan_ascii_identifier_into`]'s general reader, for an ASCII run
-    /// `start..end` whose stop byte is a `\` or a non-ASCII byte. When that byte continues
-    /// the name (a unicode escape decoding to an `IdentifierPart`, or a non-ASCII
-    /// `IdentifierPart` char), reads the rest of it through
-    /// [`Lexer::scan_identifier_tail`], writes the token and returns `true`; otherwise
-    /// returns `false` with the cursor at `end`, leaving the caller to finish the ASCII
-    /// name.
-    #[cold]
-    #[inline(never)]
-    fn continue_ascii_identifier_into(
-        &mut self,
-        start: usize,
-        end: usize,
-        dst: &mut Token,
-    ) -> bool {
-        self.set_position(end);
-        let decoded = self.scan_identifier_tail(start, None);
-        if self.position == end {
-            return false;
-        }
-        self.finish_general_identifier_into(start, decoded, dst);
-        true
     }
 
     /// Scan an identifier that begins with a unicode escape or a non-ASCII
@@ -770,8 +815,8 @@ impl<'a> Lexer<'a> {
         dst: &mut Token,
     ) {
         // Escaped identifiers are near-zero in real code; funnel the rare local
-        // buffer into the parked scratch so `decoded_str` reads it uniformly. The
-        // dispatch cleared `has_decoded` for the escape-free name.
+        // buffer into the parked scratch so `decoded_str` reads it uniformly.
+        // `next_token_into` cleared `has_decoded` for the escape-free name.
         if let Some(s) = decoded {
             self.decode_scratch.clear();
             self.decode_scratch.push_str(&s);
@@ -1112,23 +1157,28 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// Skip the WhiteSpace and LineTerminators ahead of the next token, recording in
+    /// Skip the ASCII WhiteSpace and LineTerminators ahead of the next token, recording in
     /// `had_line_terminator` whether a LineTerminator was among them, and hand back the
-    /// byte the token starts with (`None` at end of input), the cursor left on it.
+    /// byte the run stopped on (`None` at end of input), the cursor left on it. The flag is
+    /// set here and by [`Lexer::next_token_after_non_ascii`], and neither clears it —
+    /// [`Lexer::next_token_into`] does, once per token, because the run can reach the front
+    /// in two pieces.
     ///
     /// The run is ASCII on essentially every token, and empty on most, so it walks a local
-    /// cursor that is stored once and hands the dispatch the stop byte it already holds
+    /// cursor that is stored once and hands the front the stop byte it already holds
     /// rather than have it load the byte again. `<CR><LF>` needs no pairing here: each of
-    /// the two is a LineTerminator, and each sets the one flag. A non-ASCII byte — NBSP,
-    /// U+FEFF, a `Zs` space, LS / PS, or the first byte of the token itself — goes to the
-    /// cold [`skip_whitespace_general`], so the hot loop keeps nothing live for a decode.
+    /// the two is a LineTerminator, and each sets the one flag. A non-ASCII stop byte —
+    /// NBSP, U+FEFF, a `Zs` space, LS / PS, or the first byte of the token itself — is
+    /// handed back like any other, and the front sends it to the cold
+    /// [`Lexer::next_token_after_non_ascii`], which finishes the run through
+    /// [`skip_whitespace_general`]; so the hot loop keeps nothing live for a decode and
+    /// makes no call.
     ///
     /// Taking the byte from here rather than reading it again has two consumers that must
-    /// know it: the dispatch's arms step over it with [`Lexer::advance_ascii`], and the
+    /// know it: the front's arms step over it with [`Lexer::advance_ascii`], and the
     /// identifier arm restates the bound (see [`Lexer::scan_ascii_identifier_into`]).
     #[inline]
-    fn skip_whitespace(&mut self, bytes: &'a [u8]) -> Option<u8> {
-        self.had_line_terminator = false;
+    fn skip_ascii_whitespace(&mut self, bytes: &'a [u8]) -> Option<u8> {
         let mut pos = self.position;
         while let Some(&b) = bytes.get(pos) {
             match b {
@@ -1136,15 +1186,8 @@ impl<'a> Lexer<'a> {
                 b' ' | b'\t' | 0x0B | 0x0C => {}
                 // LF / CR — the ASCII LineTerminators (ES spec 12.3)
                 b'\n' | b'\r' => self.had_line_terminator = true,
-                0x80.. => {
-                    let (end, crossed) = skip_whitespace_general(self.source, pos);
-                    if crossed {
-                        self.had_line_terminator = true;
-                    }
-                    self.position = end;
-                    return bytes.get(end).copied();
-                }
-                // Any other ASCII byte is not whitespace — the token starts here.
+                // Anything else ends the ASCII run: the token starts here, or a non-ASCII
+                // byte the front hands to the general reader.
                 _ => {
                     self.position = pos;
                     return Some(b);
@@ -1161,57 +1204,79 @@ impl<'a> Lexer<'a> {
     /// `Result<Token, ParseError>` elides the round trip the by-value return
     /// makes through the caller's frame (the intermediate `Token` built,
     /// returned through a slot, then reloaded and re-scattered into the
-    /// parser's field). The match yields a `Token` value only for the short
-    /// punctuation/operator paths, whose kinds carry no payload; the
-    /// identifier/number/string/template/comment/hashbang scanners and the error
-    /// paths write `dst` (or propagate the error) via an early `return`. A payload
-    /// kind yielded by the match is not free even where it is rare: the arms merge
-    /// into one value, so every punctuation token then copies the payload bytes
-    /// through the merged stack temporary into `dst`. [`Lexer::next_token`] is the
-    /// thin by-value wrapper every other caller takes.
+    /// parser's field). [`Lexer::next_token`] is the thin by-value wrapper every
+    /// other caller takes.
+    ///
+    /// The per-token flags are cleared here, ahead of the scan: `has_decoded`, so
+    /// `decoded_str` reflects only the token this call produces (the escape paths set
+    /// it), and `had_line_terminator`, which the whitespace run ahead of the token sets.
     ///
     /// The error path is lifted into host coordinates here, at the producer
     /// ([`Lexer::host_err`]); the scan itself works in — and reports in — the lexer's own.
     #[inline]
     pub fn next_token_into(&mut self, dst: &mut Token) -> Result<(), ParseError> {
+        self.has_decoded = false;
+        self.had_line_terminator = false;
         self.next_token_into_local(dst)
             .map_err(|err| self.host_err(err))
     }
 
     /// [`Lexer::next_token_into`]'s scan, reporting an error at its position in
     /// `self.source` — never called directly, so the lift above is applied exactly once.
+    ///
+    /// This is the scan's **front**: it lexes every token whose path makes no call — end
+    /// of input, the common identifier or keyword ([`Lexer::scan_ascii_identifier_into`])
+    /// and the punctuators and operators, which together are nearly every token — and
+    /// hands the rest to a function that finishes the token, entered as the front's last
+    /// act so the handoff compiles to a jump: [`Lexer::next_token_dispatch`] for the
+    /// scanners (numbers, strings, templates, comments, the hashbang, escaped names) and
+    /// the errors, [`Lexer::next_token_after_non_ascii`] for a non-ASCII byte. The split
+    /// is what keeps the front free of a frame: a function making the scanners' calls
+    /// saves six registers on entry and restores them at every exit — on every token, the
+    /// ones that call nothing included.
+    ///
+    /// ⚠️ So nothing the front reaches may make a call it then continues past. A handoff
+    /// must stay in tail position and return this function's own `Result` (a one-word
+    /// niche, returned in a register); a callee that returns anything else — or one the
+    /// optimizer can see always succeeds, whose `Ok` it then materializes here after a
+    /// call — puts the call and the frame back. And the front runs on the caller-saved
+    /// registers alone, so what it keeps live across the identifier run is budgeted too
+    /// (see [`Lexer::next_token_dispatch_at`] and `keyword_at_in_word`).
+    ///
+    /// The match yields a `Token` value only for the punctuation/operator paths, whose
+    /// kinds carry no payload; the identifier writes `dst` itself and every handoff
+    /// returns early. A payload kind yielded by the match is not free even where it is
+    /// rare: the arms merge into one value, so every punctuation token then copies the
+    /// payload bytes through the merged stack temporary into `dst`.
     fn next_token_into_local(&mut self, dst: &mut Token) -> Result<(), ParseError> {
-        // Clear the decoded-value flag from the previous token so `decoded_str`
-        // reflects only the token produced by this call (set by the escape paths below).
-        self.has_decoded = false;
         let bytes = self.bytes;
-        let first = self.skip_whitespace(bytes);
-        let start = self.position;
-
-        *dst = match first {
-            None => Token {
+        let Some(first) = self.skip_ascii_whitespace(bytes) else {
+            let end = self.position as u32;
+            *dst = Token {
                 kind: TokenKind::Eof,
-                start: start as u32,
-                end: start as u32,
-            },
+                start: end,
+                end,
+            };
+            return Ok(());
+        };
+        let start = self.position;
+        *dst = match first {
             // ECMAScript identifiers: start with ID_Start, _, or $; continue with ID_Continue or $
             // Note: _ is in ID_Continue but not ID_Start, so we check it explicitly for start
-            // Identifiers may contain unicode escapes: \u0066oo → foo, b\u0061r → bar
             // Tested ahead of every other byte arm, the identifier being the most common
             // token: none of the arms it precedes matches an ASCII `IdentifierStart` byte.
-            Some(b) if is_ascii_id_start(b) => {
-                self.scan_ascii_identifier_into(bytes, start, dst);
-                return Ok(());
+            b if is_ascii_id_start(b) => {
+                return self.scan_ascii_identifier_into(bytes, start, dst);
             }
-            Some(b';') => {
+            b';' => {
                 self.advance_ascii();
                 self.make_token(TokenKind::Semicolon, start)
             }
-            Some(b':') => {
+            b':' => {
                 self.advance_ascii();
                 self.make_token(TokenKind::Colon, start)
             }
-            Some(b'=') => {
+            b'=' => {
                 self.advance_ascii();
                 match self.cur_byte() {
                     Some(b'>') => {
@@ -1236,48 +1301,35 @@ impl<'a> Lexer<'a> {
                     }
                 }
             }
-            Some(b) if b.is_ascii_digit() => return self.scan_number_into(start, b, dst),
-            // Unicode escape at start of identifier: \u0066oo → foo
-            Some(b'\\') => {
-                // Check if this is a valid unicode escape that decodes to an identifier start
-                if let Some((ch, _)) = try_decode_unicode_escape(self.bytes, self.position)
-                    && is_id_start(ch)
-                {
-                    return self.scan_identifier_into('\\', dst);
-                }
-                // Not a valid identifier start - error.
-                return Err(lex_err("Unexpected character: '\\'", start));
-            }
-            Some(quote @ (b'\'' | b'"')) => return self.scan_string_into(start, quote, dst),
-            Some(b',') => {
+            b',' => {
                 self.advance_ascii();
                 self.make_token(TokenKind::Comma, start)
             }
-            Some(b'{') => {
+            b'{' => {
                 self.advance_ascii();
                 self.make_token(TokenKind::BraceOpen, start)
             }
-            Some(b'}') => {
+            b'}' => {
                 self.advance_ascii();
                 self.make_token(TokenKind::BraceClose, start)
             }
-            Some(b'[') => {
+            b'[' => {
                 self.advance_ascii();
                 self.make_token(TokenKind::BracketOpen, start)
             }
-            Some(b']') => {
+            b']' => {
                 self.advance_ascii();
                 self.make_token(TokenKind::BracketClose, start)
             }
-            Some(b'(') => {
+            b'(' => {
                 self.advance_ascii();
                 self.make_token(TokenKind::ParenOpen, start)
             }
-            Some(b')') => {
+            b')' => {
                 self.advance_ascii();
                 self.make_token(TokenKind::ParenClose, start)
             }
-            Some(b'.') => {
+            b'.' => {
                 // `.`, `..`, `...` and digits are all ASCII, so peek the next two bytes.
                 if self.byte_ahead(1) == Some(b'.') && self.byte_ahead(2) == Some(b'.') {
                     // Spread operator: ...
@@ -1286,19 +1338,15 @@ impl<'a> Lexer<'a> {
                     self.advance_ascii(); // consume third .
                     self.make_token(TokenKind::DotDotDot, start)
                 } else if self.byte_ahead(1).is_some_and(|b| b.is_ascii_digit()) {
-                    // Number starting with a decimal point (`.5`, `.5e3`). Route it
-                    // through the one number entry with `.` as `first` (a non-`0`
-                    // byte → empty integer part → fraction/exponent), so leading-dot
-                    // fractions share `scan_number_into`'s separator/exponent and
-                    // boundary handling instead of a parallel scan that can drift.
-                    return self.scan_number_into(start, b'.', dst);
+                    // Number starting with a decimal point (`.5`, `.5e3`).
+                    return self.next_token_dispatch(bytes, start, b'.', dst);
                 } else {
                     // Single dot: member access operator
                     self.advance_ascii();
                     self.make_token(TokenKind::Dot, start)
                 }
             }
-            Some(b'-') => {
+            b'-' => {
                 self.advance_ascii();
                 if self.cur_byte() == Some(b'-') {
                     self.advance_ascii();
@@ -1310,7 +1358,7 @@ impl<'a> Lexer<'a> {
                     self.make_token(TokenKind::Minus, start)
                 }
             }
-            Some(b'+') => {
+            b'+' => {
                 self.advance_ascii();
                 if self.cur_byte() == Some(b'+') {
                     self.advance_ascii();
@@ -1322,23 +1370,12 @@ impl<'a> Lexer<'a> {
                     self.make_token(TokenKind::Plus, start)
                 }
             }
-            Some(b'/') => {
+            b'/' => {
                 // Could be: // line comment, /* block comment */, or / division operator
                 // Peek ahead to determine which
-                let peek = self.byte_ahead(1);
-                match peek {
-                    Some(b'/') => {
-                        // Line comment
-                        let end = comments::line_comment_end(bytes, start);
-                        self.comment_into(start, end, false, dst);
-                        return Ok(());
-                    }
-                    Some(b'*') => {
-                        // Block comment
-                        let end = comments::block_comment_end(bytes, start)?;
-                        self.comment_into(start, end, true, dst);
-                        return Ok(());
-                    }
+                match self.byte_ahead(1) {
+                    // Line or block comment
+                    Some(b'/' | b'*') => return self.next_token_dispatch(bytes, start, b'/', dst),
                     Some(b'=') => {
                         // Division assignment operator /=
                         self.advance_ascii();
@@ -1352,7 +1389,7 @@ impl<'a> Lexer<'a> {
                     }
                 }
             }
-            Some(b'*') => {
+            b'*' => {
                 self.advance_ascii();
                 if self.cur_byte() == Some(b'*') {
                     self.advance_ascii();
@@ -1369,7 +1406,7 @@ impl<'a> Lexer<'a> {
                     self.make_token(TokenKind::Star, start)
                 }
             }
-            Some(b'%') => {
+            b'%' => {
                 self.advance_ascii();
                 if self.cur_byte() == Some(b'=') {
                     self.advance_ascii();
@@ -1378,7 +1415,7 @@ impl<'a> Lexer<'a> {
                     self.make_token(TokenKind::Percent, start)
                 }
             }
-            Some(b'^') => {
+            b'^' => {
                 self.advance_ascii();
                 if self.cur_byte() == Some(b'=') {
                     self.advance_ascii();
@@ -1387,11 +1424,11 @@ impl<'a> Lexer<'a> {
                     self.make_token(TokenKind::Caret, start)
                 }
             }
-            Some(b'~') => {
+            b'~' => {
                 self.advance_ascii();
                 self.make_token(TokenKind::Tilde, start)
             }
-            Some(b'<') => {
+            b'<' => {
                 self.advance_ascii();
                 if self.cur_byte() == Some(b'=') {
                     self.advance_ascii();
@@ -1408,7 +1445,7 @@ impl<'a> Lexer<'a> {
                     self.make_token(TokenKind::LessThan, start)
                 }
             }
-            Some(b'>') => {
+            b'>' => {
                 self.advance_ascii();
                 if self.cur_byte() == Some(b'=') {
                     self.advance_ascii();
@@ -1436,7 +1473,7 @@ impl<'a> Lexer<'a> {
                     self.make_token(TokenKind::GreaterThan, start)
                 }
             }
-            Some(b'!') => {
+            b'!' => {
                 self.advance_ascii();
                 if self.cur_byte() == Some(b'=') {
                     self.advance_ascii();
@@ -1450,7 +1487,7 @@ impl<'a> Lexer<'a> {
                     self.make_token(TokenKind::Bang, start)
                 }
             }
-            Some(b'&') => {
+            b'&' => {
                 self.advance_ascii();
                 if self.cur_byte() == Some(b'&') {
                     self.advance_ascii();
@@ -1467,7 +1504,7 @@ impl<'a> Lexer<'a> {
                     self.make_token(TokenKind::Ampersand, start)
                 }
             }
-            Some(b'|') => {
+            b'|' => {
                 self.advance_ascii();
                 if self.cur_byte() == Some(b'|') {
                     self.advance_ascii();
@@ -1484,7 +1521,7 @@ impl<'a> Lexer<'a> {
                     self.make_token(TokenKind::Pipe, start)
                 }
             }
-            Some(b'?') => {
+            b'?' => {
                 self.advance_ascii();
                 if self.cur_byte() == Some(b'?') {
                     self.advance_ascii();
@@ -1510,46 +1547,130 @@ impl<'a> Lexer<'a> {
                     self.make_token(TokenKind::Question, start)
                 }
             }
-            Some(b'`') => {
-                // Template literal starting with backtick
-                return self.read_template_into(start, dst);
-            }
-            Some(b'@') => {
+            b'@' => {
                 // @ for decorators
                 self.advance_ascii();
                 self.make_token(TokenKind::At, start)
             }
-            Some(b'#') => {
-                // Check for hashbang at start of file: #!/usr/bin/env node
-                if start == 0 {
-                    let next = self.source.get(1..2);
-                    if next == Some("!") {
-                        // Hashbang comment - read until end of line
-                        return self.read_hashbang_into(start, dst);
-                    }
+            b'#' => {
+                // A hashbang at the start of the file: #!/usr/bin/env node
+                if start == 0 && self.byte_ahead(1) == Some(b'!') {
+                    return self.next_token_dispatch(bytes, start, b'#', dst);
                 }
                 // # for private identifiers
                 self.advance_ascii();
                 self.make_token(TokenKind::Hash, start)
             }
-            // Non-ASCII lead byte: a Unicode IdentifierStart, otherwise an error.
-            // (The ASCII id-start arm above handles `a-z A-Z _ $`; this decodes the
-            // char for the Unicode `is_id_start` check — the one token-start decode.)
-            Some(b) if b >= 0x80 => match self.cur_char() {
-                Some(ch) if is_id_start(ch) => return self.scan_identifier_into(ch, dst),
-                Some(ch) => {
-                    return Err(lex_err(format!("Unexpected character: '{ch}'"), start));
-                }
-                None => return Err(lex_err("Unexpected character", start)),
-            },
-            Some(b) => {
-                return Err(lex_err(
-                    format!("Unexpected character: '{}'", b as char),
-                    start,
-                ));
-            }
+            0x80.. => return self.next_token_after_non_ascii(bytes, start, dst),
+            // Numbers, strings, templates, `\`-escaped names, and bytes no token starts with.
+            b => return self.next_token_dispatch(bytes, start, b, dst),
         };
         Ok(())
+    }
+
+    /// The front's handoff for a non-ASCII byte at `pos`. Either it continues the whitespace
+    /// run (NBSP, U+FEFF, a `Zs` space, LS / PS), which [`skip_whitespace_general`] finishes
+    /// — recording a LineTerminator crossing, and re-entering the front on the token it
+    /// stops on, which may be any byte at all — or it starts the token itself, a non-ASCII
+    /// `IdentifierStart` or an error, which is the dispatch's.
+    #[cold]
+    #[inline(never)]
+    fn next_token_after_non_ascii(
+        &mut self,
+        bytes: &'a [u8],
+        pos: usize,
+        dst: &mut Token,
+    ) -> Result<(), ParseError> {
+        let (start, crossed) = skip_whitespace_general(self.source, pos);
+        if start == pos {
+            return self.next_token_dispatch(bytes, pos, bytes[pos], dst);
+        }
+        if crossed {
+            self.had_line_terminator = true;
+        }
+        self.position = start;
+        self.next_token_into_local(dst)
+    }
+
+    /// Lex the token whose first byte, `first`, sits at `start` (the cursor) into `*dst` —
+    /// every token [`Lexer::next_token_into_local`]'s front hands on: the ones whose
+    /// scanners it would have to call (numbers, strings, templates, comments, the
+    /// hashbang, names opening with a `\` or a non-ASCII char or that the front could not
+    /// settle), and the errors. Each arm is the front's for its byte narrowed to what the
+    /// front hands on, which the `debug_assert!`s state.
+    ///
+    /// `#[inline(never)]` because the front's frame-free shape depends on it: inlined, its
+    /// calls would put their register saves back on every token.
+    #[inline(never)]
+    fn next_token_dispatch(
+        &mut self,
+        bytes: &'a [u8],
+        start: usize,
+        first: u8,
+        dst: &mut Token,
+    ) -> Result<(), ParseError> {
+        match first {
+            // An ASCII-led name the front did not settle (see `scan_ascii_identifier_into`).
+            b if is_ascii_id_start(b) => {
+                let end = ascii_id_run_end(bytes, start);
+                self.finish_ascii_identifier_into(bytes, start, end, dst);
+                Ok(())
+            }
+            b if b.is_ascii_digit() => self.scan_number_into(start, b, dst),
+            b'.' => {
+                // Number starting with a decimal point (`.5`, `.5e3`). Route it
+                // through the one number entry with `.` as `first` (a non-`0`
+                // byte → empty integer part → fraction/exponent), so leading-dot
+                // fractions share `scan_number_into`'s separator/exponent and
+                // boundary handling instead of a parallel scan that can drift.
+                debug_assert!(self.byte_ahead(1).is_some_and(|b| b.is_ascii_digit()));
+                self.scan_number_into(start, b'.', dst)
+            }
+            // Unicode escape at start of identifier: \u0066oo → foo
+            b'\\' => {
+                // Check if this is a valid unicode escape that decodes to an identifier start
+                if let Some((ch, _)) = try_decode_unicode_escape(self.bytes, self.position)
+                    && is_id_start(ch)
+                {
+                    return self.scan_identifier_into('\\', dst);
+                }
+                // Not a valid identifier start - error.
+                Err(lex_err("Unexpected character: '\\'", start))
+            }
+            quote @ (b'\'' | b'"') => self.scan_string_into(start, quote, dst),
+            b'/' => {
+                if self.byte_ahead(1) == Some(b'/') {
+                    // Line comment
+                    let end = comments::line_comment_end(bytes, start);
+                    self.comment_into(start, end, false, dst);
+                } else {
+                    // Block comment
+                    debug_assert_eq!(self.byte_ahead(1), Some(b'*'));
+                    let end = comments::block_comment_end(bytes, start)?;
+                    self.comment_into(start, end, true, dst);
+                }
+                Ok(())
+            }
+            // Template literal starting with backtick
+            b'`' => self.read_template_into(start, dst),
+            // Hashbang comment at the start of the file - read until end of line
+            b'#' => {
+                debug_assert!(start == 0 && self.byte_ahead(1) == Some(b'!'));
+                self.read_hashbang_into(start, dst)
+            }
+            // Non-ASCII lead byte: a Unicode IdentifierStart, otherwise an error.
+            // (The front lexes `a-z A-Z _ $`; this decodes the char for the Unicode
+            // `is_id_start` check — the one token-start decode.)
+            b if b >= 0x80 => match self.cur_char() {
+                Some(ch) if is_id_start(ch) => self.scan_identifier_into(ch, dst),
+                Some(ch) => Err(lex_err(format!("Unexpected character: '{ch}'"), start)),
+                None => Err(lex_err("Unexpected character", start)),
+            },
+            b => Err(lex_err(
+                format!("Unexpected character: '{}'", b as char),
+                start,
+            )),
+        }
     }
 
     /// Write the `//` (`is_block: false`) or `/* */` comment token spanning `start..end`
@@ -2220,7 +2341,7 @@ mod tests {
             assert_identifier_matches_model(src);
         }
         // An escaped name leaves its decoded value in the scratch; the plain name after it
-        // must not read it back — the dispatch clears the flag for every token, and the
+        // must not read it back — `next_token_into` clears the flag for every token, and the
         // common identifier's path relies on that rather than clearing it itself.
         for (src, first_end, second) in [("\\u0061 b", 6, 7..8), ("a\\u0062 c", 7, 8..9)] {
             let mut lexer = Lexer::at_offset(src, 0);
@@ -2474,7 +2595,7 @@ mod tests {
     }
 
     /// The whitespace ahead of a token is skipped by an ASCII fast path that hands the
-    /// dispatch its stop byte, and a comment is written into the token slot by the
+    /// front its stop byte, and a comment is written into the token slot by the
     /// dispatch's `/` arm; no corpus holds most of what either must get right. Every run of
     /// zero to three [`TRIVIA_PIECES`] — so every pairing of CR, LF and CRLF, every
     /// whitespace code point beside every comment shape, and every comment against end of

@@ -717,7 +717,16 @@ const fn keyword_encode_wide(s: &str) -> u128 {
 /// `swar_matches_keyword_table`. Dispatching on `len` first keeps each per-length
 /// compare set tiny, and the `const { … }` encodings are compile-time constants so
 /// this is pure integer comparison.
-#[inline]
+///
+/// ⚠️ **`inline(always)`, not `inline`.** The lexer's front
+/// (`Lexer::next_token_into_local`) runs with no stack frame, and a call anywhere on its
+/// path would bring the frame back on every token. With two callers — the front's
+/// [`keyword_at_in_word`] and [`keyword_at`], reached from the cold identifier finisher —
+/// the plain hint left this tree out of line and the front calling it; forced, each caller
+/// carries its own copy.
+// No `#[expect(clippy::inline_always)]`: the lint skips a function whose body opens with
+// an item statement (the `use` below), so the expectation would go unfulfilled.
+#[inline(always)]
 // `allow`, not `expect`: the lint fires without it, but the expectation never registers as
 // fulfilled — neither on the fn nor on the `use` item itself — so `expect` reads as dead.
 #[allow(clippy::enum_glob_use)] // 50 arms — the glob keeps the per-length tables readable
@@ -978,11 +987,9 @@ fn read_keyword_word_wide(bytes: &[u8], start: usize, len: usize) -> u128 {
 }
 
 /// Reserved-word lookup for the identifier `bytes[start..start+len]`
-/// (`len = end - start`). The lexer's single keyword entry point: it applies a cheap
-/// pre-filter (length 2..=10, then the reserved-word LENGTHS for that first letter —
-/// see [`KEYWORD_LENGTHS_BY_FIRST_LETTER`] — rejecting PascalCase / `_`/`$`-led /
-/// non-keyword-letter names *and* every name whose length no keyword of that letter
-/// has, all before a single compare arm runs), then recognizes the
+/// (`len = end - start`). The general keyword entry point (the lexer's front takes
+/// [`keyword_at_in_word`]): it applies a cheap pre-filter (length 2..=10, then
+/// [`keyword_prefilter_admits`]), then recognizes the
 /// keyword entirely via SWAR — the 50 keywords of length ≤ 8 through [`keyword_swar`]
 /// (`u64` key) and the three length-9/10 keywords
 /// (`undefined`/`satisfies`/`instanceof`) through [`keyword_swar_long`] (`u128` key).
@@ -993,11 +1000,9 @@ fn read_keyword_word_wide(bytes: &[u8], start: usize, len: usize) -> u128 {
 /// and falls through to `None`).
 #[inline]
 pub fn keyword_at(bytes: &[u8], start: usize, len: usize) -> Option<KeywordKind> {
-    if !matches!(len, KEYWORD_MIN_LEN..=KEYWORD_MAX_LEN) {
-        return None;
-    }
-    let idx = bytes[start].wrapping_sub(b'a');
-    if idx >= 26 || (KEYWORD_LENGTHS_BY_FIRST_LETTER[idx as usize] >> len) & 1 == 0 {
+    if !matches!(len, KEYWORD_MIN_LEN..=KEYWORD_MAX_LEN)
+        || !keyword_prefilter_admits(bytes[start], len)
+    {
         return None;
     }
     if len <= 8 {
@@ -1006,6 +1011,61 @@ pub fn keyword_at(bytes: &[u8], start: usize, len: usize) -> Option<KeywordKind>
         // The 2 (len 9) + 1 (len 10) keywords: SWAR over a u128.
         keyword_swar_long(read_keyword_word_wide(bytes, start, len), len)
     }
+}
+
+/// [`keyword_at_in_word`]'s answer: the lookup settled from one word, or deferred to
+/// [`keyword_at`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WordLookup {
+    /// The name's keyword kind, `None` for a plain identifier.
+    Settled(Option<KeywordKind>),
+    /// The name needs [`keyword_at`]'s byte-loop key builders.
+    Deferred,
+}
+
+/// [`keyword_at`] for a caller that must make no call and build no loop — the lexer's
+/// frame-free front (`Lexer::next_token_into_local`). Settles the name
+/// ([`WordLookup::Settled`], the lookup's answer) when its length rules out a keyword,
+/// when the pre-filter rejects it, or when it is at most 8 bytes long, reading every
+/// answer off one 8-byte load at `start`; returns [`WordLookup::Deferred`] for the rest —
+/// a 9- or 10-byte name the pre-filter admits, whose key [`read_keyword_word_wide`]
+/// assembles in a byte loop, and any name of a keyword's length with fewer than 8 bytes
+/// from `start` to the end of `bytes` — which the caller hands to [`keyword_at`] off its
+/// hot path. Both are uncommon: the pre-filter rejects most long names (the ones it admits,
+/// `undefined` among them, are a small share of identifiers), and a file has one end.
+///
+/// The pre-filter's first letter is the load's low byte, not a read of `bytes[start]`:
+/// the caller has that byte in a register already, and a read the optimizer can merge
+/// with the caller's keeps that register live across the whole identifier run — one
+/// more than the front has to spare without saving a callee-saved one.
+#[inline]
+pub fn keyword_at_in_word(bytes: &[u8], start: usize, len: usize) -> WordLookup {
+    if !matches!(len, KEYWORD_MIN_LEN..=KEYWORD_MAX_LEN) {
+        return WordLookup::Settled(None);
+    }
+    let Some(chunk) = bytes.get(start..).and_then(|tail| tail.first_chunk::<8>()) else {
+        return WordLookup::Deferred;
+    };
+    let word = u64::from_le_bytes(*chunk);
+    if !keyword_prefilter_admits(word as u8, len) {
+        return WordLookup::Settled(None);
+    }
+    if len > 8 {
+        return WordLookup::Deferred;
+    }
+    WordLookup::Settled(keyword_swar(word, len))
+}
+
+/// The keyword lookups' pre-filter, past their length gate (`len` in 2..=10): whether an
+/// identifier of `len` bytes whose first byte is `first` has a length some reserved word
+/// of its first letter has (see [`KEYWORD_LENGTHS_BY_FIRST_LETTER`]) — rejecting
+/// PascalCase / `_`/`$`-led / non-keyword-letter names *and* every name whose length no
+/// keyword of that letter has, all before a single compare arm runs.
+#[inline]
+fn keyword_prefilter_admits(first: u8, len: usize) -> bool {
+    debug_assert!(matches!(len, KEYWORD_MIN_LEN..=KEYWORD_MAX_LEN));
+    let idx = first.wrapping_sub(b'a');
+    idx < 26 && (KEYWORD_LENGTHS_BY_FIRST_LETTER[idx as usize] >> len) & 1 != 0
 }
 
 #[cfg(test)]
@@ -1053,7 +1113,9 @@ mod tests {
     /// its complement. Grade it against the `KEYWORDS` oracle over generated
     /// near-misses rather than against a spot list — every one-byte substitution at
     /// every position of every reserved word, every proper prefix, and every
-    /// one-character extension, over the ASCII identifier alphabet.
+    /// one-character extension, over the ASCII identifier alphabet. Both lookups are
+    /// graded: [`keyword_at`] and the lexer front's [`keyword_at_in_word`], whose own
+    /// load-first spelling of the pre-filter is a second copy of the class.
     #[test]
     fn keyword_at_matches_the_oracle_on_every_near_miss() {
         fn oracle(s: &str) -> Option<KeywordKind> {
@@ -1069,11 +1131,28 @@ mod tests {
             .collect();
         let mut cases = 0_u32;
         let check = |s: &str| {
+            let expected = oracle(s);
             assert_eq!(
                 keyword_at(s.as_bytes(), 0, s.len()),
-                oracle(s),
+                expected,
                 "keyword_at disagrees with the KEYWORDS oracle on `{s}`"
             );
+            // The front's form, with a whole word in bounds and at the end of the input:
+            // whatever it settles is the oracle's answer, and with a word in bounds it
+            // defers nothing but a name longer than 8 bytes.
+            let padded = format!("{s});\n\t\t\t\t\t\t");
+            for bytes in [padded.as_bytes(), s.as_bytes()] {
+                match keyword_at_in_word(bytes, 0, s.len()) {
+                    WordLookup::Settled(settled) => assert_eq!(
+                        settled, expected,
+                        "keyword_at_in_word disagrees with the KEYWORDS oracle on `{s}`"
+                    ),
+                    WordLookup::Deferred => assert!(
+                        bytes.len() < 8 || s.len() > 8,
+                        "keyword_at_in_word deferred `{s}` with a whole word in bounds"
+                    ),
+                }
+            }
         };
         for &(kw, _) in KEYWORDS {
             check(kw);

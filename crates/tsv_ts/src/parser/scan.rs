@@ -45,8 +45,8 @@ const LOOKAHEAD_WS_LUT: [ScanByte; 256] = {
 /// The class is ECMAScript `WhiteSpace` ∪ `LineTerminator` — equivalently what
 /// JS's `\s` matches, the spec being explicit that "line terminators are included
 /// in the set of white space code points that are matched by the `\s` class in
-/// regular expressions". That is the same question the lexer's own
-/// [`Lexer::skip_whitespace`](crate::lexer::Lexer) answers, and this scan must
+/// regular expressions". That is the same question the
+/// [`Lexer`](crate::lexer::Lexer) answers ahead of every token, and this scan must
 /// agree with it by construction: a lookahead that stops **earlier** than the
 /// lexer mis-reads the shape it is classifying and rejects input the canonical
 /// parser accepts. So the two share one spelling of the productions —
