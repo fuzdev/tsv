@@ -706,7 +706,7 @@ const fn keyword_encode_wide(s: &str) -> u128 {
 /// `read_keyword_word`) and this matches it against the keyword constants of that
 /// length. Returns `None` for non-keywords and for `len` outside 2..=8 — the caller
 /// routes the three length-9/10 keywords (`undefined`/`satisfies`/`instanceof`) to
-/// [`keyword_swar_long`].
+/// [`long_keyword`].
 ///
 /// ⚠️ **`word`'s lanes at or past `len` are UNSPECIFIED** — on the reader's fast path
 /// they are whatever bytes follow the identifier. Each arm masks them off with
@@ -881,7 +881,7 @@ fn keyword_swar(word: u64, len: usize) -> Option<KeywordKind> {
 
 /// SWAR recognition for the three length-9/10 keywords (`undefined`/`satisfies`,
 /// length 9; `instanceof`, length 10). The caller packs the identifier's `len` bytes
-/// little-endian into a `u128` (`read_keyword_word_wide`) and this matches it against
+/// little-endian into a `u128` ([`long_keyword`]) and this matches it against
 /// the keyword constants of that length. A `u128` key (vs the `u64` the `len <= 8`
 /// path uses) holds the extra bytes while keeping the hot ≤8 path's compares narrow.
 /// Returns `None` for non-keywords and for `len` outside 9..=10; proven against the
@@ -950,49 +950,13 @@ fn read_keyword_word(bytes: &[u8], start: usize, len: usize) -> u64 {
     }
 }
 
-/// Pack `bytes[start..start+len]` (an identifier, `len` ∈ 9..=10) into a little-endian
-/// `u128` keyword key — the wide counterpart of [`read_keyword_word`] for the
-/// length-9/10 path. A plain byte loop where its sibling has an 8-byte load, and
-/// **deliberately so**: see the refusal below.
-///
-/// ⚠️ **This loop is not free, and the sentence that used to stand here — "only the
-/// three long keywords reach here, so this path is cold" — is why nobody noticed.**
-/// That is true of how often it MATCHES and false of how often it RUNS: only
-/// `undefined`/`satisfies`/`instanceof` match, but every 9- or 10-byte identifier the
-/// pre-filter admits is packed here first, and the loop lowers to a bounds-checked
-/// `shld`/`shl`/`cmov` pair per byte (~14 instructions × 9). Before
-/// [`KEYWORD_LENGTHS_BY_FIRST_LETTER`] took the length into the pre-filter it ran
-/// **32,668 times per pass** on a TypeScript corpus against **2,757** matches, and its
-/// loop body was the hottest line in this file (0.207% / 0.234% of the format and
-/// wire boards). The length key now rejects **82.6%** of those calls, which is what
-/// makes the remaining ones cheap enough to leave on a byte loop — ⛔ rewriting it
-/// off a `u64` head (with the [`read_keyword_word`] fast path's own `first_chunk`
-/// spelling, so the head really was one load) was measured **on top of** that
-/// pre-filter and came out *worse* on every channel, the residue being smaller than
-/// the rewrite's own tail branches. The whole remaining path is **5,673 calls per
-/// pass** against 242,269 for the `len <= 8` one — a ceiling of about **0.03%** of the
-/// run, so no spelling of it can pay.
-///
-/// ⭐ The general form: a "this path is cold" comment names a RATE, and the rate it
-/// names is usually the success rate while the cost follows the call rate.
-#[inline]
-fn read_keyword_word_wide(bytes: &[u8], start: usize, len: usize) -> u128 {
-    let mut w = 0u128;
-    let mut i = 0;
-    while i < len {
-        w |= (bytes[start + i] as u128) << (i * 8);
-        i += 1;
-    }
-    w
-}
-
 /// Reserved-word lookup for the identifier `bytes[start..start+len]`
 /// (`len = end - start`). The general keyword entry point (the lexer's front takes
 /// [`keyword_at_in_word`]): it applies a cheap pre-filter (length 2..=10, then
 /// [`keyword_prefilter_admits`]), then recognizes the
 /// keyword entirely via SWAR — the 50 keywords of length ≤ 8 through [`keyword_swar`]
 /// (`u64` key) and the three length-9/10 keywords
-/// (`undefined`/`satisfies`/`instanceof`) through [`keyword_swar_long`] (`u128` key).
+/// (`undefined`/`satisfies`/`instanceof`) through [`long_keyword`] (`u128` key).
 /// No hashing on any path.
 ///
 /// `bytes` is the lexer source and `[start, start+len)` a validated identifier, so
@@ -1009,7 +973,7 @@ pub fn keyword_at(bytes: &[u8], start: usize, len: usize) -> Option<KeywordKind>
         keyword_swar(read_keyword_word(bytes, start, len), len)
     } else {
         // The 2 (len 9) + 1 (len 10) keywords: SWAR over a u128.
-        keyword_swar_long(read_keyword_word_wide(bytes, start, len), len)
+        long_keyword(&bytes[start..start + len])
     }
 }
 
@@ -1019,20 +983,24 @@ pub fn keyword_at(bytes: &[u8], start: usize, len: usize) -> Option<KeywordKind>
 pub enum WordLookup {
     /// The name's keyword kind, `None` for a plain identifier.
     Settled(Option<KeywordKind>),
-    /// The name needs [`keyword_at`]'s byte-loop key builders.
+    /// The front must hand the name to the general reader: from [`keyword_at_in_word`], a
+    /// name of a keyword's length starting within 8 bytes of the end of input; the front also
+    /// uses it for a run stopped at a `\` or non-ASCII byte.
     Deferred,
+    /// A 9- or 10-byte name the pre-filter admits, whose answer is [`long_keyword`]'s.
+    Long,
 }
 
 /// [`keyword_at`] for a caller that must make no call and build no loop — the lexer's
 /// frame-free front (`Lexer::next_token_into_local`). Settles the name
 /// ([`WordLookup::Settled`], the lookup's answer) when its length rules out a keyword,
 /// when the pre-filter rejects it, or when it is at most 8 bytes long, reading every
-/// answer off one 8-byte load at `start`; returns [`WordLookup::Deferred`] for the rest —
-/// a 9- or 10-byte name the pre-filter admits, whose key [`read_keyword_word_wide`]
-/// assembles in a byte loop, and any name of a keyword's length with fewer than 8 bytes
-/// from `start` to the end of `bytes` — which the caller hands to [`keyword_at`] off its
-/// hot path. Both are uncommon: the pre-filter rejects most long names (the ones it admits,
-/// `undefined` among them, are a small share of identifiers), and a file has one end.
+/// answer off one 8-byte load at `start`. A 9- or 10-byte name the pre-filter admits is
+/// [`WordLookup::Long`], which the caller settles off its own frame with [`long_keyword`]:
+/// the tail read needs the source slice again, and keeping it live through the pre-filter
+/// costs the front two callee-saved registers. Any name of a keyword's length with fewer
+/// than 8 bytes from `start` to the end of `bytes` is [`WordLookup::Deferred`], which the
+/// caller hands to [`keyword_at`] off its hot path — a file has one end.
 ///
 /// The pre-filter's first letter is the load's low byte, not a read of `bytes[start]`:
 /// the caller has that byte in a register already, and a read the optimizer can merge
@@ -1051,9 +1019,35 @@ pub fn keyword_at_in_word(bytes: &[u8], start: usize, len: usize) -> WordLookup 
         return WordLookup::Settled(None);
     }
     if len > 8 {
-        return WordLookup::Deferred;
+        return WordLookup::Long;
     }
     WordLookup::Settled(keyword_swar(word, len))
+}
+
+/// The reserved word a 9- or 10-byte `name` spells, if any — [`WordLookup::Long`]'s
+/// lookup, reading the name's first eight bytes as one word and the one or two after it
+/// as a second key: every byte it reads is the name's own, so the name is the only bound.
+/// `None` for any other length.
+///
+/// Every 9- or 10-byte name the pre-filter admits is keyed here, not only the three that
+/// match: the lexer front's [`WordLookup::Long`] handoff, and through [`keyword_at`]'s long
+/// arm the general reader's names alone — one stopped at a `\` or non-ASCII byte that does
+/// not continue it.
+///
+/// ⭐ The general form: a "this path is cold" comment names a RATE, and the rate it
+/// names is usually the success rate while the cost follows the call rate.
+#[inline]
+pub fn long_keyword(name: &[u8]) -> Option<KeywordKind> {
+    let (head, rest) = name.split_first_chunk::<8>()?;
+    let tail = match *rest {
+        [ninth] => u16::from(ninth),
+        [ninth, tenth] => u16::from_le_bytes([ninth, tenth]),
+        _ => return None,
+    };
+    keyword_swar_long(
+        u128::from(u64::from_le_bytes(*head)) | (u128::from(tail) << 64),
+        name.len(),
+    )
 }
 
 /// The keyword lookups' pre-filter, past their length gate (`len` in 2..=10): whether an
@@ -1138,8 +1132,9 @@ mod tests {
                 "keyword_at disagrees with the KEYWORDS oracle on `{s}`"
             );
             // The front's form, with a whole word in bounds and at the end of the input:
-            // whatever it settles is the oracle's answer, and with a word in bounds it
-            // defers nothing but a name longer than 8 bytes.
+            // whatever it settles — itself or through `long_keyword` — is the oracle's
+            // answer, it hands `long_keyword` exactly the admitted 9- and 10-byte names, and
+            // with a word in bounds it defers nothing.
             let padded = format!("{s});\n\t\t\t\t\t\t");
             for bytes in [padded.as_bytes(), s.as_bytes()] {
                 match keyword_at_in_word(bytes, 0, s.len()) {
@@ -1147,11 +1142,26 @@ mod tests {
                         settled, expected,
                         "keyword_at_in_word disagrees with the KEYWORDS oracle on `{s}`"
                     ),
+                    WordLookup::Long => {
+                        assert!(
+                            matches!(s.len(), 9 | 10),
+                            "keyword_at_in_word handed on `{s}` as a long name"
+                        );
+                        assert_eq!(
+                            long_keyword(s.as_bytes()),
+                            expected,
+                            "long_keyword disagrees with the KEYWORDS oracle on `{s}`"
+                        );
+                    }
                     WordLookup::Deferred => assert!(
-                        bytes.len() < 8 || s.len() > 8,
+                        bytes.len() < 8,
                         "keyword_at_in_word deferred `{s}` with a whole word in bounds"
                     ),
                 }
+            }
+            // `long_keyword` itself, over every length: `None` outside 9..=10.
+            if !matches!(s.len(), 9 | 10) {
+                assert_eq!(long_keyword(s.as_bytes()), None, "long_keyword on `{s}`");
             }
         };
         for &(kw, _) in KEYWORDS {
@@ -1241,14 +1251,15 @@ mod tests {
     }
 
     /// The production keyword encoders (`read_keyword_word`, one 8-byte load or a
-    /// byte-assembly near EOF, for length ≤ 8; `read_keyword_word_wide` for length 9/10)
-    /// must produce the same little-endian word as the compile-time
+    /// byte-assembly near EOF, for length ≤ 8; `long_keyword`'s head-and-tail key for
+    /// length 9/10) must produce the same little-endian word as the compile-time
     /// `keyword_encode`/`keyword_encode_wide` the SWAR constants are built from.
     /// `swar_matches_keyword_table` feeds the compile-time encoders, so without this a
     /// divergence in the runtime readers — the byte order the lexer actually runs —
     /// would pass the unit suite and only surface in the integration gates. Covers the
     /// in-bounds fast path (padded source), the near-EOF assembly path (the keyword as
-    /// the final bytes), and the wide length-9/10 reader.
+    /// the final bytes), and the length-9/10 key, graded through `long_keyword`'s answer
+    /// since it builds its key inline.
     ///
     /// ⚠️ The reader's fast path leaves the lanes at or past `len` as whatever follows
     /// the identifier, so what must equal `keyword_encode` is the **composition** the
@@ -1257,13 +1268,14 @@ mod tests {
     /// `keyword_swar_ignores_lanes_past_len` covers the masking itself.
     #[test]
     fn read_keyword_word_matches_keyword_encode() {
-        for &(kw, _) in KEYWORDS {
+        for &(kw, kind) in KEYWORDS {
             if kw.len() > 8 {
-                // Wide path: read_keyword_word_wide must match the const keyword_encode_wide.
+                // Wide path: `long_keyword`'s key must meet the const `keyword_encode_wide`
+                // its arms compare against.
                 assert_eq!(
-                    read_keyword_word_wide(kw.as_bytes(), 0, kw.len()),
-                    keyword_encode_wide(kw),
-                    "read_keyword_word_wide disagrees with keyword_encode_wide for `{kw}`"
+                    long_keyword(kw.as_bytes()),
+                    Some(kind),
+                    "long_keyword's key disagrees with keyword_encode_wide for `{kw}`"
                 );
                 continue;
             }

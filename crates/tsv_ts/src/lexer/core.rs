@@ -4,7 +4,7 @@ use super::comments;
 use super::escapes;
 use super::ident::{is_id_continue, is_id_start};
 use super::lex_err;
-use super::token::{Token, TokenKind, WordLookup, keyword_at, keyword_at_in_word};
+use super::token::{Token, TokenKind, WordLookup, keyword_at, keyword_at_in_word, long_keyword};
 use tsv_lang::ParseError;
 
 /// The one message for a `NumericLiteralSeparator` inside a leading-zero literal —
@@ -68,9 +68,23 @@ const fn is_ascii_id_continue(b: u8) -> bool {
 
 /// The end of the ASCII `IdentifierPart` run (`[a-zA-Z0-9_$]`) of the identifier whose
 /// ASCII `IdentifierStart` byte is `bytes[start]` — the first byte past it that is not one.
+///
+/// Eight bytes at a time while eight are in bounds, each tested against the table in turn
+/// with no bound check of its own, and byte by byte within eight of the end of input. Every
+/// byte is still the table's to classify; only the bound check is shared across the chunk.
+/// Eight rather than four because most names end inside the first chunk.
 #[inline]
 fn ascii_id_run_end(bytes: &[u8], start: usize) -> usize {
+    const CHUNK: usize = 8;
     let mut end = start + 1;
+    while let Some(chunk) = bytes.get(end..end + CHUNK) {
+        for (i, &b) in chunk.iter().enumerate() {
+            if !is_ascii_id_continue(b) {
+                return end + i;
+            }
+        }
+        end += CHUNK;
+    }
     while end < bytes.len() && is_ascii_id_continue(bytes[end]) {
         end += 1;
     }
@@ -590,14 +604,16 @@ impl<'a> Lexer<'a> {
     /// one load. (Outlining the compare tree behind the inline pre-filter measured slower:
     /// the pre-filter admits most names, and each admitted name then paid a call.)
     ///
-    /// What the front cannot settle it hands to [`Lexer::next_token_dispatch_at`], which
-    /// lexes the name again from `start` ([`Lexer::finish_ascii_identifier_into`]): a `\`
-    /// or non-ASCII stop byte, which may continue the name, and a name whose keyword key
-    /// takes a byte loop to build (9 or 10 bytes and admitted by the pre-filter, or within
-    /// 8 bytes of the end of input). Re-walking a run that rare costs less than a handoff
-    /// that carries the run's end, which would be a call to a function that always
-    /// succeeds — and the optimizer, seeing that, computes the `Ok` in the front instead
-    /// of jumping, which puts the call and the frame back.
+    /// A 9- or 10-byte name the pre-filter admits (`undefined`, `instanceof`, `stringify`)
+    /// is settled by [`Lexer::finish_long_name_into`], a frame-free handoff that reads its
+    /// ninth and tenth bytes. What the front cannot settle at all it hands to
+    /// [`Lexer::next_token_dispatch_at`], which lexes the name again from `start`
+    /// ([`Lexer::finish_ascii_identifier_into`]): a `\` or non-ASCII stop byte, which may
+    /// continue the name, and a name of a keyword's length within 8 bytes of the end of
+    /// input. Re-walking a run that rare costs less than a handoff that carries the run's
+    /// end, which would be a call to a function that always succeeds — and the optimizer,
+    /// seeing that, computes the `Ok` in the front instead of jumping, which puts the call
+    /// and the frame back.
     ///
     /// `bytes` is the slice [`Lexer::skip_ascii_whitespace`] read the start byte from,
     /// passed down rather than re-read from `self` so the run is walked against the same
@@ -619,12 +635,41 @@ impl<'a> Lexer<'a> {
             Some(&stop) if stop >= 0x80 || stop == b'\\' => WordLookup::Deferred,
             _ => keyword_at_in_word(bytes, start, end - start),
         };
-        let WordLookup::Settled(keyword) = lookup else {
-            return self.next_token_dispatch_at(start, dst);
+        let keyword = match lookup {
+            WordLookup::Settled(keyword) => keyword,
+            WordLookup::Long => return self.finish_long_name_into(start, end, dst),
+            WordLookup::Deferred => return self.next_token_dispatch_at(start, dst),
         };
         self.position = end;
         *dst = Token {
             kind: match keyword {
+                Some(kw) => TokenKind::Keyword(kw),
+                None => TokenKind::Identifier,
+            },
+            start: start as u32,
+            end: end as u32,
+        };
+        Ok(())
+    }
+
+    /// The identifier front's handoff for a 9- or 10-byte name its pre-filter admits
+    /// ([`WordLookup::Long`]), `start..end`: settled off the name's own bytes by
+    /// [`long_keyword`], with no frame. The name is always in bounds; the dispatch arm for
+    /// one that is not keeps the handoff's `Result` a value the optimizer cannot compute
+    /// in the front (see [`Lexer::scan_ascii_identifier_into`]).
+    #[inline(never)]
+    fn finish_long_name_into(
+        &mut self,
+        start: usize,
+        end: usize,
+        dst: &mut Token,
+    ) -> Result<(), ParseError> {
+        let Some(name) = self.bytes.get(start..end) else {
+            return self.next_token_dispatch_at(start, dst);
+        };
+        self.position = end;
+        *dst = Token {
+            kind: match long_keyword(name) {
                 Some(kw) => TokenKind::Keyword(kw),
                 None => TokenKind::Identifier,
             },
@@ -2306,6 +2351,74 @@ mod tests {
         assert!(
             cases > 100_000,
             "the keyword sweep collapsed to {cases} cases"
+        );
+    }
+
+    /// The ASCII run is walked a chunk at a time while a whole chunk is in bounds and a
+    /// byte at a time within a chunk's length of the end of input, and the keyword word
+    /// settles a 9- or 10-byte name off the bytes past it; the generic sweep above stops at
+    /// six bytes. Every name of 1 to 20 bytes — each byte of the identifier class in turn, and
+    /// every reserved word of those lengths with its near misses — is lexed against
+    /// [`model_identifier`] with every stop that ends or continues a name, and at the end
+    /// of input, which the name then reaches at every length.
+    #[test]
+    fn every_identifier_length_matches_the_grammar() {
+        let class: Vec<char> = ('a'..='z')
+            .chain('A'..='Z')
+            .chain('0'..='9')
+            .chain(['_', '$'])
+            .collect();
+        let stops = [
+            "",
+            " ",
+            "(",
+            ".",
+            ";",
+            "\\",
+            "\\x",
+            "\\u0061",
+            "\\u0020",
+            "\u{e9}",
+            "\u{a0}",
+            "\u{2028}",
+            "\u{200c}b",
+            "\t\n",
+        ];
+        let mut names: Vec<String> = Vec::new();
+        for len in 1..=20 {
+            // Each class byte at one position per length (`k % len`; position 0 keeps a start
+            // byte), the rest a plain letter run.
+            for (k, &c) in class.iter().enumerate() {
+                let name: String = (0..len)
+                    .map(|i| match i {
+                        0 => ['x', '_', '$', 'Q'][k % 4],
+                        i if i == k % len => c,
+                        _ => 'e',
+                    })
+                    .collect();
+                names.push(name);
+            }
+        }
+        for &(kw, _) in KEYWORDS {
+            names.push(kw.to_string());
+            for position in 0..kw.len() {
+                let mut near = kw.as_bytes().to_vec();
+                near[position] = if near[position] == b'z' { b'y' } else { b'z' };
+                names.push(String::from_utf8(near).unwrap());
+            }
+            names.push(format!("{kw}s"));
+            names.push(kw[..kw.len() - 1].to_string());
+        }
+        let mut cases = 0_u32;
+        for name in &names {
+            for stop in stops {
+                assert_identifier_matches_model(&format!("{name}{stop}"));
+                cases += 1;
+            }
+        }
+        assert!(
+            cases > 15_000,
+            "the identifier length sweep collapsed to {cases} cases"
         );
     }
 
