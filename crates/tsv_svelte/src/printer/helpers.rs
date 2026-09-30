@@ -1,7 +1,7 @@
 //! Fragment analysis and child printing helpers
 
 use super::Printer;
-use crate::ast::internal::{Fragment, FragmentNode, text_edge_ws};
+use crate::ast::internal::{Fragment, FragmentNode, is_collapsible_ws, text_edge_ws};
 
 impl<'a> Printer<'a> {
     /// Check if a fragment's content is inline (huggable at both ends).
@@ -40,6 +40,12 @@ impl<'a> Printer<'a> {
     /// The single boundary-authoring question — the element boundary probes, the block
     /// section paths, and `is_inline_fragment` all route through it.
     /// See conformance_prettier_svelte.md §Svelte: Blocks.
+    ///
+    /// Answered from the text's precomputed scalars wherever they settle it, which is most
+    /// edges: `newline_count` counts the whole raw, so a text with no newline has none at its
+    /// edge either, and a whitespace-only text is all edge, so any newline it has is there.
+    /// Only a content text holding a newline walks its edge run ([`edge_run_holds_newline`]).
+    #[inline]
     pub(super) fn nodes_boundary_newline(
         &self,
         nodes: &[FragmentNode<'_>],
@@ -53,6 +59,32 @@ impl<'a> Printer<'a> {
         let Some(FragmentNode::Text(text)) = node else {
             return false;
         };
-        text_edge_ws(text.raw(self.source), is_leading).contains('\n')
+        let holds = if text.newline_count == 0 || text.is_collapsible_ws_only {
+            text.newline_count != 0
+        } else {
+            edge_run_holds_newline(&self.source.as_bytes()[text.raw_span.range()], is_leading)
+        };
+        debug_assert_eq!(
+            holds,
+            text_edge_ws(text.raw(self.source), is_leading).contains('\n')
+        );
+        holds
     }
+}
+
+/// Whether the leading (else trailing) [`is_collapsible_ws`] run of `raw` holds a `\n` —
+/// [`text_edge_ws`]'s run, asked as it is walked: the walk stops at the first `\n` or at the
+/// first content byte, whichever comes first.
+///
+/// Out of line: only a content text holding a newline reaches it
+/// ([`Printer::nodes_boundary_newline`] settles every other edge from the text's scalars).
+#[inline(never)]
+fn edge_run_holds_newline(raw: &[u8], leading: bool) -> bool {
+    let first_stop = |b: &u8| *b == b'\n' || !is_collapsible_ws(*b);
+    let stop = if leading {
+        raw.iter().find(|b| first_stop(b))
+    } else {
+        raw.iter().rev().find(|b| first_stop(b))
+    };
+    stop == Some(&b'\n')
 }
