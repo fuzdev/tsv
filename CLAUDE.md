@@ -1122,7 +1122,7 @@ The shipped language/foundation crates' external deps (the `tsv_cli` binary adds
 - `serde_json` — wire-JSON emission (exact `f64` formatting; the oracle the hand string escaper is tested against), reached only through `tsv_lang`'s `json` feature; no shipped crate deserializes. The one reader is `tsv_debug::json` (the fixture gate, the audits, tests), which enables `unbounded_depth` — the default 128-level recursion limit refused wires the parser emits fine. `serde` itself is a dev-tooling dep (`tsv_debug`'s `derive`); the language crates see it only transitively
 - `smallvec` — stack-allocated vectors (printers + `tsv_check`)
 - `thiserror` — error type derivation
-- `phf` — compile-time perfect hash maps (keywords, entities)
+- `phf` — compile-time perfect hash maps (`tsv_html`'s entity table)
 - `unicode-ident` / `unicode-segmentation` / `unicode-width` — XID identifiers, grapheme clustering, display width (CJK, zero-width)
 - `bumpalo` — bump arena for the internal AST (and, via `tsv_arena`, the bindings' per-thread `reset()` reuse; `tsv_check`'s caller-owned arenas follow the same contract)
 - `talc` — WASM global allocator (`tsv_wasm`, wasm32-only target dep): pure-Rust `no_std` allocator replacing dlmalloc; the `WasmGrowAndExtend` source keeps the warm instance's linear-memory high-water at dlmalloc parity. Pulls `lock_api` + `allocator-api2` (+ `scopeguard`) into the wasm32 graph only

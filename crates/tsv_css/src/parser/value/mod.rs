@@ -230,7 +230,7 @@ fn parse_leaf_value<'arena>(s: &str, span: Span, arena: &'arena Bump) -> CssValu
     // that would establish that (the search for the opening `(`, then the matching-paren
     // scan from it) answer a question one byte comparison has already answered. Most of a
     // stylesheet's leaves — `red`, `0`, `1px`, `#fff` — end in something else. It is the
-    // same kind of pre-filter the vocabulary sets put in front of their hash
+    // same kind of pre-filter the vocabulary sets put in front of their member compare
     // (`crate::keyword_set`): it refuses only what cannot match, so it can skip work but
     // never change an answer.
     //

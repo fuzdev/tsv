@@ -139,11 +139,23 @@ ascii_keyword_set! {
 ///
 /// An already-lowercase unit is canonical and borrows unchanged. An **unknown** unit
 /// (not in [`CSS_UNITS`]) is left untouched, matching prettier (`10FOO` stays `10FOO`).
+///
+/// Every dimension a value prints asks this, and almost none carries an uppercase byte, so
+/// the uppercase-free test is all that stays in line; the set lookup and the lowercasing
+/// are [`canonical_cased_unit`]'s.
+#[inline]
 pub(crate) fn canonical_unit(unit: &str) -> Cow<'_, str> {
     if !unit.bytes().any(|b| b.is_ascii_uppercase()) {
         return Cow::Borrowed(unit);
     }
-    // Mixed/upper input: canonicalize only a known unit (prettier leaves unknown ones).
+    canonical_cased_unit(unit)
+}
+
+/// [`canonical_unit`] for a unit holding an uppercase byte: lowercased when it is a known
+/// unit, left as written otherwise (prettier leaves unknown ones).
+#[cold]
+#[inline(never)]
+fn canonical_cased_unit(unit: &str) -> Cow<'_, str> {
     if !is_known_css_unit(unit) {
         return Cow::Borrowed(unit);
     }

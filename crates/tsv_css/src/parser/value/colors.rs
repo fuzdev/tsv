@@ -229,8 +229,8 @@ ascii_keyword_set! {
     /// Is `s` a named CSS color (ASCII-case-insensitive)?
     ///
     /// Hot: the value parser asks this of every identifier-ish leaf it builds, so almost
-    /// every call is a `var` / `auto` / `solid` / `--custom-property` that no hash needs to
-    /// touch. `ascii_keyword_set!` puts the shape pre-filter in front — see `keyword_set`.
+    /// every call is a `var` / `auto` / `solid` / `--custom-property` that one bucket load
+    /// refuses — see `keyword_set`.
     fn is_named_color;
 
     // Standard colors
