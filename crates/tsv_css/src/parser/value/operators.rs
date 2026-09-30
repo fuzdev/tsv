@@ -69,7 +69,7 @@ use bumpalo::collections::Vec as BumpVec;
 use super::scan::{comment_end, is_comment_start, matching_close_paren};
 use crate::escapes::escape_len;
 use crate::lexer::{hyphen_starts_own_token, string_end};
-use crate::number::number_part_len;
+use crate::number::{number_part_len, starts_number};
 
 /// What the token just emitted was, which is what decides whether a following `/` or `-`
 /// opens an operator or is content.
@@ -538,7 +538,7 @@ fn operator_at_operand_position(
         return !hyphen_starts_own_token(&run[i + 1..]);
     }
     opens_run(b, colon_is_operator)
-        && number_part_len(&run[i..]) == 0
+        && !starts_number(&run[i..])
         && !(b == b'+' && plus_welds && starts_word(next, after))
 }
 
