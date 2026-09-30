@@ -13,6 +13,11 @@ Each `## Unreleased` section must be non-empty and carry a
 ## Unreleased
 <!-- bump: patch -->
 
+- **breaking** fix: the no-locations helper's Svelte `loc_of` (bare, or a `create_locator`'s) now
+  requires the span-only tree as `{ast}` and throws without it
+- fix: various formatting and parsing fixes
+- perf: misc parsing and formatting improvements
+
 ## 0.4.1
 
 - fix: various formatting and parsing fixes
