@@ -160,6 +160,60 @@ fn name_run_end_from_non_ascii(source: &str, mut i: usize) -> usize {
     i
 }
 
+/// The end of a quoted attribute value — one past its closing `quote` — from the first `{`
+/// in it, at `brace`; `None` when the value never closes.
+///
+/// The expression is skipped WHOLE via the shared trivia-aware brace matcher rather than
+/// re-lexed here. It already knows every construct in which a `}` or a quote is not code —
+/// nested braces, strings (escape aware), template literals including `${…}` interpolation,
+/// comments, and regex literals — so no delimiter buried in one can be mistaken for the end
+/// of the expression or of the attribute. Hand-tracking a subset of those is the
+/// "comment-aware delimiter scan" bug class (see `tsv_debug scan_audit`): a scan tracking
+/// braces and strings but not comments or regex is desynced by `title="{/* ` */ b}"` and
+/// `title="{f(/"/)}"` and runs to EOF — an over-rejection of Svelte-valid input.
+///
+/// `parse_attribute_value` (attribute.rs) re-walks the same value to split it into Text and
+/// ExpressionTag parts, and reaches the same answer the same way (via
+/// `parse_expression_tag_at`); this is the tokenizing half.
+///
+/// A `{#`/`{@` opening the brace ends the value's life as a *sequence*: Svelte's
+/// `read_sequence` rejects a block or tag in an attribute value before it reads an
+/// expression, and so does `SvelteParser::check_sequence_placement`. The marker need not be
+/// glued — `BlockOrTagMarker::in_sequence_at` skips the gap, and must, or the accident below
+/// survives one space (`a="{ #if c}a{/if}"`). From that marker on there is no expression to
+/// skip, and pretending otherwise loses the error: `style="{#if c}a{/if}"` reaches the
+/// `{/if}`, whose `/` opens a regex literal that never closes, so the scan runs to EOF and
+/// the whole value dies as `Unterminated string literal` — a lexer accident standing in for
+/// the placement rule the author actually broke. Reading the rest as plain bytes closes the
+/// string at its real quote, which is the HTML-level delimiter the static reader uses
+/// anyway, and hands the parser the position where the rule lives.
+///
+/// Cold and out of line: few values hold a `{` at all, and this arm's matcher and marker
+/// test would otherwise set up their state on every value the lexer walks.
+#[cold]
+#[inline(never)]
+fn quoted_value_end_from_brace(source: &str, brace: usize, quote: u8) -> Option<usize> {
+    let bytes = source.as_bytes();
+    let mut i = brace;
+    let mut sequence_is_invalid = false;
+    loop {
+        let b = *bytes.get(i)?;
+        if b == quote {
+            return Some(i + 1);
+        }
+        if b == b'{' && !sequence_is_invalid {
+            if BlockOrTagMarker::in_sequence_at(source, i).is_some() {
+                sequence_is_invalid = true;
+            } else {
+                // `None` — an unterminated `{` — and the value can't close.
+                i = scan_to_matching_brace(bytes, i + 1)? + '}'.len_utf8();
+                continue;
+            }
+        }
+        i += 1;
+    }
+}
+
 pub struct Lexer<'a> {
     source: &'a str,
     /// The cursor, as a byte offset into `source` — always on a character boundary. `source`
@@ -175,6 +229,15 @@ pub struct Lexer<'a> {
     /// question the byte already answers: don't reintroduce one.
     position: usize,
     pub inside_tag: bool, // Track if we're inside <...>
+    /// The start of the last String token lexed whose value holds no `{` — `u32::MAX`
+    /// before there is one. What [`Lexer::string_holds_no_brace`] reads.
+    ///
+    /// It can never be stale: a String token is a function of its start alone (the scan
+    /// reads the immutable document from there and nothing else), so "the String at `S`
+    /// holds no `{`" stays true however the cursor moves afterwards. Only a later brace-free
+    /// String replaces it; an asker whose String is not the last brace-free one lexed simply
+    /// misses.
+    plain_string_start: u32,
 }
 
 /// The `#` or `@` that makes a brace a `{#…}` block or a `{@…}` tag rather than an
@@ -271,6 +334,7 @@ impl<'a> Lexer<'a> {
             source,
             position: tsv_lang::leading_bom_len(source),
             inside_tag: false,
+            plain_string_start: u32::MAX,
         }
     }
 
@@ -324,18 +388,18 @@ impl<'a> Lexer<'a> {
         self.source.as_bytes()[self.position..].starts_with(needle)
     }
 
-    fn skip_whitespace(&mut self) {
-        self.position = self.peek_past_whitespace();
+    /// Whether the String token starting at document offset `start` holds no `{` between
+    /// its quotes — so its whole content is one attribute-value Text, with no expression
+    /// tag to split out. `true` only for the last brace-free String lexed — the parser's
+    /// current token unless a lookahead has lexed another brace-free String past it;
+    /// `false` is "not known", never "holds a `{`".
+    #[inline]
+    pub(crate) fn string_holds_no_brace(&self, start: usize) -> bool {
+        self.plain_string_start as usize == start
     }
 
-    /// Move the cursor to byte offset `pos`, which must be a char boundary at or after the
-    /// current position. Lets a scan delegate a span to a byte-level helper
-    /// (`tsv_lang::source_scan`) and resume lexing just past it, instead of re-walking the
-    /// span char by char through `advance`.
-    #[inline]
-    fn seek_to(&mut self, pos: usize) {
-        debug_assert!(pos >= self.position && self.source.is_char_boundary(pos));
-        self.position = pos;
+    fn skip_whitespace(&mut self) {
+        self.position = self.peek_past_whitespace();
     }
 
     /// Byte offset of the first non-whitespace char at or after the cursor, without
@@ -530,79 +594,41 @@ impl<'a> Lexer<'a> {
             Some(quote @ (b'\'' | b'"')) => {
                 // Quoted attribute value. Only two things matter here: the closing quote,
                 // and any `{expr}` tag — whose interior is JS, where the attribute's quote
-                // character is just an ordinary byte (`title="{a['\"']}"`).
+                // character is just an ordinary byte (`title="{a['\"']}"`). The first `{`
+                // hands the rest of the value to `quoted_value_end_from_brace`, out of line:
+                // most values hold none, so the value is one hop to the first of the two
+                // bytes, eight bytes a word (`tsv_lang::swar::next_byte_of`), instantiated
+                // per quote kind so both needles reach the word loop as constants.
                 //
-                // The expression is skipped WHOLE via the shared trivia-aware brace
-                // matcher rather than re-lexed here. It already knows every construct in
-                // which a `}` or a quote is not code — nested braces, strings (escape
-                // aware), template literals including `${…}` interpolation, comments, and
-                // regex literals — so no delimiter buried in one can be mistaken for the
-                // end of the expression or of the attribute. Hand-tracking a subset of
-                // those is the "comment-aware delimiter scan" bug class (see
-                // `tsv_debug scan_audit`): a scan tracking braces and strings but
-                // not comments or regex is desynced by `title="{/* ` */ b}"` and
-                // `title="{f(/"/)}"` and runs to EOF — an over-rejection of Svelte-valid input.
+                // Attribute-value text. HTML/Svelte attribute values have NO backslash
+                // escapes (unlike a JS string inside `{expr}`), so `\` is a literal char:
+                // `a="{x}\"` closes at the `"` with value `{x}\`, matching Svelte's parser.
+                // Treating `\` as an escape here read `\"` as an escaped quote and ran past
+                // the close → "Unterminated string literal" (an over-rejection of valid
+                // Svelte; the `fuzz` gate).
                 //
-                // `parse_attribute_value` (attribute.rs) re-walks the same value to split
-                // it into Text and ExpressionTag parts, and reaches the same answer the
-                // same way (via `parse_expression_tag_at`); this is the tokenizing half.
-                self.advance(); // consume opening quote
-
-                // A `{#`/`{@` opening the brace ends the value's life as a *sequence*:
-                // Svelte's `read_sequence` rejects a block or tag in an attribute value before
-                // it reads an expression, and so does `SvelteParser::check_sequence_placement`.
-                // The marker need not be glued — `BlockOrTagMarker::in_sequence_at` skips the
-                // gap, and must, or the accident below survives one space
-                // (`a="{ #if c}a{/if}"`).
-                // From that marker on there is no expression to skip, and pretending otherwise
-                // loses the error: `style="{#if c}a{/if}"` reaches the `{/if}`, whose `/` opens
-                // a regex literal that never closes, so the scan runs to EOF and the whole
-                // value dies as `Unterminated string literal` — a lexer accident standing in
-                // for the placement rule the author actually broke. Reading the rest as plain
-                // bytes closes the string at its real quote, which is the HTML-level delimiter
-                // the static reader uses anyway, and hands the parser the position where the
-                // rule lives.
-                let mut sequence_is_invalid = false;
-                // Borrowed from the immutable source, so both outlive the `&mut self` `seek_to`
-                // below rather than being re-taken per brace.
-                let source = self.source;
-                let bytes = source.as_bytes();
-
-                let closed = loop {
-                    let Some(&b) = bytes.get(self.position) else {
-                        break false;
-                    };
-                    if b == quote {
-                        self.position += 1; // consume closing quote
-                        break true;
-                    }
-                    if b == b'{' && !sequence_is_invalid {
-                        if BlockOrTagMarker::in_sequence_at(source, self.position).is_some() {
-                            sequence_is_invalid = true;
-                        } else {
-                            let Some(close) = scan_to_matching_brace(bytes, self.position + 1)
-                            else {
-                                break false; // unterminated `{` — the value can't close
-                            };
-                            self.seek_to(close + '}'.len_utf8());
-                            continue;
-                        }
-                    }
-                    // Attribute-value text. HTML/Svelte attribute values have NO backslash
-                    // escapes (unlike a JS string inside `{expr}`, skipped above), so `\`
-                    // is a literal char: `a="{x}\"` closes at the `"` with value `{x}\`,
-                    // matching Svelte's parser. Treating `\` as an escape here read `\"` as
-                    // an escaped quote and ran past the close → "Unterminated string
-                    // literal" (an over-rejection of valid Svelte; the `fuzz` gate).
-                    //
-                    // Both needles are ASCII, so — as in `skip_to_special_char` — stepping
-                    // one byte cannot stop inside a character.
-                    self.position += 1;
+                // Both needles are ASCII, so — as in `skip_to_special_char` — the hop
+                // cannot stop inside a character.
+                let bytes = self.source.as_bytes();
+                let from = self.position + 1; // past the opening quote, an ASCII byte
+                let stop = if quote == b'"' {
+                    tsv_lang::swar::next_byte_of(bytes, from, [b'"', b'{'])
+                } else {
+                    tsv_lang::swar::next_byte_of(bytes, from, [b'\'', b'{'])
                 };
-                if !closed {
-                    // Unterminated string
+                let end = match bytes.get(stop) {
+                    Some(b'{') => quoted_value_end_from_brace(self.source, stop, quote),
+                    // The closing quote, and a value with no `{` in it.
+                    Some(_) => {
+                        self.plain_string_start = start as u32;
+                        Some(stop + 1)
+                    }
+                    None => None,
+                };
+                let Some(end) = end else {
                     return Err(lex_err("Unterminated string literal in template", start));
-                }
+                };
+                self.position = end;
                 TokenKind::String
             }
             Some(b) if b.is_ascii_alphabetic() || matches!(b, b'_' | b'$' | b'-' | b'!') => {
@@ -687,7 +713,36 @@ impl<'a> Lexer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Lexer, char_at, is_svelte_ws};
+    use super::{Lexer, Token, TokenKind, char_at, is_svelte_ws};
+
+    /// The brace-free fact [`Lexer::string_holds_no_brace`] answers: asked right after each
+    /// String, it holds for the brace-free values and not for the one holding an expression
+    /// tag, and a later brace-free String replaces an earlier one's.
+    #[test]
+    fn string_holds_no_brace_names_the_last_brace_free_string() {
+        let source = r#"<a b="x" c="{y}" d='z' e="">"#;
+        let mut lexer = Lexer::new(source);
+        let mut token = Token {
+            kind: TokenKind::Eof,
+            start: 0,
+            end: 0,
+        };
+        let mut answers = Vec::new();
+        let mut first_string = None;
+        loop {
+            lexer.next_token_into(&mut token).unwrap();
+            match token.kind {
+                TokenKind::Eof => break,
+                TokenKind::String => {
+                    first_string.get_or_insert(token.start as usize);
+                    answers.push(lexer.string_holds_no_brace(token.start as usize));
+                }
+                _ => {}
+            }
+        }
+        assert_eq!(answers, [true, false, true, true]);
+        assert!(!lexer.string_holds_no_brace(first_string.unwrap()));
+    }
 
     /// The name-run class as one character loop — the predicate the table walk and its
     /// cold non-ASCII arm split between them, spelled whole so the split is graded

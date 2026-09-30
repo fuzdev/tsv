@@ -1128,8 +1128,28 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let content_start = token_start + 1;
         let content_end = token_end - 1;
 
+        // Asked before the advance below, which may lex another String past this one.
+        let holds_no_brace = self.lexer.string_holds_no_brace(token_start);
+
         // Advance past the string token now, before we start parsing expression tags
         self.advance()?;
+
+        // The lexer already walked the value to its closing quote and met no `{`, so the
+        // whole content is one Text — the split below would find exactly this, empty
+        // content included (its empty Text is the same node either way).
+        if holds_no_brace {
+            let span = Span {
+                start: content_start as u32,
+                end: content_end as u32,
+            };
+            parts.push(AttributeValue::Text(Text::new(
+                span,
+                TextDecoding::AttributeValue,
+                span,
+                self.source,
+            )));
+            return Ok(parts);
+        }
 
         // Scan the quoted value as a sequence of Text and {expr} chunks. Each
         // `{expr}` goes through `parse_sequence_expression_tag_at` — the placement guard
