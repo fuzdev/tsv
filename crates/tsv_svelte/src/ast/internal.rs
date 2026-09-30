@@ -1246,20 +1246,38 @@ pub enum ElementKind {
 ///
 /// Examples: `Comp` → true, `ns.Comp` → true, `Object.component` → true, `div` → false,
 /// `foo:bar` → false, `Foo:bar` → false.
-///
-/// One walk answers both byte questions — any `:` refuses, any `.` admits — where
-/// `contains(':')` then `contains('.')` read the name twice; both are ASCII, so a byte match
-/// is the `char` match exactly.
 pub(crate) fn is_component_name(name: &str) -> bool {
+    name_shape(name) == NameShape::Component
+}
+
+/// What a tag name's own punctuation makes it: `:`-namespaced, else component-shaped
+/// ([`is_component_name`]), else neither.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum NameShape {
+    /// A `:` in the name (`foo:bar`, `Foo:bar`) — never a component.
+    Namespaced,
+    Component,
+    Plain,
+}
+
+/// The name's [`NameShape`], from one walk that answers every byte question — any `:`
+/// namespaces (and so refuses component-ness), any `.` admits — where `contains(':')` then
+/// `contains('.')` read the name twice, and [`TagFacts::compute`]'s namespaced bit a third
+/// time; both are ASCII, so a byte match is the `char` match exactly.
+fn name_shape(name: &str) -> NameShape {
     let mut dotted = false;
     for &b in name.as_bytes() {
         match b {
-            b':' => return false,
+            b':' => return NameShape::Namespaced,
             b'.' => dotted = true,
             _ => {}
         }
     }
-    dotted || name.chars().next().is_some_and(char::is_uppercase)
+    if dotted || name.chars().next().is_some_and(char::is_uppercase) {
+        NameShape::Component
+    } else {
+        NameShape::Plain
+    }
 }
 
 /// Every classification fact derivable from a tag *name* alone, packed into a `u16` and computed
@@ -1326,11 +1344,10 @@ impl TagFacts {
         if tsv_html::is_foreign_element(tag_name) {
             bits |= Self::FOREIGN;
         }
-        if is_component_name(tag_name) {
-            bits |= Self::COMPONENT_NAME;
-        }
-        if tag_name.contains(':') {
-            bits |= Self::NAMESPACED;
+        match name_shape(tag_name) {
+            NameShape::Namespaced => bits |= Self::NAMESPACED,
+            NameShape::Component => bits |= Self::COMPONENT_NAME,
+            NameShape::Plain => {}
         }
         if tag_name == "style" {
             bits |= Self::STYLE;
@@ -2467,6 +2484,9 @@ mod tests {
             "!doctype",
             "!DOCTYPE",
             "!DocType",
+            "!",
+            "!doctypex",
+            "!DOCTYPEX",
             // foreign members (SVG incl. camelCase + hyphenated; MathML)
             "svg",
             "circle",
@@ -2486,7 +2506,12 @@ mod tests {
             "svelte:head",
             "svelte:component",
             "foo:bar",
+            "Foo:bar",
             "foo.bar",
+            "foo.bar:baz",
+            "Foo.bar:",
+            ":",
+            ".",
             "Div",
             "DIV",
             "Δcomp",

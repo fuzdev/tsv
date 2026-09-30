@@ -193,9 +193,11 @@ pub fn is_block_element(tag_name: &str) -> bool {
 #[inline]
 pub fn is_void_element(tag_name: &str) -> bool {
     // `!doctype` is the one case-insensitive member and the one that does not fit the shape (it
-    // opens on `!`), so it sits outside the set and is matched on its own.
+    // opens on `!`), so it sits outside the set and is matched on its own — behind its `!`, so
+    // the case-folding compare (an out-of-line call) runs only for a declaration-shaped name
+    // and not for every name the set rejects.
     (shape_admits(&VOID_SHAPE, tag_name) && void_set_contains(tag_name))
-        || tag_name.eq_ignore_ascii_case("!doctype")
+        || (tag_name.starts_with('!') && tag_name.eq_ignore_ascii_case("!doctype"))
 }
 
 /// Whether this element IS a rendered line break — `<br>` alone. The [spec][br] says it
@@ -412,6 +414,9 @@ mod tests {
                     "Svg",
                     "!doctype",
                     "!DOCTYPE",
+                    "!",
+                    "!doctypex",
+                    "!DOCTYPEX",
                     "h1",
                     "h7",
                     "p",
