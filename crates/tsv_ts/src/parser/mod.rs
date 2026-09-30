@@ -479,8 +479,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// lex; `None` for the common escape-free token. One copy into the arena — the
     /// same copy the old owned-`String` path made when it stored the value, now the
     /// only allocation on the escape path.
+    ///
+    /// Only the test inlines; the copy is [`Parser::copy_decoded_to_arena`]'s. Inlined,
+    /// the bump allocation and its `memcpy` call kept two callee-saved registers live in
+    /// [`Parser::advance_inner`], which then saved and restored them on every token.
     #[inline]
     fn decoded_to_arena(&self) -> Option<&'arena str> {
+        if self.lexer.decoded_str().is_some() {
+            self.copy_decoded_to_arena()
+        } else {
+            None
+        }
+    }
+
+    /// [`Parser::decoded_to_arena`]'s copy, for the rare token that decoded an escape.
+    #[cold]
+    #[inline(never)]
+    fn copy_decoded_to_arena(&self) -> Option<&'arena str> {
         self.lexer
             .decoded_str()
             .map(|s| -> &'arena str { self.arena.alloc_str(s) })

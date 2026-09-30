@@ -168,6 +168,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         })
     }
 
+    /// Resume a template literal past its interpolation's closing `}` (at the raw offset
+    /// `raw_brace_end`), making the template middle or tail the lexer reads there the
+    /// current token.
+    ///
+    /// Out of line because [`Parser::parse_template_literal`] recurses once per nested
+    /// template, so its frame is the depth budget of a `` `${`${…}`}` `` chain: inlined,
+    /// the returned token's stack slot and `update_current`'s escape-copy call live in that
+    /// frame and widen it.
+    #[inline(never)]
+    fn continue_template_after_brace(&mut self, raw_brace_end: usize) -> Result<(), ParseError> {
+        let next_token = self.lexer.continue_template_from_brace(raw_brace_end)?;
+        self.update_current(next_token);
+        Ok(())
+    }
+
     /// Parse template literal: `hello ${name}`
     ///
     /// Handles both simple templates (no interpolation) and templates with expressions.
@@ -232,8 +247,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // Skip the } in the lexer without getting next token normally
                     // (calling advance() would try to lex ` as a new token)
                     // Instead, tell the lexer to skip past the } and read template content
-                    let next_token = self.lexer.continue_template_from_brace(raw_brace_end)?;
-                    self.update_current(next_token);
+                    self.continue_template_after_brace(raw_brace_end)?;
 
                     let (elem_start, elem_end) = self.current_pos();
 
