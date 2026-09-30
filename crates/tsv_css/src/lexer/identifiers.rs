@@ -17,14 +17,14 @@ pub(crate) fn is_non_ascii_identifier_codepoint(ch: char) -> bool {
 }
 
 /// 256-entry lookup table for the ASCII identifier-continuation fast path
-/// ([`ascii_identifier_run_end`], run by `read_identifier` and by the lexer's common-case
-/// identifier handoff). Each entry is computed from the same byte predicate the
+/// ([`ascii_identifier_run_end`], run by `read_identifier` and by the lexer front's common
+/// identifier). Each entry is computed from the same byte predicate the
 /// per-char continuation arm expands to for ASCII (`[a-zA-Z0-9_-]`), so a lookup
 /// replaces the alnum/eq OR-chain plus a full UTF-8 decode with one L1 load on the
 /// hot identifier-body loop. Non-ASCII bytes are all `false`, so the fast path stops
 /// at the first non-ASCII byte and the char loop decodes it — byte-identical.
 ///
-/// Shared with `read_number`'s dimension-unit body loop: a unit (`px`, `rem`) is an
+/// Shared with `read_number_into`'s dimension-unit body loop: a unit (`px`, `rem`) is an
 /// identifier, so it continues on exactly this predicate — and with the declaration
 /// value's boundary scan, which decides whether a `url` is a token start (and so opens an
 /// opaque url-token) from the single byte before it.
@@ -110,7 +110,7 @@ pub(crate) fn hyphen_starts_own_token(after: &str) -> bool {
 ///
 /// Equal to `is_identifier_start(b as char)` for every ASCII byte (`b < 0x80`), and
 /// `false` for every non-ASCII byte — the non-ASCII identifier code points (`>= 0xA0`)
-/// are `>= 0x80`, so they're handled by the dispatch's char tail, not here. Covers the
+/// are `>= 0x80`, so they're handled by the dispatch's non-ASCII arm, not here. Covers the
 /// ASCII letters, `-`, `_`, and the `\` escape introducer (digits and a leading `$`
 /// have their own dispatch arms).
 #[inline]
@@ -119,8 +119,8 @@ pub(crate) fn is_ascii_identifier_start(b: u8) -> bool {
 }
 
 /// Read a CSS identifier — the general reader, which the lexer reaches only for an
-/// identifier whose ASCII run stops on a non-ASCII byte or a `\` (the common identifier is
-/// read by the lexer's handoff, [`crate::lexer::Lexer::read_identifier_into`]).
+/// identifier whose ASCII run stops on a non-ASCII byte or a `\`, or that opens with a `\`
+/// (the common identifier is read by the lexer's front, `Lexer::next_token_into_local`).
 /// CSS identifiers can contain unicode escapes; the characters a-z, A-Z, 0-9, -, _;
 /// any non-ASCII code point at or above U+00A0 (symbols and emoji, matching Svelte's
 /// `>= 160` rule); plus an optional leading `$` (SCSS-style; the lexer dispatch only

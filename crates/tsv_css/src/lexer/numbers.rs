@@ -2,11 +2,14 @@ use super::identifiers::IDENT_CONTINUE_LUT;
 use super::token::{Token, TokenKind};
 use crate::number::{continues_unit, exponent_len};
 
-/// Read a CSS number, percentage, or dimension
+/// Read a CSS number, percentage, or dimension into `*dst`
 /// Numbers: 42, 1.5, .5, -42, +1.5
 /// Percentages: 50%, -100%
 /// Dimensions: 16px, 1.5em, -2.5rem
-pub(crate) fn read_number(source: &str, pos: &mut usize) -> Token {
+///
+/// Written through the caller's slot rather than returned: a returned `Token` comes back
+/// through a stack temporary the caller then copies into its own.
+pub(crate) fn read_number_into(source: &str, pos: &mut usize, dst: &mut Token) {
     let start = *pos;
     let bytes = source.as_bytes();
     let len = bytes.len();
@@ -72,7 +75,7 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Token {
     // out-of-range one parses to infinity rather than failing).
     debug_assert!(
         source[start..num_end].parse::<f64>().is_ok(),
-        "read_number scanned a non-number: {:?}",
+        "read_number_into scanned a non-number: {:?}",
         &source[start..num_end]
     );
 
@@ -80,11 +83,12 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Token {
     if bytes.get(p) == Some(&b'%') {
         p += 1;
         *pos = p;
-        return Token {
+        *dst = Token {
             kind: TokenKind::Percentage,
             start: start as u32,
             end: p as u32,
         };
+        return;
     }
 
     // Check for dimension (unit). A unit is an identifier, so its body continues on the
@@ -112,13 +116,14 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Token {
         let unit_len = p - unit_start;
         if unit_len > 0 {
             *pos = p;
-            return Token {
+            *dst = Token {
                 kind: TokenKind::Dimension {
                     unit_len: unit_len as u8,
                 },
                 start: start as u32,
                 end: p as u32,
             };
+            return;
         }
 
         // Reset position if we didn't find a valid unit
@@ -127,9 +132,9 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Token {
 
     // Just a number
     *pos = p;
-    Token {
+    *dst = Token {
         kind: TokenKind::Number,
         start: start as u32,
         end: p as u32,
-    }
+    };
 }
