@@ -136,26 +136,35 @@ fn is_namespaced_name(name: &str) -> bool {
 /// ASCII-alpha start, ASCII alphanumerics, then optionally a hyphen introducing a run of
 /// [`PCENChar`](tsv_html::is_pcen_char) (custom-element names such as `<my-café>`). The Unicode
 /// ranges are literal, so no general-category lookup is needed.
+///
+/// The head is read on bytes: its whole class is ASCII, so a byte that is not an ASCII
+/// alphanumeric or the hyphen — every byte of a non-ASCII character included — fails the
+/// name there. Only the tail past the hyphen can hold a non-ASCII character, and it is
+/// asked a character at a time, out of line: a custom-element name is the rare tag.
 fn is_valid_element_local_name(name: &str) -> bool {
-    let mut chars = name.chars();
-    if !chars.next().is_some_and(|c| c.is_ascii_alphabetic()) {
+    let bytes = name.as_bytes();
+    if !bytes.first().is_some_and(u8::is_ascii_alphabetic) {
         return false;
     }
-    let mut after_hyphen = false;
-    for c in chars {
-        if after_hyphen {
-            if !tsv_html::is_pcen_char(c) {
-                return false;
-            }
-        } else if c.is_ascii_alphanumeric() {
-            // still in the leading `[a-zA-Z0-9]*` run
-        } else if c == '-' {
-            after_hyphen = true; // the hyphen that opens the PCENChar tail
-        } else {
-            return false;
-        }
+    // the leading `[a-zA-Z0-9]*` run
+    let mut i = 1;
+    while i < bytes.len() && bytes[i].is_ascii_alphanumeric() {
+        i += 1;
     }
-    true
+    match bytes.get(i) {
+        None => true,
+        // the hyphen that opens the PCENChar tail; ASCII, so the cut is a char boundary
+        Some(b'-') => is_pcen_run(&name[i + 1..]),
+        Some(_) => false,
+    }
+}
+
+/// Whether every character of `tail` is a [`PCENChar`](tsv_html::is_pcen_char) — the run a
+/// custom-element name carries after its first hyphen (an empty one is valid).
+#[cold]
+#[inline(never)]
+fn is_pcen_run(tail: &str) -> bool {
+    tail.chars().all(tsv_html::is_pcen_char)
 }
 
 /// Result type for parsing elements - either a regular element or a special element.
@@ -1127,6 +1136,63 @@ mod tests {
                 .all(|&b| b.is_ascii_alphanumeric() || b == b'-')
     }
 
+    /// `REGEX_VALID_TAG_NAME` as one character loop — the predicate
+    /// [`is_valid_element_local_name`]'s byte head and character tail split between them,
+    /// spelled whole so the split is graded against something that never made it.
+    fn element_local_name_reference(name: &str) -> bool {
+        let mut chars = name.chars();
+        if !chars.next().is_some_and(|c| c.is_ascii_alphabetic()) {
+            return false;
+        }
+        let mut after_hyphen = false;
+        for c in chars {
+            if after_hyphen {
+                if !tsv_html::is_pcen_char(c) {
+                    return false;
+                }
+            } else if c.is_ascii_alphanumeric() {
+                // still in the leading `[a-zA-Z0-9]*` run
+            } else if c == '-' {
+                after_hyphen = true;
+            } else {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Every Unicode scalar at each position the local-name predicate can meet it: alone,
+    /// behind the ASCII head, as the byte after the head, behind the hyphen, deeper in the
+    /// tail, and followed by more name.
+    #[test]
+    fn element_local_name_matches_the_reference_for_every_scalar() {
+        let mut checked = 0usize;
+        for cp in 0..=0x10_ffff_u32 {
+            let Some(c) = char::from_u32(cp) else {
+                continue;
+            };
+            for name in [
+                format!("{c}"),
+                format!("{c}b"),
+                format!("a{c}"),
+                format!("a1{c}b"),
+                format!("a{c}-b"),
+                format!("a-{c}"),
+                format!("a-b{c}c"),
+                format!("a-{c}{c}"),
+                format!("a--{c}"),
+            ] {
+                assert_eq!(
+                    is_valid_element_local_name(&name),
+                    element_local_name_reference(&name),
+                    "U+{cp:04X} in {name:?}"
+                );
+                checked += 1;
+            }
+        }
+        assert!(checked > 9_000_000, "the scalar walk ran ({checked} cases)");
+    }
+
     /// The element-name predicates agree with their reference spellings at every arrangement
     /// of the characters each arm keys on — the namespace colon (one, two, leading, trailing),
     /// the doctype `!`, the custom-element hyphen and its non-ASCII `PCENChar` tail (a BMP
@@ -1152,6 +1218,11 @@ mod tests {
         crate::test_support::for_every_arrangement(&PIECES, 5, |name| {
             let namespaced = namespaced_name_reference(name);
             assert_eq!(is_namespaced_name(name), namespaced, "{name:?}");
+            assert_eq!(
+                is_valid_element_local_name(name),
+                element_local_name_reference(name),
+                "{name:?}"
+            );
             assert_eq!(
                 is_valid_element_name(name),
                 is_doctype_name(name) || namespaced || is_valid_element_local_name(name),
