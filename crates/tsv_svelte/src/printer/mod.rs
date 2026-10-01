@@ -914,6 +914,15 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         if frozen {
             self.build_frozen_node_doc(expr.span())
+        } else if let Some(path) = plain_path_span(expr)
+            && !self.owns_leading_comment_at(path.start)
+            && fuses_source_spans()
+        {
+            // A plain path that owns no comment prints as its own bytes under every embed —
+            // a name has one printed form, and so does a lone lookup off one. Every value
+            // built through this function takes the arm, a binding pattern's leaves and
+            // keys included ([`Self::build_ts_expression_doc`]).
+            self.plain_source_span_doc(path)
         } else {
             tsv_ts::build_expression_doc(self.d(), expr, &self.ts_inputs(), *embed)
         }
@@ -933,6 +942,14 @@ impl<'a> Printer<'a> {
             "a fused span holds a byte its width depends on"
         );
         self.d().source_span_plain(span)
+    }
+
+    /// Whether the node beginning at `start` **owns** a block comment glued ahead of it —
+    /// the comment its doc would print ([`Self::claim_owned_leading_comment`], `tsv_ts`'s
+    /// `prepend_owned_leading_comment`). Opens on the document-level flag, like both claims.
+    fn owns_leading_comment_at(&self, start: u32) -> bool {
+        self.has_owned_comments
+            && tsv_lang::owned_leading_comment_at(self.source, self.comments, start).is_some()
     }
 
     /// [`Self::build_head_value_doc`] for the one head whose value is an **assignment
