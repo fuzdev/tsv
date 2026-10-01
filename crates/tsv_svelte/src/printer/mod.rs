@@ -561,6 +561,65 @@ pub(crate) fn without_fused_source_spans<R>(f: impl FnOnce() -> R) -> R {
     f()
 }
 
+/// The span of an identifier that is a **plain reference**: a variable name with no `?`
+/// and no binding extra (a type annotation, a decorator), spelled in plain ASCII with no
+/// escape, whose node covers the name and nothing more. Such a node prints as those bytes
+/// (`tsv_ts`'s identifier fast path), one column a byte.
+///
+/// `extra.is_none()` is the load-bearing clause: a typed block binding (`{#each xs as x: T}`)
+/// keeps its span on the bare name with the annotation as a sibling, so nothing about the
+/// span says the node prints more than its name.
+fn plain_reference_span(id: &tsv_ts::ast::internal::Identifier<'_>) -> Option<Span> {
+    (id.name_plain_ascii
+        && id.escaped_name.is_none()
+        && !id.optional
+        && id.extra.is_none()
+        && id.span.end - id.span.start == u32::from(id.name_len))
+    .then_some(id.span)
+}
+
+/// The span of an expression that is a **plain path** — `name`, or `name.prop` with the
+/// two names one `.` apart, each a plain reference ([`plain_reference_span`]) — when the
+/// expression's own span is exactly that.
+///
+/// A plain path prints as its own source bytes: a name is its node's doc, and a node whose
+/// span is the path alone has no paren shell and no gap, so nothing between its ends can
+/// hold a comment or a byte the printer respells. The dotted form is as far as that is
+/// taken. A lone lookup off a bare identifier is a member chain `tsv_ts` builds as one
+/// flat run with no break point (`lone_lookup_off_bare_base`), where a longer chain
+/// (`a.b.c`), a `this`, `super` or `import.meta` base and a private lookup (`a.#b`) each
+/// take a group that can break before the lookup, and so have a second printed form. The
+/// remaining exclusions are conservative, kept so the gate names the one shape whose doc
+/// is provably a single flat run: an optional lookup (`a?.b`) and a trailing `!` stay in
+/// that flat arm, and a computed lookup breaks only inside its brackets. `!computed` and
+/// the span equality below imply each other for `a[b]` — its names are also one byte
+/// apart — so either one alone declines it, never neither (the span would stop short of
+/// the `]`). The one thing a path's doc can carry from
+/// outside the span is a block comment the path **owns** (`docs/comments.md` §Owned
+/// comments), which sits glued ahead of it — a caller that prints the span instead of
+/// building the doc owes the proof that none does.
+pub(in crate::printer) fn plain_path_span(expr: &Expression<'_>) -> Option<Span> {
+    let path = match &expr.kind {
+        ExpressionKind::Identifier(id) => plain_reference_span(id)?,
+        ExpressionKind::MemberExpression(member) if !member.computed && !member.optional => {
+            let (ExpressionKind::Identifier(object), ExpressionKind::Identifier(property)) =
+                (&member.object.kind, &member.property.kind)
+            else {
+                return None;
+            };
+            let object = plain_reference_span(object)?;
+            let property = plain_reference_span(property)?;
+            // One byte between the two names: the `.`, with no paren, gap or comment.
+            if object.end + 1 != property.start {
+                return None;
+            }
+            Span::new(object.start, property.end)
+        }
+        _ => return None,
+    };
+    (path == expr.span).then_some(path)
+}
+
 impl<'a> Printer<'a> {
     /// A printer over `source`, classifying its lines here (standalone layout) — the
     /// tests' constructor; the format entry points hand [`Self::with_line_breaks`] a

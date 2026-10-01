@@ -1612,12 +1612,34 @@ impl<'a> Printer<'a> {
         self.build_expression_tag_doc_at(tag, site)
     }
 
+    /// Whether `tag` is a plain path between its braces with nothing else inside them —
+    /// `{name}` or `{name.prop}` — so it prints as its own source bytes
+    /// ([`plain_path_span`](super::plain_path_span)).
+    ///
+    /// With the path flush against both braces there is no gap for a comment, a
+    /// format-ignore directive or whitespace on either side of it, and the byte ahead of
+    /// the path is the `{`, so it owns no comment either. What the general builder adds
+    /// around a value never applies: the clarity pair is an assignment's, and the regex
+    /// pair a regex-led value's. Every byte of the tag is then plain ASCII.
+    fn tag_is_plain_path(tag: &internal::ExpressionTag<'_>) -> bool {
+        super::plain_path_span(tag.expression)
+            .is_some_and(|path| path.start == tag.span.start + 1 && path.end + 1 == tag.span.end)
+    }
+
     fn build_expression_tag_doc_at(
         &self,
         tag: &internal::ExpressionTag<'_>,
         site: TagSite,
     ) -> DocId {
         let d = self.d();
+        if Self::tag_is_plain_path(tag) && super::fuses_source_spans() {
+            debug_assert!(
+                tag.span.extract(self.source).starts_with('{')
+                    && tag.span.extract(self.source).ends_with('}'),
+                "a tag one byte wider than its path on each side is that path in its braces"
+            );
+            return self.plain_source_span_doc(tag.span);
+        }
         // The same value-head content every unprefixed `{…}` builds — the tag always has its
         // braces, so the span is never absent. Only the assembly below is the tag's own: it
         // hugs its braces where an attribute value chooses between hug and block — which is
