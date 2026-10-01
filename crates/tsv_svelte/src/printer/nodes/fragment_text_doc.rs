@@ -13,9 +13,12 @@
 
 use super::fragment_doc::{DeferredBoundary, LeadingEdge, text_starts_with_linebreak};
 use super::helpers::{is_control_flow_block, is_inline_content};
-use crate::ast::internal::{FragmentNode, Text, split_collapsible_ws, text_edge_newlines};
+use crate::ast::internal::{
+    CollapsibleWord, FragmentNode, Text, collapsible_word_ranges, text_edge_newlines,
+};
 use crate::printer::Printer;
 use smallvec::SmallVec;
+use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
 /// Position of a text node relative to its siblings.
@@ -1323,21 +1326,75 @@ impl<'a> Printer<'a> {
     // Text nodes
     //
 
-    /// Append `s` as `[word, line, word, …]` fill parts (a `line` between words, none before
-    /// the first / after the last) directly into `parts` — no intermediate buffer. Split on
-    /// [`split_collapsible_ws`], matching `build_text_fill_doc_trimmed`'s word split (so a
-    /// non-breaking space or form feed stays attached). Used by the inline-element fold so the
-    /// words after a folded element pack greedily into the surrounding fill rather than moving as
-    /// one nested unit.
+    /// Where `raw` starts in the document, when it is a slice of it — which a text node's raw
+    /// text always is. Read off the slice's own address, so a caller passes the text it
+    /// already holds and nothing more: the fill's callers sit in the fragment builder, whose
+    /// frame every level of element nesting pays, and a span carried beside the slice is one
+    /// more value alive across that frame's calls.
+    ///
+    /// `None` for a string from anywhere else, which no non-empty string can overlap (an
+    /// empty one has no words); its words are then copied into the text pool instead of named
+    /// by position.
+    #[inline]
+    fn document_offset_of(&self, raw: &str) -> Option<u32> {
+        let start = raw
+            .as_ptr()
+            .addr()
+            .wrapping_sub(self.source.as_ptr().addr());
+        (start <= self.source.len() && raw.len() <= self.source.len() - start)
+            .then_some(start as u32)
+    }
+
+    /// The doc of one fill word: the word's own bytes in the document, named by position and
+    /// resolved against the source at render, so nothing is copied into the text pool.
+    /// `raw` is the text being split, `raw_start` its [`Self::document_offset_of`], and
+    /// `word` a range of it.
+    ///
+    /// An ASCII word's width is its byte length — the split ends a word at every `\t` and
+    /// `\n`, the only ASCII bytes a width depends on — so it takes the span that measures
+    /// nothing; any other word is measured.
+    ///
+    /// ⚠️ **A wrong claim is a SILENT width error** — nothing downstream re-derives the
+    /// width, so it moves a fits verdict and changes no other observable. The claim is
+    /// therefore graded against the word's own bytes in every debug build.
+    #[inline]
+    fn word_doc(&self, raw: &str, raw_start: Option<u32>, word: CollapsibleWord) -> DocId {
+        let Some(raw_start) = raw_start else {
+            return self.d().text_pooled(word.extract(raw));
+        };
+        let span = Span::new(raw_start + word.start, raw_start + word.end);
+        debug_assert_eq!(span.extract(self.source), word.extract(raw));
+        if word.is_ascii {
+            debug_assert!(
+                !word
+                    .extract(raw)
+                    .bytes()
+                    .any(tsv_lang::printing::is_width_relevant),
+                "a fill word claimed plain holds a width-relevant byte: {:?}",
+                word.extract(raw)
+            );
+            self.d().source_span_plain(span)
+        } else {
+            self.d().source_span(span, self.source)
+        }
+    }
+
+    /// Append `s` as `[word, line, word, …]` fill parts (a `line` between
+    /// words, none before the first / after the last) directly into `parts` — no intermediate
+    /// buffer. Split on [`collapsible_word_ranges`], matching `build_text_fill_doc_trimmed`'s
+    /// word split (so a non-breaking space or form feed stays attached). Used by the
+    /// inline-element fold so the words after a folded element pack greedily into the
+    /// surrounding fill rather than moving as one nested unit.
     fn extend_with_word_fill(&self, parts: &mut DocBuf, s: &str) {
         let d = self.d();
+        let start = self.document_offset_of(s);
         let mut first = true;
-        for word in split_collapsible_ws(s) {
+        for word in collapsible_word_ranges(s) {
             if !first {
                 parts.push(d.line());
             }
             first = false;
-            parts.push(d.text_pooled(word));
+            parts.push(self.word_doc(s, start, word));
         }
     }
 
@@ -1412,6 +1469,7 @@ impl<'a> Printer<'a> {
         glued_prefix: Option<DocId>,
     ) -> Option<DocId> {
         let d = self.d();
+        let raw_start = self.document_offset_of(raw);
         // Collapsible whitespace only (matching the word split below): a boundary
         // space is emitted only when the split consumed a collapsible-whitespace
         // run. A boundary non-breaking space (U+00A0 / U+202F) stays attached to its
@@ -1424,7 +1482,7 @@ impl<'a> Printer<'a> {
         // a non-breaking space (U+00A0) / narrow NBSP (U+202F), which Rust's Unicode-aware
         // `split_whitespace` would split on and drop, and a form feed, which its
         // `split_ascii_whitespace` would (prettier's `/[\t\n\f\r ]+/` drops it too).
-        let words: SmallVec<[&str; 8]> = split_collapsible_ws(raw).collect();
+        let words: SmallVec<[CollapsibleWord; 8]> = collapsible_word_ranges(raw).collect();
         if words.is_empty() {
             return None;
         }
@@ -1442,10 +1500,10 @@ impl<'a> Printer<'a> {
                 let word = if !trim_leading && has_leading_ws {
                     let mut w = d.pool_writer();
                     w.push(' ');
-                    w.push_str(words[0]);
+                    w.push_str(words[0].extract(raw));
                     w.finish_text()
                 } else {
-                    d.text_pooled(words[0])
+                    self.word_doc(raw, raw_start, words[0])
                 };
                 let parts = [fuse_head(word), d.line()];
                 return Some(d.fill(&parts));
@@ -1454,7 +1512,7 @@ impl<'a> Printer<'a> {
             if !trim_leading && has_leading_ws {
                 result.push(' ');
             }
-            result.push_str(words[0]);
+            result.push_str(words[0].extract(raw));
             if !trim_trailing && has_trailing_ws {
                 result.push(' ');
             }
@@ -1473,22 +1531,22 @@ impl<'a> Printer<'a> {
             parts.push(d.line());
         }
 
-        for (i, word) in words.iter().enumerate() {
+        for (i, &word) in words.iter().enumerate() {
             if i > 0 {
                 parts.push(d.line());
             }
             let word_doc = if i == 0 && prepend_space {
                 let mut w = d.pool_writer();
                 w.push(' ');
-                w.push_str(word);
+                w.push_str(word.extract(raw));
                 w.finish_text()
             } else if i == words.len() - 1 && append_space {
                 let mut w = d.pool_writer();
-                w.push_str(word);
+                w.push_str(word.extract(raw));
                 w.push(' ');
                 w.finish_text()
             } else {
-                d.text_pooled(word)
+                self.word_doc(raw, raw_start, word)
             };
             // `leading_line` puts a `line` in the first slot instead, and it never coexists with a
             // glued prefix (the run would have to both start with whitespace and not) — so the
@@ -1505,5 +1563,39 @@ impl<'a> Printer<'a> {
         }
 
         Some(d.fill(&parts))
+    }
+}
+
+#[cfg(test)]
+mod document_offset_tests {
+    use crate::printer::Printer;
+    use tsv_lang::doc::arena::DocArena;
+
+    /// Every sub-slice of the document, the empty ones at both ends included, is named by
+    /// its offset; a slice that only overlaps the document, or lies outside it, is not.
+    #[test]
+    fn document_offset_is_some_exactly_for_a_slice_of_the_document() {
+        // the document is the middle of a longer buffer, so one byte before, one byte past
+        // and a straddle of either end are all real, adjacent addresses
+        let buffer = String::from("ab<p>wörd x</p>cd");
+        let base = 2;
+        let doc = &buffer[base..buffer.len() - 2];
+        let arena = DocArena::for_source(doc);
+        let printer = Printer::new(&arena, doc, &[]);
+        for start in 0..=buffer.len() {
+            for end in start..=buffer.len() {
+                let Some(slice) = buffer.get(start..end) else {
+                    continue;
+                };
+                let inside = start >= base && end <= base + doc.len();
+                assert_eq!(
+                    printer.document_offset_of(slice),
+                    inside.then(|| (start - base) as u32),
+                    "{start}..{end}"
+                );
+            }
+        }
+        let foreign = String::from("<p>wörd x</p>");
+        assert_eq!(printer.document_offset_of(&foreign), None);
     }
 }

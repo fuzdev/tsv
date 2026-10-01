@@ -1809,8 +1809,20 @@ pub fn trim_end_collapsible_ws(s: &str) -> &str {
     &s[..s.len() - collapsible_ws_suffix_len(s)]
 }
 
-/// The runs of `s` between [`is_collapsible_ws_char`] characters, empties skipped — the
-/// word split of a text node's fill (prettier's `splitTextToDocs`, `/[\t\n\f\r ]+/`).
+/// The runs of `s` between [`is_collapsible_ws_char`] characters, empties skipped, each as a
+/// slice of `s` — the split the printer counts a text node's prose words with. It steps the
+/// same walk as [`collapsible_word_ranges`], the fill's splitter, so a word counted here is a
+/// word packed there.
+#[inline]
+pub fn split_collapsible_ws(s: &str) -> impl Iterator<Item = &str> {
+    CollapsibleWords { s, pos: 0 }
+}
+
+/// The runs of `s` between [`is_collapsible_ws_char`] characters, empties skipped, each as
+/// its byte range in `s` — the word split of a text node's fill (prettier's
+/// `splitTextToDocs`, `/[\t\n\f\r ]+/`). A range rather than a slice because `s` is itself a
+/// span of a longer document, and the fill names each word by position (a doc text resolved
+/// against the source at render) rather than copying it.
 ///
 /// A word split *is* a whitespace classification — every character it splits at is deleted along
 /// with the run it stood for — so it shares [`is_collapsible_ws_char`] rather than restating the
@@ -1822,15 +1834,60 @@ pub fn trim_end_collapsible_ws(s: &str) -> &str {
 /// byte of every text node's prose to find a class that is four ASCII bytes, and the fill asks
 /// it of every content text it packs.
 #[inline]
-pub fn split_collapsible_ws(s: &str) -> impl Iterator<Item = &str> {
-    CollapsibleWords { rest: s }
+pub fn collapsible_word_ranges(s: &str) -> impl Iterator<Item = CollapsibleWord> {
+    CollapsibleWordRanges {
+        bytes: s.as_bytes(),
+        pos: 0,
+    }
 }
 
-/// The iterator behind [`split_collapsible_ws`]: `rest` is the unconsumed tail, every word
-/// yielded is a maximal run of non-[`is_collapsible_ws`] bytes, and the class being ASCII
-/// is what makes each cut a char boundary.
+/// One word of [`collapsible_word_ranges`]: a maximal run of non-[`is_collapsible_ws`] bytes,
+/// as offsets into the string that was split.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CollapsibleWord {
+    pub start: u32,
+    pub end: u32,
+    /// Whether every byte of the word is ASCII, read off the walk that found its end. A
+    /// word holds no `\t` and no `\n` (both end one), so an ASCII word is one column a
+    /// byte: its display width is its byte length.
+    pub is_ascii: bool,
+}
+
+impl CollapsibleWord {
+    /// The word's text, sliced from the string it was split out of.
+    #[inline]
+    pub fn extract<'a>(&self, s: &'a str) -> &'a str {
+        &s[self.start as usize..self.end as usize]
+    }
+}
+
+/// The next word of `bytes` at or after `from`, as `(start, end, bits)` — the one walk both
+/// word iterators step. The class being ASCII is what makes each cut a char boundary.
+/// `bits` is the OR of the word's bytes, so its top bit says whether any is non-ASCII; a
+/// caller that does not read it pays nothing for it.
+#[inline]
+fn next_collapsible_word(bytes: &[u8], from: usize) -> Option<(usize, usize, u8)> {
+    let mut start = from;
+    while start < bytes.len() && is_collapsible_ws(bytes[start]) {
+        start += 1;
+    }
+    if start == bytes.len() {
+        return None;
+    }
+    // `bytes[start]` is a non-member by construction, so the word scan begins past it.
+    let mut bits = bytes[start];
+    let mut end = start + 1;
+    while end < bytes.len() && !is_collapsible_ws(bytes[end]) {
+        bits |= bytes[end];
+        end += 1;
+    }
+    Some((start, end, bits))
+}
+
+/// The iterator behind [`split_collapsible_ws`]: `pos` is where the unconsumed tail begins.
 struct CollapsibleWords<'a> {
-    rest: &'a str,
+    s: &'a str,
+    pos: usize,
 }
 
 impl<'a> Iterator for CollapsibleWords<'a> {
@@ -1838,20 +1895,36 @@ impl<'a> Iterator for CollapsibleWords<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<&'a str> {
-        let s = self.rest;
-        let bytes = s.as_bytes();
-        let start = collapsible_ws_prefix_len(s);
-        if start == bytes.len() {
-            self.rest = "";
+        let Some((start, end, _)) = next_collapsible_word(self.s.as_bytes(), self.pos) else {
+            self.pos = self.s.len();
             return None;
-        }
-        // `bytes[start]` is a non-member by construction, so the word scan begins past it.
-        let mut end = start + 1;
-        while end < bytes.len() && !is_collapsible_ws(bytes[end]) {
-            end += 1;
-        }
-        self.rest = &s[end..];
-        Some(&s[start..end])
+        };
+        self.pos = end;
+        Some(&self.s[start..end])
+    }
+}
+
+/// The iterator behind [`collapsible_word_ranges`].
+struct CollapsibleWordRanges<'a> {
+    bytes: &'a [u8],
+    pos: usize,
+}
+
+impl Iterator for CollapsibleWordRanges<'_> {
+    type Item = CollapsibleWord;
+
+    #[inline]
+    fn next(&mut self) -> Option<CollapsibleWord> {
+        let Some((start, end, bits)) = next_collapsible_word(self.bytes, self.pos) else {
+            self.pos = self.bytes.len();
+            return None;
+        };
+        self.pos = end;
+        Some(CollapsibleWord {
+            start: start as u32,
+            end: end as u32,
+            is_ascii: bits < 0x80,
+        })
     }
 }
 
@@ -2768,11 +2841,16 @@ mod collapsible_ws_tests {
     use super::*;
 
     /// Every arrangement of the four members, a non-member ASCII space relative (`<FF>`), a
-    /// multi-byte space (`<NBSP>`) and content, zero to four pieces long — the axis a corpus
-    /// samples arbitrarily and a byte walk must get right at every offset.
+    /// multi-byte space (`<NBSP>`), content, and the two ASCII controls at the ends of the
+    /// range (`<NUL>`, `<DEL>`), zero to four pieces long — the axis a corpus samples
+    /// arbitrarily and a byte walk must get right at every offset.
     fn for_every_arrangement(check: impl FnMut(&str)) {
-        const PIECES: [&str; 8] = [" ", "\t", "\n", "\r", "\u{c}", "\u{a0}", "x", "é"];
-        crate::test_support::for_every_arrangement(&PIECES, 4, check);
+        let nul = char::from(0_u8).to_string();
+        let del = char::from(0x7f_u8).to_string();
+        let pieces = [
+            " ", "\t", "\n", "\r", "\u{c}", "\u{a0}", "x", "é", &nul, &del,
+        ];
+        crate::test_support::for_every_arrangement(&pieces, 4, check);
     }
 
     /// The byte trims agree with the char-predicate searchers.
@@ -2835,6 +2913,29 @@ mod collapsible_ws_tests {
                 .filter(|w| !w.is_empty())
                 .collect();
             assert_eq!(words, reference, "{s:?}");
+        });
+    }
+
+    /// The range splitter names exactly the words the slice splitter yields, each range
+    /// extracting to its word and flagged ASCII exactly when the word is — which, for a word,
+    /// is exactly when it holds no byte a width depends on.
+    #[test]
+    fn word_ranges_match_the_slice_split() {
+        for_every_arrangement(|s| {
+            let words: Vec<&str> = split_collapsible_ws(s).collect();
+            let ranged: Vec<&str> = collapsible_word_ranges(s)
+                .map(|word| {
+                    let text = word.extract(s);
+                    assert_eq!(word.is_ascii, text.is_ascii(), "{s:?} word {text:?}");
+                    assert_eq!(
+                        word.is_ascii,
+                        !text.bytes().any(tsv_lang::printing::is_width_relevant),
+                        "{s:?} word {text:?}"
+                    );
+                    text
+                })
+                .collect();
+            assert_eq!(ranged, words, "{s:?}");
         });
     }
 }
