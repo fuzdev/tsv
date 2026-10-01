@@ -64,6 +64,18 @@ impl OutputBuffer {
         }
     }
 
+    /// Borrow the backing string for a writer that only **appends** — one that never
+    /// reads or trims what the buffer already holds, and on giving up truncates back to
+    /// the length it found. Unlike [`Self::as_empty_render_target`] this needs no
+    /// emptiness test, because such a writer cannot reach text it did not write; the
+    /// doc renderer is not one (its trim walks backwards with no floor).
+    /// `doc::arena_try_print_flat_into` is. Callers:
+    /// `tsv_css::printer::Printer::write_arena_doc` and its `_with_suffix` twin.
+    #[inline]
+    pub fn as_append_target(&mut self) -> &mut String {
+        &mut self.buffer
+    }
+
     /// Remove the last character if it matches the given character
     #[inline]
     pub fn pop_if_ends_with(&mut self, ch: char) {

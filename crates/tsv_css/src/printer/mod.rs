@@ -518,6 +518,22 @@ impl<'a> Printer<'a> {
     /// Note: base_indent_offset is already accounted for in position tracking after newlines
     /// (see doc::render_single_doc line breaks). We should NOT add it again here.
     ///
+    /// # A doc that fits its line is written without a render
+    ///
+    /// Nearly every piece this printer writes — a selector, a value list, a function —
+    /// fits the rest of its line, and the renderer would print it flat: its texts in
+    /// order, a space for each `line`. `doc::arena_try_print_flat_into` writes exactly
+    /// that straight onto the buffer in one walk, charging widths as it goes, and
+    /// refuses any doc it cannot prove the renderer prints the same way (a doc too wide
+    /// for the line above all); only a refused doc pays for the render below — the
+    /// scratch, the command stack, the fits walks. The proof and the debug twin that
+    /// holds it are in `tsv_lang`'s `doc/arena_render_flat.rs`. The renderer's audit
+    /// seams lose nothing: that walk refuses a doc holding a line-comment text or a
+    /// tagged comment node while the matching check is armed, and this printer builds
+    /// neither (a comment in its docs is plain text, and the ledger is fed where the
+    /// comment is written) — so the refusal never fires here, and in an audit build
+    /// the twin is what grades the flat path.
+    ///
     /// # Trailing whitespace is preserved
     ///
     /// A rendered piece's last line can end in whitespace that is **content** rather than
@@ -536,6 +552,17 @@ impl<'a> Printer<'a> {
     /// at-rule preludes — does the same, for the same reason.
     pub(crate) fn write_arena_doc(&mut self, d: DocId) {
         let current_col = self.current_column();
+        if doc::arena_try_print_flat_into(
+            self.arena,
+            d,
+            &self.embed,
+            current_col,
+            self.indent_level,
+            self.source,
+            self.buffer.as_append_target(),
+        ) {
+            return;
+        }
         // Render into the arena-parked scratch: one warm buffer across the
         // file's rules instead of an alloc/free per rule.
         let mut output = self.arena.take_render_scratch();
@@ -565,10 +592,24 @@ impl<'a> Printer<'a> {
     /// named `a `), and the `,` / ` {` the caller appends lands right after it: trim
     /// the payload and the stranded backslash escapes that punctuation instead
     /// (`.a\ , .b` → `.a\,`, one class named `a,` — the selector list is gone).
+    ///
+    /// Tries the flat write-out first, as [`Self::write_arena_doc`] does; the suffix
+    /// width is reserved there too.
     pub(crate) fn write_arena_doc_with_suffix(&mut self, d: DocId, suffix_width: usize) {
         let current_col = self.current_column();
         let mut embed = self.embed;
         embed.suffix_width = suffix_width;
+        if doc::arena_try_print_flat_into(
+            self.arena,
+            d,
+            &embed,
+            current_col,
+            self.indent_level,
+            self.source,
+            self.buffer.as_append_target(),
+        ) {
+            return;
+        }
         let mut output = self.arena.take_render_scratch();
         doc::arena_print_doc_with_indent_resolved_preserve_whitespace_into(
             self.arena,

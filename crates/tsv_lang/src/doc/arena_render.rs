@@ -761,7 +761,7 @@ impl RenderPolicy for SingleDocPolicy {
 /// this one runs would panic taking the top-level command stack this render holds
 /// borrowed (`DocArena::borrow_top_render_stack`), the loop never calls back into a
 /// printer, and `arena_fits` neither reads nor writes the map.
-fn render_doc_iterative(
+pub(super) fn render_doc_iterative(
     ctx: &RenderCtx<'_>,
     doc: DocId,
     output: &mut String,

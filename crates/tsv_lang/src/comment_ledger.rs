@@ -510,6 +510,55 @@ mod tests {
     }
 
     #[test]
+    fn the_flat_write_leaves_a_tagged_comment_to_the_renderer() {
+        // The renderer records a tagged comment node when it emits it; the flat
+        // write-out records nothing, so while the ledger is armed it must refuse a doc
+        // holding one — the fallback render then prints and records the comment once.
+        use crate::EmbedContext;
+        use crate::doc::arena::DocArena;
+        use crate::doc::{
+            arena_print_doc_with_indent_resolved_preserve_whitespace_into,
+            arena_try_print_flat_into,
+        };
+        let source = "/* a */ x";
+        let comments = [line_comment(0, 7)];
+        let ((refused, rendered, untagged), ledger) = with_check(|| {
+            register_parsed(source, &comments);
+            let d = DocArena::new();
+            let embed = EmbedContext::default();
+            let comment = d.source_span(comments[0].span, source);
+            d.tag_comment_doc(comment, comments[0].span, source);
+            let doc = d.group(d.concat(&[comment, d.line(), d.text("x")]));
+            let mut out = String::new();
+            let refused = !arena_try_print_flat_into(&d, doc, &embed, 0, 0, source, &mut out)
+                && out.is_empty();
+            arena_print_doc_with_indent_resolved_preserve_whitespace_into(
+                &d, doc, &embed, 0, 0, source, &mut out,
+            );
+            // A doc holding no tagged node is still written flat in the same arena.
+            let mut plain = String::new();
+            let untagged = arena_try_print_flat_into(
+                &d,
+                d.group(d.concat(&[d.text("y"), d.line(), d.text("z")])),
+                &embed,
+                0,
+                0,
+                source,
+                &mut plain,
+            ) && plain == "y z";
+            (refused, out, untagged)
+        });
+        assert!(
+            refused,
+            "a tagged comment was written flat under the ledger"
+        );
+        assert_eq!(rendered, "/* a */ x");
+        assert!(untagged, "a doc with no tagged node was refused");
+        assert!(ledger.findings.is_empty(), "{:?}", ledger.findings);
+        assert_eq!(ledger.parsed, 1);
+    }
+
+    #[test]
     fn an_unemitted_comment_is_dropped() {
         let source = "// a\nx;\n";
         let comments = [line_comment(0, 4)];

@@ -85,6 +85,14 @@ impl DocContext {
         self.trailing_reserve
     }
 
+    /// Whether any layout flag is set — a context for which this is `false` does nothing
+    /// but reserve [`Self::trailing_reserve`] columns.
+    #[inline]
+    #[must_use]
+    pub(super) const fn has_layout_flag(&self) -> bool {
+        self.flags != 0
+    }
+
     #[inline]
     const fn flag(&self, bit: u16) -> bool {
         self.flags & bit != 0

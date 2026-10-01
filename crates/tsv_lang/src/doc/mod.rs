@@ -25,6 +25,7 @@ pub mod arena;
 mod arena_fits;
 mod arena_render;
 mod arena_render_fill;
+mod arena_render_flat;
 mod arena_render_suffix;
 mod chain_share;
 mod render_config;
@@ -130,6 +131,7 @@ pub use arena_render::{
     arena_measure_doc_flat_resolved, arena_print_doc, arena_print_doc_with_indent_resolved_into,
     arena_print_doc_with_indent_resolved_preserve_whitespace_into,
 };
+pub use arena_render_flat::arena_try_print_flat_into;
 
 // Arena fits
 pub use arena_fits::arena_fits;

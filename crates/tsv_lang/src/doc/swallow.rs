@@ -196,7 +196,7 @@ mod tests {
     use super::*;
     use crate::EmbedContext;
     use crate::doc::arena::DocArena;
-    use crate::doc::arena_print_doc;
+    use crate::doc::{arena_print_doc, arena_try_print_flat_into};
 
     // The check is gated by a process-global flag; serialize the toggling so a
     // parallel test doesn't observe a half-set state. (Reports are thread-local,
@@ -278,6 +278,66 @@ mod tests {
         assert_eq!(reports.len(), 1, "expected one swallow, got {reports:?}");
         assert_eq!(reports[0].comment, " // c1");
         assert_eq!(reports[0].following, " // c2");
+    }
+
+    #[test]
+    fn the_flat_write_leaves_a_line_comment_to_the_renderer() {
+        // The flat write-out makes no note of what it writes, so while the check is
+        // armed it must refuse any doc holding a line comment — the renderer then
+        // takes the doc and reports what the comment swallows. A doc without one is
+        // written flat as usual.
+        let ((refused, wrote), reports) = with_check(|d| {
+            let embed = EmbedContext::default();
+            let mut out = String::from("x");
+            let commented =
+                d.group(d.concat(&[d.text("["), d.line_comment_text_pooled("// c"), d.text("]")]));
+            let refused =
+                !arena_try_print_flat_into(d, commented, &embed, 1, 0, "", &mut out) && out == "x";
+            let plain = d.group(d.concat(&[d.text("["), d.text_pooled("/* c */"), d.text("]")]));
+            let wrote = arena_try_print_flat_into(d, plain, &embed, 1, 0, "", &mut out)
+                && out == "x[/* c */]";
+            (refused, wrote)
+        });
+        assert!(refused, "a line comment was written flat under the check");
+        assert!(wrote, "a doc with no line comment was refused");
+        assert!(reports.is_empty(), "{reports:?}");
+    }
+
+    #[test]
+    fn the_flat_write_starts_a_line_as_a_render_does() {
+        // A `//` left pending by one render is cleared when the next begins (each
+        // render's piece is placed by its printer, which ends the line itself). The
+        // flat write-out stands for a render, so text it writes is no swallow either.
+        let (wrote, reports) = with_check(|d| {
+            let embed = EmbedContext::default();
+            let pending = d.concat(&[d.text("x "), d.line_comment_text_pooled("// c")]);
+            let _ = arena_print_doc(d, pending, &embed);
+            let mut out = String::new();
+            arena_try_print_flat_into(d, d.text("y"), &embed, 0, 0, "", &mut out) && out == "y"
+        });
+        assert!(wrote);
+        assert!(reports.is_empty(), "{reports:?}");
+    }
+
+    #[test]
+    fn the_flat_write_takes_a_line_comment_while_the_check_is_off() {
+        let _guard = LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        set_swallow_check(false);
+        let d = DocArena::new();
+        let doc = d.concat(&[d.text("x "), d.line_comment_text_pooled("// c")]);
+        let mut out = String::new();
+        assert!(arena_try_print_flat_into(
+            &d,
+            doc,
+            &EmbedContext::default(),
+            0,
+            0,
+            "",
+            &mut out
+        ));
+        assert_eq!(out, "x // c");
     }
 
     #[test]
