@@ -126,47 +126,94 @@ type ColorArgs<'a> = (&'a str, &'a str, &'a str, Option<&'a str>);
 /// otherwise the same color, authored across two lines, could reformat to two
 /// different fixed points (once as a misclassified generic function, once as a
 /// color).
+///
+/// One walk over the bytes decides all three: it stops at the first `/`, and on the way
+/// records the first three channels a `,`-or-whitespace split makes (and whether there is a
+/// fourth) and the first three commas (and whether there is a fourth). Every byte it tests
+/// is ASCII, so each boundary it records is a character boundary.
 fn split_color_args(args_str: &str) -> Option<ColorArgs<'_>> {
     let args_str = trim_css(args_str);
-    if let Some((head, alpha)) = args_str.split_once('/') {
+    let bytes = args_str.as_bytes();
+    // The channels as `(start, end)` byte ranges, and how many there are, counted past the
+    // three recorded only far enough to say "more".
+    let mut channels = [(0, 0); 3];
+    let mut channel_count = 0;
+    let mut commas = [0; 3];
+    let mut comma_count = 0;
+    // The start of the channel being walked, or `None` between channels.
+    let mut channel_start = None;
+    let mut slash = None;
+    for (i, &b) in bytes.iter().enumerate() {
+        match b {
+            b'/' => {
+                slash = Some(i);
+                break;
+            }
+            b',' | b' ' | b'\t' | b'\n' | b'\x0C' | b'\r' => {
+                if let Some(start) = channel_start.take() {
+                    if channel_count < 3 {
+                        channels[channel_count] = (start, i);
+                    }
+                    channel_count = (channel_count + 1).min(4);
+                }
+                if b == b',' {
+                    if comma_count < 3 {
+                        commas[comma_count] = i;
+                    }
+                    comma_count = (comma_count + 1).min(4);
+                }
+            }
+            _ => {
+                if channel_start.is_none() {
+                    channel_start = Some(i);
+                }
+            }
+        }
+    }
+    if let Some(start) = channel_start {
+        if channel_count < 3 {
+            channels[channel_count] = (start, slash.unwrap_or(bytes.len()));
+        }
+        channel_count = (channel_count + 1).min(4);
+    }
+    let channel = |(start, end): (usize, usize)| &args_str[start..end];
+    if let Some(slash) = slash {
         // Modern slash-alpha form: exactly `c c c / a`. Bind the alpha to the
         // fourth slot; the caller's channel parse rejects a malformed alpha (a
         // second slash, extra tokens, or an empty one all fail to parse), so only
         // the head arity is checked here.
-        let mut channels = head
-            .split(|c: char| c == ',' || c.is_ascii_whitespace())
-            .filter(|s| !s.is_empty());
-        let c1 = channels.next()?;
-        let c2 = channels.next()?;
-        let c3 = channels.next()?;
-        if channels.next().is_some() {
-            return None; // more than three channels before the slash
+        if channel_count != 3 {
+            return None; // other than three channels before the slash
         }
-        Some((c1, c2, c3, Some(trim_css(alpha))))
-    } else if args_str.contains(',') {
+        let [c1, c2, c3] = channels.map(channel);
+        Some((c1, c2, c3, Some(trim_css(&args_str[slash + 1..]))))
+    } else if comma_count > 0 {
         // Legacy comma form: exactly `c, c, c` or `c, c, c, a`. Empties are kept,
         // so `rgb(1,,2)` still presents three parts (and then fails to parse the
         // empty channel).
-        let mut parts = args_str.split(',').map(trim_css);
-        let c1 = parts.next()?;
-        let c2 = parts.next()?;
-        let c3 = parts.next()?;
-        let alpha = parts.next();
-        if parts.next().is_some() {
-            return None; // more than four comma-separated parts
+        let part = |start: usize, end: usize| trim_css(&args_str[start..end]);
+        match comma_count {
+            2 => Some((
+                part(0, commas[0]),
+                part(commas[0] + 1, commas[1]),
+                part(commas[1] + 1, bytes.len()),
+                None,
+            )),
+            3 => Some((
+                part(0, commas[0]),
+                part(commas[0] + 1, commas[1]),
+                part(commas[1] + 1, commas[2]),
+                Some(part(commas[2] + 1, bytes.len())),
+            )),
+            // fewer than three, or more than four, comma-separated parts
+            _ => None,
         }
-        Some((c1, c2, c3, alpha))
     } else {
         // Modern space form: exactly `c c c` (its alpha uses the slash form above).
-        let mut channels = args_str
-            .split(|c: char| c.is_ascii_whitespace())
-            .filter(|s| !s.is_empty());
-        let c1 = channels.next()?;
-        let c2 = channels.next()?;
-        let c3 = channels.next()?;
-        if channels.next().is_some() {
-            return None; // more than three space-separated channels
+        if channel_count != 3 {
+            return None; // other than three space-separated channels
         }
+        let [c1, c2, c3] = channels.map(channel);
         Some((c1, c2, c3, None))
     }
 }
@@ -392,6 +439,87 @@ ascii_keyword_set! {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The three-pass spelling [`split_color_args`] replaced — the split on `/`, the comma
+    /// test, then a char-decoding split — kept as the model its one byte walk must reproduce.
+    fn split_color_args_model(args_str: &str) -> Option<ColorArgs<'_>> {
+        let args_str = trim_css(args_str);
+        if let Some((head, alpha)) = args_str.split_once('/') {
+            let mut channels = head
+                .split(|c: char| c == ',' || c.is_ascii_whitespace())
+                .filter(|s| !s.is_empty());
+            let c1 = channels.next()?;
+            let c2 = channels.next()?;
+            let c3 = channels.next()?;
+            if channels.next().is_some() {
+                return None;
+            }
+            Some((c1, c2, c3, Some(trim_css(alpha))))
+        } else if args_str.contains(',') {
+            let mut parts = args_str.split(',').map(trim_css);
+            let c1 = parts.next()?;
+            let c2 = parts.next()?;
+            let c3 = parts.next()?;
+            let alpha = parts.next();
+            if parts.next().is_some() {
+                return None;
+            }
+            Some((c1, c2, c3, alpha))
+        } else {
+            let mut channels = args_str
+                .split(|c: char| c.is_ascii_whitespace())
+                .filter(|s| !s.is_empty());
+            let c1 = channels.next()?;
+            let c2 = channels.next()?;
+            let c3 = channels.next()?;
+            if channels.next().is_some() {
+                return None;
+            }
+            Some((c1, c2, c3, None))
+        }
+    }
+
+    /// Every argument string of up to five pieces over an alphabet of the separators each
+    /// form splits on (`,`, `/` and the CSS whitespace, with the vertical tab that is not
+    /// one), channel text (ASCII, non-ASCII, a trailing escape `trim_css` keeps) and the
+    /// empty piece, split the same way — the same slices, not just equal text — as the
+    /// three-pass model.
+    #[test]
+    fn color_args_split_as_the_model_splits_them() {
+        let alphabet = [
+            "", ",", "/", " ", "\t", "\n", "\r", "\u{c}", "\u{b}", "  ", "1", "50%", "0.5", "none",
+            "é", "\u{a0}", "a\\ ", "deg",
+        ];
+        let mut graded = 0;
+        let mut index = [0usize; 5];
+        loop {
+            let args: String = index.iter().map(|&i| alphabet[i]).collect();
+            let ours = split_color_args(&args);
+            let model = split_color_args_model(&args);
+            let spans = |parts: Option<ColorArgs<'_>>| {
+                parts.map(|(c1, c2, c3, alpha)| {
+                    let at = |s: &str| (s.as_ptr() as usize - args.as_ptr() as usize, s.len());
+                    (at(c1), at(c2), at(c3), alpha.map(at))
+                })
+            };
+            assert_eq!(spans(ours), spans(model), "{args:?}");
+            graded += 1;
+            // Next index, odometer order.
+            let mut digit = 0;
+            loop {
+                if digit == index.len() {
+                    assert!(graded > 1_000_000, "{graded}");
+                    return;
+                }
+                index[digit] += 1;
+                if index[digit] < alphabet.len() {
+                    break;
+                }
+                index[digit] = 0;
+                digit += 1;
+            }
+        }
+    }
 
     // The hex-body rule itself is exercised in `crate::color`; here we only confirm
     // `parse_color` routes a `#`-hash through it — a valid hex classifies, a
