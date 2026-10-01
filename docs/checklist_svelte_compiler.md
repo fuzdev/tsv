@@ -387,10 +387,9 @@ emitter never runs on a dropped region.
 
 Unlike the two rows above, this is **not** a whole-component validation: it reads
 one node's own attribute list and nothing else, so it fires in isolation and needs
-no emitted partner. That makes it the same class as the
-`svelte_meta_invalid_placement` / `svelte_meta_duplicate` rules that already **moved
-from `fragment.rs` into `validate.rs`** for exactly this reason — a rule whose inputs
-are not emission state belongs in the whole-document walk. Closing it is a
+no emitted partner. That makes it the same class as `attribute_duplicate`, which the
+whole-document walk in `validate.rs` hosts for exactly this reason — a rule whose inputs
+are not emission state belongs where a dropped region is still visited. Closing it is a
 relocation, not a validation port, and it is the only such rule left at an emitter:
 a probe battery over the sibling emitter-hosted refusals (`<title>` attributes and
 invalid children, void-element children, `<option>`, a populated `<select>`, a
@@ -446,9 +445,10 @@ read this table for its own rows.
 
 The analysis rules tsv **does** enforce are stated per family below: `dollar_prefix_invalid`
 (§Runes, the `$`-prefixed bindings rule), the three-rule `validate_assignment` family
-([The `validate_assignment` family](#the-validate_assignment-family)), `attribute_duplicate` /
-`svelte_meta_invalid_placement` / `svelte_meta_duplicate` ([The parse-time
-rules](#the-parse-time-rules)), `node_invalid_placement` ([The HTML content
+([The `validate_assignment` family](#the-validate_assignment-family)), `attribute_duplicate`
+— and, in tsv's parser rather than the compiler, `svelte_meta_invalid_placement` /
+`svelte_meta_duplicate` ([The parse-time rules](#the-parse-time-rules)),
+`node_invalid_placement` ([The HTML content
 model](#the-html-content-model)), `attribute_invalid_name` / `slot_attribute_invalid_placement`
 / `attribute_invalid_event_handler` / `attribute_invalid_sequence_expression` /
 `attribute_unquoted_sequence` — checks inside the oracle's single `validate_element` /
@@ -500,18 +500,11 @@ below).
 
 #### The parse-time rules
 
-**Closed.** Two oracle rules, both raised in `phases/1-parse/state/element.js`, both
-enforced by one upfront whole-document walk (`validate.rs`) run at the top of
-`analyze()`. They share a home not because they share inputs but because they share a
-*scope*: each fires wherever its construct sits, including a region SSR **drops**, so
-neither the emitters nor `guard_dropped_presence` alone can host them.
-
-A third — `svelte_meta_invalid_tag` (`element.js:142`) — is enforced one layer down, in
-tsv's **parser**, which rejects a `svelte:`-prefixed name that is not a known meta tag
-exactly as the oracle does. That is not a siting preference: `meta_tags.has(name)` *is*
-the node-type decision, so accepting the tag would force a fabricated `RegularElement`
-carrying the name, and no later pass can repair a wire that is already wrong. The
-compiler therefore carries no refusal for it — no such element can reach it.
+**Closed.** The oracle's `attribute_duplicate` and meta-tag rules, all raised in
+`phases/1-parse/state/element.js`. `attribute_duplicate` is enforced by the upfront
+whole-document walk (`validate.rs`) run at the top of `analyze()`: it fires wherever its
+construct sits, including a region SSR **drops**, so neither the emitters nor
+`guard_dropped_presence` alone can host it.
 
 - **Refused**: ``duplicate `{name}` attribute on one element (the oracle rejects it)`` —
   the oracle's `attribute_duplicate` (`element.js:250`). Only `Attribute` /
@@ -520,22 +513,22 @@ compiler therefore carries no refusal for it — no such element can reach it.
   (so `bind:value` collides with `value`, while `class:x` and `x` legally co-exist);
   and the name `this` is never recorded, which is what keeps
   `<svelte:element bind:this this={…}>` legal.
-- **Refused**: `<{name}> must be a top-level element (the oracle rejects it)` and
-  `duplicate <{name}> element (the oracle rejects it)` — the oracle's
-  `svelte_meta_invalid_placement` / `svelte_meta_duplicate` over its
-  `root_only_meta_tags` set (`element.js:45,155-164`). Placement is a *direct*-child
-  test against the root, so any element, block or `<svelte:boundary>` in between makes
-  the tag invalid; placement is checked before duplicate, and a mis-placed tag never
-  joins the duplicate set. `<svelte:options>` is covered upstream on both halves — a
-  nested one is a **parse** error (it is the one member with no node type of its own, so
-  a nested one is unrepresentable), and one at the root is taken by the unconditional
-  `SvelteOptions` refusal.
 
-⚠️ Enforcing both rules for the SSR-inert three
-(`<svelte:window>`/`<svelte:body>`/`<svelte:document>`) at their **emitter** — which
-never runs on a dropped region — lets one of them in a `{:catch}` compile, an
-over-acceptance every gate but the differential fuzzer misses; that is the concrete
-cost of siting an emission-independent rule at an emitter.
+The meta-tag rules are enforced one layer down, in tsv's **parser**, exactly as the
+oracle's parser does, so the compiler carries no refusal for them — no such document can
+reach it:
+
+- `svelte_meta_invalid_tag` — a `svelte:`-prefixed name that is not a known meta tag.
+  That is not a siting preference: `meta_tags.has(name)` *is* the node-type decision, so
+  accepting the tag would force a fabricated `RegularElement` carrying the name, and no
+  later pass can repair a wire that is already wrong.
+- `svelte_meta_duplicate` and `svelte_meta_invalid_placement` over the oracle's five
+  `root_only_meta_tags` (`<svelte:head>`, `<svelte:options>`, `<svelte:window>`,
+  `<svelte:document>`, `<svelte:body>`), in the oracle's order — duplicate, then
+  placement. Placement is a *direct*-child test against the root, so any element,
+  component, block or `<svelte:boundary>` in between makes the tag invalid, in a region
+  SSR drops as much as anywhere else. A `<svelte:options>` that does parse — one, at the
+  root — is taken by the unconditional `SvelteOptions` refusal.
 
 #### The HTML content model
 
@@ -1149,7 +1142,7 @@ A **static** component invocation compiles to `Name($$renderer, props)` (`shared
 | `<title>` (a `TitleElement`, i.e. `<title>` inside `<svelte:head>`) → a `$$renderer.title(($$renderer) => { $$renderer.push(`<title>…children…</title>`) })` statement (`TitleElement.js`). Like `<svelte:head>` it is **hoisted** to its fragment's front (the oracle lists it in `clean_nodes`'s hoisted set and pushes to `state.init`), so it precedes its head siblings regardless of source order and never participates in surrounding whitespace normalization. Its children are `Text`/`ExpressionTag` only, emitted like a regular element's text content (a `{expr}` folds when statically known, else `$.escape(expr)`); its children are **not** whitespace-normalized (the oracle calls `process_children` directly, without `clean_nodes`). Analyzed on the emitted path, so a `new`/prop-rooted access in a title `{expr}` fires the `$$renderer.component` wrapper. | Supported |
 | `<title>` with an attribute / a non-text-or-`{expression}` child | **Refused**: `attribute on <title> (the oracle rejects it)` / `invalid <title> content (only text and {expression} — the oracle rejects it)` (`title_illegal_attribute` / `title_invalid_content` — input tsv's permissive parser accepts) |
 | `<svelte:window>` / `<svelte:body>` / `<svelte:document>` → emit **nothing** (SSR-inert: their events/binds are client-only, so the oracle produces no template output). A legal one carries only oracle-accepted attributes: a **modern event attribute** (`on*={expr}`), the no-op drop family (`class:`/`style:`/`use:`/`transition:`/`in:`/`out:`/`animate:`/`{@attach}`), and a **whitelisted `bind:`** — the name in the ported `binding_properties` list (`this`/`focused` on any; `innerWidth`/`innerHeight`/`outerWidth`/`outerHeight`/`scrollX`/`scrollY`/`online`/`devicePixelRatio` on window; `activeElement`/`fullscreenElement`/`pointerLockElement`/`visibilityState` on document) **and** its target a reassignable lvalue (`bind:this` any lvalue; every other bind a `$state`-rooted `Identifier`/member — the same fork regular elements use, over-refusing prop/plain-`let` targets as a safe over-refusal). A **top-level** `const`-declared or imported target refuses on every bind path alike (`constant_binding`), via the shared `reassignable_bind_target_root` — including a `const`-declared `$state` (`const c = $state(0)` + `bind:innerWidth={c}`) and a `const`/import `bind:this` target, since the oracle keys that rejection on the declaration keyword, not on reactivity. Writing THROUGH a const binding (`bind:value={o.v}`) stays legal — the oracle's rule tests a bare `Identifier` and lets a member chain fall through. An optional-chained target (`bind:this={o?.el}`) refuses too — acorn wraps such a chain in a `ChainExpression`, which the oracle's `bind_invalid_expression` test rejects. A TEMPLATE-scoped const target — a `{@const}` name, a `{:then}`/`{:catch}` value (`phases/scope.js:1310`/`:1324`), or an `{#each}` index (`:1273`) — refuses on the same terms: each is `declaration_kind: 'const'`, kind `'template'`/`'static'` (not `'each'`), so the oracle raises `constant_binding`. `unassignable_names` is keyed on top-level script statements and has no view of template scopes, so the rule is applied instead by `needs_context`'s `template_consts` scope, which every `bind:` target routes through.) Each surviving expression is guard-dropped (a stray rune / top-level `await` refuses) and still analyzed — a `new`/prop-rooted member/call in a bind or handler fires the `$$renderer.component` wrapper, and a `bind:` marks its target reassigned (a later read of a `$state` target stays dynamic, not folded to its init value). | Supported |
-| `<svelte:window>` / `<svelte:body>` / `<svelte:document>` with **oracle-rejected input** — nested (legal only at the component root) / a duplicate of the same kind / children / a spread or a non-event plain attribute / a `bind:` outside the whitelist or with a non-lvalue/const/undefined target | **Refused**: `<{name}> must be a top-level element (the oracle rejects it)` / `duplicate <{name}> element (the oracle rejects it)` / `<{name}> cannot have children (the oracle rejects it)` / `invalid attribute on <{name}> (the oracle rejects it)` / `bind: directive {name}` (`svelte_meta_invalid_placement` / `svelte_meta_duplicate` / `svelte_meta_invalid_content` / `illegal_element_attribute` / `bind_invalid_target`\|`bind_invalid_name`\|`bind_invalid_expression`\|`constant_binding`\|`bind_invalid_value` — all input tsv's permissive parser accepts) |
+| `<svelte:window>` / `<svelte:body>` / `<svelte:document>` with **oracle-rejected input** — children / a spread or a non-event plain attribute / a `bind:` outside the whitelist or with a non-lvalue/const/undefined target | **Refused**: `<{name}> cannot have children (the oracle rejects it)` / `invalid attribute on <{name}> (the oracle rejects it)` / `bind: directive {name}` (`svelte_meta_invalid_content` / `illegal_element_attribute` / `bind_invalid_target`\|`bind_invalid_name`\|`bind_invalid_expression`\|`constant_binding`\|`bind_invalid_value` — all input tsv's permissive parser accepts; a nested one, or a second of the same kind, is a **parse** error on both sides: see [The parse-time rules](#the-parse-time-rules)) |
 | `<svelte:window>` / `<svelte:body>` / `<svelte:document>` with a **legacy** `on:` event directive or `let:` | **Refused**: `legacy on: directive (runes-only fence)` / `legacy let: directive (runes-only fence)` (the oracle accepts a legacy `on:` here, but tsv declines it as a deliberate safe over-refusal, matching the regular-element path) |
 | `<svelte:element this={…}>` → a statement-level `$.element($$renderer, TAG, attrsFn?, childrenFn?)` call (splits the template push stream like a component; no trailing `<!---->`). **TAG**: `this="div"` → the `'div'` string literal (the parser collapses a mixed `this="a{b}"` to its first static chunk, matching the oracle's legacy warn-and-keep-first); `this={expr}` → the erased expression with a derived read (bare or nested) rewritten to `d()` (no static fold). **attrsFn** (`() => { $$renderer.push(…) }`): the exact regular-element attribute machinery — plain attributes, a `{...spread}` → `$.attributes({…}, css_hash?, classes?, styles?)` (**never** a `flags` argument — the name is always the literal `svelte:element`, so it is never `<input>`/custom), `class:`/`style:` → `$.attr_class`/`$.attr_style` — rendered into a parameterless closure over the enclosing `$$renderer`; elided when it would push nothing. **childrenFn** (`() => { … }`): the element's fragment, emitted like any element child (not text-first, not a component root); elided when empty. The `this={expr}` and every attribute expression are still analyzed — a `new`/prop-rooted access fires the `$$renderer.component` wrapper, and a `this={local}` inside a snippet body blocks module-hoist. | Supported |
 | `<svelte:element>` — `bind:this` → **omit** (validate the target is a reassignable lvalue or `{get, set}` pair, then emit nothing — any variable, no `$state` gate; a top-level `const`/import root, and an optional-chained target, refuse via the same shared primitive as the inert elements above — carrying the same open template-scope residual noted there) | Supported |
@@ -1167,13 +1160,12 @@ A **static** component invocation compiles to `Name($$renderer, props)` (`shared
 
 Emitting a `<svelte:boundary>` rather than refusing it makes three **general**
 over-acceptances (tsv compiles what the oracle rejects) reachable through one element. None is boundary-specific — each reproduces identically with no boundary in the
-document — so all three close on the oracle's whole-component validations, never on
+document — so all three close on the oracle's own document-wide rules, never on
 `emit_boundary`:
 
 | Shape | Oracle error | Boundary-free analog that over-accepted identically | Closed at |
 | --- | --- | --- | --- |
-| `<svelte:head>` inside a boundary | `svelte_meta_invalid_placement` | `<div><svelte:head>…`, `{#if true}<svelte:head>…` | `validate.rs`'s `root_only_meta_tag` walk |
-| `<svelte:options>` inside a boundary | `svelte_meta_invalid_placement` | `<div><svelte:options …>` | the **parser** — it is the one `root_only_meta_tags` member with no node type of its own, so a nested one was a fabricated `RegularElement` rather than a validation miss |
+| `<svelte:head>` / `<svelte:options>` inside a boundary | `svelte_meta_invalid_placement` | `<div><svelte:head>…`, `{#if true}<svelte:head>…`, `<div><svelte:options …>` | the **parser**, as in the oracle — a root-only meta tag anywhere but directly in the root is a parse error |
 | `<svelte:boundary onerror={a} onerror={b}>` | `attribute_duplicate` | `<div onclick={a} onclick={b}>` | `validate.rs`'s `attribute_duplicate` port, which reaches a special element's attribute list too |
 | two `{#snippet failed}` (or `pending`) in one boundary | `declaration_duplicate` | `<div>{#snippet a}…{/snippet}{#snippet a}…{/snippet}</div>` | `validate.rs`'s per-fragment `declaration_duplicate` port |
 

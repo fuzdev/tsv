@@ -170,9 +170,14 @@ export const SVELTE_FIXTURES_PINS: GatePins = {
 	// the checkout carried ahead of the pinned oracle) and turned the two
 	// namespaced-type-selector inputs (`svg|*`, `*|*`) from parity rejects into both-accepts,
 	// once tsv parsed them too.
+	//
+	// 16 → 13 over-acceptance: the root-only meta tag rule (`svelte_meta_duplicate` /
+	// `svelte_meta_invalid_placement`) is a parse error in tsv as it is in the oracle, so
+	// `compiler-errors/samples/window-{duplicate,inside-block,inside-element}` are parity
+	// rejects.
 	scanned: 3445,
 	both_accept: 3350,
-	over_acceptance: 16
+	over_acceptance: 13
 };
 
 /** conformance:ts-fixtures — provenance in `GATE_CHECKOUT_IDS` (../acorn-typescript, oracle @sveltejs/acorn-typescript). */

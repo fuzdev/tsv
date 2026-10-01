@@ -2703,9 +2703,10 @@ impl<'a> Printer<'a> {
     /// this slice is *raw source* between the two markers, which still holds its bytes. Emitting
     /// them verbatim prints the section **twice**, and the result is not a valid component:
     /// tsv's own parser rejects it (`Duplicate instance script found` / `Duplicate style tag
-    /// found` / `Duplicate <svelte:options> found`). So the slice is emitted as the pieces
-    /// *between* the hoisted spans. Prettier drops the section from its own ignored range the
-    /// same way; the range freezes template formatting, it does not pin a section's position.
+    /// found` / ``A component can only have one `<svelte:options>` element``). So the slice
+    /// is emitted as the pieces *between* the hoisted spans. Prettier drops the section from
+    /// its own ignored range the same way; the range freezes template formatting, it does not
+    /// pin a section's position.
     ///
     /// The cuts are [`lifted_runs::range_cuts`]'s — the source rewrite that joins the neighbours
     /// of a section lifted out from between template nodes makes the same ones — and each takes

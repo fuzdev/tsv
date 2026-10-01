@@ -1,0 +1,1 @@
+<Comp><svelte:window /></Comp>

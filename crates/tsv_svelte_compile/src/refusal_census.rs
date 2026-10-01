@@ -509,9 +509,7 @@ fn import_local_names(body: &[Statement<'_>], source: &str) -> NameSet {
 /// `{:catch}` — accepted as a diagnostic imprecision. Likewise a window/body/
 /// document that the emitter refuses for a reason this walk cannot see. The walk
 /// tests one thing, a node's KIND, so two whole classes of refusal are out of
-/// reach: the node-level facts it does not model — where a node sits
-/// (`SpecialElementInvalidPlacement`), how many of it there are
-/// (`DuplicateSpecialElement`), what its fragment holds
+/// reach: the node-level fact it does not model — what a node's fragment holds
 /// (`SpecialElementChildren`) — and every ATTRIBUTE-level one, which it never
 /// inspects at all: an illegal/non-event attribute or spread
 /// (`SpecialElementIllegalAttribute`), an out-of-whitelist or invalid-target bind
@@ -519,7 +517,7 @@ fn import_local_names(body: &[Statement<'_>], source: &str) -> NameSet {
 /// (`RunesOnlyFence`).
 ///
 /// Their parity relevance differs, which is why the fenced count is not taken from
-/// here. The first four name a Svelte error code apiece — the oracle REJECTS that
+/// here. The first two name a Svelte error code apiece — the oracle REJECTS that
 /// input, so it is never a parity candidate either way and missing it costs
 /// nothing. The other two are not oracle-invalid. `BindDirective` is mixed: some
 /// names and targets the oracle does reject, but `bind:focused`, the `omit_in_ssr`

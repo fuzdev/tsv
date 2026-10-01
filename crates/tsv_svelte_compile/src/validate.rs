@@ -10,9 +10,9 @@
 //!
 //! Every rule here fires wherever its construct sits, including a region SSR
 //! **drops** — a `{:catch}` branch, an event handler, a `<svelte:boundary>`'s
-//! discarded `pending` children. All three rules below are literally *parse-time*
-//! in the oracle (`phases/1-parse/state/element.js`), so it raises them before it
-//! has any notion of emission at all.
+//! discarded `pending` children. `attribute_duplicate` is literally *parse-time* in the
+//! oracle (`phases/1-parse/state/element.js`), raised before it has any notion of
+//! emission at all; the rest are analysis rules that fire on a node's presence alone.
 //!
 //! Checking them at the emitters would therefore need the rule in **two** places —
 //! the emitted path and `guard_dropped_presence` — which is exactly how
@@ -20,12 +20,12 @@
 //! single pass over the whole document, run at the top of `analyze()`, riding the
 //! shared structural seam [`each_child_fragment`] so a new `FragmentNode` variant
 //! reaches it by construction. Because the rules read only a node, its attribute
-//! list, and its depth, one walk serves all of them.
+//! list, and its ancestors, one walk serves all of them.
 //!
 //! Rules whose inputs *are* emission state stay at their emitter, where that state
 //! lives — e.g. the SSR-inert special elements' children / illegal-attribute /
-//! invalid-bind guards in `fragment.rs`. Their *placement* and *duplicate* rules
-//! live here, not there, for exactly the reason above.
+//! invalid-bind guards in `fragment.rs`. (Their placement and duplicate rules are parse
+//! errors in `tsv_svelte`, as they are in the oracle's parser, and never reach here.)
 //!
 //! **Oracle phase**: phase 1's parse-time element rules
 //! (`phases/1-parse/state/element.js`) plus the phase-2 validations that fire on a
@@ -60,32 +60,6 @@ use tsv_ts::ast::internal::{
     ExportNamedDeclaration, Expression, ExpressionKind, LiteralValue, ModuleExportName, Statement,
     StatementKind,
 };
-
-/// The oracle's `root_only_meta_tags` (`phases/1-parse/state/element.js:45`) —
-/// the meta tags legal only as a direct child of the component root, and legal at
-/// most once per component.
-///
-/// ⚠️ Enforcing either rule for the SSR-inert three
-/// (`svelte:window`/`svelte:body`/`svelte:document`) at their **emitter** in
-/// `fragment.rs` misses a region SSR drops: that site never runs there, so one of
-/// these in a `{:catch}` compiles — an over-acceptance. The rule lives
-/// here, and only here; `fragment.rs` keeps the checks whose inputs really are
-/// emission state (children, illegal attributes, invalid binds).
-///
-/// `svelte:options` is in the oracle's map too, and both its halves are covered
-/// upstream: a nested one is rejected at PARSE (it is the one member with no node type
-/// of its own — it fills `Root`'s `options` slot, so a nested one is unrepresentable and
-/// could only be a fabricated `RegularElement`), and one at the root is taken by
-/// `analyze()`'s unconditional [`Refusal::SvelteOptions`]. So no arm here can ever fire.
-fn root_only_meta_tag(kind: &SpecialElementKind<'_>) -> Option<&'static str> {
-    match kind {
-        SpecialElementKind::SvelteHead => Some("svelte:head"),
-        SpecialElementKind::SvelteWindow => Some("svelte:window"),
-        SpecialElementKind::SvelteBody => Some("svelte:body"),
-        SpecialElementKind::SvelteDocument => Some("svelte:document"),
-        _ => None,
-    }
-}
 
 /// The oracle's `each_key_without_as` (`EachBlock.js:26-34`): an `{#each}` with a
 /// `(key)` but no `as` clause, when the block is **keyed**.
@@ -125,11 +99,10 @@ fn refuse_each_key_without_as(each: &EachBlock<'_>, source: &str) -> Result<(), 
 pub(crate) fn validate_document(root: &Root<'_>, source: &str) -> Result<(), CompileError> {
     let mut validator = Validator {
         source,
-        seen_meta: Vec::new(),
         path: Vec::new(),
         slot_path: Vec::new(),
     };
-    validator.walk_fragment(&root.fragment, true)
+    validator.walk_fragment(&root.fragment)
 }
 
 /// One entry of the oracle's `context.path`, reduced to the three things the
@@ -192,25 +165,20 @@ enum SlotAncestor {
 
 struct Validator<'s> {
     source: &'s str,
-    seen_meta: Vec<&'static str>,
     path: Vec<PathEntry<'s>>,
     slot_path: Vec<SlotAncestor>,
 }
 
 impl<'s> Validator<'s> {
-    fn walk_fragment(
-        &mut self,
-        fragment: &Fragment<'_>,
-        at_root: bool,
-    ) -> Result<(), CompileError> {
+    fn walk_fragment(&mut self, fragment: &Fragment<'_>) -> Result<(), CompileError> {
         refuse_duplicate_snippet_names(fragment, self.source)?;
         for node in fragment.nodes {
-            self.walk_node(node, at_root)?;
+            self.walk_node(node)?;
         }
         Ok(())
     }
 
-    fn walk_node(&mut self, node: &FragmentNode<'_>, at_root: bool) -> Result<(), CompileError> {
+    fn walk_node(&mut self, node: &FragmentNode<'_>) -> Result<(), CompileError> {
         match node {
             FragmentNode::Element(element) => {
                 let name = element.name_span.extract(self.source);
@@ -240,23 +208,6 @@ impl<'s> Validator<'s> {
                         self.validate_component(special.attributes)?;
                     }
                     _ => {}
-                }
-                if let Some(tag) = root_only_meta_tag(&special.kind) {
-                    // The oracle raises placement BEFORE duplicate at the same site,
-                    // and does not record a mis-placed tag in its `meta_tags` dict
-                    // (`element.js:155-164`) — so a nested one refuses on placement and
-                    // never contributes to the duplicate set.
-                    if !at_root {
-                        return Err(unsupported(Refusal::SpecialElementInvalidPlacement {
-                            name: tag.to_string(),
-                        }));
-                    }
-                    if self.seen_meta.contains(&tag) {
-                        return Err(unsupported(Refusal::DuplicateSpecialElement {
-                            name: tag.to_string(),
-                        }));
-                    }
-                    self.seen_meta.push(tag);
                 }
                 refuse_duplicate_attributes(special.attributes, self.source)?;
             }
@@ -327,13 +278,10 @@ impl<'s> Validator<'s> {
         //     its own owner. Moving this above the match silently accepts that case.
         self.slot_path.push(slot_ancestor(node, self.source));
 
-        // Every child fragment is below the root, so `at_root` is false from here down
-        // — matching the oracle's `parent.type !== 'Root'`, which is a *direct*-child
-        // test: a block or an element between the root and the tag makes it invalid.
         let mut result = Ok(());
         each_child_fragment(node, &mut |child| {
             if result.is_ok() {
-                result = self.walk_fragment(child, false);
+                result = self.walk_fragment(child);
             }
         });
 

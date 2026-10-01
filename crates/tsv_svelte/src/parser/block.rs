@@ -4,7 +4,7 @@
 
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
-use crate::parser::element::ParsedElement;
+use crate::parser::element::{ElementParent, ParsedElement};
 use crate::whitespace::is_svelte_ws;
 use bumpalo::Bump;
 use tsv_lang::source_scan::{TriviaProfile, skip_trivia_run};
@@ -1605,7 +1605,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 if self.is_next_token(TokenKind::Slash)? {
                     break;
                 }
-                match self.parse_element_or_special()? {
+                match self.parse_element_or_special(ElementParent::Nested)? {
                     ParsedElement::Element(elem) => {
                         last_end = elem.span.end_usize();
                         nodes.push(FragmentNode::Element(elem));

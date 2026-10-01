@@ -2,7 +2,7 @@
 
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
-use crate::parser::element::ParsedElement;
+use crate::parser::element::{ElementParent, ParsedElement, RootOnlyMetaTag};
 use crate::whitespace::{is_svelte_ws, skip_svelte_ws, svelte_ws_width_at};
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::source_scan::{TriviaProfile, skip_template_literal, skip_trivia};
@@ -59,13 +59,19 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 // Capture any text before the options tag
                 self.capture_text_if_gap(last_end, &mut fragment_nodes)?;
 
+                // The root-only rule, where Svelte raises it — on the tag name, ahead of
+                // the attributes. It is what makes this the component's only one.
+                self.admit_root_only_meta_tag(
+                    RootOnlyMetaTag::Options,
+                    "svelte:options",
+                    self.current_start(),
+                    ElementParent::Root,
+                )?;
+
                 // Parse svelte:options tag
                 let svelte_options = self.parse_svelte_options()?;
                 last_end = svelte_options.span.end_usize();
-
-                if options.is_some() {
-                    return Err(self.error_duplicate("<svelte:options>"));
-                }
+                debug_assert!(options.is_none(), "the root-only rule admits one");
                 options = Some(svelte_options);
             // Check for script or style tags
             } else if self.check(TokenKind::LeftAngle) && self.is_next_tag("script")? {
@@ -120,7 +126,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     last_end = comment.span.end_usize();
                     fragment_nodes.push(FragmentNode::Comment(comment));
                 } else if self.check(TokenKind::LeftAngle) {
-                    match self.parse_element_or_special()? {
+                    match self.parse_element_or_special(ElementParent::Root)? {
                         ParsedElement::Element(elem) => {
                             last_end = elem.span.end_usize();
                             fragment_nodes.push(FragmentNode::Element(elem));

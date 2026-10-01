@@ -561,15 +561,15 @@ project-wide conventions.
   whole document (riding `attr_refs`'s `each_child_fragment` seam), run at the top
   of `analyze()` before any emission decision. Home for the oracle rules that fire
   wherever their construct sits — **including a region SSR drops** — so neither the
-  emitters nor `guard_dropped_presence` alone can host them. Three parse-time rules:
+  emitters nor `guard_dropped_presence` alone can host them. One parse-time rule:
   `attribute_duplicate` (per-element, kind+name keyed with
-  `bind:` normalized onto plain, `this` never recorded) and
-  `svelte_meta_invalid_placement` / `svelte_meta_duplicate` over the oracle's
-  `root_only_meta_tags` (`<svelte:head>` plus the SSR-inert three; `<svelte:options>`
-  is refused upstream). ⚠️ The inert three's placement/duplicate rules **moved here
-  from `fragment.rs`**: an emitter never runs on a dropped region, so one of them in
-  a `{:catch}` compiled. A rule whose inputs are not emission state belongs here, not
-  at an emitter.
+  `bind:` normalized onto plain, `this` never recorded). The oracle's meta-tag
+  parse-time rules — `svelte_meta_invalid_tag`, and `svelte_meta_duplicate` /
+  `svelte_meta_invalid_placement` over its `root_only_meta_tags` — are parse errors in
+  tsv's parser too, so no such document reaches this pass. ⚠️ An emitter never runs on
+  a dropped region, so a rule sited at one lets its construct compile inside a
+  `{:catch}`: a rule whose inputs are not emission state belongs here, not at an
+  emitter.
 
   Plus the five **snippet declaration/export** rules, from two oracle sites. Three ride
   the same walk: `declaration_duplicate`'s `Scope.declare` call site
@@ -1119,9 +1119,9 @@ Both recurse back into `fragment.rs` through `emit_child_body`.
   (`svelte_meta_invalid_placement`), a duplicate `onerror` (`attribute_duplicate`),
   and a duplicate snippet name (`declaration_duplicate`). Each reproduces identically
   with no boundary in the document, so the answer is always the oracle's
-  whole-component validations, never a boundary-scoped refusal — and all close
-  exactly there (the `<svelte:options>` half in the **parser**, being a
-  fabricated node type rather than a validation miss); see
+  own document-wide rule, never a boundary-scoped refusal — and all close
+  exactly there (the placement one in the **parser**, where the oracle raises it,
+  the other two in `validate.rs`); see
   `../../docs/checklist_svelte_compiler.md`. `{@const}` hoists a
   `const` declaration to the top of its branch body and enters the evaluator's
   innermost block-scope overlay so later reads fold. Each/await locals and the

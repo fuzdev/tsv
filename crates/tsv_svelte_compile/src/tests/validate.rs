@@ -50,22 +50,29 @@ fn compile_duplicate_attribute_accepts_the_oracle_s_exemptions() {
 }
 
 #[test]
-fn compile_root_only_meta_tag_placement_refuses() {
-    // `svelte_meta_invalid_placement` / `svelte_meta_duplicate` for `<svelte:head>`
-    // — tsv already enforced both for the SSR-inert tags, but not for head.
-    assert_unsupported(
+fn compile_root_only_meta_tag_placement_is_parse_rejected() {
+    // `svelte_meta_invalid_placement` / `svelte_meta_duplicate` over the oracle's
+    // `root_only_meta_tags` are raised at PARSE on both sides, so a nested or repeated
+    // one never reaches the compiler.
+    const INVALID_PLACEMENT: &str = "cannot be inside elements or blocks";
+    assert_parse_rejected(
         "<div><svelte:head><title>x</title></svelte:head></div>",
-        "top-level",
+        INVALID_PLACEMENT,
     );
     // Any container counts, including a `<svelte:boundary>` — the placement test is
     // "direct child of Root", so a boundary between makes it invalid.
-    assert_unsupported(
+    assert_parse_rejected(
         "<svelte:boundary><svelte:head><title>x</title></svelte:head></svelte:boundary>",
-        "top-level",
+        INVALID_PLACEMENT,
     );
-    assert_unsupported(
+    // Including a region SSR DROPS — parse precedes every emission decision.
+    assert_parse_rejected(
+        "{#await p}a{:then v}b{:catch e}<svelte:window />{/await}",
+        INVALID_PLACEMENT,
+    );
+    assert_parse_rejected(
         "<svelte:head><title>a</title></svelte:head><svelte:head><title>b</title></svelte:head>",
-        "duplicate",
+        "A component can only have one `<svelte:head>` element",
     );
     // One at the root is of course still fine.
     let _ = compile_js("<svelte:head><title>a</title></svelte:head>");
@@ -103,10 +110,8 @@ fn compile_unknown_svelte_meta_tag_is_parse_rejected() {
 fn compile_nested_svelte_options_is_parse_rejected() {
     // `<svelte:options>` is the one `root_only_meta_tags` member with no node type of
     // its own — it fills `Root`'s `options` slot, which only the root dispatch fills —
-    // so a nested one is unrepresentable and is rejected at PARSE, not here. That is
-    // why `validate.rs`'s `root_only_meta_tag` has no arm for it: no such element can
-    // reach the compiler. Its four siblings DO have node types, so their placement rule
-    // is a compiler refusal (the test above).
+    // so a nested one is unrepresentable as well as rejected at PARSE, like its four
+    // siblings (the test above).
     const INVALID_PLACEMENT: &str = "cannot be inside elements or blocks";
     assert_parse_rejected("<div><svelte:options /></div>", INVALID_PLACEMENT);
     assert_parse_rejected("{#if x}<svelte:options />{/if}", INVALID_PLACEMENT);

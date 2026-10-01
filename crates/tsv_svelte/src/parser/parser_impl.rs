@@ -81,6 +81,9 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     /// attribute). Monotonic within a subtree (descendants inherit) but scoped to the template
     /// (restored for siblings). Suppresses `<slot>` → `SlotElement` (it stays a `RegularElement`).
     pub(crate) in_shadowroot_template: bool,
+    /// The root-only meta tags read so far, one bit each (`RootOnlyMetaTag::bit`) — Svelte's
+    /// `parser.meta_tags`, which makes a second one in the component a parse error.
+    pub(crate) root_only_meta_tags_seen: u8,
     /// Set on reading a raw-text element nested in the markup — see
     /// [`internal::Root::holds_nested_raw_text`]. Never cleared: a speculative read that is
     /// later rewound can only leave it set for a document that holds none, which costs the
@@ -190,6 +193,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             snippet_wire_parameters: BumpVec::new_in(arena),
             in_svelte_head: false,
             in_shadowroot_template: false,
+            root_only_meta_tags_seen: 0,
             holds_nested_raw_text: false,
         })
     }

@@ -994,17 +994,6 @@ pub enum Refusal {
         /// The rune keypath (`$derived.by`, `$effect`, `$state.snapshot`, …).
         rune: String,
     },
-    /// An SSR-inert special element (`<svelte:window>`/`<svelte:body>`/
-    /// `<svelte:document>`) nested inside an element/block/snippet. These are legal
-    /// only as a direct child of the component root; the oracle errors
-    /// `svelte_meta_invalid_placement` at analysis. tsv's parser is permissive about
-    /// placement, so the compiler refuses the nested case rather than emit nothing
-    /// for oracle-rejected input.
-    #[error("<{name}> must be a top-level element (the oracle rejects it)")]
-    SpecialElementInvalidPlacement {
-        /// The special-element tag (`svelte:window`, …).
-        name: String,
-    },
     /// Markup a browser would REPAIR by moving, removing, or inserting elements —
     /// the oracle's `node_invalid_placement` (`2-analyze/visitors/RegularElement.js`,
     /// `Text.js`, `ExpressionTag.js`, over the tables in `src/html-tree-validation.js`).
@@ -1113,15 +1102,6 @@ pub enum Refusal {
     #[error("duplicate `{name}` attribute on one element (the oracle rejects it)")]
     DuplicateAttribute {
         /// The repeated attribute/directive name.
-        name: String,
-    },
-    /// A second `<svelte:window>`/`<svelte:body>`/`<svelte:document>` of the same
-    /// kind in the component (the oracle errors `svelte_meta_duplicate`: a component
-    /// may have at most one of each). tsv's parser accepts it, so the compiler
-    /// refuses the duplicate rather than emit nothing for oracle-rejected input.
-    #[error("duplicate <{name}> element (the oracle rejects it)")]
-    DuplicateSpecialElement {
-        /// The special-element tag (`svelte:window`, …).
         name: String,
     },
     /// Children on an SSR-inert special element (`<svelte:window>`/`<svelte:body>`/

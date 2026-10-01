@@ -62,20 +62,59 @@ fn is_reserved_namespace_miss(name: &str) -> bool {
     name.starts_with("svelte:") && !SpecialElementTag::is_meta_tag_name(name)
 }
 
+/// Where the element being read sits: directly in the component root's fragment, or under
+/// anything else — an element, a component, a block, another meta tag. Svelte's
+/// `parent.type !== 'Root'`, the placement half of the root-only meta tag rule
+/// ([`RootOnlyMetaTag`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ElementParent {
+    Root,
+    Nested,
+}
+
+/// Svelte's `root_only_meta_tags` (`1-parse/state/element.js`): the meta tags a component
+/// may hold only as a direct child of its root, and at most once each. Both rules are
+/// parse errors there, raised where the tag name is read — `svelte_meta_duplicate` first,
+/// then `svelte_meta_invalid_placement` — so they are parse errors here, at the same
+/// point ([`SvelteParser::admit_root_only_meta_tag`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum RootOnlyMetaTag {
+    Head,
+    Options,
+    Window,
+    Document,
+    Body,
+}
+
+impl RootOnlyMetaTag {
+    pub(crate) fn from_tag_name(name: &str) -> Option<Self> {
+        Some(match name.strip_prefix("svelte:")? {
+            "head" => Self::Head,
+            "options" => Self::Options,
+            "window" => Self::Window,
+            "document" => Self::Document,
+            "body" => Self::Body,
+            _ => return None,
+        })
+    }
+
+    /// This tag's bit in the parser's seen set (`SvelteParser::root_only_meta_tags_seen`).
+    const fn bit(self) -> u8 {
+        1 << self as u8
+    }
+}
+
 /// Whether `name` is the meta tag that has **no fragment-node form**, so it exists only
 /// where the root dispatch (`parse_root`) builds it. Exactly `svelte:options` today: it
 /// fills `Root`'s single `Option` slot rather than becoming a `FragmentNode`. Reaching
-/// *this* parser therefore means it is nested inside an element or a block, which Svelte
-/// rejects as `svelte_meta_invalid_placement`.
+/// the element parser therefore means it is nested inside an element or a block.
 ///
-/// Rejecting is the only representable answer — the same argument that makes
-/// [`is_reserved_namespace_miss`] a parser concern rather than a later validate pass's:
-/// accepting fabricates a `RegularElement { name: "svelte:options" }`, a shape Svelte's
-/// AST never contains, and no post-parse pass can repair a wire that is already wrong.
-/// Its four `root_only_meta_tags` siblings are **not** this case — `svelte:head` /
-/// `svelte:window` / `svelte:body` / `svelte:document` each have a `SpecialElementTag`, so
-/// a nested one builds exactly the node type Svelte builds before erroring; their
-/// placement (and duplicate) rule is representable, so it stays diagnostics-layer work.
+/// The root-only rule ([`RootOnlyMetaTag`]) already rejects that placement, as it does for
+/// the four siblings — `svelte:head` / `svelte:window` / `svelte:body` / `svelte:document`,
+/// which each have a `SpecialElementTag`. This predicate states the stronger fact about
+/// `svelte:options` alone: accepting one here would fabricate a
+/// `RegularElement { name: "svelte:options" }`, a shape Svelte's AST never contains, so the
+/// element parser refuses it whatever parent it was handed.
 ///
 /// Derived from [`SpecialElementTag`] rather than a second literal, so the two cannot
 /// drift: within the reserved namespace, a meta tag with no variant *is* a meta tag with
@@ -257,11 +296,45 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         })
     }
 
+    /// Apply the root-only meta tag rule to the tag opening at `start` (its `<`), in
+    /// Svelte's order: a second `tag` in the component is `svelte_meta_duplicate`, then one
+    /// outside the root is `svelte_meta_invalid_placement`; a tag that passes both is
+    /// recorded as seen. The seen set is per component, so a tag anywhere earlier at the
+    /// root counts, whatever sits between the two.
+    pub(crate) fn admit_root_only_meta_tag(
+        &mut self,
+        tag: RootOnlyMetaTag,
+        tag_name: &str,
+        start: usize,
+        parent: ElementParent,
+    ) -> Result<(), ParseError> {
+        if self.root_only_meta_tags_seen & tag.bit() != 0 {
+            return Err(self.error_msg_at(
+                &format!("A component can only have one `<{tag_name}>` element"),
+                start,
+            ));
+        }
+        if parent != ElementParent::Root {
+            return Err(self.error_msg_at(
+                &format!("`<{tag_name}>` tags cannot be inside elements or blocks"),
+                start,
+            ));
+        }
+        self.root_only_meta_tags_seen |= tag.bit();
+        Ok(())
+    }
+
     /// Parse an element or special element: `<tag></tag>` or `<tag/>` or `<void>`
     ///
     /// Detects special elements (svelte:*, slot) and parses them appropriately.
     /// Returns a ParsedElement enum to distinguish between regular and special elements.
-    pub(crate) fn parse_element_or_special(&mut self) -> Result<ParsedElement<'arena>, ParseError> {
+    ///
+    /// `parent` says whether the element is a direct child of the component root, which the
+    /// root-only meta tags require ([`RootOnlyMetaTag`]).
+    pub(crate) fn parse_element_or_special(
+        &mut self,
+        parent: ElementParent,
+    ) -> Result<ParsedElement<'arena>, ParseError> {
         let start = self.current_start();
 
         // Parse opening tag: <tag>
@@ -306,15 +379,17 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             return Err(self.error_msg_at("Expected a valid element or component name", start + 1));
         }
 
-        // Only the root dispatch can build `<svelte:options>`, so one that reaches the
-        // element parser is nested — a placement Svelte rejects, and one tsv's AST cannot
-        // hold. As in Svelte, the check comes *after* the name gates and *before* the
-        // node-type decision below.
-        if is_root_slot_meta_tag(tag_name) {
-            return Err(self.error_msg_at(
-                &format!("`<{tag_name}>` cannot be inside elements or blocks"),
-                start,
-            ));
+        // The root-only meta tags: at most one of each, and only directly in the root. As in
+        // Svelte, the check comes *after* the name gates and *before* the node-type decision
+        // below. Only the root dispatch can build `<svelte:options>`, so one that reaches
+        // this parser is nested whatever the caller said — tsv's AST cannot hold it here.
+        if let Some(tag) = RootOnlyMetaTag::from_tag_name(tag_name) {
+            let parent = if is_root_slot_meta_tag(tag_name) {
+                ElementParent::Nested
+            } else {
+                parent
+            };
+            self.admit_root_only_meta_tag(tag, tag_name, start, parent)?;
         }
 
         self.advance_past_name(name_end)?;
@@ -709,7 +784,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     return Ok((child_nodes, self.current_start() as u32));
                 }
                 // Parse child element (may be special or regular)
-                let child = self.parse_element_or_special()?;
+                let child = self.parse_element_or_special(ElementParent::Nested)?;
                 match child {
                     ParsedElement::Element(elem) => {
                         last_end = elem.span.end_usize();
@@ -980,8 +1055,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 #[cfg(test)]
 mod tests {
     use super::{
-        is_doctype_name, is_namespaced_name, is_reserved_namespace_miss, is_root_slot_meta_tag,
-        is_valid_element_local_name, is_valid_element_name, is_valid_tag_name, tag_name_end,
+        RootOnlyMetaTag, is_doctype_name, is_namespaced_name, is_reserved_namespace_miss,
+        is_root_slot_meta_tag, is_valid_element_local_name, is_valid_element_name,
+        is_valid_tag_name, tag_name_end,
     };
     use crate::ast::internal::is_component_name;
 
@@ -1311,13 +1387,12 @@ mod tests {
     }
 
     /// The root-slot predicate must select `svelte:options` and nothing else — every other
-    /// meta tag has a `SpecialElementTag`, so a nested one is representable and its
-    /// placement rule belongs to a later pass, not to the parser.
+    /// meta tag has a `SpecialElementTag`, so it has a fragment-node form.
     #[test]
     fn root_slot_meta_tag_is_only_svelte_options() {
         assert!(is_root_slot_meta_tag("svelte:options"));
         // The four `root_only_meta_tags` siblings share the placement RULE but not the
-        // representability problem, so the parser must let them through.
+        // representability problem.
         for name in [
             "svelte:head",
             "svelte:window",
@@ -1350,5 +1425,43 @@ mod tests {
         // `is_meta_tag_name`, yet `from_tag_name` deliberately returns `None` inside a
         // `<template shadowrootmode>` — without the gate that context would reject it.
         assert!(!is_root_slot_meta_tag("slot"));
+    }
+
+    /// The root-only set is Svelte's five, spelled exactly — each with its own bit — and
+    /// every root-slot tag is in it.
+    #[test]
+    fn root_only_meta_tags_are_svelte_s_five() {
+        let names = [
+            "svelte:head",
+            "svelte:options",
+            "svelte:window",
+            "svelte:document",
+            "svelte:body",
+        ];
+        let mut bits = 0u8;
+        for name in names {
+            let tag = RootOnlyMetaTag::from_tag_name(name)
+                .unwrap_or_else(|| panic!("<{name}> is root-only"));
+            assert_eq!(bits & tag.bit(), 0, "<{name}> shares a bit");
+            bits |= tag.bit();
+        }
+        for name in [
+            "svelte:element",
+            "svelte:component",
+            "svelte:self",
+            "svelte:fragment",
+            "svelte:boundary",
+            "svelte:headx",
+            "svelte:Head",
+            "head",
+            "window",
+            "title",
+            "slot",
+            "div",
+        ] {
+            assert_eq!(RootOnlyMetaTag::from_tag_name(name), None, "<{name}>");
+            assert!(!is_root_slot_meta_tag(name), "<{name}>");
+        }
+        assert!(RootOnlyMetaTag::from_tag_name("svelte:options").is_some());
     }
 }

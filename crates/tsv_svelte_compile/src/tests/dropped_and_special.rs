@@ -292,24 +292,25 @@ fn compile_ssr_inert_special_elements() {
 
 #[test]
 fn compile_refuses_invalid_ssr_inert_special_elements() {
-    // Invalid-input shapes the oracle rejects at analysis; tsv's parser accepts
-    // them, so the compiler must refuse (never emit nothing for oracle-rejected
-    // input, which would surface as a corpus OVER-ACCEPTANCE).
+    // Invalid-input shapes the oracle rejects. The placement and duplicate rules are
+    // parse errors on both sides; the rest tsv's parser accepts, so the compiler must
+    // refuse (never emit nothing for oracle-rejected input, which would surface as a
+    // corpus OVER-ACCEPTANCE).
     //
     // PLACEMENT: legal only at the component root — nested inside an element/block/
     // snippet is `svelte_meta_invalid_placement`.
-    assert_unsupported(
+    assert_parse_rejected(
         "<div><svelte:window onkeydown={() => {}} /></div>",
-        "must be a top-level element",
+        "cannot be inside elements or blocks",
     );
-    assert_unsupported(
+    assert_parse_rejected(
         "{#if true}<svelte:body use:act />{/if}",
-        "must be a top-level element",
+        "cannot be inside elements or blocks",
     );
     // DUPLICATE: at most one of each kind (`svelte_meta_duplicate`).
-    assert_unsupported(
+    assert_parse_rejected(
         "<svelte:window /><svelte:window />",
-        "duplicate <svelte:window> element",
+        "A component can only have one `<svelte:window>` element",
     );
     // Different kinds side-by-side are fine (not a duplicate).
     let _ = compile_js("<svelte:window /><svelte:body />");
