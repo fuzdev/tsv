@@ -988,7 +988,11 @@ scratch, once by the flush — while the benefit is a property of the run's
 burst (`,"start":` N `,"end":` M) remove the same five appends and inline the
 same two integer calls, differing only in static width — ~50 bytes against ~17 —
 and staging the tails is **−1.27 points** of cycles where staging the heads is
-**+0.03**.
+**+0.03**. (Those figures compare each staged scope against the out-of-line
+pair. `tsv_css`'s tails are not staged today: `JsonWriter::start_end_tail` writes
+the same burst straight into one window of the output buffer, keeping the inline
+integers with no scratch round trip. The lesson the comparison establishes —
+arity against static width — is a property of staging, wherever it is used.)
 
 ⚠️⚠️ **So grade the SCOPE, and put every candidate scope in one layout group —
 the instruction and cycles channels can rank them in opposite order.** Four

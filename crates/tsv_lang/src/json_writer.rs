@@ -122,6 +122,17 @@ const LED_TEMPLATE: [u8; LED_WINDOW] = {
     t
 };
 
+/// The widest `lead` [`JsonWriter::start_end_tail`] takes ahead of [`START_KEY`] — a
+/// `,`, or the `]` that closes an array and then the `,`.
+const TAIL_LEAD_MAX: usize = 2;
+
+/// The widest `close` [`JsonWriter::start_end_tail`] takes after the pair — a node's `}`.
+const TAIL_CLOSE_MAX: usize = 1;
+
+/// [`JsonWriter::start_end_tail`]'s window: the widest lead, [`START_KEY`],
+/// [`START_END_WINDOW`], the widest close.
+const TAIL_WINDOW: usize = TAIL_LEAD_MAX + START_KEY.len() + START_END_WINDOW + TAIL_CLOSE_MAX;
+
 /// Decimal digit count of a `u32` (`0` is one digit) — the [`decimal_width`]
 /// sibling for the `u32` path.
 ///
@@ -961,11 +972,14 @@ impl JsonWriter {
     /// that crate's node header and read as its private business for long
     /// enough that `tsv_svelte`'s writer emitted every integer through the
     /// out-of-line [`JsonWriter::u32`] instead, which cost it ~1.6% of the
-    /// wire path. Today `tsv_ts`'s `node_header_impl`, `tsv_svelte`'s
-    /// `name_loc` field + `Attribute`/element/`Text` headers, and `tsv_css`'s
-    /// trailing `start`/`end` bursts on its rule, relative-selector and
-    /// named-selector emitters all stage. A `start`/`end` pair
-    /// outside a run is [`JsonWriter::start_end`]'s one call, not two `u32`s.
+    /// wire path. Today `tsv_ts`'s `node_header_impl` and
+    /// `write_identifier_parts_with_character`, and `tsv_svelte`'s `name_loc`
+    /// field + `Attribute`/element/`Text` headers stage. A
+    /// `start`/`end` pair outside a run is [`JsonWriter::start_end`]'s one call,
+    /// not two `u32`s — or, for a burst short enough to be written whole into
+    /// one window of the output buffer, [`JsonWriter::start_end_tail`], which is
+    /// what `tsv_css`'s rule, relative-selector and named-selector tails take
+    /// in place of a run.
     ///
     /// ⚠️ **The bar is not frequency alone — a run's STATIC fragments are
     /// copied twice**, once into the scratch and once through the flush, so the
@@ -1612,6 +1626,74 @@ impl JsonWriter {
             (end_word, end_digits),
         );
         self.buf.truncate(len + at + used);
+    }
+
+    /// A node's closing burst — `lead`, `"start":` N `,"end":` M, `close` — as one
+    /// fixed-width window of the output buffer, byte-identical to `raw(lead)`,
+    /// `raw("\"start\":")`, [`JsonWriter::start_end`] and `raw(close)`. `lead` is the
+    /// comma (behind the `]` of an array the node just closed, when there is one) and
+    /// `close` the node's `}`, or empty when more follows.
+    ///
+    /// Every store lands in the output buffer itself: the two constants at widths
+    /// fixed by their types, the key as one word, both [`digit_word`] registers, and a
+    /// `truncate` trims the padding. Nothing is assembled anywhere else first: there
+    /// is no scratch to fill and no runtime-length [`StageRun::flush`] to copy it out.
+    ///
+    /// The common path makes no call: a full buffer and a value past `99_999_999`
+    /// both leave for [`JsonWriter::start_end_tail_slow`], which does the whole write.
+    /// `inline(always)`, [`StageRun`]'s trade: the body lands at each site with its
+    /// constants folded and the buffer's fields in registers, for two inlined
+    /// `digit_word` copies of `.text` a site.
+    #[expect(clippy::inline_always, clippy::expect_used)]
+    #[inline(always)]
+    pub fn start_end_tail<const L: usize, const C: usize>(
+        &mut self,
+        lead: &[u8; L],
+        start: u32,
+        end: u32,
+        close: &[u8; C],
+    ) {
+        const { assert!(L <= TAIL_LEAD_MAX && C <= TAIL_CLOSE_MAX) };
+        let len = self.buf.len();
+        if self.buf.capacity() - len < TAIL_WINDOW {
+            self.start_end_tail_slow(lead, start, end, close);
+            return;
+        }
+        let (start_word, start_digits) = digit_word(start);
+        let (end_word, end_digits) = digit_word(end);
+        if start_digits > WORD_DIGITS || end_digits > WORD_DIGITS {
+            self.start_end_tail_slow(lead, start, end, close);
+            return;
+        }
+        self.buf.extend_from_slice(&[0; TAIL_WINDOW]);
+        let window = self
+            .buf
+            .last_chunk_mut::<TAIL_WINDOW>()
+            .expect("the window was just appended");
+        window[..L].copy_from_slice(lead);
+        let at = L + START_KEY.len();
+        window[L..at].copy_from_slice(START_KEY.as_bytes());
+        let used = fill_start_end(
+            &mut window[at..],
+            (start_word, start_digits),
+            (end_word, end_digits),
+        );
+        let close_at = at + used;
+        window[close_at..close_at + C].copy_from_slice(close);
+        self.buf.truncate(len + close_at + C);
+    }
+
+    /// [`JsonWriter::start_end_tail`] off its window: the buffer is too full for it,
+    /// or a value is past `99_999_999`. One out-of-line body for both and for every
+    /// lead and close, taking them as slices — the separate appends, each integer
+    /// through [`JsonWriter::u32`].
+    #[cold]
+    #[inline(never)]
+    fn start_end_tail_slow(&mut self, lead: &[u8], start: u32, end: u32, close: &[u8]) {
+        self.buf.extend_from_slice(lead);
+        self.raw(START_KEY);
+        self.start_end_wide(start, end);
+        self.buf.extend_from_slice(close);
     }
 
     /// [`JsonWriter::start_end`] with the buffer too full for its window: grow
@@ -2309,6 +2391,71 @@ mod tests {
             w.u32(n);
             String::from_utf8(w.into_bytes()).expect("digits are ASCII")
         });
+    }
+
+    /// [`JsonWriter::start_end_tail`] against `format!`, for each lead and close a
+    /// caller passes: every width pair at each power-of-ten edge (the 8→9-digit
+    /// hand-off to the slow arm included), written into a buffer with room for the
+    /// window and into one with none, so both the window and the slow arm are graded
+    /// at every width.
+    #[test]
+    fn start_end_tail_matches_format() {
+        fn emit<const L: usize, const C: usize>(
+            cap: usize,
+            lead: &[u8; L],
+            start: u32,
+            end: u32,
+            close: &[u8; C],
+        ) -> String {
+            let mut w = JsonWriter::with_capacity(cap);
+            w.raw("[");
+            w.start_end_tail(lead, start, end, close);
+            w.start_end_tail(lead, end, start, close);
+            String::from_utf8(w.into_bytes()).expect("digits are ASCII")
+        }
+        let mut edges = vec![0, 1, u32::MAX, u32::MAX - 1];
+        let mut pow = 10u32;
+        loop {
+            edges.extend([pow - 1, pow, pow + 1]);
+            match pow.checked_mul(10) {
+                Some(next) => pow = next,
+                None => break,
+            }
+        }
+        for &start in &edges {
+            for &end in &edges {
+                for cap in [0, 256] {
+                    assert_eq!(
+                        emit(cap, b",", start, end, b"}"),
+                        format!(
+                            "[,\"start\":{start},\"end\":{end}}},\"start\":{end},\"end\":{start}}}"
+                        ),
+                        "`,` … `}}` ({start}, {end}), capacity {cap}"
+                    );
+                    assert_eq!(
+                        emit(cap, b"],", start, end, b"}"),
+                        format!(
+                            "[],\"start\":{start},\"end\":{end}}}],\"start\":{end},\"end\":{start}}}"
+                        ),
+                        "`],` … `}}` ({start}, {end}), capacity {cap}"
+                    );
+                    assert_eq!(
+                        emit(cap, b"],", start, end, b""),
+                        format!(
+                            "[],\"start\":{start},\"end\":{end}],\"start\":{end},\"end\":{start}"
+                        ),
+                        "`],` … ({start}, {end}), capacity {cap}"
+                    );
+                    assert_eq!(
+                        emit(cap, b",", start, end, b""),
+                        format!(
+                            "[,\"start\":{start},\"end\":{end},\"start\":{end},\"end\":{start}"
+                        ),
+                        "`,` … ({start}, {end}), capacity {cap}"
+                    );
+                }
+            }
+        }
     }
 
     #[test]
