@@ -4229,6 +4229,33 @@ impl DocArena {
         std::cell::Ref::map(self.nodes.borrow(), |nodes| &nodes[id.index()])
     }
 
+    /// The span of a doc that is exactly one [`DocText::SourceSpan`] text, else `None`.
+    ///
+    /// Through the **preserve-whitespace** render entry
+    /// (`arena_print_doc_with_indent_resolved_preserve_whitespace_into`) such a doc
+    /// renders as `span.extract(source)` and nothing else, at any column, indent and
+    /// width: a lone text holds no line for the renderer to decide, and the text arm
+    /// appends the resolved slice whatever the width slot says. A printer that writes
+    /// each piece through that entry to a buffer of its own can therefore append the
+    /// slice itself and skip the render.
+    ///
+    /// ⚠️ Not so through an entry that trims the rendered piece's last line
+    /// (`arena_print_doc_with_indent_resolved_into`): a slice may END in a space or tab
+    /// of its own (a CSS escape's payload, `50px\ `), which that trim strips, so a
+    /// caller rendering there must not substitute the slice.
+    ///
+    /// ⚠️ A slice written that way never reaches the renderer's two audit seams (the
+    /// `swallow_check` text hook and the `comment_check` tag record). That is sound only
+    /// for a printer whose docs carry neither a line-comment mark nor a comment tag — the
+    /// CSS printer, which records its comments where it writes them.
+    #[inline]
+    pub fn as_source_span_text(&self, id: DocId) -> Option<Span> {
+        match &self.nodes.borrow()[id.index()] {
+            DocNode::Text(DocText::SourceSpan(span, _)) => Some(*span),
+            _ => None,
+        }
+    }
+
     /// If this DocId points to a Group node, return its contents (unwrapping the group).
     /// Otherwise return the DocId unchanged.
     #[inline]
@@ -5415,5 +5442,36 @@ mod welded_marker_burial_tests {
         // `with_context`'s own tripwire holds the render-side flags to a `Fill`.
         let flagged = a.with_context(a.text("y"), DocContext::reserving(4));
         a.debug_check_buried_welded_marker(a.group(a.concat(&[flagged, a.line()])));
+    }
+}
+
+#[cfg(test)]
+mod as_source_span_text_tests {
+    use super::DocArena;
+    use crate::Span;
+
+    /// `Some` for a doc that is one source-span text, measured or claimed plain, and for
+    /// nothing else — not a static or pooled text, not the will-break-opaque verbatim
+    /// span, not a concat holding a source span.
+    #[test]
+    fn only_a_lone_source_span_answers() {
+        let source = "abc def";
+        let span = Span { start: 0, end: 3 };
+        let a = DocArena::for_source(source);
+
+        assert_eq!(
+            a.as_source_span_text(a.source_span(span, source)),
+            Some(span)
+        );
+        assert_eq!(a.as_source_span_text(a.source_span_plain(span)), Some(span));
+
+        assert_eq!(a.as_source_span_text(a.text("abc")), None);
+        assert_eq!(a.as_source_span_text(a.text_pooled("abc")), None);
+        assert_eq!(
+            a.as_source_span_text(a.verbatim_source_span(span, source)),
+            None
+        );
+        let pair = a.concat(&[a.source_span_plain(span), a.text(";")]);
+        assert_eq!(a.as_source_span_text(pair), None);
     }
 }

@@ -306,8 +306,40 @@ impl<'a> Printer<'a> {
     /// Format a CSS value
     ///
     /// Uses the doc builder which handles source fidelity and proper formatting.
+    ///
+    /// A value whose doc is one source-span text — a verbatim identifier, an operator, an
+    /// already-canonical dimension or colour, which is most declaration values — is its
+    /// own source slice at any column, so it is appended directly instead of rendered:
+    /// the render entry would measure the column, borrow the scratch and the work
+    /// buffers, and copy the same bytes out. The audit seams the renderer hosts lose
+    /// nothing by it: this printer builds no line-comment text and tags no comment doc
+    /// (its comments are recorded where they are written), so a rendered value text only
+    /// ever reached the swallow check as content after a `//` this printer cannot emit.
     pub(super) fn print_css_value(&mut self, value: &CssValue<'_>) {
         let doc = self.build_css_value_doc(value);
+        if let Some(span) = self.arena.as_source_span_text(doc) {
+            let source = self.source;
+            #[cfg(debug_assertions)]
+            {
+                let mut rendered = String::new();
+                tsv_lang::doc::arena_print_doc_with_indent_resolved_preserve_whitespace_into(
+                    self.arena,
+                    doc,
+                    &self.embed,
+                    self.current_column(),
+                    self.indent_level,
+                    source,
+                    &mut rendered,
+                );
+                assert_eq!(
+                    rendered,
+                    span.extract(source),
+                    "a lone source-span value rendered as something other than its slice"
+                );
+            }
+            self.write(span.extract(source));
+            return;
+        }
         self.write_arena_doc(doc);
     }
 
