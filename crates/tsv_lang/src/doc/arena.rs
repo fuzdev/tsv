@@ -2406,6 +2406,12 @@ impl DocArena {
     /// pass proved free of any byte below `!` or above `~`, an operator, a unit it scanned,
     /// and a named or hex color, ASCII letters and digits by grammar.
     ///
+    /// The Svelte printer's fused constructs are a fourth: a template construct that prints
+    /// as its own source bytes — an attribute, an expression tag, or the bare name or lone
+    /// lookup that is a braced value or a binding-pattern leaf — emitted as one span over
+    /// the whole construct once a scan of it (or the name flags of the path it holds)
+    /// proved it plain.
+    ///
     /// ⚠️ **A wrong claim here is a SILENT width error.** Nothing downstream re-derives
     /// the width, so an over-claiming caller shifts a fits verdict and changes no other
     /// observable — invisible to a byte-identity sweep on any corpus whose names are
