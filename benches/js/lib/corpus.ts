@@ -548,7 +548,7 @@ const COLLECTION_TIERS: Record<string, CollectionTier> = {
 	fuz_code: 'real',
 	fuz_css: 'real',
 	fuz_docs: 'real',
-	fuz_gitops: 'real',
+	fuz_repos: 'real',
 	fuz_mastodon: 'real',
 	fuz_template: 'real',
 	fuz_ui: 'real',

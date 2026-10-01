@@ -96,7 +96,7 @@ export const GATE_CHECKOUT_IDS: Record<
 	// its manifest.
 	[CORPORA_ROOT]: {
 		tree: CORPORA_TREE,
-		hash: '03211c7c4',
+		hash: '434f81a60',
 		pins: ['CORPUS_FORMAT_*', 'CORPUS_PARSE_*', 'SVELTE_STYLES_BLOCKS_PIN']
 	},
 	// `../svelte` feeds the conformance view alone (its `tests` tree); its
