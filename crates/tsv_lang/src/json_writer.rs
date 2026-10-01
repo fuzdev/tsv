@@ -897,7 +897,7 @@ impl StageRun<'_> {
         let (word, digits) = digit_word(n);
         let at = self.len;
         if digits > WORD_DIGITS {
-            self.len = stage_wide(self.stage, at, u64::from(n));
+            self.wide(u64::from(n));
             return;
         }
         self.stage[at..at + WORD_DIGITS].copy_from_slice(&word.to_le_bytes());
@@ -912,8 +912,29 @@ impl StageRun<'_> {
     pub fn usize(&mut self, n: usize) {
         match u32::try_from(n) {
             Ok(n) => self.u32(n),
-            Err(_) => self.len = stage_wide(self.stage, self.len, n as u64),
+            Err(_) => self.wide(n as u64),
         }
+    }
+
+    /// The wide arm of [`StageRun::u32`] and [`StageRun::usize`]: [`stage_wide`],
+    /// with the length it hands back clamped to the most it can be.
+    ///
+    /// ⚠️ The clamp never changes the value — `stage_wide` advances by a decimal
+    /// width, which is at most [`MAX_U64_DIGITS`] — and it is a **codegen**
+    /// requirement, the same kind as [`dec_pair`]'s mask. `stage_wide` is out of
+    /// line, so what it returns is opaque at the call site: unclamped, the run's
+    /// length is unbounded on this arm, the arm merges back into the header, and
+    /// every append after an integer keeps its bound check against the scratch
+    /// for a value no document reaches.
+    #[inline(always)]
+    fn wide(&mut self, n: u64) {
+        let at = self.len;
+        let end = stage_wide(self.stage, at, n);
+        debug_assert!(
+            end - at <= MAX_U64_DIGITS,
+            "a decimal is at most MAX_U64_DIGITS wide"
+        );
+        self.len = end.min(at + MAX_U64_DIGITS);
     }
 
     /// Append the run to the output buffer — the single write the whole shape

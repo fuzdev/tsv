@@ -1226,3 +1226,69 @@ pub(super) fn write_identifier_with_optional(
 ) {
     write_identifier_parts(w, id.span, id.ident_name(), id.optional, None, None, ctx);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tsv_lang::{LeadingBom, LocationTracker};
+
+    /// Run `emit` under a standalone-TypeScript context over `source`, for one
+    /// wire variant and one comment role.
+    fn emitted(
+        source: &str,
+        emit_loc: bool,
+        comments: CommentMode<'_>,
+        emit: impl FnOnce(&mut JsonWriter, &Ctx<'_>),
+    ) -> String {
+        let (tracker, map) = LocationTracker::new_ecmascript_with_map(source, LeadingBom::Counted);
+        let loc = LocationMapper {
+            tracker: &tracker,
+            map: &map,
+        };
+        let ctx = Ctx::new(
+            source,
+            loc,
+            Schema::Acorn,
+            comments,
+            emit_loc,
+            AcornSeed::NONE,
+        );
+        let mut w = JsonWriter::with_capacity(0);
+        emit(&mut w, &ctx);
+        String::from_utf8(w.into_bytes()).expect("the wire is UTF-8")
+    }
+
+    /// The staged header against `node_header_wide_end`, which writes the same
+    /// header through the direct emitters — over a span whose two ends sit on
+    /// different lines behind a multibyte character, and at node-type lengths
+    /// either side of the staged run's inline copy (a real node type is at most
+    /// 31 bytes; a longer one takes the run's out-of-line copy).
+    #[test]
+    fn node_header_matches_the_direct_emitters() {
+        const TYPE: &str = "TSConstructSignatureDeclarationAndThenSomeMore";
+        let source = "é;\n\n  abc(\n);\n";
+        let start = source.find("abc").expect("present") as u32;
+        let span = Span::new(start, source.len() as u32 - 2);
+        for len in [1, 31, 32, 33, TYPE.len()] {
+            let node_type: &'static str = &TYPE[..len];
+            for emit_loc in [true, false] {
+                let staged = emitted(source, emit_loc, CommentMode::Off, |w, ctx| {
+                    node_header(w, node_type, span, ctx);
+                });
+                let direct = emitted(source, emit_loc, CommentMode::Off, |w, ctx| {
+                    node_header_wide_end(w, node_type, span, span.end, ctx);
+                });
+                assert_eq!(staged, direct, "type length {len}, loc {emit_loc}");
+                if emit_loc {
+                    assert_eq!(
+                        staged,
+                        format!(
+                            "{{\"type\":\"{node_type}\",\"start\":6,\"end\":12,\"loc\":{{\"start\":\
+                             {{\"line\":3,\"column\":2}},\"end\":{{\"line\":4,\"column\":1}}}}"
+                        )
+                    );
+                }
+            }
+        }
+    }
+}
