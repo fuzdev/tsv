@@ -4,16 +4,17 @@
 // https://tc39.es/ecma262/#sec-literals-string-literals
 //
 // Reference implementation: acorn (node_modules/acorn/dist/acorn.mjs)
-// - readString() - lines 5925-5949
-// - readEscapedChar() - lines 6052-6112
-// - readCodePoint() - lines 5910-5923
-// - readHexChar() - lines 6116-6121
+// - readString()
+// - readEscapedChar()
+// - readCodePoint()
+// - readHexChar()
 //
 // Template literal escapes follow similar rules with additional:
 // - \` - escaped backtick (template delimiter)
 // - \$ - escaped dollar (to prevent interpolation)
 
 use tsv_lang::ParseError;
+use tsv_lang::swar::next_byte_of;
 
 /// Decode JS/TypeScript string escape sequences
 ///
@@ -52,119 +53,124 @@ pub fn decode_string_escapes_into(s: &str, out: &mut String) -> Result<(), Parse
     out.clear();
     out.reserve(s.len());
     let result = out;
-    let mut chars = s.chars().peekable();
+    let mut chars = EscapeCursor { rest: s };
 
-    while let Some(ch) = chars.next() {
-        if ch == '\\' {
-            // Handle escape sequence
-            match chars.next() {
-                // Simple single-character escapes
-                Some('n') => result.push('\n'),
-                Some('t') => result.push('\t'),
-                Some('r') => result.push('\r'),
-                Some('b') => result.push('\u{0008}'), // backspace
-                Some('f') => result.push('\u{000C}'), // form feed
-                Some('v') => result.push('\u{000B}'), // vertical tab
-                Some('\\') => result.push('\\'),
-                Some('\'') => result.push('\''),
-                Some('"') => result.push('"'),
+    loop {
+        // Everything up to the next backslash is copied as one run: only a
+        // backslash can change what a character decodes to.
+        let run = next_byte_of(chars.rest.as_bytes(), 0, [b'\\']);
+        let (plain, rest) = chars.rest.split_at(run);
+        result.push_str(plain);
+        let Some(escape) = rest.strip_prefix('\\') else {
+            // No backslash left: the run reached the end.
+            break;
+        };
+        chars.rest = escape;
+        // Handle escape sequence
+        match chars.next() {
+            // Simple single-character escapes
+            Some('n') => result.push('\n'),
+            Some('t') => result.push('\t'),
+            Some('r') => result.push('\r'),
+            Some('b') => result.push('\u{0008}'), // backspace
+            Some('f') => result.push('\u{000C}'), // form feed
+            Some('v') => result.push('\u{000B}'), // vertical tab
+            Some('\\') => result.push('\\'),
+            Some('\'') => result.push('\''),
+            Some('"') => result.push('"'),
 
-                // Null character
-                Some('0') if !matches!(chars.peek(), Some('0'..='9')) => {
-                    result.push('\0');
-                }
+            // Null character
+            Some('0') if !matches!(chars.peek(), Some('0'..='9')) => {
+                result.push('\0');
+            }
 
-                // Hex escape: \xHH
-                Some('x') => {
-                    // 2 hex digits → 0..=0xFF, always a valid Unicode scalar (no
-                    // surrogate range), so `from_u32` never fails here.
-                    let code = read_hex_value(&mut chars, 2)?;
-                    if let Some(ch) = char::from_u32(code) {
-                        result.push(ch);
-                    } else {
-                        return Err(ParseError::invalid_syntax(
-                            format!("Invalid hex escape: \\x{code:02X}"),
-                            0,
-                        ));
-                    }
-                }
-
-                // Unicode escape: \uXXXX or \u{XXXXXX}
-                Some('u') => {
-                    let code = read_unicode_escape_value(&mut chars)?;
-
-                    // A LEAD surrogate joins a following TRAIL surrogate into one
-                    // code point. The pairing is a property of the code UNITS, not
-                    // of how they were spelled — `\uD83D` and `\u{D83D}` denote the
-                    // same unit — so all four lead/trail spelling combinations pair,
-                    // and only a genuinely unpaired half falls through below.
-                    if (0xD800..=0xDBFF).contains(&code)
-                        && let Some(trail) = take_trail_surrogate(&mut chars)
-                    {
-                        let paired = 0x10000 + (code - 0xD800) * 0x400 + (trail - 0xDC00);
-                        // A paired value is 0x10000..=0x10FFFF by construction, so
-                        // it is always a scalar value.
-                        debug_assert!(char::from_u32(paired).is_some());
-                        result.push(char::from_u32(paired).unwrap_or(char::REPLACEMENT_CHARACTER));
-                    } else {
-                        // `code` is ≤ 0x10FFFF, so the only value `char::from_u32`
-                        // refuses is an unpaired surrogate (U+D800..=U+DFFF) — well-formed
-                        // grammar that only the well-formed-unicode proposals reject, and
-                        // that a UTF-8 Rust `String` cannot represent. Substitute U+FFFD;
-                        // `raw` is a source slice, so printed output is unaffected.
-                        result.push(char::from_u32(code).unwrap_or(char::REPLACEMENT_CHARACTER));
-                    }
-                }
-
-                // Line continuation: backslash followed by a line terminator
-                // (LF, CR, CRLF, U+2028, U+2029) — consumed, contributes nothing
-                Some('\n' | '\u{2028}' | '\u{2029}') => {}
-                Some('\r') => {
-                    // Line continuation - consume \r and optional \n
-                    if chars.peek() == Some(&'\n') {
-                        chars.next();
-                    }
-                }
-
-                // `LegacyOctalEscapeSequence` — legal only in sloppy code. The decode is
-                // mode-free; strict code rejects the form at the parser's string-literal
-                // seam (`find_legacy_escape` below). The digit count is NOT "up to
-                // three": a third digit only when the first is `0`-`3`, so `\400` is
-                // `\40` followed by a literal `0`, and `\412` is `\41` followed by a
-                // literal `2` (ecma262 sec-literals-string-literals: `ZeroToThree
-                // OctalDigit OctalDigit` is the only three-digit production, and
-                // `FourToSeven OctalDigit` admits no third).
-                Some(ch @ '0'..='7') => {
-                    let mut code = ch as u32 - '0' as u32;
-                    let max_extra = if ch <= '3' { 2 } else { 1 };
-                    for _ in 0..max_extra {
-                        match chars.peek() {
-                            Some(&next_ch @ '0'..='7') => {
-                                chars.next();
-                                code = code * 8 + (next_ch as u32 - '0' as u32);
-                            }
-                            _ => break,
-                        }
-                    }
-                    // The productions cap the value at 0o377 (255), always a valid scalar.
-                    if let Some(ch) = char::from_u32(code) {
-                        result.push(ch);
-                    }
-                }
-
-                // Invalid escape - per spec, backslash is ignored (e.g., \z → z)
-                Some(ch) => {
+            // Hex escape: \xHH
+            Some('x') => {
+                // 2 hex digits → 0..=0xFF, always a valid Unicode scalar (no
+                // surrogate range), so `from_u32` never fails here.
+                let code = read_hex_value(&mut chars, 2)?;
+                if let Some(ch) = char::from_u32(code) {
                     result.push(ch);
-                }
-
-                // End of string after backslash (shouldn't happen in valid input)
-                None => {
-                    result.push('\\');
+                } else {
+                    return Err(ParseError::invalid_syntax(
+                        format!("Invalid hex escape: \\x{code:02X}"),
+                        0,
+                    ));
                 }
             }
-        } else {
-            // Regular character
-            result.push(ch);
+
+            // Unicode escape: \uXXXX or \u{XXXXXX}
+            Some('u') => {
+                let code = read_unicode_escape_value(&mut chars)?;
+
+                // A LEAD surrogate joins a following TRAIL surrogate into one
+                // code point. The pairing is a property of the code UNITS, not
+                // of how they were spelled — `\uD83D` and `\u{D83D}` denote the
+                // same unit — so all four lead/trail spelling combinations pair,
+                // and only a genuinely unpaired half falls through below.
+                if (0xD800..=0xDBFF).contains(&code)
+                    && let Some(trail) = take_trail_surrogate(&mut chars)
+                {
+                    let paired = 0x10000 + (code - 0xD800) * 0x400 + (trail - 0xDC00);
+                    // A paired value is 0x10000..=0x10FFFF by construction, so
+                    // it is always a scalar value.
+                    debug_assert!(char::from_u32(paired).is_some());
+                    result.push(char::from_u32(paired).unwrap_or(char::REPLACEMENT_CHARACTER));
+                } else {
+                    // `code` is ≤ 0x10FFFF, so the only value `char::from_u32`
+                    // refuses is an unpaired surrogate (U+D800..=U+DFFF) — well-formed
+                    // grammar that only the well-formed-unicode proposals reject, and
+                    // that a UTF-8 Rust `String` cannot represent. Substitute U+FFFD;
+                    // `raw` is a source slice, so printed output is unaffected.
+                    result.push(char::from_u32(code).unwrap_or(char::REPLACEMENT_CHARACTER));
+                }
+            }
+
+            // Line continuation: backslash followed by a line terminator
+            // (LF, CR, CRLF, U+2028, U+2029) — consumed, contributes nothing
+            Some('\n' | '\u{2028}' | '\u{2029}') => {}
+            Some('\r') => {
+                // Line continuation - consume \r and optional \n
+                if chars.peek() == Some('\n') {
+                    chars.next();
+                }
+            }
+
+            // `LegacyOctalEscapeSequence` — legal only in sloppy code. The decode is
+            // mode-free; strict code rejects the form at the parser's string-literal
+            // seam (`find_legacy_escape` below). The digit count is NOT "up to
+            // three": a third digit only when the first is `0`-`3`, so `\400` is
+            // `\40` followed by a literal `0`, and `\412` is `\41` followed by a
+            // literal `2` (ecma262 sec-literals-string-literals: `ZeroToThree
+            // OctalDigit OctalDigit` is the only three-digit production, and
+            // `FourToSeven OctalDigit` admits no third).
+            Some(ch @ '0'..='7') => {
+                let mut code = ch as u32 - '0' as u32;
+                let max_extra = if ch <= '3' { 2 } else { 1 };
+                for _ in 0..max_extra {
+                    match chars.peek() {
+                        Some(next_ch @ '0'..='7') => {
+                            chars.next();
+                            code = code * 8 + (next_ch as u32 - '0' as u32);
+                        }
+                        _ => break,
+                    }
+                }
+                // The productions cap the value at 0o377 (255), always a valid scalar.
+                if let Some(ch) = char::from_u32(code) {
+                    result.push(ch);
+                }
+            }
+
+            // Invalid escape - per spec, backslash is ignored (e.g., \z → z)
+            Some(ch) => {
+                result.push(ch);
+            }
+
+            // End of string after backslash (shouldn't happen in valid input)
+            None => {
+                result.push('\\');
+            }
         }
     }
 
@@ -172,12 +178,27 @@ pub fn decode_string_escapes_into(s: &str, out: &mut String) -> Result<(), Parse
 }
 
 /// Decode escapes into a freshly allocated `String` — the ergonomic wrapper over
-/// [`decode_string_escapes_into`] for tests and the cold template-error path.
+/// [`decode_string_escapes_into`] for this file's tests and the template parser's two
+/// decodes off the lexer's path: the re-run that surfaces an escape error the lexer
+/// swallowed, and the decode of a template's line-terminator-normalized raw text.
 /// The hot lexer path calls `_into` directly against a parked scratch buffer.
 pub fn decode_string_escapes(s: &str) -> Result<String, ParseError> {
     let mut out = String::new();
     decode_string_escapes_into(s, &mut out)?;
     Ok(out)
+}
+
+/// Which legacy string escape [`find_legacy_escape`] found — the two carry different
+/// messages, so the finder names the form rather than leaving the caller to re-read the
+/// digit at an offset only this function could have produced. Mirrors the numeric axis's
+/// `LeadingZeroLiteral` (`parser/scan.rs`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LegacyEscape {
+    /// `LegacyOctalEscapeSequence` — `\7`, `\101`, and `\0` followed by a decimal
+    /// digit, read in base 8.
+    LegacyOctal,
+    /// `NonOctalDecimalEscapeSequence` — `\8` / `\9`, standing for the digit itself.
+    NonOctalDecimal,
 }
 
 /// The offset within `raw` — a string literal's inner source, quotes excluded — of the
@@ -196,19 +217,6 @@ pub fn decode_string_escapes(s: &str) -> Result<String, ParseError> {
 /// whole escape at a time, so an escaped backslash (`\\7`) opens no escape and a
 /// multi-byte escaped character cannot be mistaken for one (a UTF-8 continuation byte is
 /// never `\`).
-/// Which legacy string escape [`find_legacy_escape`] found — the two carry different
-/// messages, so the finder names the form rather than leaving the caller to re-read the
-/// digit at an offset only this function could have produced. Mirrors the numeric axis's
-/// `LeadingZeroLiteral` (`parser/scan.rs`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum LegacyEscape {
-    /// `LegacyOctalEscapeSequence` — `\7`, `\101`, and `\0` followed by a decimal
-    /// digit, read in base 8.
-    LegacyOctal,
-    /// `NonOctalDecimalEscapeSequence` — `\8` / `\9`, standing for the digit itself.
-    NonOctalDecimal,
-}
-
 pub(crate) fn find_legacy_escape(raw: &str) -> Option<(usize, LegacyEscape)> {
     let bytes = raw.as_bytes();
     let mut i = 0;
@@ -232,20 +240,43 @@ pub(crate) fn find_legacy_escape(raw: &str) -> Option<(usize, LegacyEscape)> {
     None
 }
 
-/// Read exactly N hex digits from the iterator, accumulating their value directly
-/// into a `u32` — no intermediate `String` + `from_str_radix` allocation. N is at
-/// most 4 (the `\xHH` / `\uXXXX` escapes), so the value never overflows.
+/// The undecoded remainder of the string being decoded — the character cursor
+/// the escape readers share. `Copy`, so the surrogate lookahead
+/// ([`take_trail_surrogate`]) can read ahead and put the cursor back.
+///
+/// It holds the remainder as a `str`, which is what lets the decode loop hand
+/// the bytes between two backslashes to one `push_str` instead of decoding and
+/// re-encoding them a character at a time.
+#[derive(Clone, Copy)]
+struct EscapeCursor<'a> {
+    rest: &'a str,
+}
+
+impl EscapeCursor<'_> {
+    /// The next character, left in place.
+    #[inline]
+    fn peek(&self) -> Option<char> {
+        self.rest.chars().next()
+    }
+
+    /// The next character, consumed.
+    #[inline]
+    fn next(&mut self) -> Option<char> {
+        let mut chars = self.rest.chars();
+        let ch = chars.next()?;
+        self.rest = chars.as_str();
+        Some(ch)
+    }
+}
+
 /// Read the body of a `\u` escape — the caller has consumed the `\` and the `u` —
 /// in either spelling, returning the code point it denotes (always ≤ 0x10FFFF).
 ///
 /// One reader for both spellings is what lets the surrogate-pairing step above stay
 /// spelling-agnostic; splitting it was how `'\u{D83D}\u{DE00}'` came to decode as two
 /// U+FFFDs where the 4-digit spelling of the same pair gave the astral character.
-fn read_unicode_escape_value<I>(chars: &mut std::iter::Peekable<I>) -> Result<u32, ParseError>
-where
-    I: Iterator<Item = char>,
-{
-    if chars.peek() != Some(&'{') {
+fn read_unicode_escape_value(chars: &mut EscapeCursor<'_>) -> Result<u32, ParseError> {
+    if chars.peek() != Some('{') {
         // Standard unicode escape: \uXXXX (4 digits → 0..=0xFFFF)
         return read_hex_value(chars, 4);
     }
@@ -263,11 +294,11 @@ where
     let mut any_digit = false;
     loop {
         match chars.peek() {
-            Some(&'}') => {
+            Some('}') => {
                 chars.next(); // consume '}'
                 break;
             }
-            Some(&ch) => match ch.to_digit(16) {
+            Some(ch) => match ch.to_digit(16) {
                 Some(d) => {
                     chars.next();
                     if code <= 0x10FFFF {
@@ -316,16 +347,13 @@ where
 /// Anything else leaves `chars` exactly where it was, so the main decode loop reaches
 /// that `\` itself: a *malformed* escape therefore still reports its own error from
 /// the ordinary path rather than being swallowed here.
-fn take_trail_surrogate<I>(chars: &mut std::iter::Peekable<I>) -> Option<u32>
-where
-    I: Iterator<Item = char> + Clone,
-{
-    if chars.peek() != Some(&'\\') {
+fn take_trail_surrogate(chars: &mut EscapeCursor<'_>) -> Option<u32> {
+    if chars.peek() != Some('\\') {
         return None;
     }
-    let saved = chars.clone();
+    let saved = *chars;
     chars.next(); // consume '\\'
-    if chars.peek() == Some(&'u') {
+    if chars.peek() == Some('u') {
         chars.next(); // consume 'u'
         if let Ok(trail) = read_unicode_escape_value(chars)
             && (0xDC00..=0xDFFF).contains(&trail)
@@ -337,10 +365,10 @@ where
     None
 }
 
-fn read_hex_value<I>(chars: &mut std::iter::Peekable<I>, count: usize) -> Result<u32, ParseError>
-where
-    I: Iterator<Item = char>,
-{
+/// Read exactly N hex digits from the cursor, accumulating their value directly
+/// into a `u32` — no intermediate `String` + `from_str_radix` allocation. N is at
+/// most 4 (the `\xHH` / `\uXXXX` escapes), so the value never overflows.
+fn read_hex_value(chars: &mut EscapeCursor<'_>, count: usize) -> Result<u32, ParseError> {
     let mut value: u32 = 0;
     for _ in 0..count {
         match chars.next() {
@@ -578,5 +606,429 @@ mod tests {
         assert_eq!(decode_string_escapes("\\u{0000D800}").unwrap(), "\u{FFFD}");
         // A code point just outside the surrogate range is unaffected.
         assert_eq!(decode_string_escapes("\\u{E000}").unwrap(), "\u{E000}");
+    }
+
+    // The differential oracle: the decoder as a character-at-a-time loop over
+    // `chars().peekable()`, kept verbatim as the model the run-copying decoder is
+    // graded against. Never called outside these tests.
+    fn model_decode_into(s: &str, out: &mut String) -> Result<(), ParseError> {
+        out.clear();
+        out.reserve(s.len());
+        let result = out;
+        let mut chars = s.chars().peekable();
+
+        while let Some(ch) = chars.next() {
+            if ch == '\\' {
+                // Handle escape sequence
+                match chars.next() {
+                    // Simple single-character escapes
+                    Some('n') => result.push('\n'),
+                    Some('t') => result.push('\t'),
+                    Some('r') => result.push('\r'),
+                    Some('b') => result.push('\u{0008}'), // backspace
+                    Some('f') => result.push('\u{000C}'), // form feed
+                    Some('v') => result.push('\u{000B}'), // vertical tab
+                    Some('\\') => result.push('\\'),
+                    Some('\'') => result.push('\''),
+                    Some('"') => result.push('"'),
+
+                    // Null character
+                    Some('0') if !matches!(chars.peek(), Some('0'..='9')) => {
+                        result.push('\0');
+                    }
+
+                    // Hex escape: \xHH
+                    Some('x') => {
+                        // 2 hex digits → 0..=0xFF, always a valid Unicode scalar (no
+                        // surrogate range), so `from_u32` never fails here.
+                        let code = model_read_hex_value(&mut chars, 2)?;
+                        if let Some(ch) = char::from_u32(code) {
+                            result.push(ch);
+                        } else {
+                            return Err(ParseError::invalid_syntax(
+                                format!("Invalid hex escape: \\x{code:02X}"),
+                                0,
+                            ));
+                        }
+                    }
+
+                    // Unicode escape: \uXXXX or \u{XXXXXX}
+                    Some('u') => {
+                        let code = model_read_unicode_escape_value(&mut chars)?;
+
+                        // A LEAD surrogate joins a following TRAIL surrogate into one
+                        // code point. The pairing is a property of the code UNITS, not
+                        // of how they were spelled — `\uD83D` and `\u{D83D}` denote the
+                        // same unit — so all four lead/trail spelling combinations pair,
+                        // and only a genuinely unpaired half falls through below.
+                        if (0xD800..=0xDBFF).contains(&code)
+                            && let Some(trail) = model_take_trail_surrogate(&mut chars)
+                        {
+                            let paired = 0x10000 + (code - 0xD800) * 0x400 + (trail - 0xDC00);
+                            // A paired value is 0x10000..=0x10FFFF by construction, so
+                            // it is always a scalar value.
+                            debug_assert!(char::from_u32(paired).is_some());
+                            result.push(
+                                char::from_u32(paired).unwrap_or(char::REPLACEMENT_CHARACTER),
+                            );
+                        } else {
+                            // `code` is ≤ 0x10FFFF, so the only value `char::from_u32`
+                            // refuses is an unpaired surrogate (U+D800..=U+DFFF) — well-formed
+                            // grammar that only the well-formed-unicode proposals reject, and
+                            // that a UTF-8 Rust `String` cannot represent. Substitute U+FFFD;
+                            // `raw` is a source slice, so printed output is unaffected.
+                            result
+                                .push(char::from_u32(code).unwrap_or(char::REPLACEMENT_CHARACTER));
+                        }
+                    }
+
+                    // Line continuation: backslash followed by a line terminator
+                    // (LF, CR, CRLF, U+2028, U+2029) — consumed, contributes nothing
+                    Some('\n' | '\u{2028}' | '\u{2029}') => {}
+                    Some('\r') => {
+                        // Line continuation - consume \r and optional \n
+                        if chars.peek() == Some(&'\n') {
+                            chars.next();
+                        }
+                    }
+
+                    // `LegacyOctalEscapeSequence` — legal only in sloppy code. The decode is
+                    // mode-free; strict code rejects the form at the parser's string-literal
+                    // seam (`find_legacy_escape` below). The digit count is NOT "up to
+                    // three": a third digit only when the first is `0`-`3`, so `\400` is
+                    // `\40` followed by a literal `0`, and `\412` is `\41` followed by a
+                    // literal `2` (ecma262 sec-literals-string-literals: `ZeroToThree
+                    // OctalDigit OctalDigit` is the only three-digit production, and
+                    // `FourToSeven OctalDigit` admits no third).
+                    Some(ch @ '0'..='7') => {
+                        let mut code = ch as u32 - '0' as u32;
+                        let max_extra = if ch <= '3' { 2 } else { 1 };
+                        for _ in 0..max_extra {
+                            match chars.peek() {
+                                Some(&next_ch @ '0'..='7') => {
+                                    chars.next();
+                                    code = code * 8 + (next_ch as u32 - '0' as u32);
+                                }
+                                _ => break,
+                            }
+                        }
+                        // The productions cap the value at 0o377 (255), always a valid scalar.
+                        if let Some(ch) = char::from_u32(code) {
+                            result.push(ch);
+                        }
+                    }
+
+                    // Invalid escape - per spec, backslash is ignored (e.g., \z → z)
+                    Some(ch) => {
+                        result.push(ch);
+                    }
+
+                    // End of string after backslash (shouldn't happen in valid input)
+                    None => {
+                        result.push('\\');
+                    }
+                }
+            } else {
+                // Regular character
+                result.push(ch);
+            }
+        }
+
+        Ok(())
+    }
+
+    fn model_read_unicode_escape_value<I>(
+        chars: &mut std::iter::Peekable<I>,
+    ) -> Result<u32, ParseError>
+    where
+        I: Iterator<Item = char>,
+    {
+        if chars.peek() != Some(&'{') {
+            // Standard unicode escape: \uXXXX (4 digits → 0..=0xFFFF)
+            return model_read_hex_value(chars, 4);
+        }
+
+        // Codepoint escape: \u{X...}
+        chars.next(); // consume '{'
+
+        // `CodePoint :: HexDigits but only if MV of HexDigits ≤ 0x10FFFF` caps the
+        // VALUE, not the digit count — leading zeros are unbounded, so
+        // `\u{0000000000000041}` is a valid `A`. Accumulate in `u64` and stop once past
+        // the cap: an arbitrarily long escape then can't overflow, while the check below
+        // still sees a value greater than 0x10FFFF (and reports it unchanged for the
+        // ordinary `\u{110000}` spelling).
+        let mut code: u64 = 0;
+        let mut any_digit = false;
+        loop {
+            match chars.peek() {
+                Some(&'}') => {
+                    chars.next(); // consume '}'
+                    break;
+                }
+                Some(&ch) => match ch.to_digit(16) {
+                    Some(d) => {
+                        chars.next();
+                        if code <= 0x10FFFF {
+                            code = code * 16 + u64::from(d);
+                        }
+                        any_digit = true;
+                    }
+                    None => {
+                        return Err(ParseError::invalid_syntax(
+                            "Invalid unicode codepoint escape".to_string(),
+                            0,
+                        ));
+                    }
+                },
+                // End of input before the closing `}` — a `\u{…` escape must be
+                // terminated (matches acorn).
+                None => {
+                    return Err(ParseError::invalid_syntax(
+                        "Unterminated unicode codepoint escape".to_string(),
+                        0,
+                    ));
+                }
+            }
+        }
+
+        if !any_digit {
+            return Err(ParseError::invalid_syntax(
+                "Invalid unicode codepoint escape length".to_string(),
+                0,
+            ));
+        }
+
+        if code > 0x10FFFF {
+            return Err(ParseError::invalid_syntax(
+                format!("Invalid unicode codepoint: U+{code:X}"),
+                0,
+            ));
+        }
+
+        Ok(code as u32)
+    }
+
+    fn model_take_trail_surrogate<I>(chars: &mut std::iter::Peekable<I>) -> Option<u32>
+    where
+        I: Iterator<Item = char> + Clone,
+    {
+        if chars.peek() != Some(&'\\') {
+            return None;
+        }
+        let saved = chars.clone();
+        chars.next(); // consume '\\'
+        if chars.peek() == Some(&'u') {
+            chars.next(); // consume 'u'
+            if let Ok(trail) = model_read_unicode_escape_value(chars)
+                && (0xDC00..=0xDFFF).contains(&trail)
+            {
+                return Some(trail);
+            }
+        }
+        *chars = saved;
+        None
+    }
+
+    fn model_read_hex_value<I>(
+        chars: &mut std::iter::Peekable<I>,
+        count: usize,
+    ) -> Result<u32, ParseError>
+    where
+        I: Iterator<Item = char>,
+    {
+        let mut value: u32 = 0;
+        for _ in 0..count {
+            match chars.next() {
+                Some(ch) => match ch.to_digit(16) {
+                    Some(d) => value = value * 16 + d,
+                    None => {
+                        return Err(ParseError::invalid_syntax(
+                            format!("Expected hex digit, found '{ch}'"),
+                            0,
+                        ));
+                    }
+                },
+                None => {
+                    return Err(ParseError::invalid_syntax(
+                        "Unexpected end of string in escape sequence".to_string(),
+                        0,
+                    ));
+                }
+            }
+        }
+        Ok(value)
+    }
+
+    /// Both decoders' whole observable result for one input: the verdict (an error
+    /// rendered both ways, so message and position are compared) and what was left
+    /// in the output buffer, which a caller reads only on `Ok` but which must not
+    /// drift either.
+    fn outcome(
+        decode: fn(&str, &mut String) -> Result<(), ParseError>,
+        input: &str,
+    ) -> (Result<(), String>, String) {
+        // A dirty buffer: the decoder owns clearing it.
+        let mut out = String::from("stale");
+        let verdict = decode(input, &mut out).map_err(|e| format!("{e} / {e:?}"));
+        (verdict, out)
+    }
+
+    fn assert_matches_model(input: &str) {
+        assert_eq!(
+            outcome(decode_string_escapes_into, input),
+            outcome(model_decode_into, input),
+            "decoder diverged from the model on {input:?}"
+        );
+    }
+
+    /// Every escape kind, well-formed and malformed, plus the plain characters an
+    /// escape body can be confused with — the alphabet the differential tests
+    /// combine.
+    const FRAGMENTS: &[&str] = &[
+        // plain text, including the characters escape bodies are made of
+        "a",
+        "0",
+        "7",
+        "8",
+        "u",
+        "x",
+        "{",
+        "}",
+        "]",
+        "41",
+        "DE00",
+        "\u{e9}",
+        "\u{1F600}",
+        "\n",
+        "\r",
+        "\u{2028}",
+        // simple escapes
+        "\\n",
+        "\\t",
+        "\\r",
+        "\\b",
+        "\\f",
+        "\\v",
+        "\\\\",
+        "\\'",
+        "\\\"",
+        // NUL, legacy octal, non-octal decimal
+        "\\0",
+        "\\1",
+        "\\7",
+        "\\8",
+        "\\9",
+        "\\101",
+        "\\377",
+        "\\400",
+        // hex
+        "\\x41",
+        "\\xe9",
+        "\\x4",
+        "\\x",
+        "\\xZZ",
+        "\\x\u{e9}1",
+        // four-digit unicode
+        "\\u0041",
+        "\\u00e9",
+        "\\uD83D",
+        "\\uDE00",
+        "\\u",
+        "\\u12",
+        "\\uZZZZ",
+        "\\u\u{e9}",
+        // braced unicode
+        "\\u{41}",
+        "\\u{0000041}",
+        "\\u{D83D}",
+        "\\u{DE00}",
+        "\\u{1F600}",
+        "\\u{10FFFF}",
+        "\\u{110000}",
+        "\\u{}",
+        "\\u{41",
+        "\\u{4G}",
+        "\\u{\u{e9}}",
+        // identity escapes, ASCII and not
+        "\\z",
+        "\\\u{e9}",
+        "\\\u{1F600}",
+        // line continuations
+        "\\\n",
+        "\\\r",
+        "\\\r\n",
+        "\\\u{2028}",
+        "\\\u{2029}",
+        // a lone backslash, which only the last position leaves trailing
+        "\\",
+    ];
+
+    /// [`FRAGMENTS`] plus the two plain characters spelled from their code points: a
+    /// NUL, and U+2029 unescaped.
+    fn fragments() -> Vec<String> {
+        let mut all: Vec<String> = FRAGMENTS.iter().map(|&f| f.to_owned()).collect();
+        all.push(char::from(0u8).to_string());
+        all.extend(char::from_u32(0x2029).map(String::from));
+        all
+    }
+
+    /// Every sequence of up to three fragments: each escape kind at the start, in
+    /// the middle and at the end of its string, against every neighbour — a lead
+    /// surrogate before each kind of trail, a digit after each octal, a lone
+    /// backslash escaping whatever follows it.
+    #[test]
+    fn decoder_matches_model_over_fragment_sequences() {
+        assert_matches_model("");
+        let fragments = fragments();
+        let mut input = String::new();
+        for a in &fragments {
+            assert_matches_model(a);
+            for b in &fragments {
+                input.clear();
+                input.push_str(a);
+                input.push_str(b);
+                assert_matches_model(&input);
+                let pair = input.len();
+                for c in &fragments {
+                    input.truncate(pair);
+                    input.push_str(c);
+                    assert_matches_model(&input);
+                }
+            }
+        }
+    }
+
+    /// Each fragment (and each pair, for the surrogate lookahead) behind and ahead
+    /// of plain runs of every length across the run scan's eight-byte stride, in
+    /// ASCII and in multi-byte text — where the scan stops, and what the copy takes
+    /// with it, are the two things a fragment-only sweep never moves.
+    #[test]
+    fn decoder_matches_model_at_every_run_alignment() {
+        const ASCII: &str = "abcdefghijklmnopqrstuvwxyz";
+        const WIDE: &str = "a\u{e9}b\u{4e2d}c\u{1F600}d\u{2028}e\u{e9}\u{e9}f";
+        let fragments = fragments();
+        let mut input = String::new();
+        for filler in [ASCII, WIDE] {
+            let cuts: Vec<usize> = (0..=filler.len())
+                .filter(|&at| filler.is_char_boundary(at))
+                .collect();
+            for &lead in &cuts {
+                for &tail in &[0, 1, 7, 8, 9, cuts[cuts.len() / 2], filler.len()] {
+                    if !filler.is_char_boundary(tail) {
+                        continue;
+                    }
+                    for a in &fragments {
+                        for b in ["", "\\uDE00", "\\u{DE00}", "\\n", "7"] {
+                            input.clear();
+                            input.push_str(&filler[..lead]);
+                            input.push_str(a);
+                            input.push_str(b);
+                            input.push_str(&filler[..tail]);
+                            assert_matches_model(&input);
+                        }
+                    }
+                }
+            }
+        }
     }
 }
