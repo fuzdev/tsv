@@ -154,6 +154,69 @@ pub(crate) fn matching_close_paren(text: &str, open: usize) -> Option<usize> {
     None
 }
 
+/// Where a value scanner resumes after the quoted string whose opening quote sits at
+/// `open`: one past its closing quote, or the end of `text` when the string never closes.
+///
+/// A string is opaque to every value scanner — nothing inside it is a separator, a
+/// paren or a comment — so a scanner standing on an opening quote has one question, where
+/// the string ends, and [`crate::lexer::string_end`] answers it a word at a time. A
+/// scanner that hops here keeps no quote state at all.
+///
+/// The hop and the family's byte-at-a-time quote state are ONE string model, and that is
+/// an argument about escapes rather than an assumption. The byte walk steps an escape
+/// with [`crate::escapes::escape_len`] (a hex escape's digits and terminator included);
+/// `string_end` steps `\` and the one byte after it. The two land on the same closing
+/// quote because nothing a longer escape reaches past that byte can be a quote or a `\`
+/// — hex digits, one whitespace character, a multi-byte char's continuation bytes — and
+/// they agree on the three shapes that are no escape at all: a `\` before a newline (the
+/// newline is string content either way), a `\` as the text's last byte, and a string
+/// that never closes (both run to the end). The assertion below holds every hop to the
+/// byte walk's answer in every debug build.
+///
+/// Out of line on purpose: a string is the rare arm of the loop that hops here, and
+/// inlined into `fast_scan` the word scan widened that function's frame — one that sits
+/// on the value parser's recursive path (a comma list nested in a function's arguments).
+#[inline(never)]
+pub(crate) fn quoted_run_end(text: &str, open: usize) -> usize {
+    let end = match crate::lexer::string_end(text.as_bytes(), open) {
+        Ok(end) => end,
+        Err(_) => text.len(),
+    };
+    // `cfg`, not `debug_assert_eq!` alone: the model is compiled out of a release build,
+    // where the macro's arguments are still type-checked.
+    #[cfg(debug_assertions)]
+    assert_eq!(
+        end,
+        quoted_run_end_by_bytes(text, open),
+        "the string hop left the byte walk's string model in {text:?} at {open}"
+    );
+    end
+}
+
+/// [`quoted_run_end`] as the scanner family's byte-at-a-time quote state reads it — the
+/// in-quote arms of `ValueCursor::consume_until` and `classify_separators`, kept as the
+/// model the hop is graded against.
+#[cfg(any(test, debug_assertions))]
+fn quoted_run_end_by_bytes(text: &str, open: usize) -> usize {
+    let bytes = text.as_bytes();
+    let quote_char = bytes[open];
+    let mut i = open + 1;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if b == b'\\'
+            && let Some(len) = crate::escapes::escape_len(text, i)
+        {
+            i += len;
+            continue;
+        }
+        i += 1;
+        if b == quote_char {
+            return i;
+        }
+    }
+    bytes.len()
+}
+
 /// Build a scanner's 256-entry "this byte cannot possibly matter" table: `true` for a
 /// byte that is neither [`is_value_structural`] nor one the scanner is looking for, so
 /// its whole loop body collapses to `i += 1`. The overwhelming majority of a value's
@@ -223,8 +286,9 @@ mod matching_close_paren_tests {
             // a trailing `\` is not an escape, so the `)` before it still closes
             ("fn(a)\\", Some(4)),
         ] {
-            // The sole caller enters on the value's first `(` (`parse_single_value`), so
-            // the tests do too rather than hand-counting each offset.
+            // The function-leaf callers (`extract_function_parts`, `plain_function_parts`)
+            // enter on the value's first `(` — the operator splitter enters on whichever
+            // `(` its run reaches — so the tests take the first rather than hand-counting.
             let open = text
                 .bytes()
                 .position(|b| b == b'(')
@@ -240,5 +304,62 @@ mod matching_close_paren_tests {
     fn a_comment_is_not_stepped_over() {
         assert_eq!(matching_close_paren("url(foo/*bar)", 3), Some(12));
         assert_eq!(matching_close_paren("fn(/* ) */ a)", 2), Some(6));
+    }
+}
+
+#[cfg(test)]
+mod quoted_run_end_tests {
+    use super::{quoted_run_end, quoted_run_end_by_bytes};
+
+    /// Every string over an alphabet holding each byte either walk acts on — both quotes,
+    /// the backslash, a hex digit, the escape terminator, two newlines, a non-ASCII char — and
+    /// the bytes a value scanner would act on outside a string, opened by either quote.
+    /// Long enough to put a hex escape's digits and terminator against a closing quote and
+    /// to leave a string open, escaped shut, or cut off mid-escape.
+    #[test]
+    fn hop_matches_the_byte_walk() {
+        const ALPHABET: [&str; 13] = [
+            "\"", "'", "\\", "4", "g", " ", "\n", "\r", "\u{e9}", "(", ")", ",", "/",
+        ];
+        const MAX_LEN: u32 = 5;
+        let mut text = String::new();
+        for quote in ["\"", "'"] {
+            for len in 0..=MAX_LEN {
+                for case in 0..ALPHABET.len().pow(len) {
+                    text.clear();
+                    text.push_str(quote);
+                    let mut rest = case;
+                    for _ in 0..len {
+                        text.push_str(ALPHABET[rest % ALPHABET.len()]);
+                        rest /= ALPHABET.len();
+                    }
+                    assert_eq!(
+                        quoted_run_end(&text, 0),
+                        quoted_run_end_by_bytes(&text, 0),
+                        "for {text:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// The hop's four endings, by hand: a closed string, an escaped quote that does not
+    /// close it, a string left open, and one cut off on its backslash.
+    #[test]
+    fn hop_endings() {
+        for (text, want) in [
+            ("'a' b", 3),
+            (r"'a\' b' c", 7),
+            (r"'\27' b", 5),
+            ("'a b", 4),
+            ("'a\\", 3),
+            ("x \"a,(\" y", 7),
+        ] {
+            let open = text
+                .bytes()
+                .position(|b| b == b'"' || b == b'\'')
+                .expect("a quote to open on");
+            assert_eq!(quoted_run_end(text, open), want, "for {text:?}");
+        }
     }
 }

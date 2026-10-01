@@ -7,7 +7,7 @@ use crate::ast::internal::CssValue;
 use crate::parser::value::cursor::ValueCursor;
 use crate::parser::value::lists::{ValueSeparator, classify_separators};
 use crate::parser::value::scan::{
-    comment_run_end, is_comment_start, is_value_separator, value_skip_table,
+    comment_run_end, is_comment_start, is_value_separator, quoted_run_end, value_skip_table,
 };
 use crate::whitespace::is_css_whitespace;
 use bumpalo::Bump;
@@ -20,9 +20,8 @@ use tsv_lang::Span;
 ///
 /// The exhaustiveness argument, which is what makes the skip byte-identical: a skipped
 /// byte reaches no arm of the loop. It is not `/` (comment probe), not `\` (escape
-/// probe), not a paren or quote (nesting), not `,` and not whitespace (the separators)
-/// — and the one remaining arm, the in-quote close (`b == quote_char`), can't match it
-/// either, because `quote_char` only ever holds `'` or `"`, both structural.
+/// probe), not a paren (nesting), not a quote (the string hop), not `,` and not
+/// whitespace (the separators).
 const FAST_SCAN_SKIP: [bool; 256] = value_skip_table!(|b| is_value_separator(b));
 
 /// Skip table for the comma-list split's delimiter, `|c| c == ','`.
@@ -412,14 +411,13 @@ impl<'a> ValueParser<'a> {
     /// - a `/* */` comment outside quotes is reported so the caller takes the
     ///   comment-aware two-pass path (the comment-blind split here would diverge).
     ///
-    /// Paren/quote nesting is tracked exactly as `classify_separators` and
-    /// `ValueCursor` track it, so for a comment-free value the comma split is
-    /// byte-for-byte identical to the old two-pass result.
+    /// Paren nesting is tracked exactly as `classify_separators` and `ValueCursor`
+    /// track it, and a quoted string — which those two walk under a quote flag — is
+    /// hopped whole to the same end (`quoted_run_end`), so for a comment-free value the
+    /// comma split is byte-for-byte identical to the two-pass result.
     fn fast_scan<'arena>(&self, text: &str, arena: &'arena Bump) -> FastScan<'arena> {
         let bytes = text.as_bytes();
         let mut in_parens: u32 = 0;
-        let mut in_quote = false;
-        let mut quote_char = 0u8;
         let mut ws_seen = false;
 
         let mut values: BumpVec<'arena, CssValue<'arena>> = BumpVec::new_in(arena);
@@ -463,7 +461,7 @@ impl<'a> ValueParser<'a> {
             // whose `classify_separators` + `ValueCursor` both step over a comment whole.
             // Comment-bearing values are rare enough that teaching the fused pass to skip
             // them would buy nothing the fallback doesn't already get right.
-            if !in_quote && is_comment_start(bytes, i) {
+            if is_comment_start(bytes, i) {
                 return FastScan::Comment;
             }
 
@@ -489,15 +487,18 @@ impl<'a> ValueParser<'a> {
                 i += len;
                 continue;
             }
-            let top = in_parens == 0 && !in_quote;
+            let top = in_parens == 0;
             match b {
-                b'\'' | b'"' if !in_quote => {
-                    in_quote = true;
-                    quote_char = b;
+                // A string is opaque, so it is hopped whole rather than walked under a
+                // quote flag: no arm of this loop can act inside one, and its interior
+                // is where a value's longest runs are (a data URI). The twin trackers
+                // keep the flag; `quoted_run_end` holds the two to one string model.
+                b'\'' | b'"' => {
+                    i = quoted_run_end(text, i);
+                    continue;
                 }
-                _ if in_quote && b == quote_char => in_quote = false,
-                b'(' if !in_quote => in_parens += 1,
-                b')' if !in_quote => in_parens = in_parens.saturating_sub(1),
+                b'(' => in_parens += 1,
+                b')' => in_parens = in_parens.saturating_sub(1),
                 b',' if top => {
                     self.push_comma_segment(&mut values, text, seg_start, i, seg_ws, arena);
                     any_comma = true;

@@ -38,11 +38,13 @@ pub(crate) enum StringScanEnd {
 }
 
 /// End of the string whose opening quote sits at `open` (one past its closing quote).
-/// The single statement of the string token's extent, and it has four readers: the lexer
-/// maps the error arms to its two messages, `decl_scan` (the second reader of this grammar)
-/// declines on either, `parse_string_literal` asks whether a value's opening quote closes at
-/// its very end, and the printer's at-rule prelude normalizers take end-of-input for either
-/// arm (`value_normalization`'s string branch and its `skip_string`). A printer asking where
+/// The single statement of the string token's extent, read the same way by every scanner
+/// that meets a string: the lexer maps the error arms to its two messages, `decl_scan` (the
+/// second reader of this grammar) declines on either, `parse_string_literal` asks whether a
+/// value's opening quote closes at its very end, and the value parser's fused pass
+/// (`quoted_run_end`), its operator splitter and the printer's at-rule prelude normalizers
+/// (`value_normalization`'s string branch and its `skip_string`) take end-of-input for
+/// either arm. A printer asking where
 /// a string ends must get the lexer's answer: a prelude scanner that disagreed would rewrite
 /// a region the parse had read as one token.
 ///
