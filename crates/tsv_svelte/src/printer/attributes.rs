@@ -601,8 +601,10 @@ impl<'a> Printer<'a> {
     /// non-ASCII character is measured by grapheme cluster, which can reach across the part
     /// boundary a fused text erases).
     ///
-    /// The shape is `name="text"`, and every clause is one thing the general builder would
-    /// otherwise do to the bytes:
+    /// Each shape below qualifies, and every clause is one thing the general builder would
+    /// otherwise do to the bytes.
+    ///
+    /// **`name="text"`**:
     ///
     /// - **one `Text` part.** A value holding a tag has an expression to format.
     /// - **`="` directly after the name, the text directly after that.** The builder writes
@@ -626,6 +628,13 @@ impl<'a> Printer<'a> {
     /// text prints raw (an entity is never respelled), and a `Text` value is never the
     /// shorthand. No comment can sit in the span — the only comments an attribute holds are
     /// an expression tag's.
+    ///
+    /// **`name={path}`**, over a tag that is itself its own bytes
+    /// ([`Printer::tag_is_plain_path`], which also rules out a comment anywhere inside the
+    /// braces): the span from the name to the tag's `}` when the `=` and the tag follow the
+    /// name directly (a quoted `name="{path}"` drops its quotes, and space around the `=`
+    /// is removed), the name is plain ASCII, and the attribute does **not** collapse to the
+    /// shorthand — `name={name}` prints `{name}`, which is not its bytes.
     fn attribute_source_span(&self, attr: &internal::Attribute<'_>, is_html: bool) -> Option<Span> {
         if !super::fuses_source_spans() {
             return None;
@@ -647,6 +656,14 @@ impl<'a> Printer<'a> {
                         && attr.name(self.source) == "class"
                         && !class_text_is_normalized(&bytes[text.range()]));
                 fuses.then(|| Span::new(name.start, text.end + 1))
+            }
+            [internal::AttributeValue::ExpressionTag(tag)] if Self::tag_is_plain_path(tag) => {
+                let tag = tag.span;
+                let fuses = tag.start as usize == name_end + 1
+                    && bytes[name_end] == b'='
+                    && next_width_relevant_in(bytes, name.start as usize, name_end) == name_end
+                    && !self.is_shorthand_attribute(attr, value);
+                fuses.then(|| Span::new(name.start, tag.end))
             }
             _ => None,
         }
