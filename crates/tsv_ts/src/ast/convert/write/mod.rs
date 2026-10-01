@@ -203,6 +203,7 @@ pub fn write_pattern_embedded(
                     .line;
                 if line > 1 {
                     ctx.pattern_line = line;
+                    ctx.plain_positions = false;
                 }
             }
             expressions::write_expression(w, expr, &ctx);
@@ -374,8 +375,8 @@ pub struct ProgramWriter<'a> {
 ///
 /// `pattern_line` / `pattern_ann_span` are the two Svelte block-pattern quirks
 /// (`write_pattern_embedded`): they are inert (`0` / the empty span) for every
-/// ordinary emission, so the hot path pays only a never-taken compare per
-/// position (or per annotation).
+/// ordinary emission, where `plain_positions` skips the position rewrite
+/// outright and the annotation test is one never-taken compare.
 #[derive(Clone, Copy)]
 pub(super) struct Ctx<'a> {
     pub(super) source: &'a str,
@@ -449,6 +450,19 @@ pub(super) struct Ctx<'a> {
     /// per-node branch in `position_fields` predicts perfectly on the default
     /// path.
     pub(super) emit_loc: bool,
+    /// Whether [`emitted_position`] is the identity for every position this
+    /// context emits, so `position_fields` skips it: both seeds are the identity
+    /// and no `pattern_line` is set. That is every standalone TypeScript emission
+    /// and nearly every Svelte island, where the per-endpoint re-seed and bump
+    /// test would compute the tracker's answer back.
+    ///
+    /// Derived, not independent: the constructors set it from the two seeds, and
+    /// `write_pattern_embedded` clears it where it sets `pattern_line`. The other
+    /// field that function writes, `pattern_ann_span`, only chooses between the
+    /// two seeds, so it cannot move a position while both are the identity.
+    /// `Ctx::positions_are_plain` is the definition, and debug builds hold the
+    /// flag to it at every `loc`-emitting `position_fields` call.
+    pub(super) plain_positions: bool,
 }
 
 impl<'a> Ctx<'a> {
@@ -479,6 +493,8 @@ impl<'a> Ctx<'a> {
             acorn_annotation: AcornSeed::NONE,
             annotation_comments: CommentMode::Off,
             emit_loc,
+            // `acorn_annotation` is `NONE` and `pattern_line` is `0` here.
+            plain_positions: acorn.is_identity(),
         }
     }
 
@@ -500,7 +516,17 @@ impl<'a> Ctx<'a> {
             acorn_annotation: env.acorn_annotation,
             annotation_comments: env.annotation_comments,
             emit_loc: env.emit_loc,
+            plain_positions: env.acorn.is_identity() && env.acorn_annotation.is_identity(),
         }
+    }
+
+    /// What `plain_positions` caches: nothing [`emitted_position`] reads can move
+    /// a position. An identity seed leaves the line and the column alone whichever
+    /// side of `pattern_ann_span.start` the offset falls, and a `pattern_line` of
+    /// `0` equals no 1-based line.
+    #[cfg(debug_assertions)]
+    fn positions_are_plain(&self) -> bool {
+        self.acorn.is_identity() && self.acorn_annotation.is_identity() && self.pattern_line == 0
     }
 }
 
@@ -792,9 +818,16 @@ fn position_fields<const CHARACTER: bool>(run: &mut StageRun<'_>, span: Span, ct
         run.u32(ctx.loc.pos(span.end));
         return;
     }
-    let ((start_pos, start), (end_pos, end)) = ctx.loc.span_positions(span.start, span.end);
-    let start = emitted_position(ctx, span.start, start);
-    let end = emitted_position(ctx, span.end, end);
+    let ((start_pos, mut start), (end_pos, mut end)) = ctx.loc.span_positions(span.start, span.end);
+    #[cfg(debug_assertions)]
+    debug_assert_eq!(ctx.plain_positions, ctx.positions_are_plain());
+    if ctx.plain_positions {
+        debug_assert_eq!(emitted_position(ctx, span.start, start), start);
+        debug_assert_eq!(emitted_position(ctx, span.end, end), end);
+    } else {
+        start = emitted_position(ctx, span.start, start);
+        end = emitted_position(ctx, span.end, end);
+    }
     run.raw(",\"start\":");
     run.u32(start_pos);
     run.raw(",\"end\":");
