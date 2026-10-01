@@ -13,6 +13,7 @@ use crate::ast::internal;
 use crate::printer::{CommentRun, HeadExpr, HeadLayout, Printer};
 use smallvec::smallvec;
 use tsv_lang::doc::{DocBuf, arena::DocId};
+use tsv_lang::printing::next_width_relevant_in;
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Comment, Span};
 use tsv_ts::ast::internal::{Expression, ExpressionKind};
@@ -539,6 +540,9 @@ impl<'a> Printer<'a> {
         is_html: bool,
     ) -> DocId {
         let d = self.d();
+        if let Some(span) = self.attribute_source_span(attr, is_html) {
+            return self.plain_source_span_doc(span);
+        }
         // Span-identity attribute name (`source[name_span]`), reused across the
         // branches below.
         let name_doc = d.source_span(attr.name_span, self.source);
@@ -586,6 +590,65 @@ impl<'a> Printer<'a> {
         } else {
             // Boolean attribute
             name_doc
+        }
+    }
+
+    /// The span of an attribute that prints as **its own source bytes**, when it is one — so
+    /// [`Printer::build_attribute_doc`] emits a single text for it instead of a leaf per part
+    /// under a concat. The span is plain ASCII with no tab or newline, which is what lets one
+    /// text stand in for several: the parts are measured one by one, and a single text
+    /// matches their sum only where a width is a byte count (a tab is columns, and a
+    /// non-ASCII character is measured by grapheme cluster, which can reach across the part
+    /// boundary a fused text erases).
+    ///
+    /// The shape is `name="text"`, and every clause is one thing the general builder would
+    /// otherwise do to the bytes:
+    ///
+    /// - **one `Text` part.** A value holding a tag has an expression to format.
+    /// - **`="` directly after the name, the text directly after that.** The builder writes
+    ///   those two bytes for a value it double-quotes, whatever the author wrote: space
+    ///   around the `=`, single quotes and a bare value are all respelled, and a text
+    ///   holding a `"` keeps its own delimiter ([`Printer::attribute_value_delims`], whose
+    ///   double-quoted answer is this same byte test).
+    /// - **a `"` directly after the text.** Every reader that opens a value on a quote ends
+    ///   its text at the next one of the same kind, so this and the opening `"` above imply
+    ///   each other — either one alone decides, never neither (`id='x'` would then be
+    ///   emitted verbatim). Both are asked because the span is emitted as written rather
+    ///   than assembled.
+    /// - **no width-relevant byte from the name's start to the closing quote**
+    ///   ([`tsv_lang::printing::next_width_relevant_in`]) — the plain-ASCII claim, which is
+    ///   also the single-line one: a newline in the text prints as a `literalline` between
+    ///   pooled lines, which breaks the attribute group.
+    /// - **an HTML element's `class` text already normalized**
+    ///   ([`class_text_is_normalized`]), the one value whose spaces are rewritten.
+    ///
+    /// Nothing else in the builder reads such an attribute: the name prints verbatim, the
+    /// text prints raw (an entity is never respelled), and a `Text` value is never the
+    /// shorthand. No comment can sit in the span — the only comments an attribute holds are
+    /// an expression tag's.
+    fn attribute_source_span(&self, attr: &internal::Attribute<'_>, is_html: bool) -> Option<Span> {
+        if !super::fuses_source_spans() {
+            return None;
+        }
+        let value = attr.value?;
+        let bytes = self.source.as_bytes();
+        let name = attr.name_span;
+        let name_end = name.end as usize;
+        match value {
+            [internal::AttributeValue::Text(text)] => {
+                let text = text.raw_span;
+                let close = text.end as usize;
+                let fuses = text.start as usize == name_end + 2
+                    && bytes[name_end] == b'='
+                    && bytes[name_end + 1] == b'"'
+                    && bytes.get(close) == Some(&b'"')
+                    && next_width_relevant_in(bytes, name.start as usize, close) == close
+                    && !(is_html
+                        && attr.name(self.source) == "class"
+                        && !class_text_is_normalized(&bytes[text.range()]));
+                fuses.then(|| Span::new(name.start, text.end + 1))
+            }
+            _ => None,
         }
     }
 

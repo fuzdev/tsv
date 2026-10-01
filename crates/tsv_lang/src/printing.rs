@@ -1801,8 +1801,11 @@ const _: () = {
 /// match, and OR-ing the two masks preserves the kernels' lowest-lane guarantee (a
 /// spurious lane in either mask is preceded by a genuine one in that same mask). Read the
 /// result with `trailing_zeros` only.
+///
+/// Public for a printer that proves a region plain before it claims one
+/// ([`crate::doc::arena::DocArena::source_span_plain`]): reaching `end` is that proof.
 #[inline]
-pub(crate) fn next_width_relevant_in(bytes: &[u8], from: usize, end: usize) -> usize {
+pub fn next_width_relevant_in(bytes: &[u8], from: usize, end: usize) -> usize {
     debug_assert!(from <= end && end <= bytes.len());
     let mut i = from;
     while i < end {

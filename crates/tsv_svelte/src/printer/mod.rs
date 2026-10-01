@@ -21,6 +21,8 @@
 mod attributes;
 mod classification;
 mod frozen_body;
+#[cfg(test)]
+mod fused_spans_tests;
 mod helpers;
 mod lifted_runs;
 mod nodes;
@@ -520,6 +522,45 @@ pub(crate) struct Printer<'a> {
     ignore_ranges: OnceCell<IgnoreRanges>,
 }
 
+#[cfg(test)]
+thread_local! {
+    /// The tests' switch behind [`fuses_source_spans`].
+    static FUSED_SOURCE_SPANS_OFF: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Whether a builder may answer a construct that prints as its own source bytes with ONE
+/// span over it, instead of assembling the construct's doc part by part.
+///
+/// Always `true` outside the crate's tests, where it folds away. Every such answer is an
+/// optimization with no output of its own, so the tests turn it off
+/// (`without_fused_source_spans`) to grade each one against the general builder it
+/// stands in for.
+#[inline]
+pub(in crate::printer) fn fuses_source_spans() -> bool {
+    #[cfg(test)]
+    {
+        !FUSED_SOURCE_SPANS_OFF.get()
+    }
+    #[cfg(not(test))]
+    {
+        true
+    }
+}
+
+/// Run `f` with every fused-span answer declined ([`fuses_source_spans`]), so the general
+/// builders print everything. The previous setting comes back when `f` returns or unwinds.
+#[cfg(test)]
+pub(crate) fn without_fused_source_spans<R>(f: impl FnOnce() -> R) -> R {
+    struct Restore(bool);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            FUSED_SOURCE_SPANS_OFF.set(self.0);
+        }
+    }
+    let _restore = Restore(FUSED_SOURCE_SPANS_OFF.replace(true));
+    f()
+}
+
 impl<'a> Printer<'a> {
     /// A printer over `source`, classifying its lines here (standalone layout) — the
     /// tests' constructor; the format entry points hand [`Self::with_line_breaks`] a
@@ -817,6 +858,22 @@ impl<'a> Printer<'a> {
         } else {
             tsv_ts::build_expression_doc(self.d(), expr, &self.ts_inputs(), *embed)
         }
+    }
+
+    /// One text over `span`, for a construct a gate proved prints as its own source bytes
+    /// ([`fuses_source_spans`]) **and** proved plain: no tab, no newline, no non-ASCII byte,
+    /// so the text's width is its byte length and equals what its parts would measure to
+    /// one by one. Asserts the claim in a debug build, as
+    /// [`DocArena::source_span_plain`] asks of every caller.
+    pub(in crate::printer) fn plain_source_span_doc(&self, span: Span) -> DocId {
+        debug_assert!(
+            !span
+                .extract(self.source)
+                .bytes()
+                .any(tsv_lang::printing::is_width_relevant),
+            "a fused span holds a byte its width depends on"
+        );
+        self.d().source_span_plain(span)
     }
 
     /// [`Self::build_head_value_doc`] for the one head whose value is an **assignment
