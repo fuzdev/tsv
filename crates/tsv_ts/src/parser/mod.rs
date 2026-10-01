@@ -871,25 +871,40 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// lexer re-classifies an escaped keyword as an `Identifier`, so its decoded
     /// value flows through `current_ident_name` instead (property/member and
     /// class/interface/type-member keys decode via that path — acorn parity).
+    ///
+    /// The oversized-name arm's arena copy is out of line
+    /// ([`Parser::oversized_raw_name`]): inline, every call here would save and
+    /// restore the registers the copy needs, on a path no real identifier
+    /// takes.
     pub(super) fn current_raw_ident_name(&self) -> IdentName<'arena> {
         let len = self.current.end - self.current.start;
         if len > u16::MAX as u32 {
-            // Absurdly long name (> 64 KiB): `raw_len` can't hold it, so store
-            // the raw source slice arena-copied as the `&'arena str` escape
-            // hatch (essentially unreachable — no real identifier is this long).
-            let value = self.current_value();
-            IdentName {
-                escaped: Some(self.arena.alloc_str(value)),
+            return IdentName {
+                escaped: Some(self.oversized_raw_name()),
                 raw_len: 0,
                 plain_ascii: false,
-            }
-        } else {
-            IdentName {
-                escaped: None,
-                raw_len: len as u16,
-                plain_ascii: self.current_name_plain_ascii(),
-            }
+            };
         }
+        IdentName {
+            escaped: None,
+            raw_len: len as u16,
+            plain_ascii: self.current_name_plain_ascii(),
+        }
+    }
+
+    /// The current token's raw text, arena-copied — the escape hatch
+    /// [`Parser::current_raw_ident_name`] carries for an absurdly long name
+    /// (> 64 KiB), which `raw_len` can't hold (essentially unreachable — no
+    /// real identifier is this long).
+    ///
+    /// It hands back the string alone, which returns in registers, rather than
+    /// the whole `IdentName`, which would return through a stack slot each
+    /// caller this inlines into had to reserve — in parse functions that
+    /// recurse.
+    #[cold]
+    #[inline(never)]
+    fn oversized_raw_name(&self) -> &'arena str {
+        self.arena.alloc_str(self.current_value())
     }
 
     /// Name channel for the current token, which the caller has already verified
