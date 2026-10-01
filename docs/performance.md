@@ -961,9 +961,9 @@ The census is one line per consumer:
 
 ```bash
 # who uses the optimized spelling, and who uses the plain one
-grep -rc '\.stage_u32(\|\.stage_usize(' crates/tsv_*/src/ast/convert/
-grep -rc '\.start_end'                   crates/tsv_*/src/ast/convert/
-grep -rc '\.u32(\|\.usize(\|\.u64('    crates/tsv_*/src/ast/convert/
+grep -rc '\.stage_run()'               crates/tsv_*/src/ast/convert/
+grep -rc '\.start_end'                 crates/tsv_*/src/ast/convert/
+grep -rc 'w\.u32(\|w\.usize(\|w\.u64(' crates/tsv_*/src/ast/convert/
 ```
 
 **The discriminator is not "is this code hot" but "does this call site use the
@@ -1723,7 +1723,7 @@ intent was a −0.4% win. `#[inline(always)]` on identical source: **−0.377%**
 - ⚠️ **It is not only about growing, and that is the part the heading used to get
   wrong: the cost model turns on the body's SHAPE, not on its size alone.**
   Re-cutting the wire writer's integer emitter from a compare ladder plus a pair
-  loop into three magnitude arms with a variable shift made `JsonWriter::stage_u32`
+  loop into three magnitude arms with a variable shift made `StageRun::u32`
   *smaller* — and LLVM declined it where it had honoured the bigger body, because
   one linear fall-through chain estimates cheaper than branchy blocks. Left alone
   it read `instructions:u` **−0.796% with cycles +5.802%**: fewer instructions, far
@@ -1875,7 +1875,7 @@ claim about whether the filter does anything at all.**
 
 ### An inline constant-width copy is the BASELINE target's; libc's `memcpy` is the machine's
 
-`JsonWriter::stage_flush` appends a ~118-byte node header with a **runtime**-length
+`StageRun::flush` appends a ~118-byte node header with a **runtime**-length
 `Vec::extend_from_slice`, which reaches libc `memmove` and is the biggest single
 row on the parse→JSON board. Making the length a constant looks free — it deletes
 a call and four size compares — and it costs **+2.204% of cycles** (instructions
@@ -1898,7 +1898,7 @@ a copy trades a call for a *wider but worse* instruction sequence.
   parse→JSON run when bucketed by its first tsv caller frame, which reads like a
   redesign waiting to happen (buffer the writer, flush once per few KB instead of
   once per node). Its **ceiling** was measured first, for one build: raise the
-  scratch, flush on a high-water mark, make `stage_flush` a no-op. That probe's
+  scratch, flush on a high-water mark, make `StageRun::flush` a no-op. That probe's
   output is deliberately scrambled — the writer's other appends still go straight
   to the buffer — but the byte *volume* is identical, and checking that is what
   makes the number mean something. Ceiling: **instructions −0.810%, cycles

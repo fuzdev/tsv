@@ -62,7 +62,7 @@ pub use config::{EmbedContext, INDENT, LayoutMode, PRINT_WIDTH, TAB_WIDTH};
 pub use error::{ErrorContext, ParseError, Result, lex_err};
 pub use hash::{FxBuildHasher, FxHashMap, FxHashSet, FxHasher};
 #[cfg(feature = "json")]
-pub use json_writer::{JsonWriter, write_array, write_or_null};
+pub use json_writer::{JsonWriter, StageRun, write_array, write_or_null};
 pub use location::{
     BOM, ByteToCharMap, LeadingBom, LocationMapper, LocationTracker, Position, leading_bom_len,
 };

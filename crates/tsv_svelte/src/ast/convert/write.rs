@@ -57,7 +57,7 @@
 //! **Staged runs.** Four fixed-shape bursts here — the `name_loc` field
 //! ([`write_name_loc_field`]) and the `Attribute` / element / `Text` node
 //! headers — assemble in the writer's scratch and reach the buffer as one
-//! append (`JsonWriter::stage_begin`), the shape `tsv_ts`'s `node_header_impl`
+//! append (`JsonWriter::stage_run`), the shape `tsv_ts`'s `node_header_impl`
 //! already uses. Written directly, a burst pays `Vec`'s append protocol per
 //! fragment *and* re-loads the buffer's pointer, length and capacity after
 //! every integer, because `JsonWriter::u32` is deliberately `inline(never)`
@@ -77,7 +77,7 @@
 //! `start_end_field` / `start_end_object` forms, which also write the
 //! `,"start":` / `{"start":` key), the pair written into one fixed-width window
 //! of the buffer rather than as two `u32` calls around an append.
-//! ⚠️ It is the *staged emitters* that pay, not the `stage_flush` copy — grade
+//! ⚠️ It is the *staged emitters* that pay, not the `StageRun::flush` copy — grade
 //! any change here on `cycles:u`, since the run's narrow stores feed a
 //! `memmove` that reads them back.
 //!
@@ -815,7 +815,7 @@ fn write_braced_island(
 /// `start`/`end` each `{line, column, character}` (all three, always). Char-space
 /// via one fused translation per endpoint.
 ///
-/// Emitted as a **staged run** (`JsonWriter::stage_begin`) — the fixed-shape burst
+/// Emitted as a **staged run** (`JsonWriter::stage_run`) — the fixed-shape burst
 /// that machinery exists for, and the same shape as `tsv_ts`'s node header: six
 /// integers between seven static fragments, no dynamic string and no branch, ~110
 /// bytes wide. Written directly it pays `Vec`'s append protocol thirteen times and,
@@ -838,21 +838,21 @@ fn write_braced_island(
 fn write_name_loc_field(w: &mut JsonWriter, span: Span, ctx: &Ctx<'_>) {
     let ((start_char, start_pos), (end_char, end_pos)) =
         ctx.loc.one_line_span_positions(span.start, span.end);
-    w.stage_begin();
-    w.stage_raw(",\"name_loc\":{\"start\":{\"line\":");
-    w.stage_usize(start_pos.line);
-    w.stage_raw(",\"column\":");
-    w.stage_usize(start_pos.column);
-    w.stage_raw(",\"character\":");
-    w.stage_u32(start_char);
-    w.stage_raw("},\"end\":{\"line\":");
-    w.stage_usize(end_pos.line);
-    w.stage_raw(",\"column\":");
-    w.stage_usize(end_pos.column);
-    w.stage_raw(",\"character\":");
-    w.stage_u32(end_char);
-    w.stage_raw("}}");
-    w.stage_flush();
+    let mut run = w.stage_run();
+    run.raw(",\"name_loc\":{\"start\":{\"line\":");
+    run.usize(start_pos.line);
+    run.raw(",\"column\":");
+    run.usize(start_pos.column);
+    run.raw(",\"character\":");
+    run.u32(start_char);
+    run.raw("},\"end\":{\"line\":");
+    run.usize(end_pos.line);
+    run.raw(",\"column\":");
+    run.usize(end_pos.column);
+    run.raw(",\"character\":");
+    run.u32(end_char);
+    run.raw("}}");
+    run.flush();
 }
 
 /// The `,"name":` key a Svelte node's name follows.
@@ -916,14 +916,14 @@ fn write_element(w: &mut JsonWriter, elem: &internal::Element<'_>, ctx: &Ctx<'_>
         internal::ElementKind::Html => "RegularElement",
     };
     // Staged burst; ends before the `name` field (module doc, Staged runs).
-    w.stage_begin();
-    w.stage_raw("{\"type\":\"");
-    w.stage_short(node_type);
-    w.stage_raw("\",\"start\":");
-    w.stage_u32(ctx.pos(elem.span.start));
-    w.stage_raw(",\"end\":");
-    w.stage_u32(ctx.pos(elem.span.end));
-    w.stage_flush();
+    let mut run = w.stage_run();
+    run.raw("{\"type\":\"");
+    run.short(node_type);
+    run.raw("\",\"start\":");
+    run.u32(ctx.pos(elem.span.start));
+    run.raw(",\"end\":");
+    run.u32(ctx.pos(elem.span.end));
+    run.flush();
     write_element_name_field(w, elem, ctx);
     if ctx.emit_loc {
         write_name_loc_field(w, elem.name_span, ctx);
@@ -1062,13 +1062,13 @@ fn write_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
         return;
     }
     // Staged burst; ends at the dynamic `raw` (module doc, Staged runs).
-    w.stage_begin();
-    w.stage_raw("{\"type\":\"Text\",\"start\":");
-    w.stage_u32(ctx.pos(text.span.start));
-    w.stage_raw(",\"end\":");
-    w.stage_u32(ctx.pos(text.span.end));
-    w.stage_raw(",\"raw\":");
-    w.stage_flush();
+    let mut run = w.stage_run();
+    run.raw("{\"type\":\"Text\",\"start\":");
+    run.u32(ctx.pos(text.span.start));
+    run.raw(",\"end\":");
+    run.u32(ctx.pos(text.span.end));
+    run.raw(",\"raw\":");
+    run.flush();
     write_raw_then_data(w, text, ctx);
     w.raw("}");
 }
@@ -1605,12 +1605,12 @@ fn write_attribute_node(w: &mut JsonWriter, node: &internal::AttributeNode<'_>, 
 /// Emits an `Attribute` node.
 fn write_attribute(w: &mut JsonWriter, attr: &internal::Attribute<'_>, ctx: &Ctx<'_>) {
     // Staged burst; ends before the `name` field (module doc, Staged runs).
-    w.stage_begin();
-    w.stage_raw("{\"type\":\"Attribute\",\"start\":");
-    w.stage_u32(ctx.pos(attr.span.start));
-    w.stage_raw(",\"end\":");
-    w.stage_u32(ctx.pos(attr.span.end));
-    w.stage_flush();
+    let mut run = w.stage_run();
+    run.raw("{\"type\":\"Attribute\",\"start\":");
+    run.u32(ctx.pos(attr.span.start));
+    run.raw(",\"end\":");
+    run.u32(ctx.pos(attr.span.end));
+    run.flush();
     write_scanned_name_field(w, name_bytes(attr.name_span, ctx));
     if ctx.emit_loc {
         write_name_loc_field(w, attr.name_span, ctx);

@@ -37,21 +37,23 @@
 //! # Staged runs
 //!
 //! Every node here ends with the same burst — `,"start":` N `,"end":` M, then a
-//! `}` or a constant `metadata` payload — and the three emitters that carry ~37%
-//! of the corpus's nodes (`write_rule`, `write_relative_selector`,
-//! `write_named_selector`) assemble it through [`JsonWriter::stage_begin`]
-//! instead of the unstaged pair of appends, [`JsonWriter::start_end_field`] and
-//! the closing literal. The pair's body is deliberately `inline(never)` for WASM
+//! `}` or a constant `metadata` payload — and the emitters that carry ~37% of
+//! the corpus's nodes assemble it through [`JsonWriter::stage_run`]: the rule
+//! (`write_rule`), the relative selector (`write_relative_selector`), and the
+//! named selectors (`write_named_selector`, and the namespaced arm of
+//! `write_type_selector`, which writes the same tail itself). That replaces the
+//! unstaged pair of appends, [`JsonWriter::start_end_field`] and the closing
+//! literal. The pair's body is deliberately `inline(never)` for WASM
 //! size, so the call forces the output buffer's pointer/length/capacity out of
 //! registers around it; the staged form keeps the scratch base fixed, its bound a
-//! compile-time constant, and `stage_len` in a register, and reaches the buffer
+//! compile-time constant, and the run's length in a register, and reaches the buffer
 //! once.
 //!
 //! ⚠️ **Only the trailing burst stages, and that is a measured boundary, not an
 //! unfinished migration.** The *head* bursts have the same shape
 //! (`{"type":"Block","start":` N `,"end":` M `,"children":`) and staging them is
 //! a **loss**: on the four head emitters it moved the write phase −0.2% where
-//! the three tails moved it −1.0%, and staging both together was *worse* than
+//! the staged tails moved it −1.0%, and staging both together was *worse* than
 //! the tails alone (−0.87% vs −1.04%, three replicates of a 24-binary layout
 //! group). A head run's static fragments are ~50 bytes against a tail's ~17, and
 //! a staged run copies them twice — once into the scratch, once through the
@@ -59,7 +61,7 @@
 //! staging only from the first integer is worse still (+0.68% on the same
 //! instrument). **Grade any change to this on `cycles`/wall, never on
 //! instructions**: staging all seven bursts removes 2.6× more instructions than
-//! staging the three and is ~1.05 points slower.
+//! staging the tails alone and is ~1.05 points slower.
 //!
 //! Every other pair — the head bursts, and the remaining tails (combinator, the
 //! pseudo selectors, `Nth`, `Percentage`, `CSSComment`, the synthesized selector
@@ -67,7 +69,7 @@
 //! `"start":`, [`JsonWriter::start_end_field`] for a tail, each writing both
 //! integers and the key between them into one fixed-width window of the output
 //! buffer instead of two out-of-line `u32` calls around an append. It is not a
-//! substitute for the three staged tails: moving those onto `start_end_field`
+//! substitute for the staged tails: moving those onto `start_end_field`
 //! as well gives back a third of what the pairs remove (a staged run inlines its
 //! integer emission, the call does not), for ~4 KB less native `.text`.
 
@@ -288,12 +290,12 @@ fn write_rule(
     write_selector_list(w, &rule.selector, ctx);
     w.raw(",\"block\":");
     write_block(w, rule.block_span, rule.declarations, ctx, comments);
-    w.stage_begin();
-    w.stage_raw(",\"start\":");
-    w.stage_u32(ctx.pos(rule.span.start));
-    w.stage_raw(",\"end\":");
-    w.stage_u32(ctx.pos(rule.span.end));
-    w.stage_flush();
+    let mut run = w.stage_run();
+    run.raw(",\"start\":");
+    run.u32(ctx.pos(rule.span.start));
+    run.raw(",\"end\":");
+    run.u32(ctx.pos(rule.span.end));
+    run.flush();
     if ctx.has_metadata {
         w.raw(RULE_META);
     }
@@ -545,12 +547,12 @@ fn write_relative_selector(w: &mut JsonWriter, r: &internal::RelativeSelector<'_
     }
     w.raw(",\"selectors\":");
     write_array(w, r.selectors, |w, s| write_simple_selector(w, s, ctx));
-    w.stage_begin();
-    w.stage_raw(",\"start\":");
-    w.stage_u32(ctx.pos(r.span.start));
-    w.stage_raw(",\"end\":");
-    w.stage_u32(ctx.pos(r.span.end));
-    w.stage_flush();
+    let mut run = w.stage_run();
+    run.raw(",\"start\":");
+    run.u32(ctx.pos(r.span.start));
+    run.raw(",\"end\":");
+    run.u32(ctx.pos(r.span.end));
+    run.flush();
     if ctx.has_metadata {
         w.raw(RELATIVE_META);
     }
@@ -754,13 +756,13 @@ fn write_type_selector(
     write_string(w, name);
     w.raw(",\"namespace\":");
     write_string(w, &raw_selector_name(ctx.source, prefix, 0));
-    w.stage_begin();
-    w.stage_raw(",\"start\":");
-    w.stage_u32(ctx.pos(span.start));
-    w.stage_raw(",\"end\":");
-    w.stage_u32(ctx.pos(span.end));
-    w.stage_raw("}");
-    w.stage_flush();
+    let mut run = w.stage_run();
+    run.raw(",\"start\":");
+    run.u32(ctx.pos(span.start));
+    run.raw(",\"end\":");
+    run.u32(ctx.pos(span.end));
+    run.raw("}");
+    run.flush();
 }
 
 /// The shared `{type, name, start, end}` shape (Class/Id/Nesting, and a `TypeSelector`
@@ -779,13 +781,13 @@ fn write_named_selector(
     w.raw(node_type);
     w.raw("\",\"name\":");
     write_string(w, name);
-    w.stage_begin();
-    w.stage_raw(",\"start\":");
-    w.stage_u32(ctx.pos(span.start));
-    w.stage_raw(",\"end\":");
-    w.stage_u32(ctx.pos(span.end));
-    w.stage_raw("}");
-    w.stage_flush();
+    let mut run = w.stage_run();
+    run.raw(",\"start\":");
+    run.u32(ctx.pos(span.start));
+    run.raw(",\"end\":");
+    run.u32(ctx.pos(span.end));
+    run.raw("}");
+    run.flush();
 }
 
 /// Emit a functional pseudo-class's or pseudo-element's args (an `Nth` node, a

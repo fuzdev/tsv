@@ -27,7 +27,7 @@
 use super::super::internal;
 use super::{Schema, bigint_to_decimal};
 use crate::acorn_loc::AcornSeed;
-use tsv_lang::{LocationMapper, Position, Span};
+use tsv_lang::{LocationMapper, Position, Span, StageRun};
 // The JSON-scalar substrate is shared across the three language writers (so the
 // Svelte writer can compose embedded TS/CSS emission into one buffer). Only the
 // TS-specific node emitters (`node_header`, field helpers, `Ctx`) live here.
@@ -760,56 +760,62 @@ fn node_header_impl<const CHARACTER: bool>(
         "node type must be escape-free: {node_type:?}"
     );
     attach_open(node_type, span, ctx);
-    w.stage_begin();
-    w.stage_raw("{\"type\":\"");
-    w.stage_short(node_type);
-    w.stage_raw("\"");
-    position_fields::<CHARACTER>(w, span, ctx);
-    w.stage_flush();
+    let mut run = w.stage_run();
+    run.raw("{\"type\":\"");
+    run.short(node_type);
+    run.raw("\"");
+    position_fields::<CHARACTER>(&mut run, span, ctx);
+    run.flush();
 }
 
 /// The `,"start":…,"end":…,"loc":{…}` position fields (final char space) —
 /// the tail of `node_header_impl`, also emitted after a leading `name` for
 /// the Svelte-constructed identifiers whose fields precede the positions.
 ///
-/// Emits into the writer's **staged run**, so the caller owns the
-/// `stage_begin` / `stage_flush` pair around it — the whole header reaches the
-/// output buffer as one append (see [`JsonWriter::stage_begin`] for why).
-fn position_fields<const CHARACTER: bool>(w: &mut JsonWriter, span: Span, ctx: &Ctx<'_>) {
+/// Emits into the caller's **staged run**, which the caller opens and flushes
+/// around it — the whole header reaches the output buffer as one append (see
+/// [`JsonWriter::stage_run`] for why).
+///
+/// `inline(always)` because it is handed the run by reference: outlined, the
+/// run's length would live in memory across the call, which is the cost
+/// holding it by value removes (see [`StageRun`]).
+#[expect(clippy::inline_always)]
+#[inline(always)]
+fn position_fields<const CHARACTER: bool>(run: &mut StageRun<'_>, span: Span, ctx: &Ctx<'_>) {
     if !ctx.emit_loc {
         // `no-locations` variant: offsets only, no `loc` (and no `character`,
         // which lives inside `loc`). Only the byte→char `pos` is needed, so the
         // per-node line/column lookup is skipped entirely.
-        w.stage_raw(",\"start\":");
-        w.stage_u32(ctx.loc.pos(span.start));
-        w.stage_raw(",\"end\":");
-        w.stage_u32(ctx.loc.pos(span.end));
+        run.raw(",\"start\":");
+        run.u32(ctx.loc.pos(span.start));
+        run.raw(",\"end\":");
+        run.u32(ctx.loc.pos(span.end));
         return;
     }
     let ((start_pos, start), (end_pos, end)) = ctx.loc.span_positions(span.start, span.end);
     let start = emitted_position(ctx, span.start, start);
     let end = emitted_position(ctx, span.end, end);
-    w.stage_raw(",\"start\":");
-    w.stage_u32(start_pos);
-    w.stage_raw(",\"end\":");
-    w.stage_u32(end_pos);
-    w.stage_raw(",\"loc\":{\"start\":{\"line\":");
-    w.stage_usize(start.line);
-    w.stage_raw(",\"column\":");
-    w.stage_usize(start.column);
+    run.raw(",\"start\":");
+    run.u32(start_pos);
+    run.raw(",\"end\":");
+    run.u32(end_pos);
+    run.raw(",\"loc\":{\"start\":{\"line\":");
+    run.usize(start.line);
+    run.raw(",\"column\":");
+    run.usize(start.column);
     if CHARACTER {
-        w.stage_raw(",\"character\":");
-        w.stage_u32(start_pos);
+        run.raw(",\"character\":");
+        run.u32(start_pos);
     }
-    w.stage_raw("},\"end\":{\"line\":");
-    w.stage_usize(end.line);
-    w.stage_raw(",\"column\":");
-    w.stage_usize(end.column);
+    run.raw("},\"end\":{\"line\":");
+    run.usize(end.line);
+    run.raw(",\"column\":");
+    run.usize(end.column);
     if CHARACTER {
-        w.stage_raw(",\"character\":");
-        w.stage_u32(end_pos);
+        run.raw(",\"character\":");
+        run.u32(end_pos);
     }
-    w.stage_raw("}}");
+    run.raw("}}");
 }
 
 /// Emit `,"typeParameters":<declaration>` when present (skip-if-none field).
@@ -1114,9 +1120,9 @@ pub(super) fn write_identifier_parts_with_character(
     write_name_field(w, name, span.start, ctx);
     // `name` is escape-sensitive and precedes the positions, so it can't join
     // the staged run — the run opens after it and covers the positions alone.
-    w.stage_begin();
-    position_fields::<true>(w, span, ctx);
-    w.stage_flush();
+    let mut run = w.stage_run();
+    position_fields::<true>(&mut run, span, ctx);
+    run.flush();
     write_identifier_tail(w, span, optional, type_annotation, decorators, ctx);
 }
 
