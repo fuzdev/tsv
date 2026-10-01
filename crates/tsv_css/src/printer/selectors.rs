@@ -1357,10 +1357,8 @@ impl<'a> Printer<'a> {
         if name.starts_with("--") {
             return Cow::Borrowed(text);
         }
-        let head_end = name
-            .find(|c: char| c.is_ascii_whitespace())
-            .unwrap_or(name.len());
-        if name[..head_end].bytes().any(|b| b.is_ascii_uppercase()) {
+        let (head_end, head_has_uppercase) = pseudo_name_head(name);
+        if head_has_uppercase {
             // Fold only the head; the tail (from the first whitespace on) is verbatim.
             let mut out = String::with_capacity(text.len());
             out.push_str(prefix);
@@ -2047,6 +2045,21 @@ struct NthOfSplit<'a> {
     after_of: String,
 }
 
+/// A pseudo name's head — its text up to the first ASCII whitespace, the part that
+/// case-folds — as its end, and whether it holds an ASCII uppercase letter: one walk over the
+/// bytes. ASCII whitespace never occurs inside a multi-byte character, so the end is a
+/// character boundary.
+fn pseudo_name_head(name: &str) -> (usize, bool) {
+    let mut has_uppercase = false;
+    for (i, &b) in name.as_bytes().iter().enumerate() {
+        if b.is_ascii_whitespace() {
+            return (i, has_uppercase);
+        }
+        has_uppercase |= b.is_ascii_uppercase();
+    }
+    (name.len(), has_uppercase)
+}
+
 /// Split an `An+B of S` term's folded value (`"2n of "`, `"-n + 3 of "`) at its `of`, or
 /// `None` for a bare An+B (`"2n"`, `"odd"`). The parser (`match_nth_value`) only ever
 /// produces `"<An+B>\s+of\s+"` or `"<An+B>"`, so the `of` — when present — is a trailing
@@ -2187,7 +2200,42 @@ impl AttributeGap {
 
 #[cfg(test)]
 mod tests {
-    use super::{Printer, lowercase_an_plus_b_n};
+    use super::{Printer, lowercase_an_plus_b_n, pseudo_name_head};
+
+    /// [`pseudo_name_head`] answers what the char-decoding spelling it replaced did — the
+    /// head's end from a `find` over chars, then an uppercase test over the head's bytes — for
+    /// every name of up to four pieces over ASCII letters of both cases, each ASCII
+    /// whitespace byte and the vertical tab that is not one, and non-ASCII text (a letter
+    /// with an uppercase form, NBSP).
+    #[test]
+    fn pseudo_name_head_matches_the_char_walk() {
+        let alphabet = [
+            "", "a", "A", "hover", "HoVeR", " ", "\t", "\n", "\r", "\u{c}", "\u{b}", "é", "É",
+            "\u{a0}", "(", "-",
+        ];
+        let mut graded = 0;
+        for a in alphabet {
+            for b in alphabet {
+                for c in alphabet {
+                    for d in alphabet {
+                        let name = format!("{a}{b}{c}{d}");
+                        let head_end = name
+                            .find(|c: char| c.is_ascii_whitespace())
+                            .unwrap_or(name.len());
+                        let has_uppercase =
+                            name[..head_end].bytes().any(|b| b.is_ascii_uppercase());
+                        assert_eq!(
+                            pseudo_name_head(&name),
+                            (head_end, has_uppercase),
+                            "{name:?}"
+                        );
+                        graded += 1;
+                    }
+                }
+            }
+        }
+        assert!(graded > 60_000, "{graded}");
+    }
 
     /// Preserved consecutive combinators produce empty-compound `RelativeSelector`s, which
     /// both selector printer paths must handle without panicking or losing idempotency. The
