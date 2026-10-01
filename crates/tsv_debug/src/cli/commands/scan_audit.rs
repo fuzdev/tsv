@@ -316,15 +316,18 @@ fn qualifying_find_line(line: &str) -> Option<String> {
     None
 }
 
-/// Net `{` minus `}` on a line, ignoring those in `//` comments (best-effort; good
-/// enough for test-module boundary tracking).
+/// Net `{` minus `}` on a line, ignoring those in `//` comments and those spelled as a
+/// char / byte literal (best-effort; good enough for test-module boundary tracking).
 fn brace_delta(line: &str) -> i32 {
     let code = match line.find("//") {
         Some(c) => &line[..c],
         None => line,
     };
-    let opens = code.matches('{').count() as i32;
-    let closes = code.matches('}').count() as i32;
+    // a brace spelled as a char / byte literal (`'{'`, `b'}'`) opens and closes nothing
+    let literal_opens = code.matches("'{'").count() as i32;
+    let literal_closes = code.matches("'}'").count() as i32;
+    let opens = code.matches('{').count() as i32 - literal_opens;
+    let closes = code.matches('}').count() as i32 - literal_closes;
     opens - closes
 }
 
@@ -474,6 +477,8 @@ mod tests {
         assert_eq!(brace_delta("}"), -1);
         assert_eq!(brace_delta("} // closes } in comment"), -1);
         assert_eq!(brace_delta("let x = 0;"), 0);
+        assert_eq!(brace_delta("b'}' if at_top => break,"), 0);
+        assert_eq!(brace_delta("b'{' => {"), 1);
     }
 
     #[test]
