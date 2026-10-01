@@ -1706,6 +1706,10 @@ function warmup_iterations_for(preflight_ms: number): number {
 function empty_output_error(task_name: string, file: SourceFile, result: unknown): Error | null {
 	// `/\S/.test` rather than `trim()`: this also runs per file inside the timed loop, and
 	// the test stops at the first character of any real output without allocating.
+	// It is also the timed loop's only read of a string result, and reading a character is
+	// what makes the engine flatten a rope: a formatter that builds its output by
+	// concatenation pays that copy inside the clock, as its consumers do. A `.length`
+	// check would not, so don't weaken this to one.
 	if (typeof result === 'string' && !/\S/.test(result) && /\S/.test(file.content)) {
 		return new Error(
 			`${task_name} returned empty output for a ${file.bytes}-byte input (${file.path}) — a ` +
