@@ -309,6 +309,21 @@ impl<'a> ValueParser<'a> {
         arena: &'arena Bump,
         class: Option<ValueSeparator>,
     ) -> CssValue<'arena> {
+        self.parse_scanned(arena, class, false)
+    }
+
+    /// [`Self::parse_classified`] for the declaration scan, which states one more thing
+    /// about a value it classed a leaf: `group_closes_text`, that the text's first
+    /// parenthesized group closes on its last byte (`ValueFacts::group_closes_value`).
+    /// It rides to the function leaf's paren scan, which it answers
+    /// (`plain_function_parts`); `false` is "not known" and is what every other caller
+    /// passes. Read only beside a leaf class — the claim is about the whole text.
+    pub(crate) fn parse_scanned<'arena>(
+        &self,
+        arena: &'arena Bump,
+        class: Option<ValueSeparator>,
+        group_closes_text: bool,
+    ) -> CssValue<'arena> {
         let text = self.text();
         let bytes = text.as_bytes();
 
@@ -336,7 +351,7 @@ impl<'a> ValueParser<'a> {
                         self.unclassified_path_builds_leaf(text, arena),
                         "caller called {text:?} separator-free, the unclassified path disagreed"
                     );
-                    return self.build_leaf(text, arena);
+                    return self.build_scanned_leaf(text, group_closes_text, arena);
                 }
                 Some(ValueSeparator::Whitespace) => {
                     debug_assert!(
@@ -751,9 +766,33 @@ impl<'a> ValueParser<'a> {
     /// the redundant `str::trim` that `parse_single` runs for the two-pass path.
     /// Identifier text is recovered from `span` at print time, so the fallback
     /// stores no copied string.
+    #[inline]
     fn build_leaf<'arena>(&self, text: &'a str, arena: &'arena Bump) -> CssValue<'arena> {
+        self.build_scanned_leaf(text, false, arena)
+    }
+
+    /// [`Self::build_leaf`] carrying [`Self::parse_scanned`]'s `group_closes_text`.
+    ///
+    /// The one out-of-line body every leaf is built in, with the leaf classifier
+    /// (`parse_single_value`) inlined into it: a function leaf's arguments re-enter the
+    /// value parser from here, so a second frame between the two is a frame on every
+    /// level of a nested value.
+    #[inline(never)]
+    fn build_scanned_leaf<'arena>(
+        &self,
+        text: &'a str,
+        group_closes_text: bool,
+        arena: &'arena Bump,
+    ) -> CssValue<'arena> {
         let span = self.absolute_span();
-        super::parse_single_value(text, span, self.colon_is_operator, self.head_welds, arena)
+        super::parse_single_value(
+            text,
+            span,
+            self.colon_is_operator,
+            self.head_welds,
+            group_closes_text,
+            arena,
+        )
     }
 
     /// Parse single value (leaf node), trimming first.

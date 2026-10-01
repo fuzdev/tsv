@@ -348,6 +348,7 @@ pub(crate) fn parse_declaration<'arena>(
             source_relative_span,
             base,
             value_class,
+            facts.group_closes_value,
             // A top-level `:` is a value operator in a custom property's value and
             // nowhere else: css-syntax-3 admits whatever the text holds there, and
             // prettier's parser throws on a plain property's (`a { b: c:d }`), so there

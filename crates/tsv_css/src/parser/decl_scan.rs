@@ -93,6 +93,16 @@ pub(super) struct ValueFacts {
     /// Whether the value holds no tokens at all besides whitespace, comments, and a
     /// trailing `!important`.
     pub(super) is_empty: bool,
+    /// Whether the value's first parenthesized group — the first `(` to raise the paren
+    /// depth from zero — closes on the value's last byte (`value_end - 1`).
+    ///
+    /// Not one of the declaration node's facts: it is the value parser's, which asks the
+    /// same question of a function leaf (`name(args)` is a function only when the name's
+    /// `(` closes at the very end) by scanning the group a second time. Both walks here
+    /// cross the group anyway and keep the paren depth, so they note where it first
+    /// returns to zero. See `crate::parser::value::plain_function_parts` for where it is
+    /// spent and what holds it to the scan it replaces.
+    pub(super) group_closes_value: bool,
 }
 
 /// Bytes the byte scan can skip outright: everything that can move none of its state.
@@ -541,6 +551,7 @@ fn scan_value_bytes(
 
 /// What [`scan_value_core`] found: a declaration value's facts, or — only when the verdict
 /// latch is enabled — that the run is a nested rule.
+#[cfg_attr(test, derive(Debug, PartialEq))]
 enum ValueScanOutcome {
     /// A paren-depth-0 `{` arrived before any paren-depth-0 `;`/`}` — a nested rule. Only
     /// produced when `WANT_VERDICT` is set (the disambiguation caller); the plain value scan
@@ -595,6 +606,7 @@ fn scan_value_core<const WANT_VERDICT: bool>(
                     important_end: None,
                     has_comment: false,
                     is_empty: false,
+                    group_closes_value: false,
                 },
                 Some(ValueSeparator::None),
             ));
@@ -627,6 +639,9 @@ fn scan_value_core<const WANT_VERDICT: bool>(
     // Whether the paren-only verdict has settled on "declaration" (a `;`/`}` at paren depth
     // zero). Latched once, then a later paren-depth-0 `{` must not be misread as a rule.
     let mut verdict_is_decl = false;
+    // The `)` that first brings the paren depth back to zero — the close of the value's
+    // first parenthesized group. `usize::MAX` is "none yet".
+    let mut first_group_close = usize::MAX;
 
     let (terminator, terminator_kind) = loop {
         // Most of these runs are empty — the loop comes back here after every inspected
@@ -655,27 +670,36 @@ fn scan_value_core<const WANT_VERDICT: bool>(
             i += 1;
             continue;
         }
-        let at_top = paren == 0 && brace == 0 && bracket == 0;
-        // Verdict latch (the paren-only model of `scan_rule_or_declaration_tokens`): the first
-        // paren-depth-0 structural byte decides rule vs declaration. A `{` there is a rule; a
-        // `;`/`}` fixes a declaration and the loop reads on for the value terminator (`[]`/`{}` may
-        // push it further).
-        if WANT_VERDICT && !verdict_is_decl && paren == 0 {
-            match b {
-                b'{' => return Some(ValueScanOutcome::Rule),
-                b';' | b'}' => verdict_is_decl = true,
-                _ => {}
-            }
-        }
+        // One dispatch on the byte. The verdict latch (the paren-only model of
+        // `scan_rule_or_declaration_tokens`: the first paren-depth-0 structural byte decides
+        // rule vs declaration) and the all-depths-zero terminator test are asked inside the
+        // three arms that can spend them — `;`, `}` and `{` — rather than ahead of the
+        // dispatch for every inspected byte, most of which are parens and quotes.
         match b {
-            b';' if at_top => break (i, TerminatorKind::Semicolon),
-            b'}' if at_top => break (i, TerminatorKind::RightBrace),
-            b';' => i += 1,
-            b'}' => {
-                brace = brace.saturating_sub(1);
+            b';' | b'}' => {
+                // A `;`/`}` at paren depth zero fixes a declaration, and the loop reads on
+                // for the value terminator (`[]`/`{}` may push it further).
+                if WANT_VERDICT && paren == 0 {
+                    verdict_is_decl = true;
+                }
+                if paren == 0 && brace == 0 && bracket == 0 {
+                    let kind = if b == b';' {
+                        TerminatorKind::Semicolon
+                    } else {
+                        TerminatorKind::RightBrace
+                    };
+                    break (i, kind);
+                }
+                if b == b'}' {
+                    brace = brace.saturating_sub(1);
+                }
                 i += 1;
             }
             b'{' => {
+                // A `{` at paren depth zero ahead of any such `;`/`}` is a rule.
+                if WANT_VERDICT && !verdict_is_decl && paren == 0 {
+                    return Some(ValueScanOutcome::Rule);
+                }
                 brace += 1;
                 i += 1;
             }
@@ -688,6 +712,9 @@ fn scan_value_core<const WANT_VERDICT: bool>(
                 i += 1;
             }
             b')' => {
+                if paren == 1 {
+                    first_group_close = first_group_close.min(i);
+                }
                 paren = paren.saturating_sub(1);
                 i += 1;
             }
@@ -780,6 +807,8 @@ fn scan_value_core<const WANT_VERDICT: bool>(
             important_end,
             has_comment,
             is_empty,
+            // `first_group_close` is `usize::MAX` for no group, which no `value_end` reaches.
+            group_closes_value: first_group_close.wrapping_add(1) == value_end,
         },
         class,
     ))
@@ -893,6 +922,8 @@ fn scan_value_tokens(
     let mut paren: u32 = 0;
     let mut brace: u32 = 0;
     let mut bracket: u32 = 0;
+    // The `)` token that first brings the paren depth back to zero (`usize::MAX`: none).
+    let mut first_group_close = usize::MAX;
 
     // The terminator token's own start — where the parser re-seats its lexer. At EOF the
     // token is zero-width at end-of-source, so the same field serves both exits.
@@ -912,7 +943,12 @@ fn scan_value_tokens(
 
         match token.kind {
             TokenKind::LeftParen => paren += 1,
-            TokenKind::RightParen => paren = paren.saturating_sub(1),
+            TokenKind::RightParen => {
+                if paren == 1 {
+                    first_group_close = first_group_close.min(token.start as usize);
+                }
+                paren = paren.saturating_sub(1);
+            }
             TokenKind::LeftBrace => brace += 1,
             TokenKind::RightBrace => brace = brace.saturating_sub(1),
             TokenKind::LeftBracket => bracket += 1,
@@ -984,6 +1020,7 @@ fn scan_value_tokens(
         important_end,
         has_comment,
         is_empty,
+        group_closes_value: first_group_close.wrapping_add(1) == value_end,
     })
 }
 
@@ -1032,6 +1069,349 @@ mod tests {
             }
         }
         assert!(graded > 100_000, "{graded}");
+    }
+
+    /// [`scan_value_core`] with the verdict latch and the all-depths-zero test computed
+    /// ahead of the dispatch for every inspected byte, and `;` / `}` each split across a
+    /// guarded and an unguarded arm — the spelling the single dispatch is graded against.
+    /// Everything outside those arms is the scan's own text.
+    fn scan_value_core_model<const WANT_VERDICT: bool>(
+        source: &str,
+        value_start: usize,
+    ) -> Option<ValueScanOutcome> {
+        let bytes = source.as_bytes();
+        let len = bytes.len();
+        let mut i = value_start;
+
+        i = skip_run_end(bytes, i);
+        if i > value_start && !is_ascii_css_whitespace(bytes[i - 1]) {
+            let terminator_kind = match bytes.get(i) {
+                None => Some(TerminatorKind::Eof),
+                Some(b';') => Some(TerminatorKind::Semicolon),
+                Some(b'}') => Some(TerminatorKind::RightBrace),
+                Some(_) => None,
+            };
+            if let Some(terminator_kind) = terminator_kind {
+                return Some(ValueScanOutcome::Value(
+                    ValueFacts {
+                        terminator: i,
+                        terminator_kind,
+                        value_end: i,
+                        important_end: None,
+                        has_comment: false,
+                        is_empty: false,
+                        group_closes_value: false,
+                    },
+                    Some(ValueSeparator::None),
+                ));
+            }
+        }
+
+        let mut paren: u32 = 0;
+        let mut brace: u32 = 0;
+        let mut bracket: u32 = 0;
+        let mut has_comment = false;
+        let mut top_comma = usize::MAX;
+        let mut top_ws = usize::MAX;
+        let mut class_unstated = false;
+        let mut last_bang: Option<usize> = None;
+        let mut verdict_is_decl = false;
+        let mut first_group_close = usize::MAX;
+
+        let (terminator, terminator_kind) = loop {
+            if i < len && SKIP[bytes[i] as usize] {
+                i = skip_run_end(bytes, i + 1);
+            }
+            if i >= len {
+                break (len, TerminatorKind::Eof);
+            }
+            let b = bytes[i];
+            if is_value_separator(b) {
+                if paren == 0 {
+                    if b == b',' {
+                        top_comma = top_comma.min(i);
+                    } else {
+                        top_ws = top_ws.min(i);
+                    }
+                }
+                i += 1;
+                continue;
+            }
+            // Where the model differs from the live scan: the depth test and the verdict
+            // latch run ahead of the dispatch, for every inspected byte, and `;` / `}`
+            // each take a guarded and an unguarded arm below.
+            let at_top = paren == 0 && brace == 0 && bracket == 0;
+            if WANT_VERDICT && !verdict_is_decl && paren == 0 {
+                match b {
+                    b'{' => return Some(ValueScanOutcome::Rule),
+                    b';' | b'}' => verdict_is_decl = true,
+                    _ => {}
+                }
+            }
+            match b {
+                b';' if at_top => break (i, TerminatorKind::Semicolon),
+                b'}' if at_top => break (i, TerminatorKind::RightBrace),
+                b';' => i += 1,
+                b'}' => {
+                    brace = brace.saturating_sub(1);
+                    i += 1;
+                }
+                b'{' => {
+                    brace += 1;
+                    i += 1;
+                }
+                b'[' => {
+                    bracket += 1;
+                    i += 1;
+                }
+                b']' => {
+                    bracket = bracket.saturating_sub(1);
+                    i += 1;
+                }
+                b')' => {
+                    if paren == 1 {
+                        first_group_close = first_group_close.min(i);
+                    }
+                    paren = paren.saturating_sub(1);
+                    i += 1;
+                }
+                b'(' => match paren_open_kind(source, bytes, value_start, i) {
+                    ParenOpen::UrlToken { end } => {
+                        class_unstated = true;
+                        i = end;
+                    }
+                    ParenOpen::Nesting => {
+                        paren += 1;
+                        i += 1;
+                    }
+                    ParenOpen::UnterminatedUrl => return None,
+                },
+                b'"' | b'\'' => i = string_end(bytes, i).ok()?,
+                b'/' if is_comment_start(bytes, i) => {
+                    has_comment = true;
+                    i = comment_end_checked(bytes, i)?;
+                }
+                b'/' => i += 1,
+                b'!' => {
+                    last_bang = Some(i);
+                    i += 1;
+                }
+                _ => return None,
+            }
+        };
+
+        let important = last_bang.and_then(|bang| {
+            let name_start = crate::comments::skip_trivia_forward(bytes, bang + 1, terminator);
+            let mut name_end = name_start;
+            while name_end < terminator && IDENT_CONTINUE_LUT[bytes[name_end] as usize] {
+                name_end += 1;
+            }
+            if !source[name_start..name_end].eq_ignore_ascii_case("important") {
+                return None;
+            }
+            if crate::comments::skip_trivia_forward(bytes, name_end, terminator) < terminator {
+                return None;
+            }
+            Some((bang, name_end))
+        });
+
+        let (span_end, important_end) = match important {
+            Some((bang, name_end)) => (bang, Some(name_end)),
+            None => (terminator, None),
+        };
+        let value_end = trim_end(bytes, value_start, span_end);
+
+        let is_empty =
+            crate::comments::skip_trivia_forward(bytes, value_start, span_end) >= span_end;
+
+        let class = if has_comment || class_unstated {
+            None
+        } else if top_comma < value_end {
+            Some(ValueSeparator::Comma)
+        } else if top_ws < value_end {
+            Some(ValueSeparator::Whitespace)
+        } else {
+            Some(ValueSeparator::None)
+        };
+
+        Some(ValueScanOutcome::Value(
+            ValueFacts {
+                terminator,
+                terminator_kind,
+                value_end,
+                important_end,
+                has_comment,
+                is_empty,
+                group_closes_value: first_group_close.wrapping_add(1) == value_end,
+            },
+            class,
+        ))
+    }
+
+    /// The single-dispatch scan against [`scan_value_core_model`], with the verdict latch
+    /// off and on, over an alphabet of everything either spelling acts on: all three
+    /// nesting pairs, both terminators, both separators, both quotes, the comment
+    /// delimiters, the escape introducer, `!important`, a url-token opener, a custom
+    /// property name, and a line break. Every string of up to four members, then a seeded
+    /// sample of longer ones — long enough to nest, close out of order, leave a construct
+    /// open at end of input, and put a terminator inside each of them.
+    #[test]
+    fn single_dispatch_matches_the_split_arm_scan() {
+        const ALPHABET: [&str; 22] = [
+            "(",
+            ")",
+            "[",
+            "]",
+            "{",
+            "}",
+            ";",
+            ",",
+            " ",
+            "\"",
+            "'",
+            "/",
+            "*",
+            "\\",
+            "!",
+            "a",
+            "5",
+            ":",
+            "\n",
+            "url(",
+            "important",
+            "--x",
+        ];
+        fn grade(source: &str) {
+            assert_eq!(
+                scan_value_core::<false>(source, 0),
+                scan_value_core_model::<false>(source, 0),
+                "plain scan, {source:?}"
+            );
+            assert_eq!(
+                scan_value_core::<true>(source, 0),
+                scan_value_core_model::<true>(source, 0),
+                "verdict scan, {source:?}"
+            );
+        }
+
+        let mut source = String::new();
+        let mut graded = 0u32;
+        for len in 0..=4u32 {
+            for case in 0..ALPHABET.len().pow(len) {
+                source.clear();
+                let mut rest = case;
+                for _ in 0..len {
+                    source.push_str(ALPHABET[rest % ALPHABET.len()]);
+                    rest /= ALPHABET.len();
+                }
+                grade(&source);
+                graded += 1;
+            }
+        }
+
+        // xorshift64, fixed seed: the same sample every run.
+        let mut state = 0x9e37_79b9_7f4a_7c15u64;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        for _ in 0..200_000 {
+            source.clear();
+            let len = 5 + next() % 12;
+            for _ in 0..len {
+                source.push_str(ALPHABET[(next() % ALPHABET.len() as u64) as usize]);
+            }
+            grade(&source);
+            graded += 1;
+        }
+        assert!(graded > 400_000, "{graded}");
+    }
+
+    /// [`ValueFacts::group_closes_value`] against the scan it stands in for, in both
+    /// directions, over every value of up to four members of an alphabet holding what
+    /// either scan acts on (and a seeded sample of longer ones): wherever the boundary
+    /// scan states a leaf class and the value parser would ask a plain-name function's
+    /// paren scan, the fact is `true` exactly when `matching_close_paren` closes the
+    /// group on the value's last byte. Each value is then parsed whole, which runs the
+    /// debug oracles on the path that spends the fact.
+    #[test]
+    fn group_close_agrees_with_the_function_paren_scan() {
+        use crate::parser::value::plain_function_paren;
+        use crate::parser::value::scan::matching_close_paren;
+
+        const ALPHABET: [&str; 21] = [
+            "(",
+            ")",
+            "[",
+            "]",
+            "{",
+            "}",
+            ";",
+            ",",
+            " ",
+            "\"",
+            "'",
+            "/",
+            "*",
+            "\\",
+            "!",
+            "a",
+            "-",
+            "5",
+            "url(",
+            "f(",
+            "important",
+        ];
+        const HEAD: &str = "a{b:";
+        let mut arena = bumpalo::Bump::new();
+        let mut spent = 0u32;
+        let mut grade = |value: &str| {
+            let source = format!("{HEAD}{value}");
+            if let Some((facts, Some(ValueSeparator::None))) = scan_value_bytes(&source, HEAD.len())
+            {
+                let text = &source[HEAD.len()..facts.value_end];
+                if let Some(open) = plain_function_paren(text.as_bytes()) {
+                    let closes = matching_close_paren(text, open) == Some(text.len() - 1);
+                    assert_eq!(facts.group_closes_value, closes, "for {source:?}");
+                    spent += u32::from(closes);
+                }
+            }
+            arena.reset();
+            // An `Err` is a rejected stylesheet, which is most of these; the parse is run
+            // for the assertions inside it.
+            let _ = crate::parse(&source, &arena);
+        };
+
+        let mut value = String::new();
+        for len in 0..=4u32 {
+            for case in 0..ALPHABET.len().pow(len) {
+                value.clear();
+                let mut rest = case;
+                for _ in 0..len {
+                    value.push_str(ALPHABET[rest % ALPHABET.len()]);
+                    rest /= ALPHABET.len();
+                }
+                grade(&value);
+            }
+        }
+        let mut state = 0x9e37_79b9_7f4a_7c15u64;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        for _ in 0..100_000 {
+            value.clear();
+            let len = 5 + next() % 8;
+            for _ in 0..len {
+                value.push_str(ALPHABET[(next() % ALPHABET.len() as u64) as usize]);
+            }
+            grade(&value);
+        }
+        assert!(spent > 500, "{spent}");
     }
 
     /// The value's separator class, for the declaration `source` holds.

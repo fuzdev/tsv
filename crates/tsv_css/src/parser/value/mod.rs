@@ -43,6 +43,9 @@ use strings::parse_string_literal;
 ///   already derived it (`crate::parser::decl_scan`), which lets `ValueParser` skip its own
 ///   classifying pass over the very same bytes. `None` means "not known", never "no
 ///   separator" — that is `Some(ValueSeparator::None)`.
+/// * `group_closes_value` - whether that scan saw the value's first parenthesized group
+///   close on the value's last byte, which is the function leaf's own paren scan
+///   answered in advance (see [`plain_function_parts`]). `false` means "not known".
 /// * `colon_is_operator` - whether a top-level `:` in this value is a value operator,
 ///   which it is in a **custom property's** value and nowhere else at the top level (see
 ///   `operators::split_value_run`). The caller knows it from the property name.
@@ -51,6 +54,7 @@ pub fn parse_value_from_source<'arena>(
     source_relative_span: Span,
     base_offset: u32,
     class: Option<ValueSeparator>,
+    group_closes_value: bool,
     colon_is_operator: bool,
     arena: &'arena Bump,
 ) -> CssValue<'arena> {
@@ -80,10 +84,11 @@ pub fn parse_value_from_source<'arena>(
     // this text only when the trim took nothing off either end. It normally does not (a real
     // stylesheet puts no whitespace at a value's ends, and the scan's own `value_end` is
     // already trimmed); when it does, the class is dropped and the fused pass runs as usual.
-    let class = if leading == 0 && trimmed.len() == value_str.len() {
-        class
+    // The group's close describes the same text and is dropped with it.
+    let (class, group_closes_text) = if leading == 0 && trimmed.len() == value_str.len() {
+        (class, group_closes_value)
     } else {
-        None
+        (None, false)
     };
 
     // ValueParser re-parses the same source text, so nested value spans stay
@@ -93,7 +98,7 @@ pub fn parse_value_from_source<'arena>(
     } else {
         parser::ValueParser::new(trimmed, absolute_span)
     };
-    parser.parse_classified(arena, class)
+    parser.parse_scanned(arena, class, group_closes_text)
 }
 
 /// A value's text with its surrounding **CSS** whitespace removed, and how many
@@ -145,15 +150,20 @@ fn locate_value(value_str: &str) -> Option<(&str, usize)> {
 
 /// Parse a single CSS value (no lists).
 ///
-/// `s` is expected already trimmed: the sole caller (`ValueParser::build_leaf`)
+/// `s` is expected already trimmed: the sole caller (`ValueParser::build_scanned_leaf`)
 /// forwards a trimmed range — the fast path passes `self.text()` (the boundary
 /// check confirmed it is trimmed) and the two-pass fallback passes
 /// `self.text().trim()` — so no `str::trim` is repeated here.
+///
+/// `group_closes_run` is the declaration scan's word that the run's first parenthesized
+/// group closes on its last byte ([`plain_function_parts`]); `false` is "not known".
+#[inline]
 pub(crate) fn parse_single_value<'arena>(
     s: &str,
     span: Span,
     colon_is_operator: bool,
     head_welds: bool,
+    group_closes_run: bool,
     arena: &'arena Bump,
 ) -> CssValue<'arena> {
     // A whole-run function under a PLAIN name (`var(--a)`, `rgba(0, 0, 0, 0.5)`,
@@ -163,7 +173,7 @@ pub(crate) fn parse_single_value<'arena>(
     // it to find the `)` and the function arm walks it again. Whatever the arm declines (a
     // `)` closing early, an unbalanced group) takes the split exactly as before.
     if let Some(paren_pos) = plain_function_paren(s.as_bytes())
-        && let Some((name, args)) = plain_function_parts(s, paren_pos)
+        && let Some((name, args)) = plain_function_parts(s, paren_pos, group_closes_run)
     {
         debug_assert!(
             operators::split_value_run(s, colon_is_operator, head_welds, arena).is_none(),
@@ -272,7 +282,7 @@ fn parse_leaf_value<'arena>(s: &str, span: Span, arena: &'arena Bump) -> CssValu
 /// The offset of the `(` after a PLAIN name opening `bytes` — an ASCII letter or `_` (or a
 /// `-` before one), then letters, digits, `_` and `-` — when `bytes` also ends in a `)`.
 /// `None` for every other shape, which [`parse_single_value`] leaves to the split.
-fn plain_function_paren(bytes: &[u8]) -> Option<usize> {
+pub(in crate::parser) fn plain_function_paren(bytes: &[u8]) -> Option<usize> {
     if bytes.last() != Some(&b')') {
         return None;
     }
@@ -300,8 +310,32 @@ fn plain_function_paren(bytes: &[u8]) -> Option<usize> {
 /// [`extract_function_parts`] for a run [`plain_function_paren`] accepted: its name is the
 /// whole of `s[..paren_pos]` and already a valid one (plain ASCII word content, no
 /// whitespace, no escape), so only the paren scan is left to ask.
-fn plain_function_parts(s: &str, paren_pos: usize) -> Option<(&str, &str)> {
-    let close = scan::matching_close_paren(s, paren_pos)?;
+///
+/// And for a declaration's whole value the boundary scan has already asked it.
+/// `group_closes_run` is `ValueFacts::group_closes_value` — the value's first group closes
+/// on its last byte — handed over only with a stated leaf class, so the run is the text
+/// that scan walked, holding no comment, no escape outside a string and no url-token.
+/// `plain_function_paren` puts nothing but name bytes ahead of `paren_pos`, so the `(`
+/// there is the first one the scan nested on, and its close is the run's last byte without
+/// [`scan::matching_close_paren`] walking the group again. `false` claims nothing, and the
+/// scan runs as it would for any other leaf.
+///
+/// The two scans' models differ in ways the stated class rules out — the boundary scan
+/// steps a comment and a url-token whole and declines on an escape, where this one reads
+/// a `/*` as content and steps an escape — and agree on what is left: parens nest, a
+/// string is opaque, `[]` and `{}` move no paren depth. The claim is held to the scan it
+/// replaces in every debug build.
+fn plain_function_parts(s: &str, paren_pos: usize, group_closes_run: bool) -> Option<(&str, &str)> {
+    let close = if group_closes_run {
+        debug_assert_eq!(
+            scan::matching_close_paren(s, paren_pos),
+            Some(s.len() - 1),
+            "the declaration scan closed {s:?}'s group at its end, the paren scan did not"
+        );
+        s.len() - 1
+    } else {
+        scan::matching_close_paren(s, paren_pos)?
+    };
     let parts = (close == s.len() - 1).then(|| (&s[..paren_pos], &s[paren_pos + 1..close]));
     debug_assert_eq!(
         parts,
@@ -352,7 +386,7 @@ fn parse_function_leaf<'arena>(
     //
     // ⚠️ It does NOT buy back the frame. This is the CSS value parser's own
     // recursion, and the name's location has to live across `parse_function_arguments`
-    // below, so `build_leaf` grows 16 bytes and `calc(calc(…))` loses ~1,157 levels of
+    // below, so `build_scanned_leaf`'s frame grows 16 bytes and `calc(calc(…))` loses ~1,157 levels of
     // its depth budget. Three spellings were measured — the fifth tuple element, this
     // one, and hoisting the recursive call above the struct expression — and all three
     // read exactly that number. It is the shape's price, not a spelling's; don't spend
@@ -376,13 +410,14 @@ fn parse_function_leaf<'arena>(
 ///
 /// `Some` means the whole of `s` is the function — the matching close paren is its last
 /// byte — which is what lets the printer bound the argument list at `span.end - 1`
-/// (`build_value_function_doc`'s closing-comma read). It is also why the sole caller can
-/// refuse on `s`'s last byte alone: the close paren this returns on *is* that byte, so a
+/// (`build_value_function_doc`'s closing-comma read). It is also why `parse_leaf_value`
+/// can refuse on `s`'s last byte alone: the close paren this returns on *is* that byte, so a
 /// value ending in anything else is never a function.
 ///
-/// ⚠️ **`paren_pos` must address a `(`** — both call sites derive it from `position(|&b| b ==
-/// b'(')`, so the first byte [`scan::matching_close_paren`] reads always opens the run, which is
-/// what lets its unsigned depth start at zero. A violated precondition trips that walk's
+/// ⚠️ **`paren_pos` must address a `(`** — `parse_leaf_value` derives it from
+/// `position(|&b| b == b'(')` and `plain_function_parts` hands on the one
+/// `plain_function_paren` found, so the first byte [`scan::matching_close_paren`] reads
+/// always opens the run, which is what lets its unsigned depth start at zero. A violated precondition trips that walk's
 /// `debug_assert`, rather than quietly returning a wrong span.
 ///
 /// ⚠️ **That leading search is quote- and escape-blind, and [`is_function_name`] is what keeps
@@ -714,7 +749,7 @@ mod function_name_tests {
     }
 
     /// The whole seam: which values read as a function, and where the name and arguments
-    /// are cut. The sole caller enters on the value's first `(` byte, so the tests do too.
+    /// are cut. `parse_leaf_value` enters on the value's first `(` byte, so the tests do too.
     #[test]
     fn the_first_paren_byte_locates_the_function_or_refuses_it() {
         fn parts(s: &str) -> Option<(&str, &str)> {
@@ -748,7 +783,7 @@ mod value_span_tests {
     /// The span `parse_value_from_source` gives the value it parsed.
     fn value_span(source: &str, start: u32, end: u32) -> Span {
         let arena = Bump::new();
-        parse_value_from_source(source, Span { start, end }, 0, None, false, &arena).span()
+        parse_value_from_source(source, Span { start, end }, 0, None, false, false, &arena).span()
     }
 
     /// The already-trimmed fast path must agree with the trimming path on where
