@@ -81,13 +81,55 @@ use super::{
 use std::borrow::Cow;
 use tsv_lang::{ByteToCharMap, JsonWriter, LeadingBom, Span, write_array, write_or_null};
 
-/// `parseCss()` constant metadata payloads — always the `Default` (all-`false`,
-/// `null` unit) shapes, emitted only on standalone CSS (`Ctx::has_metadata`).
-/// The `,"metadata":…` prefix folds the leading comma into the constant.
-const RULE_META: &str = ",\"metadata\":{\"parent_rule\":null,\"has_local_selectors\":false,\"has_global_selectors\":false,\"is_global_block\":false}";
-const COMPLEX_META: &str = ",\"metadata\":{\"rule\":null,\"is_global\":false,\"used\":false}";
-const RELATIVE_META: &str =
-    ",\"metadata\":{\"is_global\":false,\"is_global_like\":false,\"scoped\":false}";
+/// Declares one `parseCss()` metadata payload twice from a single literal: bare
+/// (`$bare`), and as the constant burst that closes its node (`$closing` — `$lead`,
+/// the payload, the node's `}`), so a walked node ends in one append.
+macro_rules! metadata_payload {
+    ($bare:ident, $closing:ident = $lead:literal, $payload:literal) => {
+        const $bare: &str = $payload;
+        const $closing: &str = concat!($lead, $payload, "}");
+    };
+}
+
+// `parseCss()` constant metadata payloads — always the `Default` (all-`false`,
+// `null` unit) shapes, emitted only on standalone CSS (`Ctx::has_metadata`).
+// The `,"metadata":…` prefix folds the leading comma into the constant.
+
+/// A `Rule`'s metadata and its closing `}`.
+const RULE_META_CLOSE: &str = ",\"metadata\":{\"parent_rule\":null,\"has_local_selectors\":false,\"has_global_selectors\":false,\"is_global_block\":false}}";
+// `COMPLEX_META_CLOSE` leads with the `]` that ends the selector's `children`.
+metadata_payload!(
+    COMPLEX_META,
+    COMPLEX_META_CLOSE = "]",
+    ",\"metadata\":{\"rule\":null,\"is_global\":false,\"used\":false}"
+);
+metadata_payload!(
+    RELATIVE_META,
+    RELATIVE_META_CLOSE = "",
+    ",\"metadata\":{\"is_global\":false,\"is_global_like\":false,\"scoped\":false}"
+);
+
+/// An array's opening and items: `open` — a literal ending in the array's `[` — then
+/// the comma-separated items. The caller writes the `]`, as the first byte of whatever
+/// constant follows the array, so a node's array costs it no append of its own on
+/// either side (`tsv_lang::write_array` spends one on each bracket).
+#[inline]
+fn write_array_open<T, const N: usize>(
+    w: &mut JsonWriter,
+    open: &[u8; N],
+    items: impl IntoIterator<Item = T>,
+    mut f: impl FnMut(&mut JsonWriter, T),
+) {
+    w.raw_fixed(open);
+    let mut first = true;
+    for item in items {
+        if !first {
+            w.raw(",");
+        }
+        first = false;
+        f(w, item);
+    }
+}
 
 /// The per-document environment every writer function shares.
 #[derive(Clone, Copy)]
@@ -297,9 +339,10 @@ fn write_rule(
     run.u32(ctx.pos(rule.span.end));
     run.flush();
     if ctx.has_metadata {
-        w.raw(RULE_META);
+        w.raw(RULE_META_CLOSE);
+    } else {
+        w.raw("}");
     }
-    w.raw("}");
 }
 
 /// Emits an `Atrule` node. Field order: `type`, `start`, `end`, `name`,
@@ -381,15 +424,15 @@ fn write_block(
     }));
     w.raw("{\"type\":\"Block\",\"start\":");
     w.start_end(ctx.pos(block_span.start), ctx.pos(block_span.end));
-    w.raw(",\"children\":");
-    write_array(
+    write_array_open(
         w,
+        b",\"children\":[",
         children
             .iter()
             .filter(|c| !matches!(c, internal::CssBlockChild::Comment(_))),
         |w, c| write_block_child(w, c, ctx, comments),
     );
-    w.raw("}");
+    w.raw("]}");
 }
 
 fn write_block_child(
@@ -511,52 +554,60 @@ fn write_selector_list_inner(
 ) {
     w.raw("{\"type\":\"SelectorList\",\"start\":");
     w.start_end(ctx.pos(sl.span.start), ctx.pos(sl.span.end));
-    w.raw(",\"children\":");
-    write_array(
+    write_array_open(
         w,
+        b",\"children\":[",
         sl.selectors
             .iter()
             .filter(|c| !filter_invalid || !selector_contains_invalid(c)),
         |w, c| write_complex_selector(w, c, ctx),
     );
-    w.raw("}");
+    w.raw("]}");
 }
 
 /// Emits a `ComplexSelector` node.
 fn write_complex_selector(w: &mut JsonWriter, c: &internal::ComplexSelector<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"ComplexSelector\",\"start\":");
     w.start_end(ctx.pos(c.span.start), ctx.pos(c.span.end));
-    w.raw(",\"children\":");
-    write_array(w, c.children, |w, r| write_relative_selector(w, r, ctx));
+    write_array_open(w, b",\"children\":[", c.children, |w, r| {
+        write_relative_selector(w, r, ctx);
+    });
     if ctx.has_metadata {
-        w.raw(COMPLEX_META);
+        w.raw(COMPLEX_META_CLOSE);
+    } else {
+        w.raw("]}");
     }
-    w.raw("}");
 }
 
 /// Emits a `RelativeSelector` node. `combinator` is `null` (no skip) when
 /// absent; field order is `combinator`, `selectors`, `start`, `end`, `metadata`.
 ///
-/// The trailing `start`/`end` burst is a staged run, stopping before `metadata`
-/// for `write_rule`'s reason (module doc, §Staged runs).
+/// The trailing `start`/`end` burst is a staged run, led by the `]` that closes
+/// `selectors` and stopping before `metadata` for `write_rule`'s reason (module doc,
+/// §Staged runs).
 fn write_relative_selector(w: &mut JsonWriter, r: &internal::RelativeSelector<'_>, ctx: &Ctx<'_>) {
-    w.raw("{\"type\":\"RelativeSelector\",\"combinator\":");
+    // The combinator-less head — the first compound of every selector — is one literal
+    // through the `selectors` array's `[`.
     match (&r.combinator, &r.combinator_span) {
-        (Some(comb), Some(span)) => write_combinator(w, comb.as_str(), *span, ctx),
-        _ => w.null(),
+        (Some(comb), Some(span)) => {
+            w.raw("{\"type\":\"RelativeSelector\",\"combinator\":");
+            write_combinator(w, comb.as_str(), *span, ctx);
+            w.raw(",\"selectors\":[");
+        }
+        _ => w.raw("{\"type\":\"RelativeSelector\",\"combinator\":null,\"selectors\":["),
     }
-    w.raw(",\"selectors\":");
-    write_array(w, r.selectors, |w, s| write_simple_selector(w, s, ctx));
+    write_array_open(w, b"", r.selectors, |w, s| write_simple_selector(w, s, ctx));
     let mut run = w.stage_run();
-    run.raw(",\"start\":");
+    run.raw("],\"start\":");
     run.u32(ctx.pos(r.span.start));
     run.raw(",\"end\":");
     run.u32(ctx.pos(r.span.end));
     run.flush();
     if ctx.has_metadata {
-        w.raw(RELATIVE_META);
+        w.raw(RELATIVE_META_CLOSE);
+    } else {
+        w.raw("}");
     }
-    w.raw("}");
 }
 
 fn write_combinator(w: &mut JsonWriter, name: &'static str, span: Span, ctx: &Ctx<'_>) {
@@ -598,14 +649,17 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             // Past the `.` AND any comment glued to it (`./* c */cls`) — never a bare `1`.
             let name_start = crate::comments::class_name_start(ctx.source.as_bytes(), span.start);
             let name = raw_selector_name(ctx.source, *span, (name_start - span.start) as usize);
-            write_named_selector(w, "ClassSelector", &name, *span, ctx);
+            w.raw("{\"type\":\"ClassSelector\",\"name\":");
+            write_named_selector(w, &name, *span, ctx);
         }
         internal::SimpleSelector::Id { span } => {
             let name = raw_selector_name(ctx.source, *span, 1);
-            write_named_selector(w, "IdSelector", &name, *span, ctx);
+            w.raw("{\"type\":\"IdSelector\",\"name\":");
+            write_named_selector(w, &name, *span, ctx);
         }
         internal::SimpleSelector::Nesting { span } => {
-            write_named_selector(w, "NestingSelector", "&", *span, ctx);
+            w.raw("{\"type\":\"NestingSelector\",\"name\":");
+            write_named_selector(w, "&", *span, ctx);
         }
         internal::SimpleSelector::Attribute {
             namespace_span,
@@ -748,11 +802,11 @@ fn write_type_selector(
     span: Span,
     ctx: &Ctx<'_>,
 ) {
+    w.raw("{\"type\":\"TypeSelector\",\"name\":");
     let Some(prefix) = namespace_span else {
-        write_named_selector(w, "TypeSelector", name, span, ctx);
+        write_named_selector(w, name, span, ctx);
         return;
     };
-    w.raw("{\"type\":\"TypeSelector\",\"name\":");
     write_string(w, name);
     w.raw(",\"namespace\":");
     write_string(w, &raw_selector_name(ctx.source, prefix, 0));
@@ -766,20 +820,14 @@ fn write_type_selector(
 }
 
 /// The shared `{type, name, start, end}` shape (Class/Id/Nesting, and a `TypeSelector`
-/// with no namespace).
+/// with no namespace), from the name on: the caller has written the node's head,
+/// `{"type":"…","name":`, as one literal of its own — a constant-width store at each
+/// site, where a node type handed down here would be three appends, the middle one a
+/// runtime-length copy.
 ///
 /// The trailing `start`/`end`/`}` burst is a staged run (module doc, §Staged
 /// runs) — this node carries no `metadata`, so the closing brace joins it.
-fn write_named_selector(
-    w: &mut JsonWriter,
-    node_type: &str,
-    name: &str,
-    span: Span,
-    ctx: &Ctx<'_>,
-) {
-    w.raw("{\"type\":\"");
-    w.raw(node_type);
-    w.raw("\",\"name\":");
+fn write_named_selector(w: &mut JsonWriter, name: &str, span: Span, ctx: &Ctx<'_>) {
     write_string(w, name);
     let mut run = w.stage_run();
     run.raw(",\"start\":");
@@ -871,13 +919,8 @@ fn write_part_args(w: &mut JsonWriter, ident_spans: &[Span], ctx: &Ctx<'_>) {
                 Span::new(rel_start, span.end),
                 ctx,
                 |w, ctx| {
-                    write_named_selector(
-                        w,
-                        "TypeSelector",
-                        &raw_selector_name(ctx.source, *span, 0),
-                        *span,
-                        ctx,
-                    );
+                    w.raw("{\"type\":\"TypeSelector\",\"name\":");
+                    write_named_selector(w, &raw_selector_name(ctx.source, *span, 0), *span, ctx);
                 },
             );
         });
