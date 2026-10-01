@@ -1207,6 +1207,12 @@ fn write_identifier_tail(
 /// Emits a plain `Identifier` node: no optional flag, no type annotation, no
 /// decorators — regardless of what the binding carries.
 ///
+/// The common identifier — a short unescaped name, no comment attach running —
+/// is written as a single staged run, header through closing `}`: the node has
+/// no child, so nothing has to interrupt the run, and the name's key, quotes
+/// and close ride the header's one append instead of a window write and a
+/// `}` append of their own.
+///
 /// `inline(never)` to keep it out of the recursive writers' frames: once the name
 /// write went out of line this body became small enough to inline, and each inlined
 /// copy parked an `IdentName` in its caller's frame — `write_statement`'s grew from
@@ -1218,7 +1224,35 @@ pub(super) fn write_identifier_plain(
     id: &internal::Identifier<'_>,
     ctx: &Ctx<'_>,
 ) {
-    write_identifier_parts(w, id.span, id.ident_name(), false, None, None, ctx);
+    let name = id.ident_name();
+    let name_len = name.raw_len as usize;
+    if name.escaped.is_some()
+        || name_len > StageRun::SHORT_MAX
+        || !matches!(ctx.comments, CommentMode::Off)
+    {
+        write_identifier_parts(w, id.span, name, false, None, None, ctx);
+        return;
+    }
+    // The whole node as one staged run. It is `write_identifier_parts`'s bytes
+    // under the three conditions just tested: a span-identity name is its
+    // source bytes, which hold nothing JSON escapes (`write_name_field`), so it
+    // can be staged where a scanned string could not; a name no longer than
+    // `StageRun::SHORT_MAX` is copied inline, and cannot overrun the scratch
+    // behind a header; and with no comment attach the node's open and close
+    // report to nothing, so the close is the bare `}`.
+    let start = id.span.start as usize;
+    let name = &ctx.source.as_bytes()[start..start + name_len];
+    debug_assert!(
+        name.iter().all(|&b| b != b'"' && b != b'\\' && b >= 0x20),
+        "a span-identity name holds nothing JSON escapes"
+    );
+    let mut run = w.stage_run();
+    run.raw("{\"type\":\"Identifier\"");
+    position_fields::<false>(&mut run, id.span, ctx);
+    run.raw(",\"name\":\"");
+    run.short_bytes(name);
+    run.raw("\"}");
+    run.flush();
 }
 
 /// An `Identifier` carrying only the binding's `optional` flag (function and
@@ -1236,7 +1270,7 @@ pub(super) fn write_identifier_with_optional(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tsv_lang::{LeadingBom, LocationTracker};
+    use tsv_lang::{AcornPrefix, LeadingBom, LocationTracker};
 
     /// Run `emit` under a standalone-TypeScript context over `source`, for one
     /// wire variant and one comment role.
@@ -1262,6 +1296,20 @@ mod tests {
         let mut w = JsonWriter::with_capacity(0);
         emit(&mut w, &ctx);
         String::from_utf8(w.into_bytes()).expect("the wire is UTF-8")
+    }
+
+    /// The sole statement of `source` as the `Identifier` its expression is.
+    fn sole_identifier<'a>(program: &'a internal::Program<'a>) -> &'a internal::Identifier<'a> {
+        let [statement] = program.body else {
+            panic!("one statement expected");
+        };
+        let internal::StatementKind::ExpressionStatement(statement) = &statement.kind else {
+            panic!("an expression statement expected");
+        };
+        let internal::ExpressionKind::Identifier(id) = &statement.expression.kind else {
+            panic!("an identifier expected");
+        };
+        id
     }
 
     /// The staged header against `node_header_wide_end`, which writes the same
@@ -1295,6 +1343,120 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    /// `write_identifier_plain`'s single-run arm against the general identifier
+    /// emission it stands in for, and against the bytes spelled out, at each edge
+    /// of its gate: the name length either side of `StageRun::SHORT_MAX`, a
+    /// non-ASCII name (whose byte length is what the gate reads) either side of
+    /// it too, a name longer than the whole staging scratch, and an escaped
+    /// name, which carries its decoded form.
+    #[test]
+    fn plain_identifier_run_matches_the_general_emission() {
+        let ascii = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        // Two bytes and one UTF-16 unit a character.
+        let wide = "éèêëàâäîïôöùûüçñ".repeat(2);
+        let cases: Vec<(String, String)> = [
+            &ascii[..1],
+            &ascii[..2],
+            &ascii[..7],
+            &ascii[..8],
+            &ascii[..16],
+            &ascii[..31],
+            &ascii[..32],
+            &ascii[..33],
+            &ascii[..40],
+            "$",
+            "_$1",
+            &wide[..2],
+            &wide[..30],
+            &wide[..32],
+            &wide[..34],
+        ]
+        .into_iter()
+        .map(|name| (name.to_owned(), name.to_owned()))
+        .chain([(ascii[..50].repeat(8), ascii[..50].repeat(8))])
+        .chain([
+            ("\\u0061bc".to_owned(), "abc".to_owned()),
+            ("a\\u{62}".to_owned(), "ab".to_owned()),
+        ])
+        .collect();
+        for (written, name) in &cases {
+            let source = format!("\n  {written};\n");
+            let arena = bumpalo::Bump::new();
+            let program = crate::parse(&source, &arena).expect("parses");
+            let id = sole_identifier(&program);
+            let end = 3 + written.encode_utf16().count();
+            let column = end - 1;
+            for emit_loc in [true, false] {
+                let plain = emitted(&source, emit_loc, CommentMode::Off, |w, ctx| {
+                    write_identifier_plain(w, id, ctx);
+                });
+                let general = emitted(&source, emit_loc, CommentMode::Off, |w, ctx| {
+                    write_identifier_parts(w, id.span, id.ident_name(), false, None, None, ctx);
+                });
+                assert_eq!(plain, general, "{written:?}, loc {emit_loc}");
+                let loc = if emit_loc {
+                    format!(
+                        ",\"loc\":{{\"start\":{{\"line\":2,\"column\":2}},\"end\":\
+                         {{\"line\":2,\"column\":{column}}}}}"
+                    )
+                } else {
+                    String::new()
+                };
+                assert_eq!(
+                    plain,
+                    format!(
+                        "{{\"type\":\"Identifier\",\"start\":3,\"end\":{end}{loc},\
+                         \"name\":\"{name}\"}}"
+                    ),
+                    "{written:?}, loc {emit_loc}"
+                );
+            }
+        }
+    }
+
+    /// Under a comment attach the identifier keeps the general emission: its open
+    /// and close are what hand it its comments, and the single-run arm reports
+    /// neither.
+    #[test]
+    fn plain_identifier_under_a_comment_attach_emits_its_comments() {
+        let source = "/* c */ name";
+        let arena = bumpalo::Bump::new();
+        let (expression, comments) =
+            crate::parse_expression_with_comments(source, 0, &arena).expect("parses");
+        let internal::ExpressionKind::Identifier(id) = &expression.kind else {
+            panic!("an identifier expected");
+        };
+        let attach = || {
+            CommentAttach::new(
+                source,
+                IslandComments {
+                    queue: comments
+                        .iter()
+                        .map(|comment| (comment, AcornPrefix::DOCUMENT))
+                        .collect(),
+                    root_parent_end: None,
+                    root_fallback: true,
+                    html_leading: None,
+                },
+            )
+        };
+        for emit_loc in [true, false] {
+            let island = attach();
+            let plain = emitted(source, emit_loc, island.mode(), |w, ctx| {
+                write_identifier_plain(w, id, ctx);
+            });
+            let island = attach();
+            let general = emitted(source, emit_loc, island.mode(), |w, ctx| {
+                write_identifier_parts(w, id.span, id.ident_name(), false, None, None, ctx);
+            });
+            assert_eq!(plain, general, "loc {emit_loc}");
+            assert!(
+                plain.contains(",\"name\":\"name\",\"leadingComments\":[{\"type\":\"Block\""),
+                "the leading comment is emitted: {plain}"
+            );
         }
     }
 }

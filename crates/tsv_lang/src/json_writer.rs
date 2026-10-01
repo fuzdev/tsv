@@ -630,12 +630,15 @@ pub struct JsonWriter {
 /// bytes. Real offsets are far smaller — they come from `u32` spans, so 10
 /// digits — but pinning the bound to the type removes the need to re-derive
 /// that reasoning whenever a field is added, and the buffer is initialized
-/// once per writer, so the slack costs nothing per node.
+/// once per writer, so the slack costs nothing per node. A plain `Identifier`
+/// staged whole — its header, then a `name` of up to [`SHORT_FRAGMENT_MAX`]
+/// bytes and the close — is narrower still at the same widths.
 ///
 /// Overrunning it panics on the slice bound rather than truncating: a staged
 /// run is a fixed, auditable shape, so a field that doesn't fit is a bug to
 /// size, not a case to handle. `widest_node_header_fits_the_staging_buffer`
-/// is the test that holds this.
+/// and `widest_plain_identifier_run_fits_the_staging_buffer` are the tests
+/// that hold this.
 const STAGE_CAP: usize = 384;
 
 /// Longest fragment [`StageRun::short`] copies inline — two overlapping
@@ -761,9 +764,9 @@ fn whitespace_control_count(bytes: &[u8]) -> usize {
 
 /// A **staged run** in progress: the writer's scratch, its output buffer, and
 /// the run's length so far — opened by [`JsonWriter::stage_run`], appended to
-/// through [`StageRun::raw`] / [`StageRun::short`] / [`StageRun::u32`] /
-/// [`StageRun::usize`] (and its [`StageRun::usize_kept`] / [`StageRun::repeat`]
-/// pair), and closed by [`StageRun::flush`], which is the run's
+/// through [`StageRun::raw`] / [`StageRun::short`] / [`StageRun::short_bytes`] /
+/// [`StageRun::u32`] / [`StageRun::usize`] (and its [`StageRun::usize_kept`] /
+/// [`StageRun::repeat`] pair), and closed by [`StageRun::flush`], which is the run's
 /// one write to the output buffer. [`JsonWriter::stage_run`] says what a run
 /// buys and what it costs.
 ///
@@ -806,14 +809,15 @@ impl StagedDigits {
     const NOT_KEPT: Self = Self { word: 0, digits: 0 };
 }
 
-/// Copy `s` into the scratch at `at` — [`StageRun::short`]'s fallback, out of
-/// line so its libc call stays out of the header emitters: a fragment past the
-/// inline limit, or a window past the scratch's end, neither of which a node
-/// header reaches. Panics on the scratch's bound, as [`StageRun::raw`] does.
+/// Copy `src` into the scratch at `at` — [`StageRun::short_bytes`]'s fallback
+/// (and so [`StageRun::short`]'s), out of line so its libc call stays out of
+/// the header emitters: a fragment past the inline limit, or a window past the
+/// scratch's end, neither of which a node header reaches. Panics on the
+/// scratch's bound, as [`StageRun::raw`] does.
 #[cold]
 #[inline(never)]
-fn stage_copy_cold(stage: &mut [u8; STAGE_CAP], at: usize, s: &str) {
-    stage[at..at + s.len()].copy_from_slice(s.as_bytes());
+fn stage_copy_cold(stage: &mut [u8; STAGE_CAP], at: usize, src: &[u8]) {
+    stage[at..at + src.len()].copy_from_slice(src);
 }
 
 /// Write `n`'s decimal digits into the scratch at `at`, returning the offset
@@ -842,6 +846,15 @@ fn stage_wide(stage: &mut [u8; STAGE_CAP], at: usize, n: u64) -> usize {
 
 #[expect(clippy::inline_always)]
 impl StageRun<'_> {
+    /// The longest fragment [`StageRun::short_bytes`] copies inline.
+    ///
+    /// A caller whose fragment has a run-time length with no small bound of its
+    /// own — a name sliced out of the source — tests it against this before
+    /// staging it. A longer one takes the out-of-line copy, which still writes
+    /// the right bytes but panics once the run passes the scratch's end, and a
+    /// name can be longer than the whole scratch.
+    pub const SHORT_MAX: usize = SHORT_FRAGMENT_MAX;
+
     /// Append a verbatim fragment to the run. No escaping — the same contract
     /// as [`JsonWriter::raw`].
     ///
@@ -880,16 +893,33 @@ impl StageRun<'_> {
     /// staged-run change.
     #[inline(always)]
     pub fn short(&mut self, s: &'static str) {
-        let src = s.as_bytes();
+        self.short_bytes(s.as_bytes());
+    }
+
+    /// [`StageRun::short`] over bytes read at run time — a name sliced out of
+    /// the source — with the same two arms; the caller keeps the fragment
+    /// within [`StageRun::SHORT_MAX`]. No escaping, as everywhere in a run: the
+    /// caller vouches that the bytes are valid inside a JSON string as they
+    /// stand.
+    #[inline(always)]
+    pub fn short_bytes(&mut self, src: &[u8]) {
         let n = src.len();
         let at = self.len;
         // Within a window of the scratch's end the exact copy runs instead
         // (and panics exactly where `raw` would have).
         match self.stage[at..].first_chunk_mut::<SHORT_FRAGMENT_MAX>() {
-            Some(dst) if n <= SHORT_FRAGMENT_MAX => copy_short(dst, src),
-            _ => stage_copy_cold(self.stage, at, s),
+            Some(dst) if n <= SHORT_FRAGMENT_MAX => {
+                copy_short(dst, src);
+                // The guard is the bound; the `min` restates it on the value,
+                // where it survives to the appends after this one (see
+                // `StageRun::wide`).
+                self.len = at + n.min(SHORT_FRAGMENT_MAX);
+            }
+            _ => {
+                stage_copy_cold(self.stage, at, src);
+                self.len = at + n;
+            }
         }
-        self.len = at + n;
     }
 
     /// Append a `u32`'s decimal digits to the run.
@@ -1054,8 +1084,9 @@ impl JsonWriter {
     /// that crate's node header and read as its private business for long
     /// enough that `tsv_svelte`'s writer emitted every integer through the
     /// out-of-line [`JsonWriter::u32`] instead, which cost it ~1.6% of the
-    /// wire path. Today `tsv_ts`'s `node_header_impl` and
-    /// `write_identifier_parts_with_character`, and `tsv_svelte`'s `name_loc`
+    /// wire path. Today `tsv_ts`'s `node_header_impl`,
+    /// `write_identifier_parts_with_character` and `write_identifier_plain` (a
+    /// whole childless node as one run), and `tsv_svelte`'s `name_loc`
     /// field + `Attribute`/element/`Text` headers stage. A
     /// `start`/`end` pair outside a run is [`JsonWriter::start_end`]'s one call,
     /// not two `u32`s — or, for a burst short enough to be written whole into
@@ -2795,6 +2826,35 @@ mod tests {
         }
     }
 
+    /// [`StageRun::short_bytes`] against [`StageRun::raw`] over runtime bytes,
+    /// non-ASCII ones included, at every length through the inline limit and
+    /// past it, behind prefixes that move the window across the scratch.
+    #[test]
+    fn staged_short_bytes_matches_staged_raw() {
+        let text = "aé$_bcñdefghijklmnöpqrstuvwxyz0123456789ABCDEFGHIJ";
+        for len in (0..=SHORT_FRAGMENT_MAX + 8).filter(|&len| text.is_char_boundary(len)) {
+            let fragment = &text[..len];
+            for prefix in [0, 1, 20, 97, STAGE_CAP - SHORT_FRAGMENT_MAX - 3] {
+                // The closing `"}` needs two bytes past the fragment.
+                if prefix + len + 2 > STAGE_CAP {
+                    continue;
+                }
+                let lead = "x".repeat(prefix);
+                let mut ours = JsonWriter::with_capacity(0);
+                let mut run = ours.stage_run();
+                run.raw(&lead);
+                run.short_bytes(fragment.as_bytes());
+                run.raw("\"}");
+                run.flush();
+                assert_eq!(
+                    String::from_utf8(ours.into_bytes()).expect("whole characters"),
+                    format!("{lead}{fragment}\"}}"),
+                    "StageRun::short_bytes diverged at len {len}, prefix {prefix}"
+                );
+            }
+        }
+    }
+
     /// Consecutive runs must not leak: each run starts at the scratch's front
     /// and flushes its own length, so a shorter run following a longer one
     /// must not carry the tail of the previous run's scratch into the output.
@@ -2848,6 +2908,39 @@ mod tests {
         assert!(
             w.as_bytes().len() < STAGE_CAP,
             "widest staged header is {} bytes, STAGE_CAP is {STAGE_CAP}",
+            w.as_bytes().len()
+        );
+    }
+
+    /// The other staged shape with a runtime-length fragment: a whole plain
+    /// `Identifier`, its name at the inline limit, every integer at
+    /// `usize::MAX` width.
+    #[test]
+    fn widest_plain_identifier_run_fits_the_staging_buffer() {
+        let name = [b'n'; SHORT_FRAGMENT_MAX];
+        let mut w = JsonWriter::with_capacity(0);
+        let mut run = w.stage_run();
+        run.raw("{\"type\":\"Identifier\"");
+        run.raw(",\"start\":");
+        run.usize(usize::MAX);
+        run.raw(",\"end\":");
+        run.usize(usize::MAX);
+        run.raw(",\"loc\":{\"start\":{\"line\":");
+        let line = run.usize_kept(usize::MAX);
+        run.raw(",\"column\":");
+        run.usize(usize::MAX);
+        run.raw("},\"end\":{\"line\":");
+        run.repeat(line, usize::MAX);
+        run.raw(",\"column\":");
+        run.usize(usize::MAX);
+        run.raw("}}");
+        run.raw(",\"name\":\"");
+        run.short_bytes(&name);
+        run.raw("\"}");
+        run.flush();
+        assert!(
+            w.as_bytes().len() < STAGE_CAP,
+            "widest staged identifier is {} bytes, STAGE_CAP is {STAGE_CAP}",
             w.as_bytes().len()
         );
     }
