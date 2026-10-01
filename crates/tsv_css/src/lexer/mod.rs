@@ -43,12 +43,12 @@ mod strings;
 pub mod token;
 
 use comments::read_comment;
+use identifiers::{
+    IDENT_CHUNK, ascii_identifier_chunk_stop, ascii_identifier_run_end, is_ascii_identifier_start,
+    is_identifier_start, read_identifier, run_stop_ends_identifier,
+};
 pub(crate) use identifiers::{
     IDENT_CONTINUE_LUT, hyphen_starts_own_token, is_non_ascii_identifier_codepoint,
-};
-use identifiers::{
-    ascii_identifier_run_end, is_ascii_identifier_start, is_identifier_start, read_identifier,
-    run_stop_ends_identifier,
 };
 use numbers::read_number_into;
 use strings::read_string;
@@ -201,8 +201,8 @@ impl<'a> Lexer<'a> {
 
     /// [`Lexer::next_token_dispatch`]'s identifier reader, for a name the front
     /// ([`Lexer::next_token_into_local`]) does not settle: one led by a `$` or a non-ASCII
-    /// code point, and a three-byte name opening with `u` / `U`, which may be a `url`
-    /// opening a `<url-token>`.
+    /// code point, one led by `u` / `U`, which may be a `url` opening a `<url-token>`, and an
+    /// ASCII-led one within a chunk of the end of input.
     ///
     /// The escape-free identifier whose ASCII run (past an optional `$`) stops on an ASCII
     /// byte other than `\`, or at end of input, is read here; the rest goes to the cold
@@ -345,9 +345,11 @@ impl<'a> Lexer<'a> {
     /// which together are nearly every token — and hands the rest to a function that
     /// finishes the token, entered as the front's last act so the handoff compiles to a
     /// jump: [`Lexer::next_token_dispatch`] for the scanners (comments, strings, numbers),
-    /// a `$`, the non-ASCII-led and possible-`url` names, a whitespace run that reaches a
-    /// non-ASCII byte and the errors, and the cold [`Lexer::read_decoded_identifier_into`]
-    /// for a name an escape opens or continues, or a non-ASCII code point continues. Every
+    /// a `$`, the non-ASCII-led, `u`-led and near-the-end names, a whitespace run that reaches
+    /// a non-ASCII byte and the errors, [`Lexer::finish_long_identifier_into`] for a common
+    /// identifier longer than the front's one chunk, and the cold
+    /// [`Lexer::read_decoded_identifier_into`] for a name an escape opens or continues, or a
+    /// non-ASCII code point continues. Every
     /// handoff leaves the cursor on the token's first byte, and the finisher lexes the token
     /// from there. The split is what keeps the front free of a frame: a function making the
     /// scanners' calls saves registers on entry and restores them at every exit — on every
@@ -471,18 +473,32 @@ impl<'a> Lexer<'a> {
                 }
             }
 
-            // The common identifier: led by an ASCII letter, `-` or `_` (all three
+            // A name led by `u` / `U` may be a `url(` opening a `<url-token>`, which the
+            // dispatch decides: it is handed on unread. Few names open with the letter, and
+            // with no `url` test left to make here, the walk below keeps no lead byte live —
+            // the register its chunk needs.
+            b'u' | b'U' => return self.next_token_dispatch(dst),
+            // The common identifier: led by an ASCII letter other than `u`, `-` or `_` (all
             // [`IDENT_CONTINUE_LUT`] members, so the run walks on from the next byte), its run
             // stopping on an ASCII byte other than `\` or at end of input. A `\` or a
-            // non-ASCII stop byte may continue the name, and a three-byte `u…` may be a
-            // `url(` opening a `<url-token>`; both hand the name on unread.
+            // non-ASCII stop byte may continue the name, so it hands the name on unread.
+            //
+            // The front walks one chunk of the run, [`IDENT_CHUNK`] bytes behind one bound
+            // check, which ends most names; a run that fills it goes on in
+            // [`Lexer::finish_long_identifier_into`], and a name within a chunk of the end of
+            // input goes to the dispatch. The whole run is not walked here because its loop's
+            // bookkeeping takes a register more than the front has to spare.
             b'a'..=b'z' | b'A'..=b'Z' | b'-' | b'_' => {
-                let end = ascii_identifier_run_end(bytes, start + 1);
+                let from = start + 1;
+                let Some(chunk) = bytes.get(from..from + IDENT_CHUNK) else {
+                    return self.next_token_dispatch(dst);
+                };
+                let Some(i) = ascii_identifier_chunk_stop(chunk) else {
+                    return self.finish_long_identifier_into(dst, from);
+                };
+                let end = from + i;
                 if !run_stop_ends_identifier(bytes.get(end).copied()) {
                     return self.read_decoded_identifier_into(dst);
-                }
-                if end - start == 3 && b | 0x20 == b'u' {
-                    return self.next_token_dispatch(dst);
                 }
                 self.pos = end;
                 TokenKind::Identifier
@@ -501,11 +517,39 @@ impl<'a> Lexer<'a> {
         Ok(())
     }
 
+    /// The front's handoff for a common identifier whose run filled its first chunk, the
+    /// [`IDENT_CHUNK`] bytes from `from`: the run walked on past it, then settled as the
+    /// front settles it. The cursor is still on the name's first byte. (The chunk's end is
+    /// found here rather than passed, so the front keeps no register live for it.) A `\` or
+    /// non-ASCII stop byte, which may continue the name, goes to
+    /// [`Lexer::read_decoded_identifier_into`], so the handoff's `Result` is not one the
+    /// optimizer can compute in the front.
+    #[inline(never)]
+    fn finish_long_identifier_into(
+        &mut self,
+        dst: &mut Token,
+        from: usize,
+    ) -> Result<(), ParseError> {
+        let start = self.pos;
+        let end = ascii_identifier_run_end(self.bytes, from + IDENT_CHUNK);
+        if !run_stop_ends_identifier(self.bytes.get(end).copied()) {
+            return self.read_decoded_identifier_into(dst);
+        }
+        self.pos = end;
+        *dst = Token {
+            kind: TokenKind::Identifier,
+            start: start as u32,
+            end: end as u32,
+        };
+        Ok(())
+    }
+
     /// Lex the token at the cursor into `*dst` — every token the front
     /// ([`Lexer::next_token_into_local`]) hands on: the ones whose scanners it would have to
     /// call (comments, strings, numbers, a whitespace run reaching a non-ASCII byte), the
-    /// names it does not settle (`$`-led, non-ASCII-led, a three-byte `u…` that may open a
-    /// `<url-token>`), a bare `$`, and the errors. Each arm is the front's for its byte
+    /// names it does not settle (`$`-led, non-ASCII-led, `u`-led — which may open a
+    /// `<url-token>` — and an ASCII-led one within a chunk of the end of input), a bare `$`,
+    /// and the errors. Each arm is the front's for its byte
     /// narrowed to what the front hands on, which the `debug_assert!`s state.
     ///
     /// `#[inline(never)]` because the front's frame-free shape depends on it: inlined, its
@@ -558,11 +602,10 @@ impl<'a> Lexer<'a> {
                 self.pos = start + 1;
                 TokenKind::Dollar
             }
-            // An ASCII-led name the front did not settle: the three-byte `u…`.
+            // An ASCII-led name the front did not settle: a `u…`, or one within a chunk of the
+            // end of input.
             _ if is_ascii_identifier_start(first) => {
-                debug_assert!(
-                    first | 0x20 == b'u' && ascii_identifier_run_end(bytes, start + 1) - start == 3
-                );
+                debug_assert!(first | 0x20 == b'u' || bytes.len() - start <= IDENT_CHUNK);
                 return self.identifier_into(dst);
             }
             // Any other ASCII byte is not a valid token start — error. `first as char` is
@@ -827,6 +870,86 @@ mod tests {
             }
         }
         assert!(graded > 60_000, "{graded}");
+    }
+
+    /// Every ASCII-led name ends where its run of continuation bytes does, whichever of the
+    /// front's walks reaches it: the one chunk the front tests, the handoff that walks on past
+    /// it a chunk at a time and then byte by byte, and the dispatch's reader for a `u`-led
+    /// name or one within a chunk of the end of input. Names of 1 to 26 bytes — each
+    /// continuation byte at one position per length, behind each lead byte class — opening a
+    /// document and mid-declaration, each followed by a stop that ends it (any ASCII byte
+    /// that neither continues a name nor escapes, and end of input) or that continues it (a
+    /// non-ASCII code point, a hex escape), with and without text after the stop, so the
+    /// name's end falls at every distance from the end of input.
+    #[test]
+    fn every_identifier_length_ends_where_its_run_does() {
+        let class: Vec<u8> = (b'a'..=b'z')
+            .chain(b'A'..=b'Z')
+            .chain(b'0'..=b'9')
+            .chain([b'-', b'_'])
+            .collect();
+        // (stop, how many bytes of it the name takes)
+        let stops = [
+            ("", 0),
+            (" ", 0),
+            (";", 0),
+            (":", 0),
+            ("(", 0),
+            (")", 0),
+            (",", 0),
+            (".", 0),
+            ("\u{7f}", 0),
+            ("é", 2),
+            ("\u{a0}", 2),
+            ("\\72 ", 4),
+            ("\\72;", 3),
+        ];
+        let mut graded = 0;
+        for len in 1..=26usize {
+            for lead in [b'x', b'u', b'U', b'-', b'_', b'Q'] {
+                for (k, &c) in class.iter().enumerate() {
+                    let mut name = vec![b'e'; len];
+                    name[0] = lead;
+                    if len > 1 {
+                        name[1 + k % (len - 1)] = c;
+                    }
+                    // A `-` lead before a digit opens a number, and before a second `-` or a
+                    // letter an identifier: keep the name an identifier.
+                    if lead == b'-' && len > 1 && name[1].is_ascii_digit() {
+                        name[1] = b'-';
+                    }
+                    let name = String::from_utf8(name).expect("ASCII");
+                    if name.eq_ignore_ascii_case("url") {
+                        continue;
+                    }
+                    for (stop, taken) in stops {
+                        for prefix in ["", "a{b:"] {
+                            for tail in ["", " x", " padding-past-a-chunk;"] {
+                                if stop.is_empty() && !tail.is_empty() {
+                                    continue;
+                                }
+                                let source = format!("{prefix}{name}{stop}{tail}");
+                                let mut lexer = Lexer::at_offset(&source, 0);
+                                let token = loop {
+                                    let token = lexer.next_token().expect("the prefix lexes");
+                                    if token.start as usize >= prefix.len() {
+                                        break token;
+                                    }
+                                };
+                                assert_eq!(token.kind, TokenKind::Identifier, "{source:?}");
+                                assert_eq!(
+                                    (token.start as usize, token.end as usize),
+                                    (prefix.len(), prefix.len() + name.len() + taken),
+                                    "{source:?}"
+                                );
+                                graded += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert!(graded > 100_000, "{graded}");
     }
 
     /// Every short name lexes to the token its decoded value calls for, whichever reader its

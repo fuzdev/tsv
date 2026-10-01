@@ -39,15 +39,37 @@ pub(crate) const IDENT_CONTINUE_LUT: [bool; 256] = {
     t
 };
 
+/// How many bytes an identifier run's walk tests behind one bound check
+/// ([`ascii_identifier_run_end`], and the lexer front's first chunk).
+pub(crate) const IDENT_CHUNK: usize = 8;
+
 /// The end of the run of ASCII identifier-continuation bytes (`[a-zA-Z0-9_-]`,
 /// [`IDENT_CONTINUE_LUT`]) that starts at `from` — `from` itself when none does.
+///
+/// [`IDENT_CHUNK`] bytes at a time while that many are in bounds, each tested against the
+/// table in turn with no bound check of its own ([`ascii_identifier_chunk_stop`]), and byte by
+/// byte within a chunk of the end of input. Every byte is still the table's to classify; only
+/// the bound check is shared across the chunk.
 #[inline]
 pub(crate) fn ascii_identifier_run_end(bytes: &[u8], from: usize) -> usize {
     let mut p = from;
+    while let Some(chunk) = bytes.get(p..p + IDENT_CHUNK) {
+        if let Some(i) = ascii_identifier_chunk_stop(chunk) {
+            return p + i;
+        }
+        p += IDENT_CHUNK;
+    }
     while p < bytes.len() && IDENT_CONTINUE_LUT[bytes[p] as usize] {
         p += 1;
     }
     p
+}
+
+/// The offset of the first byte of `chunk` that does not continue an ASCII identifier
+/// ([`IDENT_CONTINUE_LUT`]), or `None` when every byte does.
+#[inline]
+pub(crate) fn ascii_identifier_chunk_stop(chunk: &[u8]) -> Option<usize> {
+    chunk.iter().position(|&b| !IDENT_CONTINUE_LUT[b as usize])
 }
 
 /// Whether the byte an ASCII continuation run stopped on (`None` at end of input) ends the

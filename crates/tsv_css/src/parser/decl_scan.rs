@@ -125,6 +125,30 @@ const SKIP: [bool; 256] = {
     t
 };
 
+/// How many bytes [`skip_run_end`] tests behind one bound check.
+const SKIP_CHUNK: usize = 8;
+
+/// The end of the run of [`SKIP`] bytes from `from` — `from` itself when none is one.
+///
+/// [`SKIP_CHUNK`] bytes at a time while that many are in bounds, each tested against the
+/// table in turn with no bound check of its own, and byte by byte within a chunk of the end
+/// of input. Every byte is still the table's to classify; only the bound check is shared
+/// across the chunk.
+#[inline]
+fn skip_run_end(bytes: &[u8], from: usize) -> usize {
+    let mut i = from;
+    while let Some(chunk) = bytes.get(i..i + SKIP_CHUNK) {
+        if let Some(k) = chunk.iter().position(|&b| !SKIP[b as usize]) {
+            return i + k;
+        }
+        i += SKIP_CHUNK;
+    }
+    while i < bytes.len() && SKIP[bytes[i] as usize] {
+        i += 1;
+    }
+    i
+}
+
 /// The bytes `scan_value_bytes` has a match arm for. **This must stay in lockstep with that
 /// match**: a byte named here but unhandled there is merely slow, but a byte handled there and
 /// *missing* here is skipped by the table and its arm goes dead — a silent misparse. (The
@@ -554,9 +578,7 @@ fn scan_value_core<const WANT_VERDICT: bool>(
     // tab is the one skipped byte that is) — a value that ends there and is not empty. The run
     // is the loop's own first skip, so any other value carries on from where it stopped with
     // no state to recover: a skipped byte moves none.
-    while i < len && SKIP[bytes[i] as usize] {
-        i += 1;
-    }
+    i = skip_run_end(bytes, i);
     if i > value_start && !is_ascii_css_whitespace(bytes[i - 1]) {
         let terminator_kind = match bytes.get(i) {
             None => Some(TerminatorKind::Eof),
@@ -607,8 +629,11 @@ fn scan_value_core<const WANT_VERDICT: bool>(
     let mut verdict_is_decl = false;
 
     let (terminator, terminator_kind) = loop {
-        while i < len && SKIP[bytes[i] as usize] {
-            i += 1;
+        // Most of these runs are empty — the loop comes back here after every inspected
+        // byte, and inspected bytes come in clusters (`), `, `(--`) — so the first byte is
+        // tested alone, ahead of the chunked walk's bound check.
+        if i < len && SKIP[bytes[i] as usize] {
+            i = skip_run_end(bytes, i + 1);
         }
         if i >= len {
             break (len, TerminatorKind::Eof);
@@ -965,6 +990,49 @@ fn scan_value_tokens(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// [`skip_run_end`] walks a chunk at a time and then a byte at a time; either way it must
+    /// stop where a byte-at-a-time walk of [`SKIP`] does. Runs of every length up to three
+    /// chunks, each skipped byte class at one position per length, from offsets 0 and 3,
+    /// stopped by every byte (and by end of input) and followed by input of every length.
+    #[test]
+    fn skip_runs_end_where_the_table_ends() {
+        let skipped: Vec<u8> = (0..=255u8).filter(|&b| SKIP[usize::from(b)]).collect();
+        let reference = |bytes: &[u8], mut i: usize| {
+            while i < bytes.len() && SKIP[usize::from(bytes[i])] {
+                i += 1;
+            }
+            i
+        };
+        let mut graded = 0;
+        for len in 0..=3 * SKIP_CHUNK {
+            for (k, &c) in skipped.iter().enumerate() {
+                let mut run = vec![b'a'; len];
+                if len > 0 {
+                    run[k % len] = c;
+                }
+                for stop in (0..=255u8).map(Some).chain([None]) {
+                    for tail in [0, 1, SKIP_CHUNK - 1, SKIP_CHUNK] {
+                        for from in [0, 3] {
+                            let mut bytes = vec![b';'; from];
+                            bytes.extend_from_slice(&run);
+                            if let Some(stop) = stop {
+                                bytes.push(stop);
+                                bytes.extend(core::iter::repeat_n(b'a', tail));
+                            }
+                            assert_eq!(
+                                skip_run_end(&bytes, from),
+                                reference(&bytes, from),
+                                "{bytes:?} from {from}"
+                            );
+                            graded += 1;
+                        }
+                    }
+                }
+            }
+        }
+        assert!(graded > 100_000, "{graded}");
+    }
 
     /// The value's separator class, for the declaration `source` holds.
     ///
