@@ -582,7 +582,7 @@ deno task test:deno:canonical
 # The node-modules-free part of the harness IS gated, and mostly for free: `deno check`
 # walks transitive imports, so `typecheck:scripts` already covers the loader/guard core
 # through scripts/'s own graph (check_artifact_freshness, ffi, napi, tsv_artifacts,
-# runtime, types, reject_probe) and `test:deno` covers gate_counts. `typecheck:bench-core`
+# runtime, types, reject_probe, locations_probe) and `test:deno` covers gate_counts. `typecheck:bench-core`
 # names the orphans nothing else reaches — `lib/wasm.ts`, `lib/harvest_stamp.ts` and
 # `compose_reports.ts`. It is deliberately NOT the maximal checkable set: the impl
 # wrappers also check on a bare checkout, but only because their npm imports are
@@ -1060,6 +1060,17 @@ stale or missing. The build-first tasks rebuild first, so they pass for free.
 `BENCH_STALE_OK=1` downgrades a _stale_ artifact to a `⚠` warning (a _missing_ one
 stays fatal); see the module doc for why stale is a hard error by default.
 
+**Behind the override: the no-locations wire is probed at init.** An mtime can only
+say an artifact is old, not what it does, and a WASM bundle whose parse exports
+predate the options bag drops `{locations: false}` without a throw — under
+`BENCH_STALE_OK=1` the `tsv-wasm-json-no-locations` row would time the loc-bearing
+wire and publish it under the span-only label. So each tsv binding's `init()` parses
+a fixed source both ways through the row's own calls and requires the no-locations
+AST to carry no `loc` while its sibling carries some (`lib/locations_probe.ts`
+`assert_binding_drops_locations`; the native bindings select the wire by a separate
+export and are probed alike). A failure names the artifact and its rebuild task and,
+tsv's bindings being REQUIRED (§Report files), stops the run before any row is timed.
+
 **The size-only artifacts are graded too, as a warning.** The bench's size table
 reports every tsv build from every runtime (the other binding, the subset bundles,
 the `ffi-{format,parse}` builds — `lib/tsv_artifacts.ts`, the one table the guard,
@@ -1420,6 +1431,10 @@ benches/js/
     ├── gate_counts.ts     # Pinned gate counts — see ../../docs/gate_counts.md
     ├── harvest_stamp.ts   # Harvest freshness stamps (checkout ids + pins + view entry lists) + the HARVEST_STAMPS table
     ├── implementations.ts # Implementation registry (branches native FFI vs N-API by runtime)
+    ├── locations_probe.ts # Behavioral "did `locations: false` TAKE" check, asked at each tsv
+    │                      # binding's init: the no-locations parse must carry no `loc` and its
+    │                      # sibling some, so a bundle that ignores the option can't be timed under
+    │                      # the span-only label; unit-tested by locations_probe_test.ts
     ├── malva.ts           # malva WASM wrapper (CSS only; dprint's CSS plugin, shared formatter host)
     ├── napi.ts            # process.dlopen bindings (NapiImplementation — Node/Bun native)
     ├── oxc.ts             # OXC native wrappers (oxc-parser + oxfmt)

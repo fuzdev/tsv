@@ -7,6 +7,7 @@
 import { ffi_library_path } from './tsv_artifacts.ts';
 import { BaseImplementation, goal_for, type Language, LANGUAGES, type ParseGoal } from './types.ts';
 import { assert_binding_reports_rejection } from './reject_probe.ts';
+import { assert_binding_drops_locations } from './locations_probe.ts';
 
 // FFI symbol definitions.
 //
@@ -182,15 +183,13 @@ export class NativeImplementation extends BaseImplementation {
 		const lib_path = get_library_path();
 
 		const profile = Deno.env.get('TSV_FFI_PROFILE') ?? 'release';
+		const rebuild = `cargo build -p tsv_ffi --${
+			profile === 'release' ? 'release' : `profile ${profile}`
+		}`;
 		try {
 			await Deno.stat(lib_path);
 		} catch {
-			throw new Error(
-				`Native library not found at ${lib_path}. ` +
-					`Run 'cargo build -p tsv_ffi --${
-						profile === 'release' ? 'release' : `profile ${profile}`
-					}' first.`
-			);
+			throw new Error(`Native library not found at ${lib_path}. Run '${rebuild}' first.`);
 		}
 
 		this._lib = Deno.dlopen(lib_path, symbols);
@@ -239,6 +238,11 @@ export class NativeImplementation extends BaseImplementation {
 		// only thing that tells a refusal from a formatted file. Prove it still
 		// fires — see `lib/reject_probe.ts`.
 		assert_binding_reports_rejection('tsv (FFI)', this);
+
+		// The no-locations wire is its own symbol here, not an option, so it can't be
+		// silently dropped the way the WASM bag can; probed anyway so the three
+		// bindings answer one question — see `lib/locations_probe.ts`.
+		assert_binding_drops_locations('tsv (FFI)', { path: lib_path, rebuild }, this);
 	}
 
 	/**

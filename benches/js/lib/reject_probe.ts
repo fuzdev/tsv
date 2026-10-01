@@ -112,7 +112,7 @@ export const INVALID_SOURCES: Readonly<Record<Language, string>> = {
  * the path the published coverage is measured through. The goal is inert for the other
  * languages, so they get the one call.
  */
-function probe_goals(language: Language): ReadonlyArray<ParseGoal | undefined> {
+export function probe_goals(language: Language): ReadonlyArray<ParseGoal | undefined> {
 	return language === 'typescript' ? [undefined, 'module', 'script'] : [undefined];
 }
 

@@ -27,6 +27,7 @@ import { stat } from 'node:fs/promises';
 import { napi_library_path } from './tsv_artifacts.ts';
 import { BaseImplementation, goal_for, type Language, LANGUAGES, type ParseGoal } from './types.ts';
 import { assert_binding_reports_rejection } from './reject_probe.ts';
+import { assert_binding_drops_locations } from './locations_probe.ts';
 
 /**
  * The N-API addon's exported functions (snake_case `js_name`s, matching WASM/FFI).
@@ -136,6 +137,11 @@ export class NapiImplementation extends BaseImplementation {
 		// The addon throws natively today; probed anyway so the three bindings can't
 		// come to disagree about what surfacing a refusal MEANS — see `lib/reject_probe.ts`.
 		assert_binding_reports_rejection('tsv (N-API)', this);
+
+		// The no-locations wire is its own export here, not an option, so it can't be
+		// silently dropped the way the WASM bag can; probed anyway so the three
+		// bindings answer one question — see `lib/locations_probe.ts`.
+		assert_binding_drops_locations('tsv (N-API)', { path, rebuild: 'deno task build:napi' }, this);
 	}
 
 	// `goal_for` withholds the goal for svelte/css, which REJECT a set goal rather

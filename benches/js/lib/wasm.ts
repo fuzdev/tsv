@@ -17,6 +17,7 @@ import { wasm_target } from './runtime.ts';
 import { wasm_bundle_dir } from './tsv_artifacts.ts';
 import { BaseImplementation, goal_for, type Language, LANGUAGES, type ParseGoal } from './types.ts';
 import { assert_binding_reports_rejection } from './reject_probe.ts';
+import { assert_binding_drops_locations } from './locations_probe.ts';
 
 /** The `{locations?, sourceType?}` options bag the parse exports take
  * (`sourceType` is TypeScript-only — the other languages reject the key). */
@@ -159,6 +160,16 @@ export class WasmImplementation extends BaseImplementation {
 		// disagree about what surfacing a refusal MEANS — see `lib/reject_probe.ts`.
 		// The guard above asks what a SUCCESS returns; this asks what a REFUSAL does.
 		assert_binding_reports_rejection('tsv (WASM)', this);
+
+		// `parse_no_locations` rides an OPTION here, and a bundle whose exports predate
+		// the options bag drops it without a throw — the no-locations row would then
+		// time the loc-bearing wire. The freshness guard refuses such a bundle unless
+		// `BENCH_STALE_OK=1`; this is what still stands then — see `lib/locations_probe.ts`.
+		assert_binding_drops_locations(
+			'tsv (WASM)',
+			{ path: wasm_path, rebuild: `deno task build:wasm:all:${target}` },
+			this
+		);
 	}
 
 	// `goal_for` withholds the goal for svelte/css, which reject a SET value — not
