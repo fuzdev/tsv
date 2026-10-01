@@ -1543,15 +1543,26 @@ impl JsonWriter {
     /// `inline(never)` for [`JsonWriter::u32`]'s reason, and more so: the
     /// body holds two inlined `digit_word` copies, where two `u32` calls would
     /// share one out-of-line copy with every other integer.
+    ///
+    /// The common path makes no call that returns here: a buffer too full for
+    /// the window leaves by a tail call to [`JsonWriter::start_end_grow`], which
+    /// does the whole write, as the wide arm does. With the grow inline (the
+    /// append's own reserve) the two digit words and the widths are live across
+    /// it, and every pair pays their saves and restores in callee-saved
+    /// registers around a body that almost never grows.
     #[inline(never)]
     pub fn start_end(&mut self, start: u32, end: u32) {
+        let len = self.buf.len();
+        if self.buf.capacity() - len < START_END_WINDOW {
+            self.start_end_grow(start, end);
+            return;
+        }
         let (start_word, start_digits) = digit_word(start);
         let (end_word, end_digits) = digit_word(end);
         if start_digits > WORD_DIGITS || end_digits > WORD_DIGITS {
             self.start_end_wide(start, end);
             return;
         }
-        let len = self.buf.len();
         self.buf.extend_from_slice(&[0; START_END_WINDOW]);
         let window = &mut self.buf[len..len + START_END_WINDOW];
         let used = fill_start_end(window, (start_word, start_digits), (end_word, end_digits));
@@ -1576,16 +1587,21 @@ impl JsonWriter {
     /// [`JsonWriter::start_end_object`]: [`JsonWriter::start_end`]'s window
     /// with the lead byte and `"start":` ahead of it. The key is part of the
     /// constant the window is filled from, so writing it costs the lead byte's
-    /// store alone. `inline(never)` for `start_end`'s reason.
+    /// store alone. `inline(never)` for `start_end`'s reason, and a full
+    /// buffer leaves by tail call for its reason too.
     #[inline(never)]
     fn start_end_led(&mut self, lead: u8, start: u32, end: u32) {
+        let len = self.buf.len();
+        if self.buf.capacity() - len < LED_WINDOW {
+            self.start_end_led_grow(lead, start, end);
+            return;
+        }
         let (start_word, start_digits) = digit_word(start);
         let (end_word, end_digits) = digit_word(end);
         if start_digits > WORD_DIGITS || end_digits > WORD_DIGITS {
             self.start_end_led_wide(lead, start, end);
             return;
         }
-        let len = self.buf.len();
         self.buf.extend_from_slice(&LED_TEMPLATE);
         let window = &mut self.buf[len..len + LED_WINDOW];
         window[0] = lead;
@@ -1596,6 +1612,24 @@ impl JsonWriter {
             (end_word, end_digits),
         );
         self.buf.truncate(len + at + used);
+    }
+
+    /// [`JsonWriter::start_end`] with the buffer too full for its window: grow
+    /// it, then write. Out of line and whole, as
+    /// [`JsonWriter::string_escape_free_grow`] is.
+    #[cold]
+    #[inline(never)]
+    fn start_end_grow(&mut self, start: u32, end: u32) {
+        self.buf.reserve(START_END_WINDOW);
+        self.start_end(start, end);
+    }
+
+    /// [`JsonWriter::start_end_led`]'s grow arm, for `start_end_grow`'s reason.
+    #[cold]
+    #[inline(never)]
+    fn start_end_led_grow(&mut self, lead: u8, start: u32, end: u32) {
+        self.buf.reserve(LED_WINDOW);
+        self.start_end_led(lead, start, end);
     }
 
     /// [`JsonWriter::start_end`] with either value past `99_999_999`, which no
