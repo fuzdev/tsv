@@ -2352,8 +2352,7 @@ pub(super) fn multiline_template_hug_applies(
     args: &[&internal::Expression<'_>],
     gap_start: u32,
 ) -> bool {
-    args.len() == 1
-        && is_multiline_template_expression(args[0])
+    is_sole_multiline_template_arg(args)
         // Prettier's `isTemplateOnItsOwnLine`: a template the author put on a line of its
         // own declines, and the caller falls through to the expanded layout.
         && !has_newline_before_position(printer.source, args[0].span().start)
@@ -2370,6 +2369,17 @@ pub(super) fn multiline_template_hug_applies(
         // the template on a fresh line only when nothing else follows it, and
         // `` fn(⏎// prettier-ignore⏎/* x */ `a⏎b`) `` glues a SECOND comment to the backtick.
         && printer.args_frozen_span(gap_start, args, 0).is_none()
+}
+
+/// The shape half of [`multiline_template_hug_applies`] — the argument list is one
+/// multiline template — which reads the arguments alone.
+///
+/// Separate so a caller that would have to *derive* the gap position before it could ask
+/// the whole question (the call dispatcher resolves a callee gap for it) can ask this
+/// first: nearly no call has the shape, and a call without it is answered here.
+#[inline]
+pub(super) fn is_sole_multiline_template_arg(args: &[&internal::Expression<'_>]) -> bool {
+    matches!(args, [arg] if is_multiline_template_expression(arg))
 }
 
 /// Single multiline-template argument on the same line as `(` — hug it,

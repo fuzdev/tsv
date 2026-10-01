@@ -46,7 +46,9 @@ use super::{ArrowChainContext, ParenContext, Printer, SecondTypeArgs, is_curried
 use crate::ast::internal;
 use arg_comments::{any_arg_empty_line, any_comment_forces_expansion, last_arg_has_comments};
 use arg_predicates::is_block_function;
-use arg_wrapping::{build_args_split_last, multiline_template_hug_applies};
+use arg_wrapping::{
+    build_args_split_last, is_sole_multiline_template_arg, multiline_template_hug_applies,
+};
 use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
 
@@ -62,7 +64,7 @@ use tsv_lang::doc::arena::DocId;
 /// two disagreed on exactly this pair. [`Self::optional`] joins them for the same reason: it
 /// is the region [`optional_callee_gap_doc`] emits, and [`Self::start`] is what every other
 /// window opens PAST it at, so deriving either alone re-splits the gap the wrong way.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct CalleeGap {
     /// The callee prints its own required pair (an IIFE, a sealed optional chain).
     pub(super) owned_pair: bool,
@@ -99,7 +101,7 @@ pub(super) struct CalleeGap {
 /// ([`Self::Unsplit`]), so "no split" read as "no `?.`" DROPPED the token, and "prints its
 /// own `?.`" read as "the gap splits" re-split a gap that must stay whole. Naming all four
 /// states is what makes both unaskable.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum CallOptional {
     /// Not an optional call: no `?.` anywhere, and the whole callee→`(` gap belongs to the
     /// argument side.
@@ -170,7 +172,49 @@ impl CalleeGap {
 }
 
 /// Resolve a call's [`CalleeGap`].
+///
+/// Nearly every call is the plain one — not optional, its callee printing no pair of its
+/// own, and no comment between the callee and the first argument — and for it every field
+/// is known without a search: nothing owns a pair, nothing splits, and the windows open at
+/// the callee's end. That answer is given here, by tests that run no search, so the plain
+/// call pays for none of the scans the derivation ([`callee_gap_wide`]) makes; every other
+/// call is handed to it.
 pub(super) fn callee_gap(
+    printer: &Printer<'_>,
+    call: &internal::CallExpression<'_>,
+    span: Span,
+) -> CalleeGap {
+    if !call.optional && call_callee_paren_leading_start(call, span).is_none() {
+        let start = call.callee.span().end;
+        // [`paren_split_for`]'s own gate, over the gap it would be asked about.
+        let gap_start = args_side_start(call, start);
+        if call
+            .arguments
+            .first()
+            .is_none_or(|arg| printer.gap_known_comment_free(gap_start, arg.span().start))
+        {
+            let plain = CalleeGap {
+                owned_pair: false,
+                trailing_gap: None,
+                start,
+                optional: CallOptional::Absent,
+                paren_split: None,
+            };
+            debug_assert_eq!(
+                plain,
+                callee_gap_wide(printer, call, span),
+                "the plain call's gap is the derivation's answer"
+            );
+            return plain;
+        }
+    }
+    callee_gap_wide(printer, call, span)
+}
+
+/// The derivation behind [`callee_gap`] — the one definition of every field, out of line
+/// for the calls its inline tests cannot answer.
+#[inline(never)]
+fn callee_gap_wide(
     printer: &Printer<'_>,
     call: &internal::CallExpression<'_>,
     span: Span,
@@ -686,11 +730,16 @@ impl<'a> Printer<'a> {
             if test_patterns::test_call_flat_layout_applies(call, span, self) {
                 return self.build_call_doc_with_wrapping(call, span);
             }
-            let paren_open = call_paren_open(self, call, span);
-            if multiline_template_hug_applies(self, call.arguments, paren_open)
-                && !self.has_line_comments_between(span.start, paren_open)
-            {
-                return self.build_call_doc_with_wrapping(call, span);
+            // The template rule's shape test comes first: it reads the argument list
+            // alone, where the rest needs the callee gap resolved to know where the `(`
+            // follows.
+            if is_sole_multiline_template_arg(call.arguments) {
+                let paren_open = call_paren_open(self, call, span);
+                if multiline_template_hug_applies(self, call.arguments, paren_open)
+                    && !self.has_line_comments_between(span.start, paren_open)
+                {
+                    return self.build_call_doc_with_wrapping(call, span);
+                }
             }
 
             // Use chain wrapping for chains (nested calls) or memberish callees
