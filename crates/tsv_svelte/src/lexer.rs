@@ -615,7 +615,8 @@ impl<'a> Lexer<'a> {
             }};
         }
         let kind = match b {
-            // `<!--` opens a comment and `<!` a declaration name; the dispatch reads both.
+            // `<!--` opens a comment in template mode (inside a tag it is a plain `<`) and
+            // `<!` a declaration name; the dispatch reads all three.
             b'<' if bytes.get(start + 1) == Some(&b'!') => hand_on!(),
             b'<' => {
                 self.inside_tag = true; // Enter tag mode
@@ -793,8 +794,13 @@ impl<'a> Lexer<'a> {
             // The cursor has not moved, so this is the empty token at `start`.
             None => TokenKind::Eof,
             Some(b'<') => {
-                // Check for HTML comment: <!--
-                if self.starts_with(b"<!--") {
+                // An HTML comment, `<!--`, in template mode alone. A tag's interior has no
+                // comment of that spelling: Svelte's attribute reader takes `<!--` as the
+                // start of an attribute NAME (`<input <!-- c -- />` carries three boolean
+                // attributes), so tag mode neither scans for a closer nor owes one. It
+                // yields the plain `<` and the attribute reader takes the raw run from the
+                // token's start.
+                if !self.inside_tag && self.starts_with(b"<!--") {
                     let Some(end) = html_comment_end(self.source.as_bytes(), start + b"<!--".len())
                     else {
                         return Err(lex_err("Unterminated HTML comment", start));
@@ -1274,6 +1280,58 @@ mod tests {
                     })
                     .collect();
                 assert_eq!(got, expected, "{source:?} (front: {front})");
+            }
+        }
+    }
+
+    /// Inside a tag `<!--` opens no comment: it lexes as the plain `<` an attribute name may
+    /// start with, whether or not a `-->` follows anywhere in the document — no closer is
+    /// scanned for, so none is owed. Back in template mode the same bytes are a comment
+    /// again. Through the front and the dispatch alike.
+    #[test]
+    fn comment_opener_inside_a_tag_is_a_plain_left_angle() {
+        let open = "<x ".len() as u32;
+        for tail in [
+            "<!--",
+            "<!-- c -- />",
+            "<!-- c -->",
+            "<!--c>y</x><!-- d -->",
+            "<!-- c -- /><!-- d -->",
+        ] {
+            let source = format!("<x {tail}");
+            for front in [true, false] {
+                let steps = lex_all(&source, front);
+                let at_opener = steps
+                    .iter()
+                    .find_map(|step| match step {
+                        Ok((kind, start, end, ..)) if *start == open => Some((*kind, *end)),
+                        _ => None,
+                    })
+                    .expect("a token at the opener");
+                assert_eq!(
+                    at_opener,
+                    (TokenKind::LeftAngle, open + 1),
+                    "{source:?} (front: {front})"
+                );
+                // The one comment any of these holds is the template-mode one behind the
+                // tag's `>`.
+                let template_comment = source.find("><!--").map(|at| at as u32 + 1);
+                for step in &steps {
+                    match step {
+                        Ok((TokenKind::Comment, start, ..)) => {
+                            assert_eq!(Some(*start), template_comment, "{source:?}");
+                        }
+                        Ok(_) => {}
+                        Err(err) => panic!("{source:?} (front: {front}): {err:?}"),
+                    }
+                }
+                assert_eq!(
+                    steps
+                        .iter()
+                        .any(|step| matches!(step, Ok((TokenKind::Comment, ..)))),
+                    template_comment.is_some(),
+                    "{source:?} (front: {front})"
+                );
             }
         }
     }

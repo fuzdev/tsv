@@ -283,8 +283,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// A **symbol-led** name is no special case, which follows from the same sentence: the
     /// run starts at the first byte whatever the lexer made of it, so `<div %foo #bar>` and
     /// `<p }>` read as Svelte reads them (`svelte/attributes/name_leading_symbol/`,
-    /// `svelte/attributes/name_leading_brace/`). The symbol-led *tag* name it would otherwise
-    /// pair with is refused separately, by `element.rs`'s `is_valid_tag_name`.
+    /// `svelte/attributes/name_leading_brace/`) — `<!--` included, which opens no comment
+    /// inside a tag: the lexer yields its `<` and `<input <!-- c -- />` carries the three
+    /// names `<!--`, `c` and `--` (`svelte/attributes/name_comment_opener/`). The symbol-led
+    /// *tag* name it would otherwise pair with is refused separately, by `element.rs`'s
+    /// `is_valid_tag_name`.
     fn attribute_name_run_end(&self) -> usize {
         let from = if self.check(TokenKind::Identifier) {
             self.current_end()
