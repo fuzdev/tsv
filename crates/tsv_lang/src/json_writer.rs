@@ -762,7 +762,8 @@ fn whitespace_control_count(bytes: &[u8]) -> usize {
 /// A **staged run** in progress: the writer's scratch, its output buffer, and
 /// the run's length so far — opened by [`JsonWriter::stage_run`], appended to
 /// through [`StageRun::raw`] / [`StageRun::short`] / [`StageRun::u32`] /
-/// [`StageRun::usize`], and closed by [`StageRun::flush`], which is the run's
+/// [`StageRun::usize`] (and its [`StageRun::usize_kept`] / [`StageRun::repeat`]
+/// pair), and closed by [`StageRun::flush`], which is the run's
 /// one write to the output buffer. [`JsonWriter::stage_run`] says what a run
 /// buys and what it costs.
 ///
@@ -788,6 +789,21 @@ pub struct StageRun<'a> {
     stage: &'a mut [u8; STAGE_CAP],
     buf: &'a mut Vec<u8>,
     len: usize,
+}
+
+/// The digits one [`StageRun::usize_kept`] call appended — a [`digit_word`] and
+/// its width — for [`StageRun::repeat`] to append again.
+///
+/// A width of `0` (no decimal is that narrow) marks a value that took the wide
+/// arm, whose digits were written straight to the scratch and so not kept.
+#[derive(Clone, Copy)]
+pub struct StagedDigits {
+    word: u64,
+    digits: usize,
+}
+
+impl StagedDigits {
+    const NOT_KEPT: Self = Self { word: 0, digits: 0 };
 }
 
 /// Copy `s` into the scratch at `at` — [`StageRun::short`]'s fallback, out of
@@ -916,8 +932,53 @@ impl StageRun<'_> {
         }
     }
 
-    /// The wide arm of [`StageRun::u32`] and [`StageRun::usize`]: [`stage_wide`],
-    /// with the length it hands back clamped to the most it can be.
+    /// [`StageRun::usize`], handing back the digits it appended so that
+    /// [`StageRun::repeat`] can append the same value again without converting
+    /// it again — a node's `loc` names its start line and its end line, and for
+    /// most nodes they are one line.
+    #[inline(always)]
+    pub fn usize_kept(&mut self, n: usize) -> StagedDigits {
+        if let Ok(n) = u32::try_from(n) {
+            let (word, digits) = digit_word(n);
+            if digits <= WORD_DIGITS {
+                let at = self.len;
+                self.stage[at..at + WORD_DIGITS].copy_from_slice(&word.to_le_bytes());
+                self.len = at + digits;
+                return StagedDigits { word, digits };
+            }
+        }
+        self.wide(n as u64);
+        StagedDigits::NOT_KEPT
+    }
+
+    /// Append `n` once more, from the digits [`StageRun::usize_kept`] handed
+    /// back **for that same `n`** — that they match is the caller's claim. `n`
+    /// is still an argument because a value that took the wide arm kept no
+    /// digits and is converted again.
+    #[inline(always)]
+    pub fn repeat(&mut self, kept: StagedDigits, n: usize) {
+        if kept.digits == 0 {
+            self.wide(n as u64);
+            return;
+        }
+        debug_assert!(
+            kept.digits <= WORD_DIGITS
+                && u32::try_from(n).is_ok_and(|n| digit_word(n) == (kept.word, kept.digits)),
+            "repeat takes the digits usize_kept handed back for this same n"
+        );
+        // `digits` is at most a word wide by construction; the `min` states it
+        // where the compiler can read it, so the run's length stays bounded
+        // (see `StageRun::wide`).
+        let digits = kept.digits.min(WORD_DIGITS);
+        let at = self.len;
+        self.stage[at..at + WORD_DIGITS].copy_from_slice(&kept.word.to_le_bytes());
+        self.len = at + digits;
+    }
+
+    /// The wide arm of every integer append ([`StageRun::u32`],
+    /// [`StageRun::usize`], [`StageRun::usize_kept`], [`StageRun::repeat`]):
+    /// [`stage_wide`], with the length it hands back clamped to the most it can
+    /// be.
     ///
     /// ⚠️ The clamp never changes the value — `stage_wide` advances by a decimal
     /// width, which is at most [`MAX_U64_DIGITS`] — and it is a **codegen**
@@ -2600,6 +2661,48 @@ mod tests {
             usize::MAX,
         ] {
             assert_eq!(emit_staged(n), n.to_string(), "StageRun::usize({n})");
+        }
+    }
+
+    /// [`StageRun::usize_kept`] is [`StageRun::usize`], and [`StageRun::repeat`]
+    /// of what it hands back is a second `usize` of the same value — at every
+    /// digit width, across the word-to-wide boundary, past `u32::MAX`, and
+    /// behind a first value of a different width (the kept word must not
+    /// depend on where in the scratch it was first stored).
+    #[test]
+    fn staged_usize_kept_and_repeat_match_staged_usize() {
+        let mut values: Vec<usize> = (0..=1_100).collect();
+        for exp in 1..=19u32 {
+            let p = 10usize.pow(exp);
+            values.extend([p - 1, p, p + 1]);
+        }
+        values.extend([
+            99_999_999,
+            100_000_000,
+            u32::MAX as usize - 1,
+            u32::MAX as usize,
+            u32::MAX as usize + 1,
+            usize::MAX,
+        ]);
+        for &n in &values {
+            for lead in [0usize, 7, 123_456, 100_000_000] {
+                let mut ours = JsonWriter::with_capacity(0);
+                let mut run = ours.stage_run();
+                run.usize(lead);
+                run.raw(",");
+                let kept = run.usize_kept(n);
+                run.raw(",\"column\":");
+                run.usize(lead);
+                run.raw("|");
+                run.repeat(kept, n);
+                run.raw("!");
+                run.flush();
+                assert_eq!(
+                    String::from_utf8(ours.into_bytes()).expect("ASCII"),
+                    format!("{lead},{n},\"column\":{lead}|{n}!"),
+                    "usize_kept / repeat diverged at {n} behind {lead}"
+                );
+            }
         }
     }
 

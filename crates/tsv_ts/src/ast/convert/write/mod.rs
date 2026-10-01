@@ -833,7 +833,7 @@ fn position_fields<const CHARACTER: bool>(run: &mut StageRun<'_>, span: Span, ct
     run.raw(",\"end\":");
     run.u32(end_pos);
     run.raw(",\"loc\":{\"start\":{\"line\":");
-    run.usize(start.line);
+    let start_line = run.usize_kept(start.line);
     run.raw(",\"column\":");
     run.usize(start.column);
     if CHARACTER {
@@ -841,7 +841,13 @@ fn position_fields<const CHARACTER: bool>(run: &mut StageRun<'_>, span: Span, ct
         run.u32(start_pos);
     }
     run.raw("},\"end\":{\"line\":");
-    run.usize(end.line);
+    // Most nodes end on the line they start on, and that line's digits are
+    // already in hand.
+    if end.line == start.line {
+        run.repeat(start_line, end.line);
+    } else {
+        run.usize(end.line);
+    }
     run.raw(",\"column\":");
     run.usize(end.column);
     if CHARACTER {
