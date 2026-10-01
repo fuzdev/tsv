@@ -433,6 +433,20 @@ const fn escape_lanes(w: u64) -> u64 {
     lanes_less_than(w, 0x20) | zero_lanes(w ^ splat(b'"')) | zero_lanes(w ^ splat(b'\\'))
 }
 
+/// [`escape_lanes`] over four bytes, with every constant a 32-bit immediate: the kernel holds
+/// no constant in a register. Same lowest-lane guarantee, so read it as a boolean.
+#[inline]
+const fn escape_lanes_u32(w: u32) -> u32 {
+    const LOW: u32 = 0x0101_0101;
+    const HIGH: u32 = 0x8080_8080;
+    let quote = w ^ 0x2222_2222;
+    let backslash = w ^ 0x5c5c_5c5c;
+    (w.wrapping_sub(0x2020_2020) & !w
+        | quote.wrapping_sub(LOW) & !quote
+        | backslash.wrapping_sub(LOW) & !backslash)
+        & HIGH
+}
+
 /// What each byte becomes inside a JSON string, as `serde_json` writes it: `0` for a
 /// byte written as itself, the letter after the backslash for the seven two-byte
 /// short forms (`\"`, `\\`, `\b`, `\t`, `\n`, `\f`, `\r`), and `u` for every other
@@ -1168,10 +1182,9 @@ impl JsonWriter {
     /// taken as a slice, so the caller's source slice needs no char-boundary
     /// checks; it must still be whole UTF-8, which debug builds assert.
     ///
-    /// With an empty lead it is `string`'s output, and the CSS wire writer spells
-    /// every dynamic string that way, through one out-of-line copy of its own: its
-    /// strings — property names, values, selector names — are short and numerous,
-    /// and a clean one shorter than a word is one window append with no call. It is
+    /// With an empty lead it is `string`'s output. The CSS wire writer, whose strings —
+    /// property names, values, selector names — are short and numerous, spells every
+    /// dynamic string through its variant [`Self::string_led_words`] instead. It is
     /// not `string` itself: measured on the TypeScript and Svelte writers, the same
     /// shape saved instructions but cost cycles, so it is a writer's choice.
     ///
@@ -1206,6 +1219,65 @@ impl JsonWriter {
     fn string_led_long<const K: usize>(&mut self, lead: &[u8; K], bytes: &[u8]) {
         debug_assert!(bytes.len() >= 8, "a long slice holds at least one word");
         if needs_escape(bytes) {
+            self.string_led_escaped(lead, bytes);
+            return;
+        }
+        self.string_escape_free_led(lead, bytes);
+    }
+
+    /// [`JsonWriter::string_led`] with one arm more: a string of one to two words (8 to 16
+    /// bytes) leaves by tail call to [`JsonWriter::string_led_two_words`], which prescans it
+    /// as two overlapping words and writes it with no call and no register save, where
+    /// `string_led` sends every string of a word or more to the word loop, whose hoisted
+    /// lane constants and cursors take the callee-saved registers on entry. Byte-identical
+    /// to `string_led`.
+    ///
+    /// A writer's choice, as `string_led` is: the CSS writer's strings — property names,
+    /// values, selector names — are numerous and most that reach a word do not reach three.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    pub fn string_led_words<const K: usize>(&mut self, lead: &[u8; K], bytes: &[u8]) {
+        debug_assert!(
+            core::str::from_utf8(bytes).is_ok(),
+            "string_led_words takes UTF-8: {:?}",
+            String::from_utf8_lossy(bytes)
+        );
+        if bytes.len() >= 8 {
+            self.string_led_two_words(lead, bytes);
+            return;
+        }
+        if short_needs_escape(bytes) {
+            self.string_led_escaped(lead, bytes);
+            return;
+        }
+        self.string_escape_free_led(lead, bytes);
+    }
+
+    /// [`JsonWriter::string_led_words`] for a string of a word or more, out of line: one of
+    /// at most two words is prescanned as its first and last word, which overlap or meet —
+    /// the union argument [`needs_escape`] makes for its final word — and a longer one goes
+    /// on to [`JsonWriter::string_led_long`]'s word loop.
+    ///
+    /// Each word is tested as two four-byte quarters ([`escape_lanes_u32`]), whose lane
+    /// constants are 32-bit immediates. The 64-bit kernel keeps its five constants in
+    /// registers, and beside two live words that took four callee-saved registers, saved and
+    /// restored on every string; the four quarters need none, and being independent they are
+    /// what the optimizer packs into one 16-byte vector operation where the target has one.
+    #[inline(never)]
+    fn string_led_two_words<const K: usize>(&mut self, lead: &[u8; K], bytes: &[u8]) {
+        let (Some(first), Some(last)) = (bytes.first_chunk::<8>(), bytes.last_chunk::<8>()) else {
+            self.string_led_long(lead, bytes);
+            return;
+        };
+        if bytes.len() > 16 {
+            self.string_led_long(lead, bytes);
+            return;
+        }
+        let quarter = |word: &[u8; 8], half: usize| {
+            let lanes: [u8; 4] = [word[half], word[half + 1], word[half + 2], word[half + 3]];
+            escape_lanes_u32(u32::from_le_bytes(lanes))
+        };
+        if quarter(first, 0) | quarter(first, 4) | quarter(last, 0) | quarter(last, 4) != 0 {
             self.string_led_escaped(lead, bytes);
             return;
         }
@@ -1659,8 +1731,9 @@ mod tests {
         w.into_bytes()
     }
 
-    /// [`JsonWriter::string`] and [`JsonWriter::string_led`] with an empty lead
-    /// (the CSS writer's spelling of a string) must be byte-identical to `serde_json`'s own string serialization — the parity
+    /// [`JsonWriter::string`], and [`JsonWriter::string_led`] and
+    /// [`JsonWriter::string_led_words`] with an empty lead (the CSS writer's spelling of a
+    /// string), must be byte-identical to `serde_json`'s own string serialization — the parity
     /// contract this module's whole doc comment rests on — on both of their arms:
     /// the escape-free fast path and the hand escaper.
     ///
@@ -1694,6 +1767,15 @@ mod tests {
                     led,
                     theirs,
                     "string_led with an empty lead broke on {case:?} (capacity {cap}): {:?}",
+                    String::from_utf8_lossy(&led)
+                );
+                let mut w = JsonWriter::with_capacity(cap);
+                w.string_led_words(&[], case.as_bytes());
+                let led = w.into_bytes();
+                assert_eq!(
+                    led,
+                    theirs,
+                    "string_led_words with an empty lead broke on {case:?} (capacity {cap}): {:?}",
                     String::from_utf8_lossy(&led)
                 );
             }
@@ -1906,7 +1988,8 @@ mod tests {
         grade(b",\"abcdefghij\":", &clean);
     }
 
-    /// [`JsonWriter::string_led`] against `raw(lead)` + [`JsonWriter::string`]
+    /// [`JsonWriter::string_led`] and [`JsonWriter::string_led_words`] against `raw(lead)` +
+    /// [`JsonWriter::string`]
     /// over the whole escape-parity case set — the clean cases through the
     /// window write and every escaping one through the escaper — each behind a
     /// prefix of every length to 16, with an empty lead and a real key, into a
@@ -1925,15 +2008,21 @@ mod tests {
                     ours.raw(&front);
                     ours.string_led(lead, case.as_bytes());
                     ours.raw("}");
+                    let mut words = JsonWriter::with_capacity(cap);
+                    words.raw(&front);
+                    words.string_led_words(lead, case.as_bytes());
+                    words.raw("}");
                     let mut theirs = JsonWriter::with_capacity(0);
                     theirs.raw(&front);
                     theirs.raw(lead_str);
                     theirs.string(case);
                     theirs.raw("}");
+                    let theirs = theirs.into_bytes();
+                    assert_eq!(ours.into_bytes(), theirs, "string_led broke on {case:?}");
                     assert_eq!(
-                        ours.into_bytes(),
-                        theirs.into_bytes(),
-                        "string_led broke on {case:?}"
+                        words.into_bytes(),
+                        theirs,
+                        "string_led_words broke on {case:?}"
                     );
                 }
             }

@@ -23,7 +23,7 @@
 //! `LocationTracker`: each position is translated independently via a
 //! `ByteToCharMap` (identity on ASCII). Dynamic strings are escaped by
 //! [`write_string`] (byte-identical to `serde_json`, and to `JsonWriter::string`:
-//! one shared copy of `JsonWriter::string_led` with an empty lead, whose short clean
+//! one shared copy of `JsonWriter::string_led_words` with an empty lead, whose short clean
 //! path is a single window append, which pays on this writer's many short strings); static
 //! structure/tokens are written verbatim; integers are hand-formatted.
 //!
@@ -164,11 +164,20 @@ pub fn write_css_comments(
 }
 
 /// A dynamic string value, escaped byte-identical to `serde_json`: one shared out-of-line
-/// copy of [`JsonWriter::string_led`] with an empty lead, so a clean string shorter than a
-/// word is written as one window append with no call.
+/// copy of [`JsonWriter::string_led_words`] with an empty lead, so a clean string shorter
+/// than a word is written as one window append with no call, and one of up to two words by
+/// a tail call that saves no register.
 #[inline(never)]
 fn write_string(w: &mut JsonWriter, s: &str) {
-    w.string_led(&[], s.as_bytes());
+    w.string_led_words(&[], s.as_bytes());
+}
+
+/// [`write_string`] behind its field's key `lead` (`,"property":`), written as part of the
+/// string's own window append rather than as an append of its own — one out-of-line copy per
+/// key, for the two fields every declaration carries.
+#[inline(never)]
+fn write_keyed_string<const K: usize>(w: &mut JsonWriter, lead: &[u8; K], s: &str) {
+    w.string_led_words(lead, s.as_bytes());
 }
 
 /// The standalone `StyleSheetFile` root: `type`, `start` (0), `end` (source
@@ -471,10 +480,8 @@ fn write_declaration(
 
     w.raw("{\"type\":\"Declaration\",\"start\":");
     w.start_end(ctx.pos(decl.span.start), ctx.pos(split.end));
-    w.raw(",\"property\":");
-    write_string(w, trim_wire_end(split.property));
-    w.raw(",\"value\":");
-    write_string(w, &value);
+    write_keyed_string(w, b",\"property\":", trim_wire_end(split.property));
+    write_keyed_string(w, b",\"value\":", &value);
     w.raw("}");
 }
 
