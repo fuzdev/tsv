@@ -153,8 +153,24 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// each lex; `None` for the common escape-free token. One copy into the arena —
     /// the same copy the old owned-`String` path made, now the only allocation the
     /// parser retains on the escape path.
+    ///
+    /// Only the test inlines; the copy is [`CssParser::copy_decoded_to_arena`]'s. Inlined,
+    /// the bump allocation and its `memcpy` call kept callee-saved registers live in
+    /// [`CssParser::advance`], which then saved and restored them on every token.
     #[inline]
     fn decoded_to_arena(&self) -> Option<&'arena str> {
+        if self.lexer.decoded_str().is_some() {
+            self.copy_decoded_to_arena()
+        } else {
+            None
+        }
+    }
+
+    /// [`CssParser::decoded_to_arena`]'s copy, for the rare token that decoded an escape.
+    /// It hands back the string alone, which returns in registers.
+    #[cold]
+    #[inline(never)]
+    fn copy_decoded_to_arena(&self) -> Option<&'arena str> {
         self.lexer
             .decoded_str()
             .map(|s| -> &'arena str { self.arena.alloc_str(s) })
@@ -202,6 +218,12 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         self.add_comment(comment);
     }
 
+    // `inline(never)`: with the escape copy out of line the body is small enough to
+    // inline into every parse function that consumes a token, and each copy brings the
+    // lexer call's spills into its caller's frame — in `parse_atrule`,
+    // `parse_complex_selector`, `parse_selector_list_with`, `parse_rule` and
+    // `parse_declaration`, which sit on the recursive path. One shared body keeps those frames as they are.
+    #[inline(never)]
     pub(crate) fn advance(&mut self) -> Result<(), ParseError> {
         // The token comes either from the lookahead slot (lexed during a prior
         // `peek_kind()`) or fresh from the lexer. In both cases the decoded escape
