@@ -71,7 +71,7 @@ const exec_file = promisify(execFile);
 //
 
 /** Detect language from file extension */
-function detect_language(path: string): Language | null {
+export function detect_language(path: string): Language | null {
 	const ext = extname(path).toLowerCase();
 	switch (ext) {
 		// `.html` → svelte for `../prettier-plugin-svelte/test`, whose printer samples

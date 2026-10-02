@@ -6,6 +6,7 @@ import type { BenchmarkResult } from '@fuzdev/fuz_util/benchmark_types.ts';
 import { benchmark_format_number } from '@fuzdev/fuz_util/benchmark_format.ts';
 import { time_format, time_unit_detect_best, TIME_UNIT_DISPLAY } from '@fuzdev/fuz_util/time.ts';
 
+import { detect_language } from './corpus.ts';
 import { CANONICAL_FORMATTER_ROW, CANONICAL_PARSER_ROWS, type Language } from './types.ts';
 import { OXC_WASI_BINDING } from './versions.ts';
 
@@ -473,13 +474,6 @@ export function generate_skipped_files_report(
 		error: string;
 		benchmarks: string[];
 		lang: SkipLang;
-	}
-
-	function classify_lang(path: string): SkipLang {
-		if (path.endsWith('.svelte') || path.endsWith('.html')) return 'svelte';
-		if (path.endsWith('.ts') || path.endsWith('.js')) return 'typescript';
-		if (path.endsWith('.css')) return 'css';
-		return 'other';
 	}
 
 	const all_errors: FileError[] = [];
@@ -1645,6 +1639,14 @@ export function generate_reconstruct_note(): string {
 type SkipLang = 'svelte' | 'typescript' | 'css' | 'other';
 
 /**
+ * The skip summary's language bucket for a path — the corpus loader's own
+ * extension rule, so a file the loader put in a group is counted under it.
+ */
+function classify_lang(path: string): SkipLang {
+	return detect_language(path) ?? 'other';
+}
+
+/**
  * The "universal tsv failure" pattern per language — the 6 tracking_keys
  * that fail together on unsupported-syntax fixtures (SCSS, JSX in .js,
  * early-stage proposals, etc.). When a file's failure set matches this
@@ -1719,13 +1721,6 @@ export function generate_skipped_files_markdown(
 			}
 			error_map.get(error)!.push(bench_name);
 		}
-	}
-
-	function classify_lang(path: string): SkipLang {
-		if (path.endsWith('.svelte') || path.endsWith('.html')) return 'svelte';
-		if (path.endsWith('.ts') || path.endsWith('.js')) return 'typescript';
-		if (path.endsWith('.css')) return 'css';
-		return 'other';
 	}
 
 	const all_errors: FileError[] = [];
