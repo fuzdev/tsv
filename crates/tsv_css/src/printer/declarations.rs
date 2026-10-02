@@ -38,8 +38,9 @@ struct GridMultirowPlan<'v> {
     /// material (`leading_value_comment_run`), outside the row decision entirely.
     hoisted: Option<Span>,
     /// The members beneath it, at least two: every row string, and every comment run
-    /// between them, in source order. Which member opens a row is a source question
-    /// (`grid_row_breaks_before`), asked again at emit time.
+    /// between them, in source order. Which member opens a row is `grid_row_opens_at`'s
+    /// question — the source line read against the value rule's glue — asked again at
+    /// emit time.
     members: &'v [CssValue<'v>],
 }
 
@@ -917,7 +918,7 @@ impl<'a> Printer<'a> {
     /// `-rows` (line names, sizes, `repeat()` / `minmax()` / `fit-content()`, `subgrid`),
     /// and the `grid` / `grid-template` shorthands' mix of both with `/`. A member's kind
     /// plays no part beyond a string's interior not counting; which line a member starts
-    /// on is the whole question.
+    /// on is the question, read against the value rule's glue (`grid_row_opens_at`).
     ///
     /// The comment members come from the value parser: the whitespace split makes a
     /// top-level comment run its own `Identifier` member (`split_top_level`'s
@@ -945,9 +946,9 @@ impl<'a> Printer<'a> {
         // value when no word follows it (it is `raws.between` only ahead of one), so
         // prettier's grid rule reads those comments as nodes and breaks them one per line
         // like rows.
-        members
-            .windows(2)
-            .any(|pair| self.grid_row_breaks_before(&pair[0], &pair[1]))
+        let ctx = self.value_ctx();
+        (1..members.len())
+            .any(|i| self.grid_row_opens_at(members, i, ctx))
             .then_some(GridMultirowPlan {
                 hoisted: hoist.map(|(run, _)| run),
                 members,
@@ -979,13 +980,43 @@ impl<'a> Printer<'a> {
         from <= to && self.source.as_bytes()[from..to].contains(&b'\n')
     }
 
+    /// Does member `i` open a grid row?
+    ///
+    /// `grid_row_breaks_before` is the line read; the value rule's glue is what it is read
+    /// against, since prettier's grid arm sits behind every operator arm. A newline the
+    /// author wrote IN the gap is a row break whatever the rule would glue there (a head
+    /// `/`, an operator ahead of its group) — authored glue never spans a newline, so only
+    /// glue the rule would introduce is declined. A line difference that comes from the
+    /// previous member's own interior (a function broken across lines) opens no row at a
+    /// glued gap: `fn(⏎…⏎)-a` is one run. A comment member is the exception, and tsv's
+    /// own: its interior newline ends the row whatever is glued behind it, where
+    /// prettier's operator arm keeps the run on the comment's last line
+    /// (`/* c⏎d */-[y]`).
+    fn grid_row_opens_at(&self, members: &[CssValue<'_>], i: usize, ctx: ValueCtx) -> bool {
+        let (prev, next) = (&members[i - 1], &members[i]);
+        if !self.grid_row_breaks_before(prev, next) {
+            return false;
+        }
+        let (from, to) = (prev.span().end_usize(), next.span().start_usize());
+        // A comment run is an `Identifier` member, so its text is the one thing that
+        // tells it from a word.
+        (from <= to && self.source.as_bytes()[from..to].contains(&b'\n'))
+            || prev.span().extract(self.source).starts_with("/*")
+            || !self.value_gap_is_glued(members, i - 1, ctx)
+    }
+
     /// Print a grid property's value one row per line, per the layout `grid_multirow_plan`
     /// already decided.
     ///
     /// Format: `property:⏎\trow1⏎\trow2;` — a hoisted comment run stays on the colon's line
     /// (`property: /* c */⏎\trow1…`, the shape `print_decl_multiline` gives a comma list). A
     /// row is a line, not a fill: its members are joined by plain spaces and never wrap,
-    /// whatever its width — prettier's rows do not either.
+    /// whatever its width — prettier's rows do not either. A gap the value rule glues
+    /// (`Printer::value_gap_is_glued` — `1fr/auto`, a sign on its group) takes no space
+    /// here either, and the run it joins is written as the one doc the fill makes of it
+    /// (`Printer::glued_run_doc`), so a row the one-line fill produced reads back as the
+    /// members it was built from and lays out the same. Which member opens a row is
+    /// `grid_row_opens_at`'s, the question the plan asked.
     fn print_decl_grid_multirow<'v>(
         &mut self,
         decl: &'v internal::CssDeclaration<'v>,
@@ -993,18 +1024,40 @@ impl<'a> Printer<'a> {
     ) {
         self.write_broken_value_head(plan.hoisted);
         self.indent_level += 1;
-        let mut prev: Option<&CssValue<'v>> = None;
-        for member in plan.members {
-            match prev {
-                None => self.write_indent(),
-                Some(prev) if self.grid_row_breaks_before(prev, member) => {
-                    self.write("\n");
-                    self.write_indent();
-                }
-                Some(_) => self.write(" "),
+        let ctx = self.value_ctx();
+        let members = plan.members;
+        let mut i = 0;
+        // Whether member `i` opens a row, answered where the run before it ended.
+        let mut opens_row = false;
+        while i < members.len() {
+            if i == 0 {
+                self.write_indent();
+            } else if opens_row {
+                self.write("\n");
+                self.write_indent();
+            } else {
+                self.write(" ");
             }
-            self.print_css_value(member);
-            prev = Some(member);
+            // The glued run opening at `i`: one doc, as it is one fill item.
+            let mut end = i + 1;
+            while end < members.len() {
+                opens_row = self.grid_row_opens_at(members, end, ctx);
+                if opens_row || !self.value_gap_is_glued(members, end - 1, ctx) {
+                    break;
+                }
+                end += 1;
+            }
+            if end - i == 1 {
+                self.print_css_value(&members[i]);
+            } else {
+                let mut docs = DocBuf::with_capacity(end - i);
+                for member in &members[i..end] {
+                    docs.push(self.build_css_value_doc_in(member, ctx));
+                }
+                let run = self.glued_run_doc(&docs);
+                self.write_arena_doc(run);
+            }
+            i = end;
         }
         self.indent_level -= 1;
         self.write_declaration_end(decl);

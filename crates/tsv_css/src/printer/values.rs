@@ -853,9 +853,27 @@ impl<'a> Printer<'a> {
     /// — and a gap that is a separator in one and glue in the other is a formatter that
     /// contradicts itself across the print-width boundary.
     ///
-    /// A glued gap contributes **no part at all**, which is what keeps an operator the
-    /// author glued from becoming a wrap point: `1.5/2.5` is three members and one fill
-    /// item.
+    /// The parts ALTERNATE — an item, a separator, an item — which is what a fill reads by
+    /// position, so a glued gap may not simply contribute nothing: its members would shift
+    /// every part behind them across that parity, a member measured as a separator and a
+    /// `line` as content, and where the value wraps would then depend on how many members
+    /// the run before it holds (`100%- var(…) * 2` kept an over-wide `var(…)` flat that
+    /// `100% - var(…) * 2` breaks). The members a glued gap joins fold into ONE item
+    /// instead ([`Self::glued_run_doc`]), so a glued run travels whole whatever it holds —
+    /// plain operands (`1px+2px`, `12px/1.5`), a sign on its group, alone or behind
+    /// another operator (`-(…)`, `1px+-(…)`), or a function (`100%-var(…)`) — and a
+    /// function or group in it that no line holds breaks inside its own parens, glued to
+    /// the members before it.
+    ///
+    /// No glued gap is a wrap point, because a break in one changes what the run IS
+    /// rather than how it is spaced: `1px+2px` is a dimension and a signed dimension;
+    /// `1px-2px` is a single dimension whose unit is `px-2px`, split by whitespace on
+    /// either side of the `-`; `fn(a)-webkit-x` holds a `-` an ident takes as its own
+    /// first code point once whitespace stands ahead of it; `-var(` is a single
+    /// `<function-token>` (css-syntax-3 §"Consume an ident-like token"), so `100%-var(…)`
+    /// holds no `var()` function until a break makes one — a declaration a browser drops
+    /// at parse time becoming one it accepts; and a sign parted from its group is a bare
+    /// operator ending a line, which reads back as a different run on the next pass.
     fn build_value_member_parts(
         &self,
         values: &[CssValue<'_>],
@@ -863,13 +881,39 @@ impl<'a> Printer<'a> {
         separator: DocId,
     ) -> DocBuf {
         let mut parts = DocBuf::with_capacity(values.len() * 2);
+        // Where the item being built opens in `parts`.
+        let mut item_start = 0;
         for (i, value) in values.iter().enumerate() {
             parts.push(self.build_css_value_doc_in(value, ctx));
-            if i + 1 < values.len() && !self.value_gap_is_glued(values, i, ctx) {
+            let last = i + 1 == values.len();
+            let glued = !last && self.value_gap_is_glued(values, i, ctx);
+            if glued {
+                continue;
+            }
+            if parts.len() - item_start > 1 {
+                let item = self.glued_run_doc(&parts[item_start..]);
+                parts.truncate(item_start);
+                parts.push(item);
+            }
+            if !last {
                 parts.push(separator);
             }
+            item_start = parts.len();
         }
         parts
+    }
+
+    /// The one item a glued run's member docs make.
+    ///
+    /// A group, so the run measures as a whole wherever it is rendered: when it does not
+    /// fit, its members are laid out in break mode, and each function or parenthesized
+    /// group in it then stays flat when the run fits up to the next one's opening paren —
+    /// the LAST one that has to break is the one that does (`var(--a)-fn(⏎…⏎)`). Laid out
+    /// flat-and-remeasured instead, as a fill renders its final item, the first group
+    /// would measure the whole rest of the run and break for it.
+    pub(super) fn glued_run_doc(&self, members: &[DocId]) -> DocId {
+        let d = self.d();
+        d.group(d.concat(members))
     }
 
     /// Build a doc for a space-separated value list — the **flat** spelling of

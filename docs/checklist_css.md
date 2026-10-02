@@ -356,7 +356,9 @@ Spec: `css-conditional-5` (container queries and their units moved here; `css-co
 
 ### Math Functions
 
-- `calc()`
+- `calc()` — a run of operators the author left unspaced (`100%-var(…)`) moves to the next
+  line whole, and a function in it that no line holds breaks inside its own parens
+  ([calc_unspaced_operators_long](../tests/fixtures/css/values/functions/calc_unspaced_operators_long/))
 - `min()`, `max()`, `clamp()`
 
 ### Advanced Math Functions (Level 4)
@@ -680,7 +682,11 @@ Spec: `css-grid-1`
   breaks before `auto`; a comment after the `)` opens a row and the word after the comment
   stays beside it), a string's escaped newline does not; `!important` is not a node and
   never opens a row; `grid-auto-*` does not read the author's lines. A row never wraps as a
-  fill, but a function on a wide row breaks by its own group. Matches prettier
+  fill, but a function on a wide row breaks by its own group. A gap the value rule glues
+  stays glued inside a row (`40px/1fr`,
+  [grid_template_multirow_glued](../tests/fixtures/css/declarations/grid_template_multirow_glued/)),
+  and a newline authored in a gap wins over glue the rule would introduce.
+  Matches prettier
   ([grid_template_tracks_multirow](../tests/fixtures/css/declarations/grid_template_tracks_multirow/));
   a comment inside a function member or inside line names stays there and the row still
   breaks

@@ -236,7 +236,9 @@ pub(super) fn render_fill_iterative(
                 // the overflow the way an unguarded head always has.
                 if !is_glued_head(context, offset) {
                     let line_start_pos = line_start_column(indent, render, embed);
-                    if *pos != line_start_pos {
+                    if *pos != line_start_pos
+                        && !on_shallower_indentation(output, *pos, line_start_pos)
+                    {
                         trim_trailing_whitespace(output);
                         output.push('\n');
                         write_indentation(output, indent, render, embed);
@@ -466,10 +468,12 @@ pub(super) fn render_fill_iterative(
                     continue;
                 }
 
-                trim_trailing_whitespace(output);
-                output.push('\n');
-                write_indentation(output, indent, render, embed);
-                *pos = line_start_pos;
+                if !on_shallower_indentation(output, *pos, line_start_pos) {
+                    trim_trailing_whitespace(output);
+                    output.push('\n');
+                    write_indentation(output, indent, render, embed);
+                    *pos = line_start_pos;
+                }
 
                 if content_fits_at_start || arena.is_multiline_leaf(content) {
                     // The dropped item fits intact on its fresh line, so it now sits where an
@@ -731,6 +735,35 @@ fn boundary_lookahead(
     } else {
         SmallVec::from_slice(rest_commands)
     }
+}
+
+/// Whether the item about to render sits on a line holding only indentation SHALLOWER than
+/// the fill's own line start — a fill inside an `indent` whose line was opened outside it
+/// (`fn(⏎` + `indent(fill)`), where the first item sits one level out from the fill's
+/// continuation lines. A drop to a fresh line has nothing to gain there: it trims that
+/// indentation and leaves the line blank, for a line with less room than the one given up.
+///
+/// The line's start has to be in `output` — a render appending to a buffer that opens
+/// mid-line cannot see what is ahead of it, and answers `false`.
+///
+/// It gates the two fresh-line drops (Case 1's and Case 3's) and nothing else: which arm an
+/// unfit item takes is still decided by the column alone, so every in-place arm ahead of
+/// Case 3's drop is reached exactly as it is from any other mid-line column.
+#[inline]
+fn on_shallower_indentation(output: &str, pos: usize, line_start_pos: usize) -> bool {
+    pos < line_start_pos && line_is_indentation(output)
+}
+
+/// Whether `output`'s last line, begun in `output`, holds nothing but indentation.
+#[cold]
+#[inline(never)]
+fn line_is_indentation(output: &str) -> bool {
+    let bytes = output.as_bytes();
+    let mut end = bytes.len();
+    while end > 0 && matches!(bytes[end - 1], b' ' | b'\t') {
+        end -= 1;
+    }
+    end > 0 && bytes[end - 1] == b'\n'
 }
 
 /// Whether `offset` is the fill's **glued head** — the item whose leading boundary carries no

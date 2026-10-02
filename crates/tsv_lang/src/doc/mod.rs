@@ -1229,6 +1229,38 @@ mod arena_tests {
         );
     }
 
+    /// A fill inside an `indent` whose line was opened OUTSIDE it (`f(⏎` + `indent(fill)`): the
+    /// first item sits one level out from the fill's own line start, on a line holding only
+    /// indentation. An item too wide for that line has no fresher line to drop to — a drop
+    /// would trim the indentation and leave the line blank — so it renders in place. Both drop
+    /// arms: Case 3 (more items behind it) and Case 1 (the fill's only item).
+    #[test]
+    fn test_fill_unfit_first_item_on_indentation_only_line_does_not_drop() {
+        let a = DocArena::new();
+        let wide = a.text("wwwwwwwwwwwwww");
+        let shell = |fill: DocId| {
+            a.indent(a.concat(&[
+                a.text("f("),
+                a.hardline(),
+                a.indent(fill),
+                a.hardline(),
+                a.text(")"),
+            ]))
+        };
+        let parts = [wide, a.line(), a.text("x")];
+        assert_eq!(
+            render_pw_tab(&a, shell(a.fill(&parts)), 8),
+            "f(\n\twwwwwwwwwwwwww\n\t\tx\n\t)"
+        );
+        assert_eq!(
+            render_pw_tab(&a, shell(a.fill(&[wide])), 8),
+            "f(\n\twwwwwwwwwwwwww\n\t)"
+        );
+        // Control: content ahead of it on the line, the item still drops.
+        let mid = a.concat(&[a.text("pp "), a.indent(a.fill(&parts))]);
+        assert_eq!(render_pw_tab(&a, mid, 8), "pp\n\twwwwwwwwwwwwww\n\tx");
+    }
+
     #[test]
     fn test_arena_indent_softline_break() {
         let a = DocArena::new();
