@@ -1,0 +1,156 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 205,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 92,
+				"end": 141,
+				"name": "supports",
+				"prelude": "(x: a,)",
+				"block": {
+					"type": "Block",
+					"start": 110,
+					"end": 141,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 114,
+								"end": 117,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 114,
+										"end": 117,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 114,
+														"end": 117
+													}
+												],
+												"start": 114,
+												"end": 117
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 118,
+								"end": 138,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 123,
+										"end": 133,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 114,
+							"end": 138
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 144,
+				"end": 196,
+				"name": "supports",
+				"prelude": "(x: 'b',)",
+				"block": {
+					"type": "Block",
+					"start": 164,
+					"end": 196,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 168,
+								"end": 171,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 168,
+										"end": 171,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 168,
+														"end": 171
+													}
+												],
+												"start": 168,
+												"end": 171
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 172,
+								"end": 193,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 177,
+										"end": 188,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 168,
+							"end": 193
+						}
+					]
+				}
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " a trailing comma in a declaration value is kept, glued to the closing paren ",
+				"start": 9,
+				"end": 90
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 197,
+			"styles": "\n\t/* a trailing comma in a declaration value is kept, glued to the closing paren */\n\t@supports (x: a,) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t@supports (x: 'b',) {\n\t\tdiv {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 206,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

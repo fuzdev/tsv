@@ -848,8 +848,15 @@ fn parse_condition_part<'arena>(
         }
 
         // Add space after a value-reader comma — `pads_comma`, whose left-side strip
-        // above is the same rule read from the other side.
-        if pads_comma && !parser.check(TokenKind::Whitespace) {
+        // above is the same rule read from the other side. The space separates the comma
+        // from the element after it, so a comma closing its group (`(x: a,)`, `fn(a,)`)
+        // takes none: the whitespace arm above drops an authored run ahead of a `)`, and
+        // a space written here would be read back as that run — the comma is kept, glued
+        // to the `)`, the same bound the operator's and the comment's pads read.
+        if pads_comma
+            && !parser.check(TokenKind::Whitespace)
+            && !parser.check(TokenKind::RightParen)
+        {
             part_buf.push(' ');
             trailing_spaces += 1;
         }
