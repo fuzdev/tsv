@@ -43,8 +43,7 @@ but lacks their features, extensibility, and broad language support.
 One reason for tsv to exist is to help find the performance bonuses
 left on the table in the Web's implementations.
 
-tsv is near production-ready, with a long tail of rare bugs
-(and numerous fixes to bugs in acorn-typescript/Prettier/prettier-plugin-svelte).
+tsv is near production-ready, with a long tail of rare bugs.
 Reports and feedback are appreciated.
 See the [issues](https://github.com/fuzdev/tsv/issues)
 and [discussions](https://github.com/fuzdev/tsv/discussions).
@@ -53,7 +52,7 @@ The only first-party `unsafe` is in `tsv_ffi`, where the C boundary requires it;
 `tsv_napi` relaxes the lint only to `deny` so napi-derive's generated code compiles.
 Otherwise `unsafe_code = "forbid"`.
 
-AI disclosure: this codebase is LLM-generated, and some caveats apply.
+AI disclosure: this codebase is LLM-generated.
 It's a high-effort project that prioritizes quality.
 
 ## About
