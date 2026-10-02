@@ -635,6 +635,14 @@ impl<'a> Printer<'a> {
     /// name directly (a quoted `name="{path}"` drops its quotes, and space around the `=`
     /// is removed), the name is plain ASCII, and the attribute does **not** collapse to the
     /// shorthand — `name={name}` prints `{name}`, which is not its bytes.
+    ///
+    /// **The shorthand `{name}` as written** — which the parser spells as a tag sharing the
+    /// name's span, the attribute's own span being the braces: that whole span, when the
+    /// braces sit directly around the name (a padded `{ name }` loses its padding, and a
+    /// comment beside the name sits in that gap too), the name is a plain reference
+    /// ([`plain_path_span`](super::plain_path_span) — plain ASCII with no escape, and with
+    /// the `{` directly ahead of it it owns no comment), and
+    /// [`Printer::is_shorthand_attribute`] says the general builder prints the shorthand.
     fn attribute_source_span(&self, attr: &internal::Attribute<'_>, is_html: bool) -> Option<Span> {
         if !super::fuses_source_spans() {
             return None;
@@ -656,6 +664,18 @@ impl<'a> Printer<'a> {
                         && attr.name(self.source) == "class"
                         && !class_text_is_normalized(&bytes[text.range()]));
                 fuses.then(|| Span::new(name.start, text.end + 1))
+            }
+            [internal::AttributeValue::ExpressionTag(tag)] if tag.span == name => {
+                let whole = attr.span;
+                let fuses = whole.start + 1 == name.start
+                    && whole.end == name.end + 1
+                    && super::plain_path_span(tag.expression) == Some(name)
+                    && self.is_shorthand_attribute(attr, value);
+                debug_assert!(
+                    !fuses || (bytes[whole.start as usize] == b'{' && bytes[name_end] == b'}'),
+                    "a shorthand attribute's span is its braces"
+                );
+                fuses.then_some(whole)
             }
             [internal::AttributeValue::ExpressionTag(tag)] if Self::tag_is_plain_path(tag) => {
                 let tag = tag.span;

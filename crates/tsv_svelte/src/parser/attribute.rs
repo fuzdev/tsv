@@ -608,13 +608,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     raw_len: name.len() as u16,
                     // Synthesized here rather than lexed, so the property is asked of
                     // the slice directly — in the printer's own class, since the name
-                    // seam asserts this field against exactly that. ⚠️ No path spends
-                    // it today (a shorthand's identifier does not reach that seam —
-                    // verified by mutation: claiming `true` over a non-ASCII `{é}` /
-                    // `bind:é` / `class:é` changes nothing), so this is measured rather
-                    // than assumed for the day one does. A bare `false` would be the
-                    // wrong shortcut: the seam's assertion is two-sided, so it would
-                    // fail the moment the path opens on an ASCII name.
+                    // seam asserts this field against exactly that. The Svelte printer
+                    // spends it on a shorthand `{name}`: `plain_reference_span` reads it
+                    // before `Printer::attribute_source_span` emits the attribute as one
+                    // plain span, whose width is its byte count — a `true` over a
+                    // non-ASCII `{é}` would measure it a column wide per extra byte
+                    // (a debug build asserts in `Printer::plain_source_span_doc`). A bare
+                    // `false` would be the wrong shortcut too: the seam's assertion is
+                    // two-sided, so it would fail on an ASCII name.
                     plain_ascii: settled
                         || !slice.bytes().any(tsv_lang::printing::is_width_relevant),
                 };

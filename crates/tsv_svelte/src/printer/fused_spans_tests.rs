@@ -94,6 +94,7 @@ const SEEDS: &[&str] = &[
     "<script lang=\"ts\">let xs: T[];</script>{#each xs as x: T}{x}{/each}{#snippet s(a, b)}{a}{/snippet}",
     "<div on:click={ h } bind:this={ el.x } {...rest} {@attach a.b} class:c={ c }>{@const d = e.f}</div>",
     "<table><tr><td>t</td><td> </td><td></td></tr></table><select><option>o</option></select>",
+    "<div {a} {bb} cc={cc} dd=\"{dd}\" {class}><Foo {x} {y.z} {\u{e9}} /></div>",
 ];
 
 /// Each seed with each insert at each byte position.
