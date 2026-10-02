@@ -928,23 +928,45 @@ fn write_element(w: &mut JsonWriter, elem: &internal::Element<'_>, ctx: &Ctx<'_>
     if ctx.emit_loc {
         write_name_loc_field(w, elem.name_span, ctx);
     }
-    w.raw(",\"attributes\":");
-    write_array(w, elem.attributes, |w, a| write_attribute_node(w, a, ctx));
-    w.raw(",\"fragment\":");
+    // The constant stretch between two of the element's dynamic parts is one append,
+    // and an empty attribute list rides the one that opens the fragment.
+    if elem.attributes.is_empty() {
+        w.raw(",\"attributes\":[],\"fragment\":{\"type\":\"Fragment\",\"nodes\":[");
+    } else {
+        w.raw(",\"attributes\":[");
+        write_items(w, elem.attributes, |w, a| write_attribute_node(w, a, ctx));
+        w.raw("],\"fragment\":{\"type\":\"Fragment\",\"nodes\":[");
+    }
+    let nodes = elem.fragment.nodes;
     // A `<textarea>`'s content is read with the attribute-value sequence
     // machinery in the canonical parser, whose `Text` literal leads with the
-    // positions (`{start, end, type, raw, data}`).
-    if elem.name(ctx.source) == "textarea" {
-        w.raw("{\"type\":\"Fragment\",\"nodes\":");
-        write_array(w, elem.fragment.nodes, |w, n| match n {
+    // positions (`{start, end, type, raw, data}`). Asked only of an element with
+    // children: an empty one writes the same bytes under either name.
+    if !nodes.is_empty() && elem.name(ctx.source) == "textarea" {
+        write_items(w, nodes, |w, n| match n {
             internal::FragmentNode::Text(text) => write_sequence_text(w, text, ctx),
             _ => write_fragment_node(w, n, ctx),
         });
-        w.raw("}");
     } else {
-        write_fragment(w, &elem.fragment, ctx);
+        write_items(w, nodes, |w, n| write_fragment_node(w, n, ctx));
     }
-    w.raw("}");
+    // The node array, the fragment, the element.
+    w.raw("]}}");
+}
+
+/// The items of a JSON array, comma-separated, without its brackets — for a caller
+/// whose `[` and `]` ride the constants on either side ([`write_array`] writes them
+/// itself).
+#[inline]
+fn write_items<T>(w: &mut JsonWriter, items: &[T], mut f: impl FnMut(&mut JsonWriter, &T)) {
+    let mut first = true;
+    for item in items {
+        if !first {
+            w.raw(",");
+        }
+        first = false;
+        f(w, item);
+    }
 }
 
 /// Emits a special-element node (`svelte:element`, `svelte:component`, …).
@@ -1615,22 +1637,24 @@ fn write_attribute(w: &mut JsonWriter, attr: &internal::Attribute<'_>, ctx: &Ctx
     if ctx.emit_loc {
         write_name_loc_field(w, attr.name_span, ctx);
     }
+    // A boolean attribute's `true` closes the node in the same constant.
+    let Some(values) = attr.value else {
+        w.raw(",\"value\":true}");
+        return;
+    };
     w.raw(",\"value\":");
-    write_attribute_value_field(w, attr.value, ctx);
+    write_attribute_value_field(w, values, ctx);
     w.raw("}");
 }
 
-/// Emit an attribute's `value` field: boolean (`true`), a bare `{expr}` (plain
-/// object), or a text/quoted sequence (array).
+/// Emit the value an attribute was written with — a boolean attribute has none, and
+/// [`write_attribute`] writes its `true`: a bare `{expr}` (plain object), or a
+/// text/quoted sequence (array).
 fn write_attribute_value_field(
     w: &mut JsonWriter,
-    value: Option<&[internal::AttributeValue<'_>]>,
+    values: &[internal::AttributeValue<'_>],
     ctx: &Ctx<'_>,
 ) {
-    let Some(values) = value else {
-        w.raw("true");
-        return;
-    };
     let has_text = values
         .iter()
         .any(|v| matches!(v, internal::AttributeValue::Text(_)));
@@ -2405,6 +2429,115 @@ mod tests {
                             );
                         }
                     }
+                }
+            }
+        }
+    }
+
+    /// One element holding each shape the element and attribute writers tell apart.
+    const SHAPES: &str = concat!(
+        r#"<div a b="c" d="{e}" f={g} {h} i="j{k}">t{x}<!--c-->"#,
+        r#"<textarea>y{z}</textarea><textarea></textarea><Foo /></div>"#,
+    );
+
+    /// The element and attribute writers fold the constants around their dynamic parts —
+    /// an empty attribute list, a boolean attribute's `true`, a lone text's array, each
+    /// header's positions — so the bytes are pinned whole, for every such shape at once:
+    /// a boolean, lone-text, quoted-tag, bare-tag, shorthand and mixed attribute; a text,
+    /// a tag and a comment child; a `<textarea>` with a sequence text and an empty one;
+    /// a childless component.
+    #[test]
+    fn element_and_attribute_shapes_write_these_bytes() {
+        let arena = bumpalo::Bump::new();
+        let root = crate::parse(SHAPES, &arena).expect("parse");
+        let wire = crate::convert_ast_json_bytes_no_locations(&root, SHAPES);
+        let expected = concat!(
+            r#"{"css":null,"js":[],"start":0,"end":111,"type":"Root","fragment":{"type":"Fragment","#,
+            r#""nodes":[{"type":"RegularElement","start":0,"end":111,"name":"div","#,
+            r#""attributes":[{"type":"Attribute","start":5,"end":6,"name":"a","value":true},"#,
+            r#"{"type":"Attribute","start":7,"end":12,"name":"b","value":[{"start":10,"end":11,"#,
+            r#""type":"Text","raw":"c","data":"c"}]},"#,
+            r#"{"type":"Attribute","start":13,"end":20,"name":"d","value":[{"type":"ExpressionTag","#,
+            r#""start":16,"end":19,"expression":{"type":"Identifier","start":17,"end":18,"#,
+            r#""name":"e"}}]},"#,
+            r#"{"type":"Attribute","start":21,"end":26,"name":"f","value":{"type":"ExpressionTag","#,
+            r#""start":23,"end":26,"expression":{"type":"Identifier","start":24,"end":25,"name":"g"}}},"#,
+            r#"{"type":"Attribute","start":27,"end":30,"name":"h","value":{"type":"ExpressionTag","#,
+            r#""start":28,"end":29,"expression":{"type":"Identifier","name":"h","start":28,"end":29}}},"#,
+            r#"{"type":"Attribute","start":31,"end":39,"name":"i","value":[{"start":34,"end":35,"#,
+            r#""type":"Text","raw":"j","data":"j"},"#,
+            r#"{"type":"ExpressionTag","start":35,"end":38,"expression":{"type":"Identifier","#,
+            r#""start":36,"end":37,"name":"k"}}]}],"fragment":{"type":"Fragment","#,
+            r#""nodes":[{"type":"Text","start":40,"end":41,"raw":"t","data":"t"},"#,
+            r#"{"type":"ExpressionTag","start":41,"end":44,"expression":{"type":"Identifier","#,
+            r#""start":42,"end":43,"name":"x"}},"#,
+            r#"{"type":"Comment","start":44,"end":52,"data":"c"},"#,
+            r#"{"type":"RegularElement","start":52,"end":77,"name":"textarea","attributes":[],"#,
+            r#""fragment":{"type":"Fragment","nodes":[{"start":62,"end":63,"type":"Text","raw":"y","#,
+            r#""data":"y"},"#,
+            r#"{"type":"ExpressionTag","start":63,"end":66,"expression":{"type":"Identifier","#,
+            r#""start":64,"end":65,"name":"z"}}]}},"#,
+            r#"{"type":"RegularElement","start":77,"end":98,"name":"textarea","attributes":[],"#,
+            r#""fragment":{"type":"Fragment","nodes":[]}},"#,
+            r#"{"type":"Component","start":98,"end":105,"name":"Foo","attributes":[],"#,
+            r#""fragment":{"type":"Fragment","nodes":[]}}]}}]},"options":null,"comments":[]}"#
+        );
+        assert_eq!(String::from_utf8(wire).expect("UTF-8 wire"), expected);
+    }
+
+    /// `node` with every position moved `by` code units along its line: `start`, `end`,
+    /// `character` and `column`, wherever one is a number.
+    fn shifted(node: &Value, by: u64) -> Value {
+        match node {
+            Value::Object(fields) => Value::Object(
+                fields
+                    .iter()
+                    .map(|(key, value)| {
+                        let moved = match (key.as_str(), value.as_u64()) {
+                            ("start" | "end" | "character" | "column", Some(n)) => {
+                                Value::from(n + by)
+                            }
+                            _ => shifted(value, by),
+                        };
+                        (key.clone(), moved)
+                    })
+                    .collect(),
+            ),
+            Value::Array(items) => Value::Array(items.iter().map(|v| shifted(v, by)).collect()),
+            other => other.clone(),
+        }
+    }
+
+    /// Every header writes its `start` / `end` into a fixed-width window, so each is
+    /// walked across every decimal width a document reaches: the same element behind a
+    /// one-line lead of every length that puts one of its offsets on a power of ten must
+    /// be the unpadded element with its positions moved by the lead — in both wire
+    /// variants. (A value past eight digits takes the writer's own wide arm, graded with
+    /// `JsonWriter::start_end_head`.)
+    #[test]
+    fn positions_survive_every_digit_width() {
+        let wires = |source: &str| {
+            let arena = bumpalo::Bump::new();
+            let root = crate::parse(source, &arena).expect("parse");
+            [
+                crate::convert_ast_json_bytes(&root, source),
+                crate::convert_ast_json_bytes_no_locations(&root, source),
+            ]
+            .map(|wire| serde_json::from_slice::<Value>(&wire).expect("wire"))
+        };
+        let bare = wires(SHAPES);
+        let lead_shell = "<i></i>".len();
+        for power in [10usize, 100, 1_000, 10_000, 100_000] {
+            let widest = power + 1;
+            let narrowest = power.saturating_sub(SHAPES.len() + 1).max(lead_shell);
+            for lead in narrowest..=widest {
+                let source = format!("<i>{}</i>{SHAPES}", "p".repeat(lead - lead_shell));
+                for (padded, bare) in wires(&source).iter().zip(&bare) {
+                    assert_eq!(
+                        padded["fragment"]["nodes"][1],
+                        shifted(&bare["fragment"]["nodes"][0], lead as u64),
+                        "lead {lead}"
+                    );
                 }
             }
         }
