@@ -2,8 +2,8 @@
 	"version": 19,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-09-23T01:44:33.674Z",
-	"git_commit": "23392a6e",
+	"timestamp": "2026-10-02T17:24:37.255Z",
+	"git_commit": "120567d4",
 	"machine": {
 		"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 		"os": "linux",
@@ -623,7 +623,7 @@
 		}
 	},
 	"versions": {
-		"tsv": "0.4.1",
+		"tsv": "0.5.0",
 		"svelte": "5.57.0",
 		"acorn": "8.16.0",
 		"acorn_ts": "1.0.13",
@@ -647,45 +647,45 @@
 	"binary_sizes": [
 		{
 			"label": "tsv (ffi)",
-			"bytes": 3367824,
+			"bytes": 3561120,
 			"kind": "native",
-			"gzip_bytes": 1550678
+			"gzip_bytes": 1661467
 		},
 		{
 			"label": "tsv format (ffi)",
-			"bytes": 3061808,
+			"bytes": 3239744,
 			"kind": "native",
-			"gzip_bytes": 1410750
+			"gzip_bytes": 1511298
 		},
 		{
 			"label": "tsv parse (ffi)",
-			"bytes": 1529104,
+			"bytes": 1568160,
 			"kind": "native",
-			"gzip_bytes": 674282
+			"gzip_bytes": 702155
 		},
 		{
 			"label": "tsv (napi)",
-			"bytes": 3751072,
+			"bytes": 3958480,
 			"kind": "native",
-			"gzip_bytes": 1707953
+			"gzip_bytes": 1825694
 		},
 		{
 			"label": "tsv-format-wasm",
-			"bytes": 2250575,
+			"bytes": 2410030,
 			"kind": "wasm",
-			"gzip_bytes": 866596
+			"gzip_bytes": 936957
 		},
 		{
 			"label": "tsv-parse-wasm",
-			"bytes": 966971,
+			"bytes": 1014974,
 			"kind": "wasm",
-			"gzip_bytes": 376149
+			"gzip_bytes": 398924
 		},
 		{
 			"label": "tsv-wasm",
-			"bytes": 2527817,
+			"bytes": 2707257,
 			"kind": "wasm",
-			"gzip_bytes": 965297
+			"gzip_bytes": 1045509
 		},
 		{
 			"label": "svelte + acorn-typescript parsers (js bundle)",

@@ -6,7 +6,7 @@
 
 **Corpus kind:** conformance — fixtures-only corpus (disjoint from perf; a suite with a validity oracle or harness filtered to what it calls valid), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)
 
-**Date:** 2026-09-23T01:44:33.674Z — tsv 0.4.1 (23392a6e)
+**Date:** 2026-10-02T17:24:37.255Z — tsv 0.5.0 (120567d4)
 
 **Corpus:** 4619 Svelte (1.1 MB), 53323 TypeScript (70.8 MB), 22449 CSS (7.7 MB) — 80391 files, 79.5 MB total
 
@@ -66,28 +66,28 @@
 
 | Binary | Size | Gzipped | vs tsv | vs tsv (gz) |
 | --- | ---: | ---: | ---: | ---: |
-| tsv-format-wasm | 2.3 MB | 866.6 KB | 0.9x | 0.9x |
-| tsv-parse-wasm | 967.0 KB | 376.1 KB | 0.4x | 0.4x |
-| tsv-wasm | 2.5 MB | 965.3 KB | — | — |
-| biome (wasm) | 44.6 MB | 11.4 MB | 17.7x | 11.8x |
-| dprint (wasm) | 4.2 MB | 1.2 MB | 1.7x | 1.2x |
-| oxc-parser (wasm) | 1.5 MB | 481.4 KB | 0.6x | 0.5x |
+| tsv-format-wasm | 2.4 MB | 937.0 KB | 0.9x | 0.9x |
+| tsv-parse-wasm | 1.0 MB | 398.9 KB | 0.4x | 0.4x |
+| tsv-wasm | 2.7 MB | 1.0 MB | — | — |
+| biome (wasm) | 44.6 MB | 11.4 MB | 16.5x | 10.9x |
+| dprint (wasm) | 4.2 MB | 1.2 MB | 1.5x | 1.1x |
+| oxc-parser (wasm) | 1.5 MB | 481.4 KB | 0.5x | 0.5x |
 | yuku-parser (wasm) | 743.3 KB | 222.8 KB | 0.3x | 0.2x |
-| malva (wasm) | 1.5 MB | 414.0 KB | 0.6x | 0.4x |
-| tsv (ffi) | 3.4 MB | 1.6 MB | 0.9x | 0.9x |
-| tsv format (ffi) | 3.1 MB | 1.4 MB | 0.8x | 0.8x |
-| tsv parse (ffi) | 1.5 MB | 674.3 KB | 0.4x | 0.4x |
-| tsv (napi) | 3.8 MB | 1.7 MB | — | — |
-| oxc-parser+oxfmt (napi) | 11.2 MB | 4.6 MB | 3.0x | 2.7x |
-| oxc-parser (napi) | 2.1 MB | 882.6 KB | 0.6x | 0.5x |
-| oxfmt (napi) | 9.1 MB | 3.7 MB | 2.4x | 2.2x |
+| malva (wasm) | 1.5 MB | 414.0 KB | 0.5x | 0.4x |
+| tsv (ffi) | 3.6 MB | 1.7 MB | 0.9x | 0.9x |
+| tsv format (ffi) | 3.2 MB | 1.5 MB | 0.8x | 0.8x |
+| tsv parse (ffi) | 1.6 MB | 702.2 KB | 0.4x | 0.4x |
+| tsv (napi) | 4.0 MB | 1.8 MB | — | — |
+| oxc-parser+oxfmt (napi) | 11.2 MB | 4.6 MB | 2.8x | 2.5x |
+| oxc-parser (napi) | 2.1 MB | 882.6 KB | 0.5x | 0.5x |
+| oxfmt (napi) | 9.1 MB | 3.7 MB | 2.3x | 2.0x |
 | yuku-parser (napi) | 819.2 KB | 338.1 KB | 0.2x | 0.2x |
-| rsvelte-fmt (binary) | 8.9 MB | 3.5 MB | 2.4x | 2.1x |
-| rsvelte compiler (napi) | 17.6 MB | 7.4 MB | 4.7x | 4.3x |
-| swc (napi) | 32.7 MB | 12.2 MB | 8.7x | 7.2x |
+| rsvelte-fmt (binary) | 8.9 MB | 3.5 MB | 2.3x | 1.9x |
+| rsvelte compiler (napi) | 17.6 MB | 7.4 MB | 4.5x | 4.0x |
+| swc (napi) | 32.7 MB | 12.2 MB | 8.3x | 6.7x |
 | svelte + acorn-typescript parsers (js bundle) | 497.2 KB | 124.0 KB | 0.2x | 0.1x |
-| prettier + svelte plugin (js bundle) | 2.2 MB | 566.1 KB | 0.9x | 0.6x |
-| prettier + parsers (js bundle) | 2.2 MB | 566.3 KB | 0.9x | 0.6x |
+| prettier + svelte plugin (js bundle) | 2.2 MB | 566.1 KB | 0.8x | 0.5x |
+| prettier + parsers (js bundle) | 2.2 MB | 566.3 KB | 0.8x | 0.5x |
 
 _`vs tsv` divides native rows by `tsv (napi)` — the binding this runtime benchmarks (FFI under Deno, N-API under Node/Bun), so the same artifact reads a different ratio in the deno and node/bun reports — and wasm and js-bundle rows by `tsv-wasm`, the portable artifact a JS bundle stands beside. Gzipped ≈ the artifact’s wire size (`gzip -c`, system default level; the `tsv (napi)` platform package also ships the `tsv` CLI binary, so its tarball is larger than this row). `vs tsv (gz)` compares gzipped bytes; `vs tsv` compares raw on-disk bytes. The `js bundle` rows are SYNTHESIZED, not shipped: the canonical tools publish no single artifact, so each is a minified, tree-shaken bundle of the minimum one capability needs (`benches/js/size_bundles/`), built by `deno bundle` during this run._
 
