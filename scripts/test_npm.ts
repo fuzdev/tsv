@@ -660,7 +660,7 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 		// not, a directive head with modifiers) and each identifier Svelte gives the
 		// name-shaped `loc` (shorthand expansion, snippet name, block patterns).
 		const sv =
-			'<script>\nconst x = 1;\n</script>\n\n<div class="a" on:click|preventDefault={x} {x} { x }>\n\t<svelte:head><title>t</title></svelte:head>\n\t{@const y = x}\n\t{#each [x] as item}{item}{/each}\n\t{#await x}p{:then value}{value}{:catch err}{err}{/await}\n</div>\n{#snippet row(a)}{a}{/snippet}';
+			'<script>\nconst x = 1;\n</script>\n\n<div class="a" on:click|preventDefault={x} {x} { x }>\n\t{@const y = x}\n\t{#each [x] as item}{item}{/each}\n\t{#await x}p{:then value}{value}{:catch err}{err}{/await}\n</div>\n<svelte:head><title>t</title></svelte:head>\n{#snippet row(a)}{a}{/snippet}';
 		const full = node_entry.parse_svelte(sv);
 		const recon = node_entry.reconstruct_locations(
 			node_entry.parse_svelte(sv, { locations: false }),
