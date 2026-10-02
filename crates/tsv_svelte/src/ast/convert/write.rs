@@ -913,15 +913,13 @@ fn name_bytes<'s>(span: Span, ctx: &Ctx<'s>) -> &'s [u8] {
 
 /// Emits a `RegularElement` (HTML) or `Component` node.
 fn write_element(w: &mut JsonWriter, elem: &internal::Element<'_>, ctx: &Ctx<'_>) {
-    let node_type = match elem.kind {
-        internal::ElementKind::Component => "Component",
-        internal::ElementKind::Html => "RegularElement",
-    };
-    // Staged burst; ends before the `name` field (module doc, Staged runs).
+    // Staged burst; ends before the `name` field (module doc, Staged runs). The
+    // opening literal is whole per kind, so each arm's copy is one constant's width.
     let mut run = w.stage_run();
-    run.raw("{\"type\":\"");
-    run.short(node_type);
-    run.raw("\",\"start\":");
+    match elem.kind {
+        internal::ElementKind::Component => run.raw("{\"type\":\"Component\",\"start\":"),
+        internal::ElementKind::Html => run.raw("{\"type\":\"RegularElement\",\"start\":"),
+    }
     run.u32(ctx.pos(elem.span.start));
     run.raw(",\"end\":");
     run.u32(ctx.pos(elem.span.end));
