@@ -1,6 +1,8 @@
 //! CSS escape sequence decoding.
 
 use crate::whitespace::is_css_whitespace;
+use bumpalo::Bump;
+use bumpalo::collections::String as BumpString;
 use std::borrow::Cow;
 
 /// Decode CSS escape sequences in a string.
@@ -14,6 +16,12 @@ use std::borrow::Cow;
 ///
 /// Returns a borrowed `Cow` for the common escape-free string (no allocation);
 /// only an input that actually contains `\` is decoded into an owned `String`.
+///
+/// This is the decoder's **reference** form. The parser decodes a string literal
+/// through [`decode_escape_sequences_in`], which builds the same text in the document's
+/// arena and is held to this one (a debug assertion at its call site, and a generated
+/// test here); [`decodes_to_ascii_ignore_case`] is held to it the same way. Nothing in a
+/// release build calls it.
 pub(crate) fn decode_escape_sequences(source: &str) -> Cow<'_, str> {
     if !source.contains('\\') {
         return Cow::Borrowed(source);
@@ -66,6 +74,73 @@ pub(crate) fn decode_escape_sequences(source: &str) -> Cow<'_, str> {
     }
 
     Cow::Owned(result)
+}
+
+/// [`decode_escape_sequences`] for a string literal's payload, decoded straight into the
+/// document's arena: `None` for the escape-free string (one byte search and no
+/// allocation), else the decoded text, built where it will live rather than in a
+/// heap `String` copied over afterwards.
+#[inline]
+pub(crate) fn decode_escape_sequences_in<'arena>(
+    source: &str,
+    arena: &'arena Bump,
+) -> Option<&'arena str> {
+    if !source.as_bytes().contains(&b'\\') {
+        return None;
+    }
+    Some(decode_escapes_into_arena(source, arena))
+}
+
+/// The decode behind [`decode_escape_sequences_in`], for a source that holds a `\` —
+/// [`decode_escape_sequences`]'s rules, arm for arm. Out of line, so the walk's locals
+/// stay out of the value parser's frame.
+#[inline(never)]
+fn decode_escapes_into_arena<'arena>(source: &str, arena: &'arena Bump) -> &'arena str {
+    // An escape never decodes to more bytes than it spells: `\` plus n hex digits names a
+    // code point below 16^n, whose UTF-8 is at most n bytes for n <= 4 and four bytes for
+    // five or six digits; a simple escape drops its `\`; a trailing `\` is itself.
+    let mut result = BumpString::with_capacity_in(source.len(), arena);
+    let mut chars = source.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch != '\\' {
+            result.push(ch);
+            continue;
+        }
+        let Some(&next_ch) = chars.peek() else {
+            // Trailing backslash
+            result.push('\\');
+            break;
+        };
+        if !next_ch.is_ascii_hexdigit() {
+            // Simple escape: \X → X
+            result.push(next_ch);
+            chars.next();
+            continue;
+        }
+        // Hex escape: one to six digits, one optional CSS-whitespace terminator, and
+        // nothing at all for a value that names no scalar (a surrogate, past U+10FFFF).
+        let mut code_point: u32 = 0;
+        for _ in 0..6 {
+            match chars.peek().and_then(|d| d.to_digit(16)) {
+                Some(d) => {
+                    code_point = code_point * 16 + d;
+                    chars.next();
+                }
+                None => break,
+            }
+        }
+        if let Some(&ws) = chars.peek()
+            && is_css_whitespace(ws)
+        {
+            chars.next();
+        }
+        if let Some(c) = char::from_u32(code_point) {
+            result.push(c);
+        }
+    }
+
+    result.into_bump_str()
 }
 
 /// Whether the `\` immediately before `text`'s end starts a valid escape — i.e. the
@@ -162,9 +237,8 @@ pub(crate) fn escape_span_at(s: &str, i: usize) -> Option<usize> {
 /// `decode_escape_sequences(s).as_bytes().eq_ignore_ascii_case(kw)`: a byte walk that steps
 /// over each escape by [`escape_len`], comparing a verbatim byte as itself and an escape as
 /// the UTF-8 bytes of the code point it spells, so no `String` is built and no `Cow` dropped.
-/// That keeps the decoder — a `String` builder the parser links for string literals — out of
-/// the one printer question that reads an escape-spelled identifier (function-name
-/// recognition, where `\75 rl(` must read as `url`).
+/// That keeps a decoder out of the one printer question that reads an escape-spelled
+/// identifier (function-name recognition, where `\75 rl(` must read as `url`).
 ///
 /// Byte-for-byte the decoder's verdict, including where the two scanners disagree on what
 /// an escape *is*: `escape_len` refuses a `\` before a newline (§4.3.4) where the decoder
@@ -413,6 +487,72 @@ mod tests {
 
         // With ONE leading zero (6 hex digits - CSS maximum)
         assert_eq!(decode_escape_sequences(r"\01F4A9"), "💩");
+    }
+
+    /// The arena decoder against the reference, over every sequence of up to three
+    /// fragments drawn from each escape kind at each edge: hex escapes of one to six
+    /// digits and a seventh that is content, every whitespace terminator (CRLF is two
+    /// code points, so only its CR is taken), a value past U+10FFFF, a surrogate and
+    /// zero, an escaped newline, simple escapes of both quotes, of a letter and of a
+    /// non-ASCII character, a lone backslash (trailing when it comes last, which also
+    /// makes EOF fall mid-escape), and plain neighbours, ASCII and not.
+    #[test]
+    fn the_arena_decoder_matches_the_reference_decoder() {
+        let fragments = [
+            "a",
+            "é",
+            "0",
+            " ",
+            "\\",
+            "\\\\",
+            "\\4",
+            "\\41",
+            "\\041",
+            "\\0041",
+            "\\00041",
+            "\\000041",
+            "\\0000411",
+            "\\41 ",
+            "\\41\t",
+            "\\41\n",
+            "\\41\r\n",
+            "\\41\x0c",
+            "\\110000",
+            "\\D800",
+            "\\0",
+            "\\\n",
+            "\\\"",
+            "\\'",
+            "\\g",
+            "\\é",
+        ];
+        let arena = Bump::new();
+        let mut decoded_cases = 0u32;
+        let mut check = |source: &str| {
+            let reference = decode_escape_sequences(source);
+            match (decode_escape_sequences_in(source, &arena), &reference) {
+                (None, Cow::Borrowed(_)) => {}
+                (Some(decoded), Cow::Owned(reference)) => {
+                    assert_eq!(decoded, reference, "{source:?}");
+                    decoded_cases += 1;
+                }
+                (ours, _) => panic!("{source:?}: arena {ours:?}, reference {reference:?}"),
+            }
+        };
+        check("");
+        for a in fragments {
+            check(a);
+            for b in fragments {
+                check(&format!("{a}{b}"));
+                for c in fragments {
+                    check(&format!("{a}{b}{c}"));
+                }
+            }
+        }
+        assert!(
+            decoded_cases > 10_000,
+            "{decoded_cases} escaped sources decoded"
+        );
     }
 
     /// The comparator must return exactly what decoding and then comparing would.

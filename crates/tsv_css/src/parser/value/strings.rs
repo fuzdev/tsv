@@ -36,10 +36,18 @@ pub fn parse_string_literal<'arena>(
         // Decode CSS escape sequences. No-escape strings stay `Verbatim` (zero alloc —
         // the printer recovers the text from `span`); only escaped strings own arena
         // bytes. The quote char is recovered from `source[span.start]`, not stored.
-        let content = match escapes::decode_escape_sequences(raw_content) {
-            Cow::Borrowed(_) => StringCooked::Verbatim,
-            Cow::Owned(decoded) => StringCooked::Decoded(arena.alloc_str(&decoded)),
+        let content = match escapes::decode_escape_sequences_in(raw_content, arena) {
+            None => StringCooked::Verbatim,
+            Some(decoded) => StringCooked::Decoded(decoded),
         };
+        debug_assert!(
+            match (&content, escapes::decode_escape_sequences(raw_content)) {
+                (StringCooked::Verbatim, Cow::Borrowed(_)) => true,
+                (StringCooked::Decoded(decoded), Cow::Owned(reference)) => **decoded == reference,
+                _ => false,
+            },
+            "the arena decoder left the reference decoder on {raw_content:?}"
+        );
 
         return Some(CssValue::String { content, span });
     }
@@ -75,7 +83,66 @@ fn quoted_string_spans_all(bytes: &[u8]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::quoted_string_spans_all;
+    use super::{parse_string_literal, quoted_string_spans_all};
+    use crate::ast::internal::{CssValue, StringCooked};
+    use crate::escapes::decode_escape_sequences;
+    use bumpalo::Bump;
+    use std::borrow::Cow;
+    use tsv_lang::Span;
+
+    /// A string literal's decoded payload is the reference decoder's, in both quote
+    /// kinds, and an unterminated or early-closed run is no string at all — whatever
+    /// escapes it holds.
+    #[test]
+    fn a_literal_decodes_as_the_reference_decoder_does() {
+        let bodies = [
+            "",
+            "abc",
+            "é",
+            r"\41",
+            r"\41 b",
+            "\\41\r\nb",
+            r"\110000",
+            r"\D800x",
+            r"\0",
+            "a\\\nb",
+            r"a\'b",
+            r#"a\"b"#,
+            r"\\",
+            r"é\é",
+        ];
+        let arena = Bump::new();
+        for body in bodies {
+            for quote in ['"', '\''] {
+                let literal = format!("{quote}{body}{quote}");
+                let span = Span::new(0, literal.len() as u32);
+                let Some(CssValue::String { content, .. }) =
+                    parse_string_literal(&literal, span, &arena)
+                else {
+                    panic!("{literal:?} is one string");
+                };
+                match (content, decode_escape_sequences(body)) {
+                    (StringCooked::Verbatim, Cow::Borrowed(_)) => {}
+                    (StringCooked::Decoded(decoded), Cow::Owned(reference)) => {
+                        assert_eq!(decoded, reference, "{literal:?}");
+                    }
+                    (content, reference) => panic!("{literal:?}: {content:?} vs {reference:?}"),
+                }
+                // Unterminated, closed by an escaped quote alone, and closed early.
+                for open in [
+                    format!("{quote}{body}"),
+                    format!("{quote}{body}\\{quote}"),
+                    format!("{quote}{body}{quote}x{quote}"),
+                ] {
+                    let span = Span::new(0, open.len() as u32);
+                    assert!(
+                        parse_string_literal(&open, span, &arena).is_none(),
+                        "{open:?} is not one closed string"
+                    );
+                }
+            }
+        }
+    }
 
     fn spans_all(s: &str) -> bool {
         quoted_string_spans_all(s.as_bytes())
