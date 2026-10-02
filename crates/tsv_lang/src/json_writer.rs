@@ -691,6 +691,33 @@ fn copy_short(dst: &mut [u8; SHORT_FRAGMENT_MAX], src: &[u8]) {
     }
 }
 
+/// [`JsonWriter::string_value_raw`]'s window: the `,"value":"` key (10), the
+/// value, the `","raw":"` key (9), an escaped opening quote (2), the value
+/// again, an escaped closing quote and the string's own (3) — every byte the
+/// widest admitted token writes. Each of the two [`copy_short`]s is handed a
+/// whole [`SHORT_FRAGMENT_MAX`] chunk at its offset, and the later one starts
+/// at most `10 + 32 + 9 + 2` in, so the same sum covers it.
+const STRING_VALUE_RAW_WINDOW: usize = 96;
+const _: () =
+    assert!(10 + SHORT_FRAGMENT_MAX + 9 + 2 + SHORT_FRAGMENT_MAX + 3 <= STRING_VALUE_RAW_WINDOW);
+
+/// The most digits [`JsonWriter::number_value_raw`] admits. Fifteen nines are
+/// below 2^53, so every admitted token is an integer an `f64` holds exactly.
+const PLAIN_DECIMAL_MAX_DIGITS: usize = 15;
+const _: () = assert!(10u64.pow(PLAIN_DECIMAL_MAX_DIGITS as u32) <= 1 << 53);
+
+/// [`JsonWriter::number_value_raw`]'s window. What it writes is narrow — the
+/// `,"value":` key (9), the digits, the `,"raw":"` key (8), the digits again
+/// and a quote — but each [`copy_short`] is handed a whole
+/// [`SHORT_FRAGMENT_MAX`] chunk at its offset, and it is the second chunk,
+/// starting past both keys and the first copy of the digits, that sets the
+/// width.
+const NUMBER_VALUE_RAW_WINDOW: usize = 64;
+const _: () = assert!(
+    9 + PLAIN_DECIMAL_MAX_DIGITS + 8 + SHORT_FRAGMENT_MAX <= NUMBER_VALUE_RAW_WINDOW
+        && PLAIN_DECIMAL_MAX_DIGITS <= SHORT_FRAGMENT_MAX
+);
+
 /// The widest string [`JsonWriter::string_escape_free_led`] copies inline,
 /// between its two quotes.
 const ESCAPE_FREE_WINDOW: usize = SHORT_FRAGMENT_MAX + 2;
@@ -1226,6 +1253,162 @@ impl JsonWriter {
         self.buf.push(b'"');
         self.buf.extend_from_slice(s.as_bytes());
         self.buf.push(b'"');
+    }
+
+    /// A string literal's two fields, `,"value":"V","raw":"QVQ"`, as one window
+    /// write from its source token `QVQ` — `Q` a quote of either kind, `V` the
+    /// text between — for a token whose value **is** `V` (no escape sequence
+    /// to decode). Byte-identical to `raw(",\"value\":")`, [`JsonWriter::string`]
+    /// on `V`, `raw(",\"raw\":")` and `string` on the token.
+    ///
+    /// Returns `false`, having written nothing, when it declines: `V` longer
+    /// than [`SHORT_FRAGMENT_MAX`] bytes, `V` holding a byte JSON escapes
+    /// (which is also what refuses a `"` inside a `'`-quoted token and any
+    /// `\`), or a token that is not one quote kind at both ends. The caller
+    /// then writes the two fields in full.
+    ///
+    /// One scan of `V` answers for both strings: the token adds only its two
+    /// quotes, and a `"` quote is the one byte of it JSON escapes — written
+    /// here as `\"` — while a `'` stands as it is. `V` is laid down twice by
+    /// [`copy_short`], so no libc `memcpy` runs for a runtime length.
+    ///
+    /// `inline(never)`: one shared body, a leaf on its common path — the grow
+    /// leaves by tail call, as [`JsonWriter::string_escape_free_led`]'s does.
+    #[expect(clippy::expect_used)]
+    #[inline(never)]
+    pub fn string_value_raw(&mut self, token: &[u8]) -> bool {
+        const VALUE_KEY: &[u8; 10] = b",\"value\":\"";
+        const RAW_KEY: &[u8; 9] = b"\",\"raw\":\"";
+        let [quote, v @ .., close] = token else {
+            return false;
+        };
+        let (quote, n) = (*quote, v.len());
+        if n > SHORT_FRAGMENT_MAX
+            || *close != quote
+            || (quote != b'"' && quote != b'\'')
+            || needs_escape(v)
+        {
+            return false;
+        }
+        let base = self.buf.len();
+        if self.buf.capacity() - base < STRING_VALUE_RAW_WINDOW {
+            return self.string_value_raw_grow(token);
+        }
+        self.buf.extend_from_slice(&[0; STRING_VALUE_RAW_WINDOW]);
+        let window = self
+            .buf
+            .last_chunk_mut::<STRING_VALUE_RAW_WINDOW>()
+            .expect("the window was just appended");
+        window[..VALUE_KEY.len()].copy_from_slice(VALUE_KEY);
+        let mut at = VALUE_KEY.len();
+        copy_short(
+            window[at..]
+                .first_chunk_mut::<SHORT_FRAGMENT_MAX>()
+                .expect("the window holds the widest value behind its key"),
+            v,
+        );
+        // The guard is the bound; the `min` restates it on the value.
+        let n = n.min(SHORT_FRAGMENT_MAX);
+        at += n;
+        window[at..at + RAW_KEY.len()].copy_from_slice(RAW_KEY);
+        at += RAW_KEY.len();
+        // The opening quote: `\"` for a double quote, the bare `'` otherwise —
+        // a backslash, overwritten by the quote when the quote takes no escape.
+        let escaped = usize::from(quote == b'"');
+        window[at] = b'\\';
+        window[at + escaped] = quote;
+        at += 1 + escaped;
+        copy_short(
+            window[at..]
+                .first_chunk_mut::<SHORT_FRAGMENT_MAX>()
+                .expect("the window holds the widest raw text behind both keys"),
+            v,
+        );
+        at += n;
+        window[at] = b'\\';
+        window[at + escaped] = quote;
+        window[at + escaped + 1] = b'"';
+        at += 2 + escaped;
+        self.buf.truncate(base + at);
+        true
+    }
+
+    /// [`JsonWriter::string_value_raw`] with the buffer too full for its
+    /// window: grow it, then write. Out of line and whole, so the common path
+    /// makes no call.
+    #[cold]
+    #[inline(never)]
+    fn string_value_raw_grow(&mut self, token: &[u8]) -> bool {
+        self.buf.reserve(STRING_VALUE_RAW_WINDOW);
+        self.string_value_raw(token)
+    }
+
+    /// A numeric literal's two fields, `,"value":N,"raw":"N"`, as one window
+    /// write, for a token that is its own JSON value: plain decimal digits, at
+    /// most [`PLAIN_DECIMAL_MAX_DIGITS`] of them, with no leading zero (a lone
+    /// `0` is admitted). Such a token names an integer every `f64` holds
+    /// exactly, whose shortest decimal form is the token itself.
+    ///
+    /// Returns `false`, having written nothing, for any other token — a
+    /// fraction, an exponent, a radix prefix, a separator, a leading zero, a
+    /// longer run of digits — and the caller writes the two fields in full.
+    ///
+    /// `inline(never)`, and a leaf on its common path, as
+    /// [`JsonWriter::string_value_raw`] is.
+    #[expect(clippy::expect_used)]
+    #[inline(never)]
+    pub fn number_value_raw(&mut self, token: &[u8]) -> bool {
+        const VALUE_KEY: &[u8; 9] = b",\"value\":";
+        const RAW_KEY: &[u8; 8] = b",\"raw\":\"";
+        let n = token.len();
+        if n == 0
+            || n > PLAIN_DECIMAL_MAX_DIGITS
+            || (n > 1 && token[0] == b'0')
+            || !token.iter().all(u8::is_ascii_digit)
+        {
+            return false;
+        }
+        let base = self.buf.len();
+        if self.buf.capacity() - base < NUMBER_VALUE_RAW_WINDOW {
+            return self.number_value_raw_grow(token);
+        }
+        self.buf.extend_from_slice(&[0; NUMBER_VALUE_RAW_WINDOW]);
+        let window = self
+            .buf
+            .last_chunk_mut::<NUMBER_VALUE_RAW_WINDOW>()
+            .expect("the window was just appended");
+        window[..VALUE_KEY.len()].copy_from_slice(VALUE_KEY);
+        let mut at = VALUE_KEY.len();
+        copy_short(
+            window[at..]
+                .first_chunk_mut::<SHORT_FRAGMENT_MAX>()
+                .expect("the window holds a copy's width behind the value key"),
+            token,
+        );
+        // The guard is the bound; the `min` restates it on the value.
+        let n = n.min(PLAIN_DECIMAL_MAX_DIGITS);
+        at += n;
+        window[at..at + RAW_KEY.len()].copy_from_slice(RAW_KEY);
+        at += RAW_KEY.len();
+        copy_short(
+            window[at..]
+                .first_chunk_mut::<SHORT_FRAGMENT_MAX>()
+                .expect("the window holds a copy's width behind both keys"),
+            token,
+        );
+        at += n;
+        window[at] = b'"';
+        self.buf.truncate(base + at + 1);
+        true
+    }
+
+    /// [`JsonWriter::number_value_raw`] with the buffer too full for its
+    /// window: grow it, then write.
+    #[cold]
+    #[inline(never)]
+    fn number_value_raw_grow(&mut self, token: &[u8]) -> bool {
+        self.buf.reserve(NUMBER_VALUE_RAW_WINDOW);
+        self.number_value_raw(token)
     }
 
     /// A dynamic string value the **caller** guarantees needs no escape,
@@ -2292,6 +2475,150 @@ mod tests {
         grade(b"", &clean);
         grade(b",\"name\":", &clean);
         grade(b",\"abcdefghij\":", &clean);
+    }
+
+    /// [`JsonWriter::string_value_raw`] against the four appends it stands for
+    /// — `raw` key, `string` value, `raw` key, `string` token — for both quote
+    /// kinds over the whole escape-parity case set and every length across the
+    /// inline width, into a buffer that must grow for the window and one that
+    /// need not. A refusal must leave the buffer untouched, and must happen
+    /// exactly when the stated conditions say, so neither arm can be dead.
+    #[test]
+    fn string_value_raw_matches_two_string_calls() {
+        let mut values: Vec<String> = escape_cases();
+        for len in 0..=SHORT_FRAGMENT_MAX + 3 {
+            values.push("a".repeat(len));
+            values.push("é".repeat(len / 2) + &"z".repeat(len % 2));
+            if len > 0 {
+                // one byte the scan must see, at each end of the value
+                for byte in ['"', '\\', '\'', '\n', '\u{1f}', '\u{7f}', '\u{2028}'] {
+                    values.push(format!("{byte}{}", "b".repeat(len - 1)));
+                    values.push(format!("{}{byte}", "b".repeat(len - 1)));
+                }
+            }
+        }
+        let (mut taken, mut refused) = (0usize, 0usize);
+        for value in &values {
+            for quote in ['\'', '"'] {
+                let token = format!("{quote}{value}{quote}");
+                let admitted = value.len() <= SHORT_FRAGMENT_MAX
+                    && value.bytes().all(|b| b >= 0x20 && b != b'"' && b != b'\\');
+                for (cap, prefix) in [(0, 0), (0, 5), (512, 0), (512, 7)] {
+                    let front = "{".repeat(prefix);
+                    let mut ours = JsonWriter::with_capacity(cap);
+                    ours.raw(&front);
+                    let wrote = ours.string_value_raw(token.as_bytes());
+                    assert_eq!(wrote, admitted, "wrong arm for {token:?}");
+                    if !wrote {
+                        assert_eq!(
+                            ours.as_bytes(),
+                            front.as_bytes(),
+                            "a refusal wrote: {token:?}"
+                        );
+                        refused += 1;
+                        continue;
+                    }
+                    taken += 1;
+                    ours.raw("}");
+                    let mut theirs = JsonWriter::with_capacity(0);
+                    theirs.raw(&front);
+                    theirs.raw(",\"value\":");
+                    theirs.string(value);
+                    theirs.raw(",\"raw\":");
+                    theirs.string(&token);
+                    theirs.raw("}");
+                    assert_eq!(
+                        String::from_utf8(ours.into_bytes()).expect("UTF-8"),
+                        String::from_utf8(theirs.into_bytes()).expect("UTF-8"),
+                        "string_value_raw broke on {token:?}"
+                    );
+                }
+            }
+        }
+        assert!(taken > 100 && refused > 100, "both arms must be driven");
+        // Not a token of one quote kind at both ends: refused whole.
+        for token in ["", "'", "\"", "'a\"", "\"a'", "`a`", "ab", "'a", "a'"] {
+            let mut ours = JsonWriter::with_capacity(256);
+            assert!(!ours.string_value_raw(token.as_bytes()), "{token:?}");
+            assert!(ours.as_bytes().is_empty(), "a refusal wrote: {token:?}");
+        }
+    }
+
+    /// [`JsonWriter::number_value_raw`] against the appends it stands for — the
+    /// value through [`JsonWriter::i64`], the raw text through
+    /// [`JsonWriter::string`] — at every admitted width, with the widest token
+    /// written at the very end of its window, and refusing every token that is
+    /// not its own value's digits.
+    #[test]
+    fn number_value_raw_matches_the_integer_and_string_appends() {
+        let mut admitted: Vec<String> = (0..=120u64).map(|n| n.to_string()).collect();
+        for digits in 1..=PLAIN_DECIMAL_MAX_DIGITS {
+            admitted.push("9".repeat(digits));
+            admitted.push(format!("1{}", "0".repeat(digits - 1)));
+            admitted.push("1234567890123456789"[..digits].to_string());
+        }
+        assert!(admitted.iter().any(|t| t.len() == PLAIN_DECIMAL_MAX_DIGITS));
+        for token in &admitted {
+            for (cap, prefix) in [(0, 0), (0, 5), (512, 0), (512, 7)] {
+                let front = "[".repeat(prefix);
+                let mut ours = JsonWriter::with_capacity(cap);
+                ours.raw(&front);
+                assert!(ours.number_value_raw(token.as_bytes()), "refused {token}");
+                ours.raw("}");
+                let mut theirs = JsonWriter::with_capacity(0);
+                theirs.raw(&front);
+                theirs.raw(",\"value\":");
+                theirs.i64(token.parse().expect("an admitted token is an integer"));
+                theirs.raw(",\"raw\":");
+                theirs.string(token);
+                theirs.raw("}");
+                assert_eq!(
+                    String::from_utf8(ours.into_bytes()).expect("ASCII"),
+                    String::from_utf8(theirs.into_bytes()).expect("ASCII"),
+                    "number_value_raw broke on {token}"
+                );
+                // The value an `f64` reads from the token prints as the token.
+                assert_eq!(
+                    format!("{}", token.parse::<f64>().expect("a number")),
+                    *token
+                );
+            }
+        }
+        let sixteen = "1".repeat(PLAIN_DECIMAL_MAX_DIGITS + 1);
+        for token in [
+            "",
+            "00",
+            "01",
+            "010",
+            "08",
+            "0.5",
+            ".5",
+            "5.",
+            "1e3",
+            "1E3",
+            "0x10",
+            "0b1",
+            "0o7",
+            "1_000",
+            "1n",
+            "-0",
+            "-1",
+            "+1",
+            " 1",
+            "1 ",
+            "٣",
+            "1.0",
+            sixteen.as_str(),
+            "9007199254740993",
+        ] {
+            let mut ours = JsonWriter::with_capacity(256);
+            ours.raw("[");
+            assert!(
+                !ours.number_value_raw(token.as_bytes()),
+                "admitted {token:?}"
+            );
+            assert_eq!(ours.as_bytes(), b"[", "a refusal wrote: {token:?}");
+        }
     }
 
     /// [`JsonWriter::string_led`] and [`JsonWriter::string_led_words`] against `raw(lead)` +

@@ -1079,8 +1079,73 @@ pub(super) fn write_number_value(w: &mut JsonWriter, n: f64) {
 }
 
 /// Emits a `Literal` node.
+///
+/// The common literals take [`write_literal_fields_fused`]'s single write; any
+/// it declines takes [`write_literal_fields`].
 pub(super) fn write_literal(w: &mut JsonWriter, lit: &internal::Literal<'_>, ctx: &Ctx<'_>) {
     node_header(w, "Literal", lit.span, ctx);
+    #[cfg(debug_assertions)]
+    let fields_from = w.as_bytes().len();
+    if write_literal_fields_fused(w, lit, ctx) {
+        #[cfg(debug_assertions)]
+        {
+            let mut full = JsonWriter::with_capacity(0);
+            write_literal_fields(&mut full, lit, ctx);
+            debug_assert_eq!(
+                String::from_utf8_lossy(&w.as_bytes()[fields_from..]),
+                String::from_utf8_lossy(full.as_bytes()),
+                "the fused literal fields must be the full path's bytes"
+            );
+        }
+    } else {
+        write_literal_fields(w, lit, ctx);
+    }
+    close_node(w, "Literal", lit.span, ctx);
+}
+
+/// A `Literal`'s `value` and `raw` fields as one write, for the literals whose
+/// two fields are one constant or one source token: a string with no escape to
+/// decode, a plain decimal integer, `true`, `false` and `null`. Returns `false`,
+/// having written nothing, for every other literal — and for a string or number
+/// the writer's own conditions decline ([`JsonWriter::string_value_raw`],
+/// [`JsonWriter::number_value_raw`]).
+///
+/// A numeric token is tested as text, not by its parsed value: one made only of
+/// decimal digits with no leading zero is the shortest form of the integer it
+/// names, so the value the parser stored prints as those same digits.
+#[inline]
+fn write_literal_fields_fused(
+    w: &mut JsonWriter,
+    lit: &internal::Literal<'_>,
+    ctx: &Ctx<'_>,
+) -> bool {
+    match lit.value {
+        internal::LiteralValue::String(internal::StringCooked::Verbatim) => {
+            w.string_value_raw(lit.span.extract(ctx.source).as_bytes())
+        }
+        internal::LiteralValue::Number(_) => {
+            w.number_value_raw(lit.span.extract(ctx.source).as_bytes())
+        }
+        internal::LiteralValue::Boolean(true) => {
+            w.raw(",\"value\":true,\"raw\":\"true\"");
+            true
+        }
+        internal::LiteralValue::Boolean(false) => {
+            w.raw(",\"value\":false,\"raw\":\"false\"");
+            true
+        }
+        internal::LiteralValue::Null => {
+            w.raw(",\"value\":null,\"raw\":\"null\"");
+            true
+        }
+        internal::LiteralValue::String(internal::StringCooked::Decoded(_))
+        | internal::LiteralValue::BigInt => false,
+    }
+}
+
+/// A `Literal`'s `value`, `raw` and (for a BigInt) `bigint` fields, field by
+/// field — every literal's general emission.
+fn write_literal_fields(w: &mut JsonWriter, lit: &internal::Literal<'_>, ctx: &Ctx<'_>) {
     w.raw(",\"value\":");
     // `bigint` is emitted only for BigInt literals (`skip_serializing_if` on
     // `Option`), and shares the decimal string with `value`.
@@ -1112,7 +1177,6 @@ pub(super) fn write_literal(w: &mut JsonWriter, lit: &internal::Literal<'_>, ctx
         w.raw(",\"bigint\":");
         w.string(&decimal);
     }
-    close_node(w, "Literal", lit.span, ctx);
 }
 
 /// Shared `Identifier` node emission. Emits the `Identifier` fields: `name`,
