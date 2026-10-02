@@ -365,16 +365,26 @@ const BOUNDARY_BITS: [u8; 256] = {
 const MAY_OPEN_BOUNDARY: u8 = 1;
 const ENDS_WORD_RUN: u8 = 2;
 
-/// Does any byte of `bytes` carry `bit` in [`BOUNDARY_BITS`]? An OR folded over the whole
-/// run with no exit: a value run is a handful of bytes, too short for an early exit's
-/// per-byte branch or a word loop's per-call splats to pay for themselves.
+/// Does any byte of `bytes` carry `bit` in [`BOUNDARY_BITS`]? An OR folded over the run
+/// eight bytes at a time, asked once per chunk, with the last few bytes folded on their
+/// own. A value run is a handful of bytes, too short for a per-byte exit's branch or a
+/// word loop's per-call splats to pay for themselves — but a fixed chunk of eight is a
+/// loop the compiler unrolls into eight table loads with no counter between them, and
+/// the one test behind it lets a run that does split leave at its first chunk.
 #[inline]
 fn any_byte_has(bytes: &[u8], bit: u8) -> bool {
-    bytes
-        .iter()
-        .fold(0u8, |seen, &b| seen | BOUNDARY_BITS[b as usize])
-        & bit
-        != 0
+    let fold = |chunk: &[u8]| {
+        chunk
+            .iter()
+            .fold(0u8, |seen, &b| seen | BOUNDARY_BITS[b as usize])
+    };
+    let mut chunks = bytes.chunks_exact(8);
+    for chunk in &mut chunks {
+        if fold(chunk) & bit != 0 {
+            return true;
+        }
+    }
+    fold(chunks.remainder()) & bit != 0
 }
 
 /// The tokenizer behind [`split_value_run`], without its refusal pass.
@@ -741,7 +751,64 @@ fn close_group(run: &str, i: &mut usize) -> TokenKind {
 
 #[cfg(test)]
 mod tests {
-    use super::split_value_run;
+    use super::{BOUNDARY_BITS, ENDS_WORD_RUN, MAY_OPEN_BOUNDARY, any_byte_has, split_value_run};
+
+    /// The chunked fold against the byte loop it is: for both bits, a carrier of each
+    /// bit alone, of both and of neither at every position of every length that crosses
+    /// zero to five chunk boundaries, plus two carriers at every pair of positions.
+    #[test]
+    fn any_byte_has_matches_the_byte_loop() {
+        let model =
+            |bytes: &[u8], bit: u8| bytes.iter().any(|&b| BOUNDARY_BITS[b as usize] & bit != 0);
+        let carrier = |bits: u8| {
+            (0..=255u8)
+                .find(|&b| BOUNDARY_BITS[b as usize] == bits)
+                .unwrap_or_else(|| panic!("no byte carries exactly {bits:#b}"))
+        };
+        let neither = carrier(0);
+        // `ENDS_WORD_RUN` alone may have no byte (every word-ending byte may also open a
+        // boundary); the pairs below then cover it through the bytes that carry both.
+        let specials: Vec<u8> = (0..=255u8)
+            .filter(|&b| BOUNDARY_BITS[b as usize] != 0)
+            .fold(Vec::new(), |mut seen: Vec<u8>, b| {
+                if !seen
+                    .iter()
+                    .any(|&s| BOUNDARY_BITS[s as usize] == BOUNDARY_BITS[b as usize])
+                {
+                    seen.push(b);
+                }
+                seen
+            });
+        assert!(!specials.is_empty());
+        for len in 0..=41usize {
+            let plain = vec![neither; len];
+            for bit in [MAY_OPEN_BOUNDARY, ENDS_WORD_RUN] {
+                assert_eq!(any_byte_has(&plain, bit), model(&plain, bit), "plain {len}");
+                for &special in &specials {
+                    for at in 0..len {
+                        let mut bytes = plain.clone();
+                        bytes[at] = special;
+                        assert_eq!(
+                            any_byte_has(&bytes, bit),
+                            model(&bytes, bit),
+                            "{special:#x} at {at} of {len}, bit {bit}"
+                        );
+                        for &other in &specials {
+                            for second in at + 1..len {
+                                bytes[second] = other;
+                                assert_eq!(
+                                    any_byte_has(&bytes, bit),
+                                    model(&bytes, bit),
+                                    "{special:#x} at {at}, {other:#x} at {second} of {len}"
+                                );
+                                bytes[second] = neither;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     /// The members as text. Every member that is an operator is spelled with its own
     /// byte, so the `is_operator` tag is graded by the same assertion as the split. The
