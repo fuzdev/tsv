@@ -29,6 +29,7 @@ use crate::ast::internal;
 use crate::whitespace::Edge;
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, DocContext, arena::DocId};
+use tsv_lang::printing::visual_width;
 use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 
 /// Whether `atom` is a media-query `and`/`or` connector (ASCII case-insensitive per
@@ -102,6 +103,13 @@ fn media_query_list(content: &str) -> MediaQueryList<'_> {
         entries,
         closing_comma,
     }
+}
+
+/// The display width of `text`'s first line — what a text written after a doc adds to the
+/// doc's last line, and so what the doc is fitted against. A gap's text spans lines only
+/// through a multi-line comment.
+fn first_line_width(text: &str) -> usize {
+    visual_width(text.split('\n').next().unwrap_or(text), TAB_WIDTH)
 }
 
 /// Where an at-rule's prelude region ends: its block's `{`, or its statement's `;` — the far
@@ -1034,8 +1042,13 @@ impl<'a> Printer<'a> {
     /// out-of-paren gaps re-emitted at its authored position, single-spaced.
     ///
     /// Both clauses are independently optional (css-cascade-6), so a bare `@scope { … }`
-    /// writes no prelude and `@scope to (limit)` writes only the limit. The lists are nested
-    /// context, so they don't wrap (same as `:is()`, `:where()`).
+    /// writes no prelude and `@scope to (limit)` writes only the limit. Each clause's list
+    /// wraps inside its own parens when the line does not fit (`print_selector_list_nested`),
+    /// and the line it is measured on runs through whatever follows the clause up to the next
+    /// place a break can land: the root's through `) to (` — the limit's opening paren, where
+    /// the limit's own list may drop — and the last clause's through `) {`. So a line that is
+    /// too wide opens the limit while the root's line still fits with the `) to (` behind it,
+    /// and the root otherwise.
     ///
     /// Each clause's `paren` span recovers a comment leading/trailing the list *inside* the
     /// parens (the same wrapping the `:is()` args use). The out-of-paren prelude gaps —
@@ -1043,7 +1056,7 @@ impl<'a> Printer<'a> {
     /// limit `(`, and after the last `)` before the block `{` — re-emit their comments here
     /// too, normalized to a single space on each side (prettier freezes the source spacing;
     /// a cataloged divergence — see conformance_prettier_css.md §CSS: Comments), and each
-    /// claims a boundary run the parser stepped there ([`Self::write_prelude_gap`]).
+    /// claims a boundary run the parser stepped there ([`Self::prelude_gap_text`]).
     fn write_scope_prelude(
         &mut self,
         root: Option<&internal::ScopeClause<'_>>,
@@ -1054,7 +1067,7 @@ impl<'a> Printer<'a> {
         // `@scope` (not valid CSS, but accepted like any prelude).
         let block_start = prelude_region_end(atrule);
         // Each gap ahead of a `(` or `to` keeps the author's separation from it when a claim
-        // prints it (`write_prelude_gap`), so the literal after it writes no space of its own;
+        // prints it (`prelude_gap_text`), so the literal after it writes no space of its own;
         // the gap before the terminator is flush against it, the block opener spacing itself.
         let before_token = Edge::Presence;
         let before_end = Edge::Flush;
@@ -1070,31 +1083,78 @@ impl<'a> Printer<'a> {
         } else {
             before_token
         };
-        let mut claimed = self.write_prelude_gap(atrule.name_span.end, first_start, lead_edge);
+        let claimed = self.write_prelude_gap(atrule.name_span.end, first_start, lead_edge);
 
-        if let Some(root) = root {
-            self.write_scope_clause(root, !claimed);
-        }
-        if let Some(limit) = limit {
-            // Between-clause gap: root `)` → `to` (only when a root precedes it).
-            if let Some(root) = root {
-                claimed = self.write_prelude_gap(root.paren.end, limit.to_span.start, before_token);
-            }
-            self.write(if claimed { "to" } else { " to" });
-            // After-`to` gap: `to` → limit `(`. A run glued to `to` stays glued (the prelude
-            // reader splits the keyword off it — `scope_to_keyword_len`).
-            claimed =
-                self.write_prelude_gap(limit.to_span.end, limit.clause.paren.start, before_token);
-            self.write_scope_clause(&limit.clause, !claimed);
-        }
-        // Pre-`{` gap: after the last clause's `)` (only when a clause exists — a
-        // bare `@scope /* c */ {` comment is the leading gap above).
-        if let Some(last_end) = limit
+        // What follows the last clause's list on its line: its `)`, the pre-`{` gap (only
+        // when a clause exists — a bare `@scope /* c */ {` comment is the leading gap
+        // above), and the terminator the at-rule writes after the prelude.
+        let terminator_width = if atrule.block.is_some() { 2 } else { 1 };
+        let last_end = limit
             .map(|l| l.clause.paren.end)
-            .or_else(|| root.map(|r| r.paren.end))
-        {
-            self.write_prelude_gap(last_end, block_start, before_end);
+            .or_else(|| root.map(|r| r.paren.end));
+        let mut tail = String::from(")");
+        if let Some(last_end) = last_end {
+            tail.push_str(&self.prelude_gap_text(last_end, block_start, before_end).0);
         }
+        // The terminator lands on the tail's last line, so it counts against the clause's
+        // line only when the tail stays on it (a multi-line comment in the pre-`{` gap
+        // carries it down).
+        let tail_width = first_line_width(&tail)
+            + if tail.contains('\n') {
+                0
+            } else {
+                terminator_width
+            };
+
+        match (root, limit) {
+            (Some(root), Some(limit)) => {
+                // What follows the root's list on its line: its `)`, the between-clause gap,
+                // `to`, the after-`to` gap, and the limit's `(`. A run glued to `to` stays
+                // glued (the prelude reader splits the keyword off it —
+                // `scope_to_keyword_len`).
+                let mut bridge = String::from(")");
+                let (gap, gap_claimed) =
+                    self.prelude_gap_text(root.paren.end, limit.to_span.start, before_token);
+                bridge.push_str(&gap);
+                bridge.push_str(if gap_claimed { "to" } else { " to" });
+                let (gap, gap_claimed) = self.prelude_gap_text(
+                    limit.to_span.end,
+                    limit.clause.paren.start,
+                    before_token,
+                );
+                bridge.push_str(&gap);
+                bridge.push_str(if gap_claimed { "(" } else { " (" });
+
+                // Empty limit parens (`to ()`) have no break of their own, so the root's
+                // line runs on through the tail.
+                let limit_paren = limit.clause.paren.extract(self.source);
+                let limit_is_empty = limit_paren[1..limit_paren.len() - 1]
+                    .bytes()
+                    .all(|b| b.is_ascii_whitespace());
+                let root_suffix =
+                    first_line_width(&bridge) + if limit_is_empty { tail_width } else { 0 };
+                self.write(if claimed { "(" } else { " (" });
+                self.print_selector_list_nested(&root.list, root.paren, root_suffix);
+                self.write(&bridge);
+                self.print_selector_list_nested(&limit.clause.list, limit.clause.paren, tail_width);
+            }
+            (Some(clause), None) => {
+                self.write(if claimed { "(" } else { " (" });
+                self.print_selector_list_nested(&clause.list, clause.paren, tail_width);
+            }
+            (None, Some(limit)) => {
+                self.write(if claimed { "to" } else { " to" });
+                let claimed = self.write_prelude_gap(
+                    limit.to_span.end,
+                    limit.clause.paren.start,
+                    before_token,
+                );
+                self.write(if claimed { "(" } else { " (" });
+                self.print_selector_list_nested(&limit.clause.list, limit.clause.paren, tail_width);
+            }
+            (None, None) => return,
+        }
+        self.write(&tail);
     }
 
     /// Emit a `@custom-selector` prelude: ` :--name <selector-list>`, with any comment in
@@ -1194,28 +1254,27 @@ impl<'a> Printer<'a> {
     /// normalizes to single spaces. A gap with no comment writes nothing — the neighboring
     /// ` (`/` to`/` {` literals already carry the separator.
     fn write_prelude_gap(&mut self, start: u32, end: u32, trail: Edge) -> bool {
-        if self.gap_holds_member(start, end) {
-            let kept = self.spell_gap_items(start, end, Edge::Presence, trail);
-            self.write(&kept);
-            return true;
-        }
-        let text = self.comment_blocks_in_range(start, end);
-        if !text.is_empty() {
-            self.write(" ");
-            self.write(&text);
-        }
-        false
+        let (text, claimed) = self.prelude_gap_text(start, end, trail);
+        self.write(&text);
+        claimed
     }
 
-    /// Emit one `@scope` clause — ` (<selector-list>)` — interleaving any comment inside
-    /// the parens (leading/trailing the list) via the clause's `paren` span, the same
-    /// wrapping the `:is()` args use. The printer twin of the parser's `parse_scope_clause`.
-    /// `spaced` is false where a boundary claim before it already spelled the author's
-    /// separation (`write_prelude_gap`).
-    fn write_scope_clause(&mut self, clause: &internal::ScopeClause<'_>, spaced: bool) {
-        self.write(if spaced { " (" } else { "(" });
-        self.print_selector_list_nested(&clause.list, Some(clause.paren));
-        self.write(")");
+    /// The text [`Self::write_prelude_gap`] writes for the gap `[start, end)`, and whether a
+    /// boundary claim spelled it — for a caller that must measure the gap before the text
+    /// ahead of it is written (an `@scope` clause's list is fitted against what follows it).
+    /// Asked once per gap: the comment collector records what it returns as printed.
+    fn prelude_gap_text(&self, start: u32, end: u32, trail: Edge) -> (String, bool) {
+        if self.gap_holds_member(start, end) {
+            return (
+                self.spell_gap_items(start, end, Edge::Presence, trail),
+                true,
+            );
+        }
+        let mut text = self.comment_blocks_in_range(start, end);
+        if !text.is_empty() {
+            text.insert(0, ' ');
+        }
+        (text, false)
     }
 
     /// Format an `@import` media query (doc-first).

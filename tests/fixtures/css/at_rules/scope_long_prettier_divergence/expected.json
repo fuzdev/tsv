@@ -1,0 +1,531 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 1864,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 150,
+				"end": 277,
+				"name": "scope",
+				"prelude": "(.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) to (.b > .c)",
+				"block": {
+					"type": "Block",
+					"start": 247,
+					"end": 277,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 251,
+								"end": 253,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 251,
+										"end": 253,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "a",
+														"start": 251,
+														"end": 253
+													}
+												],
+												"start": 251,
+												"end": 253
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 254,
+								"end": 274,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 259,
+										"end": 269,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 251,
+							"end": 274
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 322,
+				"end": 455,
+				"name": "scope",
+				"prelude": "(.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) to (\n\t\t.b > .c\n\t)",
+				"block": {
+					"type": "Block",
+					"start": 425,
+					"end": 455,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 429,
+								"end": 431,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 429,
+										"end": 431,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "b",
+														"start": 429,
+														"end": 431
+													}
+												],
+												"start": 429,
+												"end": 431
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 432,
+								"end": 452,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 437,
+										"end": 447,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 429,
+							"end": 452
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 508,
+				"end": 635,
+				"name": "scope",
+				"prelude": "(.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)",
+				"block": {
+					"type": "Block",
+					"start": 605,
+					"end": 635,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 609,
+								"end": 611,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 609,
+										"end": 611,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "c",
+														"start": 609,
+														"end": 611
+													}
+												],
+												"start": 609,
+												"end": 611
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 612,
+								"end": 632,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 617,
+										"end": 627,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 609,
+							"end": 632
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 697,
+				"end": 830,
+				"name": "scope",
+				"prelude": "(\n\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t)",
+				"block": {
+					"type": "Block",
+					"start": 800,
+					"end": 830,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 804,
+								"end": 806,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 804,
+										"end": 806,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "d",
+														"start": 804,
+														"end": 806
+													}
+												],
+												"start": 804,
+												"end": 806
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 807,
+								"end": 827,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 812,
+										"end": 822,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 804,
+							"end": 827
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 922,
+				"end": 1079,
+				"name": "scope",
+				"prelude": "(\n\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1,\n\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2,\n\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa3\n\t) to (.b)",
+				"block": {
+					"type": "Block",
+					"start": 1049,
+					"end": 1079,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 1053,
+								"end": 1055,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 1053,
+										"end": 1055,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "e",
+														"start": 1053,
+														"end": 1055
+													}
+												],
+												"start": 1053,
+												"end": 1055
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 1056,
+								"end": 1076,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 1061,
+										"end": 1071,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 1053,
+							"end": 1076
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 1165,
+				"end": 1302,
+				"name": "scope",
+				"prelude": "(.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) to (\n\t\t.b\n\t)",
+				"block": {
+					"type": "Block",
+					"start": 1272,
+					"end": 1302,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 1276,
+								"end": 1278,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 1276,
+										"end": 1278,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "f",
+														"start": 1276,
+														"end": 1278
+													}
+												],
+												"start": 1276,
+												"end": 1278
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 1279,
+								"end": 1299,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 1284,
+										"end": 1294,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 1276,
+							"end": 1299
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 1386,
+				"end": 1524,
+				"name": "scope",
+				"prelude": "(\n\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t) to (.b)",
+				"block": {
+					"type": "Block",
+					"start": 1494,
+					"end": 1524,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 1498,
+								"end": 1500,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 1498,
+										"end": 1500,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "g",
+														"start": 1498,
+														"end": 1500
+													}
+												],
+												"start": 1498,
+												"end": 1500
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 1501,
+								"end": 1521,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 1506,
+										"end": 1516,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 1498,
+							"end": 1521
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 1599,
+				"end": 1697,
+				"name": "scope",
+				"prelude": "(.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 1751,
+				"end": 1855,
+				"name": "scope",
+				"prelude": "(\n\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t)",
+				"block": null
+			}
+		],
+		"comments": [
+			{
+				"type": "CSSComment",
+				"value": " An @scope prelude wraps at 101 chars: the clause that does not fit opens its parens ",
+				"start": 9,
+				"end": 98
+			},
+			{
+				"type": "CSSComment",
+				"value": " 100 chars - the limit clause stays inline ",
+				"start": 101,
+				"end": 148
+			},
+			{
+				"type": "CSSComment",
+				"value": " 101 chars - the limit clause opens ",
+				"start": 280,
+				"end": 320
+			},
+			{
+				"type": "CSSComment",
+				"value": " 100 chars, root clause only - stays inline ",
+				"start": 458,
+				"end": 506
+			},
+			{
+				"type": "CSSComment",
+				"value": " 101 chars, root clause only - the root clause opens ",
+				"start": 638,
+				"end": 695
+			},
+			{
+				"type": "CSSComment",
+				"value": " 121 chars inline - a selector list that does not fit breaks one selector per line ",
+				"start": 833,
+				"end": 920
+			},
+			{
+				"type": "CSSComment",
+				"value": " the limit clause opens and the root's line, with its `) to (`, is 100 chars ",
+				"start": 1082,
+				"end": 1163
+			},
+			{
+				"type": "CSSComment",
+				"value": " one more and that line would be 101 chars - the root clause opens instead ",
+				"start": 1305,
+				"end": 1384
+			},
+			{
+				"type": "CSSComment",
+				"value": " 100 chars, no block - the `);` is the whole suffix, stays inline ",
+				"start": 1527,
+				"end": 1597
+			},
+			{
+				"type": "CSSComment",
+				"value": " 101 chars, no block - the root clause opens ",
+				"start": 1700,
+				"end": 1749
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 1856,
+			"styles": "\n\t/* An @scope prelude wraps at 101 chars: the clause that does not fit opens its parens */\n\n\t/* 100 chars - the limit clause stays inline */\n\t@scope (.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) to (.b > .c) {\n\t\t.a {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* 101 chars - the limit clause opens */\n\t@scope (.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) to (\n\t\t.b > .c\n\t) {\n\t\t.b {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* 100 chars, root clause only - stays inline */\n\t@scope (.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) {\n\t\t.c {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* 101 chars, root clause only - the root clause opens */\n\t@scope (\n\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t) {\n\t\t.d {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* 121 chars inline - a selector list that does not fit breaks one selector per line */\n\t@scope (\n\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1,\n\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2,\n\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa3\n\t) to (.b) {\n\t\t.e {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* the limit clause opens and the root's line, with its `) to (`, is 100 chars */\n\t@scope (.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) to (\n\t\t.b\n\t) {\n\t\t.f {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* one more and that line would be 101 chars - the root clause opens instead */\n\t@scope (\n\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t) to (.b) {\n\t\t.g {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* 100 chars, no block - the `);` is the whole suffix, stays inline */\n\t@scope (.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa);\n\n\t/* 101 chars, no block - the root clause opens */\n\t@scope (\n\t\t.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t);\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 1865,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

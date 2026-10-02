@@ -21,6 +21,7 @@ in [conformance_prettier.md](./conformance_prettier.md).
 - @media value newline — ◆design_choice — [media_value_newline](../tests/fixtures/css/at_rules/media_value_newline_prettier_divergence/)
 - @scope whitespace — ◆stable_quirk — [scope_complex](../tests/fixtures/css/at_rules/scope_complex_prettier_divergence/)
 - @scope newlines — ◆stable_quirk — [scope_selector](../tests/fixtures/css/at_rules/scope_selector_prettier_divergence/)
+- @scope line wrap — ◆print_width — [scope_long](../tests/fixtures/css/at_rules/scope_long_prettier_divergence/) (a clause that does not fit opens its parens, and a selector list inside breaks one selector per line; each clause is measured on its line through whatever follows it — the root through its `) to (`, the last clause through its `) {` — so the limit clause opens while the root's line still fits with the `) to (` behind it, and the root clause opens otherwise; prettier never wraps an `@scope` prelude and keeps the wrapped form when it is authored)
 - @custom-selector name case — ◆prettier_bug — [custom_selector_name_case](../tests/fixtures/css/at_rules/custom_selector_name_case_prettier_divergence/)
 - @custom-selector glued name — ◆design_choice — [custom_selector_name_glued](../tests/fixtures/css/at_rules/custom_selector_name_glued_prettier_divergence/)
 - @supports line wrap — ◆print_width — [supports_long](../tests/fixtures/css/at_rules/supports_long_prettier_divergence/)

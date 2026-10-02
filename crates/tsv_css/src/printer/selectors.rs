@@ -111,9 +111,14 @@ impl<'a> Printer<'a> {
     /// Format a selector list in a nested context that wraps inside its own
     /// parentheses — `@scope (root) to (limit)`. The caller writes the `(`/`)`; this
     /// renders the inner list, breaking each selector onto its own indented line
-    /// when it exceeds the print width (never the always-break top-level rule).
+    /// when the line, with `suffix_width` behind it, does not fit (never the always-break
+    /// top-level rule).
     ///
-    /// `paren_span` is the clause's full `(…)` span (end one past `)`, the pseudo-arg
+    /// `suffix_width` is the width of what the caller writes after the list on its line —
+    /// the `)` and everything behind it up to the next place a break can land — which the
+    /// fit reserves, so the list opens rather than leave that line over the print width.
+    ///
+    /// `paren` is the clause's full `(…)` span (end one past `)`, the pseudo-arg
     /// convention). Comments leading or trailing the selector list but inside the parens
     /// (`@scope (/* c */ .a)`) sit outside `list.span`, and so does a boundary run at either
     /// end (`@scope (.a <NBSP>)`), so both are claimed here by
@@ -121,21 +126,19 @@ impl<'a> Printer<'a> {
     pub(super) fn print_selector_list_nested(
         &mut self,
         list: &internal::SelectorList<'_>,
-        paren_span: Option<Span>,
+        paren: Span,
+        suffix_width: usize,
     ) {
         if list.selectors.is_empty() {
             return;
         }
         let d = self.d();
-        let inner = match paren_span {
-            Some(paren_span) => self.build_paren_selector_list_inner(list, paren_span),
-            None => self.build_nested_selector_list_doc(list),
-        };
+        let inner = self.build_paren_selector_list_inner(list, paren);
         // The caller already wrote `(`; emit `softline inner` indented, then a
         // trailing softline so the closing `)` (written by the caller) lands at the
-        // base level when broken. Reserve `) {`-ish via a 3-col suffix.
+        // base level when broken.
         let doc = d.group(d.concat(&[d.indent(d.concat(&[d.softline(), inner])), d.softline()]));
-        self.write_arena_doc_with_suffix(doc, 3);
+        self.write_arena_doc_with_suffix(doc, suffix_width);
     }
 
     /// The contents of a selector list in PARENS — a pseudo-class's argument list (`:is()`,
