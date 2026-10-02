@@ -212,7 +212,7 @@ pub(crate) enum ParsedElement<'arena> {
     SpecialElement(SpecialElement<'arena>),
 }
 
-/// Where an opening tag ended, as [`SvelteParser::finish_opening_tag`] read it.
+/// Where an opening tag ended, as [`SvelteParser::read_opening_tag_end`] read it.
 ///
 /// The two offsets are adjacent and easy to transpose, so they are named rather than
 /// positional: `gt` is the `>` byte itself — the element's `open_tag_end`, which is where the
@@ -417,21 +417,43 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// `>`. Shared by both element bodies and by the root dispatch's
     /// [`parse_svelte_options`](super::SvelteParser::parse_svelte_options), which differ in
     /// everything *around* the tag but terminate it identically.
+    ///
+    /// Consuming the `>` lexes the token behind it as template, so this is for a tag whose
+    /// content IS template. One whose content is scanned raw stops at the `>` instead — see
+    /// [`read_opening_tag_end`](Self::read_opening_tag_end).
     pub(super) fn finish_opening_tag(&mut self) -> Result<OpeningTagEnd, ParseError> {
+        let opening = self.read_opening_tag_end()?;
+        self.advance()?; // consume >
+        Ok(opening)
+    }
+
+    /// Read what closes an opening tag — the optional self-closing `/`, consumed, then the
+    /// required `>`, which is left as the current token.
+    ///
+    /// Stopping there is what a raw content scan needs: the bytes behind the `>` of a nested
+    /// `<script>` / `<style>` or a `<textarea>` are not template, so no template token may be
+    /// lexed from them. An unterminated `<!--` opening such content is text to Svelte, where
+    /// a template lex of it fails for want of a `-->` — or, with one further down the
+    /// document, passes only by reading through to it, so the element parses or not on bytes
+    /// far outside it, which the formatter may move (a hoisted `<script !-->` takes the
+    /// closer above the opener). The scan takes the content from `after_gt` and repositions
+    /// the lexer itself; a caller whose content is template consumes the `>`
+    /// ([`finish_opening_tag`](Self::finish_opening_tag)).
+    fn read_opening_tag_end(&mut self) -> Result<OpeningTagEnd, ParseError> {
         let self_closing = self.check(TokenKind::Slash);
         if self_closing {
             self.advance()?; // consume /
         }
 
-        // Read both offsets before consuming `>` — see `OpeningTagEnd` for which is which.
-        let gt = self.current_start() as u32;
-        let after_gt = self.current_end();
-        self.expect(TokenKind::RightAngle)?;
+        if !self.check(TokenKind::RightAngle) {
+            return Err(self.error_expected_kind(TokenKind::RightAngle));
+        }
 
+        // See `OpeningTagEnd` for which offset is which.
         Ok(OpeningTagEnd {
             self_closing,
-            gt,
-            after_gt,
+            gt: self.current_start() as u32,
+            after_gt: self.current_end(),
         })
     }
 
@@ -446,7 +468,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Parse attributes
         let attributes = self.parse_attributes()?;
 
-        let opening = self.finish_opening_tag()?;
+        // The `>` is still the current token: the two template regimes below consume it, the
+        // two raw ones scan from behind it without lexing there (`read_opening_tag_end`).
+        let opening = self.read_opening_tag_end()?;
 
         // Resolve this element's children and end offset. The four content regimes differ
         // only in how they produce `(nodes, end)`; the element is assembled once below.
@@ -454,6 +478,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             if facts.is_void() || opening.self_closing {
                 // Void and self-closing elements have no children or closing tag
                 // (classification lives in tsv_html, shared with the printer).
+                self.advance()?; // consume >
                 (&[], opening.after_gt as u32)
             } else if facts.is_raw_text() {
                 // Nested <style>/<script> are raw text (not parsed as Svelte template) —
@@ -476,6 +501,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 // components and `svelte:*` keep the strict explicit-close requirement.
                 // `parse_children` resolves `end` — past this element's `</tag>` (explicit
                 // close) or at the `<` that implicitly closed it.
+                self.advance()?; // consume >
                 let is_html = facts.element_kind() == ElementKind::Html;
                 // Enter this element's ancestor context: a RegularElement/Component resets head
                 // context (mirrors Svelte's `parent_is_head`), and a RegularElement carrying
@@ -939,11 +965,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 self.error_msg_at(&format!("Unterminated <{tag_name}> element"), element_start)
             })?;
 
-        // Reposition the lexer to the closing tag. We resume AT the `<`, which lexes to
-        // `LeftAngle` in either mode, so the (stale, content-dependent) `inside_tag` here
-        // doesn't matter — `parse_closing_tag` consumes the close and its `>` returns the
-        // lexer to template mode. Contrast `parse_rcdata_content`, which resumes PAST the
-        // close's `>` and so must force template mode itself.
+        // Reposition the lexer to the closing tag — the first token lexed since the opener's
+        // `>`, the content between them being scanned and never lexed. We resume AT the `<`,
+        // a `LeftAngle` in either mode; `parse_closing_tag` consumes the close and its `>`
+        // returns the lexer to template mode. Contrast `parse_rcdata_content`, which resumes
+        // PAST the close's `>`.
         self.advance_to_position(content_end)?;
 
         // Create a Text node (Svelte always emits one, even if empty)
@@ -1015,14 +1041,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         };
 
         let end = close_gt + 1;
-        // After `</textarea>` we're back in template mode, but `inside_tag` is stale: the
-        // manual scan above jumped the cursor forward, so it still reflects the token the
-        // lexer stopped on when the opening `>` was consumed — the close's `<` for
-        // empty/`<`-first content, which set tag mode (`{`-first content leaves it false,
-        // so the pre-fix bug was content-dependent). Left as-is, `advance_to_position`
-        // preserves that stale tag mode and a bare-text sibling (`</textarea>x`) lexes `x`
-        // as an Identifier the markup loop rejects (`{expr}`/`<el>` siblings survive —
-        // `{`/`<` are special in both modes). Force template mode before resuming.
+        // After `</textarea…>` the document is template again, and `advance_to_position`
+        // keeps whatever mode it finds. The lexer's last token is the opener's `>`, which
+        // left it in template mode; the mode is stated here rather than inherited, so a
+        // bare-text sibling (`</textarea>x`) can never lex as a tag's Identifier.
         self.lexer.inside_tag = false;
         self.advance_to_position(end)?;
         Ok((nodes, end as u32))

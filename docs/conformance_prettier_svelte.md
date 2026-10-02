@@ -280,7 +280,13 @@ freeze shape. The no-oracle argument covers only the first: prettier's behavior 
 failure is its degraded error-swallow path (the plugin logs the embedded parse error and
 resolves with the body verbatim), which is no oracle to pin against. The formats-to-empty
 half *does* have one — prettier opens the tag pair around a blank line — so that half is
-fixturable; neither case is reached by any real corpus file.
+fixturable; neither case is reached by any real corpus file. Where prettier's embedded
+parser refuses the body it does not swallow the error but throws — its JavaScript parser on a
+`<script>` body (`Unexpected token`), postcss on a `<style>` one (`CssSyntaxError`) — and the
+fixture carries a `prettier_rejects.txt` instead —
+[nested_script_style_comment_opener](../tests/fixtures/svelte/elements/nested_script_style_comment_opener_prettier_divergence/)
+(a body opening on a `<!--` that never closes: raw text to Svelte's parser, so the document
+parses and both bodies stay as written).
 
 ## Svelte: Inline content block-style
 

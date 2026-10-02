@@ -1,0 +1,286 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 417,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 90,
+				"data": " RCDATA: an unterminated `<!--` opening the content is literal text, not a comment "
+			},
+			{
+				"type": "Text",
+				"start": 90,
+				"end": 91,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 91,
+				"end": 122,
+				"name": "textarea",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 92
+					},
+					"end": {
+						"line": 2,
+						"column": 9,
+						"character": 100
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"start": 101,
+							"end": 111,
+							"type": "Text",
+							"raw": "<!-- text1",
+							"data": "<!-- text1"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 122,
+				"end": 124,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 124,
+				"end": 153,
+				"data": " nested in an element "
+			},
+			{
+				"type": "Text",
+				"start": 153,
+				"end": 154,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 154,
+				"end": 196,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 155
+					},
+					"end": {
+						"line": 5,
+						"column": 4,
+						"character": 158
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 159,
+							"end": 190,
+							"name": "textarea",
+							"name_loc": {
+								"start": {
+									"line": 5,
+									"column": 6,
+									"character": 160
+								},
+								"end": {
+									"line": 5,
+									"column": 14,
+									"character": 168
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 169,
+										"end": 179,
+										"type": "Text",
+										"raw": "<!-- text2",
+										"data": "<!-- text2"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 196,
+				"end": 198,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 198,
+				"end": 232,
+				"data": " behind leading whitespace "
+			},
+			{
+				"type": "Text",
+				"start": 232,
+				"end": 233,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 233,
+				"end": 265,
+				"name": "textarea",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 234
+					},
+					"end": {
+						"line": 8,
+						"column": 9,
+						"character": 242
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"start": 243,
+							"end": 254,
+							"type": "Text",
+							"raw": " <!-- text3",
+							"data": " <!-- text3"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 265,
+				"end": 267,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 267,
+				"end": 312,
+				"data": " a terminated one is literal text too "
+			},
+			{
+				"type": "Text",
+				"start": 312,
+				"end": 313,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 313,
+				"end": 348,
+				"name": "textarea",
+				"name_loc": {
+					"start": {
+						"line": 11,
+						"column": 1,
+						"character": 314
+					},
+					"end": {
+						"line": 11,
+						"column": 9,
+						"character": 322
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"start": 323,
+							"end": 337,
+							"type": "Text",
+							"raw": "<!-- text4 -->",
+							"data": "<!-- text4 -->"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 348,
+				"end": 350,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 350,
+				"end": 390,
+				"data": " glued, with no content after it "
+			},
+			{
+				"type": "Text",
+				"start": 390,
+				"end": 391,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 391,
+				"end": 416,
+				"name": "textarea",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 1,
+						"character": 392
+					},
+					"end": {
+						"line": 14,
+						"column": 9,
+						"character": 400
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"start": 401,
+							"end": 405,
+							"type": "Text",
+							"raw": "<!--",
+							"data": "<!--"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -301,7 +301,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         self.advance()
     }
 
-    /// [`expect`](Self::expect)'s miss: "Expected X, found Y" for a token kind.
+    /// [`expect`](Self::expect)'s miss, and that of a check that does not advance: "Expected
+    /// X, found Y" for a token kind.
     ///
     /// Cold and out of line, taking `kind` by value: formatted inline, the kind's `Display`
     /// borrows it from a stack slot and `format!`'s arguments want a frame, so every
@@ -309,7 +310,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// error it never builds.
     #[cold]
     #[inline(never)]
-    fn error_expected_kind(&self, kind: TokenKind) -> ParseError {
+    pub(crate) fn error_expected_kind(&self, kind: TokenKind) -> ParseError {
         self.error_expected_found(&kind.to_string())
     }
 
@@ -370,7 +371,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// when `pos` resumes adjacent to that token, or when the mode genuinely carries (an
     /// `{expr}` tag, a JS comment, a mid-tag attribute resync). A caller resuming into a
     /// KNOWN mode past an unrelated token must set `self.lexer.inside_tag` explicitly
-    /// first — see `parse_rcdata_content`, which forces template mode after `</textarea>`.
+    /// first — see `parse_rcdata_content`, which states template mode after `</textarea>`.
     pub(crate) fn advance_to_position(&mut self, pos: usize) -> Result<(), ParseError> {
         // Resume the lexer at the new position (its mode is kept); any lookahead was lexed
         // from the old one.

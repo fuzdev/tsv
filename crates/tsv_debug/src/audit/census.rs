@@ -35,7 +35,8 @@
 //! - **Svelte** — a lexical mode machine over the document: `<!-- -->` template
 //!   comments; `<script>` / `<style>` raw-text islands (bounded by the first
 //!   matching close tag, exactly Svelte's own lexical rule) handed to the TS /
-//!   CSS scanners; `{...}` expressions — in text, in attribute position, and
+//!   CSS scanners; `<textarea>` content, RCDATA, where only a `{...}` is live
+//!   and a `<!--` is text; `{...}` expressions — in text, in attribute position, and
 //!   inside quoted attribute values — handed to the TS scanner in expression
 //!   mode (which returns at the first unmatched `}`). A `{#if}`/`{:else}`/
 //!   `{/if}`/`{@html}` sigil + keyword is stepped over before the expression
@@ -910,8 +911,37 @@ fn scan_svelte_tag(src: &str, lt: usize, out: &mut CensusMultiset) -> usize {
     match name {
         "script" => scan_raw_island(src, i, "</script", ScanIsland::Ts, out),
         "style" => scan_raw_island(src, i, "</style", ScanIsland::Css, out),
+        "textarea" => scan_rcdata(src, i, out),
         _ => i,
     }
+}
+
+/// `<textarea>` content from just past its open tag's `>`: RCDATA, so text with live
+/// `{...}` expressions and nothing else — a `<!--` there is text, not a template comment,
+/// and a `<` opens no tag. Bounded by the first `</textarea` at a tag boundary (a `>` or
+/// any whitespace of Svelte's `\s`, which is wider than markup's), or EOF.
+/// Returns the position after the close tag.
+fn scan_rcdata(src: &str, content_start: usize, out: &mut CensusMultiset) -> usize {
+    const CLOSE: &[u8] = b"</textarea";
+    let bytes = src.as_bytes();
+    let mut i = content_start;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'{' => i = scan_svelte_brace(src, i, out),
+            b'<' if bytes
+                .get(i..i + CLOSE.len())
+                .is_some_and(|run| run.eq_ignore_ascii_case(CLOSE))
+                && src[i + CLOSE.len()..]
+                    .chars()
+                    .next()
+                    .is_none_or(|c| c == '>' || tsv_lang::is_js_whitespace(c)) =>
+            {
+                return src[i..].find('>').map_or(src.len(), |gt| i + gt + 1);
+            }
+            _ => i += 1,
+        }
+    }
+    i
 }
 
 /// A quoted attribute value from its opening quote. `{...}` inside is a live
@@ -1344,6 +1374,33 @@ mod tests {
                 (CensusBucket::Ts, CensusKind::Block, " d ".into(), 1),
                 (CensusBucket::Ts, CensusKind::Block, " e ".into(), 1),
             ]
+        );
+    }
+
+    /// `<textarea>` content is RCDATA: a `<!--` there is text however it ends, a `{...}`
+    /// is still code, and the template resumes behind the close tag.
+    #[test]
+    fn svelte_textarea_content_holds_no_template_comment() {
+        for src in [
+            "<textarea><!-- a</textarea>\n<!-- t -->",
+            "<textarea><!-- a --></textarea  >\n<!-- t -->",
+            "<textarea  ><!--</TEXTAREA>\n<!-- t -->",
+            "<textarea><!--</textarea\u{3000}>\n<!-- t -->",
+            "<textarea>a</textareax><!-- a</textarea>\n<!-- t -->",
+            "<textarea /><!-- t -->",
+        ] {
+            assert_eq!(
+                census(src, ParserType::Svelte),
+                vec![(CensusBucket::Template, CensusKind::Html, " t ".into(), 1)],
+                "{src:?}"
+            );
+        }
+        assert_eq!(
+            census(
+                "<textarea><!-- a {/* c */ x}</textarea>",
+                ParserType::Svelte
+            ),
+            vec![(CensusBucket::Ts, CensusKind::Block, " c ".into(), 1)]
         );
     }
 

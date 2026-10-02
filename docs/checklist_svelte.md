@@ -688,6 +688,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Empty comments
 - Comments between elements
 - Comments in control flow
+- `<!--` in raw content is content, not a comment: a nested `<script>` / `<style>` body and `<textarea>` content are read raw, so `<textarea><!-- x</textarea>` holds the text `<!-- x` and no `-->` is looked for or owed — where an element's content is template (`<title>`, `<pre>`) the same bytes are an unterminated comment. See `svelte/elements/textarea_comment_opener/`, `svelte/elements/nested_script_style_comment_opener_prettier_divergence/`
 
 ### Special Comments
 
