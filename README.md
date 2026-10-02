@@ -17,14 +17,14 @@ Among other benefits this means tsv doesn't depend on a JS runtime,
 which it would need to resolve configs like Prettier.
 
 Compared to Oxc, Biome, and SWC, tsv is a set of focused tools, not an extensible language platform,
-so the focus is Web standards + TS + Svelte and there's no support for JSX/SCSS/etc.
+so it targets Web standards + TS + Svelte and there's no support for JSX/SCSS/etc.
 tsv's extensibility story is currently limited to using its Rust crates as libraries (or forking);
 bridging to JS or WASM plugins is an open question (leaning against).
 
 Compared to [rsvelte](https://github.com/baseballyama/rsvelte),
 tsv has its own TS/JS/CSS parsers instead of using Oxc,
 and rsvelte additionally has a Svelte compiler and linter/typechecker integration
-(the full toolchain; tsv has some in-progress work here, scope unknown and may never ship).
+(the full toolchain; tsv has some work in progress here, of unknown scope, that may never ship).
 
 tsv prioritizes, in order:
 
@@ -33,14 +33,14 @@ tsv prioritizes, in order:
 3. binary size and memory usage
 4. extensibility, modularity, reusability
 
-Staying simple is an over-arching goal, and sometimes at odds with flexibility.
+Staying simple is an overarching goal, and is sometimes at odds with flexibility.
 Feedback is welcome to help navigate these tradeoffs.
 
 See the [benchmarks](https://tsv.fuz.dev/docs/benchmarks) for measurements.
 Compared to Oxc/oxfmt and Biome, tsv is smaller and faster
 at parsing and formatting its supported languages,
 but lacks their features, extensibility, and broad language support.
-One reason for tsv to exist is to help find the performance bonuses
+One reason for tsv to exist is to help find the performance
 left on the table in the Web's implementations.
 
 tsv is near production-ready, with a long tail of rare bugs.
@@ -71,7 +71,7 @@ tsv features:
 - [x] parsers for TypeScript/JS, CSS, and Svelte, drop-in for Svelte+acorn+acorn-typescript
 - [x] formatter following Prettier + prettier-plugin-svelte + Svelte's prettier config
       (with intentional divergences and no supported style config)
-- [x] [VSCode formatter extension](https://github.com/fuzdev/vscode-extension-tsv-format) - [`fuzdev.tsv-format`](https://marketplace.visualstudio.com/items?itemName=fuzdev.tsv-format) on the Marketplace and [Open VSX](https://open-vsx.org/extension/fuzdev/tsv-format) (WASM-only, works in desktop VSCode and the browser host)
+- [x] [VS Code formatter extension](https://github.com/fuzdev/vscode-extension-tsv-format) - [`fuzdev.tsv-format`](https://marketplace.visualstudio.com/items?itemName=fuzdev.tsv-format) on the Marketplace and [Open VSX](https://open-vsx.org/extension/fuzdev/tsv-format) (WASM-only, works in desktop VS Code and the browser host)
 - [ ] ts-to-js conversion (types-to-whitespace only)
 - [ ] module lexer
 
