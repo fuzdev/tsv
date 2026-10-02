@@ -654,17 +654,31 @@ pub struct LocationTracker {
     /// lookup fills it. Interior mutability behind `&self` (the tracker is
     /// threaded by shared reference through the single-threaded convert path).
     line_cache: Cell<(usize, usize, usize)>,
+    /// A second line-range entry, read and written only by
+    /// `resolve_line_after`: the line the last *searched* trailing endpoint
+    /// landed on. Nested nodes end together (`});` closes a call, its
+    /// argument and that argument's body on one line), so a span that leaves
+    /// its start's line very often ends on the line the previous such span
+    /// ended on, and the entry answers it without the forward search.
+    ///
+    /// Same `(line_idx, line_start, next_line_start)` triple as `line_cache`,
+    /// and the same kind of memo — an entry is only ever a row of this
+    /// tracker's own immutable `line_starts`, and a read uses it only when
+    /// the offset lies inside its range. The initial `(0, usize::MAX, 0)`
+    /// never matches.
+    end_cache: Cell<(usize, usize, usize)>,
 }
 
 impl LocationTracker {
-    /// Build a tracker from precomputed line starts, seeding an empty
-    /// line-range cache. The single constructor helper every `new*` routes
-    /// through so the cache field stays in one place.
+    /// Build a tracker from precomputed line starts, seeding both line-range
+    /// caches empty. The single constructor helper every `new*` routes
+    /// through so the cache fields stay in one place.
     #[inline]
     fn with_line_starts(line_starts: Vec<u32>) -> Self {
         Self {
             line_starts,
             line_cache: Cell::new((0, 0, 0)),
+            end_cache: Cell::new((0, usize::MAX, 0)),
         }
     }
 
@@ -910,22 +924,44 @@ impl LocationTracker {
     ///    this into a direct `offset < line_starts[from + 1]` test: that
     ///    reads memory where a hit reads none, and measured **+0.78%
     ///    instructions** for exactly that reason.
-    /// 2. **a forward gallop** from `from`, for the genuine multi-line span.
+    /// 2. **the end cache**, for the genuine multi-line span: the line the
+    ///    last searched trailing endpoint landed on, which is this one's
+    ///    whenever nested nodes close together.
+    /// 3. **a forward gallop** from `from`, which then fills the end cache.
     ///
-    /// It never writes the cache, which is what keeps it parked on the
-    /// *descending* line: the writer emits a node's `start` (line N), its
-    /// `end` (line N+k), then its first child's `start` (back to line N).
+    /// It never writes `line_cache`, which is what keeps that one parked on
+    /// the *descending* line: the writer emits a node's `start` (line N), its
+    /// `end` (line N+k), then its first child's `start` (back to line N). The
+    /// end cache is this function's alone, so filling it disturbs nothing.
     ///
     /// Returns exactly what `resolve_line(offset)` would; the caller owes the
-    /// precondition, which `resolve_span` discharges from `end >= start`.
+    /// precondition, which `resolve_span` discharges from `end >= start`. An
+    /// end-cache hit does not lean on it: the entry's range holds `offset`,
+    /// which names the line whatever `from` is.
     #[inline]
     fn resolve_line_after(&self, from: usize, offset: usize) -> (usize, usize) {
         let (line_idx, line_start, next_line_start) = self.line_cache.get();
         if line_start <= offset && offset < next_line_start {
             return (line_idx, line_start);
         }
+        let (end_idx, end_start, end_next) = self.end_cache.get();
+        if end_start <= offset && offset < end_next {
+            debug_assert_eq!(
+                end_idx,
+                self.search_line_all(offset),
+                "an end-cache hit must name the line a search would"
+            );
+            return (end_idx, end_start);
+        }
         let idx = self.search_line_from(from, offset);
-        (idx, self.line_starts[idx] as usize)
+        let start = self.line_starts[idx] as usize;
+        // Last line has no upper bound, as in `fill_cache`.
+        let next = self
+            .line_starts
+            .get(idx + 1)
+            .map_or(usize::MAX, |&s| s as usize);
+        self.end_cache.set((idx, start, next));
+        (idx, start)
     }
 
     /// Resolve both endpoints of a span in one call, as
@@ -939,8 +975,8 @@ impl LocationTracker {
     /// over the fuz_app TS corpus), and the ones left are the genuinely
     /// backward lookups.
     ///
-    /// Byte-identical to `resolve_line(start)` + `resolve_line(end)`; the cache
-    /// is a pure memo, so which line it holds is unobservable.
+    /// Byte-identical to `resolve_line(start)` + `resolve_line(end)`; both caches
+    /// are pure memos, so which lines they hold is unobservable.
     #[inline]
     fn resolve_span(&self, start: usize, end: usize) -> ((usize, usize), (usize, usize)) {
         let start_line = self.resolve_line(start);
@@ -1927,7 +1963,7 @@ mod tests {
         assert_eq!(m.byte_to_char(5), 3); // 'b' (emoji consumed 2 units)
     }
 
-    /// `resolve_line_forward` is a second search path to the answer
+    /// `resolve_line_after` is a second search path to the answer
     /// `resolve_line` already computes, and no corpus can grade a search that
     /// returns a plausible wrong line — the wire stays valid JSON either way.
     /// So grade it exhaustively against the binary search, over every
@@ -1960,6 +1996,121 @@ mod tests {
                     expected,
                     "offset {offset} from line index {from}"
                 );
+            }
+        }
+    }
+
+    /// The line a table names for `offset`, by a scan that shares nothing with
+    /// the tracker's searches or caches: `(line_idx, line_start)`.
+    fn reference_line(starts: &[u32], offset: usize) -> (usize, usize) {
+        let idx = starts.iter().rposition(|&s| s as usize <= offset).unwrap();
+        (idx, starts[idx] as usize)
+    }
+
+    /// The end cache is a second memo in front of `resolve_line_after`'s
+    /// search, and a memo that answers a plausible wrong line is invisible to
+    /// every corpus gate. So one *warm* tracker — both caches carrying
+    /// whatever the previous spans left — is graded against a cache-free scan
+    /// over span sequences shaped to move the two caches every way they can
+    /// move: ascending, descending, repeated, nested spans closing together,
+    /// spans ending on the last line and at EOF, and a seeded random walk.
+    /// Both line classes, over a source holding every ECMAScript terminator.
+    #[test]
+    fn test_end_cache_matches_cache_free_scan() {
+        fn assert_sequence(
+            tracker: &LocationTracker,
+            spans: impl IntoIterator<Item = (usize, usize)>,
+            label: &str,
+        ) {
+            for (start, end) in spans {
+                let primary_before = {
+                    // the primary cache as `start`'s resolution leaves it
+                    tracker.resolve_line(start);
+                    tracker.line_cache.get()
+                };
+                assert_eq!(
+                    tracker.resolve_span(start, end),
+                    (
+                        reference_line(&tracker.line_starts, start),
+                        reference_line(&tracker.line_starts, end)
+                    ),
+                    "{label} [{start}, {end}]"
+                );
+                assert_eq!(
+                    tracker.line_cache.get(),
+                    primary_before,
+                    "{label} [{start}, {end}]: the trailing endpoint moved the primary cache"
+                );
+            }
+        }
+
+        let mut long = String::new();
+        for len in [
+            0usize, 1, 0, 0, 5, 1, 40, 0, 2, 3, 1, 1, 1, 7, 0, 1, 100, 1, 0, 4,
+        ] {
+            long.push_str(&"x".repeat(len));
+            long.push('\n');
+        }
+        long.push_str("tail");
+        let sources = [
+            long.as_str(),
+            "a\rbb\r\nc\u{2028}dd\u{2029}\n\r\ne\r",
+            "é\u{2028}\u{2028}😀\r\r\nz",
+            "one line only",
+            "\n\n\n",
+            "",
+        ];
+        for source in sources {
+            let n = source.len();
+            let all: Vec<(usize, usize)> =
+                (0..=n).flat_map(|s| (s..=n).map(move |e| (s, e))).collect();
+            for (class, tracker) in [
+                ("lf", LocationTracker::new(source)),
+                ("ecmascript", LocationTracker::new_ecmascript(source)),
+                (
+                    "map-only",
+                    LocationTracker::new_map_only(source, LeadingBom::Counted).0,
+                ),
+            ] {
+                let label = format!("{class} {source:?}");
+                // Ascending, then descending, on the same warm tracker.
+                assert_sequence(&tracker, all.iter().copied(), &label);
+                assert_sequence(&tracker, all.iter().rev().copied(), &label);
+                // Each span twice running, then nested spans sharing an end
+                // (the closing-together shape), outermost first.
+                assert_sequence(&tracker, all.iter().flat_map(|&s| [s, s]), &label);
+                for end in (0..=n).rev() {
+                    assert_sequence(&tracker, (0..=end).map(|start| (start, end)), &label);
+                }
+                // Spans to EOF and to the last line's first byte, interleaved
+                // with single-point lookups through the public readers.
+                let last = *tracker.line_starts.last().unwrap() as usize;
+                for start in 0..=n {
+                    assert_sequence(&tracker, [(start, n), (start.min(last), last)], &label);
+                    let (idx, line_start) = reference_line(&tracker.line_starts, start);
+                    assert_eq!(
+                        tracker.get_line_column(start),
+                        (idx + 1, start - line_start)
+                    );
+                    assert_eq!(tracker.line_start_byte(n - start), {
+                        reference_line(&tracker.line_starts, n - start).1
+                    });
+                }
+                // A seeded random walk: no locality at all.
+                let mut seed = 0x9e37_79b9_7f4a_7c15_u64;
+                let mut next = |bound: usize| {
+                    seed = seed
+                        .wrapping_mul(6_364_136_223_846_793_005)
+                        .wrapping_add(1_442_695_040_888_963_407);
+                    (seed >> 33) as usize % (bound + 1)
+                };
+                let walk: Vec<(usize, usize)> = (0..4000)
+                    .map(|_| {
+                        let start = next(n);
+                        (start, start + next(n - start))
+                    })
+                    .collect();
+                assert_sequence(&tracker, walk, &label);
             }
         }
     }
