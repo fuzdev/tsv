@@ -834,19 +834,21 @@ fn write_braced_island(
 /// includes `\n` — an element or component name, an attribute name and a directive's
 /// head (`on:click|once`) are each read to Svelte whitespace, `/`, `>` or `=` at the
 /// latest, and a shorthand attribute's (`{x}`) is its identifier's span, which holds
-/// no whitespace at all.
+/// no whitespace at all. So the end's line is the start's digits appended again
+/// (`StageRun::usize_kept` / `StageRun::repeat`) rather than a second conversion.
 fn write_name_loc_field(w: &mut JsonWriter, span: Span, ctx: &Ctx<'_>) {
     let ((start_char, start_pos), (end_char, end_pos)) =
         ctx.loc.one_line_span_positions(span.start, span.end);
+    debug_assert_eq!(start_pos.line, end_pos.line, "a name span lies on one line");
     let mut run = w.stage_run();
     run.raw(",\"name_loc\":{\"start\":{\"line\":");
-    run.usize(start_pos.line);
+    let line = run.usize_kept(start_pos.line);
     run.raw(",\"column\":");
     run.usize(start_pos.column);
     run.raw(",\"character\":");
     run.u32(start_char);
     run.raw("},\"end\":{\"line\":");
-    run.usize(end_pos.line);
+    run.repeat(line, end_pos.line);
     run.raw(",\"column\":");
     run.usize(end_pos.column);
     run.raw(",\"character\":");
@@ -2406,6 +2408,28 @@ mod tests {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /// `write_name_loc_field` writes the end's line as the start's digits again: graded
+    /// at each decimal width of the line, over every name shape, against the line the
+    /// source puts the name on.
+    #[test]
+    fn name_loc_line_repeats_at_every_digit_width() {
+        for line in [
+            1usize, 9, 10, 99, 100, 999, 1_000, 9_999, 10_000, 99_999, 100_000,
+        ] {
+            let source = format!(
+                "{}<div class=\"a\" {{b}} on:click|once={{f}}><Foo.Bar /></div><svelte:head></svelte:head>",
+                "\n".repeat(line - 1)
+            );
+            let mut locs = Vec::new();
+            name_locs(&convert_svelte(&source), &mut locs);
+            assert_eq!(locs.len(), 6, "line {line}");
+            for (start, end) in locs {
+                assert_eq!(start["line"], line, "line {line}");
+                assert_eq!(end["line"], line, "line {line}");
             }
         }
     }
