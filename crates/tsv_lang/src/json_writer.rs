@@ -133,6 +133,18 @@ const TAIL_CLOSE_MAX: usize = 1;
 /// [`START_END_WINDOW`], the widest close.
 const TAIL_WINDOW: usize = TAIL_LEAD_MAX + START_KEY.len() + START_END_WINDOW + TAIL_CLOSE_MAX;
 
+/// The widest `lead` [`JsonWriter::start_end_head`] takes — a node's opening literal
+/// through its `"start":` key (`{"type":"ComplexSelector","start":` is 34 bytes).
+const HEAD_LEAD_MAX: usize = 40;
+
+/// The widest `close` [`JsonWriter::start_end_head`] takes after the pair — the key
+/// and opening bracket of the array that follows (`,"children":[`).
+const HEAD_CLOSE_MAX: usize = 16;
+
+/// [`JsonWriter::start_end_head`]'s window: the widest lead, [`START_END_WINDOW`], the
+/// widest close.
+const HEAD_WINDOW: usize = HEAD_LEAD_MAX + START_END_WINDOW + HEAD_CLOSE_MAX;
+
 /// Decimal digit count of a `u32` (`0` is one digit) — the [`decimal_width`]
 /// sibling for the `u32` path.
 ///
@@ -1796,6 +1808,67 @@ impl JsonWriter {
         self.buf.truncate(len + close_at + C);
     }
 
+    /// A node's opening burst — `lead` (a literal ending in `"start":`), N `,"end":` M,
+    /// `close` — as one fixed-width window of the output buffer, byte-identical to
+    /// `raw(lead)`, [`JsonWriter::start_end`] and `raw(close)`. `close` is whatever
+    /// constant follows the positions (the key and `[` of the node's array), or empty.
+    ///
+    /// [`JsonWriter::start_end_tail`]'s shape at the other end of a node, and its
+    /// trade: every store lands in the output buffer at a width fixed by a type, the
+    /// common path makes no call (a full buffer and a value past `99_999_999` leave for
+    /// [`JsonWriter::start_end_head_slow`]), and `inline(always)` keeps the buffer's
+    /// fields in registers across the burst — the separate `raw` + `start_end` + `raw`
+    /// it replaces spilled them around `start_end`'s call. Out of line it is that call
+    /// again with more arguments. The price is two inlined [`digit_word`] copies of
+    /// `.text` a site.
+    #[expect(clippy::inline_always, clippy::expect_used)]
+    #[inline(always)]
+    pub fn start_end_head<const L: usize, const C: usize>(
+        &mut self,
+        lead: &[u8; L],
+        start: u32,
+        end: u32,
+        close: &[u8; C],
+    ) {
+        const { assert!(L <= HEAD_LEAD_MAX && C <= HEAD_CLOSE_MAX) };
+        let len = self.buf.len();
+        if self.buf.capacity() - len < HEAD_WINDOW {
+            self.start_end_head_slow(lead, start, end, close);
+            return;
+        }
+        let (start_word, start_digits) = digit_word(start);
+        let (end_word, end_digits) = digit_word(end);
+        if start_digits > WORD_DIGITS || end_digits > WORD_DIGITS {
+            self.start_end_head_slow(lead, start, end, close);
+            return;
+        }
+        self.buf.extend_from_slice(&[0; HEAD_WINDOW]);
+        let window = self
+            .buf
+            .last_chunk_mut::<HEAD_WINDOW>()
+            .expect("the window was just appended");
+        window[..L].copy_from_slice(lead);
+        let used = fill_start_end(
+            &mut window[L..],
+            (start_word, start_digits),
+            (end_word, end_digits),
+        );
+        let close_at = L + used;
+        window[close_at..close_at + C].copy_from_slice(close);
+        self.buf.truncate(len + close_at + C);
+    }
+
+    /// [`JsonWriter::start_end_head`] off its window, for
+    /// [`JsonWriter::start_end_tail_slow`]'s two reasons and in its shape: one
+    /// out-of-line body for every lead and close, the separate appends.
+    #[cold]
+    #[inline(never)]
+    fn start_end_head_slow(&mut self, lead: &[u8], start: u32, end: u32, close: &[u8]) {
+        self.buf.extend_from_slice(lead);
+        self.start_end_wide(start, end);
+        self.buf.extend_from_slice(close);
+    }
+
     /// [`JsonWriter::start_end_tail`] off its window: the buffer is too full for it,
     /// or a value is past `99_999_999`. One out-of-line body for both and for every
     /// lead and close, taking them as slices — the separate appends, each integer
@@ -2504,6 +2577,84 @@ mod tests {
             w.u32(n);
             String::from_utf8(w.into_bytes()).expect("digits are ASCII")
         });
+    }
+
+    /// [`JsonWriter::start_end_head`] against `format!`, for each lead and close a
+    /// caller passes, over the same edges and the same two capacities as the tail's
+    /// test below: the window and the slow arm are both graded at every width pair.
+    #[test]
+    fn start_end_head_matches_format() {
+        fn emit<const L: usize, const C: usize>(
+            cap: usize,
+            lead: &[u8; L],
+            start: u32,
+            end: u32,
+            close: &[u8; C],
+        ) -> String {
+            let mut w = JsonWriter::with_capacity(cap);
+            w.raw("[");
+            w.start_end_head(lead, start, end, close);
+            w.start_end_head(lead, end, start, close);
+            String::from_utf8(w.into_bytes()).expect("digits are ASCII")
+        }
+        let mut edges = vec![0, 1, u32::MAX, u32::MAX - 1];
+        let mut pow = 10u32;
+        loop {
+            edges.extend([pow - 1, pow, pow + 1]);
+            match pow.checked_mul(10) {
+                Some(next) => pow = next,
+                None => break,
+            }
+        }
+        for &start in &edges {
+            for &end in &edges {
+                for cap in [0, 256] {
+                    let lead = "{\"type\":\"ComplexSelector\",\"start\":";
+                    let close = ",\"children\":[";
+                    assert_eq!(
+                        emit(
+                            cap,
+                            b"{\"type\":\"ComplexSelector\",\"start\":",
+                            start,
+                            end,
+                            b",\"children\":["
+                        ),
+                        format!(
+                            "[{lead}{start},\"end\":{end}{close}{lead}{end},\"end\":{start}{close}"
+                        ),
+                        "lead … close ({start}, {end}), capacity {cap}"
+                    );
+                    let lead = "{\"type\":\"Declaration\",\"start\":";
+                    assert_eq!(
+                        emit(
+                            cap,
+                            b"{\"type\":\"Declaration\",\"start\":",
+                            start,
+                            end,
+                            b""
+                        ),
+                        format!("[{lead}{start},\"end\":{end}{lead}{end},\"end\":{start}"),
+                        "lead … ({start}, {end}), capacity {cap}"
+                    );
+                    // The widest lead and close the window is sized for.
+                    let lead = "x".repeat(HEAD_LEAD_MAX);
+                    let close = "y".repeat(HEAD_CLOSE_MAX);
+                    assert_eq!(
+                        emit(
+                            cap,
+                            &[b'x'; HEAD_LEAD_MAX],
+                            start,
+                            end,
+                            &[b'y'; HEAD_CLOSE_MAX]
+                        ),
+                        format!(
+                            "[{lead}{start},\"end\":{end}{close}{lead}{end},\"end\":{start}{close}"
+                        ),
+                        "widest ({start}, {end}), capacity {cap}"
+                    );
+                }
+            }
+        }
     }
 
     /// [`JsonWriter::start_end_tail`] against `format!`, for each lead and close a

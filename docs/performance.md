@@ -991,7 +991,9 @@ and staging the tails is **−1.27 points** of cycles where staging the heads is
 **+0.03**. (Those figures compare each staged scope against the out-of-line
 pair. `tsv_css`'s tails are not staged today: `JsonWriter::start_end_tail` writes
 the same burst straight into one window of the output buffer, keeping the inline
-integers with no scratch round trip. The lesson the comparison establishes —
+integers with no scratch round trip, and `JsonWriter::start_end_head` does the
+same for the four commonest heads — one copy of the static bytes, so not the
+staged head these figures refuse. The lesson the comparison establishes —
 arity against static width — is a property of staging, wherever it is used.)
 
 ⚠️⚠️ **So grade the SCOPE, and put every candidate scope in one layout group —

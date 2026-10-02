@@ -27,19 +27,21 @@
 //! path is a single window append, which pays on this writer's many short strings); static
 //! structure/tokens are written verbatim; integers are hand-formatted.
 //!
-//! Node-header prefixes are single pre-fused `w.raw` literals per site,
-//! deliberately NOT extracted into a shared `open_node` helper: the helper —
-//! even `#[inline]` taking the pre-fused prefix — shifted fat-LTO inlining
-//! across the crate (`write_block`/`write_atrule` de-inlined) and measured
-//! +0.45% instructions on the CSS parse-JSON path. CSS nodes are small enough
-//! that per-node call structure is visible; keep the literals inline.
+//! Node-header prefixes are single pre-fused literals per site, deliberately NOT
+//! extracted into a shared `open_node` helper: the helper — even `#[inline]`
+//! taking the pre-fused prefix — shifted fat-LTO inlining across the crate
+//! (`write_block`/`write_atrule` de-inlined) and measured +0.45% instructions on
+//! the CSS parse-JSON path. CSS nodes are small enough that per-node call
+//! structure is visible; keep the literals at the site, whether a site hands its
+//! literal to `w.raw` or to the head window below (which is `inline(always)` and
+//! const-generic over the literal's length, so it is the site's own code).
 //!
 //! # The `start`/`end` bursts
 //!
 //! Every node here ends with the same burst — `,"start":` N `,"end":` M, then a
 //! `}` or a constant `metadata` payload — and the nodes whose positions lead open
 //! with its twin (`{"type":"Block","start":` N `,"end":` M `,"children":[`). Each
-//! is written into the output buffer directly, in one of two shapes:
+//! is written into the output buffer directly, in one of three shapes:
 //!
 //! - The emitters that carry ~37% of the corpus's nodes — the rule
 //!   (`write_rule`), the relative selector (`write_relative_selector`), and the
@@ -48,30 +50,34 @@
 //!   [`JsonWriter::start_end_tail`]: the lead, the key, both integers and the
 //!   closing byte stored into one fixed-width window of the buffer, inline at the
 //!   site.
-//! - Every other pair is one call. A head burst, and the synthesized relative
-//!   selector's tail (whose `],"start":` is a literal of its own), take
-//!   [`JsonWriter::start_end`] after a literal ending in `"start":`; the remaining
-//!   tails (combinator, the pseudo selectors, `Nth`, `Percentage`,
-//!   `CSSComment`) take [`JsonWriter::start_end_field`]. Each writes
-//!   both integers and the key between them into such a window. Those bodies are
-//!   deliberately `inline(never)` for WASM size, so the call forces the output
-//!   buffer's pointer/length/capacity out of registers around it — the price the
-//!   four hot tails do not pay.
+//! - The four heads that open most nodes — `Block`, `Declaration`, `SelectorList`
+//!   and `ComplexSelector` — open through [`JsonWriter::start_end_head`], the
+//!   tail window's twin: the opening literal, both integers, and the constant that
+//!   follows them (`,"children":[`, so the array's opener costs no append of its
+//!   own) in one window, inline at the site. It has to be inline to pay: the same
+//!   burst behind a call is the call below with more arguments.
+//! - Every other pair is one call. The remaining head bursts (`StyleSheetFile`, `Atrule`,
+//!   `AttributeSelector`, the synthesized selector list), and the synthesized relative selector's
+//!   tail (whose `],"start":` is a literal of its own), take [`JsonWriter::start_end`] after a
+//!   literal ending in `"start":`; the remaining tails (combinator, the pseudo selectors, `Nth`,
+//!   `Percentage`, `CSSComment`) take [`JsonWriter::start_end_field`]. Each writes both integers
+//!   and the key between them into such a window. Those bodies are deliberately `inline(never)` for
+//!   WASM size, so the call forces the output buffer's pointer/length/capacity out of registers
+//!   around it — the price the hot tails and heads do not pay.
 //!
-//! ⚠️ **None of these bursts is a staged run ([`JsonWriter::stage_run`]), and the
-//! two ends are refused for different reasons.** A staged run copies its static
-//! fragments twice — once into the scratch, once through the flush — so the trade
-//! is *appends removed* against *static bytes in the run*. A *head* run's static
-//! fragments are ~50 bytes against a tail's ~17, and staging the heads is a loss:
-//! it removes more instructions than staging the tails does and buys no cycles
-//! for them. The *tails* do pay as staged runs against the out-of-line pair (a
-//! staged run inlines its integer emission, the call does not), and the window
-//! keeps exactly that — the integers inline, nothing spilled around a call —
-//! while writing the digits and the closing constant straight into the output
-//! buffer: no scratch round trip and no runtime-length flush, so fewer
-//! instructions than the staged form. **Grade any change to this on
-//! `cycles`/wall as well as instructions** — the two channels have ranked this
-//! file's scopes in opposite orders.
+//! ⚠️ **None of these bursts is a staged run ([`JsonWriter::stage_run`]), and the two ends are
+//! refused for different reasons.** A staged run copies its static fragments twice — once into the
+//! scratch, once through the flush — so the trade is *appends removed* against *static bytes in the
+//! run*. A *head* run's static fragments are ~50 bytes against a tail's ~17, and staging the heads
+//! is a loss: it removes more instructions than staging the tails does and buys no cycles for them.
+//! That verdict is about the double copy, not about bursting a head: the head window stores its
+//! literal once, at a constant width, into the output buffer, which is the half of the trade a
+//! staged run cannot have. The *tails* do pay as staged runs against the out-of-line pair (a staged
+//! run inlines its integer emission, the call does not), and the window keeps exactly that — the
+//! integers inline, nothing spilled around a call — while writing the digits and the closing
+//! constant straight into the output buffer: no scratch round trip and no runtime-length flush, so
+//! fewer instructions than the staged form. **Grade any change to this on `cycles`/wall as well as
+//! instructions** — the two channels have ranked this file's scopes in opposite orders.
 
 use super::super::internal;
 use super::{
@@ -109,10 +115,10 @@ metadata_payload!(
     ",\"metadata\":{\"is_global\":false,\"is_global_like\":false,\"scoped\":false}"
 );
 
-/// An array's opening and items: `open` — a literal ending in the array's `[` — then
-/// the comma-separated items. The caller writes the `]`, as the first byte of whatever
-/// constant follows the array, so a node's array costs it no append of its own on
-/// either side (`tsv_lang::write_array` spends one on each bracket).
+/// An array's opening and items: `open` — a literal ending in the array's `[`, or empty where the
+/// node's head burst already wrote it — then the comma-separated items. The caller writes the `]`,
+/// as the first byte of whatever constant follows the array, so a node's array costs it no append
+/// of its own on either side (`tsv_lang::write_array` spends one on each bracket).
 #[inline]
 fn write_array_open<T, const N: usize>(
     w: &mut JsonWriter,
@@ -417,11 +423,15 @@ fn write_block(
         }),
         _ => None,
     }));
-    w.raw("{\"type\":\"Block\",\"start\":");
-    w.start_end(ctx.pos(block_span.start), ctx.pos(block_span.end));
+    w.start_end_head(
+        b"{\"type\":\"Block\",\"start\":",
+        ctx.pos(block_span.start),
+        ctx.pos(block_span.end),
+        b",\"children\":[",
+    );
     write_array_open(
         w,
-        b",\"children\":[",
+        b"",
         children
             .iter()
             .filter(|c| !matches!(c, internal::CssBlockChild::Comment(_))),
@@ -518,8 +528,12 @@ fn write_declaration(
         Cow::Borrowed(trim_wire_end(split.value))
     };
 
-    w.raw("{\"type\":\"Declaration\",\"start\":");
-    w.start_end(ctx.pos(decl.span.start), ctx.pos(split.end));
+    w.start_end_head(
+        b"{\"type\":\"Declaration\",\"start\":",
+        ctx.pos(decl.span.start),
+        ctx.pos(split.end),
+        b"",
+    );
     write_keyed_string(w, b",\"property\":", trim_wire_end(split.property));
     write_keyed_string(w, b",\"value\":", &value);
     w.raw("}");
@@ -547,11 +561,15 @@ fn write_selector_list_inner(
     ctx: &Ctx<'_>,
     filter_invalid: bool,
 ) {
-    w.raw("{\"type\":\"SelectorList\",\"start\":");
-    w.start_end(ctx.pos(sl.span.start), ctx.pos(sl.span.end));
+    w.start_end_head(
+        b"{\"type\":\"SelectorList\",\"start\":",
+        ctx.pos(sl.span.start),
+        ctx.pos(sl.span.end),
+        b",\"children\":[",
+    );
     write_array_open(
         w,
-        b",\"children\":[",
+        b"",
         sl.selectors
             .iter()
             .filter(|c| !filter_invalid || !selector_contains_invalid(c)),
@@ -562,9 +580,13 @@ fn write_selector_list_inner(
 
 /// Emits a `ComplexSelector` node.
 fn write_complex_selector(w: &mut JsonWriter, c: &internal::ComplexSelector<'_>, ctx: &Ctx<'_>) {
-    w.raw("{\"type\":\"ComplexSelector\",\"start\":");
-    w.start_end(ctx.pos(c.span.start), ctx.pos(c.span.end));
-    write_array_open(w, b",\"children\":[", c.children, |w, r| {
+    w.start_end_head(
+        b"{\"type\":\"ComplexSelector\",\"start\":",
+        ctx.pos(c.span.start),
+        ctx.pos(c.span.end),
+        b",\"children\":[",
+    );
+    write_array_open(w, b"", c.children, |w, r| {
         write_relative_selector(w, r, ctx);
     });
     if ctx.has_metadata {
