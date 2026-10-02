@@ -18,7 +18,7 @@ what the glued text lexes as), so `output_prettier.svelte` holds output that pre
 own next pass then rejects.
 
 tsv keeps the authored gap, at both arms — the refusal is read once, ahead of every arm
-that can glue (`value_gap_is_glued`'s `introduces_merge`), rather than restated at each: the
+that can glue (`value_gap_is_glued_by_rule`'s `introduces_merge`), rather than restated at each: the
 `font` arm reached `font: 12px/ * 2` → `12px/* 2` through its own door while the head arm's
 own refusal stood. It is scoped to the `*` alone — a `/` is a `<delim-token>` beside every
 other member, a second `/` included (`/ /2.5` → `//2.5` is two delimiters and a number, the

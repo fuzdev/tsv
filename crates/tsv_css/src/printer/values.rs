@@ -247,6 +247,18 @@ fn is_possible_font_size(value: &CssValue<'_>, source: &str) -> bool {
     }
 }
 
+/// Is this member one no arm of [`Printer::value_gap_is_glued`] reads as its own
+/// trigger — not an operator, and not a one-byte word, which is what the lone `@` and
+/// the `{` / `}` members are ([`is_word_spelled`])? Any other one-byte identifier
+/// (`a`) answers `false` too and simply takes the full rule.
+fn is_plain_operand(value: &CssValue<'_>) -> bool {
+    match value {
+        CssValue::Operator { .. } => false,
+        CssValue::Identifier { span } => span.end - span.start != 1,
+        _ => true,
+    }
+}
+
 /// Is this member a word spelled exactly `text` — the `{`, `}` and lone `@` members
 /// the run splitter emits, which postcss also carries as `value-word` nodes keyed on
 /// their text (`isLeftCurlyBraceNode`, `isRightCurlyBraceNode`, the empty `atword`)?
@@ -895,12 +907,33 @@ impl<'a> Printer<'a> {
     /// never asks what the two spell together, so it welds `- a` into the single
     /// `<ident -a>`. Both are cataloged in `docs/conformance_prettier_css.md`
     /// §CSS: Values.
+    ///
+    /// Every arm that glues reads an operator on one side of the gap, or a word spelled
+    /// `@`, `{` or `}` there — so a gap between two members that are neither
+    /// ([`is_plain_operand`]) takes the separator, and is answered before any of the
+    /// arms' source reads. That is most gaps: a value list is mostly operands.
     pub(super) fn value_gap_is_glued(
         &self,
         values: &[CssValue<'_>],
         i: usize,
         ctx: ValueCtx,
     ) -> bool {
+        if let Some(next) = values.get(i + 1)
+            && is_plain_operand(&values[i])
+            && is_plain_operand(next)
+        {
+            debug_assert!(
+                !self.value_gap_is_glued_by_rule(values, i, ctx),
+                "a gap between two plain operands was glued by an arm"
+            );
+            return false;
+        }
+        self.value_gap_is_glued_by_rule(values, i, ctx)
+    }
+
+    /// [`Self::value_gap_is_glued`]'s arms, in prettier's order — the whole rule, which
+    /// the gate in front of it answers for a gap no arm can glue.
+    fn value_gap_is_glued_by_rule(&self, values: &[CssValue<'_>], i: usize, ctx: ValueCtx) -> bool {
         let source = self.source;
         let current = &values[i];
         let Some(next) = values.get(i + 1) else {
@@ -1107,6 +1140,51 @@ fn function_paren_interior(raw: &str, name_span: Span, span: Span) -> Option<&st
 #[cfg(test)]
 mod tests {
     use super::{ValueOperator, operator_glue_merges};
+
+    /// The plain-operand gate against the rule it stands in front of.
+    ///
+    /// `value_gap_is_glued` asserts, in debug builds, that a gap its gate answers is one
+    /// the full rule would not have glued. This drives every pair of members, followed
+    /// by a word, an operator and a one-byte word — each operand kind, each operator, the
+    /// three one-byte words the arms key on, and a one-byte identifier that is none of
+    /// them — glued and spaced, through every scope the rule reads (a plain value, `font`,
+    /// a custom property, `calc()`, a colour adjuster, a nameless group, Tailwind's
+    /// `@utility`), so the assertion sees each arm with a plain operand on either side.
+    ///
+    /// The grading is the debug assertion, so this test proves nothing in a build without
+    /// debug assertions; the fixtures hold the gate's own answer.
+    #[test]
+    fn the_plain_operand_gate_never_overrides_an_arm() {
+        let members = [
+            "ab", "a", "1.5", "12px", "#fff", "'s'", "f(a)", "(a)", "/", "*", "+", "-", ":", "@",
+            "{", "}",
+        ];
+        let scopes: [fn(&str) -> String; 7] = [
+            |v| format!("a{{x:{v}}}"),
+            |v| format!("a{{font:{v}}}"),
+            |v| format!("a{{--x:{v}}}"),
+            |v| format!("a{{x:calc({v})}}"),
+            |v| format!("a{{x:color-mod({v})}}"),
+            |v| format!("a{{x:({v})}}"),
+            |v| format!("@utility u{{x:--value({v})}}"),
+        ];
+        let mut formatted = 0u32;
+        for first in members {
+            for second in members {
+                for third in ["ab", "/", "@"] {
+                    for (gap1, gap2) in [("", ""), (" ", ""), ("", " "), (" ", " ")] {
+                        let value = format!("{first}{gap1}{second}{gap2}{third}");
+                        for scope in scopes {
+                            // A value the parser refuses reaches no gap; the rest are
+                            // graded by the assertion inside the rule.
+                            formatted += u32::from(crate::format_str(&scope(&value)).is_ok());
+                        }
+                    }
+                }
+            }
+        }
+        assert!(formatted > 10_000, "{formatted} values formatted");
+    }
 
     /// The would-merge refusal, cell by cell: gluing a head `-` or `+` to the member
     /// after it must be refused exactly where css-syntax-3 reads the pair as one token.
