@@ -11,7 +11,7 @@ Each `## Unreleased` section must be non-empty and carry a
 `## Unreleased` (reset to `bump: patch`) for the next cycle.
 
 ## Unreleased
-<!-- bump: patch -->
+<!-- bump: minor -->
 
 - **breaking** fix: the no-locations helper's Svelte `loc_of` (bare, or a `create_locator`'s) now
   requires the span-only tree as `{ast}` and throws without it
