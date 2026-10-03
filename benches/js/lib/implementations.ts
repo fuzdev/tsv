@@ -472,7 +472,7 @@ export interface BenchmarkTask {
 	 * `oxc-parser` and `oxfmt`.
 	 */
 	impl: ImplKey;
-	/** Key for corpus size tracking (e.g., "parse/svelte/native-no-locations") */
+	/** Key for corpus size tracking (e.g., "parse/svelte/native-span") */
 	tracking_key: string;
 	/** Whether this benchmark runs async */
 	is_async: boolean;
@@ -605,15 +605,11 @@ export function get_benchmark_tasks(
 		// (via `js_sys`) for wasm, as each package's facade does. Rows are named by wire
 		// and never renamed, so the span rows keep their `-no-locations` names; no row
 		// times the loc-bearing wire, which no binding ships.
-		add('native', true, 'tsv-json-no-locations', 'native-no-locations', (source, _language, goal) =>
+		add('native', true, 'tsv-json-no-locations', 'native-span', (source, _language, goal) =>
 			impls.native.parse(source, language, goal)
 		);
-		add(
-			'wasm',
-			true,
-			'tsv-wasm-json-no-locations',
-			'wasm-no-locations',
-			(source, _language, goal) => impls.wasm.parse(source, language, goal)
+		add('wasm', true, 'tsv-wasm-json-no-locations', 'wasm-span', (source, _language, goal) =>
+			impls.wasm.parse(source, language, goal)
 		);
 
 		// The span-only wire PLUS `loc` reconstructed in JS over the whole tree — what
@@ -635,7 +631,7 @@ export function get_benchmark_tasks(
 			'native',
 			reconstruct_enabled,
 			'tsv-json-no-locations+reconstruct',
-			'native-no-locations-reconstruct',
+			'native-span-reconstruct',
 			(source, _language, goal) =>
 				reconstruct_locations(impls.native.parse(source, language, goal), source, { language })
 		);
@@ -643,7 +639,7 @@ export function get_benchmark_tasks(
 			'wasm',
 			reconstruct_enabled,
 			'tsv-wasm-json-no-locations+reconstruct',
-			'wasm-no-locations-reconstruct',
+			'wasm-span-reconstruct',
 			(source, _language, goal) =>
 				reconstruct_locations(impls.wasm.parse(source, language, goal), source, { language })
 		);

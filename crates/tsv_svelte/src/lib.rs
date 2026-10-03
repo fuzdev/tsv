@@ -151,6 +151,10 @@ pub fn convert_ast_json_bytes_with_locations(root: &Root<'_>, source: &str) -> V
 /// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (the WASM
 /// binding's `JSON.parse`, N-API strings): same wire bytes plus one UTF-8 validation of
 /// the output. Byte-oriented consumers should prefer the bytes variant.
+///
+/// There is no `_with_locations` `String` twin: the `&str` boundaries this form serves are
+/// the bindings, which ship the span-only wire alone, and the loc-bearing wire's only
+/// callers (`tsv parse --locations`, `tsv_debug`) write bytes.
 #[cfg(feature = "convert")]
 #[expect(clippy::expect_used)]
 pub fn convert_ast_json_string(root: &Root<'_>, source: &str) -> String {

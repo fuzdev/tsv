@@ -193,7 +193,7 @@ impl Ctx<'_> {
         end: u32,
         close: &[u8; C],
     ) {
-        if self.positions.emits_loc() {
+        if self.positions.has_locations() {
             w.raw_fixed(lead);
             w.raw("\"start\":");
             self.start_end(w, start, end);
@@ -216,7 +216,7 @@ impl Ctx<'_> {
         end: u32,
         close: &[u8; C],
     ) {
-        if self.positions.emits_loc() {
+        if self.positions.has_locations() {
             w.raw_fixed(lead);
             self.start_end(w, start, end);
             w.raw_fixed(close);

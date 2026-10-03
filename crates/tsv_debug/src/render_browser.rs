@@ -37,7 +37,7 @@
 
 use serde_json::Value;
 
-use crate::fixtures::remove_locations;
+use crate::fixtures::remove_positions;
 use crate::render_normalize::{
     TrimEnd, for_each_fragment, is_empty_text, is_text, render_normalize, trim_text,
 };
@@ -147,8 +147,8 @@ pub fn browser_render_normalize(value: Value) -> Value {
 #[must_use]
 pub fn browser_normalize_pair(a: Value, b: Value) -> (Value, Value) {
     (
-        remove_locations(browser_render_normalize(a)),
-        remove_locations(browser_render_normalize(b)),
+        remove_positions(browser_render_normalize(a)),
+        remove_positions(browser_render_normalize(b)),
     )
 }
 

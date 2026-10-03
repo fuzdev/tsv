@@ -27,20 +27,21 @@ use std::fs;
 use std::path::Path;
 use tsv_cli::cli::format_source::format_source_with_source_type;
 
-/// Recursively remove location/span fields from JSON for AST comparison
-pub fn remove_locations(mut value: serde_json::Value) -> serde_json::Value {
+/// Recursively remove every position — `start`, `end` and `loc` — from JSON for AST
+/// comparison. Not [`strip_locations`], which removes the line/column objects alone.
+pub fn remove_positions(mut value: serde_json::Value) -> serde_json::Value {
     match &mut value {
         serde_json::Value::Object(map) => {
             map.remove("start");
             map.remove("end");
             map.remove("loc");
             for v in map.values_mut() {
-                *v = remove_locations(std::mem::take(v));
+                *v = remove_positions(std::mem::take(v));
             }
         }
         serde_json::Value::Array(arr) => {
             for v in arr.iter_mut() {
-                *v = remove_locations(std::mem::take(v));
+                *v = remove_positions(std::mem::take(v));
             }
         }
         _ => {}
@@ -50,19 +51,21 @@ pub fn remove_locations(mut value: serde_json::Value) -> serde_json::Value {
 
 /// Recursively remove every `loc` and `name_loc` key — the line/column objects the
 /// span-only wire omits (`character` lives inside both, so it goes too). What turns a
-/// canonical parser's output into the shape an `expected*.json` pins.
-pub fn strip_line_columns(value: &mut serde_json::Value) {
+/// canonical parser's output into the shape an `expected*.json` pins. `shift_remove`, not
+/// `remove`: under `preserve_order` the latter is a `swap_remove`, which moves the object's
+/// last key into the hole.
+pub fn strip_locations(value: &mut serde_json::Value) {
     match value {
         serde_json::Value::Object(map) => {
             map.shift_remove("loc");
             map.shift_remove("name_loc");
             for v in map.values_mut() {
-                strip_line_columns(v);
+                strip_locations(v);
             }
         }
         serde_json::Value::Array(arr) => {
             for v in arr {
-                strip_line_columns(v);
+                strip_locations(v);
             }
         }
         _ => {}
@@ -223,7 +226,7 @@ pub fn canonical_sidecar_failure(input_type: InputType, error: &DenoError) -> St
 /// Parse a fixture input with its canonical parser (Svelte, acorn-typescript, or `parseCss`)
 /// at `goal`, returning the AST in the exact bytes an `expected*.json` holds — tab-indented
 /// with a trailing newline, and **span-only**: every `loc` and `name_loc` key is stripped
-/// ([`strip_line_columns`]), because a fixture pins spans and `loc` is graded against the
+/// ([`strip_locations`]), because a fixture pins spans and `loc` is graded against the
 /// canonical parsers at corpus scale instead.
 ///
 /// The single definition the generators (`fixture_init`, `fixtures_update_parsed`) and the
@@ -244,7 +247,7 @@ pub async fn canonical_expected_json(
     let mut ast = parse_by_type_with_goal(source, input_type.parser_type(), goal)
         .await
         .map_err(CanonicalParseError::from_deno)?;
-    strip_line_columns(&mut ast);
+    strip_locations(&mut ast);
     let json = to_json_with_tabs(&ast).map_err(|e| {
         CanonicalParseError::Unserializable(format!(
             "Failed to serialize {} AST: {e}",

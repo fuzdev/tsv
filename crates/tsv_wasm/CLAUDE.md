@@ -300,11 +300,10 @@ Svelte and CSS, as each canonical parser does (`tsv_lang::LeadingBom` on the Rus
 On top of that it restores the Svelte-only fields, each an exact function of a node's span
 and type: `name_loc` on elements, attributes and directives, and the `character` field on
 the positions Svelte's own template reader creates — a shorthand attribute's identifier, a
-snippet name, a simple-identifier block pattern, and an in-tag comment, recovered
-from the tree's own spans (a comment inside its innermost element, ahead of the first
-child, and inside no attribute's span nor a `this={…}`'s braces — including the
-`<svelte:options>` head, whose wire node carries no `type` and is pushed into the
-host-element pass explicitly). Svelte's own `loc` quirks are
+snippet name, a simple-identifier block pattern, and an in-tag comment, told apart by
+the key order the wire gives it (Svelte's template reader writes `{type, start, end,
+value}`, acorn's collector `{type, value, start, end}`), so a tree whose comments' keys
+were reordered loses that stamp. Svelte's own `loc` quirks are
 reproduced by neither implementation; the corpus comparator grades them as named
 tolerances (see [docs/conformance_svelte.md](../../docs/conformance_svelte.md)).
 

@@ -912,7 +912,7 @@ Scales at O(features) rather than O(tools × features).
 - Detached comments — Simple AST, O(log n) lookup, matches prettier
 - Doc builder — Prettier-style declarative formatting
 - Source threading — Preserve escapes without AST duplication
-- Lazy locations — Parse-time speed, serialize-time computation
+- Span-only wire — `loc` is derived from the offsets and the source (`{locations: true}`), emitted only on request
 - Fixtures as data — Reusable across tools, O(features) scaling
 
 ## Traversal and Extensibility

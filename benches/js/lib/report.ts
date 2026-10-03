@@ -1785,7 +1785,7 @@ function is_universal_tsv_failure(
 }
 
 /**
- * Resolve a tracking_key (`parse/svelte/native-no-locations`) to a display label
+ * Resolve a tracking_key (`parse/svelte/native-span`) to a display label
  * (`parse/svelte: tsv-json-no-locations`). Falls back to the raw tracking_key when the
  * mapping isn't available — readers still see something useful.
  */

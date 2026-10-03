@@ -843,7 +843,7 @@ fn write_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
     run.u32(ctx.pos(text.span.start));
     run.raw(",\"end\":");
     run.u32(ctx.pos(text.span.end));
-    if ctx.positions.emits_loc() {
+    if ctx.positions.has_locations() {
         run.flush();
         ctx.loc(w, text.span.start, text.span.end);
         w.raw(",\"raw\":");

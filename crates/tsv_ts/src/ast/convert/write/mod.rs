@@ -72,7 +72,7 @@ pub fn write_program_json(
     let ctx = Ctx::new(source, positions, schema, CommentMode::Off);
     let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(
         source.len(),
-        positions.emits_loc(),
+        positions.has_locations(),
     ));
     write_program(&mut w, program, &ctx);
     w.into_bytes()

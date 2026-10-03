@@ -847,7 +847,7 @@ if (untiered_rows.length > 0) {
 //
 
 //
-// Per-impl tracking maps (keyed by tracking_key, e.g. `parse/svelte/native-no-locations`).
+// Per-impl tracking maps (keyed by tracking_key, e.g. `parse/svelte/native-span`).
 //
 // Populated by the **untimed pre-flight pass** before each group's timed
 // bench run. The pre-flight records each impl's success/skip set; the timed

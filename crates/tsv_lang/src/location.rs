@@ -647,7 +647,7 @@ impl<'a> WirePositions<'a> {
     /// Whether this wire carries `loc`.
     #[inline]
     #[must_use]
-    pub const fn emits_loc(&self) -> bool {
+    pub const fn has_locations(&self) -> bool {
         #[cfg(feature = "locations")]
         {
             self.lines.is_some()

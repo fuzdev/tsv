@@ -199,6 +199,8 @@ pub fn convert_ast_json_bytes(stylesheet: &CssStyleSheet<'_>, source: &str) -> V
     ast::convert::write_stylesheet_file_bytes(stylesheet, source, false)
 }
 
+/// Convert internal AST to compact JSON wire bytes **with** per-node `loc`.
+///
 /// The `convert_ast_json_bytes` wire plus a `loc` on every object carrying `start`/`end` —
 /// `parseCss` emits none; tsv's is the line (1-based, LF-only) and column (0-based, UTF-16
 /// code units) of those offsets. `tsv parse --locations` writes it.
@@ -212,7 +214,11 @@ pub fn convert_ast_json_bytes_with_locations(
 
 /// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (the WASM
 /// binding's `JSON.parse`, N-API strings): same wire bytes plus one UTF-8 validation of
-/// the output.
+/// the output. Byte-oriented consumers should prefer the bytes variant.
+///
+/// There is no `_with_locations` `String` twin: the `&str` boundaries this form serves are
+/// the bindings, which ship the span-only wire alone, and the loc-bearing wire's only
+/// callers (`tsv parse --locations`, `tsv_debug`) write bytes.
 #[cfg(feature = "convert")]
 #[expect(clippy::expect_used)]
 pub fn convert_ast_json_string(stylesheet: &CssStyleSheet<'_>, source: &str) -> String {

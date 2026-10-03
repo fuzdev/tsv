@@ -33,10 +33,10 @@
 
 use serde_json::Value;
 
-use crate::fixtures::remove_locations;
+use crate::fixtures::remove_positions;
 
 /// Return `value` with Svelte 5 render-time whitespace normalization applied to
-/// every template `Fragment`. Pairs with [`crate::fixtures::remove_locations`]
+/// every template `Fragment`. Pairs with [`crate::fixtures::remove_positions`]
 /// for a render-equivalence AST comparison.
 #[must_use]
 pub fn render_normalize(mut value: Value) -> Value {
@@ -58,7 +58,7 @@ pub fn normalize_pair(a: Value, b: Value, render: bool) -> (Value, Value) {
     } else {
         (a, b)
     };
-    (remove_locations(a), remove_locations(b))
+    (remove_positions(a), remove_positions(b))
 }
 
 /// Reduce an AST to its structure: preserve object keys, array lengths, nesting,
@@ -121,7 +121,7 @@ pub fn structural_skeleton(v: &Value) -> Value {
 /// Do `a` and `b` reduce to the SAME [structural skeleton](structural_skeleton) under
 /// [`normalize_pair`] — that verdict, without building any of the four trees that spell it.
 ///
-/// `structural_skeleton(remove_locations(render_normalize(a))) == …(b)` is a question about two
+/// `structural_skeleton(remove_positions(render_normalize(a))) == …(b)` is a question about two
 /// documents, and every tree it names is discarded the moment it is answered: the two normalized
 /// clones, and the two skeletons built only to be compared. On a per-injection audit that is the
 /// most expensive thing on the page — the skeleton pair alone rebuilds both trees with a fresh
@@ -137,7 +137,7 @@ pub fn structural_skeleton(v: &Value) -> Value {
 ///   node's position in its fragment. Each side carries its own whitespace-`preserve` context,
 ///   because the tag `name` that flips it is itself a scalar the skeleton erases: two documents
 ///   can normalize under different contexts and still be skeleton-equal.
-/// - **location stripping** ([`remove_locations`]) and the skeleton's own metadata drops are one
+/// - **location stripping** ([`remove_positions`]) and the skeleton's own metadata drops are one
 ///   key filter, [`skeleton_skips_key`].
 /// - **scalar erasure** makes every leaf pair equal, whatever it held — except a `type`, the
 ///   node discriminator, whose string value is compared.
@@ -150,7 +150,7 @@ pub fn skeletons_equal(a: &Value, b: &Value, render: bool) -> bool {
     skeleton_eq(a, b, render, false, false)
 }
 
-/// The keys [`skeletons_equal`] drops: [`remove_locations`]' three positions, then
+/// The keys [`skeletons_equal`] drops: [`remove_positions`]' three positions, then
 /// [`structural_skeleton`]'s own three metadata bags.
 fn skeleton_skips_key(key: &str) -> bool {
     matches!(

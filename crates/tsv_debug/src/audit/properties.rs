@@ -144,7 +144,7 @@ pub(crate) fn tsv_parse_to_value(source: &str, parser: ParserType) -> Option<Val
 /// [`census_skips_key`], the leaf multiset's [`collect_conserved_leaves`],
 /// [`node_edge`](crate::audit::node_edge)'s non-structural set, the site scans, the blank
 /// audit's verbatim-region scan, `ast_census`) or strips it first
-/// ([`remove_locations`](crate::fixtures::remove_locations), which every `Value`-compare runs
+/// ([`remove_positions`](crate::fixtures::remove_positions), which every `Value`-compare runs
 /// ahead of the skeleton). The span consumers read `start` / `end`, which are untouched.
 ///
 /// Dropping it is the substrate's single biggest lever, because the audits pay the wire on the

@@ -343,27 +343,6 @@ fn wires_and_reference(
     )
 }
 
-/// Remove every `loc` and `name_loc` key — the exact set the span-only wire omits
-/// (`character` lives inside both). `shift_remove`, not `remove`: under `preserve_order`
-/// the latter is a `swap_remove`, which moves the object's last key into the hole.
-fn strip_locations(value: &mut Value) {
-    match value {
-        Value::Object(map) => {
-            map.shift_remove("loc");
-            map.shift_remove("name_loc");
-            for child in map.values_mut() {
-                strip_locations(child);
-            }
-        }
-        Value::Array(items) => {
-            for item in items {
-                strip_locations(item);
-            }
-        }
-        _ => {}
-    }
-}
-
 /// The span-only wire must be the loc wire with every `loc` / `name_loc` removed and
 /// nothing else, byte for byte: so the two wires agree on every `type` / `start` / `end`
 /// and payload, in the same key order, and the fixtures' grade of the span-only wire
@@ -374,7 +353,7 @@ fn strip_locations(value: &mut Value) {
 /// byte-for-byte against `serde_json`'s). Strips `loc_wire` in place; returns where the
 /// two first differ.
 fn span_wire_difference(loc_wire: &mut Value, span: &[u8]) -> Option<String> {
-    strip_locations(loc_wire);
+    fixtures::strip_locations(loc_wire);
     let stripped = serde_json::to_string(loc_wire).expect("a parsed wire re-serializes");
     let at = stripped
         .bytes()
