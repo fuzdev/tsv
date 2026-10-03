@@ -45,6 +45,18 @@ Each `## Unreleased` section must be non-empty and carry a
 - **breaking** fix: every parse and format export throws a `TypeError` on a `source` that is not
   a string, with one message in every package — the WASM packages read one as the empty document
   outside Node, and each engine's error differed
+- **breaking** feat: a parse or format failure throws a `SyntaxError` (typed `TsvSyntaxError`)
+  with `start` — the UTF-16 offset, in the AST's coordinates — and `loc: {line, column}`; the
+  message's `line:col` header follows the same definition, and a format error is reported in
+  the caller's own source, CRLF included
+- **breaking** feat: every argument error is a `TypeError` — a non-string source, a bad options
+  bag, an unknown key, a wrong-typed value — and the locations helpers refuse a bad bag too
+- **breaking** feat: `locations.d.ts` drops `Loc` for `SourceLocation` and renames
+  `LocationOptions` to `ReconstructLocationsOptions`
+- feat: `create_locator(...).position_at(offset)` gives one offset's `{line, column}`;
+  `position_at` and `loc_of` throw a `RangeError` for an offset the source doesn't hold
+- feat: a `./locations` subpath export on the parse-capable packages — the line/column helpers
+  alone, loading no engine
 - fix: a Svelte multi-line block comment's `value` is dedented by its own line in the document,
   not by the text Svelte's reader handed acorn — so it can differ from Svelte's where a
   `<script>` prefix, block binding or `{#snippet}` head shares that line
