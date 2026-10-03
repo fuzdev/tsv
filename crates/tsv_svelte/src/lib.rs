@@ -103,8 +103,8 @@ pub fn format_folded_in(
 
 /// Convert internal AST to compact JSON wire bytes with character-based positions
 ///
-/// The **sole emission path**: emits the wire JSON directly during a single
-/// walk of the *internal* Svelte AST — no typed public tree, no intermediate
+/// The **sole emission path** for its wire: emits the wire JSON directly during a
+/// single walk of the *internal* Svelte AST — no typed public tree, no intermediate
 /// `Value` for the output. A **writer-mode conversion** (`ast/convert/write.rs`) fuses
 /// byte→UTF-16 offset translation into the walk: the whole document — the
 /// Svelte spine (elements, blocks, tags, directives, attributes, `name_loc`),
@@ -115,12 +115,15 @@ pub fn format_folded_in(
 /// acorn's attach **online** off this same emit's node opens and closes
 /// (`ast/convert/comment_attachment.rs` declares each island's window), so each node emits
 /// its own `leadingComments` / `trailingComments` at its close — no second
-/// pass and no per-node map. This is the hot path for the FFI parse binding and the
-/// CLI's compact output — the bytes are valid UTF-8 by construction (every
-/// emitted byte is a source slice or ASCII fragment), and byte-oriented
-/// consumers skip the O(output) validation a `String` requires.
+/// pass and no per-node map. This is `tsv parse --locations`'s writer (and
+/// `tsv_debug`'s); the bindings and the CLI's default emit
+/// `convert_ast_json_bytes_no_locations`. The bytes are valid UTF-8 by
+/// construction (every emitted byte is a source slice or ASCII fragment), and
+/// byte-oriented consumers skip the O(output) validation a `String` requires.
 ///
-/// The output is the Svelte parser's JSON shape, with every byte-based position
+/// The output is the Svelte parser's JSON shape plus a `loc` on every object
+/// carrying `start`/`end` (a superset of Svelte's, which gives `loc` to
+/// acorn-parsed nodes only), with every byte-based position
 /// (`start`, `end`, `loc.*.column`, `character`) already translated to a Unicode
 /// character offset by the writer.
 ///
@@ -141,9 +144,8 @@ pub fn convert_ast_json_bytes(root: &Root<'_>, source: &str) -> Vec<u8> {
 ///
 /// The span-only variant of `convert_ast_json_bytes` — the wire every binding emits:
 /// drops every
-/// line/column object from the Svelte wire — the acorn `loc` on
-/// `<script>`/`{expr}` nodes, the `name_loc` on elements/attributes/directives,
-/// and the root-comment `loc` — keeping only `start`/`end` offsets. All are
+/// line/column object from the Svelte wire — every `loc` and the `name_loc` on
+/// elements/attributes/directives — keeping only `start`/`end` offsets. All are
 /// derivable from those offsets plus source, so a consumer that has the source
 /// loses nothing; a name's exact span reconstructs as `node.start + a fixed
 /// per-node-type prefix`. Because this removes *all* line/column emission,
@@ -157,8 +159,8 @@ pub fn convert_ast_json_bytes_no_locations(root: &Root<'_>, source: &str) -> Vec
 /// Convert internal AST to a compact JSON string with character-based positions
 ///
 /// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (the
-/// WASM binding's `JSON.parse`, N-API strings): same wire bytes plus one
-/// UTF-8 validation of the output. Byte-oriented consumers should prefer the
+/// bindings use the `_no_locations` twin): same wire bytes plus one UTF-8
+/// validation of the output. Byte-oriented consumers should prefer the
 /// bytes variant.
 #[cfg(feature = "convert")]
 #[expect(clippy::expect_used)]

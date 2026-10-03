@@ -17,7 +17,7 @@ marker). The user stamps it at release time.
 
 ## Priorities
 
-1. **Correctness**: Match Svelte's parser exactly — it's a drop-in replacement. The formatter began with Prettier as its guide and tracks it for the common case, but makes deliberate, cataloged divergences where more defensible (spec, print width, comment position, its own taste) and fixes numerous Prettier bugs. Fixtures are the source of truth — when tests fail, fix the code; when tsv diverges on purpose, the fixture records it.
+1. **Correctness**: Match Svelte's parser exactly — it's a drop-in replacement on the default span-only wire (every field but `loc` and `name_loc`); `loc` is opt-in and follows one definition (acorn-exact for TypeScript, Svelte's `loc` quirks not reproduced — ./docs/architecture.md#loc-lines-one-rule-per-document). The formatter began with Prettier as its guide and tracks it for the common case, but makes deliberate, cataloged divergences where more defensible (spec, print width, comment position, its own taste) and fixes numerous Prettier bugs. Fixtures are the source of truth — when tests fail, fix the code; when tsv diverges on purpose, the fixture records it.
 2. **Performance**: Pure Rust for speed. Dev tools use an embedded Deno sidecar that minimizes process overhead.
 
 ## Development Philosophy: Test-Driven Development with Fixtures
@@ -324,7 +324,7 @@ deno task validate:artifacts             # tight wasm size bounds + Deno smoke o
 
 `scripts/validate_artifacts.ts` holds deliberately tight (~±8%) size bounds — a legitimate binary size change fails the publish until the constants are updated, keeping size moves visible and intentional.
 
-**TS type maintenance**: `crates/tsv_wasm/types/tsv_ast.d.ts` is hand-maintained. Any PR changing the wire JSON a writer emits (`crates/tsv_*/src/ast/convert/write*`) must also update the `.d.ts`. Drift is caught by `deno task check:ast-types` (part of `deno task check`), which asks three things: the curated `tsv parse` samples still type (the live writer), every `type` discriminant the fixture corpus produces is declared or explicitly opaque, and a computed minimal cover of the corpus's committed `expected*.json` — every gradable field slot (`ParentType.key -> ChildType`) — types against the `.d.ts`. That last arm grades the file against the **canonical** wire rather than tsv's own, and composes with `fixtures_tests` (which pins `tsv == expected.json`) to cover every position tsv's span-only wire emits — the committed files are span-only, so the `loc` fields themselves are typed by the curated `tsv parse` samples, the first arm. Per-field checklist, the Svelte-built-node rule (a node Svelte constructs is not the acorn node of the same `type` — the tell is a missing `loc` in Svelte's own wire), and the comment-attachment rule: ./crates/tsv_wasm/CLAUDE.md §TS type maintenance.
+**TS type maintenance**: `crates/tsv_wasm/types/tsv_ast.d.ts` is hand-maintained. Any PR changing the wire JSON a writer emits (`crates/tsv_*/src/ast/convert/write*`) must also update the `.d.ts`. Drift is caught by `deno task check:ast-types` (part of `deno task check`), which asks three things: the curated `tsv parse --locations` samples still type (the live writer), every `type` discriminant the fixture corpus produces is declared or explicitly opaque, and a computed minimal cover of the corpus's committed `expected*.json` — every gradable field slot (`ParentType.key -> ChildType`) — types against the `.d.ts`. That last arm grades the file against the **canonical** wire rather than tsv's own, and composes with `fixtures_tests` (which pins `tsv == expected.json`) to cover every position tsv's span-only wire emits — the committed files are span-only, so the `loc` fields themselves are typed by the curated `tsv parse` samples, the first arm. Per-field checklist, the Svelte-built-node rule (a node Svelte constructs is not the acorn node of the same `type` — the tell is a missing `loc` in Svelte's own wire), and the comment-attachment rule: ./crates/tsv_wasm/CLAUDE.md §TS type maintenance.
 
 ### Corpus Comparison
 
@@ -549,7 +549,7 @@ See [Development Philosophy](#development-philosophy-test-driven-development-wit
 
    ```bash
    cargo run -p tsv_debug compare <fixture>/input.svelte          # vs prettier
-   cargo run -p tsv_debug canonical_parse <fixture>/input.svelte  # vs Svelte's AST
+   cargo run -p tsv_debug canonical_parse <fixture>/input.svelte  # vs Svelte's AST (raw: carries the oracle's `loc`, which expected.json strips)
    ```
 
 2. **Fixture matches prettier/Svelte** → the fixture is correct; fix our code to match.
@@ -738,7 +738,7 @@ cargo run -p tsv_debug fixtures_validate [pattern...]
 
 # fixtures_update - regenerate from canonical sources
 cargo run -p tsv_debug fixtures_update            # both parsed + formatted
-cargo run -p tsv_debug fixtures_update_parsed     # expected.json only (Svelte for .svelte, acorn for .ts, parseCss for .css)
+cargo run -p tsv_debug fixtures_update_parsed     # expected.json only (Svelte for .svelte, acorn for .ts, parseCss for .css; `loc`/`name_loc` stripped — fixtures pin the span-only wire)
 cargo run -p tsv_debug fixtures_update_formatted  # output_prettier.svelte (auto-deletes if identical to input;
 #   skips the no-oracle markers prettier_nonconvergent / prettier_rejects / tsv_rejects)
 

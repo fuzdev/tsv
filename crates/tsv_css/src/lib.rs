@@ -183,7 +183,7 @@ impl HostBoundaryScan {
     }
 }
 
-/// Convert CSS AST to compact JSON wire bytes — the **sole emission path**
+/// Convert CSS AST to compact JSON wire bytes — the **sole emission path** for its wire
 ///
 /// The writer (`ast/convert/write.rs`) walks the internal AST once and emits the
 /// wire JSON directly, never materializing a typed public tree, fusing the
@@ -193,10 +193,11 @@ impl HostBoundaryScan {
 /// or `content` fields, `end` set to the full source length), plus a `loc` on
 /// every object carrying `start`/`end` — `parseCss` emits none; tsv's is the
 /// line (1-based, LF-only) and column (0-based, UTF-16 code units) of those
-/// offsets. The hot path for the FFI parse binding and the CLI's compact output
-/// — the bytes are valid UTF-8 by construction (source slices + ASCII
-/// fragments), and byte-oriented consumers skip the O(output) validation a
-/// `String` requires.
+/// offsets. This is `tsv parse --locations`'s writer (and `tsv_debug`'s); the
+/// bindings and the CLI's default emit `convert_ast_json_bytes_no_locations`.
+/// The bytes are valid UTF-8 by construction (source slices + ASCII fragments),
+/// and byte-oriented consumers skip the O(output) validation a `String`
+/// requires.
 #[cfg(feature = "convert")]
 pub fn convert_ast_json_bytes(stylesheet: &CssStyleSheet<'_>, source: &str) -> Vec<u8> {
     ast::convert::write_stylesheet_file_bytes(stylesheet, source, true)
@@ -213,8 +214,8 @@ pub fn convert_ast_json_bytes_no_locations(
 }
 
 /// Like `convert_ast_json_bytes`, as a `String` for `&str` boundaries (the
-/// WASM binding's `JSON.parse`, N-API strings): same wire bytes plus one
-/// UTF-8 validation of the output.
+/// bindings use the `_no_locations` twin): same wire bytes plus one UTF-8
+/// validation of the output.
 #[cfg(feature = "convert")]
 #[expect(clippy::expect_used)]
 pub fn convert_ast_json_string(stylesheet: &CssStyleSheet<'_>, source: &str) -> String {

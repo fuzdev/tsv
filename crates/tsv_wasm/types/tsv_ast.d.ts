@@ -40,8 +40,8 @@ export interface Position {
  * `loc` when locations are requested (`{locations: true}`, `tsv parse --locations`) — the
  * line (1-based) and column (0-based, UTF-16 code units) of those offsets, ECMAScript line
  * terminators for a TypeScript document and LF alone for a Svelte or CSS one. Optional, as
- * in estree: the default span-only wire omits it. In the Svelte and CSS trees it is a superset of the canonical parsers' own wire, which
- * carries `loc` on acorn-parsed nodes only.
+ * in estree: the default span-only wire omits it. In a Svelte tree it is a superset of
+ * Svelte's own wire, which carries `loc` on acorn-parsed nodes only; `parseCss` emits none.
  */
 export interface SourceLocation {
 	start: Position;
@@ -1896,7 +1896,10 @@ export interface StyleContent {
 // Svelte AST
 //
 
-/** Span of a name (element, attribute, directive), as `{line, column, character}` endpoints; `character` is a UTF-16 offset. */
+/**
+ * Span of a name (element, attribute, directive), as `{line, column, character}` endpoints;
+ * `character` is a UTF-16 offset. Present when locations are requested.
+ */
 export interface NameLocation {
 	start: NamePosition;
 	end: NamePosition;

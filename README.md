@@ -157,6 +157,9 @@ tsv's goal is to be an optimal, focused toolchain for TypeScript/JS, CSS, and Sv
     Svelte 5's modern AST with acorn and acorn-typescript
     (excluding bug fixes, see [docs/conformance_svelte.md](docs/conformance_svelte.md)),
     and tsv has its own internal optimal AST
+  - the AST is span-only by default (`start`/`end` offsets, like acorn's `locations: false`);
+    `{locations: true}` adds `loc` — acorn's exactly for TypeScript, and for Svelte
+    the true line/column of every node rather than a copy of Svelte's own `loc` quirks
 - formatters following Prettier
   - formatting is similar to Prettier and prettier-plugin-svelte for the common case,
     and diverges more often for Svelte than TypeScript;
@@ -278,7 +281,7 @@ Each language crate exports a consistent API:
 
 - `parse(source, arena) -> Result<AST>` — the AST allocates into the caller's `bumpalo` arena (the bindings reuse a per-thread arena across calls via `tsv_arena`)
 - `format(ast, source) -> String` — plus `format_in(ast, source, doc_arena)`, the same formatter writing through a reusable doc arena for the bindings' hot loop, `format_folded_in(ast, &folded, doc_arena)` for a caller that folded the source's line terminators itself, and `format_str(source)`, the parse+format one-shot
-- `convert_ast_json_bytes(ast, source) -> Vec<u8>` — the wire JSON, emitted directly from the internal AST, with a `convert_ast_json_string` wrapper and span-only `_no_locations` variants of both alongside (default-on `convert` cargo feature; turn off for parse+format-only builds)
+- `convert_ast_json_bytes(ast, source) -> Vec<u8>` — the wire JSON, emitted directly from the internal AST, with a `convert_ast_json_string` wrapper and span-only `_no_locations` variants of both alongside — the wire every binding ships; the plain functions add `loc` (default-on `convert` cargo feature; turn off for parse+format-only builds)
 
 For more details see [CLAUDE.md](CLAUDE.md).
 

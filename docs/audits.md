@@ -1010,8 +1010,9 @@ known properties"), and a field the `.d.ts` requires that the converter does not
 
 **Three arms, because "does it drift" and "is anything ungraded" are different questions.**
 
-- **A — writer conformance.** The curated `tsv parse` samples. Grades the LIVE writer, so it is
-  the arm that fails the moment a `write_*` changes.
+- **A — writer conformance.** The curated `tsv parse --locations` samples — the only arm that
+  types `loc` / `name_loc`, since the fixture wire is span-only. Grades the LIVE writer, so it
+  is the arm that fails the moment a `write_*` changes.
 - **B — wire-type coverage.** Every `type` discriminant present in the committed fixture wire
   must be declared, or listed in the script's `OPAQUE_WIRE_TYPES` — the CSS node vocabulary,
   which `StyleSheet.children` types as `unknown[]` by design, plus one non-node: `Boolean`, a
@@ -1021,8 +1022,8 @@ known properties"), and a field the `.d.ts` requires that the converter does not
   so the list cannot quietly outlive its reason.
 - **C — fixture-corpus conformance.** Arm A over inputs nobody curated: a computed minimal cover
   of the corpus's `expected*.json`, typed against the same `.d.ts`. Stronger than arm A in two
-  ways, not merely wider — the committed `expected.json` is the CANONICAL parser's output
-  (`fixtures_update_parsed` regenerates it), so this arm grades the `.d.ts` against the ORACLE
+  ways, not merely wider — the committed `expected.json` is the CANONICAL parser's output with
+  `loc`/`name_loc` stripped (`fixtures_update_parsed` regenerates it), so this arm grades the `.d.ts` against the ORACLE
   rather than against tsv's own opinion; and its inputs are the whole tree.
   `expected_ours.json` wins where a fixture declares a parser divergence.
 

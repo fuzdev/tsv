@@ -460,17 +460,17 @@ fn format_program_in(
 
 /// Convert internal AST to compact JSON wire bytes with character-based positions
 ///
-/// The **sole emission path**: emits the wire JSON directly during a single
-/// walk of the internal AST (the writer in `ast/convert/write/`), never
+/// The **sole emission path** for its wire: emits the wire JSON directly during a
+/// single walk of the internal AST (the writer in `ast/convert/write/`), never
 /// materializing a typed public tree or an intermediate `Value`, and
 /// fuses the byte→UTF-16 offset translation into that walk: the writer receives
 /// the `ByteToCharMap` via `WirePositions` and emits final char-space
 /// positions directly, so no post-conversion translation walk runs. For ASCII
 /// sources the map is empty and emission is byte-space passthrough. This is
-/// the hot path for the FFI parse binding and the CLI's compact output — both
-/// hand the bytes on without ever needing `&str`, so they skip the O(output)
-/// UTF-8 validation `convert_ast_json_string` pays (the output is ~15× the
-/// source).
+/// `tsv parse --locations`'s writer (and `tsv_debug`'s); the bindings and the
+/// CLI's default emit `convert_ast_json_bytes_no_locations`. Returning bytes lets
+/// a consumer that never needs `&str` skip the O(output) UTF-8 validation
+/// `convert_ast_json_string` pays (the output is ~15× the source).
 ///
 /// Every node carries `loc` — the line (1-based) and column (0-based, UTF-16
 /// code units) of its own `start` / `end` under ECMAScript's line terminators
@@ -517,8 +517,8 @@ fn convert_ast_json_bytes_variant(program: &Program<'_>, source: &str, locations
 /// Convert internal AST to a compact JSON string with character-based positions
 ///
 /// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (the
-/// WASM binding's `JSON.parse`, N-API strings): same wire bytes plus one
-/// UTF-8 validation of the output. Byte-oriented consumers should prefer the
+/// bindings use the `_no_locations` twin): same wire bytes plus one UTF-8
+/// validation of the output. Byte-oriented consumers should prefer the
 /// bytes variant.
 #[cfg(feature = "convert")]
 #[expect(clippy::expect_used)]

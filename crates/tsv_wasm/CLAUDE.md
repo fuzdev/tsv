@@ -81,7 +81,7 @@ StyleSheetFile`. No overloads: `tsv_ast.d.ts` declares `loc?` optional on every 
 estree and acorn's own declarations do, so a caller who passed `{locations: true}` narrows
 or `!`s. `patch_npm_package.ts` fails the build when a published function or option type
 has no declaration there. The wasm-bindgen-generated `tsv_wasm.d.ts` types only the raw
-module (`source_type?: string | null`, an `any` return) — no entry re-exports a function
+module (`source_type: any`, required, from the `JsValue` decoder; an `any` return) — no entry re-exports a function
 from it. Their exact option shapes are [The Option Interfaces](#the-option-interfaces).
 
 ## Panic Reporting
@@ -485,7 +485,7 @@ Maintenance checklist when a writer's emitted shape changes:
 `deno task check:ast-types` (also part of `deno task check`) runs three arms
 against `tsv_ast.d.ts`, described in full at
 [docs/audits.md §Wire-Type Drift Check](../../docs/audits.md#wire-type-drift-check-checkast-types):
-**(A)** `tsv parse` on a curated set of source snippets, each JSON output
+**(A)** `tsv parse --locations` on a curated set of source snippets, each JSON output
 embedded as a typed literal and `deno check`ed — TypeScript's
 excess-property checking catches both directions of drift, missing/added
 fields and discriminator-string mismatches; **(B)** every `type`
@@ -495,7 +495,7 @@ config-data `type:` key); **(C)** a computed minimal
 cover of the corpus's committed `expected*.json` — every field SLOT
 (`ParentType.key -> ChildType`), in as few files as possible — typed the
 same way. Arm C grades this file against the CANONICAL parser's output
-rather than against tsv's own, since `expected.json` is what
+(`loc`/`name_loc` stripped) rather than against tsv's own, since `expected.json` is what
 `fixtures_update_parsed` regenerates from Svelte / acorn-typescript /
 `parseCss`.
 

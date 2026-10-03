@@ -41,8 +41,9 @@ Parse → Internal AST → [Format, Lint, Analyze]
 Each language crate separates these cleanly:
 
 - `ast/internal` — Optimized for manipulation (file or directory)
-- `ast/convert` — Emits the public wire JSON directly from `internal`, in one
-  walk (the writer), matching the canonical parser's JSON exactly (file or directory)
+- `ast/convert` (file or directory) — Emits the public wire JSON directly from
+  `internal`, in one walk (the writer), matching the canonical parser's JSON exactly
+  on the span-only wire (the `loc` wire is a superset — §`loc` lines)
 
 TypeScript uses directories (`internal/`, `convert/`) due to complexity. CSS and Svelte use a single `internal.rs` for AST types and a directory for conversion.
 
@@ -158,13 +159,13 @@ pub fn convert_ast_json_bytes(ast: &InternalAst, source: &str) -> Vec<u8>;
 pub fn convert_ast_json_string(ast: &InternalAst, source: &str) -> String;
 ```
 
-`convert_ast_json_bytes` is the **sole emission path** — the hot path for
-compact wire output (FFI, the CLI) and the source every other JSON form
-derives from, the CLI's `--pretty` included (a linear re-indent of these
-bytes, never a read). In every language it is a **writer-mode conversion**
+`convert_ast_json_bytes` and its span-only twin are the **sole emission
+paths** — every JSON form derives from one of them, the CLI's `--pretty`
+included (a linear re-indent of their bytes, never a read). In every language
+each is a **writer-mode conversion**
 (`ast/convert/write*`) that emits the wire JSON directly during a single
 walk of the *internal* AST — no typed public tree is ever materialized —
-with byte→UTF-16 offset translation fused into the walk via `LocationMapper`
+with byte→UTF-16 offset translation fused into the walk via `WirePositions`
 (final char-space positions emitted directly; ASCII sources are byte-space
 passthrough). The output is valid UTF-8 by construction, and returning bytes
 lets byte-oriented boundaries skip the O(output) UTF-8 validation a `String`
@@ -184,8 +185,9 @@ binding ships (`tsv_ffi`, `tsv_napi`, `tsv_wasm`) and `tsv parse`'s default; the
 plus source, so the packages derive it consumer-side rather than shipping it: every
 package that parses carries the derivation as a pure-JS `reconstruct_locations` helper,
 which its `parse_*(source, {locations: true})` runs. Each writer is a faithful emission of the acorn /
-`parseCss` quirk catalog; the fixture suite gates its output against the
-canonical parser's `expected.json` on every fixture (including the multibyte
+`parseCss` quirk catalog; the fixture suite gates the span-only wire against
+the canonical parser's `expected.json` (its output with `loc` / `name_loc`
+stripped) on every fixture (including the multibyte
 and template-comment ones that exercise the fused offset translation and
 island-scoped comment attach). tsv_svelte's template-expression comments
 (outside `<script>`) fuse via an island-scoped attach that runs **online**,

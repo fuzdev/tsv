@@ -1,6 +1,6 @@
 # Svelte Conformance
 
-The tsv parser aims for **exact AST compatibility** with Svelte's parser. This document catalogs tsv's compatibility behaviors and intentional corrections.
+The tsv parser aims for **exact AST compatibility** with Svelte's parser on every field but `loc` and `name_loc` — the span-only wire every binding emits; `loc` (opt-in) follows one definition and reproduces none of Svelte's `loc` quirks (§Svelte Template Corrections). This document catalogs tsv's compatibility behaviors and intentional corrections.
 
 ## Mental Model
 
@@ -1560,13 +1560,12 @@ Backslash doubling and unicode-escape duplication are inherited "for free" by ex
 
 Compat behaviors live in the **conversion layer** wherever possible: the
 internal AST stays clean and semantic, and quirks apply only when generating
-Svelte-compatible JSON. Two exceptions sit deeper by design: the radix
+Svelte-compatible JSON. One exception sits deeper by design: the radix
 digit-fold runs in the parser (the internal numeric value is the folded one —
 formatting reads raw source, and every JSON consumer wants acorn's value, so
-a spec-rounded internal value would have no consumer), and line tracking is a
-per-node-origin route — the parser records where each acorn parse began, and
-the writer answers each position from the emitting node's own class — rather
-than a per-field quirk.
+a spec-rounded internal value would have no consumer). `loc` is no quirk site
+at all: it follows one definition per document, computed from the emitted
+offsets at write time (§Svelte Template Corrections).
 
 **At-rule preludes — source-extracted at the boundary.** The public `Atrule.prelude` is reproduced from the raw source span (`strip_css_comments(span.extract(source))`) for every prelude shape — the structured `@import`/`@scope`/`@supports`/`@container`, raw `@media`, and the raw path (`@layer`, `@keyframes`, `@namespace`, `@page`, …) — so it stays byte-for-byte with Svelte's verbatim string even on non-canonical whitespace (`@layer a , b` → `a , b`; `@namespace url(  x  )` → `url(  x  )`). The parser still builds a _normalized_ prelude string, but it is printer-facing only: the formatter consumes it, the public AST does not. (`@media` normalizes its query; `@namespace` is value-normalized to match postcss; other raw at-rules keep the prelude verbatim — all only on the formatter side.) The internal-vs-public split is therefore complete for preludes.
 
