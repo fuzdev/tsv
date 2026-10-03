@@ -6,8 +6,7 @@
 //!   and how it counts a leading BOM), and one position in them
 //! - `WireTables` / `WirePositions` - what a wire writer emits positions from (the
 //!   byte→UTF-16 map, and the line table under the `locations` feature);
-//!   `LocationTracker` / `ByteToCharMap` / `LocationMapper` - the line/column machinery
-//!   beneath them
+//!   `LocationMapper` - the line/column view a `loc` emitter reads from them
 //! - `ParseError` - error types and result aliases
 //! - `OutputBuffer` - shared printer output utilities
 //! - `config` - hardcoded formatter settings (`PRINT_WIDTH` / `TAB_WIDTH` / `INDENT`)
@@ -65,8 +64,8 @@ pub use hash::{FxBuildHasher, FxHashMap, FxHashSet, FxHasher};
 #[cfg(feature = "json")]
 pub use json_writer::{JsonWriter, StageRun, StagedDigits, write_array, write_or_null};
 pub use location::{
-    BOM, ByteToCharMap, LeadingBom, LineRule, LocationMapper, LocationTracker, Position,
-    WireCoordinates, WirePoint, WirePositions, WireTables, leading_bom_len,
+    BOM, LeadingBom, LineRule, LocationMapper, Position, Wire, WireCoordinates, WirePoint,
+    WirePositions, WireTables, leading_bom_len,
 };
 pub use output::{OutputBuffer, write_indent};
 pub use sizing::{estimated_ast_arena_capacity, estimated_json_capacity};

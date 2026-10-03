@@ -33,14 +33,9 @@ use serde_json::Value;
 use std::path::Path;
 use tsv_debug::fixtures::{self, InputType};
 
-/// Which characters end a line in a document.
-#[derive(Clone, Copy, Debug)]
-enum LineRule {
-    /// LF, CR, CRLF (one terminator), U+2028, U+2029 — a TypeScript document.
-    Ecmascript,
-    /// LF alone — a Svelte document and everything in it, and a CSS document.
-    Lf,
-}
+#[path = "support/utf16_lines.rs"]
+mod utf16_lines;
+use utf16_lines::{LineRule, line_column, line_starts};
 
 /// A document as its wire positions index it: its UTF-16 code units (behind the BOM when
 /// the wire elides one) and the unit offset each line starts at.
@@ -57,29 +52,14 @@ impl Reference {
             source
         };
         let units: Vec<u16> = document.encode_utf16().collect();
-        let mut line_starts = vec![0];
-        for (i, &unit) in units.iter().enumerate() {
-            let ends_line = match rule {
-                LineRule::Lf => unit == 0x0a,
-                LineRule::Ecmascript => match unit {
-                    0x0a | 0x2028 | 0x2029 => true,
-                    // A CR followed by its LF is one terminator, ended by the LF.
-                    0x0d => units.get(i + 1) != Some(&0x0a),
-                    _ => false,
-                },
-            };
-            if ends_line {
-                line_starts.push(i + 1);
-            }
-        }
+        let line_starts = line_starts(&units, rule);
         Self { units, line_starts }
     }
 
-    /// `(line, column)` of a UTF-16 offset: the line is how many lines start at or
-    /// before it.
+    /// `(line, column)` of a UTF-16 offset.
     fn position(&self, offset: usize) -> (u64, u64) {
-        let line = self.line_starts.partition_point(|&start| start <= offset);
-        (line as u64, (offset - self.line_starts[line - 1]) as u64)
+        let (line, column) = line_column(&self.line_starts, offset);
+        (line as u64, column as u64)
     }
 }
 

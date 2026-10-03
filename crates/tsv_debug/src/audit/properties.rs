@@ -197,7 +197,7 @@ pub(crate) fn tsv_parses(source: &str, parser: ParserType) -> bool {
 
 /// Translates the wire AST's positions into byte offsets.
 ///
-/// The wire emits **UTF-16 code-unit** offsets (`tsv_lang::location::ByteToCharMap`), not
+/// The wire emits **UTF-16 code-unit** offsets (`tsv_lang`'s byte→UTF-16 map), not
 /// byte offsets — they coincide on ASCII and diverge the moment a file holds a `é` or an
 /// emoji. Slicing `source` with a raw wire offset is then off by the multi-byte count:
 /// wrong regions, or a panic on a non-char-boundary. Nothing downstream can catch that —

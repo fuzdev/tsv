@@ -96,18 +96,13 @@ pub fn decode_string_escapes_into(s: &str, out: &mut String) -> Result<(), Parse
 
             // Hex escape: \xHH
             Some('x') => {
-                // 2 hex digits → 0..=0xFF, always a valid Unicode scalar (no
-                // surrogate range), so `from_u32` never fails here.
                 let code =
                     read_hex_value(&mut chars, 2).map_err(|e| e.shift_position(backslash))?;
-                if let Some(ch) = char::from_u32(code) {
-                    result.push(ch);
-                } else {
-                    return Err(ParseError::invalid_syntax(
-                        format!("Invalid hex escape: \\x{code:02X}"),
-                        backslash,
-                    ));
-                }
+                // Two hex digits are at most 0xFF: a Latin-1 code point, the one range a
+                // byte converts to a `char` infallibly.
+                #[expect(clippy::cast_possible_truncation, reason = "two hex digits fit a byte")]
+                let byte = code as u8;
+                result.push(char::from(byte));
             }
 
             // Unicode escape: \uXXXX or \u{XXXXXX}
@@ -676,18 +671,14 @@ mod tests {
 
                     // Hex escape: \xHH
                     Some('x') => {
-                        // 2 hex digits → 0..=0xFF, always a valid Unicode scalar (no
-                        // surrogate range), so `from_u32` never fails here.
                         let code = model_read_hex_value(&mut chars, 2)
                             .map_err(|e| e.shift_position(backslash))?;
-                        if let Some(ch) = char::from_u32(code) {
-                            result.push(ch);
-                        } else {
-                            return Err(ParseError::invalid_syntax(
-                                format!("Invalid hex escape: \\x{code:02X}"),
-                                backslash,
-                            ));
-                        }
+                        #[expect(
+                            clippy::cast_possible_truncation,
+                            reason = "two hex digits fit a byte"
+                        )]
+                        let byte = code as u8;
+                        result.push(char::from(byte));
                     }
 
                     // Unicode escape: \uXXXX or \u{XXXXXX}

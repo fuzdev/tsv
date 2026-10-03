@@ -51,18 +51,17 @@ use std::slice;
 // Per-thread reusable arenas live in the shared `tsv_arena` crate (used by both
 // native bindings — see its module docs for the reuse rationale + soundness;
 // the FFI path additionally relies on `reset()` recovering cleanly after a
-// `catch_unwind`-caught panic). The goal-axis macros come from the same crate,
-// so the three bindings share ONE definition of which languages have a goal
-// rather than three hand-synced copies.
+// `catch_unwind`-caught panic). The goal-axis macros and the format export's
+// body (`parse_format!`) come from the same crate, so the three bindings share ONE
+// definition of which languages have a goal rather than three hand-synced copies.
 #[cfg(any(feature = "parse", feature = "format"))]
 use tsv_arena::goal_allowed;
 #[cfg(feature = "parse")]
 use tsv_arena::parse_ast;
 #[cfg(feature = "format")]
-use tsv_arena::parse_ast_for_format;
+use tsv_arena::parse_format;
+#[cfg(any(feature = "parse", test))]
 use tsv_arena::with_ast_arena;
-#[cfg(feature = "format")]
-use tsv_arena::with_doc_arena;
 
 /// `*out_status` for a call that produced its payload: the returned bytes are the
 /// wire JSON, the formatted source, or (for `tsv_parse_internal_*`) empty.
@@ -275,11 +274,11 @@ fn ffi_source_type(
 // these are uniform across svelte/typescript/css — no per-language arity split.
 #[cfg(feature = "parse")]
 macro_rules! parse_convert {
-    ($goalness:ident, $lang:ident, $conv:ident, $source:expr, $goal:expr) => {
+    ($goalness:ident, $lang:ident, $source:expr, $goal:expr) => {
         with_ast_arena(|arena| {
             let ast =
                 parse_ast!($goalness, $lang, $source, $goal, arena).map_err(|e| e.to_string())?;
-            Ok($lang::$conv(&ast, $source))
+            Ok($lang::convert_ast_json_bytes(&ast, $source))
         })
     };
 }
@@ -301,26 +300,6 @@ macro_rules! parse_internal {
             Ok(Vec::new())
         })
     };
-}
-
-#[cfg(feature = "format")]
-macro_rules! parse_format {
-    ($goalness:ident, $lang:ident, $source:expr, $goal:expr) => {{
-        // The format path's line-terminator fold, ahead of the parse — see
-        // `tsv_lang::printing::normalize_carriage_returns`. `parse_convert!` deliberately
-        // skips it: the wire's offsets are a drop-in contract over the author's own bytes.
-        let folded = tsv_lang::printing::normalize_carriage_returns($source);
-        let source = folded.text();
-        with_ast_arena(|arena| {
-            // a parse error indexes the folded text: mapped back onto the caller's
-            // source, its `line:col` is the one a parse of that source reports
-            let ast = parse_ast_for_format!($goalness, $lang, source, $goal, arena)
-                .map_err(|e| folded.unfold_error(e).to_string())?;
-            Ok(with_doc_arena(|doc_arena| {
-                $lang::format_folded_in(&ast, &folded, doc_arena)
-            }))
-        })
-    }};
 }
 
 /// Generate `tsv_parse_<lang>` / `tsv_parse_internal_<lang>` / `tsv_format_<lang>`
@@ -377,7 +356,7 @@ macro_rules! lang_bindings {
                     // names the default the decoder already applied.
                     let goal = ffi_source_type(source_type, goal_allowed!($goalness), false)?
                         .unwrap_or(tsv_ts::Goal::Module);
-                    parse_convert!($goalness, $lang, convert_ast_json_bytes, source, goal)
+                    parse_convert!($goalness, $lang, source, goal)
                 })
             }
         }
@@ -425,7 +404,7 @@ macro_rules! lang_bindings {
                     // `true`: only a formatter can answer the unspecified code, with the
                     // module grammar retried as a script.
                     let goal = ffi_source_type(source_type, goal_allowed!($goalness), true)?;
-                    parse_format!($goalness, $lang, source, goal)
+                    parse_format!($goalness, $lang, source, goal, |e| e.to_string())
                 })
             }
         }

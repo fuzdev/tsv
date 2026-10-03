@@ -1,6 +1,5 @@
 use super::*;
 use crate::audit::panic_hook::{SuppressedPanicHook, panic_message};
-use tsv_lang::LeadingBom;
 
 /// The merge-path family codes — a *missing* of one of these is classified as a
 /// merge-phase gap, not a same-table cascade bug.
@@ -309,10 +308,6 @@ fn grade_test(
     };
     let parsed = matches!(parse, ParseReport::Parsed(_));
 
-    // The unit's line map — reused across the test's variants for the parsed case.
-    let line_map = parsed
-        .then(|| LocationTracker::new_ecmascript_with_map(&unit.content, LeadingBom::Counted));
-
     for variant in in_scope {
         let name = config_name(&test.basename, &variant.description);
         let baseline = ondisk.get(&(test.suite, name.clone())).copied();
@@ -422,19 +417,12 @@ fn grade_test(
                     }
                     Some(b) => {
                         report.baselined_parsed += 1;
-                        // `parsed` => `line_map` is `Some`; the `None` arm is dead.
-                        let ours_family = match line_map.as_ref() {
-                            Some((tracker, map)) => {
-                                let mapper = LocationMapper { tracker, map };
-                                build_ours_family(
-                                    &result.diagnostics,
-                                    &unit.name,
-                                    &mapper,
-                                    lib_files,
-                                )
-                            }
-                            None => Vec::new(),
-                        };
+                        let ours_family = build_ours_family(
+                            &result.diagnostics,
+                            &unit.name,
+                            &unit.content,
+                            lib_files,
+                        );
                         grade_family(test, &name, b, &ours_family, report)
                     }
                 }
@@ -541,7 +529,7 @@ const UNITS_LEN: u32 = 1;
 fn build_ours_family(
     diagnostics: &[Diagnostic],
     unit_name: &str,
-    mapper: &LocationMapper<'_>,
+    content: &str,
     lib_files: &[String],
 ) -> Vec<FamilyEntry> {
     diagnostics
@@ -553,17 +541,17 @@ fn build_ours_family(
             if file.index() >= UNITS_LEN as usize {
                 return None;
             }
-            let (_, pos) = mapper.pos_and_position(d.span.start);
+            let point = tsv_ts::WIRE_COORDINATES.point(content, d.span.start as usize);
             let key = FamilyDiag {
                 file: unit_name.to_string(),
-                line: pos.line as u32,
-                col: pos.column as u32 + 1,
+                line: point.line,
+                col: point.column + 1,
                 code: d.code,
             };
             let related = d
                 .related
                 .iter()
-                .map(|r| resolve_related(r, unit_name, mapper, lib_files))
+                .map(|r| resolve_related(r, unit_name, content, lib_files))
                 .collect();
             Some(FamilyEntry { key, related })
         })
@@ -576,16 +564,16 @@ fn build_ours_family(
 fn resolve_related(
     r: &Diagnostic,
     unit_name: &str,
-    mapper: &LocationMapper<'_>,
+    content: &str,
     lib_files: &[String],
 ) -> RelatedKey {
     match r.file {
         Some(f) if f.index() < UNITS_LEN as usize => {
-            let (_, pos) = mapper.pos_and_position(r.span.start);
+            let point = tsv_ts::WIRE_COORDINATES.point(content, r.span.start as usize);
             RelatedKey {
                 code: r.code,
                 file: unit_name.to_string(),
-                loc: Some((pos.line as u32, pos.column as u32 + 1)),
+                loc: Some((point.line, point.column + 1)),
             }
         }
         Some(f) => {

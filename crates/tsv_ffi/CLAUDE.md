@@ -72,7 +72,7 @@ construction.
 
 ## Files
 
-- `src/lib.rs` — All bindings: the `lang_bindings!` macro (over the shared `parse_ast!` / `goal_allowed!` goal axis, with `ffi_source_type` decoding the `u32` code, and `parse_ast_for_format!` carrying the format path's `Option<Goal>`), the three `lang_bindings!` invocations, the `TSV_STATUS_*` constants, source-extraction helpers, `tsv_free`, and a `#[cfg(test)]` module. The reusable arenas and the goal macros are imported from `tsv_arena` (`with_ast_arena`, plus `with_doc_arena` under the `format` feature)
+- `src/lib.rs` — All bindings: the `lang_bindings!` macro (over the shared `parse_ast!` / `goal_allowed!` goal axis, with `ffi_source_type` decoding the `u32` code, and `parse_format!` carrying the format path's `Option<Goal>`), the three `lang_bindings!` invocations, the `TSV_STATUS_*` constants, source-extraction helpers, `tsv_free`, and a `#[cfg(test)]` module. The reusable arenas and the goal macros are imported from `tsv_arena` (`with_ast_arena` where a parse export or a test calls it directly, and `parse_format!` under the `format` feature, which runs both arena helpers itself)
 - `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "allow"` (FFI requires it); deps include `tsv_arena` (`format` → `tsv_arena/format`)
 
 The in-crate test module drives every entry point in-process (real

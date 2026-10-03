@@ -83,7 +83,7 @@ pub fn format_str(source: &str) -> Result<String> {
     // alone so its offsets stay a drop-in contract with Svelte's.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
     let arena = bumpalo::Bump::new();
-    let root = parse(folded.text(), &arena).map_err(|e| folded.unfold_error(e))?;
+    let root = folded.parse_with(|text| parse(text, &arena))?;
     let doc_arena = tsv_lang::doc::arena::DocArena::for_source(folded.text());
     Ok(format_folded_in(&root, &folded, &doc_arena))
 }
@@ -146,7 +146,7 @@ pub fn format_folded_in(
 /// ```
 #[cfg(feature = "convert")]
 pub fn convert_ast_json_bytes(root: &Root<'_>, source: &str) -> Vec<u8> {
-    ast::convert::write_root_bytes(root, source, false)
+    ast::convert::write_root_bytes(root, source, tsv_lang::Wire::Span)
 }
 
 /// The `convert_ast_json_bytes` wire plus a `loc` on every object carrying `start`/`end`
@@ -156,7 +156,7 @@ pub fn convert_ast_json_bytes(root: &Root<'_>, source: &str) -> Vec<u8> {
 /// everything embedded in it. `tsv parse --locations` writes it.
 #[cfg(feature = "locations")]
 pub fn convert_ast_json_bytes_with_locations(root: &Root<'_>, source: &str) -> Vec<u8> {
-    ast::convert::write_root_bytes(root, source, true)
+    ast::convert::write_root_bytes(root, source, tsv_lang::Wire::Loc)
 }
 
 /// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (the WASM

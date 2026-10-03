@@ -21,10 +21,10 @@
 //! `mod.rs` (`strip_css_comments_collecting`, `split_declaration_svelte_compat`,
 //! `raw_selector_name`, …) so the Svelte scan semantics are defined once.
 //!
-//! `parseCss` emits only `start`/`end`; tsv adds `loc` (LF-only lines, UTF-16
-//! columns) to every object that carries them, on the wire that asks for it — the
-//! one `loc` definition all three writers share (`tsv_lang::WirePositions`). Each
-//! position is translated via the `ByteToCharMap` (identity on ASCII). Dynamic
+//! `parseCss` emits only `start`/`end`; tsv adds `loc` to every object that carries
+//! them, on the wire that asks for it — the one `loc` definition all three writers
+//! share (`tsv_lang::WirePositions`), in the coordinates `crate::WIRE_COORDINATES`
+//! states. Each position is translated via the byte→UTF-16 map (identity on ASCII). Dynamic
 //! strings are escaped by
 //! [`write_string`] (byte-identical to `serde_json`, and to `JsonWriter::string`:
 //! one shared copy of `JsonWriter::string_led_words` with an empty lead, whose short clean
@@ -93,7 +93,7 @@ use super::{
     split_declaration_svelte_compat, strip_css_comments_collecting, trim_wire_end, trim_wire_start,
 };
 use std::borrow::Cow;
-use tsv_lang::{JsonWriter, Span, WirePositions, WireTables, write_array, write_or_null};
+use tsv_lang::{JsonWriter, Span, Wire, WirePositions, WireTables, write_array, write_or_null};
 
 /// Declares one `parseCss()` metadata payload twice from a single literal: bare
 /// (`$bare`), and as the constant burst that closes its node (`$closing` — `$lead`,
@@ -225,26 +225,21 @@ impl Ctx<'_> {
 }
 
 /// Convert the internal CSS nodes straight to standalone-`StyleSheetFile` wire
-/// bytes — one AST walk, with byte→char offset translation fused in, and every
-/// node's `loc` (LF-only lines, UTF-16 columns) when `locations` is set.
-///
-/// A leading BOM is ELIDED: `parseCss` strips it (`remove_bom`) before parsing, so every
-/// canonical offset indexes the BOM-less string — one UTF-16 unit below the author's
-/// file. The lexer's spans stay file-true; only the emitted position moves. (An embedded
-/// `<style>` takes the Svelte writer's positions, built the same way.)
+/// bytes on `wire` — one AST walk, with byte→char offset translation fused in, in
+/// the coordinates `crate::WIRE_COORDINATES` states. (An embedded `<style>` takes the
+/// Svelte writer's positions.)
 pub(crate) fn write_stylesheet_file_bytes(
     stylesheet: &internal::CssStyleSheet<'_>,
     source: &str,
-    locations: bool,
+    wire: Wire,
 ) -> Vec<u8> {
-    let tables = WireTables::new(source, crate::WIRE_COORDINATES, locations);
+    let tables = WireTables::new(source, crate::WIRE_COORDINATES, wire);
     let ctx = Ctx {
         source,
         positions: tables.positions(),
         has_metadata: true,
     };
-    let mut w =
-        JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len(), locations));
+    let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len(), wire));
     write_stylesheet_file(&mut w, stylesheet, &ctx);
     w.into_bytes()
 }

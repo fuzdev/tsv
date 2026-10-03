@@ -118,7 +118,7 @@ pub fn format_str(source: &str) -> Result<String> {
     // alone so its offsets stay a drop-in contract with `parseCss`'s.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
     let arena = bumpalo::Bump::new();
-    let stylesheet = parse(folded.text(), &arena).map_err(|e| folded.unfold_error(e))?;
+    let stylesheet = folded.parse_with(|text| parse(text, &arena))?;
     let doc_arena = tsv_lang::doc::arena::DocArena::for_source(folded.text());
     Ok(format_folded_in(&stylesheet, &folded, &doc_arena))
 }
@@ -208,12 +208,12 @@ impl HostBoundaryScan {
 /// `loc`, and no line table built at all. The writer (`ast/convert/write.rs`) walks the
 /// internal AST once and emits the wire JSON directly, never materializing a typed public
 /// tree, fusing the byte→char offset translation into the walk (each position through a
-/// `ByteToCharMap`; identity on ASCII). The bytes are valid UTF-8 by construction (source
+/// byte→UTF-16 map; identity on ASCII). The bytes are valid UTF-8 by construction (source
 /// slices + ASCII fragments), and byte-oriented consumers skip the O(output) validation a
 /// `String` requires.
 #[cfg(feature = "convert")]
 pub fn convert_ast_json_bytes(stylesheet: &CssStyleSheet<'_>, source: &str) -> Vec<u8> {
-    ast::convert::write_stylesheet_file_bytes(stylesheet, source, false)
+    ast::convert::write_stylesheet_file_bytes(stylesheet, source, tsv_lang::Wire::Span)
 }
 
 /// Convert internal AST to compact JSON wire bytes **with** per-node `loc`.
@@ -226,7 +226,7 @@ pub fn convert_ast_json_bytes_with_locations(
     stylesheet: &CssStyleSheet<'_>,
     source: &str,
 ) -> Vec<u8> {
-    ast::convert::write_stylesheet_file_bytes(stylesheet, source, true)
+    ast::convert::write_stylesheet_file_bytes(stylesheet, source, tsv_lang::Wire::Loc)
 }
 
 /// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (the WASM

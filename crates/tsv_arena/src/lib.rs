@@ -5,7 +5,8 @@
 //! would otherwise hand-sync them, and each encodes a contract too subtle to
 //! keep three copies of honest (see the crate's CLAUDE.md §Why this crate
 //! exists). The arenas are the bulk of it and are described below; the goal
-//! macros ([`parse_ast!`], [`goal_allowed!`]) sit at the bottom of this file.
+//! macros ([`parse_ast!`], [`goal_allowed!`], and the format path's `parse_format!`) sit at
+//! the bottom of this file.
 //!
 //! # The arenas
 //!
@@ -220,6 +221,38 @@ macro_rules! parse_ast_for_format {
         // expansion.
         let _ = $goal;
         $lang::parse($source, $arena)
+    }};
+}
+
+/// The whole format export: fold the source's line terminators, parse the folded text
+/// through [`parse_ast_for_format!`] in the per-thread AST arena, and format it in the
+/// per-thread doc arena — a parse error mapped back onto the caller's source
+/// (`tsv_lang::printing::FoldedSource::parse_with`) and then through `$map_err`, each
+/// binding's own error type (a message string, a located failure, a JS value).
+///
+/// Expands to `Result<String, _>` inside the caller's `with_*_arena` closures, so the
+/// caller's `?`-conversion rules apply; `$lang` and `tsv_lang` resolve in the caller's
+/// scope, as in [`parse_ast!`]. The parse exports skip the fold: their wire's offsets are
+/// a drop-in contract over the author's own bytes.
+///
+/// ```ignore
+/// parse_format!(goal, tsv_ts, source, source_type, |e| e.to_string())
+/// ```
+#[cfg(feature = "format")]
+#[macro_export]
+macro_rules! parse_format {
+    ($goalness:ident, $lang:ident, $source:expr, $goal:expr, $map_err:expr) => {{
+        let folded = tsv_lang::printing::normalize_carriage_returns($source);
+        $crate::with_ast_arena(|arena| {
+            let ast = folded
+                .parse_with(|source| {
+                    $crate::parse_ast_for_format!($goalness, $lang, source, $goal, arena)
+                })
+                .map_err($map_err)?;
+            Ok($crate::with_doc_arena(|doc_arena| {
+                $lang::format_folded_in(&ast, &folded, doc_arena)
+            }))
+        })
     }};
 }
 

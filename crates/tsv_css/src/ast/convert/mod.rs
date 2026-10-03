@@ -13,9 +13,8 @@
 // - Declaration `end` — the `;`/`}` terminator scan position
 // - Selector names — half-decoded like `read_identifier` (hex escapes decode,
 //   identity escapes keep the backslash)
-// Spans always index the real file; a leading BOM is elided at EMISSION
-// (`LeadingBom::Elided` in `WIRE_COORDINATES`), since `parseCss`
-// strips it before parsing and its offsets index the BOM-less string.
+// Spans always index the real file; how an emitted position counts lines and a
+// leading BOM is `WIRE_COORDINATES`'s statement, applied at EMISSION.
 //
 // The writer (`write.rs`) emits the wire JSON directly from the internal AST
 // in one walk and **reuses the raw-source reconstruction helpers below**

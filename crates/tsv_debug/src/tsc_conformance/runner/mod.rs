@@ -71,7 +71,6 @@ use tsv_check::{
     CheckOptions, Diagnostic, FileId, ParseReport, SourceUnit, bind_file, bind_program, build_flow,
     check_bound, check_program, render_flow_dot,
 };
-use tsv_lang::{LeadingBom, LocationMapper, LocationTracker};
 
 /// The full set of codes the gate grades — the bind/merge duplicate-conflict
 /// family ([`DUP_CODES`]) plus the flow-construction family ([`FLOW_CODES`]).
@@ -311,14 +310,8 @@ pub fn check_one(
         match d.file {
             Some(f) if f.index() < units_len => {
                 let (line, col) = units.get(f.index()).map_or((None, None), |u| {
-                    let (t, m) =
-                        LocationTracker::new_ecmascript_with_map(&u.content, LeadingBom::Counted);
-                    let (_, pos) = LocationMapper {
-                        tracker: &t,
-                        map: &m,
-                    }
-                    .pos_and_position(d.span.start);
-                    (Some(pos.line as u32), Some(pos.column as u32 + 1))
+                    let point = tsv_ts::WIRE_COORDINATES.point(&u.content, d.span.start as usize);
+                    (Some(point.line), Some(point.column + 1))
                 });
                 DiagLine {
                     file: units.get(f.index()).map(|u| u.name.clone()),

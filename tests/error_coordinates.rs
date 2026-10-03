@@ -24,6 +24,10 @@ use bumpalo::Bump;
 use std::path::Path;
 use tsv_lang::ParseError;
 
+#[path = "support/utf16_lines.rs"]
+mod utf16_lines;
+use utf16_lines::{LineRule, line_column, line_starts};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Language {
     TypeScript,
@@ -44,24 +48,13 @@ fn reference_point(source: &str, position: usize, language: Language) -> (u32, u
     } else {
         0
     };
+    let rule = match language {
+        Language::TypeScript => LineRule::Ecmascript,
+        Language::Svelte | Language::Css => LineRule::Lf,
+    };
     let units: Vec<u16> = source[bom..].encode_utf16().collect();
     let offset = source[bom..position.max(bom)].encode_utf16().count();
-    let mut line_starts = vec![0];
-    for (i, &unit) in units.iter().enumerate() {
-        let ends_line = match language {
-            Language::Svelte | Language::Css => unit == 0x0a,
-            Language::TypeScript => match unit {
-                0x0a | 0x2028 | 0x2029 => true,
-                0x0d => units.get(i + 1) != Some(&0x0a),
-                _ => false,
-            },
-        };
-        if ends_line {
-            line_starts.push(i + 1);
-        }
-    }
-    let line = line_starts.partition_point(|&start| start <= offset);
-    let column = offset - line_starts[line - 1];
+    let (line, column) = line_column(&line_starts(&units, rule), offset);
     (offset as u32, line as u32, column as u32)
 }
 
@@ -272,6 +265,11 @@ const ESCAPE_CASES: &[(Language, &str)] = &[
     (Language::TypeScript, "let a;\nlet s = '\\u{12';"),
     (Language::TypeScript, "let a;\nlet s = '\\u{110000}';"),
     (Language::TypeScript, "let a;\nlet s = '\\u{}';"),
+    // content ahead of the escape INSIDE its literal or template segment, which is what
+    // tells the backslash from the start of the slice the decoder was handed
+    (Language::TypeScript, "let a;\nlet s = 'ab\\u{zz}';"),
+    (Language::TypeScript, "let a;\nlet t = `x${a}y\\u{zz}`;"),
+    (Language::TypeScript, "let a;\nlet s = 'ab\\x4';"),
     (
         Language::TypeScript,
         "let a = '𝒜';\nlet t = `x${a}\\u{zz}`;",
@@ -285,7 +283,16 @@ const ESCAPE_CASES: &[(Language, &str)] = &[
         Language::Svelte,
         "<div>hi</div>\n<script>\n\tlet s = '\\u{zz}';\n</script>",
     ),
+    (
+        Language::Svelte,
+        "<div>hi</div>\n<script>\n\tlet t = `\\x4`;\n</script>",
+    ),
+    (
+        Language::Svelte,
+        "<div>hi</div>\n<script>\n\tlet s = '\\7';\n</script>",
+    ),
     (Language::Svelte, "<p>x</p>\n{'\\u{zz}'}"),
+    (Language::Svelte, "<p>x</p>\n{'ab\\u{zz}'}"),
     (Language::Svelte, "<p>𝒜</p>\n<div title={`\\x4`}></div>"),
     (Language::Svelte, "<p>x</p>\n{#if '\\u12'}{/if}"),
     (Language::Css, "a {}\n.b\\\n{}"),
@@ -295,16 +302,39 @@ const ESCAPE_CASES: &[(Language, &str)] = &[
     ),
 ];
 
-/// Every malformed escape is reported at its own backslash — the first in the source.
+/// Every malformed escape is reported at its own backslash — the first in the source —
+/// and its message excerpts the backslash's own line. (Its point and header are graded
+/// with the synthetic cases.)
 #[test]
 fn escape_errors_point_at_their_backslash() {
     let mut failures = Vec::new();
     for &(language, source) in ESCAPE_CASES {
         let backslash = source.find('\\').expect("an escape");
-        let position = parse_error(source, language).and_then(|e| e.position());
+        let Some(error) = parse_error(source, language) else {
+            failures.push(format!("{language:?} {source:?}: parses"));
+            continue;
+        };
+        let position = error.position();
         if position != Some(backslash) {
             failures.push(format!(
                 "{language:?} {source:?}: at {position:?}, the backslash at {backslash}"
+            ));
+        }
+        // the cases break lines with LF alone, so the display line is the LF-bounded one
+        let line_start = source[..backslash].rfind('\n').map_or(0, |i| i + 1);
+        let line_end = source[backslash..]
+            .find('\n')
+            .map_or(source.len(), |i| backslash + i);
+        let rendered = error.to_string();
+        let excerpt = rendered
+            .lines()
+            .nth(1)
+            .and_then(|line| line.split_once(' '))
+            .map(|(_, text)| text);
+        if excerpt != Some(&source[line_start..line_end]) {
+            failures.push(format!(
+                "{language:?} {source:?}: excerpt {excerpt:?}, the backslash's line {:?}",
+                &source[line_start..line_end]
             ));
         }
     }

@@ -36,17 +36,17 @@ use napi_derive::napi;
 use napi::bindgen_prelude::{Either, Undefined};
 // Per-thread reusable arenas live in the shared `tsv_arena` crate (used by both
 // native bindings — see its module docs for the reuse rationale + soundness).
-// The goal-axis macros come from the same crate, so the three bindings share ONE
-// definition of which languages have a goal rather than three hand-synced copies.
+// The goal-axis macros and the format export's body (`parse_format!`) come from
+// the same crate, so the three bindings share ONE definition of which languages have
+// a goal rather than three hand-synced copies.
 #[cfg(any(feature = "parse", feature = "format"))]
 use tsv_arena::goal_allowed;
 #[cfg(feature = "parse")]
 use tsv_arena::parse_ast;
 #[cfg(feature = "format")]
-use tsv_arena::parse_ast_for_format;
+use tsv_arena::parse_format;
+#[cfg(any(feature = "parse", feature = "panic_probe"))]
 use tsv_arena::with_ast_arena;
-#[cfg(feature = "format")]
-use tsv_arena::with_doc_arena;
 
 /// Decode the optional `sourceType` argument (`"script"` / `"module"`); omitted
 /// or `undefined` stays **unset**.
@@ -97,9 +97,7 @@ enum Failure {
     /// (`ParseError::wire_point`).
     Syntax {
         message: String,
-        start: u32,
-        line: u32,
-        column: u32,
+        point: tsv_ts::WirePoint,
     },
 }
 
@@ -110,12 +108,7 @@ impl Failure {
     fn parse(e: &tsv_ts::ParseError) -> Self {
         let message = e.to_string();
         match e.wire_point() {
-            Some(point) => Failure::Syntax {
-                message,
-                start: point.start,
-                line: point.line,
-                column: point.column,
-            },
+            Some(point) => Failure::Syntax { message, point },
             None => Failure::Plain(message),
         }
     }
@@ -137,12 +130,7 @@ impl Failure {
     fn into_napi(self, env: Env) -> napi::Error {
         match self {
             Failure::Plain(message) => napi::Error::from_reason(message),
-            Failure::Syntax {
-                message,
-                start,
-                line,
-                column,
-            } => match pointed_error(env, &message, start, line, column) {
+            Failure::Syntax { message, point } => match pointed_error(env, &message, point) {
                 Ok(error) => error,
                 Err(_) => napi::Error::from_reason(message),
             },
@@ -158,14 +146,13 @@ impl Failure {
 /// non-enumerable `line` and `column` at construction, and a plain set writes through
 /// that property and keeps it non-enumerable; with nothing to delete (Node, Deno) the
 /// delete is a no-op.
-fn pointed_error(
-    env: Env,
-    message: &str,
-    start: u32,
-    line: u32,
-    column: u32,
-) -> napi::Result<napi::Error> {
+fn pointed_error(env: Env, message: &str, point: tsv_ts::WirePoint) -> napi::Result<napi::Error> {
     let mut error = env.create_error(napi::Error::from_reason(message))?;
+    let tsv_ts::WirePoint {
+        start,
+        line,
+        column,
+    } = point;
     for (name, value) in [("start", start), ("line", line), ("column", column)] {
         error.delete_named_property(name)?;
         error.set(name, value)?;
@@ -179,11 +166,11 @@ fn pointed_error(
 // these are uniform across svelte/typescript/css — no per-language arity split.
 #[cfg(feature = "parse")]
 macro_rules! parse_convert {
-    ($goalness:ident, $lang:ident, $conv:ident, $source:expr, $goal:expr) => {
+    ($goalness:ident, $lang:ident, $source:expr, $goal:expr) => {
         with_ast_arena(|arena| {
             let ast = parse_ast!($goalness, $lang, $source, $goal, arena)
                 .map_err(|e| Failure::parse(&e))?;
-            Ok($lang::$conv(&ast, $source))
+            Ok($lang::convert_ast_json_string(&ast, $source))
         })
     };
 }
@@ -198,26 +185,6 @@ macro_rules! parse_internal {
             Ok(())
         })
     };
-}
-
-#[cfg(feature = "format")]
-macro_rules! parse_format {
-    ($goalness:ident, $lang:ident, $source:expr, $goal:expr) => {{
-        // The format path's line-terminator fold, ahead of the parse — see
-        // `tsv_lang::printing::normalize_carriage_returns`. `parse_convert!` deliberately
-        // skips it: the wire's offsets are a drop-in contract over the author's own bytes.
-        let folded = tsv_lang::printing::normalize_carriage_returns($source);
-        let source = folded.text();
-        with_ast_arena(|arena| {
-            // a parse error indexes the folded text: mapped back onto the caller's
-            // source, its point is the one a parse of that source reports
-            let ast = parse_ast_for_format!($goalness, $lang, source, $goal, arena)
-                .map_err(|e| Failure::parse(&folded.unfold_error(e)))?;
-            Ok(with_doc_arena(|doc_arena| {
-                $lang::format_folded_in(&ast, &folded, doc_arena)
-            }))
-        })
-    }};
 }
 
 /// Generate `parse_<lang>_json` / `parse_internal_<lang>` / `format_<lang>` N-API
@@ -267,7 +234,7 @@ macro_rules! lang_bindings {
             ) -> Result<String, Failure> {
                 let goal = napi_source_type(source_type, goal_allowed!($goalness), "parse")?
                     .unwrap_or(tsv_ts::Goal::Module);
-                parse_convert!($goalness, $lang, convert_ast_json_string, source, goal)
+                parse_convert!($goalness, $lang, source, goal)
             }
 
             /// Parse only, no conversion.
@@ -288,7 +255,7 @@ macro_rules! lang_bindings {
                 source_type: Option<String>,
             ) -> Result<String, Failure> {
                 let goal = napi_source_type(source_type, goal_allowed!($goalness), "format")?;
-                parse_format!($goalness, $lang, source, goal)
+                parse_format!($goalness, $lang, source, goal, |e| Failure::parse(&e))
             }
         }
 
@@ -896,17 +863,11 @@ mod tests {
         ];
         for ((label, parse_fn, format_fn, internal_fn), src) in cases {
             let parse_err = at_default(parse_fn, src).unwrap_err();
-            let Failure::Syntax {
-                message,
-                line,
-                column,
-                ..
-            } = &parse_err
-            else {
+            let Failure::Syntax { message, point } = &parse_err else {
                 panic!("{label} parse: a parse failure is pointed: {parse_err:?}");
             };
             assert!(
-                message.contains(&format!("\n{line}:{} ", column + 1)),
+                message.contains(&format!("\n{}:{} ", point.line, point.column + 1)),
                 "{label} parse: the header prints the point: {message}"
             );
             assert_eq!(
@@ -933,9 +894,11 @@ mod tests {
             matches!(
                 parse_err,
                 Failure::Syntax {
-                    start: 23,
-                    line: 2,
-                    column: 6,
+                    point: tsv_ts::WirePoint {
+                        start: 23,
+                        line: 2,
+                        column: 6,
+                    },
                     ..
                 }
             ),

@@ -3,10 +3,9 @@ use std::cell::Cell;
 use crate::sizing::estimated_line_starts_capacity;
 use crate::swar::{ascii_has_byte_below, ascii_zero_lanes, high_bit_lanes, splat};
 
-/// A position in source code (line and column)
-///
-/// Generic type without serialization - languages can wrap this in their own types
-/// that include serde derives if needed.
+/// A line (1-based) and column (0-based, UTF-16 code units) — the `loc` point a wire
+/// writer emits beside an offset ([`LocationMapper::span_positions`],
+/// `JsonWriter::loc_field`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Position {
     pub line: usize,
@@ -40,7 +39,7 @@ pub struct Position {
 /// by the parser, which always point to the start of a character); a byte
 /// position inside a multibyte character resolves to that character's start.
 #[derive(Debug)]
-pub struct ByteToCharMap {
+pub(crate) struct ByteToCharMap {
     deltas: Deltas,
 }
 
@@ -62,7 +61,8 @@ enum Deltas {
 /// `parse` and `parseCss` **strip** it before parsing (`remove_bom` in the compiler's
 /// entry points), so every offset they emit indexes the BOM-less string — one UTF-16 unit
 /// lower than the author's file, and one column lower on line 1. Each wire follows its own
-/// oracle, so the writer names which reading its map takes; a map built `Elided` resolves
+/// oracle, so each language's `WIRE_COORDINATES` names which reading its maps and error
+/// points take ([`WireCoordinates::bom`]); a map built `Elided` resolves
 /// the BOM's three bytes to position 0 and every later byte one unit lower than `Counted`
 /// would. A U+FEFF anywhere but byte 0 is an ordinary character under both.
 ///
@@ -523,9 +523,9 @@ fn build_map(
 /// The wire-JSON writers thread this instead of a bare tracker so position
 /// emission and byte→UTF-16 translation fuse into one pass:
 ///
-/// - with a real map (`ByteToCharMap::new(source, bom)`), `pos_and_position`
-///   and the span forms emit final UTF-16 code-unit offsets and char-based
-///   columns directly — no post-conversion translation walk;
+/// - with a real map (`ByteToCharMap::new(source, bom)`), the span forms emit
+///   final UTF-16 code-unit offsets and char-based columns directly — no
+///   post-conversion translation walk;
 /// - with `ByteToCharMap::identity()` (an all-ASCII source, where a byte offset
 ///   and a UTF-16 offset coincide), both are exact byte-space passthrough.
 ///
@@ -534,17 +534,15 @@ fn build_map(
 /// node's `start`/`end` carry.
 #[derive(Clone, Copy, Debug)]
 pub struct LocationMapper<'a> {
-    pub tracker: &'a LocationTracker,
-    pub map: &'a ByteToCharMap,
+    pub(crate) tracker: &'a LocationTracker,
+    pub(crate) map: &'a ByteToCharMap,
 }
 
 impl LocationMapper<'_> {
-    /// The emitted offset (UTF-16 code units) plus its `Position`, in one translation —
-    /// the per-endpoint form direct wire emitters use (translating the offset with
-    /// `WirePositions::pos` and deriving the `Position` separately would put
-    /// `byte_offset` through the map twice on the multibyte path).
-    #[inline]
-    pub fn pos_and_position(&self, byte_offset: u32) -> (u32, Position) {
+    /// The emitted offset (UTF-16 code units) plus its `Position` for one endpoint — the
+    /// unit tests' per-endpoint oracle for the span forms, which the writers call.
+    #[cfg(test)]
+    fn pos_and_position(&self, byte_offset: u32) -> (u32, Position) {
         let (line, byte_column) = self.tracker.get_line_column(byte_offset as usize);
         if self.map.has_multibyte() {
             let pos = self.map.byte_to_char(byte_offset);
@@ -752,6 +750,19 @@ impl<'a> WirePositions<'a> {
     }
 }
 
+/// Which wire a writer emits: the two differ only in whether position objects ride along.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Wire {
+    /// `start` / `end` offsets alone — the wire every binding ships and `tsv parse`'s
+    /// default. No line table is built for it.
+    Span,
+    /// The span-only wire plus a `loc` on every object carrying `start` / `end` (and, on
+    /// the Svelte wire, `name_loc`) — what `tsv parse --locations` prints. Exists only
+    /// under the `locations` feature, so a binding cannot ask for it.
+    #[cfg(feature = "locations")]
+    Loc,
+}
+
 /// The tables one document's wire is written from, owned: the byte→UTF-16 map every
 /// wire needs and — only for the loc-bearing wire — the line table built alongside it
 /// in the same source scan. [`Self::positions`] lends both to a writer.
@@ -763,40 +774,32 @@ pub struct WireTables {
 }
 
 impl WireTables {
-    /// A document's tables in its language's coordinates: the line table under
-    /// `coordinates.lines` — ECMAScript's terminators for a TypeScript document
+    /// A document's tables for `wire` in its language's coordinates: the map alone for
+    /// [`Wire::Span`]; for [`Wire::Loc`] the line table under `coordinates.lines` too —
+    /// ECMAScript's terminators for a TypeScript document
     /// ([`LocationTracker::new_ecmascript_with_map`]), `\n` alone for a Svelte or CSS one
-    /// ([`LocationTracker::new_with_map`]) — when `locations` is set, the map alone
-    /// otherwise; the map counts a leading BOM as `coordinates.bom` says.
+    /// ([`LocationTracker::new_with_map`]) — built in the same source scan. The map counts
+    /// a leading BOM as `coordinates.bom` says.
     #[must_use]
-    pub fn new(source: &str, coordinates: WireCoordinates, locations: bool) -> Self {
+    pub fn new(source: &str, coordinates: WireCoordinates, wire: Wire) -> Self {
         let bom = coordinates.bom;
-        #[cfg(feature = "locations")]
-        if locations {
-            let (lines, map) = match coordinates.lines {
-                LineRule::Ecmascript => LocationTracker::new_ecmascript_with_map(source, bom),
-                LineRule::Lf => LocationTracker::new_with_map(source, bom),
-            };
-            return Self {
-                map,
-                lines: Some(lines),
-            };
-        }
-        Self::span_only(source, bom, locations)
-    }
-
-    /// The map alone. Without the `locations` feature a set `locations` cannot reach
-    /// here — each language crate's loc-bearing entry point is gated on the same feature
-    /// — so the request is asserted rather than silently dropped.
-    fn span_only(source: &str, bom: LeadingBom, locations: bool) -> Self {
-        debug_assert!(
-            cfg!(feature = "locations") || !locations,
-            "the loc-bearing wire needs tsv_lang's `locations` feature"
-        );
-        Self {
-            map: ByteToCharMap::new(source, bom),
+        match wire {
+            Wire::Span => Self {
+                map: ByteToCharMap::new(source, bom),
+                #[cfg(feature = "locations")]
+                lines: None,
+            },
             #[cfg(feature = "locations")]
-            lines: None,
+            Wire::Loc => {
+                let (lines, map) = match coordinates.lines {
+                    LineRule::Ecmascript => LocationTracker::new_ecmascript_with_map(source, bom),
+                    LineRule::Lf => LocationTracker::new_with_map(source, bom),
+                };
+                Self {
+                    map,
+                    lines: Some(lines),
+                }
+            }
         }
     }
 
@@ -813,7 +816,7 @@ impl WireTables {
 }
 
 #[derive(Debug)]
-pub struct LocationTracker {
+pub(crate) struct LocationTracker {
     /// Byte offset of each line's first byte, ascending, `[0]` always present.
     ///
     /// `u32`, not `usize`: a source offset is already `u32`-bounded (`Span`,
@@ -822,7 +825,7 @@ pub struct LocationTracker {
     /// residency. The searches hold their needle in `u32` too, so nothing
     /// widens per probe.
     line_starts: Vec<u32>,
-    /// 1-entry line-range cache for `get_line_column` and the span resolvers.
+    /// 1-entry line-range cache for `resolve_line` and the span resolvers.
     /// Wire-JSON emission is a DFS with high line locality, so successive
     /// offset lookups usually fall in the last-resolved line's `[line_start,
     /// next_line_start)` range and skip the O(log n) binary search on
@@ -907,7 +910,14 @@ impl LocationTracker {
     /// selects a byte-level line scan + identity map on the common all-ASCII
     /// path). Byte-identical to the character-walking oracle +
     /// `ByteToCharMap::new(source, bom)`.
-    pub fn new_ecmascript_with_map(source: &str, bom: LeadingBom) -> (Self, ByteToCharMap) {
+    #[cfg_attr(
+        not(any(test, feature = "locations")),
+        expect(
+            dead_code,
+            reason = "a line table is built only for the loc-bearing wire"
+        )
+    )]
+    pub(crate) fn new_ecmascript_with_map(source: &str, bom: LeadingBom) -> (Self, ByteToCharMap) {
         if source.is_ascii() {
             return (
                 Self::with_line_starts(ascii_ecmascript_line_starts(source.as_bytes())),
@@ -926,7 +936,14 @@ impl LocationTracker {
     /// it included — and of a standalone CSS document. The sibling of
     /// `new_ecmascript_with_map`; byte-identical to the character-walking oracle
     /// + `ByteToCharMap::new(source, bom)`.
-    pub fn new_with_map(source: &str, bom: LeadingBom) -> (Self, ByteToCharMap) {
+    #[cfg_attr(
+        not(any(test, feature = "locations")),
+        expect(
+            dead_code,
+            reason = "a line table is built only for the loc-bearing wire"
+        )
+    )]
+    pub(crate) fn new_with_map(source: &str, bom: LeadingBom) -> (Self, ByteToCharMap) {
         let mut lines = LineScan::lines(source.len());
         let map = if source.is_ascii() {
             ascii_lf_line_starts_into(source.as_bytes(), 0, &mut lines);
@@ -1032,7 +1049,10 @@ impl LocationTracker {
         lo + starts[lo + 1..hi].partition_point(|&s| s <= needle)
     }
 
-    pub(crate) fn get_line_column(&self, offset: usize) -> (usize, usize) {
+    /// The 1-based line and 0-based byte column of `offset` — the
+    /// [`LocationMapper::pos_and_position`] oracle's line half.
+    #[cfg(test)]
+    fn get_line_column(&self, offset: usize) -> (usize, usize) {
         let (line_idx, line_start) = self.resolve_line(offset);
         (line_idx + 1, offset - line_start) // Lines are 1-indexed
     }

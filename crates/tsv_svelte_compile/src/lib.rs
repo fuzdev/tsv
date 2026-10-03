@@ -278,8 +278,7 @@ pub fn canonicalize_js(source: &str) -> Result<String, CanonicalizeError> {
     // folded text, so it is mapped back onto the caller's source before it leaves.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse_with_goal(folded.text(), Goal::Module, &arena)
-        .map_err(|e| folded.unfold_error(e))?;
+    let program = folded.parse_with(|text| tsv_ts::parse_with_goal(text, Goal::Module, &arena))?;
     let output = tsv_ts::format_canonical(&program, folded.text());
     let check_arena = bumpalo::Bump::new();
     if let Err(err) = tsv_ts::parse_with_goal(&output, Goal::Module, &check_arena) {

@@ -1,5 +1,5 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
-#![allow(clippy::expect_used)]
+#![expect(clippy::expect_used)]
 
 //! Lexer error positions are **host** coordinates — the document the error is rendered
 //! against.
@@ -71,10 +71,15 @@ fn css_error(source: &str) -> (usize, usize, String) {
 }
 
 /// `(line, column)` of `needle`'s first byte, both 1-indexed — where the caret belongs.
+/// The column counts UTF-16 units, as the error header does; lines break at LF alone,
+/// the one terminator these cases hold.
 fn token_at(source: &str, needle: &str) -> (usize, usize) {
     let at = source.find(needle).expect("the needle is in the source");
     let line_start = source[..at].rfind('\n').map_or(0, |i| i + 1);
-    (source[..at].matches('\n').count() + 1, at - line_start + 1)
+    (
+        source[..at].matches('\n').count() + 1,
+        source[line_start..at].encode_utf16().count() + 1,
+    )
 }
 
 /// The line the caret must point at, for the readable half of an assertion.
@@ -226,71 +231,6 @@ fn standalone_lexer_errors_are_unchanged() {
 
     let css = "/* unterminated\n";
     assert_eq!(css_error(css), (1, 1, line_text(css, 1)));
-}
-
-/// A malformed escape is reported at its own backslash, not at the start of the slice the
-/// decoder was handed (the literal's content, a template segment) — each behind content
-/// and a line break, so a slice-relative position lands on the wrong line, never the
-/// right one by accident. The strict-mode legacy escapes ride along: they are graded where
-/// the literal becomes a node, and retroactively by a later `"use strict"`.
-#[test]
-fn escape_errors_point_at_their_backslash() {
-    for source in [
-        "let a;\nlet s = \"\\u{zz}\";",
-        "let a;\nlet s = '\\x4';",
-        "let a;\nlet s = '\\u12';",
-        "let a;\nlet s = '\\u{12';",
-        "let a;\nlet s = '\\u{110000}';",
-        "let a;\nlet t = `x${a}\\u{zz}`;",
-        // content ahead of the escape INSIDE its literal or template segment, which is what
-        // tells the backslash from the start of the slice the decoder was handed
-        "let a;\nlet s = 'ab\\u{zz}';",
-        "let a;\nlet t = `x${a}y\\u{zz}`;",
-        "let a;\nlet s = 'ab\\x4';",
-        "let a;\nlet s = '\\7';",
-        "function f() {\n\t'\\08';\n\t'use strict';\n}",
-    ] {
-        let (line, column) = token_at(source, "\\");
-        assert_eq!(
-            ts_error(source),
-            (line, column, line_text(source, line)),
-            "{source:?}"
-        );
-    }
-
-    for body in [
-        "\n\tlet s = '\\u{zz}';\n",
-        "\n\tlet t = `\\x4`;\n",
-        "\n\tlet s = '\\7';\n",
-    ] {
-        let host = format!("{MARKUP}<script>{body}</script>\n");
-        let (line, column) = token_at(&host, "\\");
-        assert_eq!(
-            svelte_error(&host),
-            (line, column, line_text(&host, line)),
-            "{body:?}"
-        );
-    }
-
-    for host in [
-        "<p>x</p>\n{'\\u{zz}'}\n",
-        "<p>x</p>\n{'ab\\u{zz}'}\n",
-        "<p>x</p>\n<div title={`\\x4`}></div>\n",
-    ] {
-        let (line, column) = token_at(host, "\\");
-        assert_eq!(
-            svelte_error(host),
-            (line, column, line_text(host, line)),
-            "{host:?}"
-        );
-    }
-
-    let css = "a {}\n.b\\\n{}\n";
-    let (line, column) = token_at(css, "\\");
-    assert_eq!(css_error(css), (line, column, line_text(css, line)));
-    let host = format!("{MARKUP}<style>\n\t.b\\\n{{}}\n</style>\n");
-    let (line, column) = token_at(&host, "\\");
-    assert_eq!(svelte_error(&host), (line, column, line_text(&host, line)));
 }
 
 /// A `{#snippet}` generic the naive `<`/`>` count cannot close is reported in the

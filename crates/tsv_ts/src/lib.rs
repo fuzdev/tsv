@@ -29,7 +29,7 @@ use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::is_format_ignore_directive;
 use tsv_lang::printing::{FoldedSource, LineBreaks, LineTable};
 use tsv_lang::{CommentFreeWindow, EmbedContext, Span};
-pub use tsv_lang::{ParseError, Result};
+pub use tsv_lang::{ParseError, Result, WirePoint};
 
 pub use goal::Goal;
 pub use parser::TopLevelAs;
@@ -345,8 +345,7 @@ pub fn format_str(source: &str) -> Result<String> {
     // drop-in contract over the author's own bytes.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
     let arena = bumpalo::Bump::new();
-    let program = parse_with_goal_or_fallback(folded.text(), None, &arena)
-        .map_err(|e| folded.unfold_error(e))?;
+    let program = folded.parse_with(|text| parse_with_goal_or_fallback(text, None, &arena))?;
     let doc_arena = DocArena::for_source(folded.text());
     Ok(format_folded_in(&program, &folded, &doc_arena))
 }
@@ -482,7 +481,7 @@ fn format_program_in(
 /// The **sole emission path** for its wire: emits the wire JSON directly during a single
 /// walk of the internal AST (the writer in `ast/convert/write/`), never materializing a
 /// typed public tree or an intermediate `Value`, and fuses the byte→UTF-16 offset
-/// translation into that walk: the writer receives the `ByteToCharMap` via
+/// translation into that walk: the writer receives the byte→UTF-16 map via
 /// `WirePositions` and emits final char-space positions directly, so no post-conversion
 /// translation walk runs. For ASCII sources the map is empty and emission is byte-space
 /// passthrough. Returning bytes lets a consumer that never needs `&str` skip the
@@ -490,7 +489,7 @@ fn format_program_in(
 /// the source).
 #[cfg(feature = "convert")]
 pub fn convert_ast_json_bytes(program: &Program<'_>, source: &str) -> Vec<u8> {
-    convert_ast_json_bytes_variant(program, source, false)
+    ast::convert::write_program_bytes(program, source, tsv_lang::Wire::Span)
 }
 
 /// Convert internal AST to compact JSON wire bytes **with** per-node `loc`.
@@ -500,21 +499,7 @@ pub fn convert_ast_json_bytes(program: &Program<'_>, source: &str) -> Vec<u8> {
 /// terminators (CR, LF, CRLF, LS, PS), which is acorn's. `tsv parse --locations` writes it.
 #[cfg(feature = "locations")]
 pub fn convert_ast_json_bytes_with_locations(program: &Program<'_>, source: &str) -> Vec<u8> {
-    convert_ast_json_bytes_variant(program, source, true)
-}
-
-#[cfg(feature = "convert")]
-fn convert_ast_json_bytes_variant(program: &Program<'_>, source: &str, locations: bool) -> Vec<u8> {
-    // The line table is built only when `loc` is written — one fused source scan
-    // builds it with the map; ASCII sources take a byte-level line scan and get
-    // the identity map. The span-only wire builds the map alone.
-    let tables = tsv_lang::WireTables::new(source, WIRE_COORDINATES, locations);
-    ast::convert::write_program_json(
-        program,
-        source,
-        tables.positions(),
-        ast::convert::Schema::Acorn,
-    )
+    ast::convert::write_program_bytes(program, source, tsv_lang::Wire::Loc)
 }
 
 /// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (the WASM

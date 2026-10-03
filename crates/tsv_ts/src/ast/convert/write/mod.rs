@@ -28,7 +28,7 @@
 
 use super::super::internal;
 use super::{Schema, bigint_to_decimal};
-use tsv_lang::{Span, StageRun, WirePositions};
+use tsv_lang::{Span, StageRun, Wire, WirePositions, WireTables};
 // The JSON-scalar substrate is shared across the three language writers (so the
 // Svelte writer can compose embedded TS/CSS emission into one buffer). Only the
 // TS-specific node emitters (`node_header`, field helpers, `Ctx`) live here.
@@ -49,12 +49,11 @@ use declarations::{write_decorator, write_type_parameter_declaration};
 use statements::{write_statement, write_variable_declaration};
 use types::{write_type_annotation, write_type_parameter_instantiation};
 
-/// Convert an internal `Program` straight to its compact wire-JSON bytes.
+/// Convert an internal `Program` straight to its compact wire-JSON bytes on `wire`, in
+/// the coordinates `crate::WIRE_COORDINATES` states.
 ///
-/// One AST walk, no intermediate tree. `positions` decides the offset space and
-/// whether `loc` is written: its map translates byte offsets to UTF-16 code units
-/// (identity on ASCII), and its line table — the document's ECMAScript one — is
-/// present exactly when the wire carries `loc`.
+/// One AST walk, no intermediate tree, the byte→UTF-16 translation fused in (identity
+/// on ASCII).
 ///
 /// Returns `Vec<u8>` rather than `String`: every emitted byte comes from `&str`
 /// slices and ASCII fragments, so the output is valid UTF-8 by construction,
@@ -63,17 +62,14 @@ use types::{write_type_annotation, write_type_parameter_instantiation};
 /// Byte-oriented boundaries (FFI, the CLI's stdout) take the bytes as-is; `&str`
 /// boundaries (`convert_ast_json_string` → WASM/N-API) pay the one validation at
 /// the edge.
-pub fn write_program_json(
+pub(crate) fn write_program_bytes(
     program: &internal::Program<'_>,
     source: &str,
-    positions: WirePositions<'_>,
-    schema: Schema,
+    wire: Wire,
 ) -> Vec<u8> {
-    let ctx = Ctx::new(source, positions, schema, CommentMode::Off);
-    let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(
-        source.len(),
-        positions.has_locations(),
-    ));
+    let tables = WireTables::new(source, crate::WIRE_COORDINATES, wire);
+    let ctx = Ctx::new(source, tables.positions(), Schema::Acorn, CommentMode::Off);
+    let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len(), wire));
     write_program(&mut w, program, &ctx);
     w.into_bytes()
 }
@@ -1120,25 +1116,24 @@ pub(super) fn write_identifier_with_optional(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tsv_lang::WireTables;
 
     /// The wire variants a test runs: both, unless the build lacks the loc-bearing one
     /// (`tsv_lang`'s `locations` feature, off in a bare `cargo test -p tsv_ts`).
-    const WIRES: &[bool] = if cfg!(feature = "locations") {
-        &[true, false]
-    } else {
-        &[false]
-    };
+    const WIRES: &[Wire] = &[
+        #[cfg(feature = "locations")]
+        Wire::Loc,
+        Wire::Span,
+    ];
 
     /// Run `emit` under a standalone-TypeScript context over `source`, for one
     /// wire variant and one comment role.
     fn emitted(
         source: &str,
-        locations: bool,
+        wire: Wire,
         comments: CommentMode<'_>,
         emit: impl FnOnce(&mut JsonWriter, &Ctx<'_>),
     ) -> String {
-        let tables = WireTables::new(source, crate::WIRE_COORDINATES, locations);
+        let tables = WireTables::new(source, crate::WIRE_COORDINATES, wire);
         let ctx = Ctx::new(source, tables.positions(), Schema::Acorn, comments);
         let mut w = JsonWriter::with_capacity(0);
         emit(&mut w, &ctx);
@@ -1172,15 +1167,15 @@ mod tests {
         let span = Span::new(start, source.len() as u32 - 2);
         for len in [1, 31, 32, 33, TYPE.len()] {
             let node_type: &'static str = &TYPE[..len];
-            for &locations in WIRES {
-                let staged = emitted(source, locations, CommentMode::Off, |w, ctx| {
+            for &wire in WIRES {
+                let staged = emitted(source, wire, CommentMode::Off, |w, ctx| {
                     node_header(w, node_type, span, ctx);
                 });
-                let direct = emitted(source, locations, CommentMode::Off, |w, ctx| {
+                let direct = emitted(source, wire, CommentMode::Off, |w, ctx| {
                     node_header_wide_end(w, node_type, span, span.end, ctx);
                 });
-                assert_eq!(staged, direct, "type length {len}, loc {locations}");
-                if locations {
+                assert_eq!(staged, direct, "type length {len}, {wire:?}");
+                if wire != Wire::Span {
                     assert_eq!(
                         staged,
                         format!(
@@ -1236,15 +1231,15 @@ mod tests {
             let id = sole_identifier(&program);
             let end = 3 + written.encode_utf16().count();
             let column = end - 1;
-            for &locations in WIRES {
-                let plain = emitted(&source, locations, CommentMode::Off, |w, ctx| {
+            for &wire in WIRES {
+                let plain = emitted(&source, wire, CommentMode::Off, |w, ctx| {
                     write_identifier_plain(w, id, ctx);
                 });
-                let general = emitted(&source, locations, CommentMode::Off, |w, ctx| {
+                let general = emitted(&source, wire, CommentMode::Off, |w, ctx| {
                     write_identifier_parts(w, id.span, id.ident_name(), false, None, None, ctx);
                 });
-                assert_eq!(plain, general, "{written:?}, loc {locations}");
-                let loc = if locations {
+                assert_eq!(plain, general, "{written:?}, {wire:?}");
+                let loc = if wire != Wire::Span {
                     format!(
                         ",\"loc\":{{\"start\":{{\"line\":2,\"column\":2}},\"end\":\
                          {{\"line\":2,\"column\":{column}}}}}"
@@ -1258,7 +1253,7 @@ mod tests {
                         "{{\"type\":\"Identifier\",\"start\":3,\"end\":{end}{loc},\
                          \"name\":\"{name}\"}}"
                     ),
-                    "{written:?}, loc {locations}"
+                    "{written:?}, {wire:?}"
                 );
             }
         }
@@ -1287,16 +1282,16 @@ mod tests {
                 },
             )
         };
-        for &locations in WIRES {
+        for &wire in WIRES {
             let island = attach();
-            let plain = emitted(source, locations, island.mode(), |w, ctx| {
+            let plain = emitted(source, wire, island.mode(), |w, ctx| {
                 write_identifier_plain(w, id, ctx);
             });
             let island = attach();
-            let general = emitted(source, locations, island.mode(), |w, ctx| {
+            let general = emitted(source, wire, island.mode(), |w, ctx| {
                 write_identifier_parts(w, id.span, id.ident_name(), false, None, None, ctx);
             });
-            assert_eq!(plain, general, "loc {locations}");
+            assert_eq!(plain, general, "{wire:?}");
             assert!(
                 plain.contains(",\"name\":\"name\",\"leadingComments\":[{\"type\":\"Block\""),
                 "the leading comment is emitted: {plain}"

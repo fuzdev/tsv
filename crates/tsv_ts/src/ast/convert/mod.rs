@@ -33,10 +33,11 @@ impl Schema {
 // The writer — the sole emission mode.
 mod write;
 
+pub(crate) use write::write_program_bytes;
 pub use write::{
     CommentAttach, CommentMode, EmbedWriter, IslandComments, ProgramWriter,
     write_expression_embedded, write_identifier_expression_with_character, write_pattern_embedded,
-    write_program_embedded, write_program_json, write_variable_declaration_embedded,
+    write_program_embedded, write_variable_declaration_embedded,
 };
 
 /// Convert non-decimal BigInt values to decimal string (matching acorn behavior).

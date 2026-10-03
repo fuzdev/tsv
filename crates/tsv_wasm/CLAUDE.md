@@ -69,9 +69,8 @@ wrapped around the engine call alone, rebuilds that as the `SyntaxError`, so bot
 compares the two engines directly). Anything else an engine throws passes through as itself:
 the raw engines' own source-type refusals and a source over the 4 GiB cap (plain `Error`s with
 no point), a caught panic, a WASM trap (`RuntimeError`) or stack exhaustion (`RangeError`). A
-format parses the CR-folded text, so its engine hands the error through
-`FoldedSource::unfold_error` first and reports the point a parse of the caller's source
-would. Where the facade `JSON.parse`s an engine's wire itself (the native engine), a failure
+format parses the CR-folded text through `FoldedSource::parse_with`, which maps the error
+back onto the caller's source, so it reports the point a parse of that source would. Where the facade `JSON.parse`s an engine's wire itself (the native engine), a failure
 there is rethrown as `Error('internal error: AST serialized to invalid JSON', {cause})` —
 the WASM engine's own text for that case — never as the bare `SyntaxError` that would read
 as a parse failure.
@@ -536,9 +535,10 @@ Maintenance checklist when a writer's emitted shape changes:
 4. A field the writer emits only conditionally (`if let Some(..)` / `if flag`)
    is optional in TS (`T?`); one it never emits is absent from the interface.
 5. If the field carries positions (`start`/`end`/`loc`/`character`), make sure
-   the writer (`ast/convert/write*`) emits them through the `LocationMapper`
-   (`ctx.pos(...)` / the `loc` helpers) — a raw byte offset means silently
-   untranslated positions on multibyte sources.
+   the writer (`ast/convert/write*`) emits them through the document's
+   `WirePositions` (each writer's `Ctx::pos` and the node-header / `start_end` helpers over it for offsets,
+   `JsonWriter::span_loc` / `loc_field` for `loc`) — a raw byte offset means
+   silently untranslated positions on multibyte sources.
 6. Run `cargo test --workspace` and `deno task check:ast-types`.
 
 `deno task check:ast-types` (also part of `deno task check`) runs three arms

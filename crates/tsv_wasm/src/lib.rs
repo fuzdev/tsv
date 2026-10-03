@@ -30,17 +30,17 @@ use wasm_bindgen::prelude::*;
 // next call's `reset()`, and both helpers park their arena outside the
 // thread-local while it is in use, so a trap here leaves a callable instance
 // (see `tsv_arena`'s §Abort safety — this is the target that made it necessary).
-// The goal-axis macros come from the same crate, so the three bindings share ONE
-// definition of which languages have a goal rather than three hand-synced copies.
+// The goal-axis macros and the format export's body (`parse_format!`) come from
+// the same crate, so the three bindings share ONE definition of which languages have
+// a goal rather than three hand-synced copies.
 #[cfg(any(feature = "parse", feature = "format"))]
 use tsv_arena::goal_allowed;
 #[cfg(feature = "parse")]
 use tsv_arena::parse_ast;
 #[cfg(feature = "format")]
-use tsv_arena::parse_ast_for_format;
+use tsv_arena::parse_format;
+#[cfg(feature = "parse")]
 use tsv_arena::with_ast_arena;
-#[cfg(feature = "format")]
-use tsv_arena::with_doc_arena;
 
 // WASM global allocator: talc replaces std's default dlmalloc on wasm32. The
 // format path is allocation-heavy (doc IR, output string, memo vecs) and
@@ -546,21 +546,7 @@ macro_rules! lang_bindings {
                 "format",
             )
             .map_err(err)?;
-            // The format path's line-terminator fold, ahead of the parse — see
-            // `tsv_lang::printing::normalize_carriage_returns`. The parse exports
-            // deliberately skip it: the wire's offsets are a drop-in contract over the
-            // author's own bytes.
-            let folded = tsv_lang::printing::normalize_carriage_returns(source);
-            let source = folded.text();
-            with_ast_arena(|arena| {
-                // a parse error indexes the folded text: mapped back onto the caller's
-                // source, its point is the one a parse of that source reports
-                let ast = parse_ast_for_format!($goalness, $lang, source, goal, arena)
-                    .map_err(|e| parse_err(&folded.unfold_error(e)))?;
-                Ok(with_doc_arena(|doc_arena| {
-                    $lang::format_folded_in(&ast, &folded, doc_arena)
-                }))
-            })
+            parse_format!($goalness, $lang, source, goal, |e| parse_err(&e))
         }
     };
 }

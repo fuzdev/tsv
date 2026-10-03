@@ -322,11 +322,13 @@ impl ParseError {
     /// whole document, so a slice-local position points at the wrong construct — an error
     /// on line 4 of a component rendered against line 1, out in the markup.
     ///
-    /// Each of those lexers applies this **once**, at the entry point that PRODUCES the
-    /// error; a wrapper that delegates to such an entry point must not re-apply it. A
-    /// double shift runs the position past the end of the source, where the context
-    /// clamps it to the end of the document, so the caret lands there instead of on the
-    /// construct.
+    /// A position is lifted **once per coordinate frame it is lifted across** — the
+    /// escape decoder's digit-relative position to its backslash, the backslash to the
+    /// literal's content, the content to the lexer's source, the lexer's source to the
+    /// document (the lexer's `base_offset`) — each lift applied by the code that owns that
+    /// frame, and never again by a wrapper delegating to it. A frame lifted twice runs the
+    /// position past the end of the source, where the context clamps it to the end of the
+    /// document, so the caret lands there instead of on the construct.
     ///
     /// The parser side needs none of this: its positions are already host coordinates (the
     /// TypeScript and CSS parsers' `current_pos` adds the same `base_offset`; the Svelte
@@ -337,7 +339,11 @@ impl ParseError {
     #[inline(never)]
     pub fn shift_position(mut self, base_offset: usize) -> Self {
         // A positionless error has nothing to shift.
-        if let Some((position, _)) = self.0.kind.located_mut() {
+        if let Some((position, context)) = self.0.kind.located_mut() {
+            debug_assert!(
+                context.is_none(),
+                "shift_position after with_context leaves the context at the unshifted point"
+            );
             *position += base_offset;
         }
         self
@@ -361,6 +367,12 @@ impl ParseError {
         // boxed, so this is a write through the pointer instead of a 96-byte move.
         // A positionless error has no line to excerpt.
         if let Some((position, slot)) = self.0.kind.located_mut() {
+            // One fill per error: a second would overwrite the first with whatever text it
+            // was handed. Re-taking a context deliberately is `unfold`'s job, not this one's.
+            debug_assert!(
+                slot.is_none(),
+                "with_context on an error that already has one"
+            );
             *slot = Some(ErrorContext::from_source(source, *position, coordinates));
         }
         self
@@ -387,7 +399,7 @@ impl ParseError {
     /// caller handed over: the position moves to the original byte it was folded from
     /// ([`crate::printing::unfold_position`]), and the context is re-taken there, in the
     /// coordinates it was first taken in. Reached only through
-    /// [`crate::printing::FoldedSource::unfold_error`], which holds both texts.
+    /// [`crate::printing::FoldedSource::parse_with`], which holds both texts.
     pub(crate) fn unfold(mut self, original: &str) -> Self {
         if let Some((position, slot)) = self.0.kind.located_mut() {
             *position = crate::printing::unfold_position(original, *position);

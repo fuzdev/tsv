@@ -11,14 +11,15 @@
 //! **Fused emission.** The Svelte spine (elements, blocks, tags, directives,
 //! attributes, `name_loc`, positions) is emitted *fused* — final char-space
 //! `start`/`end`/`loc`/`character` written directly via `WirePositions` (the
-//! `ByteToCharMap`, plus the document's one LF-only line table on the wire that
-//! carries `loc`), exactly as the `tsv_ts`/`tsv_css` writers do.
+//! byte→UTF-16 map, plus the document's one line table on the wire that carries
+//! `loc`, both in the coordinates `crate::WIRE_COORDINATES` states), exactly as the
+//! `tsv_ts`/`tsv_css` writers do.
 //!
 //! **`loc` everywhere.** Every object with numeric `start`/`end` — template nodes,
 //! `Root`, `Script`, `StyleSheet` and its `content`, `<svelte:options>`, attached and
 //! root comments, every acorn and `<style>` node — gets `loc` immediately after `end`:
-//! the line (1-based, LF-only for the whole document) and column (0-based, UTF-16
-//! code units) of those same offsets. That is a superset of Svelte's own wire, which
+//! the line (1-based, one line rule for the whole document) and column (0-based,
+//! UTF-16 code units) of those same offsets. That is a superset of Svelte's own wire, which
 //! carries `loc` on acorn-parsed nodes only, and it reproduces none of Svelte's
 //! `loc` quirks (the destructure column shift, the `_ as ` line swallow, acorn's
 //! second line class, the tag-position `Program.loc`).
@@ -115,8 +116,8 @@ use crate::ast::internal;
 use crate::whitespace::is_svelte_ws;
 use tsv_css::ast::convert::{write_css_children, write_css_comments};
 use tsv_lang::{
-    Comment, JsonWriter, LocationMapper, Span, WirePositions, WireTables, estimated_json_capacity,
-    write_array, write_or_null,
+    Comment, JsonWriter, LocationMapper, Span, Wire, WirePositions, WireTables,
+    estimated_json_capacity, write_array, write_or_null,
 };
 use tsv_ts::ast::convert::{
     CommentAttach, CommentMode, EmbedWriter, ProgramWriter, Schema, write_expression_embedded,
@@ -132,27 +133,15 @@ use super::special::{bool_option, component_is_typescript, find_option_values, t
 
 /// Convert an internal Svelte `Root` straight to its compact wire-JSON bytes.
 ///
-/// One AST walk, no intermediate `serde_json::Value` for the spine. With `locations`
-/// unset it writes the span-only wire every binding ships — only `start`/`end` offsets,
-/// no `loc` and no `name_loc`, and no line table built; set, it adds every line/column
-/// object, the loc-bearing wire `tsv parse --locations` prints.
-pub(crate) fn write_root_bytes(
-    root: &internal::Root<'_>,
-    source: &str,
-    locations: bool,
-) -> Vec<u8> {
-    // One LF-only line table (Svelte's `locate-character` convention) for the whole
-    // document — template, every acorn island, `<script>` bodies, root comments and
-    // `<style>` — built with the byte→UTF-16 map in one source scan, and only when the
-    // wire carries `loc`; the identity map short-circuits on ASCII. The span-only wire
-    // builds the map alone — once per file, no per-node cost.
-    //
-    // A leading BOM is ELIDED: Svelte's `parse` strips it (`remove_bom`) before the
-    // parser sees the source, so every canonical offset — the template spine, `name_loc`,
-    // the `<style>` sheet, and every acorn island, which Svelte hands the BOM-less string
-    // too — indexes one UTF-16 unit below the author's file, and a line-1 column one
-    // lower. The parser's spans stay file-true; only the emitted position moves.
-    let tables = WireTables::new(source, crate::WIRE_COORDINATES, locations);
+/// One AST walk, no intermediate `serde_json::Value` for the spine. On [`Wire::Span`]
+/// it writes the span-only wire every binding ships — only `start`/`end` offsets, no
+/// `loc` and no `name_loc`; on `Wire::Loc` it adds every line/column object, the
+/// loc-bearing wire `tsv parse --locations` prints.
+pub(crate) fn write_root_bytes(root: &internal::Root<'_>, source: &str, wire: Wire) -> Vec<u8> {
+    // One set of tables for the whole document — template, every acorn island,
+    // `<script>` bodies, root comments and `<style>` — in the coordinates
+    // `crate::WIRE_COORDINATES` states.
+    let tables = WireTables::new(source, crate::WIRE_COORDINATES, wire);
 
     // Template comments (outside `<script>` content spans) are the only comments
     // the template attach passes move; everything else stays where it is.
@@ -173,7 +162,7 @@ pub(crate) fn write_root_bytes(
         component_is_ts: component_is_typescript(root, source),
     };
 
-    let mut w = JsonWriter::with_capacity(estimated_json_capacity(source.len(), locations));
+    let mut w = JsonWriter::with_capacity(estimated_json_capacity(source.len(), wire));
     write_root(&mut w, root, &ctx);
     w.into_bytes()
 }
@@ -183,7 +172,7 @@ pub(crate) fn write_root_bytes(
 struct Ctx<'a> {
     source: &'a str,
     /// The document's positions: the byte→UTF-16 map, and — on the wire that carries
-    /// `loc` — its one LF-only line table, which every node, `name_loc`, root comment,
+    /// `loc` — its one line table, which every node, `name_loc`, root comment,
     /// embedded island and `<style>` node reads.
     positions: WirePositions<'a>,
     /// `Root::snippet_wire_parameters`: the preserved-paren parameter lists the wire emits

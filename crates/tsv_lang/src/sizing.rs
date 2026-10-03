@@ -1,6 +1,8 @@
 // Sizing heuristics for allocation pre-sizing — the wire-JSON output buffer,
 // the parse-time bump arena, and the wire writer's line-start table.
 
+use crate::location::Wire;
+
 /// Estimated compact-JSON bytes per source byte for the span-only wire — the one
 /// every binding emits.
 ///
@@ -16,20 +18,20 @@ const SPAN_JSON_BYTES_PER_SOURCE_BYTE: usize = 12;
 /// (`tsv parse --locations`): the per-node `loc` object roughly doubles the wire
 /// (median ~17x TypeScript, ~19x Svelte over the same snapshot), so 20 covers the
 /// typical file and the high-ratio outliers pay one doubling.
+#[cfg(feature = "locations")]
 const LOC_JSON_BYTES_PER_SOURCE_BYTE: usize = 20;
 
-/// Pre-size estimate for a document's compact wire-JSON output, `locations`
-/// naming the wire (whether it carries `loc`).
+/// Pre-size estimate for a document's compact wire-JSON output on `wire`.
 ///
 /// Used by each language's wire-JSON writer to allocate the `JsonWriter` buffer
 /// up front instead of growing it through `Vec`'s default doubling (the wire runs
 /// several times the source length, so default growth pays many large reallocs).
 /// The floor covers tiny sources whose output is mostly fixed envelope.
-pub fn estimated_json_capacity(source_len: usize, locations: bool) -> usize {
-    let per_byte = if locations {
-        LOC_JSON_BYTES_PER_SOURCE_BYTE
-    } else {
-        SPAN_JSON_BYTES_PER_SOURCE_BYTE
+pub fn estimated_json_capacity(source_len: usize, wire: Wire) -> usize {
+    let per_byte = match wire {
+        Wire::Span => SPAN_JSON_BYTES_PER_SOURCE_BYTE,
+        #[cfg(feature = "locations")]
+        Wire::Loc => LOC_JSON_BYTES_PER_SOURCE_BYTE,
     };
     source_len.saturating_mul(per_byte).max(128)
 }

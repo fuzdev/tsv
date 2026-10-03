@@ -402,7 +402,7 @@ pub fn normalize_carriage_returns(source: &str) -> FoldedSource<'_> {
 /// is one of the original too. A position past the folded text's end maps past the
 /// original's by the same count.
 #[must_use]
-pub fn unfold_position(original: &str, folded_position: usize) -> usize {
+pub(crate) fn unfold_position(original: &str, folded_position: usize) -> usize {
     // How many bytes the original runs ahead of the folded text at this point: one per
     // `<CR><LF>` already passed.
     let mut extra = 0;
@@ -430,7 +430,7 @@ pub fn unfold_position(original: &str, folded_position: usize) -> usize {
 #[derive(Debug)]
 pub struct FoldedSource<'a> {
     /// The text the fold was applied to — what a position over [`Self::text`] is mapped
-    /// back onto ([`Self::unfold_error`]).
+    /// back onto ([`Self::parse_with`]).
     original: &'a str,
     text: Cow<'a, str>,
     lf_only: bool,
@@ -454,14 +454,26 @@ impl<'a> FoldedSource<'a> {
         self.text
     }
 
+    /// Parse [`Self::text`] with `parse`, an error mapped back onto the text the fold was
+    /// applied to ([`Self::unfold_error`]) — so a format error reports the position, and
+    /// prints the header and excerpt, of the caller's own source, as a parse of that source
+    /// would ([`crate::ParseError::wire_point`]). Every format entry point that folds parses
+    /// through this, which is what keeps the unfold from being skipped.
+    ///
+    /// # Errors
+    ///
+    /// `parse`'s error, in the coordinates of the text the fold was applied to.
+    pub fn parse_with<'s, T>(
+        &'s self,
+        parse: impl FnOnce(&'s str) -> crate::Result<T>,
+    ) -> crate::Result<T> {
+        parse(&self.text).map_err(|error| self.unfold_error(error))
+    }
+
     /// Map an error from a parse of [`Self::text`] back onto the text the fold was applied
-    /// to, so a format error reports the position — and prints the header and excerpt —
-    /// of the caller's own source, as a parse of that source would
-    /// ([`crate::ParseError::wire_point`]). Every format entry point that folds hands its
-    /// parse error through this. The error is returned untouched when the fold changed
-    /// nothing.
+    /// to. The error is returned untouched when the fold changed nothing.
     #[must_use]
-    pub fn unfold_error(&self, error: crate::ParseError) -> crate::ParseError {
+    pub(crate) fn unfold_error(&self, error: crate::ParseError) -> crate::ParseError {
         match self.text {
             Cow::Borrowed(_) => error,
             Cow::Owned(_) => error.unfold(self.original),

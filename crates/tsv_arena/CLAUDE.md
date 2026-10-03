@@ -19,10 +19,11 @@ It's a crate, not duplicated inline, because the bindings would otherwise hand-s
 
 Both `reset()` at the *start* of each call; `f` must return an owned value (a formatted `String`, a JSON `String`, or `()`) so nothing borrowed escapes. Full rationale + soundness in the `src/lib.rs` module docs.
 
-Plus the goal-axis pair, `#[macro_export]`ed and feature-independent (they generate no code of their own):
+Plus the goal-axis macros, `#[macro_export]`ed; the first three are feature-independent (they generate no code of their own):
 
 - `parse_ast!($goalness, $lang, $source, $goal, $arena)` — the per-language parse call. `goal` (TypeScript) threads the decoded goal into `$lang::parse_with_goal`; `nogoal` (Svelte, CSS) drops it and calls `$lang::parse`. `$lang` resolves in the *caller's* scope, so this crate depends on no language crate.
 - `parse_ast_for_format!($goalness, $lang, $source, $goal, $arena)` — the format path's twin, whose `$goal` is an `Option`: `goal` calls `$lang::parse_with_goal_or_fallback`, so a named source type is exact and an unnamed one takes the module-then-script fallback (see [../../docs/cli.md §Multi-File Formatting](../../docs/cli.md#multi-file-formatting)); `nogoal` drops it as above. The parse exports keep `parse_ast!`, whose goal is settled: their product is a wire carrying `Program.sourceType`, a claim no retry may make depend on the input.
+- `parse_format!($goalness, $lang, $source, $goal, $map_err)` — a binding's whole format export body, behind the **`format`** feature: fold the source's carriage returns, parse it through `parse_ast_for_format!` into the per-thread AST arena, and print it into the per-thread doc arena, with a parse error mapped back onto the caller's own source (`FoldedSource::parse_with`) and then through `$map_err`, the binding's own error type.
 - `goal_allowed!($goalness)` — `true` / `false`, read by each binding's own goal decoder (`ffi_source_type`, `napi_source_type`, `wasm_source_type`).
 
 The load-bearing property is that **one `$goalness` tag drives both**: a language with no axis *rejects* a set goal rather than ignoring it, and the macro that picks the parse call and the macro that licenses the refusal can't come to disagree about which languages those are. Each binding still owns its own `lang_bindings!` (three different export signatures) and its own refusal wording.
@@ -38,12 +39,12 @@ What the module docs don't carry, because it is evidence rather than rationale:
 
 ## Features
 
-- `format` (default) — adds `with_doc_arena` + the optional `tsv_lang` dep.
+- `format` (default) — adds `with_doc_arena`, `parse_format!` + the optional `tsv_lang` dep.
 
 The **workspace dependency entry is `default-features = false`**, so a binding gets only `with_ast_arena` by default and re-enables `format` from its own `format` feature — that's what keeps the parse-only binding build from pulling `tsv_lang`. A standalone `cargo test -p tsv_arena` uses the crate's own `default = ["format"]`, so both helpers are exercised.
 
 ## Consumers
 
-`tsv_ffi`, `tsv_napi`, and `tsv_wasm`. Each maps its `format` feature to `tsv_arena/format`, calls the two arena helpers from its `lang_bindings!` macro, and expands the same `parse_ast!` / `parse_ast_for_format!` / `goal_allowed!` set inside it.
+`tsv_ffi`, `tsv_napi`, and `tsv_wasm`. Each maps its `format` feature to `tsv_arena/format`, and expands the same `parse_ast!` / `goal_allowed!` / `parse_format!` set inside its `lang_bindings!` macro — the parse exports calling `with_ast_arena` themselves, the format export through `parse_format!`, which runs both arena helpers.
 
 For the two **native** bindings the win is heap-churn through the host FFI/N-API layer. For **`tsv_wasm`** it's the per-call `Bump`/`DocArena` allocation in the sandbox (the documented WASM-format allocation-count lever) — measured at a **byte-identical ~2% warm format speedup** (svelte ~3%) on the zzz corpus via `benches/js/diagnostics/wasm_format_probe.ts`, with a negligible cold single-shot cost (one un-pre-sized first allocation; even `npm/cli.js` is warm after its first file) and +0.08% bundle size. Before this, `tsv_wasm` was the lone binding still allocating fresh arenas per call.
