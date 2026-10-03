@@ -414,6 +414,16 @@ Things the published numbers measure that aren't quite what they look like.
     `tsv-wasm-internal` (parse-only, no JS materialization) have **no fair oxc
     counterpart** — oxc's JS API always serializes to cross into JS — and that
     asymmetry is left honest rather than papered over with a misleading row.
+  - **oxc's eager raw transfer is untimed, and it is faster than the JSON path the
+    `oxc-parser` row times.** `experimentalRawTransfer` (native-only like lazy, and
+    undocumented: absent from oxc-parser's README and `.d.ts`, present only in its JS
+    source) deserializes the AST transfer buffer straight into JS objects, skipping
+    JSON. A probe over fuz_util's `src/lib` `.ts` files at oxc-parser 0.150.0 measured
+    it ~2.8x faster with `.program` materialized (10.8 vs 30.7 ms per sweep; 16.1 vs
+    36.8 ms with a full AST walk) — enough to likely reverse the published native
+    `parse/typescript` ratio against `tsv-json-no-locations`. The fix is an
+    `oxc-parser-raw` row; until it lands, the `oxc-parser` row times oxc's default path
+    only.
 - **The `yuku-parser` rows need two corrections to be honest, and both are
   load-bearing.** yuku is payload-matched to oxc (span-only AST, same padding
   fields), so read it against `oxc-parser` / `tsv-json-no-locations` rather than
