@@ -3,7 +3,6 @@
 // This module provides common printing logic used across language printers
 // (TypeScript, CSS, Svelte) to eliminate code duplication.
 
-use crate::acorn_prefix::AcornPrefix;
 use crate::escapes::swap_quote_escaping_into;
 use crate::swar::{high_bit_lanes, lanes_less_than, splat, zero_lanes, zero_or_high_lanes};
 use crate::whitespace::trim_start_js_whitespace;
@@ -2115,56 +2114,60 @@ fn next_line_terminator(bytes: &[u8], from: usize) -> Option<(usize, usize)> {
 /// non-empty `[ \t]` indentation can never match — so one boundary or two is the same answer,
 /// and [`line_terminator_len`]'s pairing is free to take it as one.
 ///
-/// ⚠️ **`source` is the document, but the indentation is the one acorn SAW** — and for four of
-/// Svelte's readers those are different strings. `onComment` measures the line out of whatever
-/// `parser.template` slice-and-splice its caller handed acorn, which may be a blanked prefix,
-/// a `(pattern = 1)` wrapper or a `_ as ` insert; `prefix` is that fact, and
-/// [`AcornPrefix::line_indentation`] is what reads it. Measuring the document instead strips
-/// the author's own tab off a `value` Svelte leaves whole. [`AcornPrefix::DOCUMENT`] is the
-/// identity, and is what every standalone parse passes.
+/// ⚠️ **The line is the DOCUMENT's**, and that is a deliberate departure from `onComment`,
+/// which measures it out of whatever string its caller handed acorn. For four of Svelte's
+/// readers that string is manufactured — a `<script>` body's prefix blanked to spaces, a
+/// block pattern's `(pattern = 1)` wrapper, an annotation's `_ as ` insert, a `{#snippet}`
+/// head's blanked prelude — so on the one line where the manufacture ends, Svelte dedents by
+/// a run the document does not hold. tsv reads the author's own run there, as it does
+/// everywhere else; the two agree on every other line. Cataloged in `docs/conformance_svelte.md`
+/// §Comment Attachment Differences. The document's first line opens past a leading byte-order
+/// mark, as Svelte's does — its parse strips one before anything else reads the source — so
+/// `source` is the author's own text, BOM included, in the coordinates of `comment_start`.
 ///
 /// The gate above this — a BLOCK comment whose content holds a `\n`, and only those
 /// ([`crate::Comment::content_is_multiline`]) — and the `[ \t]` indentation class are Svelte's
 /// too. All five spellings of both steps are pinned by
-/// `tests/comment_dedent_line_terminators.rs`, and the five preparations by
-/// `tests/comment_dedent_manufactured_source.rs`; each module doc says why a fixture cannot
-/// carry what it holds.
+/// `tests/comment_dedent_line_terminators.rs`, whose module doc says why a fixture cannot
+/// carry what it holds; which line the run is read from, by `tests/comment_dedent_document_line.rs`.
 ///
 /// # Examples
 ///
 /// ```
-/// use tsv_lang::{AcornPrefix, AcornPrefixText, printing::strip_comment_indentation};
+/// use tsv_lang::printing::strip_comment_indentation;
 ///
 /// // The comment opens at byte 2, on a line indented by two tabs, so two tabs come off the
 /// // front of each of its lines.
 /// let source = "\t\t/* a\n\t\tb */";
-/// let doc = AcornPrefix::DOCUMENT;
-/// assert_eq!(strip_comment_indentation(source, " a\n\t\tb ", 2, doc), " a\nb ");
+/// assert_eq!(strip_comment_indentation(source, " a\n\t\tb ", 2), " a\nb ");
 ///
 /// // A `<LS>` inside the content opens a line just as a `\n` does.
-/// assert_eq!(
-///     strip_comment_indentation(source, " a\u{2028}\t\tb ", 2, doc),
-///     " a\u{2028}b "
-/// );
+/// assert_eq!(strip_comment_indentation(source, " a\u{2028}\t\tb ", 2), " a\u{2028}b ");
 ///
-/// // Under a blanked prefix acorn saw two SPACES where those tabs are, so the tabs are not
-/// // the indentation and the content rides out whole.
-/// let blanked = AcornPrefix::manufactured(AcornPrefixText::Blanked, 2);
-/// assert_eq!(strip_comment_indentation(source, " a\n\t\tb ", 2, blanked), " a\n\t\tb ");
+/// // The run is the line's own, whatever stands between it and the comment.
+/// let source = "\t<script>/* a\n\tb */";
+/// assert_eq!(strip_comment_indentation(source, " a\n\tb ", 9), " a\nb ");
 /// ```
-pub fn strip_comment_indentation(
-    source: &str,
-    content: &str,
-    comment_start: u32,
-    prefix: AcornPrefix,
-) -> String {
-    // The line the comment opens on — `\n` and nothing else, per the walk-back above, and
-    // read out of what acorn SAW: a preparation that overwrites the author's newline opens
-    // the line further back than the document does ([`AcornPrefix::line_start`]).
-    let line_start = prefix.line_start(source, comment_start as usize);
+#[must_use]
+pub fn strip_comment_indentation(source: &str, content: &str, comment_start: u32) -> String {
+    let bytes = source.as_bytes();
+    // The line the comment opens on — `\n` and nothing else, per the walk-back above. The
+    // document's first line begins past a leading byte-order mark, because Svelte strips one
+    // before it parses (`remove_bom`): read from byte 0, the BOM's three bytes would stand
+    // between the line start and its indentation, and the run would always be empty.
+    let comment_start = (comment_start as usize).min(bytes.len());
+    let line_start = bytes[..comment_start]
+        .iter()
+        .rposition(|&b| b == b'\n')
+        .map_or_else(|| crate::leading_bom_len(source), |at| at + 1);
 
-    // The `[ \t]` run that opens that line, as acorn saw it.
-    let indentation = prefix.line_indentation(source, line_start);
+    // The `[ \t]` run that opens that line. ASCII bytes only, so the slice is valid at either
+    // end; it stops at the comment's own `/` at the latest.
+    let run = bytes[line_start..]
+        .iter()
+        .take_while(|&&b| matches!(b, b' ' | b'\t'))
+        .count();
+    let indentation = &source[line_start..line_start + run];
     if indentation.is_empty() {
         return content.to_string();
     }
@@ -2175,7 +2178,7 @@ pub fn strip_comment_indentation(
     let mut result = String::with_capacity(content.len());
     let mut pos = 0;
     loop {
-        let body_start = if content[pos..].starts_with(&*indentation) {
+        let body_start = if content[pos..].starts_with(indentation) {
             pos + indentation.len()
         } else {
             pos
@@ -3281,12 +3284,7 @@ mod tests {
         for (term, _) in TERMINATORS {
             let source = format!("x{term}\t\t/* a\n\t\tb */");
             let comment_start = (1 + term.len() + 2) as u32;
-            let stripped = strip_comment_indentation(
-                &source,
-                " a\n\t\tb ",
-                comment_start,
-                AcornPrefix::DOCUMENT,
-            );
+            let stripped = strip_comment_indentation(&source, " a\n\t\tb ", comment_start);
             if term == "\n" || term == "\r\n" {
                 // A line really does start after these two, and it opens with the `\t\t`.
                 assert_eq!(stripped, " a\nb ", "line start after {term:?}");
@@ -3304,16 +3302,29 @@ mod tests {
         // leaves the indent standing after a `<CR>` / `<LS>` / `<PS>`, under-dedenting.
         for (term, _) in TERMINATORS {
             assert_eq!(
-                strip_comment_indentation(
-                    "\t/* x */",
-                    &format!(" a\n\tb{term}\tc "),
-                    1,
-                    AcornPrefix::DOCUMENT
-                ),
+                strip_comment_indentation("\t/* x */", &format!(" a\n\tb{term}\tc "), 1),
                 format!(" a\nb{term}c "),
                 "indent stripped after {term:?}"
             );
         }
+    }
+
+    #[test]
+    fn test_strip_comment_indentation_first_line_opens_past_a_bom() {
+        // Svelte strips a leading BOM before it parses, so the first line's run is the `\t`
+        // after it. Read from byte 0, the BOM stands between the line start and the tab and
+        // the run is empty.
+        let source = "\u{feff}\t{a /* x\n\ty */}";
+        assert_eq!(strip_comment_indentation(source, " x\n\ty ", 7), " x\ny ");
+        // A U+FEFF anywhere but byte 0 is ordinary text, and a later line is unaffected.
+        assert_eq!(
+            strip_comment_indentation("\u{feff}\u{feff}\t/* x\n\ty */", " x\n\ty ", 7),
+            " x\n\ty "
+        );
+        assert_eq!(
+            strip_comment_indentation("\u{feff}a\n\t/* x\n\ty */", " x\n\ty ", 6),
+            " x\ny "
+        );
     }
 
     #[test]

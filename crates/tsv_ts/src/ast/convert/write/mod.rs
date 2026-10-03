@@ -1113,7 +1113,7 @@ pub(super) fn write_identifier_with_optional(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tsv_lang::{AcornPrefix, LeadingBom, LocationTracker};
+    use tsv_lang::{LeadingBom, LocationTracker};
 
     /// Run `emit` under a standalone-TypeScript context over `source`, for one
     /// wire variant and one comment role.
@@ -1266,10 +1266,7 @@ mod tests {
             CommentAttach::new(
                 source,
                 IslandComments {
-                    queue: comments
-                        .iter()
-                        .map(|comment| (comment, AcornPrefix::DOCUMENT))
-                        .collect(),
+                    queue: comments.iter().collect(),
                     root_parent_end: None,
                     root_fallback: true,
                     html_leading: None,

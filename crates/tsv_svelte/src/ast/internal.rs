@@ -19,7 +19,7 @@
 use std::borrow::Cow;
 
 use tsv_css::ast::internal::CssStyleSheet;
-pub use tsv_lang::{AcornPrefix, AcornPrefixText, Comment, Span};
+pub use tsv_lang::{Comment, Span};
 use tsv_ts::ast::internal::{Expression, Program, TSTypeParameterDeclaration, VariableDeclaration};
 
 /// Svelte Root - top-level AST node
@@ -37,9 +37,6 @@ pub struct Root<'arena> {
     /// All comments from scripts and template expressions.
     /// Use `comments_to_emit_in_range(span)` to find comments for a specific node.
     pub comments: Vec<Comment>,
-    /// Every embedded acorn parse this component contains, ascending by
-    /// [`AcornRegion::lex_start`] — see [`AcornRegion`].
-    pub acorn_regions: &'arena [AcornRegion],
     /// The wire's parameter lists for the `{#snippet}` heads that hold a grouping pair,
     /// ascending by [`SnippetWireParameters::snippet_start`] — see
     /// [`SnippetWireParameters`].
@@ -65,152 +62,6 @@ pub struct SnippetWireParameters<'arena> {
     /// The snippet block's `span.start` — the key the writer finds the list by.
     pub snippet_start: u32,
     pub parameters: &'arena [Expression<'arena>],
-}
-
-/// One embedded **acorn parse**: where it began reading the component's own
-/// bytes, and what Svelte did to the text ahead of it.
-///
-/// Svelte runs acorn once per island over a *purpose-built* string, and a
-/// multi-line block comment's wire `value` is dedented against that string.
-/// Recording the parse start here is what lets the wire writer rebuild it: it
-/// cannot be recovered from a node's own span (a leading comment, or whitespace
-/// Svelte had already stepped over, sits between them), and the root `comments`
-/// array is emitted outside the tree walk that would otherwise carry it.
-///
-/// Regions are recorded in strict source order, so "the region a position belongs
-/// to" is the last one starting at or before it.
-///
-/// ⚠️ They **can nest**: a block pattern's trailing `: T` is its own parse, handed
-/// the whole rest of the head (the type parser finds its own end), so its region
-/// runs over whatever the head holds after it — `{#each}`'s `(key)`, `{@const}`'s
-/// init — and those later parses' regions sit inside it. The "last start at or
-/// before" rule is still the right answer there: the later start is the inner,
-/// more specific parse, which is the one that lexed the position.
-#[derive(Debug, Clone, Copy)]
-pub struct AcornRegion {
-    /// First byte of the component acorn lexes for real.
-    pub lex_start: u32,
-    /// One past the last byte of the slice this sub-parse was handed — the extent
-    /// a position resolving to this region must fall inside.
-    ///
-    /// Carried so the position→parse lookup can tell a position inside a region
-    /// from one past it ([`AcornPrefixes::at`]). Inclusive at the bound — an empty
-    /// `<script>` records a zero-length region whose `Program` starts exactly at
-    /// `end`.
-    pub end: u32,
-    /// acorn's `startPos` for this parse. Behind `lex_start` only where Svelte
-    /// *inserts* synthetic text there (`read_type_annotation`'s `_ as `), which
-    /// acorn lexes in place of the bytes it covers.
-    pub origin: u32,
-    /// How Svelte prepared the text ahead of `origin` — which decides the
-    /// indentation `onComment` dedents a multi-line block comment by
-    /// ([`AcornPrefixText`]).
-    pub prefix: AcornPrefixText,
-}
-
-impl AcornRegion {
-    /// This parse's preparation as the writers ask for it — the kind plus the offset its
-    /// manufactured bytes run out at. That is `origin` wherever Svelte splices its text
-    /// between document bytes: its own slicing put the boundary there, so the two cannot
-    /// drift. Under `BlankedThenAs` it is `lex_start` instead, one past the colon, because the
-    /// `_ as ` overwrites the document up to there — and `lex_start` is exact where `origin`
-    /// can only name the character a surrogate-split window opens in.
-    #[inline]
-    pub(crate) fn acorn_prefix(self) -> AcornPrefix {
-        match self.prefix {
-            AcornPrefixText::Document => AcornPrefix::DOCUMENT,
-            AcornPrefixText::BlankedThenAs => {
-                AcornPrefix::manufactured(self.prefix, self.lex_start)
-            }
-            _ => AcornPrefix::manufactured(self.prefix, self.origin),
-        }
-    }
-
-    /// Where the second acorn parse of a block pattern's trailing `: T` begins
-    /// lexing real bytes — one past the `:`, found from the annotation's own
-    /// span start.
-    ///
-    /// The annotation is anchored at the **binding's** end, not at the colon
-    /// (`tsv_ts::attach_pattern_type_annotation`), so the two differ by whatever
-    /// whitespace the author left between them. Only whitespace can be there:
-    /// Svelte reaches the colon with `allow_whitespace()` + `eat(':')`, so
-    /// anything else means this is not an annotation at all and no region was
-    /// recorded.
-    ///
-    /// The annotation's span start is behind `lex_start` by an author-controlled
-    /// distance, so the parser records the region at this position rather than at
-    /// the span start.
-    pub(crate) fn annotation_lex_start(source: &str, annotation_start: u32) -> u32 {
-        // The colon is the first NON-WHITESPACE byte, so this steps over the run
-        // rather than searching for the glyph. Not a stylistic choice: a `:` scan
-        // is not a discriminator here — it finds one wherever it looks, including
-        // far down the document, so on any position that is not in fact an
-        // annotation's gap it returns a confidently wrong answer instead of a
-        // recognizable one. `skip_svelte_ws` is Svelte's own `allow_whitespace()`,
-        // the same step `read_type_annotation` takes to reach the colon.
-        crate::whitespace::skip_svelte_ws(source, annotation_start as usize) as u32 + 1
-    }
-}
-
-/// The document's acorn regions, resolved to the source Svelte handed each parse —
-/// what a multi-line block comment's wire `value` is dedented by.
-///
-/// One resolver rather than a free function per caller, because both halves of the wire
-/// ask it and neither owns the other: the root `comments` array is emitted outside any
-/// island's walk, while the attached `leadingComments` / `trailingComments` copies are
-/// emitted by `tsv_ts`'s island attach. One answer, so the two lists cannot disagree
-/// about the same comment.
-#[derive(Debug, Clone, Copy)]
-pub struct AcornPrefixes<'a> {
-    /// The parse-fact ledger, ascending by `lex_start`.
-    pub(crate) regions: &'a [AcornRegion],
-}
-
-impl<'a> AcornPrefixes<'a> {
-    /// Build the resolver for one document.
-    #[must_use]
-    pub fn new(regions: &'a [AcornRegion]) -> Self {
-        Self { regions }
-    }
-
-    /// The **index** of the last region starting at or before `pos` — the one "which
-    /// parse lexed this position" rule. Where regions nest (a block pattern and its `: T`)
-    /// the later start is the inner parse, which is the one that lexed the position.
-    /// Whether that region also CONTAINS `pos` is [`at`](Self::at)'s question.
-    #[inline]
-    pub(crate) fn index_at(self, pos: u32) -> Option<usize> {
-        self.regions
-            .partition_point(|r| r.lex_start <= pos)
-            .checked_sub(1)
-    }
-
-    /// The source Svelte handed acorn for the parse `pos` belongs to, insofar as the
-    /// comment DEDENT reads it.
-    ///
-    /// Answered per POSITION rather than per island, because an island is not the unit: a
-    /// block binding's is up to **two** parses, each blanking a different span, so one
-    /// answer for the whole island is wrong for whichever half it did not come from.
-    ///
-    /// A position outside every region is [`AcornPrefix::DOCUMENT`] rather than an
-    /// assertion: this is asked about every comment in the document, including ones no
-    /// acorn parse covers.
-    #[must_use]
-    pub fn at(self, pos: u32) -> AcornPrefix {
-        match self.index_at(pos) {
-            Some(i) if pos <= self.regions[i].end => self.regions[i].acorn_prefix(),
-            _ => AcornPrefix::DOCUMENT,
-        }
-    }
-
-    /// The per-comment dedent sources for a queue, paired with it so the two cannot be
-    /// indexed apart.
-    #[must_use]
-    pub fn pair_with(self, queue: Vec<&Comment>) -> Vec<(&Comment, AcornPrefix)> {
-        queue
-            .into_iter()
-            .map(|c| (c, self.at(c.span.start)))
-            .collect()
-    }
 }
 
 /// Svelte Fragment - container for template nodes

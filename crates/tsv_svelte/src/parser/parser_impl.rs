@@ -3,10 +3,9 @@
 use crate::ast::internal::{self, FragmentNode};
 use crate::lexer::{Lexer, Token, TokenKind};
 use crate::parser::element::tag_name_end;
-use crate::whitespace::skip_svelte_ws;
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
-use tsv_lang::{AcornPrefixText, Comment, ParseError, Span};
+use tsv_lang::{Comment, ParseError, Span};
 use tsv_ts::Expression;
 use tsv_ts::TSTypeAnnotation;
 use tsv_ts::TopLevelAs;
@@ -58,14 +57,6 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     pub(crate) peek: Option<Token>,
     /// TS comments collected from template expressions (e.g., {@debug /* comment */ a})
     pub(crate) expression_comments: Vec<Comment>,
-    /// Every embedded acorn parse, in the order the reads happen — which is
-    /// source order, so `Root.acorn_regions` needs no sort. See
-    /// [`record_acorn_region`](Self::record_acorn_region).
-    ///
-    /// Bump-allocated because `Root` wants an `&'arena [_]`: growing in the
-    /// arena hands the finished run straight over (`into_bump_slice`), where a
-    /// heap `Vec` owes a malloc, a free, and a copy into the arena at the end.
-    pub(crate) acorn_regions: BumpVec<'arena, internal::AcornRegion>,
     /// The wire-only parameter lists of the `{#snippet}` heads that hold a grouping pair,
     /// in read order — which is source order, since a head is read before its body. See
     /// [`internal::SnippetWireParameters`].
@@ -95,7 +86,6 @@ pub(crate) struct SvelteParser<'a, 'arena> {
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct EmbeddedParseMark {
     comments: usize,
-    acorn_regions: usize,
     snippet_wire_parameters: usize,
 }
 
@@ -188,7 +178,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             current,
             peek: None,
             expression_comments: Vec::new(),
-            acorn_regions: BumpVec::new_in(arena),
             snippet_wire_parameters: BumpVec::new_in(arena),
             in_svelte_head: false,
             in_shadowroot_template: false,
@@ -604,7 +593,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<&'arena Expression<'arena>, ParseError> {
-        self.record_acorn_region(base_offset, source, AcornPrefixText::Document);
         let (expr, comments) =
             tsv_ts::parse_expression_with_comments(source, base_offset, self.arena)?;
         self.expression_comments.extend_from_slice(comments);
@@ -629,7 +617,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         base_offset: usize,
         top_level_as: TopLevelAs,
     ) -> Result<(&'arena Expression<'arena>, usize), ParseError> {
-        self.record_acorn_region(base_offset, source, AcornPrefixText::Document);
         let (expr, end_pos, comments) = tsv_ts::parse_expression_partial_with_comments(
             source,
             base_offset,
@@ -656,11 +643,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<TSTypeAnnotation<'arena>, ParseError> {
-        // The COLON's offset: `parse_block_pattern` splits every block and tag pattern head
-        // itself and parses the annotation from there. The wire writer looks the region up
-        // from the annotation's own start; both reach the same `lex_start` — see
-        // `record_annotation_acorn_region`.
-        self.record_annotation_acorn_region(base_offset as u32, base_offset + source.len());
         let (ta, comments) =
             tsv_ts::parse_type_annotation_partial(source, base_offset, self.arena)?;
         self.expression_comments.extend_from_slice(comments);
@@ -672,7 +654,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// `source` is the BARE pattern — a name or a matched bracket, as
     /// `SvelteParser::parse_block_pattern` bounds it. A trailing `: T` is a second acorn parse
     /// for canonical (`read_pattern` calls `read_type_annotation` after it), so the caller
-    /// reads it through [`Self::parse_ts_type_annotation`], which records its own region.
+    /// reads it through [`Self::parse_ts_type_annotation`].
     ///
     /// The pattern is arena-allocated here and handed back `&mut`, so the `{#each}` head can
     /// still attach its separately-parsed annotation in place before storing the reference.
@@ -681,18 +663,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<&'arena mut Expression<'arena>, ParseError> {
-        // Svelte's `read_pattern` branches on the same byte: a name is `read_identifier`,
-        // which builds the binding itself and hands acorn nothing, and only a `{` / `[` is
-        // wrapped into the synthetic `(pattern = 1)` expression. The region is recorded
-        // either way — it is what reproduces `locate-character`'s columns for the identifier
-        // arm too — so the kinds part on the manufacture, not on the class: both are LF, and
-        // an identifier binding holds no comment for the dedent half to answer about.
-        let prefix = if source.starts_with(['{', '[']) {
-            AcornPrefixText::BlankedThenParen
-        } else {
-            AcornPrefixText::Blanked
-        };
-        self.record_acorn_region(base_offset, source, prefix);
         let (pattern, comments) =
             tsv_ts::parse_pattern_with_comments(source, base_offset, self.arena)?;
         debug_assert!(
@@ -703,126 +673,18 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         Ok(self.arena.alloc(pattern))
     }
 
-    /// Record the embedded **acorn parse** Svelte runs over this component
-    /// starting around `origin` — the fact `Root.acorn_regions` carries to the
-    /// wire writer, which reads from it the source acorn was handed (what a
-    /// multi-line block comment's `value` is dedented by).
-    ///
-    /// Svelte calls `allow_whitespace()` before every one of these reads, so
-    /// acorn's `startPos` is the first non-whitespace byte — while tsv's own
-    /// sub-parse offsets are sometimes the delimiter still behind it.
-    /// [`skip_svelte_ws`] is that same `allow_whitespace()` over a raw offset. The
-    /// skip lives here rather than at each call site because it is one rule, and
-    /// getting it wrong is invisible until it isn't: a terminator tsv is still
-    /// standing behind belongs to the prefix acorn **skipped**.
-    ///
-    /// `slice` is the source the sub-parse is about to be handed, so the region's
-    /// extent is `origin + slice.len()` — taken from the same value the parse gets,
-    /// rather than restated, so the two cannot disagree.
-    pub(crate) fn record_acorn_region(
-        &mut self,
-        origin: usize,
-        slice: &str,
-        prefix: AcornPrefixText,
-    ) {
-        let at = skip_svelte_ws(self.source, origin);
-        self.record_acorn_region_at(at, at, origin + slice.len(), prefix);
-    }
-
-    /// Record the acorn parse of a block pattern's trailing `: T`, given any position
-    /// `at` that reaches the `:` over whitespace alone — the annotation's own span start
-    /// (which is anchored at the *binding's* end) or the colon itself;
-    /// `annotation_lex_start` steps the run either way.
-    ///
-    /// Svelte reads it with a second parse over `blanked_prefix + "_ as " +
-    /// rest`, entered at `a = parser.index - "_ as ".length` with `parser.index`
-    /// just past the `:` — so acorn is entered at the first of the five UTF-16
-    /// code units ending at the colon, and starts lexing real source again one
-    /// past it. Those five units (the colon's included) are the ones the
-    /// synthetic `_ as ` overwrites, which is why `origin` may sit mid-token: the
-    /// comment dedent only reads the source *behind* it.
-    ///
-    /// The window is counted in **code units**, because Svelte indexes a JS string:
-    /// behind a non-ASCII binding it reaches more than five bytes back, and it may
-    /// open between a surrogate pair's halves, where no byte offset exists.
-    /// [`AcornPrefixText::as_insert_origin`] states both, and `origin` is the byte
-    /// offset of the character the window opens in — a line start and a line number
-    /// read the same there as at the unit itself, since that character is no line
-    /// terminator.
-    ///
-    /// The walk cannot run out (`as_insert_origin`'s `None`, asserted in debug) — an
-    /// annotation colon is always inside a block or tag head, and every head that reaches
-    /// here spends more than five units ahead of the colon. The shortest is `{@const x:`,
-    /// whose colon sits at offset 9; `{:then v:` / `{:catch e:` are shorter heads but never
-    /// stand alone, and `{#each … as x:` is longer still. Were it to run out, release reads
-    /// it as no insert at all — the origin at `lex_start`, one past the colon — as
-    /// `synthetic_insert_range` does.
-    fn record_annotation_acorn_region(&mut self, at: u32, end: usize) {
-        let lex_start = internal::AcornRegion::annotation_lex_start(self.source, at) as usize;
-        let origin = AcornPrefixText::as_insert_origin(self.source, lex_start);
-        debug_assert!(
-            origin.is_some(),
-            "an annotation at {at} leaves no room for Svelte's synthetic `_ as `, so this \
-             is not a block-pattern annotation at all"
-        );
-        self.record_acorn_region_at(
-            lex_start,
-            origin.unwrap_or(lex_start),
-            end,
-            AcornPrefixText::BlankedThenAs,
-        );
-    }
-
-    /// The explicit form, for the two regions whose parse does **not** begin at
-    /// the first non-whitespace byte: `<script>` content, which `read_script`
-    /// reaches by lexing from offset 0 (so its leading whitespace is acorn's to
-    /// count), and a block pattern's trailing `: T`, whose parse starts on
-    /// Svelte's synthetic `_ as `, over the five code units ending at the colon.
-    ///
-    /// `lex_start` is the first byte of the component acorn lexes for real;
-    /// `origin` is acorn's `startPos`; `end` is one past the slice the sub-parse
-    /// was handed ([`internal::AcornRegion::end`]).
-    pub(crate) fn record_acorn_region_at(
-        &mut self,
-        lex_start: usize,
-        origin: usize,
-        end: usize,
-        prefix: AcornPrefixText,
-    ) {
-        debug_assert!(
-            self.acorn_regions
-                .last()
-                .is_none_or(|r| (r.lex_start as usize) < lex_start),
-            "acorn regions are recorded in strict source order and never repeat \
-             (binary-searched by the wire writer); a re-parse over the same region \
-             must rewind through `EmbeddedParseMark`"
-        );
-        debug_assert!(
-            lex_start <= end,
-            "an acorn region cannot lex past the slice its parse was handed"
-        );
-        self.acorn_regions.push(internal::AcornRegion {
-            lex_start: lex_start as u32,
-            end: end as u32,
-            origin: origin as u32,
-            prefix,
-        });
-    }
-
     /// How far every ledger an embedded parse appends to had filled before it ran,
     /// so a **re-parse over the same region** can rewind them together.
     ///
     /// One value rather than a mark per ledger because the ledgers fail differently
     /// and only one of the failures is loud: a comment registered twice is printed
-    /// twice, while a repeated [`internal::AcornRegion`] is (today) an exact duplicate
-    /// that `partition_point` resolves to the same region, and a repeated
-    /// [`internal::SnippetWireParameters`] entry is a second list under one key that the
-    /// writer's binary search may or may not pick — so rewinding one and forgetting
-    /// another reads as correct until the entries stop being identical.
+    /// twice, while a repeated [`internal::SnippetWireParameters`] entry is a second list
+    /// under one key that the writer's binary search may or may not pick — so rewinding
+    /// one and forgetting the other reads as correct until the entries stop being
+    /// identical.
     pub(crate) fn embedded_parse_mark(&self) -> EmbeddedParseMark {
         EmbeddedParseMark {
             comments: self.expression_comments.len(),
-            acorn_regions: self.acorn_regions.len(),
             snippet_wire_parameters: self.snippet_wire_parameters.len(),
         }
     }
@@ -831,7 +693,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// parser as if they had not run. See [`embedded_parse_mark`](Self::embedded_parse_mark).
     pub(crate) fn rewind_embedded_parses(&mut self, mark: EmbeddedParseMark) {
         self.expression_comments.truncate(mark.comments);
-        self.acorn_regions.truncate(mark.acorn_regions);
         self.snippet_wire_parameters
             .truncate(mark.snippet_wire_parameters);
     }
@@ -843,7 +704,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<tsv_ts::Statement<'arena>, ParseError> {
-        self.record_acorn_region(base_offset, source, AcornPrefixText::Document);
         let (stmt, comments) =
             tsv_ts::parse_statement_with_comments(source, base_offset, self.arena)?;
         self.expression_comments.extend_from_slice(comments);

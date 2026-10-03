@@ -319,7 +319,7 @@ only add sites. So the rule is: **census ⇒ gradeable; sample ⇒ discovery onl
 undocumented files where the census found **25** (7 signature groups vs 19), which is 8x
 its own findings hidden. That reading is kept because it is the evidence; it has since
 been worked down to zero, the comment-extent bug having accounted for 15 of the 25 and all
-but 4 of the groups, and the dedent bug below for the rest.
+but 4 of the groups, and the dedent finding below for the rest.
 
 **Each variant is graded against its own base file.** A divergence the base already had
 is not the injection's doing, and `tests/fixtures` deliberately contains ~91
@@ -361,44 +361,29 @@ files are controls and are dropped; only the delta is reported. Subtraction is b
 list, not a regression gate, which is why it is not in `deno task check` (it also needs
 the canonical parser, so it is conformance-tier at best). Standing findings:
 
-- **`ws`** (census: **0 files**) — the family is CLEAN, and both of the bugs it found asked
-  a sub-parse the same question: **which SOURCE did that parse actually see?**
+- **`ws`** (census: **0 files**) — the family is CLEAN, and both of its findings asked a
+  sub-parse the same question: **which SOURCE did that parse actually see?**
 
-  The one it retired second was **the acorn comment DEDENT computed against the document**
-  (10 files, from 2 `tags/const/` bases) where canonical computes it against the synthetic
-  source it built. Svelte's `onComment` strips the comment line's own indentation from every
-  line of a multiline block comment's `value` (`1-parse/acorn.js`), and `Comment::wire_value`
-  mirrors it — but four of Svelte's parses hand acorn a **manufactured** string whose line
-  prefix is not the author's. `tsv_lang::AcornPrefix` is the model of them, resolved per
-  COMMENT from `Root::acorn_regions` (a block binding's island is up to two parses, each
-  blanking a different span). It is a model of what acorn saw, not of what the document
-  says — and it is subtler than a width in four ways, each of which was a live bug in the
-  first cut: the two blankings differ
-  (`/[^\n]/g` erases the author's tab, `{#snippet}`'s `/\S/g` keeps it and blanks past it);
-  `read_pattern` deletes one blank from its prefix; a run that reaches `read_script`'s body
-  carries on into the body's own whitespace; and `read_type_annotation`'s `_ as ` is spliced
-  OVER five document bytes, so a `\n` among them is one acorn never sees. The blanks are
-  built in **JS's** units at that — `\S` complements JS `\s`, not Rust's
-  `White_Space`, and `String.replace` walks UTF-16 code units, so an astral character blanks
-  to two columns. Pinned by
-  [comment_dedent_manufactured_source.rs](../tests/comment_dedent_manufactured_source.rs)
-  (each reader with its null controls, and the spellings no formatter leaves standing), by
-  the frozen
-  [head_multiline_comment_dedent](../tests/fixtures/svelte/syntax/comments/head_multiline_comment_dedent/)
-  fixture (the template readers, kept alive behind `<!-- prettier-ignore -->`), and by
+  The second is **the acorn comment DEDENT** (injected variants of the `{@const}` and
+  `{#each}` binding bases): a sanctioned divergence, so those variants are excused, not fixed.
+  Svelte's `onComment` strips the comment line's own indentation from every line of a
+  multiline block comment's `value` (`1-parse/acorn.js`), but it measures that line in the string its reader handed acorn, and
+  four readers manufacture that string (a blanked `<script>` prefix, `(pattern = 1)`, `_ as `,
+  the `{#snippet}` prelude). tsv measures the document's line — a deliberate divergence on the
+  one line a manufacture ends, cataloged in
+  [conformance_svelte.md §Comment Attachment Differences](./conformance_svelte.md#comment-attachment-differences)
+  — so those variants classify under the `manufactured_line_comment_dedent` matcher, which
+  admits a `value` only as an exact document-line dedent against canonical's uniform one.
+  Pinned by [comment_dedent_document_line.rs](../tests/comment_dedent_document_line.rs), the
+  frozen
+  [head_multiline_comment_dedent_svelte_divergence](../tests/fixtures/svelte/syntax/comments/head_multiline_comment_dedent_svelte_divergence/)
+  fixture (the template readers, kept alive behind `<!-- prettier-ignore -->`), and
   [const_annotation_comment_svelte_divergence](../tests/fixtures/svelte/tags/const/const_annotation_comment_svelte_divergence/)
-  (the one spelling that is a fixed point unfrozen).
-
-  ⚠️ **The census's zero certifies only the sources some fixture carries in a head.** It
-  injects whitespace, so it can only reveal the bug where a fixture already holds a
-  multi-line block comment in the affected head — the trigger is a comment that OPENS on the
-  synthetic region's own line, which formatting normally moves off it. The three TEMPLATE
-  readers (`read_pattern`, `read_type_annotation`, `{#snippet}`'s `\S` prelude) are kept
-  reachable by the `<!-- prettier-ignore -->`-frozen
-  [head_multiline_comment_dedent](../tests/fixtures/svelte/syntax/comments/head_multiline_comment_dedent/)
-  fixture, which carries each with its null controls; `read_script` cannot be a fixture at
-  all (prettier reformats a script's body through an ignore directive, and both formatters
-  move its content off the tag's line), so there the Rust test is the sole guard.
+  (the one spelling that is a fixed point unfrozen). The census reaches it only where a
+  fixture already holds a multi-line block comment opening on a manufactured line, which
+  formatting normally moves off it; `read_script` cannot be a fixture at all (prettier
+  reformats a script's body through an ignore directive, and both formatters move its content
+  off the tag's line), so there the Rust test is the sole pin.
 
   The sibling it retired was a **comment extent clipped at a trimmed slice boundary**: the
   bounded head readers handed their interior to the sub-parse whitespace-trimmed at BOTH

@@ -322,7 +322,7 @@ fn multiline_comment_carries(comment: &tsv_lang::Comment, source: &str) -> bool 
     {
         return false;
     }
-    let value = comment.wire_value(source, tsv_lang::AcornPrefix::DOCUMENT);
+    let value = comment.wire_value(source);
     content.split('\n').next() == value.split('\n').next()
 }
 

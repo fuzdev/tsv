@@ -208,17 +208,13 @@ fn svelte_expression_list_island_attached_comments() {
 }
 
 /// A **multi-line block** comment, which every case above deliberately isn't: its `value` is
-/// the one comment field that is not a verbatim source slice. Svelte's `onComment` dedents it
-/// by the line of the source *its own parse* was handed, and Svelte manufactures that source
-/// at four of its readers (`tsv_lang::AcornPrefix`) — so the writer must resolve the
-/// preparation per island on **both** variants.
-///
-/// ⭐ That is what this case gates: the preparation ledger (`Root::acorn_regions`) must be
-/// read on both variants, and the fixtures grade only the span-only one. The newline before
-/// the `:` is load-bearing: `read_type_annotation`'s `_ as ` swallows it, so the line acorn
-/// measured is the binding's.
+/// the one comment field that is not a verbatim source slice — Svelte's `onComment` dedents it
+/// by its line's indentation — so both variants must run the same dedent, on the root
+/// `comments` entry and the attached copy alike. The newline before the `:` is the shape whose
+/// line Svelte reads differently (its `_ as ` swallows that newline); tsv reads the document's
+/// on both variants.
 #[test]
-fn svelte_manufactured_multiline_comment_dedent() {
+fn svelte_multiline_comment_dedent() {
     assert_svelte(
         "<script lang=\"ts\">\n\tlet xs = [1];\n</script>\n\
          {#each xs as x\n\t: /* c1\n\t c2 */ number}{x}{/each}",

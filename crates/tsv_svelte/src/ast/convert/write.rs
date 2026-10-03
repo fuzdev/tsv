@@ -175,7 +175,6 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
     let ctx = Ctx {
         source,
         positions: WirePositions::new(&map, tracker.as_ref()),
-        acorn_prefixes: internal::AcornPrefixes::new(root.acorn_regions),
         snippet_wire_parameters: root.snippet_wire_parameters,
         comments: &template_comments,
         // Component-global: `lang="ts"` on any script makes *every* script emit the
@@ -196,13 +195,6 @@ struct Ctx<'a> {
     /// `loc` — its one LF-only line table, which every node, `name_loc`, root comment,
     /// embedded island and `<style>` node reads.
     positions: WirePositions<'a>,
-    /// Every embedded acorn parse in this component (the parse-fact ledger
-    /// `Root::acorn_regions` carries), resolved per position to the source Svelte handed
-    /// it — what a multi-line block comment's `value` is dedented by. Asked on both wires:
-    /// the fixtures pin the span-only wire's dedent, and the loc wire's is graded against
-    /// it by `check:loc` and pinned by `tests/no_locations.rs`'s
-    /// `svelte_manufactured_multiline_comment_dedent`.
-    acorn_prefixes: internal::AcornPrefixes<'a>,
     /// `Root::snippet_wire_parameters`: the preserved-paren parameter lists the wire emits
     /// in place of a head's paren-free `SnippetBlock::parameters`.
     snippet_wire_parameters: &'a [internal::SnippetWireParameters<'a>],
@@ -303,7 +295,7 @@ impl<'a> Ctx<'a> {
 
     /// The shared inputs for a template island's comment attach
     /// (`ast/convert/comment_attachment.rs`'s `attach_*`) — this document's
-    /// template comments, source, and per-comment dedent resolver.
+    /// template comments and source.
     ///
     /// It carries no parser variant and no tracker: the attach runs online off
     /// the one emission, so there is no second pass to configure and no way for
@@ -313,7 +305,6 @@ impl<'a> Ctx<'a> {
         AttachInputs {
             template_comments: self.comments,
             source: self.source,
-            acorn_prefixes: self.acorn_prefixes,
         }
     }
 
@@ -465,11 +456,6 @@ fn write_root(w: &mut JsonWriter, root: &internal::Root<'_>, ctx: &Ctx<'_>) {
 /// document's one line table.
 fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
     let span = comment.span;
-    // The dedent basis, per comment — this array is emitted outside the tree walk that
-    // would otherwise carry it. Asked unconditionally: a comment Svelte's own template
-    // reader collected takes no dedent at all, and `Comment::wire_value` is the ONE place
-    // that says so; restating its gate here would put the rule in two crates.
-    let prefix = ctx.acorn_prefixes.at(span.start);
     w.raw("{\"type\":\"");
     w.raw(if comment.is_block { "Block" } else { "Line" });
     if comment.emit_character_field {
@@ -479,10 +465,10 @@ fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
             write_character_loc_field(w, span, lines);
         }
         w.raw(",\"value\":");
-        w.string(&comment.wire_value(ctx.source, prefix));
+        w.string(&comment.wire_value(ctx.source));
     } else {
         w.raw("\",\"value\":");
-        w.string(&comment.wire_value(ctx.source, prefix));
+        w.string(&comment.wire_value(ctx.source));
         ctx.start_end_field(w, span.start, span.end);
     }
     w.raw("}");

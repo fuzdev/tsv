@@ -674,40 +674,19 @@ terminator, BOM and astral inputs no fixture can hold. The shipped JS reconstruc
 (`crates/tsv_wasm/npm/locations.js`) implements the same definition over the span-only wire,
 and `deno task check:loc` holds the two equal over every fixture input.
 
-**The comment `value` is the one question acorn's prepared sources still answer.** acorn's
-`onComment` dedents a multi-line block comment by the `[ \t]` run opening the comment's line
-*in the string acorn was handed*, and Svelte hands it a differently prepared string at every
-island:
-
-| island | source acorn receives |
-| --- | --- |
-| `<script>` (`read_script`) | prefix blanked with `replace(/[^\n]/g, ' ')` + content |
-| `{expr}` / attribute values (`read_expression`) | the raw template |
-| `{const …}` / `{let …}` (`read_declaration` → `parse_statement_at`) | the raw template |
-| `{#snippet}` parameters | prefix `replace(/\S/g, ' ')` — whitespace survives |
-| a pattern binding — `{@const}`'s `id`, a destructured block binding (`read_pattern`) | blanked prefix + `(pattern = 1)` |
-| a binding's trailing `: T` (`read_type_annotation`) | blanked prefix + `_ as ` + raw rest |
-
-`tsv_svelte`'s parser records the parse start of every island in `Root::acorn_regions`, and
-`tsv_lang::AcornPrefix` models the four manufactured rows (`Comment::wire_value`), resolved by
-"the last region starting at or before" a comment — per COMMENT rather than per island, since
-a block binding spans two of the rows (`AcornPrefixes::at`, which both the root `comments`
-array and the attached `leadingComments`/`trailingComments` copies read, so the two lists
-cannot disagree about one comment). Regions **can** nest (a block pattern's `: T` runs inside
-the pattern's own parse), where the later start is the inner parse and so the right answer.
-
-The two synthetic tokens differ in kind, and the difference is load-bearing for the dedent:
-`read_pattern`'s `(` is **spliced** between prefix and region, where `read_type_annotation`'s
-`_ as ` **overwrites** the five UTF-16 code units it covers (the colon and the four before
-it; behind non-ASCII text that is more than five bytes, and it can open between a surrogate
-pair's halves) — it can swallow an author's `\n` (the line then opens further back than the
-document's does), and a line opening on the insert itself has no document indentation to
-read. The blanking is `String.replace`, which lays one space per UTF-16 code unit, so any
-non-ASCII ahead of the comment on its line makes a byte count too long. Pinned by
-`tests/comment_dedent_manufactured_source.rs` and the frozen fixture
-`tests/fixtures/svelte/syntax/comments/head_multiline_comment_dedent`; the line-terminator
-classes the dedent's two steps read are the sibling question, pinned by
-`tests/comment_dedent_line_terminators.rs`.
+**The comment `value` is measured on the document too.** acorn's `onComment` dedents a
+multi-line block comment by the `[ \t]` run opening the comment's line, and Svelte reads that
+run *in the string its reader handed acorn* — which four readers manufacture (`read_script`'s
+blanked prefix, `read_pattern`'s `(pattern = 1)`, `read_type_annotation`'s `_ as `, the
+`{#snippet}` head's blanked prelude). tsv keeps the dedent but reads the run on the document's
+own line (`Comment::wire_value` → `tsv_lang::printing::strip_comment_indentation`), so the
+parse records nothing about how Svelte prepared each island and both comment emitters — the
+root `comments` array and the attached `leadingComments` / `trailingComments` copies — answer
+from the comment and the source alone. The two differ only on the line where a manufacture
+ends, a cataloged divergence ([conformance_svelte.md §Comment Attachment
+Differences](./conformance_svelte.md#comment-attachment-differences)); which line is read is
+pinned by `tests/comment_dedent_document_line.rs`, and the line-terminator classes the dedent's
+two steps read by `tests/comment_dedent_line_terminators.rs`.
 
 ### Source-Based Printing
 

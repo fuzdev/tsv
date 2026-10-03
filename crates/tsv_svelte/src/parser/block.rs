@@ -424,9 +424,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// The slice STARTS where the partial parse did and reaches further, so it re-registers
     /// everything that parse registered — rewinding to `mark` first is what keeps each
     /// registration single. Without it a comment here was listed twice in the root
-    /// `comments` array and printed twice by whichever emitter owned its gap, and the
-    /// iterable's `AcornRegion` was pushed twice. Both re-parsing arms share this, so the
-    /// rewind cannot be done at one and forgotten at the other.
+    /// `comments` array and printed twice by whichever emitter owned its gap. Both
+    /// re-parsing arms share this, so the rewind cannot be done at one and forgotten at the
+    /// other.
     fn reparse_each_iterable(
         &mut self,
         iterable: &str,
@@ -1407,19 +1407,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             const WRAPPER_PREFIX: &str = "function f";
             let wrapper = format!("{WRAPPER_PREFIX}{head_slice} {{}}");
             let base = (content_offset + head_start).saturating_sub(WRAPPER_PREFIX.len());
-            // Svelte's own prelude is `replace(/\S/g, ' ')` — it blanks the
-            // non-whitespace and keeps every terminator and every tab.
-            // The extent is the head slice itself — from the `<` or `(` through the
-            // matching `)` — not the wrapper the parse actually runs over, whose
-            // `function f` prefix sits at synthetic offsets outside the document.
-            self.record_acorn_region(
-                content_offset + head_start,
-                &content[head_start..=close_paren],
-                // `replace(/\S/g, ' ')` blanks the non-whitespace ONLY: the author's tab
-                // reaches acorn intact, and the blanked columns after it EXTEND the run the
-                // dedent measures past anything the document has.
-                AcornPrefixText::WhitespaceKept,
-            );
             // Two trees, one per reader. Svelte keeps acorn's `preserveParens` here (and,
             // unlike every other template expression, skips `remove_parens`), so the WIRE
             // holds a `ParenthesizedExpression` for each grouping pair — `c = (2, 3)` keeps

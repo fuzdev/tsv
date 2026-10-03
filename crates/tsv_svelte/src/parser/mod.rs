@@ -198,13 +198,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // the style node via `write_css_comments`, matching where parseCss puts them —
         // so they are never merged into `Root.comments`.
 
-        // Recorded in read order, which is source order — the wire writer
-        // binary-searches this by position (`SvelteParser::record_acorn_region_at`
-        // asserts the order at each push). Already in the arena, so handing it over
-        // is a move; the empty replacement it leaves behind allocates nothing.
-        let acorn_regions = std::mem::replace(&mut self.acorn_regions, BumpVec::new_in(self.arena))
-            .into_bump_slice();
-
         let snippet_wire_parameters = std::mem::replace(
             &mut self.snippet_wire_parameters,
             BumpVec::new_in(self.arena),
@@ -218,7 +211,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             css,
             options,
             comments,
-            acorn_regions,
             snippet_wire_parameters,
             holds_nested_raw_text: self.holds_nested_raw_text,
         })

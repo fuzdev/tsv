@@ -17,30 +17,25 @@
 use crate::ast::internal;
 use crate::whitespace::svelte_ws_width_at;
 
-use tsv_lang::{AcornPrefix, Comment, Span, source_scan::skip_comment};
+use tsv_lang::{Comment, Span, source_scan::skip_comment};
 use tsv_ts::ast::convert::{CommentAttach, CommentMode, IslandComments};
 
 /// The inputs every island's comment-attach builder (the `attach_*` fns below)
 /// shares: the document's template comments and its source.
 ///
 /// (`attach_script` takes the same inputs but ignores `template_comments`: it
-/// queues the script's *own* comments, pairing them off the shared resolver.)
+/// queues the script's *own* comments.)
 #[derive(Clone, Copy)]
 pub(super) struct AttachInputs<'a> {
     pub(super) template_comments: &'a [&'a Comment],
     pub(super) source: &'a str,
-    /// Every embedded acorn parse, resolved to the source Svelte handed it — what each
-    /// comment's wire `value` is dedented by. The same resolver the root `comments` array
-    /// reads, so an attached copy and the root entry for one comment cannot disagree.
-    pub(super) acorn_prefixes: internal::AcornPrefixes<'a>,
 }
 
 impl<'a> AttachInputs<'a> {
-    /// The island's queue: the template comments inside `[start, end)`, each paired with the
-    /// source Svelte handed acorn for it. The shape every window-based builder below wants.
-    fn window_queue(self, start: u32, end: u32) -> Vec<(&'a Comment, AcornPrefix)> {
-        self.acorn_prefixes
-            .pair_with(window_queue(self.template_comments, start, end))
+    /// The island's queue: the template comments inside `[start, end)`. The shape every
+    /// window-based builder below wants.
+    fn window_queue(self, start: u32, end: u32) -> Vec<&'a Comment> {
+        window_queue(self.template_comments, start, end)
     }
 }
 
@@ -249,15 +244,10 @@ pub(super) fn attach_script<'a>(
     attach: AttachInputs<'a>,
     html_leading_comment: Option<&internal::HtmlComment>,
 ) -> CommentAttach<'a> {
-    // The queue is the script's own comments rather than the template's, but the dedent
-    // lookup reads only their positions — so `read_script`'s blanked prefix comes from the
-    // one region table here too, rather than being restated from `script.content.span`.
     CommentAttach::new(
         attach.source,
         IslandComments {
-            queue: attach
-                .acorn_prefixes
-                .pair_with(script.content.comments.iter().collect()),
+            queue: script.content.comments.iter().collect(),
             root_parent_end: None,
             root_fallback: true,
             html_leading: html_leading_comment.map(|c| c.content(attach.source)),

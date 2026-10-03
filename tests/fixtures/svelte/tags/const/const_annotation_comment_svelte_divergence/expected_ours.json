@@ -382,7 +382,7 @@
 													"leadingComments": [
 														{
 															"type": "Block",
-															"value": "\n\t c5 ",
+															"value": "\n c5 ",
 															"start": 799,
 															"end": 809
 														}
@@ -555,7 +555,7 @@
 		},
 		{
 			"type": "Block",
-			"value": "\n\t c5 ",
+			"value": "\n c5 ",
 			"start": 799,
 			"end": 809
 		},

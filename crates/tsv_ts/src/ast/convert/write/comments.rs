@@ -73,7 +73,7 @@
 use std::cell::{Cell, RefCell};
 
 use super::CommentMode;
-use tsv_lang::{AcornPrefix, Comment, JsonWriter, Span, WirePositions};
+use tsv_lang::{Comment, JsonWriter, Span, WirePositions};
 
 /// What one island declares up front: the comments its canonical parse would have
 /// collected, plus the two facts acorn's walk reads about a **root**'s surroundings.
@@ -96,19 +96,7 @@ pub struct IslandComments<'a> {
     /// scan dead on that `)`, and every comment after it is filtered out before the
     /// walk — a `trailingComments` entry canonical emits and tsv then has nowhere to
     /// put. `tsv_svelte`'s `attach_expression` states the rule for the family.
-    ///
-    /// Each is paired with the source Svelte handed acorn for it — what its wire `value`
-    /// is dedented by. Paired rather than carried in a second list, because the pairing is
-    /// the only thing that keeps them aligned: read positionally out of two `Vec`s, a
-    /// misalignment dedents a comment against a source it was never in and still emits a
-    /// well-formed wire.
-    ///
-    /// ⚠️ The prefix is per COMMENT, not per island, and the two are genuinely different:
-    /// a block binding's island is up to **two** parses (the pattern and its `: T`), each
-    /// blanking a different span, so one answer for the whole island is wrong for whichever
-    /// half it did not come from. [`AcornPrefix::DOCUMENT`] throughout for a standalone
-    /// (non-Svelte) parse.
-    pub queue: Vec<(&'a Comment, AcornPrefix)>,
+    pub queue: Vec<&'a Comment>,
     /// The `end` a **root** node sees for its parent — the one thing a closing node asks
     /// about its parent, driving acorn's `node.end !== parent.end` trailing suppression.
     /// (The other thing it asks, acorn's `is_last_in_body`, is a fact about the CHILD and
@@ -455,7 +443,7 @@ impl<'a> CommentAttach<'a> {
     /// The queue front, or `None` when the island is drained.
     #[inline]
     fn front(&self, st: &State) -> Option<&'a Comment> {
-        (st.head < self.island.queue.len()).then(|| self.island.queue[st.head].0)
+        (st.head < self.island.queue.len()).then(|| self.island.queue[st.head])
     }
 
     /// acorn's post-recursion trailing rule for one node: claim the comments
@@ -500,7 +488,7 @@ impl<'a> CommentAttach<'a> {
             // stopping at the parent's own end.
             let rest = &self.island.queue[st.head..];
             match parent_end {
-                Some(pe) => rest.iter().take_while(|(c, _)| c.span.start < pe).count(),
+                Some(pe) => rest.iter().take_while(|c| c.span.start < pe).count(),
                 None => rest.len(),
             }
         } else if span.end <= first.span.start {
@@ -724,11 +712,11 @@ impl<'a> CommentAttach<'a> {
             if i > 0 {
                 w.raw(",");
             }
-            let (comment, prefix) = self.island.queue[idx as usize];
+            let comment = self.island.queue[idx as usize];
             w.raw("{\"type\":\"");
             w.raw(if comment.is_block { "Block" } else { "Line" });
             w.raw("\",\"value\":");
-            w.string(&comment.wire_value(self.source, prefix));
+            w.string(&comment.wire_value(self.source));
             w.start_end_field(
                 positions.pos(comment.span.start),
                 positions.pos(comment.span.end),

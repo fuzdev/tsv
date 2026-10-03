@@ -32,8 +32,8 @@
 //! (`cargo run -p tsv_debug canonical_parse`) rather than regenerated, so it would go stale
 //! silently if `onComment` changed.
 //!
-//! `tests/comment_dedent_manufactured_source.rs` is the same arrangement for the other thing
-//! the dedent itself reads two ways: *which source* the indentation is measured out of.
+//! `tests/comment_dedent_document_line.rs` is the sibling for the other question the dedent
+//! answers: *which line* the indentation is measured on.
 
 /// The one comment's dedented wire `value` — the field `onComment` writes.
 fn comment_value(src: &str) -> String {

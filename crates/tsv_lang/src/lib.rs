@@ -8,7 +8,6 @@
 //! - `OutputBuffer` - shared printer output utilities
 //! - `config` - hardcoded formatter settings (`PRINT_WIDTH` / `TAB_WIDTH` / `INDENT`)
 //! - `Comment` - shared comment type
-//! - `acorn_prefix` - what acorn saw ahead of one embedded Svelte parse
 //! - `census` - opt-in perf census counters (`census` feature)
 //! - `comment_ledger` - print-once comment ledger (`comment_check` feature)
 //! - `doc` - document builder primitives for prettier-compatible formatting
@@ -21,7 +20,6 @@
 //! - `swar` - word-at-a-time byte-search kernels shared by the line scans, the
 //!   wire-JSON escape prescan, and the lexers' token-body scans
 
-mod acorn_prefix;
 pub mod census;
 mod comment;
 #[cfg(feature = "comment_check")]
@@ -42,7 +40,6 @@ mod span;
 pub mod swar;
 mod whitespace;
 
-pub use acorn_prefix::{AcornPrefix, AcornPrefixText};
 pub use comment::{
     ClassifiedComments, Comment, CommentFreeWindow, CommentPosition, classify_comment,
     classify_comment_scan, comments_in_source_after, comments_in_source_after_comment,

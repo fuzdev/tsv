@@ -466,8 +466,6 @@ pub(crate) fn board() -> Vec<TypeRow> {
         out,
         "svelte",
         [
-            svelte::AcornPrefixes<'static>,
-            svelte::AcornRegion,
             svelte::AnimateDirective<'static>,
             svelte::AttachTag<'static>,
             svelte::Attribute<'static>,

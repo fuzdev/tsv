@@ -51,26 +51,25 @@ which Svelte reads **once**. There canonical attaches it to `A` alone — exactl
 what tsv emits at `a6` — so a single copy of the comment produces tsv's answer
 under canonical's own walk.
 
-## The third claim: which source the DEDENT reads
+## The third claim: which line the DEDENT reads
 
-`a5` is a multi-line block comment inside the annotation, and it pins the other
-thing `read_type_annotation`'s synthetic source decides. acorn's `onComment`
+`a5` is a multi-line block comment inside the annotation, opening on the line
+where `read_type_annotation`'s synthetic source ends. acorn's `onComment`
 dedents such a comment by the `[ \t]` run opening its line **in the string acorn
-was given** — and that string is the template blanked to spaces, with `_ as ` overwriting
-the five UTF-16 code units ending at the colon. So the tab opening `a5`'s
-line is not indentation acorn can see (it is a blanked space, and the run before
-it ends at the `_`), and the comment's `value` keeps its tab where reading the
-document would have stripped it.
+was given** — the template blanked to spaces, with `_ as ` overwriting the five
+UTF-16 code units ending at the colon — so to Svelte the tab opening `a5`'s line
+is a blanked space, and its `value` keeps the tab (`"\n\t c5 "`). tsv measures
+the run on the **document's** line, which is that tab, so the tab comes off
+(`"\n c5 "`) — on the root `comments` entry and on the attached
+`leadingComments` copy alike.
 
-Both parsers answer that identically — the value is a **match**, on the root
-`comments` entry and on the attached `leadingComments` copy alike. What still
-diverges is only the duplication above. The spellings this fixture cannot hold
-unfrozen — a head the formatter would join back onto one line, and the other
-three synthetic sources (`read_script`, `read_pattern`, `{#snippet}`'s prelude),
-none of which is a format fixed point — are pinned by
-[`tests/comment_dedent_manufactured_source.rs`](../../../../../comment_dedent_manufactured_source.rs)
-and, for the template readers, by the `<!-- prettier-ignore -->`-frozen
-[`head_multiline_comment_dedent`](../../../syntax/comments/head_multiline_comment_dedent/)
-fixture.
+That is a second divergence in this fixture, cataloged on its own (the
+manufactured-line dedent, in the same section). `a5` is the one spelling of it
+that is a format fixed point unfrozen; the other template spellings ride the
+`<!-- prettier-ignore -->`-frozen
+[`head_multiline_comment_dedent_svelte_divergence`](../../../syntax/comments/head_multiline_comment_dedent_svelte_divergence/)
+fixture, and the `<script>` reader and the spellings no formatter leaves
+standing are pinned by
+[`tests/comment_dedent_document_line.rs`](../../../../../comment_dedent_document_line.rs).
 
 See [conformance_svelte.md](../../../../../../docs/conformance_svelte.md) §Comment Attachment Differences.
