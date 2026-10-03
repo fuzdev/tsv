@@ -8,26 +8,24 @@
  * that reconstruction, shipped so callers don't reimplement the line rules; a package's
  * `parse_*(source, {locations: true})` runs it for them.
  *
- * Three entry points:
+ * Two entry points:
  * - `reconstruct_locations(ast, source, options?)` — one-shot: build the line table once,
  *   walk the tree, add `loc` to every node (and `name_loc` back to the Svelte nodes that
  *   carry one), return the (mutated) ast. The language is inferred from the root when
  *   `options.language` is omitted — a whole parse's root (`Root`, `StyleSheetFile`, or a
  *   `Program` spanning the whole source); any other node names no document, a Svelte
  *   `<script>`'s `Program` included, so it throws rather than guess.
- * - `create_locator(source, {language})` — amortized: hold the prebuilt line table and
+ * - `create_locator(source, {language})` — amortized: build the line table once and
  *   expose `position_at(offset)` (one offset), `loc_of(node)` (one node) and
- *   `reconstruct(ast)` (whole tree). Prefer this for heavy sparse use.
- * - `loc_of(node, source, {language})` — a single node; rebuilds the O(source) table per
- *   call.
+ *   `reconstruct(ast)` (whole tree) over it, for any number of lookups.
  *
- * The last two take the language **required** — a lone node or a bare source names no
- * document, and the language decides the line rule, the BOM, and the Svelte stamping, so
- * a default would silently answer for the wrong document.
+ * `create_locator` takes the language **required** — a bare source names no document, and
+ * the language decides the line rule, the BOM, and the Svelte stamping, so a default would
+ * silently answer for the wrong document.
  *
  * **Errors.** A bad argument — a `source` that is not a string, a missing or unknown
  * `language`, a root whose language cannot be inferred — throws a `TypeError`. An offset
- * outside the indexed text throws a `RangeError` from the two single-lookup forms
+ * outside the indexed text throws a `RangeError` from a locator's two single lookups
  * (`position_at`, `loc_of`), which check what they are handed; the whole-tree walk
  * (`reconstruct`, `reconstruct_locations`) is the hot path and checks no node — it trusts
  * the tree to be a parse of `source`.
@@ -77,7 +75,7 @@
  * the wire's offsets index — `source` with its BOM dropped for Svelte and CSS, `source`
  * itself for TypeScript — so a consumer hands over the source it parsed, BOM and all.
  *
- * The one-shot and `reconstruct` forms **mutate the ast in place** (adding a `loc`
+ * `reconstruct_locations` and a locator's `reconstruct` **mutate the ast in place** (adding a `loc`
  * key to each node) and return it, for efficiency on large trees. Callers that
  * need the input untouched should `structuredClone(ast)` first.
  *
@@ -462,7 +460,7 @@ const LANGUAGES = new Set(['typescript', 'svelte', 'css']);
  *
  * @param {unknown} source - the caller's source
  * @returns {string} the same `source`
- * @throws {TypeError} when `source` is not a string
+ * @throws TypeError when `source` is not a string
  */
 function read_locations_source(source) {
 	if (typeof source !== 'string') {
@@ -481,7 +479,7 @@ function read_locations_source(source) {
  *
  * @param {unknown} options - the caller's bag
  * @returns {unknown} the bag's `language`, `undefined` when unset
- * @throws {TypeError} when `options` is not an object, carries an unknown key, or its
+ * @throws TypeError when `options` is not an object, carries an unknown key, or its
  *   `language` getter throws (the getter's error rides along as the `cause`)
  */
 function read_language_option(options) {
@@ -518,20 +516,25 @@ function is_offset_in(offset, length) {
 }
 
 /**
- * An offset as an error message names it — the value when it is a number, its kind when not.
+ * A refused value as an error message's `(got …)` names it: a string quoted, a number or
+ * boolean as written, `null`, `none` for `undefined`, and anything else by its `typeof`.
+ * `api.js` states the same rule; restated here rather than imported, like
+ * `read_locations_source`.
  *
- * @param {unknown} offset
+ * @param {unknown} value - the refused value
  * @returns {string}
  */
-function describe_offset(offset) {
-	if (typeof offset === 'number') return String(offset);
-	return offset === null ? 'null' : typeof offset;
+function describe_value(value) {
+	if (typeof value === 'string') return `'${value}'`;
+	if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+	if (value === undefined) return 'none';
+	return value === null ? 'null' : typeof value;
 }
 
 /**
- * Build a locator that holds the source's line-start table so repeated lookups
- * don't rebuild it. Prefer this over the bare `loc_of`/`reconstruct_locations`
- * helpers for heavy sparse use — those rebuild the O(source) table per call.
+ * Build a locator that holds the source's line-start table, so any number of lookups
+ * against one source build it once. For a whole tree, `reconstruct_locations` builds it
+ * once too; the locator is for lookups one offset or one node at a time.
  *
  * Offsets are in the wire's coordinates: UTF-16 units into the text the parse's offsets
  * index — `source` itself for TypeScript, `source` without a leading BOM for Svelte and
@@ -548,24 +551,16 @@ function describe_offset(offset) {
  * 		({start: {line: number, column: number}, end: {line: number, column: number}} | null),
  * 	reconstruct: (ast: any) => any
  * }}
- * @throws {TypeError} when `source` is not a string, `options` is not an object or carries
+ * @throws TypeError when `source` is not a string, `options` is not an object or carries
  *   a key other than `language`, or `options.language` is missing or not one of the three
  */
 export function create_locator(source, options) {
 	read_locations_source(source);
 	const language = read_language_option(options);
 	if (!LANGUAGES.has(language)) {
-		const got =
-			language === undefined
-				? 'none'
-				: typeof language === 'string'
-					? `'${language}'`
-					: language === null
-						? 'null'
-						: typeof language;
 		throw new TypeError(
-			`locations: \`language\` must be 'typescript', 'svelte' or 'css' — the document's ` +
-				`line rule depends on it (got ${got})`
+			"locations option 'language' must be 'typescript', 'svelte' or 'css' " +
+				`(got ${describe_value(language)})`
 		);
 	}
 	// Everything below reads the string the wire's offsets index (see `indexed_text`),
@@ -579,7 +574,7 @@ export function create_locator(source, options) {
 			if (!is_offset_in(offset, text.length)) {
 				throw new RangeError(
 					`position_at: offset must be an integer from 0 to ${text.length}, the indexed ` +
-						`text's length (got ${describe_offset(offset)})`
+						`text's length (got ${describe_value(offset)})`
 				);
 			}
 			// `+ 0` folds a `-0` offset, which would otherwise surface as `column: -0`
@@ -621,9 +616,9 @@ export function create_locator(source, options) {
  *   language; inferred from the root node (`Root`/`Program`/`StyleSheetFile`) when omitted.
  * @returns {any} the same `ast`, now with `loc` on every node (plus `name_loc` on
  *   the Svelte nodes that carry one).
- * @throws {TypeError} when `source` is not a string, when `options.language` is omitted and
- *   `ast` is not one of those three roots, or when it is set and not one of the three
- *   languages
+ * @throws TypeError when `source` is not a string, `options` is not an object or carries a
+ *   key other than `language`, `options.language` is omitted and `ast` is not one of those
+ *   three roots, or it is set and not one of the three languages
  */
 export function reconstruct_locations(ast, source, options) {
 	read_locations_source(source);
@@ -639,32 +634,11 @@ export function reconstruct_locations(ast, source, options) {
 					? `a '${type}' root`
 					: 'a root with no type';
 		throw new TypeError(
-			`locations: cannot infer the document's language from ${root} — ` +
+			"locations option 'language' is required: cannot infer the document's language " +
+				`from ${root} — ` +
 				`pass {language: 'typescript' | 'svelte' | 'css'}, or the parse's own root ` +
 				`(Root, Program or StyleSheetFile)`
 		);
 	}
 	return create_locator(source, { language }).reconstruct(ast);
-}
-
-/**
- * Line/column for a single node, derived from its `start`/`end` + `source`.
- * Returns `null` if the node has no numeric `start`/`end`. The plain `{line, column}`
- * shape always — the `character` field `reconstruct` puts on a few Svelte positions
- * is the offset itself, which the caller already holds.
- *
- * Convenience form: it rebuilds the O(source) line-start table on every call, so for
- * more than a couple of lookups against one source reuse a `create_locator`.
- *
- * @param {{start?: number | undefined, end?: number | undefined} | null | undefined} node - a
- *   node from a span-only wire
- * @param {string} source - the exact source the node was parsed from
- * @param {{language: 'typescript' | 'svelte' | 'css'}} options - as for `create_locator`
- * @returns {{start: {line: number, column: number}, end: {line: number, column: number}} | null}
- * @throws {TypeError} when `source` is not a string, `options` is not an object or carries
- *   a key other than `language`, or `options.language` is missing or not one of the three
- * @throws {RangeError} when the node's span is not a range of the indexed text
- */
-export function loc_of(node, source, options) {
-	return create_locator(source, options).loc_of(node);
 }

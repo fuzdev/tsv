@@ -10,7 +10,9 @@
  * the published surface — `(source, options?)` with an acorn-style bag — and is the ONE
  * options reader: staged verbatim into every package (`scripts/patch_npm_package.ts`,
  * `scripts/build_napi_packages.ts`), so the error a caller matches on is the same text
- * whichever package they installed.
+ * whichever package they installed. The texts are the facade's own: the raw engines refuse
+ * a bad source type in their own words (`tsv_arena`'s, shared by the WASM and N-API
+ * decoders), and the facade never lets one reach them.
  *
  * The bag: `parse_<lang>(source, {locations?, sourceType?})`,
  * `parse_<lang>_json(source, {sourceType?})`, `format_<lang>(source, {sourceType?})`.
@@ -33,9 +35,10 @@
  * `create_locator(source, {language}).position_at(start)` answers), and a message whose
  * `line:col` header prints `loc.line:loc.column + 1`. The engines throw a plain error with
  * own enumerable integer `start`, `line` and `column` set on it; `call_engine` rethrows that
- * as the `SyntaxError`. Anything else an engine throws passes through as itself: its argument
- * refusals and a source over the size cap (plain `Error`s with no point), a caught panic,
- * a WASM trap (`RuntimeError`) or stack exhaustion (`RangeError`).
+ * as the `SyntaxError`. Anything else an engine throws passes through as itself. The
+ * facade's own checks leave an engine no argument to refuse, so that is a source over the
+ * size cap (a plain `Error` with no point), a caught panic, a WASM trap (`RuntimeError`) or
+ * stack exhaustion (`RangeError`).
  *
  * A `source` that is not a string is refused before the engine sees it
  * (`read_source`), since the engines would each answer it differently.
@@ -55,9 +58,22 @@
  */
 
 /**
+ * The three export kinds a bag is read for: `parse` (`parse_<lang>`, which takes
+ * `locations`), `parse_json` (`parse_<lang>_json`, which refuses it) and `format`.
+ *
+ * @typedef {'parse' | 'parse_json' | 'format'} ExportKind
+ */
+
+/**
  * Read an options bag against one export's key set, returning
  * `{locations, source_type}` (`locations` default `false`, `source_type` default
  * `undefined` — unset, not `'module'`; see the module doc).
+ *
+ * The key set follows from the export: `locations` is a key of a `parse` export alone (a
+ * `parse_json` export refuses it with its own explanation — the export returns the wire,
+ * which `loc` is not part of — and a `format` export as an unknown key), and `sourceType`
+ * is settable for TypeScript alone, the one language with a parse goal. Every error names
+ * the export family, `parse` or `format`.
  *
  * `undefined` / `null` mean all defaults; a string, a number or an array (which is
  * `typeof 'object'` and has no keys, so it would otherwise read as all defaults) is
@@ -66,20 +82,17 @@
  * all defaults. A key's getter runs once, and one that throws surfaces as
  * `failed to read <noun> option '<name>'` with the getter's error as its `cause`.
  *
- * Every refusal is a `TypeError` — each is a caller passing an argument of the wrong
- * shape, the class `read_source`'s refusal and the engines' own conversions throw.
- *
  * @param {unknown} options - the caller's bag
- * @param {'parse' | 'format'} noun - the export family, as every error names it
- * @param {boolean} takes_locations - whether this export takes `locations`
- * @param {boolean} takes_source_type - whether this export's language has a parse goal
- * @param {string} [json_language] - set for a `parse_<lang>_json` export, to its language:
- *   a `locations` key there (whatever its value) is refused with its own explanation —
- *   the export returns the wire, which `loc` is not part of — rather than as unknown
+ * @param {ExportKind} kind - the export the bag is for
+ * @param {string} language - the export's language, as the engine names it
  * @returns {{locations: boolean, source_type: 'script' | 'module' | undefined}}
- * @throws {TypeError} on any refusal
+ * @throws TypeError when `options` is not an object, carries a key the export does not take,
+ *   holds a value of the wrong type, or has a getter that throws
  */
-export function read_options(options, noun, takes_locations, takes_source_type, json_language) {
+export function read_options(options, kind, language) {
+	const noun = kind === 'format' ? 'format' : 'parse';
+	const takes_locations = kind === 'parse';
+	const takes_source_type = language === 'typescript';
 	const parsed = { locations: false, source_type: undefined };
 	if (options === undefined || options === null) return parsed;
 	if (typeof options !== 'object' || Array.isArray(options)) {
@@ -93,10 +106,10 @@ export function read_options(options, noun, takes_locations, takes_source_type, 
 				throw new TypeError(`${noun} option 'locations' must be a boolean`);
 			}
 			parsed.locations = value;
-		} else if (name === 'locations' && json_language !== undefined) {
+		} else if (name === 'locations' && kind === 'parse_json') {
 			throw new TypeError(
-				`${noun} option 'locations' is not supported by parse_${json_language}_json — the ` +
-					`JSON string is the span-only wire; use parse_${json_language}(source, {locations: true})`
+				`${noun} option 'locations' is not supported by parse_${language}_json — the ` +
+					`JSON string is the span-only wire; use parse_${language}(source, {locations: true})`
 			);
 		} else if (name === 'sourceType') {
 			const value = read_option(options, name, noun);
@@ -106,11 +119,10 @@ export function read_options(options, noun, takes_locations, takes_source_type, 
 			if (!takes_source_type) {
 				throw new TypeError(`${noun} option 'sourceType' is only supported for TypeScript`);
 			}
-			if (typeof value !== 'string') {
-				throw new TypeError(`${noun} option 'sourceType' must be 'script' or 'module'`);
-			}
 			if (value !== 'script' && value !== 'module') {
-				throw new TypeError(`invalid sourceType '${value}' (expected 'script' or 'module')`);
+				throw new TypeError(
+					`${noun} option 'sourceType' must be 'script' or 'module' (got ${describe_value(value)})`
+				);
 			}
 			parsed.source_type = value;
 		} else {
@@ -129,6 +141,21 @@ export function read_options(options, noun, takes_locations, takes_source_type, 
 }
 
 /**
+ * A refused value as an error message's `(got …)` names it: a string quoted, a number or
+ * boolean as written, `null`, `none` for `undefined`, and anything else by its `typeof`.
+ * `locations.js` restates it, since that module imports nothing.
+ *
+ * @param {unknown} value - the refused value
+ * @returns {string}
+ */
+function describe_value(value) {
+	if (typeof value === 'string') return `'${value}'`;
+	if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+	if (value === undefined) return 'none';
+	return value === null ? 'null' : typeof value;
+}
+
+/**
  * Read one supported key off a bag, naming the option when its getter throws — the
  * caller's own error rides along as the `cause`. An unknown key is refused before it
  * is read, so its getter never runs.
@@ -137,7 +164,7 @@ export function read_options(options, noun, takes_locations, takes_source_type, 
  * @param {string} name - a key this export takes
  * @param {'parse' | 'format'} noun - the export family, as every error names it
  * @returns {unknown}
- * @throws {TypeError} when the key's getter throws
+ * @throws TypeError when the key's getter throws
  */
 function read_option(options, name, noun) {
 	try {
@@ -157,7 +184,7 @@ function read_option(options, name, noun) {
  * @param {unknown} source - the caller's source
  * @param {'parse' | 'format'} noun - the export family, as every error names it
  * @returns {string} the same `source`
- * @throws {TypeError} when `source` is not a string
+ * @throws TypeError when `source` is not a string
  */
 export function read_source(source, noun) {
 	if (typeof source !== 'string') {
@@ -182,7 +209,7 @@ export function read_source(source, noun) {
  * @param {string} source - the source, already read
  * @param {'script' | 'module' | undefined} source_type - the decoded source type
  * @returns {T}
- * @throws {SyntaxError} when the source does not parse
+ * @throws SyntaxError when the source does not parse
  */
 export function call_engine(engine_fn, source, source_type) {
 	try {
@@ -230,17 +257,6 @@ function is_point_property(object, key) {
 }
 
 /**
- * Whether `language` has a parse goal, i.e. takes a `sourceType` — TypeScript alone
- * (`tsv_arena`'s `goal_allowed!`, restated for the bag; the refusal text names it).
- *
- * @param {string} language
- * @returns {boolean}
- */
-export function has_source_type(language) {
-	return language === 'typescript';
-}
-
-/**
  * Build the format family over one engine's `format_<lang>(source, source_type?)`
  * functions, keyed by language.
  *
@@ -251,12 +267,11 @@ export function create_format_api(format) {
 	/** @type {Record<string, (source: string, options?: unknown) => string>} */
 	const api = {};
 	for (const [language, format_language] of Object.entries(format)) {
-		const goal = has_source_type(language);
 		api[`format_${language}`] = (source, options) =>
 			call_engine(
 				format_language,
 				read_source(source, 'format'),
-				read_options(options, 'format', false, goal).source_type
+				read_options(options, 'format', language).source_type
 			);
 	}
 	return api;

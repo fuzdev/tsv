@@ -32,7 +32,8 @@ export type {
 	ParseJsonOptions,
 	TypeScriptParseJsonOptions
 } from './api_parse.js';
-export type { FormatOptions, TypeScriptFormatOptions, TsvSyntaxError } from './api.js';
+export type { FormatOptions, TypeScriptFormatOptions } from './api.js';
+export type { TsvSyntaxError } from './syntax_error.js';
 export {
 	parse_svelte,
 	parse_svelte_json,

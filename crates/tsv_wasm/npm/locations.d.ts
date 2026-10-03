@@ -30,9 +30,9 @@ export interface ReconstructLocationsOptions {
 }
 
 /**
- * `create_locator` / `loc_of`'s options: the language is REQUIRED, since a bare source
- * or a lone node names no document (a missing or unknown one throws a `TypeError`). The
- * bag is read as every tsv options bag is: a non-object or an unknown key throws too.
+ * `create_locator`'s options: the language is REQUIRED, since a bare source names no
+ * document (a missing or unknown one throws a `TypeError`). The bag is read as every tsv
+ * options bag is: a non-object or an unknown key throws too.
  */
 export interface LocatorOptions {
 	/** The document's language — see `ReconstructLocationsOptions.language`. */
@@ -49,16 +49,16 @@ export interface Locator {
 	/**
 	 * Line (1-based) and column (0-based, UTF-16 units) of one offset.
 	 *
-	 * @throws `RangeError` when `offset` is not an integer from 0 to the indexed text's
-	 *   length (the end of the text is a position).
+	 * @throws RangeError when `offset` is not an integer from 0 to the indexed text's
+	 *   length (the end of the text is a position)
 	 */
 	position_at(offset: number): Position;
 	/**
 	 * Line/column for one node's `start` and `end`, or `null` if it has no numeric
 	 * `start`/`end`.
 	 *
-	 * @throws `RangeError` when the span is not a range of the indexed text — an offset
-	 *   past its end, or `start` after `end`.
+	 * @throws RangeError when the span is not a range of the indexed text — an offset
+	 *   past its end, or `start` after `end`
 	 */
 	loc_of(
 		node: { start?: number | undefined; end?: number | undefined } | null | undefined
@@ -74,11 +74,11 @@ export interface Locator {
 }
 
 /**
- * Build a locator that holds the source's line-start table for repeated lookups.
- * Prefer this over the bare helpers for heavy sparse use.
+ * Build a locator that holds the source's line-start table, so any number of lookups
+ * against one source build it once.
  *
- * @throws `TypeError` when `source` is not a string, `options` is not an object or carries
- *   a key other than `language`, or `options.language` is missing or not one of the three.
+ * @throws TypeError when `source` is not a string, `options` is not an object or carries
+ *   a key other than `language`, or `options.language` is missing or not one of the three
  */
 export declare function create_locator(source: string, options: LocatorOptions): Locator;
 
@@ -90,28 +90,13 @@ export declare function create_locator(source: string, options: LocatorOptions):
  * language — and is what a parse with `{locations: true}` returns. The walk checks no
  * offset: it trusts `ast` to be a parse of `source`.
  *
- * @throws `TypeError` when `source` is not a string, when `options.language` is omitted
- *   and `ast` is not a parse's root (`Root`, `StyleSheetFile`, or a `Program` spanning the
- *   whole source), when it names a language that is not one of the three, or when `options`
- *   is not an object or carries a key other than `language`.
+ * @throws TypeError when `source` is not a string, `options` is not an object or carries a
+ *   key other than `language`, `options.language` is omitted and `ast` is not a parse's
+ *   root (`Root`, `StyleSheetFile`, or a `Program` spanning the whole source), or it names
+ *   a language that is not one of the three
  */
 export declare function reconstruct_locations<T>(
 	ast: T,
 	source: string,
 	options?: ReconstructLocationsOptions
 ): T;
-
-/**
- * Line/column for a single node, or `null` if it has no numeric `start`/`end`. Rebuilds
- * the line-start table per call — reuse a `create_locator` for more than a couple of
- * lookups against one source.
- *
- * @throws `TypeError` when `source` is not a string, or `options.language` is missing or
- *   not one of the three; `RangeError` when the node's span is not a range of the indexed
- *   text.
- */
-export declare function loc_of(
-	node: { start?: number | undefined; end?: number | undefined } | null | undefined,
-	source: string,
-	options: LocatorOptions
-): SourceLocation | null;

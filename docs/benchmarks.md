@@ -435,8 +435,8 @@ Things the published numbers measure that aren't quite what they look like.
   the shipped `reconstruct_locations` (`crates/tsv_wasm/npm/locations.js`, the source
   every parse-capable package bundles), the line-table build inside the timed region —
   exactly what the packages' `{locations: true}` runs. The language is always named
-  (`create_locator` and `loc_of` refuse a missing one; the line rule and the Svelte
-  stamping both key on it), every language has the pair, and they are perf-only: their
+  (`create_locator` refuses a missing one; the line rule and the Svelte stamping both
+  key on it), every language has the pair, and they are perf-only: their
   parse is the span row's, so a coverage table would learn nothing from them. Read them
   against `tsv-json-no-locations` / `tsv-wasm-json-no-locations`: the report's
   `{locations: true}` cost note computes that ratio from the run's own rows. The

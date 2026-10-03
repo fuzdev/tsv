@@ -1,7 +1,7 @@
 /**
  * The parse API every parse-capable tsv npm package exports — the parse half of the
- * facade `api.js` opens with (its module doc carries the bag's rules and the error
- * texts' single source).
+ * facade `api.js` opens with (its module doc carries the bag's rules, and its
+ * `read_options` the error texts).
  *
  * The engine emits one wire, span-only: `start`/`end` offsets, no per-node `loc`.
  * `{locations: true}` runs `locations.js`'s `reconstruct_locations` over the parsed
@@ -14,7 +14,7 @@
  * `locations.js`, never loads one.
  */
 
-import { call_engine, has_source_type, read_options, read_source } from './api.js';
+import { call_engine, read_options, read_source } from './api.js';
 import { reconstruct_locations } from './locations.js';
 
 /**
@@ -40,11 +40,10 @@ export function create_parse_api(engine) {
 	/** @type {Record<string, (source: string, options?: unknown) => any>} */
 	const api = {};
 	for (const [language, parse_json] of Object.entries(engine.parse_json)) {
-		const goal = has_source_type(language);
 		const engine_parse = engine.parse?.[language];
 		api[`parse_${language}`] = (source, options) => {
 			const text = read_source(source, 'parse');
-			const parsed = read_options(options, 'parse', true, goal);
+			const parsed = read_options(options, 'parse', language);
 			const ast = engine_parse
 				? call_engine(engine_parse, text, parsed.source_type)
 				: parse_wire(call_engine(parse_json, text, parsed.source_type));
@@ -54,7 +53,7 @@ export function create_parse_api(engine) {
 			call_engine(
 				parse_json,
 				read_source(source, 'parse'),
-				read_options(options, 'parse', false, goal, language).source_type
+				read_options(options, 'parse_json', language).source_type
 			);
 	}
 	return api;
@@ -67,7 +66,7 @@ export function create_parse_api(engine) {
  *
  * @param {string} json - the wire string
  * @returns {any}
- * @throws {Error} when `json` is not valid JSON
+ * @throws Error when `json` is not valid JSON
  */
 function parse_wire(json) {
 	try {

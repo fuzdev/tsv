@@ -33,11 +33,12 @@ Each `## Unreleased` section must be non-empty and carry a
   narrow or `!` after `{locations: true}`; the `{locations: false}` overloads returning `any` are
   gone, so every parse returns its typed root. `parse_*_json` takes only `sourceType` and throws
   on `locations` (the string is the span-only wire)
-- **breaking** feat: `create_locator(source, {language})` and `loc_of(node, source, {language})`
-  require the language (`'typescript'`, `'svelte'` or `'css'`) and no longer take `{ast}`;
-  `reconstruct_locations(ast, source)` reads it off a parse's root — a `Root`, a
-  `StyleSheetFile`, or a `Program` spanning the whole source — and throws on anything else
-  passed without `{language}`, a Svelte `<script>`'s `Program` included
+- **breaking** feat: `create_locator(source, {language})` requires the language
+  (`'typescript'`, `'svelte'` or `'css'`) and no longer takes `{ast}`; the bare `loc_of` export
+  is gone — use a locator's `loc_of(node)`; `reconstruct_locations(ast, source)` reads the
+  language off a parse's root — a `Root`, a `StyleSheetFile`, or a `Program` spanning the
+  whole source — and throws on anything else passed without `{language}`, a Svelte
+  `<script>`'s `Program` included
 - **breaking** feat: for Rust source consumers of the language crates, `convert_ast_json_bytes` /
   `convert_ast_json_string` now write the span-only wire; the loc-bearing wire is
   `convert_ast_json_bytes_with_locations`, behind a new opt-in `locations` cargo feature, and the
@@ -53,8 +54,8 @@ Each `## Unreleased` section must be non-empty and carry a
   bag, an unknown key, a wrong-typed value — and the locations helpers refuse a bad bag too
 - **breaking** feat: `locations.d.ts` drops `Loc` for `SourceLocation` and renames
   `LocationOptions` to `ReconstructLocationsOptions`
-- feat: `create_locator(...).position_at(offset)` gives one offset's `{line, column}`;
-  `position_at` and `loc_of` throw a `RangeError` for an offset the source doesn't hold
+- feat: `create_locator(...).position_at(offset)` gives one offset's `{line, column}`; a
+  locator's `position_at` and `loc_of` throw a `RangeError` for an offset the source doesn't hold
 - feat: a `./locations` subpath export on the parse-capable packages — the line/column helpers
   alone, loading no engine
 - fix: a Svelte multi-line block comment's `value` is dedented by its own line in the document,

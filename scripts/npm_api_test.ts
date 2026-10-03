@@ -14,7 +14,7 @@ import { deepStrictEqual, strictEqual, throws } from 'node:assert';
 
 import { create_format_api, read_options } from '../crates/tsv_wasm/npm/api.js';
 import { create_parse_api } from '../crates/tsv_wasm/npm/api_parse.js';
-import { create_locator, loc_of, reconstruct_locations } from '../crates/tsv_wasm/npm/locations.js';
+import { create_locator, reconstruct_locations } from '../crates/tsv_wasm/npm/locations.js';
 
 type Call = { source: string; source_type: string | undefined };
 
@@ -69,74 +69,103 @@ const throws_range_error = (f: () => unknown, pattern: RegExp): void => {
 
 Deno.test('read_options: defaults — locations off, the source type unset', () => {
 	for (const options of [undefined, null, {}]) {
-		deepStrictEqual(read_options(options, 'parse', true, true), {
+		deepStrictEqual(read_options(options, 'parse', 'typescript'), {
 			locations: false,
 			source_type: undefined
 		});
 	}
 	// a supported key set to `undefined` is its default, sourceType included on a
 	// language that refuses a set one — the forwarding idiom
-	deepStrictEqual(
-		read_options({ locations: undefined, sourceType: undefined }, 'parse', true, false),
-		{ locations: false, source_type: undefined }
-	);
-	deepStrictEqual(read_options({ locations: true, sourceType: 'script' }, 'parse', true, true), {
+	for (const kind of ['parse', 'parse_json', 'format'] as const) {
+		deepStrictEqual(read_options({ sourceType: undefined }, kind, 'svelte'), {
+			locations: false,
+			source_type: undefined
+		});
+	}
+	deepStrictEqual(read_options({ locations: undefined, sourceType: undefined }, 'parse', 'css'), {
+		locations: false,
+		source_type: undefined
+	});
+	deepStrictEqual(read_options({ locations: true, sourceType: 'script' }, 'parse', 'typescript'), {
 		locations: true,
+		source_type: 'script'
+	});
+	deepStrictEqual(read_options({ sourceType: 'module' }, 'parse_json', 'typescript'), {
+		locations: false,
+		source_type: 'module'
+	});
+	deepStrictEqual(read_options({ sourceType: 'script' }, 'format', 'typescript'), {
+		locations: false,
 		source_type: 'script'
 	});
 });
 
 Deno.test('read_options: every refusal, word for word', () => {
 	throws_type_error(
-		() => read_options('script', 'parse', true, true),
+		() => read_options('script', 'parse', 'typescript'),
 		'parse options must be an object'
 	);
 	throws_type_error(
-		() => read_options(['script'], 'format', false, true),
+		() => read_options(['script'], 'format', 'typescript'),
 		'format options must be an object'
 	);
 	throws_type_error(
-		() => read_options({ locations: 'yes' }, 'parse', true, true),
+		() => read_options({ locations: 'yes' }, 'parse', 'typescript'),
 		"parse option 'locations' must be a boolean"
 	);
 	throws_type_error(
-		() => read_options({ sourceType: 'module' }, 'parse', true, false),
+		() => read_options({ sourceType: 'module' }, 'parse', 'svelte'),
 		"parse option 'sourceType' is only supported for TypeScript"
 	);
+	// one text for every value that is not a goal, the value described
+	for (const [value, got] of [
+		[true, 'true'],
+		['sloppy', "'sloppy'"],
+		['', "''"],
+		[null, 'null'],
+		[1, '1'],
+		[{}, 'object']
+	] as const) {
+		throws_type_error(
+			() => read_options({ sourceType: value }, 'format', 'typescript'),
+			`format option 'sourceType' must be 'script' or 'module' (got ${got})`
+		);
+	}
 	throws_type_error(
-		() => read_options({ sourceType: true }, 'format', false, true),
-		"format option 'sourceType' must be 'script' or 'module'"
+		() => read_options({ sourceType: 'sloppy' }, 'parse', 'typescript'),
+		"parse option 'sourceType' must be 'script' or 'module' (got 'sloppy')"
 	);
+	// an unknown key errors whatever its value, `undefined` included; the detail names the
+	// export's own key set
 	throws_type_error(
-		() => read_options({ sourceType: 'sloppy' }, 'parse', true, true),
-		"invalid sourceType 'sloppy' (expected 'script' or 'module')"
-	);
-	// an unknown key errors whatever its value, `undefined` included
-	throws_type_error(
-		() => read_options({ locatons: undefined }, 'parse', true, true),
+		() => read_options({ locatons: undefined }, 'parse', 'typescript'),
 		"unknown parse option 'locatons' (expected 'locations' or 'sourceType')"
 	);
 	throws_type_error(
-		() => read_options({ x: 1 }, 'parse', true, false),
+		() => read_options({ x: 1 }, 'parse', 'svelte'),
 		"unknown parse option 'x' (expected 'locations')"
 	);
 	throws_type_error(
-		() => read_options({ locations: false }, 'parse', false, true),
-		"unknown parse option 'locations' (expected 'sourceType')"
+		() => read_options({ x: 1 }, 'parse_json', 'typescript'),
+		"unknown parse option 'x' (expected 'sourceType')"
 	);
 	throws_type_error(
-		() => read_options({ anything: true }, 'format', false, false),
+		() => read_options({ locations: false }, 'format', 'typescript'),
+		"unknown format option 'locations' (expected 'sourceType')"
+	);
+	throws_type_error(
+		() => read_options({ anything: true }, 'format', 'css'),
 		"unknown format option 'anything' (this export takes no options)"
 	);
-	// a `_json` export's language: `locations` gets its own explanation, any other unknown
-	// key the ordinary refusal
+	// a `_json` export: `locations` gets its own explanation, naming the export's language,
+	// and any other unknown key the ordinary refusal
 	throws_type_error(
-		() => read_options({ locations: undefined }, 'parse', false, true, 'typescript'),
+		() => read_options({ locations: undefined }, 'parse_json', 'typescript'),
 		"parse option 'locations' is not supported by parse_typescript_json — the JSON string " +
 			'is the span-only wire; use parse_typescript(source, {locations: true})'
 	);
 	throws_type_error(
-		() => read_options({ x: 1 }, 'parse', false, false, 'css'),
+		() => read_options({ x: 1 }, 'parse_json', 'css'),
 		"unknown parse option 'x' (this export takes no options)"
 	);
 });
@@ -155,7 +184,7 @@ Deno.test('read_options: a throwing getter is named, its error kept as the cause
 		['sourceType', 'format']
 	] as const) {
 		throws(
-			() => read_options(bag(name), noun, true, true),
+			() => read_options(bag(name), noun, 'typescript'),
 			(e: unknown) =>
 				e instanceof TypeError &&
 				e.message === `failed to read ${noun} option '${name}'` &&
@@ -164,14 +193,14 @@ Deno.test('read_options: a throwing getter is named, its error kept as the cause
 	}
 	// an unknown key is refused before it is read, so its getter never runs
 	throws_type_error(
-		() => read_options(bag('locatons'), 'parse', true, true),
+		() => read_options(bag('locatons'), 'parse', 'typescript'),
 		"unknown parse option 'locatons' (expected 'locations' or 'sourceType')"
 	);
 });
 
 Deno.test('read_options: a non-plain object reads as a keyless bag — all defaults', () => {
 	for (const options of [new Date(0), new Map([['locations', true]])]) {
-		deepStrictEqual(read_options(options, 'parse', true, true), {
+		deepStrictEqual(read_options(options, 'parse', 'typescript'), {
 			locations: false,
 			source_type: undefined
 		});
@@ -214,22 +243,24 @@ Deno.test('reconstruct_locations: the language is inferred from a root, never gu
 		['Program', 2],
 		['StyleSheetFile', 1]
 	] as const) {
-		const ast = reconstruct_locations(JSON.parse(span_wire(type, lf_cr)), lf_cr);
+		const tree = JSON.parse(span_wire(type, lf_cr));
+		const ast = reconstruct_locations(tree, lf_cr);
+		strictEqual(ast, tree, 'mutated in place and returned');
 		strictEqual(ast.loc.end.line, line, type);
 	}
 	// a subtree names no document: refused, rather than read under TypeScript's rule
 	const fragment = { type: 'Fragment', start: 0, end: 3, nodes: [] };
 	throws_type_error(
 		() => reconstruct_locations(fragment, lf_cr),
-		"locations: cannot infer the document's language from a 'Fragment' root — pass " +
-			"{language: 'typescript' | 'svelte' | 'css'}, or the parse's own root " +
-			'(Root, Program or StyleSheetFile)'
+		"locations option 'language' is required: cannot infer the document's language from " +
+			"a 'Fragment' root — pass {language: 'typescript' | 'svelte' | 'css'}, or the " +
+			"parse's own root (Root, Program or StyleSheetFile)"
 	);
 	throws_type_error(
 		() => reconstruct_locations({ start: 0, end: 3 }, lf_cr),
-		"locations: cannot infer the document's language from a root with no type — pass " +
-			"{language: 'typescript' | 'svelte' | 'css'}, or the parse's own root " +
-			'(Root, Program or StyleSheetFile)'
+		"locations option 'language' is required: cannot infer the document's language from " +
+			"a root with no type — pass {language: 'typescript' | 'svelte' | 'css'}, or the " +
+			"parse's own root (Root, Program or StyleSheetFile)"
 	);
 	// a Svelte `<script>`'s program is a `Program` that starts after its tag: refused,
 	// rather than read as a TypeScript root (ECMAScript terminators, a counted BOM)
@@ -237,9 +268,9 @@ Deno.test('reconstruct_locations: the language is inferred from a root, never gu
 	const script_program = { type: 'Program', start: 8, end: 13, body: [], sourceType: 'module' };
 	throws_type_error(
 		() => reconstruct_locations(script_program, svelte_source),
-		"locations: cannot infer the document's language from a 'Program' that does not " +
-			"span the source — pass {language: 'typescript' | 'svelte' | 'css'}, or the " +
-			"parse's own root (Root, Program or StyleSheetFile)"
+		"locations option 'language' is required: cannot infer the document's language from " +
+			"a 'Program' that does not span the source — pass {language: 'typescript' | " +
+			"'svelte' | 'css'}, or the parse's own root (Root, Program or StyleSheetFile)"
 	);
 	strictEqual(
 		reconstruct_locations(script_program, svelte_source, { language: 'svelte' }).loc.end.line,
@@ -248,9 +279,9 @@ Deno.test('reconstruct_locations: the language is inferred from a root, never gu
 	// named, a subtree reconstructs under that language's rule
 	strictEqual(reconstruct_locations(fragment, lf_cr, { language: 'svelte' }).loc.end.line, 1);
 	// a named language that is not one of the three keeps the locator's own refusal
-	throws(
+	throws_type_error(
 		() => reconstruct_locations(fragment, lf_cr, { language: 'html' as 'css' }),
-		/`language` must be 'typescript', 'svelte' or 'css'.*\(got 'html'\)/
+		"locations option 'language' must be 'typescript', 'svelte' or 'css' (got 'html')"
 	);
 });
 
@@ -266,7 +297,6 @@ Deno.test('locations: a non-string source is refused, as read_source refuses one
 		const bad = source as unknown as string;
 		throws_type_error(() => create_locator(bad, { language: 'typescript' }), message);
 		throws_type_error(() => reconstruct_locations(ast, bad), message);
-		throws_type_error(() => loc_of({ start: 0, end: 0 }, bad, { language: 'css' }), message);
 	}
 });
 
@@ -286,8 +316,8 @@ Deno.test("create_locator: position_at answers one offset in the wire's coordina
 		[1.5, '1.5'],
 		[Number.NaN, 'NaN'],
 		[7, '7'],
-		['1', 'string'],
-		[undefined, 'undefined']
+		['1', "'1'"],
+		[undefined, 'none']
 	] as const) {
 		throws_range_error(
 			() => ts.position_at(offset as unknown as number),
@@ -296,42 +326,43 @@ Deno.test("create_locator: position_at answers one offset in the wire's coordina
 	}
 });
 
-Deno.test('loc_of: null without a span, a RangeError for one the text does not hold', () => {
-	const source = 'a\nbc';
-	const locator = create_locator(source, { language: 'svelte' });
-	deepStrictEqual(locator.loc_of({ start: 2, end: 4 }), {
-		start: { line: 2, column: 0 },
-		end: { line: 2, column: 2 }
-	});
-	for (const node of [null, undefined, {}, { start: 0 }, { start: '0', end: 1 }]) {
-		strictEqual(locator.loc_of(node as never), null);
-		strictEqual(loc_of(node as never, source, { language: 'svelte' }), null);
+Deno.test(
+	"a locator's loc_of: null without a span, a RangeError for one the text does not hold",
+	() => {
+		const source = 'a\nbc';
+		const locator = create_locator(source, { language: 'svelte' });
+		deepStrictEqual(locator.loc_of({ start: 2, end: 4 }), {
+			start: { line: 2, column: 0 },
+			end: { line: 2, column: 2 }
+		});
+		for (const node of [null, undefined, {}, { start: 0 }, { start: '0', end: 1 }]) {
+			strictEqual(locator.loc_of(node as never), null);
+		}
+		for (const [start, end] of [
+			[0, 5],
+			[5, 5],
+			[3, 2],
+			[-1, 2],
+			[0.5, 2]
+		]) {
+			const pattern = new RegExp(`^loc_of: node span ${start}\\.\\.${end} is not a range`);
+			throws_range_error(() => locator.loc_of({ start, end }), pattern);
+		}
+		// the bound is the INDEXED text's: a Svelte BOM is not in the wire's coordinates
+		const bom_locator = create_locator('\uFEFFa\nbc', { language: 'svelte' });
+		deepStrictEqual(bom_locator.loc_of({ start: 2, end: 4 }), {
+			start: { line: 2, column: 0 },
+			end: { line: 2, column: 2 }
+		});
+		throws_range_error(() => bom_locator.loc_of({ start: 2, end: 5 }), /^loc_of: node span 2\.\.5/);
+		// a `-0` offset is offset 0, not a `column: -0`
+		deepStrictEqual(locator.position_at(-0), { line: 1, column: 0 });
+		deepStrictEqual(locator.loc_of({ start: -0, end: -0 }), {
+			start: { line: 1, column: 0 },
+			end: { line: 1, column: 0 }
+		});
 	}
-	for (const [start, end] of [
-		[0, 5],
-		[5, 5],
-		[3, 2],
-		[-1, 2],
-		[0.5, 2]
-	]) {
-		const pattern = new RegExp(`^loc_of: node span ${start}\\.\\.${end} is not a range`);
-		throws_range_error(() => locator.loc_of({ start, end }), pattern);
-		throws_range_error(() => loc_of({ start, end }, source, { language: 'svelte' }), pattern);
-	}
-	// the bound is the INDEXED text's: a Svelte BOM is not in the wire's coordinates
-	const bom_locator = create_locator('\uFEFFa\nbc', { language: 'svelte' });
-	deepStrictEqual(bom_locator.loc_of({ start: 2, end: 4 }), {
-		start: { line: 2, column: 0 },
-		end: { line: 2, column: 2 }
-	});
-	throws_range_error(() => bom_locator.loc_of({ start: 2, end: 5 }), /^loc_of: node span 2\.\.5/);
-	// a `-0` offset is offset 0, not a `column: -0`
-	deepStrictEqual(locator.position_at(-0), { line: 1, column: 0 });
-	deepStrictEqual(locator.loc_of({ start: -0, end: -0 }), {
-		start: { line: 1, column: 0 },
-		end: { line: 1, column: 0 }
-	});
-});
+);
 
 Deno.test('locations: the options bag is read as the facade reads one', () => {
 	const ast = { type: 'Program', start: 0, end: 1 };
@@ -367,8 +398,20 @@ Deno.test('locations: the options bag is read as the facade reads one', () => {
 	// a set `language` is never inferred around, `null` included
 	throws_type_error(
 		() => reconstruct_locations(ast, 'a', { language: null } as never),
-		"locations: `language` must be 'typescript', 'svelte' or 'css' — the document's line rule depends on it (got null)"
+		"locations option 'language' must be 'typescript', 'svelte' or 'css' (got null)"
 	);
+	// `create_locator` takes no inference: the language is required, the value described
+	for (const [bag, got] of [
+		[undefined, 'none'],
+		[{}, 'none'],
+		[{ language: 'js' }, "'js'"],
+		[{ language: 1 }, '1']
+	] as const) {
+		throws_type_error(
+			() => create_locator('a', bag as never),
+			`locations option 'language' must be 'typescript', 'svelte' or 'css' (got ${got})`
+		);
+	}
 	// unset — an absent bag, `null`, or the key set to `undefined` — infers
 	for (const bag of [undefined, null, {}, { language: undefined }]) {
 		strictEqual(reconstruct_locations({ ...ast }, 'a', bag as never).loc.end.column, 1);
@@ -625,7 +668,8 @@ Deno.test('a pointed engine error becomes a SyntaxError with exactly start and l
 Deno.test('anything else an engine throws passes through as the same object', () => {
 	class RuntimeError extends Error {}
 	const values: Array<() => unknown> = [
-		// a refusal or the size cap: a plain Error with no point
+		// the size cap (or a raw engine's own refusal, reached past the facade): a plain
+		// Error with no point
 		() => new Error('File too large: 5 bytes (maximum: 4 bytes / 4GB)'),
 		// a WASM trap, and V8's stack exhaustion
 		() => new RuntimeError('unreachable'),

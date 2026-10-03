@@ -618,10 +618,10 @@ export function get_benchmark_tasks(
 		// (`crates/tsv_wasm/npm/locations.js`, the source every parse-capable package
 		// bundles) with its line-table build inside the timed region.
 		//
-		// ⚠ The language is NAMED, never left to a default: `create_locator` / `loc_of`
-		// refuse a missing one, and the line rule and the Svelte stamping (`name_loc`,
-		// the `character` field) both key on it, so a Svelte row timed under another
-		// language would time a different walk than a Svelte consumer runs.
+		// ⚠ The language is NAMED, never left to a default: `create_locator` refuses a
+		// missing one, and the line rule and the Svelte stamping (`name_loc`, the
+		// `character` field) both key on it, so a Svelte row timed under another language
+		// would time a different walk than a Svelte consumer runs.
 		//
 		// PERF-ONLY: a consumer-cost row, and the parse it runs is the span row's, so on
 		// the coverage surface it would add nothing. Its absence there is disclosed

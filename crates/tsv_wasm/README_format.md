@@ -18,26 +18,11 @@ npm i @fuzdev/tsv-format-wasm
 
 Requires Node.js 22+; Bun and Deno work too, and browsers via `init()` (below).
 
+TypeScript declarations are bundled. They name the DOM lib's `fetch` and `WebAssembly` types (for `init()` and the compiled module), so a project type-checking them needs `"dom"` in its `lib`, or `skipLibCheck`.
+
 ## Usage
 
 Three formatting functions: `format_svelte`, `format_typescript`, `format_css`. Each takes a source `string` and returns the formatted `string`, throwing on a parse error.
-
-Each also takes an optional trailing options object. Formatting itself is non-configurable, so the only option is `format_typescript(source, {sourceType: 'script' | 'module'})` — the parse goal, where `'script'` makes `await` an ordinary identifier, turns top-level `import`/`export`, `for await` and `import.meta` into syntax errors, and leaves the code sloppy unless its own `"use strict"` prologue makes it strict (so `with` and legacy octal literals/escapes parse; a module is always strict). `format_svelte`/`format_css` **throw** on the key rather than ignoring it (Svelte's `<script>` is always a module, CSS has no goal), so code forwarding one options bag to whichever formatter should spell the inapplicable source type as `undefined` — a supported key set to `undefined` reads as its default. Omitting `sourceType` is not the same as passing `'module'`: the source is formatted as a module and, only if that parse fails, retried as a script — so a legacy sloppy script formats with no bag at all, while anything the module grammar accepts is never reinterpreted (formatting reads no goal, so no output changes). A set value is exact, and when both grammars reject the source the error thrown is the module's if the script retry died on a top-level `import`/`export`, an `import.meta`, a top-level `for await` or a top-level `await`'s operand (the source is a module, wherever that sits), else the one that reached further into it (the module's on a tie) — a sloppy script's own typo, not the `with` the retry would have accepted. Unknown option keys throw, whatever their value.
-
-A second argument that isn't an object throws too, arrays included. That makes `sources.map(format_typescript)` an error, since `map` passes the index as the second argument — write `sources.map((s) => format_typescript(s))`. Every argument error — a source that isn't a string, a bad options argument, an unknown key, a wrong-typed or invalid value — is a `TypeError`; a source that doesn't parse throws a `SyntaxError` (below).
-
-A source that doesn't parse throws a `SyntaxError` with two own properties, `start` and `loc` (typed `TsvSyntaxError`, exported). `start` is the UTF-16 offset of the error and `loc` its `{line, column}` (1-based line, 0-based UTF-16 column), in the same coordinates as the AST's own positions: TypeScript counts ECMAScript line terminators (LF, CR, CRLF, U+2028, U+2029) and a leading BOM; Svelte (`<script>`, `<style>` and template expressions included) and CSS count LF alone and leave a leading BOM out of the offsets. The position is into your own source even where it has CRLF line endings, so for the same error it is the offset [`@fuzdev/tsv-parse-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-parse-wasm) reports — but with no `sourceType` named, `format_typescript` retries a failed module parse as a script, and can report that attempt's error where a module parse reports its own. Read `start` and `loc` rather than `line` / `column`, which some runtimes put on every `Error`. The message's second line starts with `loc` as `line:column + 1`:
-
-```javascript
-try { format_typescript('let a;\nconst = ;'); } catch (e) {
-	e instanceof SyntaxError; // true — the message ends with the line and a caret
-	[e.start, e.loc]; // [13, {line: 2, column: 6}]
-}
-```
-
-A Rust panic — always a tsv bug, please report it — surfaces as a `RuntimeError: unreachable` with the real message on `console.error`; the instance survives it, so the next call works.
-
-Deeply nested input has a ceiling: the WASM stack is 1 MiB, and the deepest shapes — nested arrow bodies and member chains — cost several times more of it per level than nested parens (the per-shape stack costs and each surface's ceiling are in the repo's [docs/cli.md](https://github.com/fuzdev/tsv/blob/main/docs/cli.md#recursion-depth)). Past the ceiling the call traps with `memory access out of bounds`, and unlike a parse error or a panic it **poisons the instance** — every later call throws the same thing. `reinstantiate()` is the recovery: it synchronously swaps in a fresh instance from the already-compiled module (no recompile — same environment constraints as `init_sync`), and every import keeps working against it. Objects created before the swap (an `IgnoreStack`) are invalidated — rebuild them after: every method on a stale one throws, and `free()` on it is a safe no-op. Real code is nowhere near this ceiling; generated and minified code can be.
 
 ### Node.js, Bun, Deno
 
@@ -61,6 +46,35 @@ const formatted = format_svelte('<script>\nconst   x=1\n</script>');
 ```
 
 `init_sync({ module })` is also exported for Workers and custom loading.
+
+### Options
+
+Each function also takes an optional trailing options object. Formatting itself is non-configurable, so the one option is TypeScript's parse goal, `format_typescript(source, {sourceType: 'script' | 'module'})`:
+
+- `'module'` — the source is a module, always strict.
+- `'script'` — `await` is an ordinary identifier, top-level `import`/`export`, `for await` and `import.meta` are syntax errors, and the code is sloppy unless its own `"use strict"` prologue makes it strict (so `with` and legacy octal literals/escapes parse).
+- omitted — not the same as `'module'`: the source is formatted as a module and, only if that parse fails, retried as a script. So a legacy sloppy script formats with no options at all, while anything the module grammar accepts is never reinterpreted (formatting reads no goal, so no output changes).
+
+A set value is exact. With none named and both grammars rejecting the source, the error thrown is the one that best explains the failure (the rule is in the repo's [docs/cli.md](https://github.com/fuzdev/tsv/blob/main/docs/cli.md#multi-file-formatting)).
+
+`format_svelte`/`format_css` **throw** on the key rather than ignoring it (Svelte's `<script>` is always a module, CSS has no goal), so code forwarding one options object to whichever formatter should spell the inapplicable source type as `undefined` — a supported key set to `undefined` reads as its default. Unknown option keys throw, whatever their value.
+
+A second argument that isn't an object throws too, arrays included. That makes `sources.map(format_typescript)` an error, since `map` passes the index as the second argument — write `sources.map((s) => format_typescript(s))`. Every argument error — a source that isn't a string, a bad options argument, an unknown key, a wrong-typed or invalid value — is a `TypeError`; a source that doesn't parse throws a `SyntaxError` (below).
+
+### Errors and depth limits
+
+A source that doesn't parse throws a `SyntaxError` with two own properties, `start` and `loc` (typed `TsvSyntaxError`, exported). `start` is the UTF-16 offset of the error and `loc` its `{line, column}` (1-based line, 0-based UTF-16 column), in the same coordinates as the AST's own positions: TypeScript counts ECMAScript line terminators (LF, CR, CRLF, U+2028, U+2029) and a leading BOM; Svelte (`<script>`, `<style>` and template expressions included) and CSS count LF alone and leave a leading BOM out of the offsets. The position is into your own source even where it has CRLF line endings, so for the same error it is the offset [`@fuzdev/tsv-parse-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-parse-wasm) reports — but with no `sourceType` named, `format_typescript` retries a failed module parse as a script, and can report that attempt's error where a module parse reports its own. Read `start` and `loc` rather than `line` / `column`, which some runtimes put on every `Error`. The message's second line starts with `loc` as `line:column + 1`:
+
+```javascript
+try { format_typescript('let a;\nconst = ;'); } catch (e) {
+	e instanceof SyntaxError; // true — the message ends with the line and a caret
+	[e.start, e.loc]; // [13, {line: 2, column: 6}]
+}
+```
+
+A Rust panic — always a tsv bug, please report it — surfaces as a `RuntimeError: unreachable` with the real message on `console.error`; the instance survives it, so the next call works.
+
+Deeply nested input has a ceiling: the WASM stack is 1 MiB, and the deepest shapes — nested arrow bodies and member chains — cost several times more of it per level than nested parens (the per-shape stack costs and each surface's ceiling are in the repo's [docs/cli.md](https://github.com/fuzdev/tsv/blob/main/docs/cli.md#recursion-depth)). Past the ceiling the call traps with `memory access out of bounds`, and unlike a parse error or a panic it **poisons the instance** — every later call throws the same thing. `reinstantiate()` is the recovery: it synchronously swaps in a fresh instance from the already-compiled module (no recompile — same environment constraints as `init_sync`), and every import keeps working against it. Objects created before the swap (an `IgnoreStack`) are invalidated — rebuild them after: every method on a stale one throws, and `free()` on it is a safe no-op. Real code is nowhere near this ceiling; generated and minified code can be.
 
 ### Worker pools
 

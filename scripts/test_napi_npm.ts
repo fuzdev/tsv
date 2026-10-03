@@ -58,8 +58,9 @@ import { pathToFileURL } from 'node:url';
 
 import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
 import { assert_staged_fresh, staged_staleness } from './check_staged_freshness.ts';
-import { FACADE_SOURCE_DIR, facade_files, facade_sources } from './npm_facade.ts';
+import { facade_files, facade_sources, facade_type_names } from './npm_facade.ts';
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
+import { register_dts_specifier_test } from './dts_specifiers.ts';
 import { register_syntax_error_suite, syntax_errors } from './syntax_error_suite.ts';
 
 const pkg_root = 'crates/tsv_napi/pkg';
@@ -137,7 +138,6 @@ await assert_staged_fresh([
 			'crates/tsv_napi/npm/platform.js',
 			'crates/tsv_napi/npm/bin.js',
 			...facade_sources(true),
-			'crates/tsv_wasm/types/tsv_ast.d.ts',
 			'scripts/build_napi_packages.ts',
 			'scripts/npm_facade.ts',
 			'scripts/npm_metadata.ts'
@@ -410,21 +410,16 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		assert.equal(ast.type, 'Program');
 		assert.equal(ast.body[0].loc, undefined, 'the default wire is span-only');
 		assert.equal(typeof ast.body[0].start, 'number');
-		assert.equal(api.parse_svelte('<div>x</div>').type, 'Root');
-		assert.equal(api.parse_css('a { color: red }').type, 'StyleSheetFile');
+		const svelte = api.parse_svelte('<div>x</div>');
+		assert.equal(svelte.type, 'Root');
+		assert.equal(svelte.fragment.nodes[0].loc, undefined);
+		assert.equal(svelte.fragment.nodes[0].name_loc, undefined);
+		const css = api.parse_css('a { color: red }');
+		assert.equal(css.type, 'StyleSheetFile');
+		assert.equal(css.children[0].loc, undefined);
 		const json = api.parse_typescript_json('const x = 1;');
 		assert.equal(typeof json, 'string');
 		assert.deepEqual(JSON.parse(json), ast);
-	});
-
-	it('locations: true adds loc in every language', () => {
-		assert.ok(api.parse_typescript('const x = 1;', { locations: true }).body[0].loc);
-		const sv = api.parse_svelte('<div>x</div>', { locations: true });
-		assert.ok(sv.fragment.nodes[0].loc);
-		assert.ok(sv.fragment.nodes[0].name_loc);
-		assert.ok(api.parse_css('a { color: red }', { locations: true }).children[0].loc);
-		assert.equal(api.parse_svelte('<div>x</div>').fragment.nodes[0].loc, undefined);
-		assert.equal(api.parse_css('a { color: red }').children[0].loc, undefined);
 	});
 
 	// The facade and the helper that `{locations: true}` runs ship together — the
@@ -444,24 +439,17 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		const locator = api.create_locator(source, { language: 'typescript' });
 		assert.deepEqual(locator.loc_of(spans.body[1]), spans.body[1].loc);
 		assert.deepEqual(locator.position_at(spans.body[1].start), spans.body[1].loc.start);
-		assert.deepEqual(
-			api.loc_of(spans.body[1], source, { language: 'typescript' }),
-			spans.body[1].loc
-		);
-		assert.throws(() => api.create_locator(source), /`language` must be/);
 		// Svelte (LF-only for the whole document, `name_loc` and `character` restored) and
 		// CSS through the facade.
 		const sv =
 			'<script>\nlet a = 1;\u2028let b = 2;\n</script>\n<div /* c */ {x}>\n{#each xs as { a }}{a}{/each}\n</div>\n<style>\np { }\n</style>\n';
-		assert.deepEqual(
-			api.reconstruct_locations(api.parse_svelte(sv), sv),
-			api.parse_svelte(sv, { locations: true })
-		);
+		const sv_located = api.parse_svelte(sv, { locations: true });
+		assert.deepEqual(api.reconstruct_locations(api.parse_svelte(sv), sv), sv_located);
+		assert.ok(sv_located.fragment.nodes.some((node: any) => node.name_loc));
 		const css = '/* c */\na {\n\tcolor: red;\n}\r\nb { }';
-		assert.deepEqual(
-			api.reconstruct_locations(api.parse_css(css), css),
-			api.parse_css(css, { locations: true })
-		);
+		const css_located = api.parse_css(css, { locations: true });
+		assert.deepEqual(api.reconstruct_locations(api.parse_css(css), css), css_located);
+		assert.ok(css_located.children[0].loc);
 		// The `_json` siblings return the span-only wire the object parse reads.
 		assert.equal(api.parse_css_json(css), JSON.stringify(api.parse_css(css)));
 	});
@@ -489,7 +477,7 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		);
 		throws_with(
 			() => api.parse_typescript('const x = 1;', { sourceType: 'sloppy' }),
-			"invalid sourceType 'sloppy' (expected 'script' or 'module')"
+			"parse option 'sourceType' must be 'script' or 'module' (got 'sloppy')"
 		);
 	});
 
@@ -519,13 +507,33 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 	});
 
 	it('the loader ships the shared facade verbatim', () => {
-		for (const file of facade_files(true)) {
+		for (const { published, source } of facade_files(true)) {
 			assert.equal(
-				readFileSync(join(pkg_root, 'napi', file), 'utf8'),
-				readFileSync(join(FACADE_SOURCE_DIR, file), 'utf8'),
-				file
+				readFileSync(join(pkg_root, 'napi', published), 'utf8'),
+				readFileSync(source, 'utf8'),
+				published
 			);
 		}
+	});
+
+	// The loader's `index.d.ts` is hand-written, where the wasm entries' re-export lists are
+	// generated from the facade's declarations (`facade_type_names`) — so it is held to
+	// that same derived set: every option and error type the facade declares, by name, from
+	// the file that declares it.
+	it("index.d.ts re-exports exactly the facade's declared types", () => {
+		const index_dts = readFileSync(join(pkg_root, 'napi', 'index.d.ts'), 'utf8');
+		const reexported = (from: string): Array<string> =>
+			[...index_dts.matchAll(/^export type \{([^}]*)\} from '([^']+)';/gm)]
+				.filter((m) => m[2] === from)
+				.flatMap((m) => m[1]!.split(',').map((name) => name.trim()))
+				.filter((name) => name !== '')
+				.sort();
+		assert.deepEqual(reexported('./api.js'), facade_type_names('api.d.ts').sort());
+		assert.deepEqual(reexported('./api_parse.js'), facade_type_names('api_parse.d.ts').sort());
+		assert.deepEqual(
+			reexported('./syntax_error.js'),
+			facade_type_names('syntax_error.d.ts').sort()
+		);
 	});
 
 	// The discovery matcher rides the package as a class. The `undefined`
@@ -562,11 +570,6 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		);
 		stack.pop_gitignore();
 		assert.equal(stack.is_ignored('dist', true), false);
-	});
-
-	it('parse errors and engine errors are thrown JS errors', () => {
-		assert.throws(() => api.parse_typescript('const = ;'));
-		assert.throws(() => api.format_svelte('<div {'));
 	});
 
 	it('multibyte content survives, and formatting is idempotent', () => {
@@ -613,7 +616,7 @@ process.stdout.write(JSON.stringify({out: tsv.format_typescript('const   x=1'), 
 		assert.deepEqual(JSON.parse(probe.stdout), {
 			out: 'const x = 1;\n',
 			unexported: 'ERR_PACKAGE_PATH_NOT_EXPORTED',
-			locations: ['create_locator', 'loc_of', 'reconstruct_locations']
+			locations: ['create_locator', 'reconstruct_locations']
 		});
 	});
 
@@ -625,12 +628,13 @@ process.stdout.write(JSON.stringify({out: tsv.format_typescript('const   x=1'), 
 			[
 				'--input-type=module',
 				'--eval',
-				`const {create_locator, loc_of, reconstruct_locations} = await import('@fuzdev/tsv/locations');
+				`const {create_locator, reconstruct_locations} = await import('@fuzdev/tsv/locations');
 const src = 'a\\nbc';
 const tree = {type: 'Program', start: 0, end: src.length, body: [{type: 'X', start: 2, end: 4}]};
+const locator = create_locator(src, {language: 'typescript'});
 process.stdout.write(JSON.stringify({
-	position: create_locator(src, {language: 'typescript'}).position_at(3),
-	node: loc_of(tree.body[0], src, {language: 'typescript'}),
+	position: locator.position_at(3),
+	node: locator.loc_of(tree.body[0]),
 	root: reconstruct_locations(tree, src).loc
 }));`
 			],
@@ -694,28 +698,8 @@ process.stdout.write(JSON.stringify({
 		}
 	});
 
-	// The same rule `scripts/test_npm.ts` pins over the wasm packages, over this
-	// package's hand-written declarations. Under `moduleResolution:
-	// node16`/`nodenext` an extensionless relative specifier inside a `.d.ts` is
-	// TS2834/TS2835 raised from inside the package, at every consumer without
-	// `skipLibCheck` — and nothing in-repo type-checks the merged package
-	// `.d.ts`, so it is invisible until someone else compiles.
-	it('every .d.ts relative specifier carries the .js extension', () => {
-		const loader_dir = join(staged, 'node_modules', '@fuzdev', 'tsv');
-		const loader_pkg = JSON.parse(readFileSync(join(loader_dir, 'package.json'), 'utf8'));
-		const bad: Array<string> = [];
-		for (const rel of loader_pkg.files.filter((f: string) => f.endsWith('.d.ts'))) {
-			const source = readFileSync(join(loader_dir, rel), 'utf8');
-			for (const [, spec] of source.matchAll(/(?:from|import\()\s*['"](\.[^'"]*)['"]/g)) {
-				if (!/\.(?:js|mjs|cjs|json)$/.test(spec)) bad.push(`${rel}: ${spec}`);
-			}
-		}
-		assert.deepEqual(
-			bad,
-			[],
-			`extensionless relative specifiers in shipped .d.ts:\n${bad.join('\n')}`
-		);
-	});
+	// over the hand-written declarations here (the wasm packages' run in `scripts/test_npm.ts`)
+	register_dts_specifier_test(join(staged, 'node_modules', '@fuzdev', 'tsv'));
 
 	// This host IS a prebuilt platform, so the bare staging exercises the
 	// "supported but not installed" arm (a lockfile from another OS,

@@ -62,8 +62,9 @@ into `crates/tsv_napi/pkg/` (gitignored):
 - **`pkg/napi/` — `@fuzdev/tsv`**, the loader: `npm/index.js` +
   `npm/index.d.ts` + `npm/platform.js` (triple detection, shared by the next
   two) + `npm/bin.js` (the `tsv` bin — a dispatcher, see below) +
-  `npm/README.md` + a copy of `tsv_wasm`'s `tsv_ast.d.ts`, the facade
-  (`api.js` / `api_parse.js` + their `.d.ts`), `locations.js`/`.d.ts`, and
+  `npm/README.md` + the facade with its parse half (`api.js` / `api_parse.js`,
+  `locations.js`, their `.d.ts` and `tsv_wasm`'s `tsv_ast.d.ts` — the file table
+  `scripts/npm_facade.ts` shares with the wasm staging), and
   `cli.js` (the JS CLI mirror, `bin.js`'s
   fallback) + a generated package.json pinning the platform packages as
   **exact-version `optionalDependencies`**. The staging directory is named
@@ -130,7 +131,7 @@ an export set captured before the delta moved reads as clean. Neither package
 exports the bench-only `parse_internal_*` family
 (`scripts/patch_npm_package.ts` filters it out of the wasm wrappers too).
 
-The locations helpers (`reconstruct_locations` / `create_locator` / `loc_of`)
+The locations helpers (`reconstruct_locations` / `create_locator`)
 ship here too: `tsv_wasm/npm/locations.js` is pure JS over the span-only wire —
 the facade's `{locations: true}` runs it — so the staging script copies that same
 file in and the loader's `index.js` re-exports it whole (`export *`), so the names are
@@ -176,6 +177,8 @@ packaged shape under Node — loader resolution (by BARE SPECIFIER: the ESM walk
 of the `exports` map from a cwd inside the staging, and the CommonJS
 `require.resolve` walk of the same map, plus the encapsulation — a file the map
 does not name stays unreachable), the options surface with exact error strings,
+that the hand-written `index.d.ts` re-exports exactly the option and error types the
+facade's declarations declare (`facade_type_names`),
 the export-set diff against `@fuzdev/tsv-wasm` when that package is staged and
 fresh, package.json coherence (pins, selection fields, `files` on both
 packages, the executable bit on the CLI binary, the

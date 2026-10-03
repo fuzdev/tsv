@@ -39,10 +39,11 @@ export interface TypeScriptParseOptions {
 	/** As `ParseOptions.locations`. @default false */
 	locations?: boolean | undefined;
 	/**
-	 * Parse goal: at `'script'`, `await` is an ordinary identifier and
-	 * `import`/`export`/`import.meta` are syntax errors. A script is also **sloppy**
-	 * unless its own `"use strict"` directive prologue makes it strict, so `with` and
-	 * the legacy octal literals/escapes parse there; a module is always strict.
+	 * Parse goal: at `'script'`, `await` is an ordinary identifier, and
+	 * `import`/`export`/`import.meta` and a top-level `for await` are syntax errors. A
+	 * script is also **sloppy** unless its own `"use strict"` directive prologue makes it
+	 * strict, so `with` and the legacy octal literals/escapes parse there; a module is
+	 * always strict.
 	 * @default 'module'
 	 */
 	sourceType?: 'script' | 'module' | undefined;
@@ -68,8 +69,10 @@ export interface TypeScriptParseJsonOptions {
 /**
  * Parse a Svelte component into its AST — the span-only tree (`start`/`end` offsets);
  * `{locations: true}` adds `loc` / `name_loc`.
- * @throws {TsvSyntaxError} when the source does not parse (`api.d.ts`)
- * @throws {TypeError} when an argument is refused
+ * @throws TypeError when `source` is not a string, `options` is not an object, or `options`
+ *   carries an unknown key, a non-boolean `locations` or a set `sourceType`
+ * @throws SyntaxError when the source does not parse — a `TsvSyntaxError` (`syntax_error.d.ts`), its
+ *   position on `start` and `loc`
  */
 export declare function parse_svelte(
 	source: string,
@@ -77,16 +80,21 @@ export declare function parse_svelte(
 ): import('./tsv_ast.js').Root;
 /**
  * Parse a Svelte component into its span-only wire, as a compact JSON string.
- * @throws {TsvSyntaxError} when the source does not parse (`api.d.ts`)
- * @throws {TypeError} when an argument is refused
+ * @throws TypeError when `source` is not a string, `options` is not an object, or `options`
+ *   carries `locations`, an unknown key or a set `sourceType`
+ * @throws SyntaxError when the source does not parse — a `TsvSyntaxError` (`syntax_error.d.ts`), its
+ *   position on `start` and `loc`
  */
 export declare function parse_svelte_json(source: string, options?: ParseJsonOptions): string;
 
 /**
  * Parse TypeScript (or JavaScript) into its ESTree AST — the span-only tree
  * (`start`/`end` offsets); `{locations: true}` adds `loc`.
- * @throws {TsvSyntaxError} when the source does not parse (`api.d.ts`)
- * @throws {TypeError} when an argument is refused
+ * @throws TypeError when `source` is not a string, `options` is not an object, or `options`
+ *   carries an unknown key, a non-boolean `locations` or a `sourceType` other than
+ *   `'script'` or `'module'`
+ * @throws SyntaxError when the source does not parse — a `TsvSyntaxError` (`syntax_error.d.ts`), its
+ *   position on `start` and `loc`
  */
 export declare function parse_typescript(
 	source: string,
@@ -94,8 +102,11 @@ export declare function parse_typescript(
 ): import('./tsv_ast.js').Program;
 /**
  * Parse TypeScript into its span-only wire, as a compact JSON string.
- * @throws {TsvSyntaxError} when the source does not parse (`api.d.ts`)
- * @throws {TypeError} when an argument is refused
+ * @throws TypeError when `source` is not a string, `options` is not an object, or `options`
+ *   carries `locations`, an unknown key or a `sourceType` other than `'script'` or
+ *   `'module'`
+ * @throws SyntaxError when the source does not parse — a `TsvSyntaxError` (`syntax_error.d.ts`), its
+ *   position on `start` and `loc`
  */
 export declare function parse_typescript_json(
 	source: string,
@@ -105,8 +116,10 @@ export declare function parse_typescript_json(
 /**
  * Parse CSS into its AST — the span-only tree (`start`/`end` offsets);
  * `{locations: true}` adds `loc`.
- * @throws {TsvSyntaxError} when the source does not parse (`api.d.ts`)
- * @throws {TypeError} when an argument is refused
+ * @throws TypeError when `source` is not a string, `options` is not an object, or `options`
+ *   carries an unknown key, a non-boolean `locations` or a set `sourceType`
+ * @throws SyntaxError when the source does not parse — a `TsvSyntaxError` (`syntax_error.d.ts`), its
+ *   position on `start` and `loc`
  */
 export declare function parse_css(
 	source: string,
@@ -114,7 +127,9 @@ export declare function parse_css(
 ): import('./tsv_ast.js').StyleSheetFile;
 /**
  * Parse CSS into its span-only wire, as a compact JSON string.
- * @throws {TsvSyntaxError} when the source does not parse (`api.d.ts`)
- * @throws {TypeError} when an argument is refused
+ * @throws TypeError when `source` is not a string, `options` is not an object, or `options`
+ *   carries `locations`, an unknown key or a set `sourceType`
+ * @throws SyntaxError when the source does not parse — a `TsvSyntaxError` (`syntax_error.d.ts`), its
+ *   position on `start` and `loc`
  */
 export declare function parse_css_json(source: string, options?: ParseJsonOptions): string;

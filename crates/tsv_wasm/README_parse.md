@@ -16,6 +16,8 @@ npm i @fuzdev/tsv-parse-wasm
 
 Requires Node.js 22+; Bun and Deno work too, and browsers via `init()` (below).
 
+TypeScript declarations are bundled. They name the DOM lib's `fetch` and `WebAssembly` types (for `init()` and the compiled module), so a project type-checking them needs `"dom"` in its `lib`, or `skipLibCheck`.
+
 ## Usage
 
 In Node.js, Bun, and Deno, WASM is initialized synchronously at import time — zero config. In browsers and bundlers, call `await init()` once first (Vite, Webpack, and Rollup resolve the WASM asset automatically; `init_sync({ module })` is also exported for Workers and custom loading).
@@ -29,7 +31,7 @@ const program: Program = parse_typescript('const x: number = 1;');
 const stylesheet: StyleSheetFile = parse_css('a { color: red }');
 ```
 
-Three parsers: `parse_svelte` (matches Svelte's modern parser), `parse_typescript` (matches acorn + acorn-typescript), `parse_css` (matches Svelte's `parseCss`). Each takes a source `string` plus an optional options object and returns a Svelte-compatible JSON AST, throwing on a parse error. The AST is **span-only** by default: every node carries its `start`/`end` offsets but no per-node `loc` (line/column) object, and Svelte nodes no `name_loc` — pass `{locations: true}` for those (below).
+Three parsers, each returning the AST its canonical parser returns: `parse_svelte` Svelte's modern `parse` AST, `parse_typescript` ESTree as acorn + acorn-typescript emit it, and `parse_css` Svelte's `parseCss` AST. Each takes a source `string` plus an optional options object, and throws on a parse error. The AST is **span-only** by default: every node carries its `start`/`end` offsets but no per-node `loc` (line/column) object, and Svelte nodes no `name_loc` — pass `{locations: true}` for those (below).
 
 AST types are bundled in `tsv_ast.d.ts` and re-exported from the package — `import type` any node directly.
 
@@ -42,7 +44,7 @@ Each parser also has a `parse_*_json` variant (`parse_svelte_json`, `parse_types
 Every parser accepts an optional second argument, like acorn:
 
 - `locations` (default `false`) — add per-node `loc` (line/column), as acorn's `locations: true` does, and Svelte's `name_loc`. The parser emits only the offsets; `{locations: true}` computes the line/column objects from them and your source in JS after the parse (see below) — one extra walk over the tree, so it costs more than the default but needs no re-parse, and leaving it off loses nothing if you have the source. For a few lookups, `create_locator` is cheaper than reconstructing the whole tree.
-- `sourceType` (TypeScript only, default `'module'` — the parsers have no source-type fallback, since the wire's `Program.sourceType` is a claim one settled grammar has to produce) — the parse goal: at `'script'`, `await` is an ordinary identifier, `import`/`export`/`import.meta` and a top-level `for await` are syntax errors, and the code is sloppy unless its own `"use strict"` prologue makes it strict (so `with` and legacy octal literals/escapes parse; a module is always strict). `parse_svelte` and `parse_css` **throw** on the key rather than ignoring it (Svelte's `<script>` is always a module, CSS has no goal), so code forwarding one options bag to whichever parser should spell the inapplicable source type as `undefined` — every supported key reads `undefined` as its default.
+- `sourceType` (TypeScript only; omitted means `'module'`) — the parse goal: at `'script'`, `await` is an ordinary identifier, `import`/`export`/`import.meta` and a top-level `for await` are syntax errors, and the code is sloppy unless its own `"use strict"` prologue makes it strict (so `with` and legacy octal literals/escapes parse; a module is always strict). `parse_svelte` and `parse_css` **throw** on the key rather than ignoring it (Svelte's `<script>` is always a module, CSS has no goal), so code forwarding one options bag to whichever parser should spell the inapplicable source type as `undefined` — every supported key reads `undefined` as its default.
 
 Unknown option keys throw, whatever their value — a typo like `{locatons: true}` (or `{locatons: undefined}`) fails loudly instead of silently handing back the tree without `loc`.
 
@@ -77,7 +79,7 @@ const same = reconstruct_locations(parse_typescript(src), src);
 
 `reconstruct_locations(ast, source)` walks the tree and adds `loc` to every object carrying `start`/`end`, **mutating in place** and returning it (`structuredClone(ast)` first if you need the input untouched). Each `loc` is the line and column of the object's own `start`/`end` — ECMAScript's line terminators for TypeScript (acorn's `locations: true` exactly), `\n` alone for a whole Svelte document and for CSS — together with the `name_loc` on Svelte elements, attributes, and directives, and the `character` field Svelte reports on a shorthand attribute's identifier, a snippet name, a simple-identifier block pattern, and an in-tag comment (`<div /* c */ class="x">`, including inside `<svelte:options>`). The key is appended last on each object. For a Svelte document this is a superset of Svelte's own `parse` output, which carries `loc` only on the nodes acorn parsed, and it follows the definition above where Svelte's `loc` departs from its own offsets (Svelte's `<script>` `Program.loc` sits at the tag; here it matches `start`/`end`) — cataloged in the repo's [docs/conformance_svelte.md](https://github.com/fuzdev/tsv/blob/main/docs/conformance_svelte.md). Without a `language` it is read off the root (`Root`, `StyleSheetFile`, or a `Program` spanning the whole source), so for a subtree — a Svelte `Fragment`, a `<script>`'s `Program`, a single statement — pass `{language}`; it throws rather than guess.
 
-For sparse or repeated lookups, `create_locator(source, {language})` holds the prebuilt line-start table and exposes `position_at(offset)` (the `{line, column}` of one offset), `loc_of(node)` (the `loc` of one node, or `null` for a node without numeric `start`/`end`) and `reconstruct(ast)`; the `language` (`'typescript'`, `'svelte'`, or `'css'`) is required, since it picks the document's line rule. A one-shot `loc_of(node, source, {language})` is also exported for the occasional single lookup (it rebuilds the table each call). Offsets are the AST's own — UTF-16 units, into the source with a leading BOM dropped for Svelte and CSS (as their parsers drop it) and as given for TypeScript.
+For sparse or repeated lookups, `create_locator(source, {language})` builds the line-start table once and exposes `position_at(offset)` (the `{line, column}` of one offset), `loc_of(node)` (the `loc` of one node, or `null` for a node without numeric `start`/`end`) and `reconstruct(ast)`; the `language` (`'typescript'`, `'svelte'`, or `'css'`) is required, since it picks the document's line rule. Offsets are the AST's own — UTF-16 units, into the source with a leading BOM dropped for Svelte and CSS (as their parsers drop it) and as given for TypeScript.
 
 ```typescript
 import {create_locator, parse_typescript} from '@fuzdev/tsv-parse-wasm';
@@ -89,9 +91,9 @@ locator.loc_of(b); // {start: {line: 2, column: 0}, end: {line: 2, column: 6}}
 locator.position_at(7); // {line: 2, column: 0}
 ```
 
-The single lookups check what they are handed: `position_at` throws a `RangeError` for an offset that isn't an integer from 0 to the text's length, and `loc_of` for a span that doesn't fit the text (an offset past its end, or `start` after `end`). The whole-tree forms check nothing per node — they trust the tree to be a parse of the source. A missing or unknown `language`, a root whose language can't be inferred, or a source that isn't a string throws a `TypeError`. So does an options argument that isn't an object, or a key other than `language` — a typo like `{langauge: 'css'}` throws rather than falling back to inference.
+A locator's single lookups check what they are handed: `position_at` throws a `RangeError` for an offset that isn't an integer from 0 to the text's length, and `loc_of` for a span that doesn't fit the text (an offset past its end, or `start` after `end`). The whole-tree forms check nothing per node — they trust the tree to be a parse of the source. A missing or unknown `language`, a root whose language can't be inferred, or a source that isn't a string throws a `TypeError`. So does an options argument that isn't an object, or a key other than `language` — a typo like `{langauge: 'css'}` throws rather than falling back to inference.
 
-The helper is also its own entry point, `@fuzdev/tsv-parse-wasm/locations` — `reconstruct_locations`, `create_locator`, and `loc_of`, as pure JS that loads no WASM — for code that holds a tree (read from disk, sent from another process, or parsed elsewhere) and only needs line/column. It is typed on its own (`locations.d.ts`); the `SourceLocation` and `Position` its lookups return are the AST types the package root exports.
+The helper is also its own entry point, `@fuzdev/tsv-parse-wasm/locations` — `reconstruct_locations` and `create_locator`, as pure JS that loads no WASM — for code that holds a tree (read from disk, sent from another process, or parsed elsewhere) and only needs line/column. It is typed on its own (`locations.d.ts`); the `SourceLocation` and `Position` its lookups return are the AST types the package root exports.
 
 ## Status
 

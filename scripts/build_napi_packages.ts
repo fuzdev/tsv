@@ -2,11 +2,11 @@
  * Stage the publishable N-API npm packages into `crates/tsv_napi/pkg/`:
  *
  * - `pkg/napi/` — the `@fuzdev/tsv` loader, ESM like the wasm packages (index.js + index.d.ts +
- *   platform.js (triple detection) + tsv_ast.d.ts + the shared facade (`api.js` / `api_parse.js`
- *   + their `.d.ts`) + the shared `locations.js`/`.d.ts` helper + the shared
- *   `cli.js` + the `bin.js` dispatcher wired as the `tsv` bin + README +
- *   LICENSE + generated package.json with the exact-pinned platform
- *   `optionalDependencies`).
+ *   platform.js (triple detection) + the shared facade with its parse half — `api.js` /
+ *   `api_parse.js`, the `locations.js` helper, their `.d.ts` and `tsv_ast.d.ts`, the table
+ *   `scripts/npm_facade.ts` names — + the shared `cli.js` + the `bin.js` dispatcher wired
+ *   as the `tsv` bin + README + LICENSE + generated package.json with the exact-pinned
+ *   platform `optionalDependencies`).
  * - `pkg/<triple>/` — ONE platform package, `@fuzdev/tsv-<triple>`: the
  *   built cdylib copied to `tsv_napi.node` (a byte-identical rename), the
  *   real `tsv_cli` binary copied to `tsv`/`tsv.exe` (what `bin.js` execs —
@@ -32,7 +32,7 @@
 import { parseArgs } from 'node:util';
 
 import { cli_binary_name, host_triple } from './napi_host.ts';
-import { FACADE_SOURCE_DIR, facade_files } from './npm_facade.ts';
+import { LOCATIONS_EXPORT, facade_files } from './npm_facade.ts';
 import { NPM_SHARED_METADATA } from './npm_metadata.ts';
 import { format_size } from './size.ts';
 
@@ -110,10 +110,9 @@ for (const [from, to] of [
 	// CLI binary, falling back to cli.js (see crates/tsv_napi/npm/bin.js)
 	['crates/tsv_napi/npm/bin.js', 'bin.js'],
 	['crates/tsv_napi/npm/README.md', 'README.md'],
-	['crates/tsv_wasm/types/tsv_ast.d.ts', 'tsv_ast.d.ts'],
 	// the shared facade every tsv package exports through — one options reader and
 	// one set of error texts with the wasm packages; `index.js` imports both halves
-	...facade_files(true).map((file) => [`${FACADE_SOURCE_DIR}/${file}`, file]),
+	...facade_files(true).map(({ source, published }) => [source, published]),
 	// the JS CLI — imports its engine from `./index.js`, so the same source
 	// binds to the native loader here and to the wasm engine in
 	// @fuzdev/tsv-wasm (where it IS the bin); here it is bin.js's fallback
@@ -141,10 +140,7 @@ write_pkg(loader_dir, {
 		},
 		// the reconstruction helper alone — pure JS that imports nothing, so it loads no
 		// addon (the wasm packages that parse export the same subpath)
-		'./locations': {
-			types: './locations.d.ts',
-			default: './locations.js'
-		}
+		'./locations': LOCATIONS_EXPORT
 	},
 	// Bare relative path: npm normalizes `./bin.js` → `bin.js` at publish and words
 	// that normalization as the bin being "invalid and removed" (a false alarm) —
@@ -155,8 +151,7 @@ write_pkg(loader_dir, {
 		'index.d.ts',
 		'platform.js',
 		'bin.js',
-		...facade_files(true),
-		'tsv_ast.d.ts',
+		...facade_files(true).map((file) => file.published),
 		'cli.js',
 		'README.md',
 		'LICENSE'

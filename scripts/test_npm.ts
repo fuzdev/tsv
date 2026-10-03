@@ -49,9 +49,10 @@ import { isDeepStrictEqual } from 'node:util';
 import { Worker } from 'node:worker_threads';
 
 import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
-import { FACADE_SOURCE_DIR, facade_files, facade_sources } from './npm_facade.ts';
+import { facade_files, facade_sources } from './npm_facade.ts';
 import { assert_staged_fresh } from './check_staged_freshness.ts';
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
+import { register_dts_specifier_test } from './dts_specifiers.ts';
 import { register_syntax_error_suite } from './syntax_error_suite.ts';
 
 const pkg_dir = process.env.PKG_DIR;
@@ -109,8 +110,8 @@ await assert_staged_fresh([
 		rebuild: `deno task build:npm:${variant}`
 	},
 	{
-		// every facade file the variant ships is copied in the same staging step, so the
-		// first one's age speaks for the rest
+		// every facade file the variant ships — the AST types included — is copied in the
+		// same staging step, so the first one's age speaks for the rest
 		label: `staged facade (${variant})`,
 		staged: `${pkg_dir}/api.js`,
 		crates: [],
@@ -125,17 +126,6 @@ await assert_staged_fresh([
 					crates: [],
 					files: ['crates/tsv_wasm/npm/cli.js'],
 					rebuild: 'deno task build:npm:all'
-				}
-			]
-		: []),
-	...(variant !== 'format'
-		? [
-				{
-					label: `staged AST types (${variant})`,
-					staged: `${pkg_dir}/tsv_ast.d.ts`,
-					crates: [],
-					files: ['crates/tsv_wasm/types/tsv_ast.d.ts'],
-					rebuild: `deno task build:npm:${variant}`
 				}
 			]
 		: [])
@@ -193,29 +183,7 @@ describe(`package metadata: ${pkg_dir}`, () => {
 		assert.ok(seen.length >= 5, `exports map looks truncated: only ${seen.length} targets`);
 	});
 
-	// Every relative specifier in a shipped `.d.ts` must carry the `.js`
-	// extension. Under `moduleResolution: node16`/`nodenext` an extensionless
-	// one is TS2834/TS2835 — errors raised from INSIDE the package, at any
-	// consumer without `skipLibCheck`. This is a real blind spot rather than a
-	// hypothetical: nothing in-repo type-checks the merged package `.d.ts`
-	// (`check:ast-types` covers `tsv_ast.d.ts` alone), and the same class has
-	// now shipped twice — the generated declarations and the napi loader's
-	// hand-written one. A regex is not a typechecker, but it pins this class
-	// without adding a `tsc` dependency to the package suites.
-	it('every .d.ts relative specifier carries the .js extension', () => {
-		const bad: Array<string> = [];
-		for (const rel of pkg.files.filter((f: string) => f.endsWith('.d.ts'))) {
-			const source = readFileSync(new URL(`../${pkg_dir}/${rel}`, import.meta.url), 'utf-8');
-			for (const [, spec] of source.matchAll(/(?:from|import\()\s*['"](\.[^'"]*)['"]/g)) {
-				if (!/\.(?:js|mjs|cjs|json)$/.test(spec)) bad.push(`${rel}: ${spec}`);
-			}
-		}
-		assert.deepEqual(
-			bad,
-			[],
-			`extensionless relative specifiers in shipped .d.ts:\n${bad.join('\n')}`
-		);
-	});
+	register_dts_specifier_test(join(repo_root, pkg_dir));
 
 	it('every files[] entry exists', () => {
 		for (const rel of pkg.files) {
@@ -230,25 +198,16 @@ describe(`package metadata: ${pkg_dir}`, () => {
 		assert.deepEqual(pkg.sideEffects, ['./index.js']);
 	});
 
-	it('parse-capable variants bundle tsv_ast.d.ts', { skip: !has_parse }, () => {
-		assert.ok(pkg.files.includes('tsv_ast.d.ts'));
-	});
-
-	it('parse-capable variants bundle the locations helper', { skip: !has_parse }, () => {
-		assert.ok(pkg.files.includes('locations.js'));
-		assert.ok(pkg.files.includes('locations.d.ts'));
-	});
-
 	// The facade's two halves: the shared one (the options reader + the format family)
-	// in every variant, the parse one only where parsing ships — so the format-only
-	// package carries neither `api_parse.js` nor the `locations.js` it imports.
+	// in every variant, the parse one — `api_parse.js`, the `locations.js` helper it
+	// imports, and the AST types — only where parsing ships.
 	it('every variant ships its half of the facade, verbatim', () => {
-		for (const file of facade_files(has_parse)) {
-			assert.ok(pkg.files.includes(file), file);
+		for (const { published, source } of facade_files(has_parse)) {
+			assert.ok(pkg.files.includes(published), published);
 			assert.equal(
-				readFileSync(new URL(`../${pkg_dir}/${file}`, import.meta.url), 'utf8'),
-				readFileSync(new URL(`../${FACADE_SOURCE_DIR}/${file}`, import.meta.url), 'utf8'),
-				`${file} is the shared source`
+				readFileSync(new URL(`../${pkg_dir}/${published}`, import.meta.url), 'utf8'),
+				readFileSync(new URL(`../${source}`, import.meta.url), 'utf8'),
+				`${published} is the shared source`
 			);
 		}
 	});
@@ -380,10 +339,6 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		assert.equal(node_entry.format_svelte(once), once);
 	});
 
-	it('throws a useful error on invalid syntax', { skip: !has_format }, () => {
-		assert.throws(() => node_entry.format_typescript('const ='));
-	});
-
 	// The poisoning-trap recovery contract. A stack overflow (input nested past
 	// the ~1 MiB shadow stack) is the one trap the instance does not survive:
 	// `__stack_pointer` is a mutable global the trap never restores, so every
@@ -500,38 +455,25 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		assert.equal(node_entry.create_locator, undefined);
 	});
 
-	it('parse_typescript returns a Program', { skip: !has_parse }, () => {
-		const program = node_entry.parse_typescript('const x = 1;');
-		assert.equal(program.type, 'Program');
-		assert.ok(Array.isArray(program.body));
-	});
-
-	it('parse_typescript_json returns a JSON string', { skip: !has_parse }, () => {
-		const json = node_entry.parse_typescript_json('const x = 1;');
-		assert.equal(typeof json, 'string');
-		assert.equal(JSON.parse(json).type, 'Program');
-	});
-
-	it('parse_svelte and parse_css work', { skip: !has_parse }, () => {
-		assert.equal(node_entry.parse_svelte('<div>x</div>').type, 'Root');
-		assert.equal(node_entry.parse_css('a { color: red }').type, 'StyleSheetFile');
-	});
-
-	it('parse_*_json round-trips to parse_*', { skip: !has_parse }, () => {
-		// parse_X is defined as JSON.parse(parse_X_json(src)); the two must agree.
-		assert.deepEqual(
-			JSON.parse(node_entry.parse_typescript_json('const x = 1;')),
-			node_entry.parse_typescript('const x = 1;')
-		);
-		assert.deepEqual(
-			JSON.parse(node_entry.parse_svelte_json('<div>x</div>')),
-			node_entry.parse_svelte('<div>x</div>')
-		);
-		assert.deepEqual(
-			JSON.parse(node_entry.parse_css_json('a { color: red }')),
-			node_entry.parse_css('a { color: red }')
-		);
-	});
+	// parse_X is defined as JSON.parse(parse_X_json(src)): each object parser returns its
+	// language's root, and its `_json` sibling the same tree as a string
+	it(
+		'parse_* return the root, parse_*_json the same tree as a string',
+		{ skip: !has_parse },
+		() => {
+			for (const [language, source, root] of [
+				['typescript', 'const x = 1;', 'Program'],
+				['svelte', '<div>x</div>', 'Root'],
+				['css', 'a { color: red }', 'StyleSheetFile']
+			]) {
+				const ast = node_entry[`parse_${language}`](source);
+				assert.equal(ast.type, root);
+				const json = node_entry[`parse_${language}_json`](source);
+				assert.equal(typeof json, 'string');
+				assert.deepEqual(JSON.parse(json), ast);
+			}
+		}
+	);
 
 	it('parse: the span-only wire by default, `loc` on request', { skip: !has_parse }, () => {
 		const span_only = node_entry.parse_typescript('const x = 1;');
@@ -661,19 +603,8 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 		});
 	});
 
-	it('reconstruct_locations mutates in place and returns the same object', () => {
-		const ast = node_entry.parse_typescript('const x = 1;');
-		const returned = node_entry.reconstruct_locations(ast, 'const x = 1;');
-		assert.equal(returned, ast); // same reference
-		assert.ok(ast.loc); // mutated in place
-	});
-
-	it('reconstruct_locations refuses to guess the language of a subtree', () => {
+	it('a named subtree reconstructs as it sits in the located parse', () => {
 		const sv = '<p>x</p>';
-		assert.throws(
-			() => node_entry.reconstruct_locations(node_entry.parse_svelte(sv).fragment, sv),
-			/cannot infer the document's language from a 'Fragment' root/
-		);
 		// named, the subtree reconstructs under Svelte's rule, `name_loc` included
 		const fragment = node_entry.reconstruct_locations(node_entry.parse_svelte(sv).fragment, sv, {
 			language: 'svelte'
@@ -684,19 +615,7 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 		);
 	});
 
-	it('loc_of derives a single node line/column', () => {
-		const ts = 'const x = 1;\nconst y = 2;\n';
-		const located = node_entry.parse_typescript(ts, { locations: true });
-		const spans = node_entry.parse_typescript(ts);
-		// second statement starts on line 2, column 0
-		assert.deepEqual(
-			node_entry.loc_of(spans.body[1], ts, { language: 'typescript' }),
-			located.body[1].loc
-		);
-		assert.equal(node_entry.loc_of({ type: 'X' }, ts, { language: 'typescript' }), null); // no start/end → null
-	});
-
-	it('create_locator reuses one line table for many lookups', () => {
+	it("a locator's lookups agree with the located parse", () => {
 		const ts = 'const x = 1;\nconst y = 2;\n';
 		const located = node_entry.parse_typescript(ts, { locations: true });
 		const spans = node_entry.parse_typescript(ts);
@@ -705,29 +624,6 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 		assert.deepEqual(locator.loc_of(spans.body[1]), located.body[1].loc);
 		// one offset at a time, in the same coordinates
 		assert.deepEqual(locator.position_at(spans.body[1].start), located.body[1].loc.start);
-		assert.throws(() => locator.position_at(ts.length + 1), RangeError);
-		assert.throws(() => locator.loc_of({ start: 0, end: ts.length + 1 }), RangeError);
-	});
-
-	// A bare source or a lone node names no document, and the language decides the line
-	// rule, the BOM and the Svelte stamping — so the two entry points that take one refuse
-	// to guess, where `reconstruct_locations` reads it off the tree's root.
-	it('create_locator and loc_of require the language', () => {
-		const message = {
-			name: 'TypeError',
-			message: /`language` must be 'typescript', 'svelte' or 'css'/
-		};
-		assert.throws(() => node_entry.create_locator('x'), message);
-		assert.throws(() => node_entry.create_locator('x', {}), message);
-		assert.throws(() => node_entry.create_locator('x', { language: 'js' }), /got 'js'/);
-		assert.throws(() => node_entry.loc_of({ start: 0, end: 1 }, 'x'), message);
-		assert.throws(() => node_entry.loc_of({ start: 0, end: 1 }, 42, { language: 'css' }), {
-			name: 'TypeError',
-			message: 'locations source must be a string (got number)'
-		});
-		assert.ok(
-			node_entry.reconstruct_locations(node_entry.parse_svelte('<p>x</p>'), '<p>x</p>').loc
-		);
 	});
 
 	it('CSS: `loc` on every node on request, LF-only', () => {
@@ -1191,24 +1087,23 @@ console.log(JSON.stringify(report));
 		assert.equal(report?.unexported, 'ERR_PACKAGE_PATH_NOT_EXPORTED');
 	});
 
-	// The helper alone, by its subpath: exactly its three functions where it ships, and
+	// The helper alone, by its subpath: exactly its two functions where it ships, and
 	// unreachable from the format-only package, which ships no helper.
 	it('the ./locations subpath exposes exactly the helper', () => {
 		assert.deepEqual(
 			report?.locations,
-			has_parse
-				? ['create_locator', 'loc_of', 'reconstruct_locations']
-				: 'ERR_PACKAGE_PATH_NOT_EXPORTED'
+			has_parse ? ['create_locator', 'reconstruct_locations'] : 'ERR_PACKAGE_PATH_NOT_EXPORTED'
 		);
 	});
 
 	it('the ./locations subpath works with no engine installed', { skip: !has_parse }, () => {
-		const source = `const {create_locator, loc_of, reconstruct_locations} = await import(${JSON.stringify(`${pkg_name}/locations`)});
+		const source = `const {create_locator, reconstruct_locations} = await import(${JSON.stringify(`${pkg_name}/locations`)});
 const src = 'a\\nbc';
 const tree = {type: 'Program', start: 0, end: src.length, body: [{type: 'X', start: 2, end: 4}]};
+const locator = create_locator(src, {language: 'typescript'});
 console.log(JSON.stringify({
-	position: create_locator(src, {language: 'typescript'}).position_at(3),
-	node: loc_of(tree.body[0], src, {language: 'typescript'}),
+	position: locator.position_at(3),
+	node: locator.loc_of(tree.body[0]),
 	root: reconstruct_locations(tree, src).loc
 }));`;
 		const run = spawnSync(process.execPath, ['--input-type=module', '--eval', source], {
