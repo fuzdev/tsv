@@ -424,6 +424,23 @@ Things the published numbers measure that aren't quite what they look like.
     `parse/typescript` ratio against `tsv-json-no-locations`. The fix is an
     `oxc-parser-raw` row; until it lands, the `oxc-parser` row times oxc's default path
     only.
+- **The `+reconstruct` rows price `loc` on the consumer side, and they are not
+  opponents.** `tsv-json-no-locations+reconstruct` and its wasm sibling run the
+  `no-locations` row's exact call (`JSON.parse` included), then rebuild `loc` on every
+  node with the shipped `reconstruct_locations` (`crates/tsv_wasm/npm/locations.js`,
+  the source every parse-capable package bundles), the line-table build inside the
+  timed region — what a consumer who wants every node's line/column pays when it
+  fetches only spans. The language is always named (a locator built without one reads
+  a Svelte source by the TypeScript line rule and skips the Svelte stamping), and they
+  are perf-only: their parse is the `no-locations` row's, so a coverage table would
+  learn nothing from them. Read them against `tsv-json` / `tsv-wasm-json`: the report's
+  span-only + reconstruct note computes that ratio from the run's own rows. On
+  TypeScript the reconstructed tree is the drop-in AST exactly. On Svelte it is a
+  superset of the drop-in `loc` (every template node gains `loc`, where Svelte's wire
+  carries it only on acorn-parsed nodes), so the Svelte ratio errs against the
+  reconstruct row — and approximate on two Svelte parser quirks the helper does not
+  replicate, the `<script>` tag-position `Program.loc` and the destructure `+1` column
+  (`locations.js`'s module doc states both).
 - **The `yuku-parser` rows need two corrections to be honest, and both are
   load-bearing.** yuku is payload-matched to oxc (span-only AST, same padding
   fields), so read it against `oxc-parser` / `tsv-json-no-locations` rather than

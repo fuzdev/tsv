@@ -279,8 +279,9 @@ init guard — it never touches WASM). Its correctness is gated by the package N
 tests (`scripts/test_npm.ts`); at corpus scale,
 `benches/js/diagnostics/no_locations_parity.ts` proves the reconstruction *rules*
 (its own re-derived transcription — it never imports the shipped helper) while
-`benches/js/diagnostics/reconstruct_vs_materialize.ts` is the diagnostic that runs
-the shipped helper itself.
+the bench's `tsv-json-no-locations+reconstruct` / `tsv-wasm-json-no-locations+reconstruct`
+rows run the shipped helper itself over the perf corpus, timing what a consumer who
+wants every node's `loc` pays against the loc-bearing wire.
 
 ⚠️ **The re-derivation is an independent IMPLEMENTATION, not an independent oracle.** Both
 sides of that comparison come from tsv — the loc-bearing wire, and a JS transcription of

@@ -36,6 +36,7 @@ import { RsvelteParseImplementation } from './rsvelte_parse.ts';
 import { SwcImplementation } from './swc.ts';
 import type { AlternativeVersionInfo } from './report.ts';
 import { type AllVersions, load_all_versions } from './versions.ts';
+import { reconstruct_locations } from '../../../crates/tsv_wasm/npm/locations.js';
 
 /**
  * One optional implementation that failed to initialize on this machine — an
@@ -622,6 +623,45 @@ export function get_benchmark_tasks(
 			'tsv-wasm-json-no-locations',
 			'wasm-no-locations',
 			(source, _language, goal) => impls.wasm.parse_no_locations(source, language, goal)
+		);
+
+		// The no-locations wire PLUS `loc` reconstructed in JS over the whole tree — what
+		// a consumer who wants every node's line/column pays when only the span-only wire
+		// is fetched. Same call as the row above (`JSON.parse` included), then the SHIPPED
+		// helper (`crates/tsv_wasm/npm/locations.js`, the source every parse-capable
+		// package bundles) with its line-table build inside the timed region, so the row
+		// is directly comparable to the loc-bearing `tsv-json` / `tsv-wasm-json` beside it.
+		//
+		// ⚠ The language is NAMED, never left to a default: a locator built without one
+		// reads every source as TypeScript — the ECMAScript line rule and none of the
+		// Svelte stamping (`name_loc`, the in-tag comment `character`, the block-binding
+		// annotation placement) — and would time a cheaper walk than a Svelte consumer
+		// runs. CSS is skipped for the reason the no-locations rows skip it.
+		//
+		// PERF-ONLY: a consumer-cost row, and the parse it runs is the no-locations row's,
+		// so on the coverage surface it would add nothing but the helper's refusal (a Svelte
+		// source holding a lone CR / U+2028 / U+2029) published as a tsv parse gap. Its
+		// absence there is disclosed (`SURFACE_DISCLOSURES` in bench.ts).
+		const reconstruct_enabled = language !== 'css' && options.corpus_kind !== 'conformance';
+		add(
+			'native',
+			reconstruct_enabled,
+			'tsv-json-no-locations+reconstruct',
+			'native-no-locations-reconstruct',
+			(source, _language, goal) =>
+				reconstruct_locations(impls.native.parse_no_locations(source, language, goal), source, {
+					language
+				})
+		);
+		add(
+			'wasm',
+			reconstruct_enabled,
+			'tsv-wasm-json-no-locations+reconstruct',
+			'wasm-no-locations-reconstruct',
+			(source, _language, goal) =>
+				reconstruct_locations(impls.wasm.parse_no_locations(source, language, goal), source, {
+					language
+				})
 		);
 
 		// Internal parsing variants (no JSON serialization) - shows JSON overhead

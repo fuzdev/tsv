@@ -669,6 +669,24 @@ const SURFACE_DISCLOSURES: ReadonlyArray<SurfaceDisclosure> = [
 			'The WASM binding runs the same engine and carries the row; both are measured on the perf ' +
 			'corpus.\n'
 	},
+	// The two `+reconstruct` rows, one entry each because the claim is checked per row:
+	// consumer-cost rows whose parse IS the no-locations row's, so on a coverage surface
+	// they would add only the reconstruct helper's refusal, published as a tsv parse gap.
+	{
+		row: 'tsv-json-no-locations+reconstruct',
+		direction: 'excluded',
+		prose:
+			'**Excluded here:** tsv-json-no-locations+reconstruct — the span-only wire plus `loc` ' +
+			'reconstructed in JS, a consumer-cost row measured on the perf corpus. The parse it runs is ' +
+			'tsv-json-no-locations’, so its coverage is that row’s.\n'
+	},
+	{
+		row: 'tsv-wasm-json-no-locations+reconstruct',
+		direction: 'excluded',
+		prose:
+			'**Excluded here:** tsv-wasm-json-no-locations+reconstruct — the same consumer-cost row over ' +
+			'the WASM binding; its coverage is tsv-wasm-json-no-locations’.\n'
+	},
 	{
 		// The mirror-image disclosure: a row present ONLY here needs saying as much
 		// as one absent, and `tsc`'s reading changes by corpus source — it is the
@@ -3033,10 +3051,10 @@ function generate_markdown_report(data: Baseline, groups: GroupResults[]): strin
 			lines.push(comparison_markdown);
 			lines.push('');
 		}
-		// Consumer-side reconstruct-vs-materialize note — a curated cross-ref to
-		// `diagnostics/reconstruct_vs_materialize.ts` (not a bench row), sitting
-		// with the parse comparison since it's about the `no-locations` wire.
-		lines.push(generate_reconstruct_note(), '');
+		// Consumer-side span-only + reconstruct note, computed from this run's rows and
+		// sitting with the parse comparison since it's about the `no-locations` wire.
+		const reconstruct_note = generate_reconstruct_note(groups);
+		if (reconstruct_note) lines.push(reconstruct_note, '');
 	}
 
 	// Stability disclosure — see `UNSTABLE_CV_THRESHOLD`. Sits with the other

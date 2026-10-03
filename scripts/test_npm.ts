@@ -603,8 +603,8 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 
 // Locations helper (locations.js, re-exported from index.js) — reconstruct the
 // per-node `loc` a `no-locations` wire drops, from `start`/`end` + source. These
-// assert the shipped package export end-to-end; at corpus scale the diagnostic
-// benches/js/diagnostics/reconstruct_vs_materialize.ts runs it too.
+// assert the shipped package export end-to-end; at corpus scale the bench's
+// `+reconstruct` rows run it too.
 describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => {
 	it('reconstruct_locations is EXACT for TypeScript (equals the full wire)', () => {
 		const ts = 'const x = 1;\nconst y = 2;\n';

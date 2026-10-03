@@ -101,8 +101,10 @@ const DISPLAY_ORDER = [
 	// tsv variants
 	'tsv-json',
 	'tsv-json-no-locations',
+	'tsv-json-no-locations+reconstruct',
 	'tsv-wasm-json',
 	'tsv-wasm-json-no-locations',
+	'tsv-wasm-json-no-locations+reconstruct',
 	'tsv',
 	'tsv-wasm',
 	// Opt-in diagnostic (`BENCH_FORCED_ASYNC=1`), so it reaches no committed report
@@ -165,7 +167,12 @@ export function rows_missing_from_display_order(names: Iterable<string>): string
  *
  * - `drop_in` — the canonical parser's own AST shape (loc-bearing for TS and Svelte;
  *   `parseCss` emits no `loc`). The oracle rows, tsv's `-json` wires, and
- *   `rsvelte-parse`, measured within ~1.5% of tsv's bytes.
+ *   `rsvelte-parse`, measured within ~1.5% of tsv's bytes. The `+reconstruct` rows too:
+ *   the span-only wire with `loc` rebuilt in JS — acorn-exact on TypeScript. On Svelte
+ *   it is a superset of the drop-in `loc` (every template node gains one), which errs
+ *   against that row, and approximate on two Svelte parser quirks it does not replicate:
+ *   the `<script>` tag-position `Program.loc` and the destructure `+1` column
+ *   (`crates/tsv_wasm/npm/locations.js`'s module doc).
  * - `span_only` — `start`/`end` and no per-node `loc`: tsv's `no-locations` wires,
  *   and oxc's and yuku's default ASTs.
  * - `own_shape` — a product that is neither: its own AST dialect (swc, postcss,
@@ -186,6 +193,12 @@ const PARSE_PAYLOAD_TIERS: Readonly<Record<string, PayloadTier>> = {
 	'rsvelte-parse': 'drop_in',
 	'tsv-json-no-locations': 'span_only',
 	'tsv-wasm-json-no-locations': 'span_only',
+	// `loc` rebuilt in JS on every node: acorn-exact on TypeScript, so the drop-in tier; on
+	// Svelte a superset of the drop-in `loc` (template nodes gain one too), which only
+	// makes a ratio against `tsv-json` conservative for this row, and approximate on the
+	// two parser quirks `locations.js` declines (tag-position `Program.loc`, destructure +1)
+	'tsv-json-no-locations+reconstruct': 'drop_in',
+	'tsv-wasm-json-no-locations+reconstruct': 'drop_in',
 	'oxc-parser': 'span_only',
 	'oxc-parser-wasm': 'span_only',
 	'yuku-parser': 'span_only',
@@ -543,7 +556,7 @@ export function generate_skipped_files_report(
 		const truncated = error.length > max_error_length;
 		const display_error = truncated ? error.slice(0, max_error_length) + '...' : error;
 		lines.push(`  Error: ${display_error}`);
-		const failed_in = is_universal_tsv_failure(lang, benchmarks)
+		const failed_in = is_universal_tsv_failure(lang, benchmarks, task_tracking_by_group)
 			? 'all tsv variants'
 			: benchmarks.map((b) => tracking_key_display(b, task_tracking_by_group)).join(', ');
 		const prefix =
@@ -903,6 +916,10 @@ const COMPARISON_EXCLUSIONS: Readonly<Record<string, string>> = {
 	'tsv-json-no-locations': "tsv's own wire variant — a row of the group table, not an opponent",
 	'tsv-wasm-json-no-locations':
 		"tsv's own wire variant — a row of the group table, not an opponent",
+	'tsv-json-no-locations+reconstruct':
+		"tsv's own consumer-cost row — read against tsv-json in the span-only + reconstruct note, not an opponent",
+	'tsv-wasm-json-no-locations+reconstruct':
+		"tsv's own consumer-cost row — read against tsv-wasm-json in the span-only + reconstruct note, not an opponent",
 	'tsv-internal': "tsv's own parse-only variant; no third-party row is the same tier",
 	'tsv-wasm-internal': "tsv's own parse-only variant; no third-party row is the same tier",
 	'tsv-forced-async': 'opt-in async-tax control (`BENCH_FORCED_ASYNC=1`), deliberately unpublished',
@@ -1603,28 +1620,60 @@ export function generate_json_overhead_note(results: BenchmarkResult[]): string 
 }
 
 /**
- * Measured ratios for the reconstruct-vs-materialize note below. NOT computed
- * from bench rows (there is no reconstruct benchmark row) — the source of truth
- * is `benches/js/diagnostics/reconstruct_vs_materialize.ts`. Refresh these when
- * that diagnostic's number moves materially. `full` = reconstruct ALL `loc` in
- * JS; `loc_free` = the loc-sparse/free ceiling. TypeScript (exact), perf corpus.
+ * tsv's three parse wires per binding, as `[binding, loc_bearing, span_only,
+ * reconstruct]`: the loc-bearing drop-in wire, the span-only `no-locations` wire, and
+ * that span-only wire plus `loc` reconstructed over the whole tree in JS. The two
+ * ratios `generate_reconstruct_note` renders are both against `loc_bearing`, the
+ * product a `{locations: true}` consumer gets today.
  */
-const RECONSTRUCT_VS_MATERIALIZE = { full: '~1.7x', loc_free: '~2.2x' } as const;
+const RECONSTRUCT_ROWS: ReadonlyArray<
+	readonly [binding: string, loc_bearing: string, span_only: string, reconstruct: string]
+> = [
+	['native', 'tsv-json', 'tsv-json-no-locations', 'tsv-json-no-locations+reconstruct'],
+	['wasm', 'tsv-wasm-json', 'tsv-wasm-json-no-locations', 'tsv-wasm-json-no-locations+reconstruct']
+];
 
 /**
- * One-line consumer-side note: for a JS consumer that needs full `loc`, fetching
- * the span-only `no-locations` wire and reconstructing `loc` in JS (via the
- * shipped `reconstruct_locations` helper) beats fetching the full loc-bearing
- * `tsv-json` wire end-to-end — the full wire's `loc` bytes cost real `JSON.parse`
- * tokenization, while a line-start table + binary search is cheaper. So
- * pre-materializing `loc` in Rust is not optimal for JS consumers.
+ * Consumer-side note, COMPUTED from this run's parse rows: per language and binding,
+ * the loc-bearing wire against the span-only wire, and against the span-only wire
+ * plus `loc` reconstructed in JS over every node (the `+reconstruct` rows — the
+ * shipped `reconstruct_locations`, line-table build included). Speedup form like
+ * every other `Nx` in the report: >1 means that path is faster than fetching the
+ * loc-bearing wire, so the `+reconstruct` figure is what a consumer who wants every
+ * node's `loc` saves (or pays) by fetching spans and reconstructing.
  *
- * Not a tsv impl row (there's no reconstruct benchmark) — a curated cross-ref to
- * the diagnostic that measures it; see `RECONSTRUCT_VS_MATERIALIZE`.
+ * A cell needs all of its rows in the same group; a language or binding missing
+ * any is left out, and the note is omitted when nothing is left — a filtered or
+ * coverage-only run carries no stale claim.
+ *
+ * ⚠ The Svelte reconstruct is a superset of the drop-in `loc`: it adds `loc` to every
+ * node, where the Svelte wire carries it only on the acorn-parsed nodes (plus
+ * `name_loc`), so on Svelte the `+reconstruct` row builds the larger tree and its
+ * ratio is conservative. It is also approximate on two Svelte parser quirks it does not
+ * replicate — the `<script>` tag-position `Program.loc` and the destructure `+1` column
+ * (`crates/tsv_wasm/npm/locations.js`'s module doc) — which move values, not size.
  */
-export function generate_reconstruct_note(): string {
-	const { full, loc_free } = RECONSTRUCT_VS_MATERIALIZE;
-	return `_Consumer-side: for full \`loc\`, fetching the span-only \`no-locations\` wire and reconstructing \`loc\` in JS (\`reconstruct_locations\`, shipped in every parse-capable package) beats the full loc-bearing \`tsv-json\` wire end-to-end — ${full} faster reconstructing every node, ${loc_free} loc-free (TypeScript, exact; measured by \`diagnostics/reconstruct_vs_materialize.ts\`). Pre-materializing \`loc\` in Rust is not optimal for JS consumers._`;
+export function generate_reconstruct_note(all_group_results: GroupResults[]): string | null {
+	const parts: string[] = [];
+	for (const group of all_group_results) {
+		if (!group.name.startsWith('parse/')) continue;
+		const language = group.name.slice('parse/'.length);
+		const mean = (name: string): number | undefined =>
+			group.results.find((r) => r.name === name)?.stats.mean_ns;
+		const cells: string[] = [];
+		for (const [binding, loc_bearing, span_only, reconstruct] of RECONSTRUCT_ROWS) {
+			const base = mean(loc_bearing);
+			const span = mean(span_only);
+			const recon = mean(reconstruct);
+			if (base === undefined || span === undefined || recon === undefined) continue;
+			cells.push(
+				`${binding} span-only ${(base / span).toFixed(2)}x, +reconstruct ${(base / recon).toFixed(2)}x`
+			);
+		}
+		if (cells.length > 0) parts.push(`${language}: ${cells.join('; ')}`);
+	}
+	if (parts.length === 0) return null;
+	return `**Span-only + reconstruct vs the loc-bearing wire** (the binding's loc-bearing row — \`tsv-json\` / \`tsv-wasm-json\` — mean / row mean, speedup form; \`+reconstruct\` = the span-only wire plus \`loc\` on every node rebuilt in JS by the shipped \`reconstruct_locations\`, line table included — on Svelte a superset of the drop-in \`loc\`, so that ratio is conservative, and approximate on two parser quirks, the \`<script>\` tag-position \`Program.loc\` and the destructure +1 column): ${parts.join(' | ')}`;
 }
 
 /**
@@ -1647,28 +1696,41 @@ function classify_lang(path: string): SkipLang {
 }
 
 /**
- * The "universal tsv failure" pattern per language — the 6 tracking_keys
- * that fail together on unsupported-syntax fixtures (SCSS, JSX in .js,
- * early-stage proposals, etc.). When a file's failure set matches this
- * exactly, the per-file `Failed in:` list collapses to one short label;
- * anything else is rendered explicitly because it might be an
- * impl-specific bug worth chasing.
+ * The "universal tsv failure" pattern per language — every tsv row this run
+ * registered in the language's parse and format groups, which fail together on
+ * unsupported-syntax fixtures (SCSS, JSX in .js, early-stage proposals, etc.).
+ * When a file's failure set matches this exactly, the per-file `Failed in:` list
+ * collapses to one short label; anything else is rendered explicitly because it
+ * might be an impl-specific bug worth chasing.
+ *
+ * DERIVED from the run's task tracking rather than spelled as tracking keys: which tsv
+ * rows a group carries varies by language (CSS has no `no-locations` rows) and by
+ * surface (the `+reconstruct` rows are perf-only), so a hand-kept list cannot track it —
+ * the set is read from the rows this run actually registered. `null` (never collapse)
+ * without the tracking map.
  */
-function tsv_universal_set(lang: Exclude<SkipLang, 'other'>): Set<string> {
-	return new Set([
-		`parse/${lang}/native`,
-		`parse/${lang}/wasm`,
-		`parse/${lang}/native-internal`,
-		`parse/${lang}/wasm-internal`,
-		`format/${lang}/native`,
-		`format/${lang}/wasm`
-	]);
+function tsv_universal_set(
+	lang: Exclude<SkipLang, 'other'>,
+	task_tracking_by_group: Map<string, Map<string, string>> | undefined
+): Set<string> | null {
+	if (!task_tracking_by_group) return null;
+	const keys = new Set<string>();
+	for (const group of [`parse/${lang}`, `format/${lang}`]) {
+		for (const [name, key] of task_tracking_by_group.get(group) ?? []) {
+			if (name === 'tsv' || name.startsWith('tsv-')) keys.add(key);
+		}
+	}
+	return keys.size > 0 ? keys : null;
 }
 
-function is_universal_tsv_failure(lang: SkipLang, benchmarks: string[]): boolean {
+function is_universal_tsv_failure(
+	lang: SkipLang,
+	benchmarks: string[],
+	task_tracking_by_group: Map<string, Map<string, string>> | undefined
+): boolean {
 	if (lang === 'other') return false;
-	const universal = tsv_universal_set(lang);
-	if (benchmarks.length !== universal.size) return false;
+	const universal = tsv_universal_set(lang, task_tracking_by_group);
+	if (universal === null || benchmarks.length !== universal.size) return false;
 	for (const b of benchmarks) if (!universal.has(b)) return false;
 	return true;
 }
@@ -1789,7 +1851,7 @@ export function generate_skipped_files_markdown(
 		const display_error = (truncated ? e.error.slice(0, max_error_length) + '…' : e.error)
 			.replace(/`/g, '\\`')
 			.replace(/\n/g, ' ');
-		const failed_in = is_universal_tsv_failure(e.lang, e.benchmarks)
+		const failed_in = is_universal_tsv_failure(e.lang, e.benchmarks, task_tracking_by_group)
 			? 'all tsv variants'
 			: e.benchmarks.map((b) => tracking_key_display(b, task_tracking_by_group)).join(', ');
 		return [`- \`${e.file_path}\``, `  - Error: ${display_error}`, `  - Failed in: ${failed_in}`];

@@ -17,6 +17,10 @@
  * sidecar serializes it (JSON round-trip with BigInt → string), so fixture and
  * corpus semantics match; the tsv side is the shipped FFI wire
  * (`convert_ast_json_string`), which the WASM artifact shares post-Win-1.
+ * The span-only arm diffs the FFI `no-locations` wire against that same oracle
+ * output with every `loc` / `name_loc` removed — the wire's own contract (it
+ * omits exactly those keys), not a tolerance; everything else is raw-diffed as
+ * above.
  *
  * Multibyte files are the high-value slice: byte→UTF-16 offset translation vs
  * the canonical parsers' native offsets is the riskiest machinery. Use
@@ -38,6 +42,7 @@ import { z } from 'zod';
 
 import {
 	COMPARE_BASE_ARG_FIELDS,
+	type CompareFailure,
 	create_compare_loader,
 	dispose_compare,
 	emit_json_stdout,
@@ -50,6 +55,7 @@ import {
 	resolve_compare_base_path,
 	run_compare_main
 } from './lib/compare_cli.ts';
+import { is_native_panic_error } from './lib/divergence/panic_errors.ts';
 import { CORPUS_PARSE_COMPARED_PIN, CORPUS_PARSE_TSV_ERRORS_PIN } from './lib/gate_counts.ts';
 import { type Language, LANGUAGES } from './lib/types.ts';
 import {
@@ -159,6 +165,56 @@ function has_non_ascii(s: string): boolean {
 // retire that detector.
 export function bigint_replacer(_key: string, value: unknown): unknown {
 	return typeof value === 'bigint' ? value.toString() : value;
+}
+
+// --- The span-only arm -----------------------------------------------------------
+//
+// tsv's `no-locations` wire is graded against the SAME oracle output with its line/column
+// objects removed — the definition `tests/no_locations.rs` (`strip_locations`) and
+// `diagnostics/no_locations_parity.ts` both encode: every `loc` key and every Svelte
+// `name_loc` key, anywhere in the tree (the `character` field Svelte puts on a name-shaped
+// or in-tag-comment position lives inside one of those, so it goes too). Nothing else
+// differs between the two wires, so the arm reuses the diff engine and the documented
+// matchers unchanged: a span difference the loc arm excuses is excused identically here,
+// and a loc-only matcher (`each_as_stale_loc`) has nothing to match.
+
+/** The languages with a span-only export — CSS has none, because its wire carries no `loc`. */
+type SpanLanguage = Exclude<Language, 'css'>;
+const SPAN_ONLY_LANGUAGES: readonly SpanLanguage[] = ['svelte', 'typescript'];
+const is_span_language = (lang: Language): lang is SpanLanguage => lang !== 'css';
+
+/** The keys the span-only wire drops — see the section comment above. */
+const LOCATION_KEYS: ReadonlySet<string> = new Set(['loc', 'name_loc']);
+
+/** `bigint_replacer` that also drops the span-only wire's dropped keys. */
+function span_only_replacer(key: string, value: unknown): unknown {
+	return LOCATION_KEYS.has(key) ? undefined : bigint_replacer(key, value);
+}
+
+/** Per-language counts for the span-only arm. */
+interface SpanStats {
+	/** Files both tsv wires and the oracle parsed, so the span-only tree was diffed. */
+	compared: number;
+	match: number;
+	documented: number;
+	undocumented: number;
+	/**
+	 * Files the two tsv wires gave different VERDICTS on — one parsed, the other threw.
+	 * One parser behind two writers, so any count here is a binding bug, and fails.
+	 */
+	verdict_mismatch: number;
+}
+
+function empty_span_stats(): SpanStats {
+	return { compared: 0, match: 0, documented: 0, undocumented: 0, verdict_mismatch: 0 };
+}
+
+/** A file the two tsv wires disagreed on parsing — each side's first error line, or `parsed`. */
+interface SpanVerdictMismatch {
+	path: string;
+	language: Language;
+	loc_wire: string;
+	span_wire: string;
 }
 
 /** Truncated single-line preview of a leaf value for reports. */
@@ -842,30 +898,66 @@ function build_stats_block(stats: Map<Language, LanguageStats>) {
 	return { languages, total: stats_to_counts(totals) };
 }
 
+/** One diff group as the JSON report carries it — samples previewed, paths repo-relative. */
+function group_to_json(g: DiffGroup, base_path: string) {
+	return {
+		language: g.language,
+		signature: g.signature,
+		documented: g.documented,
+		file_count: g.files.size,
+		entry_count: g.entry_count,
+		files: [...g.files].slice(0, 20).map((p) => rel_path(p, base_path)),
+		samples: g.samples.map((s) => ({
+			file: rel_path(s.path, base_path),
+			path: s.entry.path,
+			kind: s.entry.kind,
+			ours: preview(s.entry.ours),
+			canonical: preview(s.entry.canonical)
+		}))
+	};
+}
+
+/** The span-only arm's books, as the run hands them to the JSON report. */
+interface SpanReport {
+	stats: Map<SpanLanguage, SpanStats>;
+	groups: DiffGroup[];
+	verdict_mismatches: SpanVerdictMismatch[];
+}
+
+/** The `span_only` block: per-language counts plus a summed total, its groups and verdict mismatches. */
+function build_span_json(span: SpanReport, base_path: string) {
+	const languages: Record<string, SpanStats> = {};
+	const total = empty_span_stats();
+	for (const [lang, s] of span.stats) {
+		languages[lang] = { ...s };
+		total.compared += s.compared;
+		total.match += s.match;
+		total.documented += s.documented;
+		total.undocumented += s.undocumented;
+		total.verdict_mismatch += s.verdict_mismatch;
+	}
+	return {
+		stats: { languages, total },
+		groups: span.groups.map((g) => group_to_json(g, base_path)),
+		verdict_mismatches: span.verdict_mismatches.map((m) => ({
+			...m,
+			path: rel_path(m.path, base_path)
+		}))
+	};
+}
+
 /** Build the single buffered JSON report. */
 function build_json_report(
 	results: Map<Language, FileResult[]>,
 	stats: Map<Language, LanguageStats>,
 	groups: DiffGroup[],
+	span: SpanReport,
 	base_path: string
 ): Record<string, unknown> {
 	return {
 		stats: build_stats_block(stats),
-		groups: groups.map((g) => ({
-			language: g.language,
-			signature: g.signature,
-			documented: g.documented,
-			file_count: g.files.size,
-			entry_count: g.entry_count,
-			files: [...g.files].slice(0, 20).map((p) => rel_path(p, base_path)),
-			samples: g.samples.map((s) => ({
-				file: rel_path(s.path, base_path),
-				path: s.entry.path,
-				kind: s.entry.kind,
-				ours: preview(s.entry.ours),
-				canonical: preview(s.entry.canonical)
-			}))
-		})),
+		groups: groups.map((g) => group_to_json(g, base_path)),
+		span_only: build_span_json(span, base_path),
 		errors: LANGUAGES.flatMap((lang) =>
 			results
 				.get(lang)!
@@ -955,6 +1047,18 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		stats.set(lang, empty_stats());
 	}
 
+	// The span-only arm's own books, kept apart from the loc arm's so neither table blends
+	// the two wires. Every language is keyed (CSS stays empty) so `build_groups` reads it.
+	const span_results: Map<Language, FileResult[]> = new Map(LANGUAGES.map((lang) => [lang, []]));
+	const span_stats_by_lang: Map<SpanLanguage, SpanStats> = new Map(
+		SPAN_ONLY_LANGUAGES.map((lang) => [lang, empty_span_stats()])
+	);
+	const span_verdict_mismatches: SpanVerdictMismatch[] = [];
+	// Span-wire panics, held for `gate_on_panics` beside the loc arm's failures: a file
+	// whose loc wire throws a plain rejection while the span wire panics reads as
+	// both-errored (no verdict mismatch) and is skipped, so nothing else would see it.
+	const span_panics: CompareFailure[] = [];
+
 	const lang_counts: Record<Language, number> = { svelte: 0, typescript: 0, css: 0 };
 	// Inject-mode split of `lang_counts`: the base files parsed only to seed the
 	// subtraction, and the manufactured inputs the run is actually about.
@@ -1001,14 +1105,62 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		}
 		let canonical_ast: unknown;
 		let canonical_error: string | null = null;
+		let canonical_raw: unknown;
 		try {
+			canonical_raw = canonical.parse(file.content, lang);
 			// Serialize exactly like the fixture sidecar does (BigInt → string;
 			// RegExp values collapse to {}), so corpus and fixture semantics match.
-			canonical_ast = JSON.parse(
-				JSON.stringify(canonical.parse(file.content, lang), bigint_replacer)
-			);
+			canonical_ast = JSON.parse(JSON.stringify(canonical_raw, bigint_replacer));
 		} catch (e) {
 			canonical_error = String(e instanceof Error ? e.message : e).split('\n')[0];
+		}
+
+		// The span-only arm (see `SPAN_ONLY_LANGUAGES`). Off under injection: those runs
+		// grade manufactured variants against their own base files, and the subtraction
+		// that makes that sound is built for the loc arm's results alone.
+		if (!injecting && is_span_language(lang)) {
+			const span_stats = span_stats_by_lang.get(lang)!;
+			let ours_span: unknown;
+			let span_error: string | null = null;
+			try {
+				ours_span = native.parse_no_locations(file.content, lang);
+			} catch (e) {
+				span_error = String(e instanceof Error ? e.message : e).split('\n')[0];
+				if (is_native_panic_error(span_error)) {
+					span_panics.push({ path: file.path, error: span_error });
+				}
+			}
+			if ((span_error === null) !== (tsv_error === null)) {
+				span_stats.verdict_mismatch++;
+				span_verdict_mismatches.push({
+					path: file.path,
+					language: lang,
+					loc_wire: tsv_error ?? 'parsed',
+					span_wire: span_error ?? 'parsed'
+				});
+			} else if (span_error === null && canonical_error === null) {
+				span_stats.compared++;
+				const canonical_span = JSON.parse(JSON.stringify(canonical_raw, span_only_replacer));
+				const span = diff_asts(ours_span, canonical_span, {
+					source: file.content,
+					canonical_root: canonical_span
+				});
+				if (span.diffs.length === 0) {
+					span_stats.match++;
+				} else {
+					const all_documented = span.diffs.every((d) => d.documented !== null);
+					if (all_documented) span_stats.documented++;
+					else span_stats.undocumented++;
+					span_results.get(lang)!.push({
+						path: file.path,
+						bytes: file.bytes,
+						multibyte,
+						status: all_documented ? 'documented' : 'undocumented',
+						diffs: span.diffs,
+						truncated: span.truncated
+					});
+				}
+			}
 		}
 
 		if (tsv_error || canonical_error) {
@@ -1107,7 +1259,17 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		// An empty scope is a failed comparison run, not a pass — an existing-but-
 		// source-empty path (typo, moved src/) must not read as green.
 		console.log('No files found — nothing was compared.');
-		if (json_mode) emit_json_stdout(build_json_report(results, stats, [], base_path));
+		if (json_mode) {
+			emit_json_stdout(
+				build_json_report(
+					results,
+					stats,
+					[],
+					{ stats: span_stats_by_lang, groups: [], verdict_mismatches: [] },
+					base_path
+				)
+			);
+		}
 		exit_compare_failure(impls);
 	}
 
@@ -1174,19 +1336,71 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		}
 	}
 
+	// The span-only arm's table: the same deep diff over the `no-locations` wire, against
+	// the oracle with its line/column objects stripped (see `SPAN_ONLY_LANGUAGES`).
+	const span_totals = empty_span_stats();
+	for (const s of span_stats_by_lang.values()) {
+		span_totals.compared += s.compared;
+		span_totals.match += s.match;
+		span_totals.documented += s.documented;
+		span_totals.undocumented += s.undocumented;
+		span_totals.verdict_mismatch += s.verdict_mismatch;
+	}
+	if (!injecting && span_totals.compared + span_totals.verdict_mismatch > 0) {
+		console.log('\nSpan-only arm (no-locations wire vs canonical with `loc`/`name_loc` stripped):');
+		const rows: [string, SpanStats][] = [
+			...[...span_stats_by_lang].filter(([, s]) => s.compared + s.verdict_mismatch > 0),
+			['total', span_totals]
+		];
+		for (const [label, s] of rows) {
+			if (label === 'total') console.log('  ' + '─'.repeat(72));
+			const pct = s.compared > 0 ? ((s.match / s.compared) * 100).toFixed(1) : '100.0';
+			const match_str = `${s.match}/${s.compared} exact (${pct}%)`.padEnd(26);
+			const parts: string[] = [];
+			if (s.documented > 0) parts.push(`${s.documented} documented`);
+			if (s.undocumented > 0) parts.push(`\x1b[31m${s.undocumented} UNDOCUMENTED\x1b[0m`);
+			if (s.verdict_mismatch > 0) {
+				parts.push(`\x1b[31m${s.verdict_mismatch} VERDICT MISMATCH (loc vs span wire)\x1b[0m`);
+			}
+			console.log(`  ${label.padEnd(12)} ${match_str} | ${parts.join(' | ') || 'all exact'}`);
+		}
+	}
+
 	const groups = build_groups(results);
 	const undocumented_groups = groups.filter((g) => g.documented === null);
 	const documented_groups = groups.filter((g) => g.documented !== null);
+	const span_groups = build_groups(span_results);
+	const span_undocumented_groups = span_groups.filter((g) => g.documented === null);
 
-	if (json_mode) emit_json_stdout(build_json_report(results, stats, groups, base_path));
+	if (json_mode) {
+		emit_json_stdout(
+			build_json_report(
+				results,
+				stats,
+				groups,
+				{
+					stats: span_stats_by_lang,
+					groups: span_groups,
+					verdict_mismatches: span_verdict_mismatches
+				},
+				base_path
+			)
+		);
+	}
 
 	// A caught panic hard-fails ahead of the "compared nothing" floor and the
 	// count pins — a tsv-side parse failure is otherwise dimmed as "skipped", and
 	// only `--all`'s exact `CORPUS_PARSE_TSV_ERRORS_PIN` would notice, reporting a
 	// crash as one more over-rejection. `canonical_error` files are excluded: their
-	// recorded message is the JS oracle's, which can't be a panic.
+	// recorded message is the JS oracle's, which can't be a panic. The span-only arm's
+	// panics ride along — no other check of that arm reaches a file both wires reject.
 	gate_on_panics(
-		LANGUAGES.flatMap((lang) => results.get(lang)!.filter((r) => r.status !== 'canonical_error')),
+		[
+			...LANGUAGES.flatMap((lang) =>
+				results.get(lang)!.filter((r) => r.status !== 'canonical_error')
+			),
+			...span_panics
+		],
 		impls,
 		base_path
 	);
@@ -1199,6 +1413,30 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 			`\x1b[31mFAIL: 0 of ${total_processed} files compared (all parse-fail-skipped) — systemic failure or wrong corpus?\x1b[0m`
 		);
 		exit_compare_failure(impls);
+	}
+
+	// The span-only arm's vacuity guard, structural rather than pinned: it diffs exactly the
+	// files the loc arm compares (both tsv wires and the oracle parsed — a verdict mismatch
+	// fails on its own), so per language its `compared` must EQUAL the loc arm's. An arm
+	// that silently stopped running would otherwise read as zero findings, not a failure.
+	// Unlike a count pin this holds on a narrowed root too, and a corpus refresh costs no
+	// re-pin. Off under injection, where the arm does not run, and for a language with a
+	// verdict mismatch, which the loc arm counts and the span arm cannot — that failure
+	// reports itself below, with its paths.
+	if (!injecting) {
+		const span_population_failures = SPAN_ONLY_LANGUAGES.filter((lang) => {
+			const span = span_stats_by_lang.get(lang)!;
+			return span.verdict_mismatch === 0 && span.compared !== stats.get(lang)!.compared;
+		}).map(
+			(lang) =>
+				`${lang} span-only compared ${span_stats_by_lang.get(lang)!.compared} ≠ loc-arm compared ${stats.get(lang)!.compared}`
+		);
+		if (span_population_failures.length > 0) {
+			console.log(
+				`\x1b[31mFAIL: span-only arm population — ${span_population_failures.join('; ')}\x1b[0m`
+			);
+			exit_compare_failure(impls);
+		}
 	}
 
 	// Pinned counts (--all only — see lib/gate_counts.ts): EXACT per-language
@@ -1230,10 +1468,11 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		}
 	}
 
-	// Undocumented groups — the actionable output
-	if (undocumented_groups.length > 0) {
-		console.log(`\n\x1b[31mUNDOCUMENTED diff groups (${undocumented_groups.length}):\x1b[0m`);
-		for (const g of undocumented_groups) {
+	// Undocumented groups — the actionable output, one listing per arm
+	const print_undocumented = (label: string, undocumented: DiffGroup[]): void => {
+		if (undocumented.length === 0) return;
+		console.log(`\n\x1b[31mUNDOCUMENTED ${label} (${undocumented.length}):\x1b[0m`);
+		for (const g of undocumented) {
 			console.log(
 				`\n  [${g.language}] ${g.signature}  (${g.files.size} files, ${g.entry_count} sites)`
 			);
@@ -1247,6 +1486,17 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 			if (g.files.size > g.samples.length) {
 				console.log(`    ... and ${g.files.size - g.samples.length} more files`);
 			}
+		}
+	};
+	print_undocumented('diff groups', undocumented_groups);
+	print_undocumented('span-only diff groups', span_undocumented_groups);
+	if (span_verdict_mismatches.length > 0) {
+		console.log(
+			`\n\x1b[31mVERDICT MISMATCH between the loc and span-only wires (${span_verdict_mismatches.length}):\x1b[0m`
+		);
+		for (const m of span_verdict_mismatches.slice(0, 10)) {
+			console.log(`  [${m.language}] ${rel_path(m.path, base_path)}`);
+			console.log(`    loc wire: ${m.loc_wire}  span wire: ${m.span_wire}`);
 		}
 	}
 
@@ -1274,13 +1524,26 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	}
 
 	console.log();
-	if (total_undocumented > 0) {
-		console.log(
-			`\x1b[31mFAIL: ${total_undocumented} file(s) with undocumented AST diffs vs canonical\x1b[0m`
-		);
+	const failures = [
+		...(total_undocumented > 0
+			? [`${total_undocumented} file(s) with undocumented AST diffs vs canonical`]
+			: []),
+		...(span_totals.undocumented > 0
+			? [`${span_totals.undocumented} file(s) with undocumented span-only AST diffs vs canonical`]
+			: []),
+		...(span_totals.verdict_mismatch > 0
+			? [`${span_totals.verdict_mismatch} file(s) the loc and span-only wires parse differently`]
+			: [])
+	];
+	if (failures.length > 0) {
+		console.log(`\x1b[31mFAIL: ${failures.join('; ')}\x1b[0m`);
 		exit_compare_failure(impls);
 	} else {
-		console.log('\x1b[32mPASS: no undocumented AST diffs vs canonical\x1b[0m');
+		console.log(
+			injecting
+				? '\x1b[32mPASS: no undocumented AST diffs vs canonical\x1b[0m'
+				: '\x1b[32mPASS: no undocumented AST diffs vs canonical, on either wire\x1b[0m'
+		);
 	}
 
 	dispose_compare(impls);
@@ -1297,6 +1560,14 @@ function build_error_json_report(message: string): Record<string, unknown> {
 	return {
 		stats: build_stats_block(empty),
 		groups: [],
+		span_only: build_span_json(
+			{
+				stats: new Map(SPAN_ONLY_LANGUAGES.map((lang) => [lang, empty_span_stats()])),
+				groups: [],
+				verdict_mismatches: []
+			},
+			''
+		),
 		errors: [],
 		truncated_files: [],
 		error: message

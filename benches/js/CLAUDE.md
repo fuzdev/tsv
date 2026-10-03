@@ -360,6 +360,24 @@ files; undocumented groups are the actionable output and fail the run (exit 1).
 Parse failures on either side are counted and skipped — `skip_triage.ts` is the
 dedicated tool for those.
 
+**The span-only arm.** For Svelte and TypeScript the same run also grades tsv's
+`no-locations` wire (the FFI's span-only export): per file, it is deep-diffed against
+the oracle's output with every `loc` and `name_loc` key removed — the definition
+`tests/no_locations.rs` and `diagnostics/no_locations_parity.ts` encode, and the whole of
+what that wire drops (the `character` field Svelte writes lives inside one of those).
+It reuses the diff engine and `DOCUMENTED_MATCHERS` unchanged, so a span difference the
+loc arm excuses is excused identically and a `loc`-only matcher has nothing to excuse;
+an undocumented span-only group fails the run, and so does a file the two tsv wires
+give different verdicts on (one parser behind two writers). It prints its own table
+and lands in `--json` as `span_only` (`stats`, `groups`, `verdict_mismatches`). Its
+vacuity guard is structural, not a pin: on every non-injecting run its per-language
+`compared` must equal the loc arm's (it diffs exactly the files that arm compares), so
+the check holds on a narrowed root too and a corpus refresh costs no re-pin. A span-wire
+panic rides the shared panic gate beside the loc arm's — a file whose loc wire throws a
+plain rejection while the span wire panics would otherwise read as both-errored and be
+skipped. CSS needs no arm — its wire carries no `loc`, so the main arm already grades it span-only. Off under
+`--inject*`, whose baseline subtraction is built for the loc arm alone.
+
 The documented-divergence matchers live in `corpus_compare_parse.ts`
 (`DOCUMENTED_MATCHERS`) and cover only the AST-content divergences that parse on
 both sides (comment-attachment duplication, async-generic-arrow params); the
@@ -1514,8 +1532,9 @@ Per-file detail (paths, error messages, failure sets) is opt-in via `--verbose`,
 most universal-tsv failures are unsupported-syntax fixtures (SCSS in `.css`, JSX in
 `.js`, early-stage proposals). When verbose, entries sort ascending by failure-set
 size so rare / impl-specific failures land at the top, and the `Failed in:` line
-collapses to `all tsv variants` when the failure set matches the canonical 6-element
-pattern. All labels use display names (`tsv-json`, `acorn-typescript`) rather than
+collapses to `all tsv variants` when the failure set is exactly the tsv rows the run
+registered in that language's groups (derived from the task tracking — which rows exist
+varies by language and surface). All labels use display names (`tsv-json`, `acorn-typescript`) rather than
 internal trackingKeys. If an impl fails on many files (e.g. WASM panics corrupting
 internal state), the coverage report and skip counts make it visible without
 `--verbose`.
@@ -1685,10 +1704,10 @@ fail with a message when `Deno.dlopen` loads it — `skip_triage` segfaulted at 
 a twelve-day-old `libtsv_ffi.so` with nothing naming the cause — so a stale one now
 aborts with the rebuild hint (`BENCH_STALE_OK=1` downgrades it). That includes the
 ones that measure only the native path
-(`no_locations_parity`, `reconstruct_vs_materialize`, `skip_triage`), where an
+(`no_locations_parity`, `skip_triage`), where an
 unbuilt bundle otherwise fails a run that would never have touched it, with a WASM
 error naming nothing the script is about: `deno task build:ffi && deno task
-build:wasm:all:deno` first (these three read the `release` FFI, not `corpus`). The
+build:wasm:all:deno` first (these two read the `release` FFI, not `corpus`). The
 two with `deno task` entries — `css:over-acceptance` and `ts-repo:over-acceptance`
 — build what they need themselves.
 
@@ -1707,7 +1726,6 @@ Seven live here but are documented above: the parse-conformance gates
 | `ts_repo_over_acceptance.ts` | per-tool OVER-ACCEPTANCE over the tsc corpus — the files tsc's own PARSER rejects (`.cache/ts_repo_rejects.json`). The axis coverage structurally cannot show: coverage counts accepts, so it can only reward permissiveness, and every conformance corpus is therefore filtered to VALID inputs. Read inverted (lower is better) and as a PROFILE, not a gate — a deferred early error is a documented tsv posture, and the per-file gate on tsv alone is `conformance:ts-repo`. The `tsc` row must read 0 (it built the list); anything else fails the run as a stale cache | `ts-repo:over-acceptance` |
 | `biome_oxfmt_diff.ts` | 4-way formatter differential (tsv vs prettier vs biome-wasm vs oxfmt) so a tsv-vs-prettier divergence can be bucketed *tsv alone* (candidate bug) vs *tsv + another agree* (candidate sanctioned divergence). Prettier is routed through the **typescript** parser, never babel | — |
 | `no_locations_parity.ts` | proves the `no-locations` wire is losslessly reconstructible (TS exact; two Svelte non-derivable cases classified, not failed, and two classes counted and set aside — the two-line-class sources the shipped helper refuses, and the block-binding annotations it places from the tree). The reference reconstruction a consumer would use. ⚠️ Both sides are tsv's — the wire, and a JS transcription of `tsv_lang::LocationTracker` — so it grades the TRANSCRIPTION, not the shared `loc` model; the canonical parser's own `loc` is what would make it an oracle | — |
-| `reconstruct_vs_materialize.ts` | its **perf** sibling: is it faster to materialize `loc` in Rust or reconstruct it in JS? (Finding: reconstruct wins.) Feeds the committed report's consumer-side note | — |
 | `wasm_json_probe.ts` | splits parse cost into pure-parse vs materialization for native + WASM, isolating JS-side `JSON.parse` | — |
 | `wasm_format_probe.ts` | WASM **format** wall-time A/B at single-digit-% resolution (paired discipline: interleaved pairs, in-run A/A noise floor, byte-identity gate) | — |
 | `wasm_memory_probe.ts` | WASM **linear-memory high-water** for `format()` — the axis the wall-time probe can't see, and the gate for doc-IR memory work. `--cold` (per-file cold-start peak) or default steady-state | — |
