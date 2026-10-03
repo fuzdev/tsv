@@ -2,6 +2,8 @@
 //!
 //! This crate provides core types shared across all language implementations:
 //! - `Span` - source code location tracking
+//! - `WireCoordinates` / `WirePoint` - a language's position coordinates (its line rule
+//!   and how it counts a leading BOM), and one position in them
 //! - `WireTables` / `WirePositions` - what a wire writer emits positions from (the
 //!   byte→UTF-16 map, and the line table under the `locations` feature);
 //!   `LocationTracker` / `ByteToCharMap` / `LocationMapper` - the line/column machinery
@@ -58,13 +60,13 @@ pub use comment::{
     range_too_narrow_for_a_comment,
 };
 pub use config::{EmbedContext, INDENT, LayoutMode, PRINT_WIDTH, TAB_WIDTH};
-pub use error::{ErrorContext, ParseError, Result, lex_err};
+pub use error::{ParseError, Result, lex_err};
 pub use hash::{FxBuildHasher, FxHashMap, FxHashSet, FxHasher};
 #[cfg(feature = "json")]
 pub use json_writer::{JsonWriter, StageRun, StagedDigits, write_array, write_or_null};
 pub use location::{
-    BOM, ByteToCharMap, LeadingBom, LocationMapper, LocationTracker, Position, WirePositions,
-    WireTables, leading_bom_len,
+    BOM, ByteToCharMap, LeadingBom, LineRule, LocationMapper, LocationTracker, Position,
+    WireCoordinates, WirePoint, WirePositions, WireTables, leading_bom_len,
 };
 pub use output::{OutputBuffer, write_indent};
 pub use sizing::{estimated_ast_arena_capacity, estimated_json_capacity};

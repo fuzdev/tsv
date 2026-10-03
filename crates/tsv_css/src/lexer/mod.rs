@@ -105,7 +105,7 @@ impl<'a> Lexer<'a> {
         // Skip UTF-8 BOM (U+FEFF) at start of file if present.
         // BOM is a legacy artifact; we strip it (like deno fmt, VS Code).
         // Position starts after BOM so token spans reflect actual file bytes; the WIRE
-        // elides it at emission (`LeadingBom::Elided` in the writer), since `parseCss`
+        // elides it at emission (`LeadingBom::Elided` in `WIRE_COORDINATES`), since `parseCss`
         // strips it before parsing and its offsets index the BOM-less string.
         let pos = tsv_lang::leading_bom_len(source);
         Self {

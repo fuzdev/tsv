@@ -5,14 +5,15 @@
 //! JS string into a Rust `String` and the returned `String` back out, so there
 //! are no raw pointers and no manual free — the cleanest of the three bindings.
 //!
-//! Transport mirrors `tsv_wasm`'s deliberate choice: `parse_<lang>` returns the
+//! Transport mirrors `tsv_wasm`'s deliberate choice: `parse_<lang>_json` returns the
 //! span-only wire as a JSON **string** for the host to `JSON.parse`, rather than
 //! building the object graph node-by-node across the boundary (measurably slower).
 //! It is the one wire every binding emits — `start`/`end` offsets, no per-node
 //! `loc`; the `@fuzdev/tsv` loader's `{locations: true}` reconstructs `loc` in JS.
 //! `format_<lang>` returns the formatted source directly. Engine errors surface as
-//! thrown JS errors (`napi::Error`); `parse_internal_<lang>` parses without
-//! converting (benchmark-only, AST kept live via `black_box`).
+//! thrown JS errors (`napi::Error`) — a parse failure as an `Error` carrying its point as
+//! own `start` / `line` / `column` properties (`Failure`); `parse_internal_<lang>` parses
+//! without converting (benchmark-only, AST kept live via `black_box`).
 //!
 //! **Panic contract**: every export carries `#[napi(catch_unwind)]`, and the
 //! addon builds with the workspace `napi` profile (`release` + `panic =
@@ -27,6 +28,8 @@
 //! `parse` cargo features gate which entry points are emitted (mirrors
 //! `tsv_ffi` / `tsv_wasm`).
 
+use napi::bindgen_prelude::JsObjectValue;
+use napi::{Env, JsValue};
 use napi_derive::napi;
 
 #[cfg(feature = "format")]
@@ -64,7 +67,7 @@ fn napi_source_type(
     source_type: Option<String>,
     allowed: bool,
     noun: &str,
-) -> napi::Result<Option<tsv_ts::Goal>> {
+) -> Result<Option<tsv_ts::Goal>, Failure> {
     let Some(source_type) = source_type else {
         return Ok(None);
     };
@@ -72,15 +75,102 @@ fn napi_source_type(
         // `noun` names the export family (`parse` / `format`), as the npm facade's
         // options reader and `tsv_wasm` spell it — this addon is published on its own
         // (`@fuzdev/tsv-<triple>`), so it says the whole sentence itself
-        return Err(napi::Error::from_reason(
-            tsv_arena::source_type_unsupported_message(noun),
-        ));
+        return Err(Failure::Plain(tsv_arena::source_type_unsupported_message(
+            noun,
+        )));
     }
     tsv_ts::Goal::from_source_type(&source_type)
         .map(Some)
-        .ok_or_else(|| {
-            napi::Error::from_reason(tsv_arena::invalid_source_type_message(&source_type))
-        })
+        .ok_or_else(|| Failure::Plain(tsv_arena::invalid_source_type_message(&source_type)))
+}
+
+/// What an export's engine half fails with, before it meets the JS boundary — split from
+/// `napi::Error` because the thrown value of a parse failure carries properties only an
+/// `Env` can set, and the engine half (each language's `engine` module) runs without one,
+/// which is what lets the in-crate tests drive it.
+#[derive(Debug, PartialEq, Eq)]
+enum Failure {
+    /// A refusal or an internal failure — a source type the export cannot take, a source
+    /// over the size cap: thrown as a plain `Error` carrying this message.
+    Plain(String),
+    /// A parse failure at a point in the document's wire coordinates
+    /// (`ParseError::wire_point`).
+    Syntax {
+        message: String,
+        start: u32,
+        line: u32,
+        column: u32,
+    },
+}
+
+impl Failure {
+    /// A parse error: located ones carry their point, the positionless one (a source over
+    /// the size cap) is plain.
+    #[cfg(any(feature = "parse", feature = "format"))]
+    fn parse(e: &tsv_ts::ParseError) -> Self {
+        let message = e.to_string();
+        match e.wire_point() {
+            Some(point) => Failure::Syntax {
+                message,
+                start: point.start,
+                line: point.line,
+                column: point.column,
+            },
+            None => Failure::Plain(message),
+        }
+    }
+
+    /// The message the thrown error carries.
+    #[cfg(test)]
+    fn message(&self) -> &str {
+        match self {
+            Failure::Plain(message) | Failure::Syntax { message, .. } => message,
+        }
+    }
+
+    /// The value the export throws: a plain JS `Error` carrying the message — and, for a
+    /// parse failure, own enumerable numeric `start`, `line` and `column` properties, which
+    /// the npm facade (`npm/api.js`) reads to rethrow it as the published `SyntaxError`, so
+    /// these names are its contract, shared with `tsv_wasm`. Built on `env` and handed to
+    /// napi-rs as a reference (`napi::Error::from(Unknown)`), so the object thrown is this
+    /// one. Were building it to fail, the message still throws, without the point.
+    fn into_napi(self, env: Env) -> napi::Error {
+        match self {
+            Failure::Plain(message) => napi::Error::from_reason(message),
+            Failure::Syntax {
+                message,
+                start,
+                line,
+                column,
+            } => match pointed_error(env, &message, start, line, column) {
+                Ok(error) => error,
+                Err(_) => napi::Error::from_reason(message),
+            },
+        }
+    }
+}
+
+/// A JS `Error` carrying `message` and the three point properties, as a `napi::Error`
+/// that throws that very object.
+///
+/// Each property is deleted before it is set, so all three are own ENUMERABLE data
+/// properties — what the facade requires of a point. Bun gives every `Error` its own
+/// non-enumerable `line` and `column` at construction, and a plain set writes through
+/// that property and keeps it non-enumerable; with nothing to delete (Node, Deno) the
+/// delete is a no-op.
+fn pointed_error(
+    env: Env,
+    message: &str,
+    start: u32,
+    line: u32,
+    column: u32,
+) -> napi::Result<napi::Error> {
+    let mut error = env.create_error(napi::Error::from_reason(message))?;
+    for (name, value) in [("start", start), ("line", line), ("column", column)] {
+        error.delete_named_property(name)?;
+        error.set(name, value)?;
+    }
+    Ok(napi::Error::from(error.to_unknown()))
 }
 
 // Per-language compound-op helpers: parse the source into a per-thread AST arena
@@ -92,7 +182,7 @@ macro_rules! parse_convert {
     ($goalness:ident, $lang:ident, $conv:ident, $source:expr, $goal:expr) => {
         with_ast_arena(|arena| {
             let ast = parse_ast!($goalness, $lang, $source, $goal, arena)
-                .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+                .map_err(|e| Failure::parse(&e))?;
             Ok($lang::$conv(&ast, $source))
         })
     };
@@ -103,7 +193,7 @@ macro_rules! parse_internal {
     ($goalness:ident, $lang:ident, $source:expr, $goal:expr) => {
         with_ast_arena(|arena| {
             let ast = parse_ast!($goalness, $lang, $source, $goal, arena)
-                .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+                .map_err(|e| Failure::parse(&e))?;
             std::hint::black_box(&ast);
             Ok(())
         })
@@ -119,8 +209,10 @@ macro_rules! parse_format {
         let folded = tsv_lang::printing::normalize_carriage_returns($source);
         let source = folded.text();
         with_ast_arena(|arena| {
+            // a parse error indexes the folded text: mapped back onto the caller's
+            // source, its point is the one a parse of that source reports
             let ast = parse_ast_for_format!($goalness, $lang, source, $goal, arena)
-                .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+                .map_err(|e| Failure::parse(&folded.unfold_error(e)))?;
             Ok(with_doc_arena(|doc_arena| {
                 $lang::format_folded_in(&ast, &folded, doc_arena)
             }))
@@ -128,10 +220,17 @@ macro_rules! parse_format {
     }};
 }
 
-/// Generate `parse_<lang>` / `parse_internal_<lang>` / `format_<lang>` N-API
+/// Generate `parse_<lang>_json` / `parse_internal_<lang>` / `format_<lang>` N-API
 /// functions for one language module. The `js_name` literals keep the JS export
 /// names snake_case for parity with `tsv_wasm` (napi-rs would otherwise camelCase
-/// them).
+/// them); `parse_<lang>_json` is the name `tsv_wasm` gives the same string-returning
+/// export (the WASM engine's `parse_<lang>` returns the parsed object, which this
+/// addon leaves to its host's `JSON.parse`).
+///
+/// Each export is two halves: the engine work, in a module named for the language
+/// (`$engine`), returning a [`Failure`] — what the in-crate tests drive, since they
+/// cannot construct an `Env` — and the `#[napi]` wrapper, which takes the `Env` napi-rs
+/// injects (not a JS argument, so the JS arity is unchanged) to build the thrown value.
 // One export per (language, operation), each taking the same
 // `(source, sourceType?)` arguments. The `$goalness` axis decides only whether a
 // `sourceType` ARGUMENT is accepted, never the arity: there is no goalless twin
@@ -151,18 +250,58 @@ macro_rules! lang_bindings {
     (
         $goalness:ident,
         $lang:ident,
-        $parse_fn:ident, $parse_js:literal,
+        $engine:ident,
+        $parse_json_fn:ident, $parse_json_js:literal,
         $parse_internal_fn:ident, $parse_internal_js:literal,
         $format_fn:ident, $format_js:literal
     ) => {
+        /// The engine halves of this language's exports (see `lang_bindings!`).
+        mod $engine {
+            use super::*;
+
+            /// The span-only JSON AST as a string.
+            #[cfg(feature = "parse")]
+            pub(super) fn parse_json(
+                source: &str,
+                source_type: Option<String>,
+            ) -> Result<String, Failure> {
+                let goal = napi_source_type(source_type, goal_allowed!($goalness), "parse")?
+                    .unwrap_or(tsv_ts::Goal::Module);
+                parse_convert!($goalness, $lang, convert_ast_json_string, source, goal)
+            }
+
+            /// Parse only, no conversion.
+            #[cfg(feature = "parse")]
+            pub(super) fn parse_internal(
+                source: &str,
+                source_type: Option<String>,
+            ) -> Result<(), Failure> {
+                let goal = napi_source_type(source_type, goal_allowed!($goalness), "parse")?
+                    .unwrap_or(tsv_ts::Goal::Module);
+                parse_internal!($goalness, $lang, source, goal)
+            }
+
+            /// The formatted source.
+            #[cfg(feature = "format")]
+            pub(super) fn format(
+                source: &str,
+                source_type: Option<String>,
+            ) -> Result<String, Failure> {
+                let goal = napi_source_type(source_type, goal_allowed!($goalness), "format")?;
+                parse_format!($goalness, $lang, source, goal)
+            }
+        }
+
         /// Parse source code and return its span-only JSON AST as a string —
         /// `start`/`end` offsets, no per-node `loc` (Svelte also no `name_loc`).
         #[cfg(feature = "parse")]
-        #[napi(js_name = $parse_js, catch_unwind)]
-        pub fn $parse_fn(source: String, source_type: Option<String>) -> napi::Result<String> {
-            let goal = napi_source_type(source_type, goal_allowed!($goalness), "parse")?
-                .unwrap_or(tsv_ts::Goal::Module);
-            parse_convert!($goalness, $lang, convert_ast_json_string, &source, goal)
+        #[napi(js_name = $parse_json_js, catch_unwind)]
+        pub fn $parse_json_fn(
+            env: Env,
+            source: String,
+            source_type: Option<String>,
+        ) -> napi::Result<String> {
+            $engine::parse_json(&source, source_type).map_err(|f| f.into_napi(env))
         }
 
         /// Parse source to the internal AST only (no conversion, no
@@ -170,10 +309,12 @@ macro_rules! lang_bindings {
         /// parse can't be optimized away.
         #[cfg(feature = "parse")]
         #[napi(js_name = $parse_internal_js, catch_unwind)]
-        pub fn $parse_internal_fn(source: String, source_type: Option<String>) -> napi::Result<()> {
-            let goal = napi_source_type(source_type, goal_allowed!($goalness), "parse")?
-                .unwrap_or(tsv_ts::Goal::Module);
-            parse_internal!($goalness, $lang, &source, goal)
+        pub fn $parse_internal_fn(
+            env: Env,
+            source: String,
+            source_type: Option<String>,
+        ) -> napi::Result<()> {
+            $engine::parse_internal(&source, source_type).map_err(|f| f.into_napi(env))
         }
 
         /// Format source code and return the formatted string. The source type
@@ -181,9 +322,12 @@ macro_rules! lang_bindings {
         /// Omitted, it means none was named: the module grammar, retried as a script.
         #[cfg(feature = "format")]
         #[napi(js_name = $format_js, catch_unwind)]
-        pub fn $format_fn(source: String, source_type: Option<String>) -> napi::Result<String> {
-            let goal = napi_source_type(source_type, goal_allowed!($goalness), "format")?;
-            parse_format!($goalness, $lang, &source, goal)
+        pub fn $format_fn(
+            env: Env,
+            source: String,
+            source_type: Option<String>,
+        ) -> napi::Result<String> {
+            $engine::format(&source, source_type).map_err(|f| f.into_napi(env))
         }
     };
 }
@@ -191,8 +335,9 @@ macro_rules! lang_bindings {
 lang_bindings!(
     nogoal,
     tsv_svelte,
-    parse_svelte,
-    "parse_svelte",
+    svelte_engine,
+    parse_svelte_json,
+    "parse_svelte_json",
     parse_internal_svelte,
     "parse_internal_svelte",
     format_svelte,
@@ -201,8 +346,9 @@ lang_bindings!(
 lang_bindings!(
     goal,
     tsv_ts,
-    parse_typescript,
-    "parse_typescript",
+    typescript_engine,
+    parse_typescript_json,
+    "parse_typescript_json",
     parse_internal_typescript,
     "parse_internal_typescript",
     format_typescript,
@@ -211,8 +357,9 @@ lang_bindings!(
 lang_bindings!(
     nogoal,
     tsv_css,
-    parse_css,
-    "parse_css",
+    css_engine,
+    parse_css_json,
+    "parse_css_json",
     parse_internal_css,
     "parse_internal_css",
     format_css,
@@ -516,20 +663,20 @@ pub fn panic_probe() {
 mod tests {
     use super::*;
 
-    /// Signature shared by every `parse_<lang>` / `format_<lang>` entry point.
-    type StringFn = fn(String, Option<String>) -> napi::Result<String>;
-    /// Signature shared by every `parse_internal_<lang>` entry point.
-    type UnitFn = fn(String, Option<String>) -> napi::Result<()>;
+    /// Signature shared by every `parse_json` / `format` engine half.
+    type StringFn = fn(&str, Option<String>) -> Result<String, Failure>;
+    /// Signature shared by every `parse_internal` engine half.
+    type UnitFn = fn(&str, Option<String>) -> Result<(), Failure>;
 
     /// Call at the default (Module) goal, i.e. with the `source_type` argument omitted —
     /// the shape every non-TypeScript caller uses.
-    fn at_default(f: StringFn, source: &str) -> napi::Result<String> {
-        f(source.to_owned(), None)
+    fn at_default(f: StringFn, source: &str) -> Result<String, Failure> {
+        f(source, None)
     }
 
     /// Call at an explicit goal.
-    fn at_goal(f: StringFn, source: &str, goal: &str) -> napi::Result<String> {
-        f(source.to_owned(), Some(goal.to_owned()))
+    fn at_goal(f: StringFn, source: &str, goal: &str) -> Result<String, Failure> {
+        f(source, Some(goal.to_owned()))
     }
 
     // --- format: normalizes, every language (exact output) ---
@@ -539,14 +686,19 @@ mod tests {
         let cases: [(&str, StringFn, &str, &str); 3] = [
             (
                 "typescript",
-                format_typescript,
+                typescript_engine::format,
                 "const   x=1",
                 "const x = 1;\n",
             ),
-            ("css", format_css, "a{color:red}", "a {\n\tcolor: red;\n}\n"),
+            (
+                "css",
+                css_engine::format,
+                "a{color:red}",
+                "a {\n\tcolor: red;\n}\n",
+            ),
             (
                 "svelte",
-                format_svelte,
+                svelte_engine::format,
                 "<div   >x</div   >",
                 "<div>x</div>\n",
             ),
@@ -561,12 +713,22 @@ mod tests {
     #[test]
     fn parse_returns_language_root_type() {
         // The root `type` is distinct per language, so asserting it also guards
-        // the `lang_bindings!` wiring: a transposed invocation (e.g. `parse_css`
+        // the `lang_bindings!` wiring: a transposed invocation (e.g. `parse_css_json`
         // pointed at `tsv_ts`) would return the wrong root, not just "some JSON."
         let cases: [(&str, StringFn, &str, &str); 3] = [
-            ("typescript", parse_typescript, "const x = 1;", "Program"),
-            ("css", parse_css, "a { color: red }", "StyleSheetFile"),
-            ("svelte", parse_svelte, "<div>x</div>", "Root"),
+            (
+                "typescript",
+                typescript_engine::parse_json,
+                "const x = 1;",
+                "Program",
+            ),
+            (
+                "css",
+                css_engine::parse_json,
+                "a { color: red }",
+                "StyleSheetFile",
+            ),
+            ("svelte", svelte_engine::parse_json, "<div>x</div>", "Root"),
         ];
         for (label, f, src, root_type) in cases {
             let json = at_default(f, src).unwrap();
@@ -589,25 +751,26 @@ mod tests {
 
     #[test]
     fn typescript_goal_switches_await() {
+        use typescript_engine::{format, parse_internal, parse_json};
         // `await` is an ordinary identifier at Script goal, reserved at Module goal.
         let src = "var await = 1;\n";
-        assert!(at_goal(parse_typescript, src, "script").is_ok());
-        assert!(at_goal(parse_typescript, src, "module").is_err());
+        assert!(at_goal(parse_json, src, "script").is_ok());
+        assert!(at_goal(parse_json, src, "module").is_err());
         // An omitted goal is the Module default, not a third behavior.
-        assert!(at_default(parse_typescript, src).is_err());
-        assert!(parse_internal_typescript(src.to_owned(), Some("script".to_owned())).is_ok());
-        assert!(parse_internal_typescript(src.to_owned(), Some("module".to_owned())).is_err());
-        assert!(parse_internal_typescript(src.to_owned(), None).is_err());
+        assert!(at_default(parse_json, src).is_err());
+        assert!(parse_internal(src, Some("script".to_owned())).is_ok());
+        assert!(parse_internal(src, Some("module".to_owned())).is_err());
+        assert!(parse_internal(src, None).is_err());
         // The format twin: the goal shapes the parse the formatter runs.
         assert_eq!(
-            at_goal(format_typescript, "var   await=1", "script").unwrap(),
+            at_goal(format, "var   await=1", "script").unwrap(),
             "var await = 1;\n",
             "script-goal format"
         );
-        assert!(at_goal(format_typescript, src, "module").is_err());
+        assert!(at_goal(format, src, "module").is_err());
         // An invalid `sourceType` string is a thrown error, not a silent module fallback.
-        assert!(at_goal(parse_typescript, src, "sloppy").is_err());
-        assert!(at_goal(format_typescript, src, "sloppy").is_err());
+        assert!(at_goal(parse_json, src, "sloppy").is_err());
+        assert!(at_goal(format, src, "sloppy").is_err());
     }
 
     #[test]
@@ -622,51 +785,57 @@ mod tests {
         // line, so a refusal can be lost on exactly one of them.
         // `parse_internal_*` returns `()` and is driven separately below.
         let cases: [(&str, StringFn, &str); 4] = [
-            ("svelte parse", parse_svelte, "<div>x</div>"),
-            ("svelte format", format_svelte, "<div>x</div>"),
-            ("css parse", parse_css, "a { color: red }"),
-            ("css format", format_css, "a { color: red }"),
+            ("svelte parse", svelte_engine::parse_json, "<div>x</div>"),
+            ("svelte format", svelte_engine::format, "<div>x</div>"),
+            ("css parse", css_engine::parse_json, "a { color: red }"),
+            ("css format", css_engine::format, "a { color: red }"),
         ];
         for (label, f, src) in cases {
             // Even `"module"` — the value they would have used — is refused: the
             // rejection is of the AXIS, so a caller cannot read agreement into it.
             // The whole sentence is asserted, noun included: this addon is
             // published on its own, and the loader and `tsv_wasm` spell it with the
-            // export family up front.
+            // export family up front. A refusal is a plain error, never a pointed one.
             let noun = if label.contains("format") {
                 "format"
             } else {
                 "parse"
             };
             for goal in ["script", "module"] {
-                let err = at_goal(f, src, goal).unwrap_err();
                 assert_eq!(
-                    err.reason,
-                    tsv_arena::source_type_unsupported_message(noun),
+                    at_goal(f, src, goal),
+                    Err(Failure::Plain(tsv_arena::source_type_unsupported_message(
+                        noun
+                    ))),
                     "{label} at {goal}"
                 );
             }
-            at_default(f, src).unwrap_or_else(|e| panic!("{label}: {}", e.reason));
+            at_default(f, src).unwrap_or_else(|e| panic!("{label}: {}", e.message()));
         }
 
         let internal: [(&str, UnitFn, &str); 2] = [
             (
                 "svelte parse_internal",
-                parse_internal_svelte,
+                svelte_engine::parse_internal,
                 "<div>x</div>",
             ),
-            ("css parse_internal", parse_internal_css, "a { color: red }"),
+            (
+                "css parse_internal",
+                css_engine::parse_internal,
+                "a { color: red }",
+            ),
         ];
         for (label, f, src) in internal {
             for goal in ["script", "module"] {
-                let err = f(src.to_owned(), Some(goal.to_owned())).unwrap_err();
                 assert_eq!(
-                    err.reason,
-                    tsv_arena::source_type_unsupported_message("parse"),
+                    f(src, Some(goal.to_owned())),
+                    Err(Failure::Plain(tsv_arena::source_type_unsupported_message(
+                        "parse"
+                    ))),
                     "{label} at {goal}"
                 );
             }
-            f(src.to_owned(), None).unwrap_or_else(|e| panic!("{label}: {}", e.reason));
+            f(src, None).unwrap_or_else(|e| panic!("{label}: {}", e.message()));
         }
     }
 
@@ -675,44 +844,107 @@ mod tests {
     #[test]
     fn parse_internal_ok_per_language() {
         let cases: [(&str, UnitFn, &str); 3] = [
-            ("typescript", parse_internal_typescript, "const x = 1;"),
-            ("css", parse_internal_css, "a { color: red }"),
-            ("svelte", parse_internal_svelte, "<div>x</div>"),
+            (
+                "typescript",
+                typescript_engine::parse_internal,
+                "const x = 1;",
+            ),
+            ("css", css_engine::parse_internal, "a { color: red }"),
+            ("svelte", svelte_engine::parse_internal, "<div>x</div>"),
         ];
         for (label, f, src) in cases {
-            f(src.to_owned(), None).unwrap_or_else(|e| panic!("{label}: {}", e.reason));
+            f(src, None).unwrap_or_else(|e| panic!("{label}: {}", e.message()));
         }
     }
 
-    // --- errors surface as a thrown napi::Error carrying the engine message ---
+    // --- errors: a parse failure carries its message and its point ---
 
     #[test]
     fn invalid_syntax_errors_per_language() {
-        // Both parse and format wrap the engine error into a napi::Error (which
-        // napi-rs throws — there is no `{"error": …}` envelope, unlike FFI).
-        // Cover the error arm for every language across both entry-point kinds.
-        let cases: [(&str, StringFn, StringFn, &str); 3] = [
+        // Parse and format both fail a source that does not parse with a pointed
+        // `Failure` (thrown by the wrapper as an `Error` with `start` / `line` / `column`),
+        // its message the engine's, and the point the message's header prints.
+        type Engine = (&'static str, StringFn, StringFn, UnitFn);
+        let cases: [(Engine, &str); 3] = [
             (
-                "typescript",
-                parse_typescript,
-                format_typescript,
+                (
+                    "typescript",
+                    typescript_engine::parse_json,
+                    typescript_engine::format,
+                    typescript_engine::parse_internal,
+                ),
                 "const = ;",
             ),
-            ("css", parse_css, format_css, "a {"),
-            ("svelte", parse_svelte, format_svelte, "<div {"),
+            (
+                (
+                    "css",
+                    css_engine::parse_json,
+                    css_engine::format,
+                    css_engine::parse_internal,
+                ),
+                "a {",
+            ),
+            (
+                (
+                    "svelte",
+                    svelte_engine::parse_json,
+                    svelte_engine::format,
+                    svelte_engine::parse_internal,
+                ),
+                "<div {",
+            ),
         ];
-        for (label, parse_fn, format_fn, src) in cases {
+        for ((label, parse_fn, format_fn, internal_fn), src) in cases {
             let parse_err = at_default(parse_fn, src).unwrap_err();
+            let Failure::Syntax {
+                message,
+                line,
+                column,
+                ..
+            } = &parse_err
+            else {
+                panic!("{label} parse: a parse failure is pointed: {parse_err:?}");
+            };
             assert!(
-                !parse_err.reason.is_empty(),
-                "{label} parse: error must carry a reason"
+                message.contains(&format!("\n{line}:{} ", column + 1)),
+                "{label} parse: the header prints the point: {message}"
             );
-            let format_err = at_default(format_fn, src).unwrap_err();
-            assert!(
-                !format_err.reason.is_empty(),
-                "{label} format: error must carry a reason"
+            assert_eq!(
+                at_default(format_fn, src).unwrap_err(),
+                parse_err,
+                "{label} format: the same failure as the parse"
+            );
+            assert_eq!(
+                internal_fn(src, None).unwrap_err(),
+                parse_err,
+                "{label} parse_internal: the same failure as the parse"
             );
         }
+    }
+
+    /// The format path's failure is reported in the caller's coordinates, not the
+    /// CR-folded text's the formatter parses: the same point the parse of the same source
+    /// reports, past a CRLF and an astral character.
+    #[test]
+    fn format_failure_point_is_the_sources() {
+        let src = "const a = '\u{1D49C}';\r\nconst = ;\r\n";
+        let parse_err = at_default(typescript_engine::parse_json, src).unwrap_err();
+        assert!(
+            matches!(
+                parse_err,
+                Failure::Syntax {
+                    start: 23,
+                    line: 2,
+                    column: 6,
+                    ..
+                }
+            ),
+            "{parse_err:?}"
+        );
+        assert_eq!(
+            at_default(typescript_engine::format, src).unwrap_err(),
+            parse_err
+        );
     }
 
     // --- the per-thread arenas are reset+reused across calls (warm-path soundness) ---
@@ -725,11 +957,12 @@ mod tests {
         // back-to-back formats on a warm arena must produce identical output,
         // and interleaving a parse (which drives the AST arena on its own)
         // between them must not perturb the format result.
-        let once = at_default(format_typescript, "const   x=1").unwrap();
-        let twice = at_default(format_typescript, "const   x=1").unwrap();
+        let format = typescript_engine::format;
+        let once = at_default(format, "const   x=1").unwrap();
+        let twice = at_default(format, "const   x=1").unwrap();
         assert_eq!(once, twice, "second format on a warm arena diverged");
-        at_default(parse_typescript, "const y = 2;").unwrap();
-        let after_parse = at_default(format_typescript, "const   x=1").unwrap();
+        at_default(typescript_engine::parse_json, "const y = 2;").unwrap();
+        let after_parse = at_default(format, "const   x=1").unwrap();
         assert_eq!(once, after_parse, "interleaved parse perturbed format");
     }
 
@@ -740,16 +973,16 @@ mod tests {
         // napi-rs marshals JS strings in/out and the AST carries char offsets;
         // this is the same boundary risk tsv_ffi's same-named test guards.
         let src = "const x = '€🦀';\n";
-        let json = at_default(parse_typescript, src).unwrap();
+        let json = at_default(typescript_engine::parse_json, src).unwrap();
         assert!(json.contains("\"type\""), "parse produced no AST: {json}");
-        let formatted = at_default(format_typescript, src).unwrap();
+        let formatted = at_default(typescript_engine::format, src).unwrap();
         assert!(
             formatted.contains("€🦀"),
             "multibyte content lost: {formatted}"
         );
         // Re-formatting is stable (idempotent) across the boundary.
         assert_eq!(
-            at_default(format_typescript, &formatted).unwrap(),
+            at_default(typescript_engine::format, &formatted).unwrap(),
             formatted,
             "re-format not idempotent across the boundary"
         );

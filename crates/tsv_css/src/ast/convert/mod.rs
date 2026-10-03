@@ -14,7 +14,7 @@
 // - Selector names — half-decoded like `read_identifier` (hex escapes decode,
 //   identity escapes keep the backslash)
 // Spans always index the real file; a leading BOM is elided at EMISSION
-// (`LeadingBom::Elided` in `write_stylesheet_file_bytes`), since `parseCss`
+// (`LeadingBom::Elided` in `WIRE_COORDINATES`), since `parseCss`
 // strips it before parsing and its offsets index the BOM-less string.
 //
 // The writer (`write.rs`) emits the wire JSON directly from the internal AST

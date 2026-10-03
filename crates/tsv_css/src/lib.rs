@@ -19,6 +19,16 @@ mod whitespace;
 pub use ast::{CssDeclaration, CssNode, CssRule, CssStyleSheet};
 pub use tsv_lang::{ParseError, Result};
 
+/// The coordinates a CSS document's positions are reported in — `parseCss`'s: a leading
+/// BOM **elided** (`parseCss` strips it before parsing, so every offset indexes the
+/// BOM-less string), and `\n` alone ending a line. The wire writer's tables and every
+/// parse error's point (`ParseError::wire_point`, and the `line:col` its message prints)
+/// read this one statement.
+pub const WIRE_COORDINATES: tsv_lang::WireCoordinates = tsv_lang::WireCoordinates {
+    lines: tsv_lang::LineRule::Lf,
+    bom: tsv_lang::LeadingBom::Elided,
+};
+
 /// Parse CSS source into internal AST
 ///
 /// # Arguments
@@ -41,7 +51,7 @@ pub use tsv_lang::{ParseError, Result};
 /// (caller-owns-`Bump`); the stylesheet borrows from it for `'arena`.
 pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<CssStyleSheet<'arena>> {
     ParseError::ensure_source_fits(source)?;
-    parser::parse_css(source, 0, arena).map_err(|e| e.with_context(source))
+    parser::parse_css(source, 0, arena).map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
 
 /// Parse embedded CSS source into internal AST
@@ -55,16 +65,23 @@ pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<CssSt
 ///
 /// # Returns
 /// * `Ok(CssStyleSheet)` - Parsed AST with nodes and value comments
-/// * `Err(ParseError)` - Parse error with position and context
+/// * `Err(ParseError)` - Parse error positioned in the parent file
 ///
 /// `arena` owns the returned AST's nodes (shared with the host document's arena
 /// when CSS is embedded in a Svelte `<style>`).
+///
+/// # Errors
+///
+/// An error is positioned in the parent file (`base_offset` included) but carries no
+/// point — [`ParseError::wire_point`] is `None` — until the host fills its context over
+/// the whole document ([`ParseError::with_context`], as `tsv_svelte::parse` does): a
+/// context taken over `source`, a slice, would read that position against the wrong text.
 pub fn parse_embedded<'arena>(
     source: &str,
     base_offset: usize,
     arena: &'arena bumpalo::Bump,
 ) -> Result<CssStyleSheet<'arena>> {
-    parser::parse_css(source, base_offset, arena).map_err(|e| e.with_context(source))
+    parser::parse_css(source, base_offset, arena)
 }
 
 /// Format CSS stylesheet to a formatted string
@@ -101,7 +118,7 @@ pub fn format_str(source: &str) -> Result<String> {
     // alone so its offsets stay a drop-in contract with `parseCss`'s.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
     let arena = bumpalo::Bump::new();
-    let stylesheet = parse(folded.text(), &arena)?;
+    let stylesheet = parse(folded.text(), &arena).map_err(|e| folded.unfold_error(e))?;
     let doc_arena = tsv_lang::doc::arena::DocArena::for_source(folded.text());
     Ok(format_folded_in(&stylesheet, &folded, &doc_arena))
 }

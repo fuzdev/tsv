@@ -68,23 +68,35 @@ export interface TypeScriptParseJsonOptions {
 /**
  * Parse a Svelte component into its AST — the span-only tree (`start`/`end` offsets);
  * `{locations: true}` adds `loc` / `name_loc`.
+ * @throws {TsvSyntaxError} when the source does not parse (`api.d.ts`)
+ * @throws {TypeError} when an argument is refused
  */
 export declare function parse_svelte(
 	source: string,
 	options?: ParseOptions
 ): import('./tsv_ast.js').Root;
-/** Parse a Svelte component into its span-only wire, as a compact JSON string. */
+/**
+ * Parse a Svelte component into its span-only wire, as a compact JSON string.
+ * @throws {TsvSyntaxError} when the source does not parse (`api.d.ts`)
+ * @throws {TypeError} when an argument is refused
+ */
 export declare function parse_svelte_json(source: string, options?: ParseJsonOptions): string;
 
 /**
  * Parse TypeScript (or JavaScript) into its ESTree AST — the span-only tree
  * (`start`/`end` offsets); `{locations: true}` adds `loc`.
+ * @throws {TsvSyntaxError} when the source does not parse (`api.d.ts`)
+ * @throws {TypeError} when an argument is refused
  */
 export declare function parse_typescript(
 	source: string,
 	options?: TypeScriptParseOptions
 ): import('./tsv_ast.js').Program;
-/** Parse TypeScript into its span-only wire, as a compact JSON string. */
+/**
+ * Parse TypeScript into its span-only wire, as a compact JSON string.
+ * @throws {TsvSyntaxError} when the source does not parse (`api.d.ts`)
+ * @throws {TypeError} when an argument is refused
+ */
 export declare function parse_typescript_json(
 	source: string,
 	options?: TypeScriptParseJsonOptions
@@ -93,10 +105,16 @@ export declare function parse_typescript_json(
 /**
  * Parse CSS into its AST — the span-only tree (`start`/`end` offsets);
  * `{locations: true}` adds `loc`.
+ * @throws {TsvSyntaxError} when the source does not parse (`api.d.ts`)
+ * @throws {TypeError} when an argument is refused
  */
 export declare function parse_css(
 	source: string,
 	options?: ParseOptions
 ): import('./tsv_ast.js').StyleSheetFile;
-/** Parse CSS into its span-only wire, as a compact JSON string. */
+/**
+ * Parse CSS into its span-only wire, as a compact JSON string.
+ * @throws {TsvSyntaxError} when the source does not parse (`api.d.ts`)
+ * @throws {TypeError} when an argument is refused
+ */
 export declare function parse_css_json(source: string, options?: ParseJsonOptions): string;

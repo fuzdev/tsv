@@ -312,8 +312,10 @@ macro_rules! parse_format {
         let folded = tsv_lang::printing::normalize_carriage_returns($source);
         let source = folded.text();
         with_ast_arena(|arena| {
+            // a parse error indexes the folded text: mapped back onto the caller's
+            // source, its `line:col` is the one a parse of that source reports
             let ast = parse_ast_for_format!($goalness, $lang, source, $goal, arena)
-                .map_err(|e| e.to_string())?;
+                .map_err(|e| folded.unfold_error(e).to_string())?;
             Ok(with_doc_arena(|doc_arena| {
                 $lang::format_folded_in(&ast, &folded, doc_arena)
             }))
@@ -952,6 +954,18 @@ mod tests {
                 "{label} format: expected an error message for {src:?}"
             );
         }
+    }
+
+    /// A format's parse reads the CR-folded text, yet its error names the caller's own
+    /// line and column, and the message is the parse's. A lone CR in a Svelte document is
+    /// the input that tells the two texts apart: folded, it is a line break the document
+    /// does not count.
+    #[test]
+    fn format_error_reports_the_sources_own_point() {
+        let src = "<p>a\rb</p>\n{a +}";
+        let format_err = call_err(tsv_format_svelte, src);
+        assert!(format_err.contains("\n2:5 {a +}\n"), "{format_err}");
+        assert_eq!(format_err, call_err(tsv_parse_svelte, src));
     }
 
     // --- invalid UTF-8 is reported, not a crash (module safety contract) ---

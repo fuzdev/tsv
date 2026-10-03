@@ -831,7 +831,7 @@ function format_one(path, check) {
 			sourceType: parser === 'typescript' ? source_type_from_extension(path) : undefined
 		});
 	} catch (error) {
-		// A trap (`WebAssembly.RuntimeError` — a parse error is a plain `Error`)
+		// A trap (`WebAssembly.RuntimeError` — a parse error is a `SyntaxError`)
 		// is not a per-file failure: a stack overflow (input nested past ~2,500
 		// levels — generated or minified code) leaves `__stack_pointer` where the
 		// deep call left it, poisoning the instance so every later file throws
@@ -876,8 +876,9 @@ function error_message(error) {
 /**
  * Whether a throw out of the engine is the engine failing rather than the input being
  * rejected: a WASM trap (`WebAssembly.RuntimeError` — a deep input overran the module's
- * own stack) or V8's `RangeError` (its native stack ran out first). A parse error is a
- * plain `Error`. `format_one` reads the same split to recover the engine between files.
+ * own stack) or V8's `RangeError` (its native stack ran out first). A parse error is the
+ * facade's `SyntaxError`, and the engine's other refusals plain `Error`s — neither is
+ * either class. `format_one` reads the same split to recover the engine between files.
  */
 function is_engine_failure(error) {
 	return error instanceof WebAssembly.RuntimeError || error instanceof RangeError;

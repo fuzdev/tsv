@@ -532,3 +532,184 @@ Deno.test('the facade builds exactly the engine families it is handed', () => {
 		'parse_typescript_json'
 	]);
 });
+
+/**
+ * The whole published surface over an engine whose every call throws `make_thrown()`
+ * (a fresh value per call), with or without the engine-side object parse.
+ */
+function throwing_api(make_thrown: () => unknown, with_object_parse: boolean) {
+	const calls: Array<string> = [];
+	const family = (op: string) =>
+		Object.fromEntries(
+			['svelte', 'typescript', 'css'].map((language) => [
+				language,
+				() => {
+					calls.push(`${op}_${language}`);
+					throw make_thrown();
+				}
+			])
+		);
+	const engine = {
+		parse_json: family('parse_json'),
+		...(with_object_parse ? { parse: family('parse') } : {})
+	};
+	const api: Record<string, (source: any, options?: unknown) => unknown> = {
+		...create_parse_api(engine),
+		...create_format_api(family('format'))
+	};
+	return { api, calls };
+}
+
+/** What `f` throws. */
+const caught = (f: () => unknown): unknown => {
+	try {
+		f();
+	} catch (error) {
+		return error;
+	}
+	throw new Error('expected a throw');
+};
+
+const PUBLISHED = [
+	'parse_svelte',
+	'parse_svelte_json',
+	'parse_typescript',
+	'parse_typescript_json',
+	'parse_css',
+	'parse_css_json',
+	'format_svelte',
+	'format_typescript',
+	'format_css'
+];
+
+/**
+ * An `Error` shaped as Bun builds every one: its own NON-enumerable numeric `line` and
+ * `column` (a plain assignment over those keeps them non-enumerable), plus `extra` set as
+ * ordinary enumerable properties.
+ */
+function bun_shaped_error(extra: Record<string, unknown>): Error {
+	const error = new Error('x');
+	for (const [key, value] of [
+		['line', 7],
+		['column', 3]
+	] as const) {
+		Object.defineProperty(error, key, {
+			value,
+			writable: true,
+			enumerable: false,
+			configurable: true
+		});
+	}
+	return Object.assign(error, extra);
+}
+
+Deno.test('a pointed engine error becomes a SyntaxError with exactly start and loc', () => {
+	const message = "Expected ';', found 'y'\n2:3 x y\n      ^ here";
+	const pointed = () => Object.assign(new Error(message), { start: 9, line: 2, column: 2 });
+	for (const with_object_parse of [true, false]) {
+		const { api } = throwing_api(pointed, with_object_parse);
+		for (const name of PUBLISHED) {
+			const error = caught(() => api[name]('x\nx y'));
+			strictEqual(error instanceof SyntaxError, true, name);
+			const syntax_error = error as SyntaxError & { start: number; loc: unknown };
+			strictEqual(syntax_error.message, message, name);
+			deepStrictEqual(Object.keys(syntax_error), ['start', 'loc'], name);
+			strictEqual(syntax_error.start, 9, name);
+			deepStrictEqual(syntax_error.loc, { line: 2, column: 2 }, name);
+			// minimal by design: no cause, nothing else from the engine's object
+			strictEqual(syntax_error.cause, undefined, name);
+		}
+	}
+});
+
+Deno.test('anything else an engine throws passes through as the same object', () => {
+	class RuntimeError extends Error {}
+	const values: Array<() => unknown> = [
+		// a refusal or the size cap: a plain Error with no point
+		() => new Error('File too large: 5 bytes (maximum: 4 bytes / 4GB)'),
+		// a WASM trap, and V8's stack exhaustion
+		() => new RuntimeError('unreachable'),
+		() => new RangeError('Maximum call stack size exceeded'),
+		// a partial point is no point
+		() => Object.assign(new Error('x'), { start: 1, line: 1 }),
+		() => Object.assign(new Error('x'), { start: '1', line: 1, column: 0 }),
+		// Bun gives every Error its own non-enumerable numeric `line` and `column`, so an
+		// error carrying a numeric `start` alone must not read as a point there
+		() => bun_shaped_error({ start: 4 }),
+		// a member that is not an integer is no point
+		() => Object.assign(new Error('x'), { start: Number.NaN, line: 1, column: 0 }),
+		() => Object.assign(new Error('x'), { start: 0, line: Infinity, column: 0 }),
+		() => Object.assign(new Error('x'), { start: 0, line: 1, column: 1.5 }),
+		// nor is one that is not an own enumerable property
+		() =>
+			Object.defineProperty(Object.assign(new Error('x'), { line: 1, column: 0 }), 'start', {
+				value: 0,
+				enumerable: false
+			}),
+		() => Object.assign(Object.create({ start: 0 }), { line: 1, column: 0 }),
+		// not an object at all
+		() => 'a string',
+		() => undefined
+	];
+	for (const make of values) {
+		for (const with_object_parse of [true, false]) {
+			let last: unknown;
+			const { api } = throwing_api(() => (last = make()), with_object_parse);
+			for (const name of PUBLISHED) {
+				const error = caught(() => api[name]('x'));
+				strictEqual(error, last, name);
+			}
+		}
+	}
+});
+
+Deno.test('argument refusals stay TypeErrors and never reach the engine', () => {
+	const { api, calls } = throwing_api(
+		() => Object.assign(new Error('bad'), { start: 0, line: 1, column: 0 }),
+		true
+	);
+	for (const name of PUBLISHED) {
+		strictEqual(caught(() => api[name](42)) instanceof TypeError, true, name);
+		strictEqual(caught(() => api[name]('x', { nope: true })) instanceof TypeError, true, name);
+	}
+	strictEqual(calls.length, 0);
+});
+
+Deno.test("the facade's own JSON.parse failing is an internal Error, not a SyntaxError", () => {
+	const api = create_parse_api({
+		parse_json: { typescript: () => '{"type":"Program",' }
+	});
+	const error = caught(() => api.parse_typescript('x'));
+	strictEqual(error instanceof Error, true);
+	strictEqual(error instanceof SyntaxError, false);
+	strictEqual((error as Error).message, 'internal error: AST serialized to invalid JSON');
+	strictEqual((error as Error).cause instanceof SyntaxError, true);
+	// the string export hands the wire back untouched — it parses nothing
+	strictEqual(api.parse_typescript_json('x'), '{"type":"Program",');
+});
+
+Deno.test(
+	'an options read that throws reaches the caller as itself, before any engine call',
+	() => {
+		// the bag is read ahead of `call_engine`, so even a throw shaped exactly like an
+		// engine's pointed failure is never converted, and no engine runs
+		const pointed = Object.assign(new Error('from the bag'), { start: 0, line: 1, column: 0 });
+		const bag = new Proxy(
+			{},
+			{
+				ownKeys() {
+					throw pointed;
+				}
+			}
+		);
+		const { api, calls } = throwing_api(() => new Error('engine'), true);
+		for (const name of PUBLISHED) {
+			strictEqual(
+				caught(() => api[name]('x', bag)),
+				pointed,
+				name
+			);
+		}
+		strictEqual(calls.length, 0);
+	}
+);

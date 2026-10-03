@@ -93,9 +93,7 @@ use super::{
     split_declaration_svelte_compat, strip_css_comments_collecting, trim_wire_end, trim_wire_start,
 };
 use std::borrow::Cow;
-use tsv_lang::{
-    JsonWriter, LeadingBom, Span, WirePositions, WireTables, write_array, write_or_null,
-};
+use tsv_lang::{JsonWriter, Span, WirePositions, WireTables, write_array, write_or_null};
 
 /// Declares one `parseCss()` metadata payload twice from a single literal: bare
 /// (`$bare`), and as the constant burst that closes its node (`$closing` — `$lead`,
@@ -239,7 +237,7 @@ pub(crate) fn write_stylesheet_file_bytes(
     source: &str,
     locations: bool,
 ) -> Vec<u8> {
-    let tables = WireTables::lf(source, LeadingBom::Elided, locations);
+    let tables = WireTables::new(source, crate::WIRE_COORDINATES, locations);
     let ctx = Ctx {
         source,
         positions: tables.positions(),

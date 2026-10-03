@@ -34,6 +34,16 @@ pub use tsv_lang::{ParseError, Result};
 pub use goal::Goal;
 pub use parser::TopLevelAs;
 
+/// The coordinates a TypeScript document's positions are reported in — acorn's: a
+/// leading BOM **counted** (acorn reads U+FEFF as whitespace, so it is one UTF-16 unit at
+/// offset 0), and ECMAScript's line terminators (LF, CR, CRLF as one, U+2028, U+2029).
+/// The wire writer's tables and every parse error's point (`ParseError::wire_point`, and
+/// the `line:col` its message prints) read this one statement.
+pub const WIRE_COORDINATES: tsv_lang::WireCoordinates = tsv_lang::WireCoordinates {
+    lines: tsv_lang::LineRule::Ecmascript,
+    bom: tsv_lang::LeadingBom::Counted,
+};
+
 /// The per-document environment shared by every formatting entry point: the
 /// source the AST's spans index into, the comment buffer, the precomputed
 /// line breaks and the three document-level flags computed beside them.
@@ -177,7 +187,7 @@ fn with_doc_printer<'a, R>(
 /// ```
 pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Program<'arena>> {
     ParseError::ensure_source_fits(source)?;
-    parser::parse_typescript(source, arena).map_err(|e| e.with_context(source))
+    parser::parse_typescript(source, arena).map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
 
 /// Parse TypeScript source against an explicit [`Goal`] (`Script` vs `Module`).
@@ -199,7 +209,8 @@ pub fn parse_with_goal<'arena>(
     arena: &'arena bumpalo::Bump,
 ) -> Result<Program<'arena>> {
     ParseError::ensure_source_fits(source)?;
-    parser::parse_typescript_with_goal(source, goal, arena).map_err(|e| e.with_context(source))
+    parser::parse_typescript_with_goal(source, goal, arena)
+        .map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
 
 /// Parse TypeScript against `goal`, or — when the goal is unset — at `Module`
@@ -277,7 +288,8 @@ pub fn parse_preserve_parens<'arena>(
     arena: &'arena bumpalo::Bump,
 ) -> Result<Program<'arena>> {
     ParseError::ensure_source_fits(source)?;
-    parser::parse_typescript_preserve_parens(source, arena).map_err(|e| e.with_context(source))
+    parser::parse_typescript_preserve_parens(source, arena)
+        .map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
 
 /// Whether a block comment's content (delimiters excluded) is a JSDoc type cast —
@@ -333,7 +345,8 @@ pub fn format_str(source: &str) -> Result<String> {
     // drop-in contract over the author's own bytes.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
     let arena = bumpalo::Bump::new();
-    let program = parse_with_goal_or_fallback(folded.text(), None, &arena)?;
+    let program = parse_with_goal_or_fallback(folded.text(), None, &arena)
+        .map_err(|e| folded.unfold_error(e))?;
     let doc_arena = DocArena::for_source(folded.text());
     Ok(format_folded_in(&program, &folded, &doc_arena))
 }
@@ -495,7 +508,7 @@ fn convert_ast_json_bytes_variant(program: &Program<'_>, source: &str, locations
     // The line table is built only when `loc` is written — one fused source scan
     // builds it with the map; ASCII sources take a byte-level line scan and get
     // the identity map. The span-only wire builds the map alone.
-    let tables = tsv_lang::WireTables::ecmascript(source, tsv_lang::LeadingBom::Counted, locations);
+    let tables = tsv_lang::WireTables::new(source, WIRE_COORDINATES, locations);
     ast::convert::write_program_json(
         program,
         source,
@@ -531,6 +544,12 @@ pub fn convert_ast_json_string(program: &Program<'_>, source: &str) -> String {
 ///
 /// * `Ok(Program)` - The parsed AST
 /// * `Err(ParseError)` - If parsing fails
+///
+/// # Errors
+///
+/// An error is positioned in the host document (`base_offset` included) but carries no
+/// point — [`ParseError::wire_point`] is `None` — until the host fills its context over
+/// the whole document ([`ParseError::with_context`], as `tsv_svelte::parse` does).
 // The `Parser::parse` method-path form clippy suggests for the bare `parser.parse()`
 // closure fails the higher-ranked lifetime check on `with_embedding_parser`'s `f`
 // bound (the closure lets the compiler infer it), so allow the closure here.
@@ -544,8 +563,12 @@ pub fn parse_embedded<'arena>(
 }
 
 /// Build an embedding [`parser::Parser`] at `base_offset`, run `f` over it. What
-/// `f` returns borrows only `arena`; `source` error context is applied once
-/// here, so `f`'s body stays context-free.
+/// `f` returns borrows only `arena`.
+///
+/// An error leaves here positioned in the host document and context-free. Its point is
+/// the host's to take: `source` is a slice of that document, so a context taken over it
+/// would read a host-absolute position against the wrong text and clamp it to a
+/// plausible-but-wrong point. The host fills it over the whole document instead.
 fn with_embedding_parser<'arena, T>(
     source: &str,
     base_offset: usize,
@@ -554,7 +577,7 @@ fn with_embedding_parser<'arena, T>(
 ) -> Result<T> {
     let mut parser = parser::Parser::with_base_offset(source, base_offset, arena);
     parser.prime()?;
-    f(&mut parser).map_err(|e| e.with_context(source))
+    f(&mut parser)
 }
 
 /// Parse embedded TypeScript with grouping parens preserved.
@@ -574,6 +597,12 @@ fn with_embedding_parser<'arena, T>(
 /// parses would build the same tree, so this one serves both. It may over-report (a
 /// pair a speculative parse built and then abandoned), which costs that second parse
 /// and nothing else.
+///
+/// # Errors
+///
+/// An error is positioned in the host document (`base_offset` included) but carries no
+/// point — [`ParseError::wire_point`] is `None` — until the host fills its context over
+/// the whole document ([`ParseError::with_context`], as `tsv_svelte::parse` does).
 pub fn parse_embedded_preserve_parens<'arena>(
     source: &str,
     base_offset: usize,
@@ -590,6 +619,12 @@ pub fn parse_embedded_preserve_parens<'arena>(
 ///
 /// This is used when parsing expressions in contexts where comments need to be
 /// preserved (e.g., Svelte expression tags `{/* comment */ expr}`).
+///
+/// # Errors
+///
+/// An error is positioned in the host document (`base_offset` included) but carries no
+/// point — [`ParseError::wire_point`] is `None` — until the host fills its context over
+/// the whole document ([`ParseError::with_context`], as `tsv_svelte::parse` does).
 pub fn parse_expression_with_comments<'arena>(
     source: &str,
     base_offset: usize,
@@ -627,6 +662,12 @@ pub fn parse_expression_with_comments<'arena>(
 ///   the comments this sub-parse consumed — a caller that drops them drops the comment
 ///   outright (see [`parse_type_annotation_partial`])
 /// * `Err(ParseError)` - If parsing or conversion fails
+///
+/// # Errors
+///
+/// An error is positioned in the host document (`base_offset` included) but carries no
+/// point — [`ParseError::wire_point`] is `None` — until the host fills its context over
+/// the whole document ([`ParseError::with_context`], as `tsv_svelte::parse` does).
 pub fn parse_pattern_with_comments<'arena>(
     source: &str,
     base_offset: usize,
@@ -774,6 +815,12 @@ pub fn pattern_binding_end(pattern: &Expression<'_>) -> u32 {
 /// trailing comment and using it as a consumed extent silently eats one — which is exactly
 /// how `{#each xs as x: T /* c */}` came to be accepted where canonical Svelte rejects it.
 /// The annotation's own `span.end` is the consumed extent; take it from the returned node.
+///
+/// # Errors
+///
+/// An error is positioned in the host document (`base_offset` included) but carries no
+/// point — [`ParseError::wire_point`] is `None` — until the host fills its context over
+/// the whole document ([`ParseError::with_context`], as `tsv_svelte::parse` does).
 pub fn parse_type_annotation_partial<'arena>(
     source: &str,
     base_offset: usize,
@@ -798,6 +845,12 @@ pub fn parse_type_annotation_partial<'arena>(
 /// see [`TopLevelAs`]. It is not a formality: a head that gives the keyword away owes the
 /// assertion run its own reader, and one that passes the wrong policy either swallows its
 /// binding or rejects every assertion in the head. `satisfies` is never in question.
+///
+/// # Errors
+///
+/// An error is positioned in the host document (`base_offset` included) but carries no
+/// point — [`ParseError::wire_point`] is `None` — until the host fills its context over
+/// the whole document ([`ParseError::with_context`], as `tsv_svelte::parse` does).
 pub fn parse_expression_partial_with_comments<'arena>(
     source: &str,
     base_offset: usize,
@@ -822,6 +875,12 @@ pub fn parse_expression_partial_with_comments<'arena>(
 /// Deliberately hands back a position and nothing else. The node is dropped, and so are
 /// the comments the probe collected: the region is re-read by the real iterable and
 /// binding parses, so returning either would register every comment in the head twice.
+///
+/// # Errors
+///
+/// An error is positioned in the host document (`base_offset` included) but carries no
+/// point — [`ParseError::wire_point`] is `None` — until the host fills its context over
+/// the whole document ([`ParseError::with_context`], as `tsv_svelte::parse` does).
 // The method-path form clippy suggests fails the higher-ranked lifetime check on
 // `with_embedding_parser`'s `f` bound — same reason as [`parse_embedded`]'s closure.
 #[expect(clippy::redundant_closure_for_method_calls)]
@@ -834,6 +893,12 @@ pub fn parse_type_extent(source: &str, base_offset: usize, arena: &bumpalo::Bump
 /// Used by embedders whose host syntax wraps a statement — e.g. Svelte's
 /// `{const …}` / `{let …}` tags, which are a `VariableDeclaration` (no trailing
 /// `;`). The statement's `span().end` is the byte offset just past it.
+///
+/// # Errors
+///
+/// An error is positioned in the host document (`base_offset` included) but carries no
+/// point — [`ParseError::wire_point`] is `None` — until the host fills its context over
+/// the whole document ([`ParseError::with_context`], as `tsv_svelte::parse` does).
 pub fn parse_statement_with_comments<'arena>(
     source: &str,
     base_offset: usize,

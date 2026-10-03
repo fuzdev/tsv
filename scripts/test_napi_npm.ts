@@ -60,6 +60,7 @@ import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
 import { assert_staged_fresh, staged_staleness } from './check_staged_freshness.ts';
 import { FACADE_SOURCE_DIR, facade_files, facade_sources } from './npm_facade.ts';
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
+import { register_syntax_error_suite, syntax_errors } from './syntax_error_suite.ts';
 
 const pkg_root = 'crates/tsv_napi/pkg';
 if (!existsSync(join(pkg_root, 'napi'))) {
@@ -394,6 +395,15 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 			);
 		}
 	);
+
+	// One input, one error: the class, the message, the `start` and the `loc`, from both
+	// engines alike — the facade builds the published error from the same three engine
+	// properties on both. Gated on the wasm package being current, as the export parity
+	// above is.
+	it('throws the same parse failures as @fuzdev/tsv-wasm', { skip: wasm_parity_skip }, async () => {
+		const wasm = await import(pathToFileURL(wasm_package_index).href);
+		assert.deepEqual(syntax_errors(api), syntax_errors(wasm));
+	});
 
 	it('parses to span-only objects, and _json siblings return the string', () => {
 		const ast = api.parse_typescript('const x = 1;');
@@ -737,6 +747,8 @@ process.stdout.write(JSON.stringify({
 // DECISION can be driven over hosts the CI matrix will never have (an Alpine
 // container, a Debian box with the `musl` package installed, a runtime whose
 // `process.report` is absent or partial).
+register_syntax_error_suite('@fuzdev/tsv loader', api);
+
 describe('libc detection (platform.js)', () => {
 	/** A stub probe bag that records which probes a verdict actually asked. */
 	const probe_bag = (facts: {
@@ -1376,6 +1388,38 @@ describe('message parity: the native CLI and cli.js refuse in the same order', (
 			}
 		});
 	}
+
+	// A parse failure's message is the engine's on both bins — the native CLI's
+	// `ParseError` and the binding's, one Rust type — and its `line:col` header is the
+	// error's point in the file's own coordinates, on the format path too, whose parse
+	// reads the CR-folded text. A CRLF file with an astral character ahead of the error
+	// is where a header computed over the folded text, or counted in code points, would
+	// part the two.
+	it('a parse failure prints the same error on both bins, format and parse', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-syntax-error-'));
+		try {
+			const files: Array<[string, string]> = [
+				['a.ts', "const a = '𝒜';\r\nconst = ;\r\n"],
+				['b.svelte', "<script>\r\n\tlet a = '𝒜';\r\n\tconst = ;\r\n</script>\r\n"],
+				['c.css', 'a {\r\n\tcontent: "𝒜";\r\n}\r\n𝒜 } b {}\r\n']
+			];
+			for (const [name, source] of files) {
+				const path = join(dir, name);
+				writeFileSync(path, source);
+				for (const command of ['format', 'parse']) {
+					const native = run_native([command, path]);
+					const mirror = run_mirror([command, path]);
+					assert.equal(native.status, command === 'format' ? 2 : 1, native.stderr);
+					assert.equal(mirror.status, native.status, mirror.stderr);
+					assert.equal(mirror.stderr, native.stderr, `${command} ${name}`);
+					assert.match(native.stderr, /\n[0-9]+:[0-9]+ /, 'a located error');
+				}
+				assert.equal(readFileSync(path, 'utf8'), source, 'neither bin rewrote the file');
+			}
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
 
 	// `--pretty` is a re-serialization on the mirror (`JSON.stringify(JSON.parse(…))`)
 	// and a byte re-indent natively, and the two are held byte-identical — which

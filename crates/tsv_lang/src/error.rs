@@ -4,71 +4,85 @@ use std::fmt;
 
 use thiserror::Error;
 
-/// Rich error context with source snippet and position
+use crate::location::{WireCoordinates, WirePoint};
+
+/// Where a located error sits: its point in the document's wire coordinates and the
+/// source line excerpted under the message.
+///
+/// The two answer different questions and are bounded differently on purpose. The
+/// **point** is the position a caller can act on — the `start` / `line` / `column` the
+/// wire would give a node there, under the document's own line rule and BOM reading
+/// ([`WireCoordinates::point`]) — and the message's `line:col` header prints it. The
+/// **excerpt** is for a terminal: it is bounded by every ECMAScript terminator whatever
+/// the language, since a raw `<CR>`, `<LS>` or `<PS>` printed mid-line overwrites or
+/// garbles the text the caret points into, so on a Svelte or CSS line holding one the
+/// excerpt is the stretch after it while the header still counts the whole `\n` line.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ErrorContext {
-    /// The source line containing the error
-    pub source_line: String,
-    /// Column position within the line (0-indexed)
-    pub column: usize,
-    /// Line number in the source (1-indexed)
-    pub line_number: usize,
+pub(crate) struct ErrorContext {
+    /// The excerpted source line (no terminator). A `Box<str>` rather than a `String`, and
+    /// the caret column a `u32`, to keep the context — and so the payload every located
+    /// [`ParseErrorKind`] variant carries — at the size the `const` assert below pins.
+    source_line: Box<str>,
+    /// Characters from the excerpt's start to the error — what the caret is padded past.
+    caret_column: u32,
+    /// The error's position in the document's wire coordinates.
+    point: WirePoint,
+    /// The coordinates `point` was taken in, kept so the context can be re-taken over
+    /// another text ([`ParseError::unfold`]).
+    coordinates: WireCoordinates,
 }
 
 impl ErrorContext {
-    /// Extract error context from source code at a given byte position
+    /// The context of byte offset `position` in `source`, under `coordinates`.
     ///
-    /// Returns None if position is out of bounds or source is empty
-    pub fn from_source(source: &str, position: usize) -> Option<Self> {
-        if source.is_empty() || position > source.len() {
-            return None;
-        }
-
-        // `position` is a byte offset that can land *inside* a multibyte char — a
-        // lexer/parser error position on malformed multibyte input. Error
-        // formatting must be total, so floor it to the nearest char boundary
-        // before slicing (every slice below would otherwise panic).
+    /// Total, like [`WireCoordinates::point`]: a position past the end is clamped to it and
+    /// one inside a multibyte character — a lexer/parser error position on malformed
+    /// multibyte input — is floored to that character's start, so every slice below is on
+    /// a boundary. An empty source is one empty line.
+    pub(crate) fn from_source(source: &str, position: usize, coordinates: WireCoordinates) -> Self {
         let mut position = position.min(source.len());
-        while position > 0 && !source.is_char_boundary(position) {
+        while !source.is_char_boundary(position) {
             position -= 1;
         }
 
-        // The line's bounds and number, over the ECMAScript terminator class (`\n`, `\r`,
-        // `\r\n`, `<LS>`, `<PS>`) rather than `\n` alone — one question, stated once, in
-        // `printing` beside the class itself.
-        let (line_start, line_end, line_number) = crate::printing::line_bounds_at(source, position);
+        // The excerpt's bounds, over the ECMAScript terminator class (`\n`, `\r`, `\r\n`,
+        // `<LS>`, `<PS>`) rather than `\n` alone — one question, stated once, in `printing`
+        // beside the class itself.
+        let (line_start, line_end, _) = crate::printing::line_bounds_at(source, position);
 
-        // Extract the line
-        let source_line = source[line_start..line_end].to_string();
+        // Clamped to the line's own end, which `position` can exceed only by sitting inside
+        // the terminator sequence that ends it.
+        // Saturating: every source a parse accepts is under the `u32` cap, so a column
+        // past it would be one no parse could report.
+        let caret_column = source[line_start..position.min(line_end)].chars().count();
+        let caret_column = u32::try_from(caret_column).unwrap_or(u32::MAX);
 
-        // Calculate column (CHARACTERS from line start to error position, matching the
-        // character-based columns the wire AST reports — a byte count puts the caret past
-        // its token on any line with a multi-byte character ahead of the error). Clamped to
-        // the line's own end, which `position` can exceed only by sitting inside the
-        // terminator sequence that ends it.
-        let column = source[line_start..position.min(line_end)].chars().count();
-
-        Some(ErrorContext {
-            source_line,
-            column,
-            line_number,
-        })
+        ErrorContext {
+            source_line: source[line_start..line_end].into(),
+            caret_column,
+            point: coordinates.point(source, position),
+            coordinates,
+        }
     }
 
     /// Format error context with caret pointer
-    pub fn format_with_caret(&self, message: &str) -> String {
+    fn format_with_caret(&self, message: &str) -> String {
         // The pad reproduces what the excerpt PRINTS ahead of the error, not how many
         // characters it holds. Two independent reasons a character count is wrong: a CJK
         // character occupies two columns, and a tab occupies however many the *terminal*
         // says — its stops are absolute, so no fixed width can stand in for one. So a tab
         // is echoed AS a tab (both lines then reach the same stop, whatever it is) and
         // everything else is padded by its display width.
-        let header = format!("{}:{}", self.line_number, self.column + 1);
+        let header = format!("{}:{}", self.point.line, self.point.column + 1);
         // Everything printed ahead of the excerpt: the whole `{line}:{col}` header plus its
         // one separating space. Measuring only `{line}:` left the caret short by the
         // column's own digits at every position past column 9.
         let mut indent = " ".repeat(header.chars().count() + 1);
-        let prefix: String = self.source_line.chars().take(self.column).collect();
+        let prefix: String = self
+            .source_line
+            .chars()
+            .take(self.caret_column as usize)
+            .collect();
         for (i, segment) in prefix.split('\t').enumerate() {
             if i > 0 {
                 indent.push('\t');
@@ -168,6 +182,10 @@ struct Payload {
 // `Result<(), ParseError>` down to a bare pointer.
 const _: () = assert!(size_of::<ParseError>() == size_of::<*const ()>());
 const _: () = assert!(size_of::<Result<()>>() == size_of::<*const ()>());
+// The payload size the rationale above (and `with_context`'s move) is stated in, on a
+// 64-bit target: an inline error would cost every small `Result` this many bytes.
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<ParseErrorKind>() == 96);
 
 impl fmt::Display for ParseError {
     #[inline]
@@ -306,8 +324,9 @@ impl ParseError {
     ///
     /// Each of those lexers applies this **once**, at the entry point that PRODUCES the
     /// error; a wrapper that delegates to such an entry point must not re-apply it. A
-    /// double shift runs the position past the end of the source, where
-    /// `ErrorContext::from_source` returns `None` and the caret disappears entirely.
+    /// double shift runs the position past the end of the source, where the context
+    /// clamps it to the end of the document, so the caret lands there instead of on the
+    /// construct.
     ///
     /// The parser side needs none of this: its positions are already host coordinates (the
     /// TypeScript and CSS parsers' `current_pos` adds the same `base_offset`; the Svelte
@@ -324,20 +343,57 @@ impl ParseError {
         self
     }
 
-    /// Add source context to an error
+    /// Fill in where the error sits in `source` — the document every position of this
+    /// error indexes — under the document's `coordinates`: the point its message header
+    /// prints and [`ParseError::wire_point`] reports, and the line excerpted under it. Each
+    /// language crate's public parse entry points call this with that language's
+    /// coordinates (`tsv_ts::WIRE_COORDINATES` and its siblings). The embedded entry points
+    /// (`tsv_ts::parse_embedded` and its siblings, `tsv_css::parse_embedded`) do not: their
+    /// source is a slice of a host document, so their errors leave context-free and the
+    /// host (`tsv_svelte::parse`) fills them over the whole document.
     ///
-    /// Call this to enrich errors with source snippets for better debugging.
-    /// Example:
     /// ```ignore
-    /// let err = ParseError::unexpected_token(expected, found, position);
-    /// let rich_err = err.with_context(source);
+    /// parser::parse(source).map_err(|e| e.with_context(source, WIRE_COORDINATES))
     /// ```
-    pub fn with_context(mut self, source: &str) -> Self {
+    #[must_use]
+    pub fn with_context(mut self, source: &str, coordinates: WireCoordinates) -> Self {
         // Filling in place rather than rebuilding the variant: the payload is already
         // boxed, so this is a write through the pointer instead of a 96-byte move.
         // A positionless error has no line to excerpt.
         if let Some((position, slot)) = self.0.kind.located_mut() {
-            *slot = ErrorContext::from_source(source, *position);
+            *slot = Some(ErrorContext::from_source(source, *position, coordinates));
+        }
+        self
+    }
+
+    /// Where the error sits, in the wire coordinates of the document it was parsed from:
+    /// the `start` offset a wire node there would carry, and the `loc` point
+    /// (`line` 1-based, `column` 0-based UTF-16 units) the document's line rule gives it —
+    /// the numbers its message header prints, as `line:column+1`.
+    ///
+    /// `None` for the positionless kind (a source over the `u32` cap) and for an error no
+    /// [`ParseError::with_context`] has filled — which only the embedded entry points
+    /// return, ahead of their host's fill; no whole-document parse entry point does.
+    pub fn wire_point(&self) -> Option<WirePoint> {
+        self.0
+            .kind
+            .located()
+            .and_then(|(_, context)| context.as_ref())
+            .map(|context| context.point)
+    }
+
+    /// Lift an error raised by a parse of the CR-folded text
+    /// ([`crate::printing::normalize_carriage_returns`]) back onto `original`, the text the
+    /// caller handed over: the position moves to the original byte it was folded from
+    /// ([`crate::printing::unfold_position`]), and the context is re-taken there, in the
+    /// coordinates it was first taken in. Reached only through
+    /// [`crate::printing::FoldedSource::unfold_error`], which holds both texts.
+    pub(crate) fn unfold(mut self, original: &str) -> Self {
+        if let Some((position, slot)) = self.0.kind.located_mut() {
+            *position = crate::printing::unfold_position(original, *position);
+            if let Some(context) = slot {
+                *context = ErrorContext::from_source(original, *position, context.coordinates);
+            }
         }
         self
     }
@@ -386,6 +442,32 @@ impl ParseErrorKind {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::location::{LeadingBom, LineRule};
+
+    /// A TypeScript document's coordinates: ECMAScript lines, a BOM counted.
+    const ECMA: WireCoordinates = WireCoordinates {
+        lines: LineRule::Ecmascript,
+        bom: LeadingBom::Counted,
+    };
+    /// A Svelte or CSS document's coordinates: `\n` lines, a BOM elided.
+    const LF: WireCoordinates = WireCoordinates {
+        lines: LineRule::Lf,
+        bom: LeadingBom::Elided,
+    };
+
+    fn point(start: u32, line: u32, column: u32) -> WirePoint {
+        WirePoint {
+            start,
+            line,
+            column,
+        }
+    }
+
+    /// The `line:col` header of a rendered caret-form message.
+    fn header(rendered: &str) -> &str {
+        let located = rendered.lines().nth(1).expect("a located line");
+        located.split_once(' ').map_or(located, |(head, _)| head)
+    }
 
     /// The goal-gate mark rides the payload through the two rewrites a located error
     /// takes on its way out of an embedded parse — the offset shift and the context
@@ -394,7 +476,7 @@ mod tests {
     fn test_goal_gate_mark_survives_shift_and_context() {
         let e = ParseError::goal_gate("'export' is only allowed in a module".to_string(), 0)
             .shift_position(3)
-            .with_context("x; export {};");
+            .with_context("x; export {};", ECMA);
         assert!(e.is_goal_gated());
         assert_eq!(e.position(), Some(3));
         assert!(!ParseError::invalid_syntax("x".to_string(), 0).is_goal_gated());
@@ -407,12 +489,13 @@ mod tests {
     #[test]
     fn test_into_goal_gate_keeps_the_kind_and_its_message() {
         let plain = ParseError::unexpected_token("';'".to_string(), "identifier".to_string(), 6)
-            .with_context("await x;");
+            .with_context("await x;", ECMA);
         let gated = plain.clone().into_goal_gate();
         assert!(!plain.is_goal_gated());
         assert!(gated.is_goal_gated());
         assert_eq!(gated.to_string(), plain.to_string());
         assert_eq!(gated.position(), Some(6));
+        assert_eq!(gated.wire_point(), plain.wire_point());
     }
 
     /// `Display` forwards to the boxed kind, so the rendered message must be exactly
@@ -427,14 +510,14 @@ mod tests {
         let e = ParseError::invalid_syntax("bad token".to_string(), 4);
         assert_eq!(e.to_string(), "bad token at position 4");
         assert_eq!(
-            e.with_context(source).to_string(),
+            e.with_context(source, ECMA).to_string(),
             "bad token\n1:5 let x =\n        ^ here"
         );
 
         let e = ParseError::unexpected_token("';'".to_string(), "'y'".to_string(), 8);
         assert_eq!(e.to_string(), "Expected ';', found 'y' at position 8");
         assert_eq!(
-            e.with_context(source).to_string(),
+            e.with_context(source, ECMA).to_string(),
             "Expected ';', found 'y'\n2:1 y\n    ^ here"
         );
 
@@ -451,13 +534,16 @@ mod tests {
             "File too large: 5 bytes (maximum: 4 bytes / 4GB)"
         );
 
-        // `with_context` on the context-free variant is a no-op, not a panic.
+        // `with_context` on the context-free variant is a no-op, not a panic, and it has
+        // no point to report.
+        let too_large = ParseError::file_too_large(5, 4).with_context(source, ECMA);
         assert_eq!(
-            ParseError::file_too_large(5, 4)
-                .with_context(source)
-                .to_string(),
+            too_large.to_string(),
             "File too large: 5 bytes (maximum: 4 bytes / 4GB)"
         );
+        assert_eq!(too_large.wire_point(), None);
+        // Nor does a located error no context has been filled for.
+        assert_eq!(ParseError::unexpected_eof(9).wire_point(), None);
 
         // `Debug` forwards too, so it prints the kind — not a `ParseError(..)` wrapper.
         assert!(
@@ -466,31 +552,187 @@ mod tests {
         );
     }
 
-    /// The excerpt is bounded by the ECMAScript terminator class, not by `\n` alone. On a
-    /// lone-`<CR>` source the `\n`-only reading made the whole file one line, so the line
-    /// number was 1 whatever the position and the excerpt carried raw `<CR>`s — which a
-    /// terminal renders by overwriting, hiding the very text the caret points into.
+    /// The excerpt is bounded by the ECMAScript terminator class, not by `\n` alone, in
+    /// EVERY language's coordinates. On a lone-`<CR>` source the `\n`-only reading made the
+    /// whole file one excerpt, carrying raw `<CR>`s — which a terminal renders by
+    /// overwriting, hiding the very text the caret points into. The header's line is the
+    /// coordinates' own: the ECMAScript count for a TypeScript document, `\n` alone for a
+    /// Svelte or CSS one.
     #[test]
     fn context_bounds_the_line_on_every_terminator() {
         let cr = "let a = 1;\rlet b = 2;\r";
-        let ctx = ErrorContext::from_source(cr, 15).expect("context");
-        assert_eq!(ctx.source_line, "let b = 2;");
-        assert_eq!(ctx.line_number, 2);
-        assert_eq!(ctx.column, 4);
+        for coordinates in [ECMA, LF] {
+            let ctx = ErrorContext::from_source(cr, 15, coordinates);
+            assert_eq!(&*ctx.source_line, "let b = 2;");
+            assert_eq!(ctx.caret_column, 4);
+        }
+        assert_eq!(
+            ErrorContext::from_source(cr, 15, ECMA).point,
+            point(15, 2, 4)
+        );
+        assert_eq!(
+            ErrorContext::from_source(cr, 15, LF).point,
+            point(15, 1, 15)
+        );
 
-        // `<CR><LF>` is ONE terminator, so the second line is still line 2.
+        // `<CR><LF>` is ONE terminator, so the second line is still line 2 — and `\n`
+        // alone counts it once too.
         let crlf = "let a = 1;\r\nlet b = 2;\r\n";
-        let ctx = ErrorContext::from_source(crlf, 16).expect("context");
-        assert_eq!(ctx.source_line, "let b = 2;");
-        assert_eq!(ctx.line_number, 2);
-        assert_eq!(ctx.column, 4);
+        for coordinates in [ECMA, LF] {
+            let ctx = ErrorContext::from_source(crlf, 16, coordinates);
+            assert_eq!(&*ctx.source_line, "let b = 2;");
+            assert_eq!(ctx.caret_column, 4);
+            assert_eq!(ctx.point, point(16, 2, 4));
+        }
 
-        // `<LS>` and `<PS>` terminate a line for ECMAScript too.
+        // `<LS>` and `<PS>` terminate a line for ECMAScript, and are ordinary characters
+        // (one UTF-16 unit each) on a `\n` line.
         let ls = "let a = 1;\u{2028}let b = 2;";
-        let ctx = ErrorContext::from_source(ls, 17).expect("context");
-        assert_eq!(ctx.source_line, "let b = 2;");
-        assert_eq!(ctx.line_number, 2);
-        assert_eq!(ctx.column, 4);
+        for coordinates in [ECMA, LF] {
+            let ctx = ErrorContext::from_source(ls, 17, coordinates);
+            assert_eq!(&*ctx.source_line, "let b = 2;");
+            assert_eq!(ctx.caret_column, 4);
+        }
+        assert_eq!(
+            ErrorContext::from_source(ls, 17, ECMA).point,
+            point(15, 2, 4)
+        );
+        assert_eq!(
+            ErrorContext::from_source(ls, 17, LF).point,
+            point(15, 1, 15)
+        );
+    }
+
+    /// The rendered excerpt never carries a raw terminator, and the header is the point's
+    /// `line:column+1` — whatever the coordinates and wherever the error sits.
+    #[test]
+    fn header_is_the_point_and_the_excerpt_holds_no_terminator() {
+        let sources = [
+            "a\rb\r\nc\u{2028}d\u{2029}e\nf",
+            "\u{FEFF}x𝒜y\r\nz",
+            "",
+            "\r\n",
+        ];
+        for source in sources {
+            for coordinates in [ECMA, LF] {
+                for position in 0..=source.len() + 2 {
+                    let e = ParseError::invalid_syntax("bad".to_string(), position)
+                        .with_context(source, coordinates);
+                    let p = e.wire_point().expect("a located, filled error has a point");
+                    let rendered = e.to_string();
+                    assert_eq!(header(&rendered), format!("{}:{}", p.line, p.column + 1));
+                    let excerpt = rendered.lines().nth(1).expect("located line");
+                    assert!(
+                        !excerpt.contains(['\r', '\u{2028}', '\u{2029}']),
+                        "{source:?} @ {position}: {rendered:?}"
+                    );
+                    assert_eq!(rendered.split('\n').count(), 3, "{rendered:?}");
+                }
+            }
+        }
+    }
+
+    /// `WireCoordinates::point` across both line rules and both BOM readings.
+    #[test]
+    fn wire_point_across_rules_and_bom_readings() {
+        // An astral character is two UTF-16 units: `start` and the column both step 2.
+        let astral = "a𝒜b";
+        assert_eq!(ECMA.point(astral, 5), point(3, 1, 3));
+        assert_eq!(LF.point(astral, 5), point(3, 1, 3));
+        // A position INSIDE a multibyte character floors to its start.
+        for inside in 2..=4 {
+            assert_eq!(ECMA.point(astral, inside), point(1, 1, 1));
+        }
+        // Past the end clamps to the end.
+        assert_eq!(ECMA.point(astral, 99), point(4, 1, 4));
+        assert_eq!(ECMA.point("", 3), point(0, 1, 0));
+
+        // A leading BOM: counted, it is one unit at position 0 (acorn); elided, it occupies
+        // no position, so everything after it — line 1's columns included — is one lower.
+        let bom = "\u{FEFF}ab\ncd";
+        assert_eq!(ECMA.point(bom, 0), point(0, 1, 0));
+        assert_eq!(LF.point(bom, 0), point(0, 1, 0));
+        // Inside the BOM's three bytes floors to 0.
+        assert_eq!(LF.point(bom, 2), point(0, 1, 0));
+        assert_eq!(ECMA.point(bom, 4), point(2, 1, 2));
+        assert_eq!(LF.point(bom, 4), point(1, 1, 1));
+        assert_eq!(ECMA.point(bom, 7), point(5, 2, 1));
+        assert_eq!(LF.point(bom, 7), point(4, 2, 1));
+        // A U+FEFF anywhere but byte 0 is an ordinary character under both readings.
+        assert_eq!(LF.point("a\u{FEFF}b", 4), point(2, 1, 2));
+
+        // Inside `<CR><LF>` — the byte between the two — the CR has not ended the line
+        // (CRLF is one terminator, ended by its LF), so the point is the CR's line, one
+        // column past it. `\n` alone reads the CR as an ordinary character: the same point.
+        let crlf = "ab\r\ncd";
+        assert_eq!(ECMA.point(crlf, 3), point(3, 1, 3));
+        assert_eq!(LF.point(crlf, 3), point(3, 1, 3));
+        assert_eq!(ECMA.point(crlf, 4), point(4, 2, 0));
+        assert_eq!(LF.point(crlf, 4), point(4, 2, 0));
+
+        // A lone CR, U+2028 and U+2029 break an ECMAScript line only.
+        for terminator in ["\r", "\u{2028}", "\u{2029}"] {
+            let source = format!("ab{terminator}cd");
+            let at = source.len() - 1;
+            assert_eq!(ECMA.point(&source, at), point(4, 2, 1), "{terminator:?}");
+            assert_eq!(LF.point(&source, at), point(4, 1, 4), "{terminator:?}");
+        }
+    }
+
+    /// `unfold_position` maps a byte offset in the CR-folded text back to the byte the fold
+    /// produced it from: a CRLF's single folded LF maps to the CR that opens the pair, a
+    /// lone CR's LF to that CR, and every later byte past the dropped LFs.
+    #[test]
+    fn unfold_position_maps_folded_offsets_to_the_original() {
+        use crate::printing::{normalize_carriage_returns, unfold_position};
+
+        // No CR: the identity.
+        for p in 0..=6 {
+            assert_eq!(unfold_position("ab\ncdé", p), p);
+        }
+        // CRLF: folded "a\nb\nc" from "a\r\nb\r\nc".
+        let original = "a\r\nb\r\nc";
+        assert_eq!(normalize_carriage_returns(original).text(), "a\nb\nc");
+        let expected = [0, 1, 3, 4, 6, 7];
+        for (folded, original_pos) in expected.into_iter().enumerate() {
+            assert_eq!(unfold_position(original, folded), original_pos, "{folded}");
+        }
+        // Lone CR: the fold changes the byte, not the length.
+        for p in 0..=5 {
+            assert_eq!(unfold_position("a\rb\rc", p), p);
+        }
+        // Mixed, with a multibyte character ahead: folded "é\nx\ny" from "é\r\nx\ry".
+        let original = "é\r\nx\ry";
+        assert_eq!(normalize_carriage_returns(original).text(), "é\nx\ny");
+        let expected = [0, 1, 2, 4, 5, 6, 7];
+        for (folded, original_pos) in expected.into_iter().enumerate() {
+            assert_eq!(unfold_position(original, folded), original_pos, "{folded}");
+        }
+    }
+
+    /// An error raised over the folded text, unfolded, is the error a parse of the original
+    /// would report at the same character: position, point and message.
+    #[test]
+    fn unfold_error_retakes_the_context_over_the_original() {
+        let original = "a;\r\nb;\r\n  @";
+        let folded = crate::printing::normalize_carriage_returns(original);
+        let at_folded = folded.text().find('@').expect("@");
+        let e = ParseError::invalid_syntax("bad".to_string(), at_folded)
+            .with_context(folded.text(), ECMA);
+        let unfolded = folded.unfold_error(e);
+        let at_original = original.find('@').expect("@");
+        let direct =
+            ParseError::invalid_syntax("bad".to_string(), at_original).with_context(original, ECMA);
+        assert_eq!(unfolded.position(), Some(at_original));
+        assert_eq!(unfolded.wire_point(), direct.wire_point());
+        assert_eq!(unfolded.to_string(), direct.to_string());
+        assert_eq!(unfolded.wire_point(), Some(point(10, 3, 2)));
+
+        // A text the fold left alone is handed back untouched.
+        let plain = "a;\n@";
+        let folded = crate::printing::normalize_carriage_returns(plain);
+        let e = ParseError::invalid_syntax("bad".to_string(), 3).with_context(plain, LF);
+        assert_eq!(folded.unfold_error(e.clone()), e);
     }
 
     /// A position INSIDE a terminator sequence — the byte between a `<CR>` and its `<LF>`
@@ -499,73 +741,90 @@ mod tests {
     #[test]
     fn context_of_a_position_inside_a_terminator_sequence() {
         let crlf = "let a = 1;\r\nlet b = 2;\r\n";
-        let ctx = ErrorContext::from_source(crlf, 11).expect("context");
-        assert_eq!(ctx.source_line, "let a = 1;");
-        assert_eq!(ctx.line_number, 1);
-        assert_eq!(ctx.column, 10);
+        let ctx = ErrorContext::from_source(crlf, 11, ECMA);
+        assert_eq!(&*ctx.source_line, "let a = 1;");
+        assert_eq!(ctx.caret_column, 10);
+        assert_eq!(ctx.point, point(11, 1, 11));
     }
 
-    /// The column counts CHARACTERS and the caret pads by DISPLAY width — the two differ
-    /// from a byte count in opposite directions, and a byte count gets both wrong.
+    /// The caret pads by DISPLAY width; the header's column counts UTF-16 units — the
+    /// two differ from a byte count in opposite directions, and a byte count gets both
+    /// wrong.
     #[test]
     fn caret_lands_under_its_token_past_a_multibyte_prefix() {
-        // `à` is 2 bytes, 1 character, 1 column: a byte column would report 12 and pad one
+        // `à` is 2 bytes, 1 UTF-16 unit, 1 column: a byte column would report 12 and pad one
         // space too far.
         let src = "const à = ;";
-        let ctx = ErrorContext::from_source(src, src.find(';').expect("semi")).expect("context");
-        assert_eq!(ctx.column, 10);
+        let ctx = ErrorContext::from_source(src, src.find(';').expect("semi"), ECMA);
+        assert_eq!(ctx.point.column, 10);
         assert_eq!(
             ctx.format_with_caret("bad"),
             "bad\n1:11 const à = ;\n               ^ here"
         );
 
+        // `𝒜` is 4 bytes, 1 character, 1 display column and 2 UTF-16 units: the header
+        // counts the units (the wire's column), the caret pads the one column it prints.
+        let src = "x𝒜 = ;";
+        let ctx = ErrorContext::from_source(src, src.find(';').expect("semi"), ECMA);
+        assert_eq!(ctx.point.column, 6);
+        assert_eq!(
+            ctx.format_with_caret("bad"),
+            "bad\n1:7 x𝒜 = ;\n         ^ here"
+        );
+
         // A tab is 1 character and however many columns the terminal's stops give it, so
         // the pad echoes the tab itself rather than guessing a width for it.
         let src = "\tconst a = ;";
-        let ctx = ErrorContext::from_source(src, src.find(';').expect("semi")).expect("context");
-        assert_eq!(ctx.column, 11);
+        let ctx = ErrorContext::from_source(src, src.find(';').expect("semi"), ECMA);
+        assert_eq!(ctx.point.column, 11);
         assert_eq!(
             ctx.format_with_caret("bad"),
             "bad\n1:12 \tconst a = ;\n     \t          ^ here"
+        );
+
+        // An elided BOM moves line 1's header column, never the caret: the excerpt still
+        // carries it, and it prints zero columns wide.
+        let src = "\u{FEFF}a = ;";
+        let ctx = ErrorContext::from_source(src, src.find(';').expect("semi"), LF);
+        assert_eq!(ctx.point, point(4, 1, 4));
+        assert_eq!(
+            ctx.format_with_caret("bad"),
+            "bad\n1:5 \u{FEFF}a = ;\n        ^ here"
         );
     }
 
     #[test]
     fn test_error_context_at_eof_no_newline() {
         // Position at EOF, source doesn't end with newline
-        let source = "hello";
-        let ctx = ErrorContext::from_source(source, 5).unwrap();
-        assert_eq!(ctx.source_line, "hello");
-        assert_eq!(ctx.column, 5);
-        assert_eq!(ctx.line_number, 1);
+        let ctx = ErrorContext::from_source("hello", 5, ECMA);
+        assert_eq!(&*ctx.source_line, "hello");
+        assert_eq!(ctx.caret_column, 5);
+        assert_eq!(ctx.point, point(5, 1, 5));
     }
 
     #[test]
     fn test_error_context_at_eof_with_newline() {
         // Position at EOF, source ends with newline
-        let source = "hello\n";
-        let ctx = ErrorContext::from_source(source, 6).unwrap();
-        assert_eq!(ctx.source_line, ""); // Empty line after newline
-        assert_eq!(ctx.column, 0);
-        assert_eq!(ctx.line_number, 2);
+        let ctx = ErrorContext::from_source("hello\n", 6, ECMA);
+        assert_eq!(&*ctx.source_line, ""); // Empty line after newline
+        assert_eq!(ctx.caret_column, 0);
+        assert_eq!(ctx.point, point(6, 2, 0));
     }
 
     #[test]
     fn test_error_context_middle_of_line() {
-        let source = "abc\ndef\nghi";
-        let ctx = ErrorContext::from_source(source, 5).unwrap(); // 'e' in "def"
-        assert_eq!(ctx.source_line, "def");
-        assert_eq!(ctx.column, 1);
-        assert_eq!(ctx.line_number, 2);
+        let ctx = ErrorContext::from_source("abc\ndef\nghi", 5, ECMA); // 'e' in "def"
+        assert_eq!(&*ctx.source_line, "def");
+        assert_eq!(ctx.caret_column, 1);
+        assert_eq!(ctx.point, point(5, 2, 1));
     }
 
     #[test]
     fn test_error_context_start_of_file() {
-        let source = "hello";
-        let ctx = ErrorContext::from_source(source, 0).unwrap();
-        assert_eq!(ctx.source_line, "hello");
-        assert_eq!(ctx.column, 0);
-        assert_eq!(ctx.line_number, 1);
+        let ctx = ErrorContext::from_source("hello", 0, ECMA);
+        assert_eq!(&*ctx.source_line, "hello");
+        assert_eq!(ctx.caret_column, 0);
+        assert_eq!(ctx.point, point(0, 1, 0));
     }
 
     #[test]
@@ -574,26 +833,34 @@ mod tests {
         // floored to the char boundary. `名` is 3 bytes (starts at byte 4).
         let source = "abc 名 def";
         for pos in 4..=6 {
-            let ctx = ErrorContext::from_source(source, pos)
-                .expect("in-bounds position yields a context");
-            assert_eq!(ctx.source_line, source);
-            assert_eq!(ctx.line_number, 1);
+            let ctx = ErrorContext::from_source(source, pos, ECMA);
+            assert_eq!(&*ctx.source_line, source);
             // Floored to the char boundary at byte 4 (the start of `名`) — which is
             // character 4 as well, everything before it being ASCII.
-            assert_eq!(ctx.column, 4);
+            assert_eq!(ctx.caret_column, 4);
+            assert_eq!(ctx.point, point(4, 1, 4));
         }
         // A boundary just past the multibyte char is kept as-is: byte 7, character 5.
-        let ctx = ErrorContext::from_source(source, 7).unwrap();
-        assert_eq!(ctx.column, 5);
+        let ctx = ErrorContext::from_source(source, 7, ECMA);
+        assert_eq!(ctx.caret_column, 5);
+        assert_eq!(ctx.point, point(5, 1, 5));
     }
 
+    /// An empty source is one empty line, and its one position is the start of it.
     #[test]
     fn test_error_context_empty_source() {
-        assert!(ErrorContext::from_source("", 0).is_none());
+        let ctx = ErrorContext::from_source("", 0, LF);
+        assert_eq!(&*ctx.source_line, "");
+        assert_eq!(ctx.point, point(0, 1, 0));
     }
 
+    /// A position past the end — a bug upstream (a double `shift_position`) — clamps to
+    /// the end rather than dropping the caret.
     #[test]
     fn test_error_context_position_out_of_bounds() {
-        assert!(ErrorContext::from_source("hello", 10).is_none());
+        let ctx = ErrorContext::from_source("hello", 10, ECMA);
+        assert_eq!(&*ctx.source_line, "hello");
+        assert_eq!(ctx.caret_column, 5);
+        assert_eq!(ctx.point, point(5, 1, 5));
     }
 }

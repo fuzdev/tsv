@@ -1120,7 +1120,7 @@ pub(super) fn write_identifier_with_optional(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tsv_lang::{LeadingBom, WireTables};
+    use tsv_lang::WireTables;
 
     /// The wire variants a test runs: both, unless the build lacks the loc-bearing one
     /// (`tsv_lang`'s `locations` feature, off in a bare `cargo test -p tsv_ts`).
@@ -1138,7 +1138,7 @@ mod tests {
         comments: CommentMode<'_>,
         emit: impl FnOnce(&mut JsonWriter, &Ctx<'_>),
     ) -> String {
-        let tables = WireTables::ecmascript(source, LeadingBom::Counted, locations);
+        let tables = WireTables::new(source, crate::WIRE_COORDINATES, locations);
         let ctx = Ctx::new(source, tables.positions(), Schema::Acorn, comments);
         let mut w = JsonWriter::with_capacity(0);
         emit(&mut w, &ctx);

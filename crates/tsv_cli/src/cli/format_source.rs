@@ -85,17 +85,22 @@ pub(crate) fn format_source_in(
     // author's own bytes. Borrowed unchanged on a source with no `<CR>`, and the fold's
     // pass is the document's line verdict too — the `format_folded_in` siblings take it
     // rather than walking the source again.
+    //
+    // A parse error indexes the folded text, so it is mapped back onto `source` before it
+    // renders (`FoldedSource::unfold_error`): its `line:col` and excerpt are the caller's
+    // own file's, the ones `tsv parse` reports for the same file.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
-    let source = folded.text();
+    let text = folded.text();
+    let unfold = |e| folded.unfold_error(e).to_string();
     match parser_type {
-        ParserType::Svelte => tsv_svelte::parse(source, arena)
+        ParserType::Svelte => tsv_svelte::parse(text, arena)
             .map(|ast| tsv_svelte::format_folded_in(&ast, &folded, doc_arena))
-            .map_err(|e| e.to_string()),
-        ParserType::Css => tsv_css::parse(source, arena)
+            .map_err(unfold),
+        ParserType::Css => tsv_css::parse(text, arena)
             .map(|ast| tsv_css::format_folded_in(&ast, &folded, doc_arena))
-            .map_err(|e| e.to_string()),
-        ParserType::TypeScript => tsv_ts::parse_with_goal_or_fallback(source, goal, arena)
+            .map_err(unfold),
+        ParserType::TypeScript => tsv_ts::parse_with_goal_or_fallback(text, goal, arena)
             .map(|ast| tsv_ts::format_folded_in(&ast, &folded, doc_arena))
-            .map_err(|e| e.to_string()),
+            .map_err(unfold),
     }
 }

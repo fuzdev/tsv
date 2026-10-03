@@ -115,8 +115,8 @@ use crate::ast::internal;
 use crate::whitespace::is_svelte_ws;
 use tsv_css::ast::convert::{write_css_children, write_css_comments};
 use tsv_lang::{
-    Comment, JsonWriter, LeadingBom, LocationMapper, Span, WirePositions, WireTables,
-    estimated_json_capacity, write_array, write_or_null,
+    Comment, JsonWriter, LocationMapper, Span, WirePositions, WireTables, estimated_json_capacity,
+    write_array, write_or_null,
 };
 use tsv_ts::ast::convert::{
     CommentAttach, CommentMode, EmbedWriter, ProgramWriter, Schema, write_expression_embedded,
@@ -152,7 +152,7 @@ pub(crate) fn write_root_bytes(
     // the `<style>` sheet, and every acorn island, which Svelte hands the BOM-less string
     // too — indexes one UTF-16 unit below the author's file, and a line-1 column one
     // lower. The parser's spans stay file-true; only the emitted position moves.
-    let tables = WireTables::lf(source, LeadingBom::Elided, locations);
+    let tables = WireTables::new(source, crate::WIRE_COORDINATES, locations);
 
     // Template comments (outside `<script>` content spans) are the only comments
     // the template attach passes move; everything else stays where it is.

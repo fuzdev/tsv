@@ -52,6 +52,7 @@ import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
 import { FACADE_SOURCE_DIR, facade_files, facade_sources } from './npm_facade.ts';
 import { assert_staged_fresh } from './check_staged_freshness.ts';
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
+import { register_syntax_error_suite } from './syntax_error_suite.ts';
 
 const pkg_dir = process.env.PKG_DIR;
 if (!pkg_dir) {
@@ -600,6 +601,41 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 	});
 });
 
+// The parse-failure contract (`scripts/syntax_error_suite.ts`) over the auto-init entry;
+// the lazy entry runs the same table once initialized (the browser entry's block below).
+register_syntax_error_suite(`index.js: ${pkg_dir}`, node_entry);
+
+// What the facade converts: the raw engine's parse failure carries its point as own,
+// ENUMERABLE integer properties — the shape `api.js` requires of one. Read off the glue
+// module the entry initialized, past the facade.
+describe(`raw engine parse failure (tsv_wasm.js): ${pkg_dir}`, () => {
+	it('an Error with own enumerable integer start, line and column', async () => {
+		const raw = await import(`../${pkg_dir}/tsv_wasm.js`);
+		const call = has_parse
+			? () => raw.parse_typescript_json('let a;\nconst = ;')
+			: () => raw.format_typescript('let a;\nconst = ;');
+		let thrown: any;
+		try {
+			call();
+		} catch (error) {
+			thrown = error;
+		}
+		assert.ok(thrown instanceof Error && !(thrown instanceof SyntaxError), String(thrown));
+		assert.deepEqual(
+			['start', 'line', 'column'].map((key) => [
+				key,
+				Object.prototype.propertyIsEnumerable.call(thrown, key),
+				(thrown as unknown as Record<string, unknown>)[key]
+			]),
+			[
+				['start', true, 13],
+				['line', true, 2],
+				['column', true, 6]
+			]
+		);
+	});
+});
+
 // Locations helper (locations.js, re-exported from index.js) and the `{locations: true}`
 // sugar that runs it — `loc` reconstructed from `start`/`end` + source over the span-only
 // tree every parse returns. These assert the shipped package's wiring end to end; whether
@@ -913,6 +949,10 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 		const wasm = readFileSync(new URL(`../${pkg_dir}/tsv_wasm_bg.wasm`, import.meta.url));
 		browser.init_sync({ module: wasm });
 	});
+
+	// the parse-failure table over the lazy entry, now initialized — the same facade over
+	// the same guarded engine functions, reached through the other entry's wiring
+	register_syntax_error_suite(`browser.js (lazy entry): ${pkg_dir}`, () => browser);
 
 	it('format functions work after init', { skip: !has_format }, () => {
 		assert.equal(browser.format_typescript('const   x=1'), 'const x = 1;\n');

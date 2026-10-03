@@ -86,8 +86,64 @@ fn install_panic_hook() {
     std::panic::set_hook(Box::new(|info| console_error(&info.to_string())));
 }
 
-fn err(e: impl ToString) -> JsError {
-    JsError::new(&e.to_string())
+/// A refusal or an internal failure — a source type the export cannot take, a source over
+/// the size cap — as a plain JS `Error` carrying `message`.
+fn err(message: impl ToString) -> JsValue {
+    JsError::new(&message.to_string()).into()
+}
+
+// The JS `Error` a parse failure is thrown as, with its point set on it as own properties.
+// Declared by hand rather than taken from `js_sys::Error`: the format-only build carries no
+// `js-sys`, and a constructor, three setters and `Reflect.deleteProperty` are all this
+// needs (the `console_error` binding above is the same trade).
+#[cfg(any(feature = "parse", feature = "format"))]
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_name = Error)]
+    type PointedError;
+
+    #[wasm_bindgen(constructor, js_class = "Error")]
+    fn new(message: &str) -> PointedError;
+
+    #[wasm_bindgen(method, setter)]
+    fn set_start(this: &PointedError, value: u32);
+
+    #[wasm_bindgen(method, setter)]
+    fn set_line(this: &PointedError, value: u32);
+
+    #[wasm_bindgen(method, setter)]
+    fn set_column(this: &PointedError, value: u32);
+
+    #[wasm_bindgen(js_namespace = Reflect, js_name = deleteProperty)]
+    fn delete_property(target: &PointedError, key: &str) -> bool;
+}
+
+/// A parse failure as the JS `Error` the export throws: its message, plus — for every
+/// located error — own enumerable numeric `start`, `line` and `column` properties, the
+/// error's point in the document's wire coordinates (`ParseError::wire_point`). The npm
+/// facade (`npm/api.js`) reads those three to rethrow it as the published `SyntaxError`, so
+/// these names are its contract, shared with `tsv_napi`. A positionless error (a source over
+/// the size cap) stays a plain `Error`.
+///
+/// Each property is deleted before it is set, so all three are own ENUMERABLE data
+/// properties — what the facade requires of a point. Bun gives every `Error` its own
+/// non-enumerable `line` and `column` at construction, and a plain set writes through
+/// that property and keeps it non-enumerable; with nothing to delete (Node, Deno, a
+/// browser) the delete is a no-op.
+#[cfg(any(feature = "parse", feature = "format"))]
+fn parse_err(e: &tsv_ts::ParseError) -> JsValue {
+    let message = e.to_string();
+    let Some(point) = e.wire_point() else {
+        return err(message);
+    };
+    let error = PointedError::new(&message);
+    for key in ["start", "line", "column"] {
+        delete_property(&error, key);
+    }
+    error.set_start(point.start);
+    error.set_line(point.line);
+    error.set_column(point.column);
+    error.into()
 }
 
 /// Hierarchical, git-faithful matcher for tsv's discovery ignore files,
@@ -434,7 +490,7 @@ macro_rules! lang_bindings {
         /// `parse_<lang>_json`'s wire, run engine-side from Rust.
         #[cfg(feature = "parse")]
         #[wasm_bindgen]
-        pub fn $parse_fn(source: &str, source_type: JsValue) -> Result<JsValue, JsError> {
+        pub fn $parse_fn(source: &str, source_type: JsValue) -> Result<JsValue, JsValue> {
             let json = $parse_json_fn(source, source_type)?;
             js_sys::JSON::parse(&json)
                 .map_err(|_| err("internal error: AST serialized to invalid JSON"))
@@ -445,7 +501,7 @@ macro_rules! lang_bindings {
         /// skipping JS object materialization (for consumers forwarding the wire).
         #[cfg(feature = "parse")]
         #[wasm_bindgen]
-        pub fn $parse_json_fn(source: &str, source_type: JsValue) -> Result<String, JsError> {
+        pub fn $parse_json_fn(source: &str, source_type: JsValue) -> Result<String, JsValue> {
             let goal = wasm_source_type(
                 SourceTypeArg::read(&source_type),
                 goal_allowed!($goalness),
@@ -454,7 +510,8 @@ macro_rules! lang_bindings {
             .map_err(err)?
             .unwrap_or(tsv_ts::Goal::Module);
             with_ast_arena(|arena| {
-                let ast = parse_ast!($goalness, $lang, source, goal, arena).map_err(err)?;
+                let ast =
+                    parse_ast!($goalness, $lang, source, goal, arena).map_err(|e| parse_err(&e))?;
                 Ok($lang::convert_ast_json_string(&ast, source))
             })
         }
@@ -462,7 +519,7 @@ macro_rules! lang_bindings {
         /// Parse only, no serialization — the benchmark coverage/throughput probe.
         #[cfg(feature = "parse")]
         #[wasm_bindgen]
-        pub fn $parse_internal_fn(source: &str, source_type: JsValue) -> Result<(), JsError> {
+        pub fn $parse_internal_fn(source: &str, source_type: JsValue) -> Result<(), JsValue> {
             let goal = wasm_source_type(
                 SourceTypeArg::read(&source_type),
                 goal_allowed!($goalness),
@@ -471,7 +528,8 @@ macro_rules! lang_bindings {
             .map_err(err)?
             .unwrap_or(tsv_ts::Goal::Module);
             with_ast_arena(|arena| {
-                let ast = parse_ast!($goalness, $lang, source, goal, arena).map_err(err)?;
+                let ast =
+                    parse_ast!($goalness, $lang, source, goal, arena).map_err(|e| parse_err(&e))?;
                 std::hint::black_box(&ast);
                 Ok(())
             })
@@ -481,7 +539,7 @@ macro_rules! lang_bindings {
         /// omitted, it means none was named — the module grammar, retried as a script.
         #[cfg(feature = "format")]
         #[wasm_bindgen]
-        pub fn $format_fn(source: &str, source_type: JsValue) -> Result<String, JsError> {
+        pub fn $format_fn(source: &str, source_type: JsValue) -> Result<String, JsValue> {
             let goal = wasm_source_type(
                 SourceTypeArg::read(&source_type),
                 goal_allowed!($goalness),
@@ -495,8 +553,10 @@ macro_rules! lang_bindings {
             let folded = tsv_lang::printing::normalize_carriage_returns(source);
             let source = folded.text();
             with_ast_arena(|arena| {
-                let ast =
-                    parse_ast_for_format!($goalness, $lang, source, goal, arena).map_err(err)?;
+                // a parse error indexes the folded text: mapped back onto the caller's
+                // source, its point is the one a parse of that source reports
+                let ast = parse_ast_for_format!($goalness, $lang, source, goal, arena)
+                    .map_err(|e| parse_err(&folded.unfold_error(e)))?;
                 Ok(with_doc_arena(|doc_arena| {
                     $lang::format_folded_in(&ast, &folded, doc_arena)
                 }))

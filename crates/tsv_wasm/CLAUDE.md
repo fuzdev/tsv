@@ -46,10 +46,35 @@ that rejects it, which is what lets a caller forward one bag to whichever parser
 (`source_type_unsupported_message`, `invalid_source_type_message`), restated there by hand
 and shared with the raw decoders below. **Every argument refusal is a `TypeError`** — the
 bag's, `read_source`'s non-string source, and `locations.js`'s (a non-string source, a non-object bag or unknown key, a
-missing or unknown `language`, an uninferable root); a parse error stays the engine's plain
-`Error`, so a caller can tell "you called it wrong" from "the source doesn't parse" by
-class. `locations.js`'s single lookups add the one `RangeError` (an offset the text doesn't
-hold — [the helper](#linecolumn-reconstruction-helper-npmlocationsjs)).
+missing or unknown `language`, an uninferable root); **every parse failure is a
+`SyntaxError`** — from `parse_*`, `parse_*_json` and `format_*` alike — so a caller can tell
+"you called it wrong" from "the source doesn't parse" by class. `locations.js`'s single
+lookups add the one `RangeError` (an offset the text doesn't hold —
+[the helper](#linecolumn-reconstruction-helper-npmlocationsjs)).
+
+**The parse failure's shape.** The published error's own enumerable keys are exactly
+`start` then `loc`: the error's point in the wire's coordinates (`ParseError::wire_point` —
+`start` the UTF-16 offset a wire node there would carry, `loc` its `{line, column}` under the
+document's line rule, so `loc` is `create_locator(source, {language}).position_at(start)`),
+and its message keeps the Rust `ParseError` text, whose `line:col` header prints the same
+point ([docs/cli.md §Parse errors](../../docs/cli.md#parse-errors)). The engines throw a plain
+`Error` with own ENUMERABLE integer `start`, `line` and `column` properties — `call_engine`
+converts nothing looser, since Bun puts its own non-enumerable numeric `line` / `column` on
+every `Error` — here a hand-declared `#[wasm_bindgen] extern` `Error` (`PointedError` in
+`src/lib.rs`: a constructor, three setters and `Reflect.deleteProperty`, which clears Bun's own
+`line` / `column` ahead of each set, since the format-only build carries no `js-sys`), in
+`tsv_napi` an `Error` built on the injected `Env` the same way — and `api.js`'s `call_engine`,
+wrapped around the engine call alone, rebuilds that as the `SyntaxError`, so both engines' errors for one input are identical
+(`scripts/syntax_error_suite.ts` holds both package suites to one table, and the napi suite
+compares the two engines directly). Anything else an engine throws passes through as itself:
+the raw engines' own source-type refusals and a source over the 4 GiB cap (plain `Error`s with
+no point), a caught panic, a WASM trap (`RuntimeError`) or stack exhaustion (`RangeError`). A
+format parses the CR-folded text, so its engine hands the error through
+`FoldedSource::unfold_error` first and reports the point a parse of the caller's source
+would. Where the facade `JSON.parse`s an engine's wire itself (the native engine), a failure
+there is rethrown as `Error('internal error: AST serialized to invalid JSON', {cause})` —
+the WASM engine's own text for that case — never as the bare `SyntaxError` that would read
+as a parse failure.
 
 **Why the reader is JS.** Both package sets need it, and the native one has no WASM to
 host a Rust reader — so a reader in Rust would need a hand restatement in the napi loader
@@ -78,7 +103,9 @@ smoke read the raw module directly.
 ships `api.js` alone — neither `api_parse.js` nor `locations.js` is in its `files`, and its
 entries import neither (`scripts/test_npm.ts` asserts both).
 
-**Typed returns.** The published declarations are the facade's hand-written
+**Typed returns.** The parse failure is declared once, `TsvSyntaxError` in `npm/api.d.ts`
+(so the format-only package has it too), re-exported by name from every entry and from the
+napi `index.d.ts`, and named in each published function's `@throws`. The published declarations are the facade's hand-written
 `npm/api.d.ts` (format) and `npm/api_parse.d.ts` (parse), re-exported **by name** from
 each entry's `index.d.ts` / `browser.d.ts` (the napi `index.d.ts` the same way):
 `parse_svelte(...): Root`, `parse_typescript(...): Program`, `parse_css(...):

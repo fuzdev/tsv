@@ -41,6 +41,14 @@ use tsv_lang::swar::next_byte_of;
 /// - Invalid escapes: `\z` → 'z' (backslash ignored per spec) — including `\8` / `\9`,
 ///   the `NonOctalDecimalEscapeSequence`, which stands for the digit itself
 ///
+/// # Errors
+///
+/// A malformed `\x` or `\u` escape — a missing or non-hex digit, an unterminated or
+/// empty `\u{…}`, a value past U+10FFFF — is an error positioned at the offset into `s`
+/// of the backslash that opens it. `s` is a slice of some larger text, so the caller
+/// shifts that by the slice's own position (`ParseError::shift_position`) before the
+/// error leaves it.
+///
 /// # Examples:
 /// ```ignore
 /// let mut out = String::new();
@@ -61,6 +69,8 @@ pub fn decode_string_escapes_into(s: &str, out: &mut String) -> Result<(), Parse
         let run = next_byte_of(chars.rest.as_bytes(), 0, [b'\\']);
         let (plain, rest) = chars.rest.split_at(run);
         result.push_str(plain);
+        // The backslash's offset into `s`, which every error this escape raises carries.
+        let backslash = s.len() - rest.len();
         let Some(escape) = rest.strip_prefix('\\') else {
             // No backslash left: the run reached the end.
             break;
@@ -88,20 +98,22 @@ pub fn decode_string_escapes_into(s: &str, out: &mut String) -> Result<(), Parse
             Some('x') => {
                 // 2 hex digits → 0..=0xFF, always a valid Unicode scalar (no
                 // surrogate range), so `from_u32` never fails here.
-                let code = read_hex_value(&mut chars, 2)?;
+                let code =
+                    read_hex_value(&mut chars, 2).map_err(|e| e.shift_position(backslash))?;
                 if let Some(ch) = char::from_u32(code) {
                     result.push(ch);
                 } else {
                     return Err(ParseError::invalid_syntax(
                         format!("Invalid hex escape: \\x{code:02X}"),
-                        0,
+                        backslash,
                     ));
                 }
             }
 
             // Unicode escape: \uXXXX or \u{XXXXXX}
             Some('u') => {
-                let code = read_unicode_escape_value(&mut chars)?;
+                let code = read_unicode_escape_value(&mut chars)
+                    .map_err(|e| e.shift_position(backslash))?;
 
                 // A LEAD surrogate joins a following TRAIL surrogate into one
                 // code point. The pairing is a property of the code UNITS, not
@@ -275,6 +287,10 @@ impl EscapeCursor<'_> {
 /// One reader for both spellings is what lets the surrogate-pairing step above stay
 /// spelling-agnostic; splitting it was how `'\u{D83D}\u{DE00}'` came to decode as two
 /// U+FFFDs where the 4-digit spelling of the same pair gave the astral character.
+///
+/// Its errors (and [`read_hex_value`]'s) are built at position 0, since neither reader
+/// knows where its escape began; [`decode_string_escapes_into`] shifts them to the
+/// escape's backslash.
 fn read_unicode_escape_value(chars: &mut EscapeCursor<'_>) -> Result<u32, ParseError> {
     if chars.peek() != Some('{') {
         // Standard unicode escape: \uXXXX (4 digits → 0..=0xFFFF)
@@ -451,6 +467,24 @@ mod tests {
         assert_eq!(decode_string_escapes("test\\qend").unwrap(), "testqend");
     }
 
+    /// A malformed escape is reported at its own backslash — past a multibyte character, a
+    /// well-formed escape, and a lead surrogate whose would-be trail is the malformed one.
+    #[test]
+    fn malformed_escape_errors_point_at_their_backslash() {
+        for (input, backslash) in [
+            ("ab\\u{zz}", 2),
+            ("\u{e9}\\x4", 2),
+            ("\\n\\u12", 2),
+            ("x\\u{12", 1),
+            ("\\u{110000}", 0),
+            ("\\u{}", 0),
+            ("\\uD83D\\u{zz}", 6),
+        ] {
+            let error = decode_string_escapes(input).expect_err("malformed");
+            assert_eq!(error.position(), Some(backslash), "{input:?}");
+        }
+    }
+
     #[test]
     fn test_line_continuation() {
         assert_eq!(decode_string_escapes("test\\\nline").unwrap(), "testline");
@@ -619,6 +653,9 @@ mod tests {
 
         while let Some(ch) = chars.next() {
             if ch == '\\' {
+                // The backslash's offset into `s`, counted from what is left unread — the
+                // model's own arithmetic, independent of the decoder's.
+                let backslash = s.len() - chars.clone().map(char::len_utf8).sum::<usize>() - 1;
                 // Handle escape sequence
                 match chars.next() {
                     // Simple single-character escapes
@@ -641,20 +678,22 @@ mod tests {
                     Some('x') => {
                         // 2 hex digits → 0..=0xFF, always a valid Unicode scalar (no
                         // surrogate range), so `from_u32` never fails here.
-                        let code = model_read_hex_value(&mut chars, 2)?;
+                        let code = model_read_hex_value(&mut chars, 2)
+                            .map_err(|e| e.shift_position(backslash))?;
                         if let Some(ch) = char::from_u32(code) {
                             result.push(ch);
                         } else {
                             return Err(ParseError::invalid_syntax(
                                 format!("Invalid hex escape: \\x{code:02X}"),
-                                0,
+                                backslash,
                             ));
                         }
                     }
 
                     // Unicode escape: \uXXXX or \u{XXXXXX}
                     Some('u') => {
-                        let code = model_read_unicode_escape_value(&mut chars)?;
+                        let code = model_read_unicode_escape_value(&mut chars)
+                            .map_err(|e| e.shift_position(backslash))?;
 
                         // A LEAD surrogate joins a following TRAIL surrogate into one
                         // code point. The pairing is a property of the code UNITS, not

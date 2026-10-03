@@ -82,9 +82,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// literals revision an invalid escape is allowed in a **tagged** template
     /// (cooked value `null` → `TemplateCooked::Invalid`), but is a syntax error in
     /// an untagged template or a template-literal type.
+    ///
+    /// `content_start` is `content`'s position in the document, where the decoder's
+    /// content-relative error position is lifted to.
     pub(super) fn template_cooked(
         &self,
         content: &str,
+        content_start: usize,
         tagged: bool,
     ) -> Result<TemplateCooked<'arena>, ParseError> {
         match self.current_decoded {
@@ -97,9 +101,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // lexer swallowed to defer the tagged/untagged decision.
                     Err(crate::lexer::escapes::decode_string_escapes(content)
                         .err()
-                        .unwrap_or_else(|| {
-                            self.error_msg("Invalid escape sequence in template literal")
-                        }))
+                        .map_or_else(
+                            || self.error_msg("Invalid escape sequence in template literal"),
+                            |e| e.shift_position(content_start),
+                        ))
                 }
             }
             None => Ok(TemplateCooked::Verbatim),
@@ -128,7 +133,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<TemplateElement<'arena>, ParseError> {
         let arena = self.arena;
         let (content, raw_span) = template_token_content(self.current_value(), span, tail);
-        let cooked = self.template_cooked(content, tagged)?;
+        let cooked = self.template_cooked(content, raw_span.start as usize, tagged)?;
         // `has_newline` asks about the SOURCE bytes — the printer walks
         // `raw_span` — so it stays on `content` under either arm below.
         let has_newline = content.contains('\n');
@@ -151,9 +156,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // corpus caught it. This decodes with the lexer's own function
         // (`decode_string_escapes_into` is the template path in `lexer/core.rs`),
         // so it is a re-run, not a second implementation.
+        //
+        // The re-run cannot fail — the same escapes decoded from the raw text above, and the
+        // CR fold touches none — so its error, were there one, is positioned no more
+        // precisely than at the segment: its offsets index `trv`, not the document.
         let cooked = match cooked {
             TemplateCooked::Decoded(_) => TemplateCooked::Decoded(
-                arena.alloc_str(&crate::lexer::escapes::decode_string_escapes(&trv)?),
+                arena.alloc_str(
+                    &crate::lexer::escapes::decode_string_escapes(&trv)
+                        .map_err(|e| e.shift_position(raw_span.start as usize))?,
+                ),
             ),
             verbatim_or_invalid => verbatim_or_invalid,
         };

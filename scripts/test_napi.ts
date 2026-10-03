@@ -57,8 +57,8 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 		assert.equal(addon.format_svelte('<div   >x</div   >'), '<div>x</div>\n');
 	});
 
-	it('parse_typescript returns a JSON AST string the host can JSON.parse', () => {
-		const ast = JSON.parse(addon.parse_typescript('const x = 1;'));
+	it('parse_typescript_json returns a JSON AST string the host can JSON.parse', () => {
+		const ast = JSON.parse(addon.parse_typescript_json('const x = 1;'));
 		assert.equal(ast.type, 'Program');
 	});
 
@@ -66,7 +66,44 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 		// napi-rs converts `napi::Error` into a thrown JS Error — unlike FFI there
 		// is no `{"error": …}` envelope to inspect; the throw just propagates.
 		assert.throws(() => addon.format_typescript('const = ;'), /.+/);
-		assert.throws(() => addon.parse_typescript('const = ;'), /.+/);
+		assert.throws(() => addon.parse_typescript_json('const = ;'), /.+/);
+	});
+
+	it('a parse failure throws an Error carrying its point as numeric own properties', () => {
+		// the contract the npm facade's `call_engine` reads to rethrow a `SyntaxError`
+		// (`crates/tsv_wasm/npm/api.js`); the same three names the WASM engine sets
+		// the format call's source holds a CRLF: its point is still the caller's source's
+		const cases: [() => unknown, number][] = [
+			[() => addon.parse_typescript_json('let a;\nconst = ;'), 13],
+			[() => addon.parse_internal_typescript('let a;\nconst = ;'), 13],
+			[() => addon.format_typescript('let a;\r\nconst = ;'), 14]
+		];
+		for (const [call, start] of cases) {
+			let thrown: any;
+			try {
+				call();
+			} catch (e) {
+				thrown = e;
+			}
+			assert.ok(thrown instanceof Error && !(thrown instanceof SyntaxError), String(thrown));
+			const pointed = thrown as Error & { start: unknown; line: unknown; column: unknown };
+			assert.equal(pointed.start, start);
+			assert.equal(pointed.line, 2);
+			assert.equal(pointed.column, 6);
+			// own and enumerable, which the facade requires of a point — Bun's own
+			// non-enumerable `line` / `column` on every Error must not survive the set
+			for (const key of ['start', 'line', 'column']) {
+				assert.ok(Object.prototype.propertyIsEnumerable.call(thrown, key), key);
+			}
+			assert.match(pointed.message, /\n2:7 const = ;\n/);
+		}
+		// a refusal carries no point
+		try {
+			addon.parse_css_json('a {}', 'script');
+			assert.fail('a source type on CSS must throw');
+		} catch (e: any) {
+			assert.equal(e.start, undefined);
+		}
 	});
 
 	it('multibyte content survives the JS-string marshalling boundary', () => {
@@ -95,7 +132,7 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 			assert.throws(() => addon.__panic_probe!(), /panic/i, 'second panic must throw');
 			// The process survived and the arenas recovered: parse (AST arena)
 			// and format (AST + doc arenas) still produce correct output.
-			const ast = JSON.parse(addon.parse_typescript('const x = 1;'));
+			const ast = JSON.parse(addon.parse_typescript_json('const x = 1;'));
 			assert.equal(ast.type, 'Program', 'parse must work after a panic');
 			assert.equal(
 				addon.format_typescript('const   x=1'),
@@ -174,7 +211,7 @@ let errors = 0;
 for (let i = 0; i < workerData.iterations; i++) {
 	formatted.add(addon.format_typescript('const   x=1'));
 	css.add(addon.format_css('a{color:red}'));
-	parsed_types.add(JSON.parse(addon.parse_typescript('const x = 1;')).type);
+	parsed_types.add(JSON.parse(addon.parse_typescript_json('const x = 1;')).type);
 	// A throw on every iteration too: the error path unwinds through the same
 	// arenas, so an arena the panic/error path fails to park would surface as a
 	// corrupted result on the NEXT iteration rather than as an error here.

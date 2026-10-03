@@ -57,7 +57,7 @@ Every export shares one signature — `(source, options?)` with an acorn-style o
 
 The object parsers additionally take `{locations: true}`, which adds per-node `loc` (line/column, as acorn's `locations: true` does; Svelte also `name_loc`), computed in JS from the offsets plus the source. The `parse_*_json` variants return the wire itself and the formatters emit none, so both reject that key — a `_json` variant with a message pointing at its object parser — and the formatters, being non-configurable, take no option beyond the source type. A **`sourceType`-only** bag is therefore the one that forwards to any export, parser or formatter; a bag carrying `locations` is an object-parse bag and throws anywhere else.
 
-Unknown option keys throw, whatever their value; a supported key set to `undefined` is read as absent. A second argument that isn't an object throws too, arrays included — that makes `sources.map(format_typescript)` an error, since `map` passes the index as the second argument, so write `sources.map((s) => format_typescript(s))`. Every argument error — a source that isn't a string, a bad options argument, an unknown key, a wrong-typed or invalid value — is a `TypeError`; a parse error in the source itself is a plain `Error`.
+Unknown option keys throw, whatever their value; a supported key set to `undefined` is read as absent. A second argument that isn't an object throws too, arrays included — that makes `sources.map(format_typescript)` an error, since `map` passes the index as the second argument, so write `sources.map((s) => format_typescript(s))`. Every argument error — a source that isn't a string, a bad options argument, an unknown key, a wrong-typed or invalid value — is a `TypeError`; a source that doesn't parse throws a `SyntaxError` ([below](#errors-and-depth-limits)).
 
 ### Reconstructing line/column
 
@@ -67,7 +67,16 @@ The helper is also its own entry point, `@fuzdev/tsv-wasm/locations` — the sam
 
 ### Errors and depth limits
 
-Parse errors are thrown JS errors. A Rust panic — always a tsv bug, please report it — surfaces as a `RuntimeError: unreachable` with the real message on `console.error`; the instance survives it, so the next call works.
+A source that doesn't parse throws a `SyntaxError` — from a parser and a formatter alike — with two own properties, `start` and `loc` (typed `TsvSyntaxError`, exported). `start` is the UTF-16 offset of the error and `loc` its `{line, column}` (1-based line, 0-based UTF-16 column), in the same coordinates as the AST's own positions: TypeScript counts ECMAScript line terminators (LF, CR, CRLF, U+2028, U+2029) and a leading BOM; Svelte (`<script>`, `<style>` and template expressions included) and CSS count LF alone and leave a leading BOM out of the offsets. So `loc` is `create_locator(source, {language}).position_at(start)`, and the message's second line starts with `loc` as `line:column + 1`. A formatter's position is into your own source even where it has CRLF line endings, so for the same error a formatter reports what a parser does — but with no `sourceType` named, `format_typescript` retries a failed module parse as a script and can report that attempt's error where `parse_typescript` (a module unless told otherwise) reports its own. Read `start` and `loc` rather than `line` / `column`, which some runtimes put on every `Error`:
+
+```javascript
+try { format_typescript('let a;\nconst = ;'); } catch (e) {
+	e instanceof SyntaxError; // true — the message ends with the line and a caret
+	[e.start, e.loc]; // [13, {line: 2, column: 6}]
+}
+```
+
+A Rust panic — always a tsv bug, please report it — surfaces as a `RuntimeError: unreachable` with the real message on `console.error`; the instance survives it, so the next call works.
 
 Deeply nested input has a ceiling: the WASM stack is 1 MiB, and the deepest shapes — nested arrow bodies and member chains — cost several times more of it per level than nested parens (the per-shape stack costs and each surface's ceiling are in the repo's [docs/cli.md](https://github.com/fuzdev/tsv/blob/main/docs/cli.md#recursion-depth)). Past the ceiling the call traps with `memory access out of bounds`, and unlike a parse error or a panic it **poisons the instance** — every later call throws the same thing. `reinstantiate()` is the recovery: it synchronously swaps in a fresh instance from the already-compiled module (no recompile — same environment constraints as `init_sync`), and every import keeps working against it. Objects created before the swap (an `IgnoreStack`) are invalidated — rebuild them after: every method on a stale one throws, and `free()` on it is a safe no-op. The `tsv` bin does this automatically, so a too-deep file is one per-file error and the rest of the run formats normally. Real code is nowhere near this ceiling; generated and minified code can be.
 

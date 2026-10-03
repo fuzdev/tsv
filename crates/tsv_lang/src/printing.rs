@@ -366,6 +366,7 @@ pub fn normalize_carriage_returns(source: &str) -> FoldedSource<'_> {
     let Some(first) = first_cr else {
         debug_assert_eq!(lf_only, line_terminators_are_lf_only(source.as_bytes()));
         return FoldedSource {
+            original: source,
             text: Cow::Borrowed(source),
             lf_only,
         };
@@ -384,9 +385,41 @@ pub fn normalize_carriage_returns(source: &str) -> FoldedSource<'_> {
     out.push_str(rest);
     debug_assert_eq!(lf_only, line_terminators_are_lf_only(out.as_bytes()));
     FoldedSource {
+        original: source,
         text: Cow::Owned(out),
         lf_only,
     }
+}
+
+/// The byte of `original` that byte offset `folded_position` of its CR-folded text
+/// ([`normalize_carriage_returns`]) was folded from — what a position reported over the
+/// folded text means in the text the caller handed over.
+///
+/// The fold rewrites a lone `<CR>` to `<LF>` in place and drops the `<LF>` of a
+/// `<CR><LF>`, so each pair ahead of the position moves it one byte later; the folded
+/// `<LF>` a terminator became maps to the `<CR>` that opens it. Nothing else moves — the
+/// fold touches no other byte — so a position on a character boundary of the folded text
+/// is one of the original too. A position past the folded text's end maps past the
+/// original's by the same count.
+#[must_use]
+pub fn unfold_position(original: &str, folded_position: usize) -> usize {
+    // How many bytes the original runs ahead of the folded text at this point: one per
+    // `<CR><LF>` already passed.
+    let mut extra = 0;
+    let mut from = 0;
+    while let Some(offset) = original[from..].find('\r') {
+        let cr = from + offset;
+        if cr - extra >= folded_position {
+            break;
+        }
+        if original.as_bytes().get(cr + 1) == Some(&b'\n') {
+            extra += 1;
+            from = cr + 2;
+        } else {
+            from = cr + 1;
+        }
+    }
+    folded_position + extra
 }
 
 /// A document with its `<CR>` fold applied ([`normalize_carriage_returns`]) and the line
@@ -396,6 +429,9 @@ pub fn normalize_carriage_returns(source: &str) -> FoldedSource<'_> {
 /// read against a text it was not taken on.
 #[derive(Debug)]
 pub struct FoldedSource<'a> {
+    /// The text the fold was applied to — what a position over [`Self::text`] is mapped
+    /// back onto ([`Self::unfold_error`]).
+    original: &'a str,
     text: Cow<'a, str>,
     lf_only: bool,
 }
@@ -416,6 +452,20 @@ impl<'a> FoldedSource<'a> {
     /// The folded text alone, for a caller with no printer to hand the verdict to.
     pub fn into_text(self) -> Cow<'a, str> {
         self.text
+    }
+
+    /// Map an error from a parse of [`Self::text`] back onto the text the fold was applied
+    /// to, so a format error reports the position — and prints the header and excerpt —
+    /// of the caller's own source, as a parse of that source would
+    /// ([`crate::ParseError::wire_point`]). Every format entry point that folds hands its
+    /// parse error through this. The error is returned untouched when the fold changed
+    /// nothing.
+    #[must_use]
+    pub fn unfold_error(&self, error: crate::ParseError) -> crate::ParseError {
+        match self.text {
+            Cow::Borrowed(_) => error,
+            Cow::Owned(_) => error.unfold(self.original),
+        }
     }
 }
 

@@ -1339,7 +1339,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             if after_name.starts_with('<') {
                 // `type_params_raw` is the raw inner text — feeds the public AST's `typeParams`
                 // string (Svelte stores it raw too) and the parse-failure fallback.
-                let close_pos = self.find_matching_angle_bracket(content, head_start)?;
+                let close_pos =
+                    self.find_matching_angle_bracket(content, content_offset, head_start)?;
                 (
                     close_pos + 1,
                     Some(self.alloc_str_in(&content[head_start + 1..close_pos])),
@@ -1499,9 +1500,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// a `(` immediately after, so such a head (a function type — `<T extends () => void>`,
     /// `<T = () => void>` — or any stray `>`) is rejected exactly as Svelte rejects it,
     /// rather than mis-sliced and corrupted on format.
+    ///
+    /// `content_offset` is `content`'s position in the document: an unmatched `<` is
+    /// reported at `content`'s end, in the document's coordinates.
     fn find_matching_angle_bracket(
         &self,
         content: &str,
+        content_offset: usize,
         open_pos: usize,
     ) -> Result<usize, ParseError> {
         match_bracket(
@@ -1512,7 +1517,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             b'>',
             TriviaProfile::JS,
         )
-        .ok_or_else(|| ParseError::unexpected_eof(content.len()))
+        .ok_or_else(|| ParseError::unexpected_eof(content_offset + content.len()))
     }
 
     /// Scan source from a position until we find the closing } of a block tag

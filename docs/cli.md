@@ -181,6 +181,36 @@ the parser, `--locations` the writer), so the two compose.
 
 Implemented in `tsv_cli/src/cli/input.rs`
 
+### Parse errors
+
+A source that does not parse is reported as the message, a located line, and a caret:
+
+```
+Expected identifier or destructuring pattern, found '='
+2:7 const = ;
+          ^ here
+```
+
+The `line:col` header is the error's point in the **wire's coordinates** — the `loc` a node
+at the error would carry, under the same definition as `--locations`: the line (1-based) under
+the document's line rule (ECMAScript's terminators for TypeScript, LF alone for Svelte and
+everything in it, and for CSS), and the column counted in UTF-16 code units, printed 1-based. A
+leading byte-order mark is counted on line 1 for TypeScript and elided for Svelte and CSS, as
+their wires do. `format` reports the point in the file's own coordinates: its parse reads the
+CR-folded text (see [CLAUDE.md §Line Terminators](../CLAUDE.md#line-terminators-parse-preserves-format-folds)),
+and the error is mapped back onto the file's own bytes before it prints, so for the same error
+it prints exactly what `parse` does. The same *error* is not guaranteed: with no
+`--source-type` named, a TypeScript `format` retries a failed module parse as a script
+([§Multi-File Formatting](#multi-file-formatting)) and can report the script attempt's error
+where a module-only `parse` reports the module's — at one goal the two agree. The excerpt is a
+display line, bounded by every ECMAScript terminator whatever the language, since a raw CR,
+U+2028 or U+2029 printed mid-line garbles the text the caret points into; the caret is padded
+by the display width of what the excerpt prints ahead of it (a tab echoed as a tab), so it
+sits under the error's character even where the header's UTF-16 column and the screen column
+differ. The text comes from `tsv_lang`'s `ParseError` and is the same on both bins and in every
+package — where it is the message of the `SyntaxError` the facade throws, whose `start` and
+`loc` properties carry the same point (`crates/tsv_wasm/npm/api.js`).
+
 ## Recursion Depth
 
 The parser and the printer are recursive descents, so nesting depth costs stack — and a

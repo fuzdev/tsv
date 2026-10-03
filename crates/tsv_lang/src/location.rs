@@ -96,6 +96,99 @@ pub fn leading_bom_len(source: &str) -> usize {
     }
 }
 
+/// Which characters start a new line in a document's coordinates — the half of `loc`'s
+/// definition that differs by language ([`WireCoordinates::lines`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LineRule {
+    /// ECMAScript's `LineTerminator`s: LF, CR, CRLF (one terminator), U+2028, U+2029 —
+    /// acorn's count, and a TypeScript document's.
+    Ecmascript,
+    /// LF alone: a Svelte document (every island in it included) and a CSS document. A
+    /// CR, U+2028 or U+2029 is an ordinary character on its line.
+    Lf,
+}
+
+/// The coordinates one language's wire reports positions in: how its offsets count a
+/// leading byte-order mark, and which characters end its lines. Each language crate
+/// states its own once (`tsv_ts::WIRE_COORDINATES` and its siblings), and everything that
+/// reports a position for that language — the wire writers' tables
+/// ([`WireTables::new`]) and a parse error's point ([`crate::ParseError::wire_point`]) —
+/// reads that one statement rather than restating it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WireCoordinates {
+    /// Which characters end a line.
+    pub lines: LineRule,
+    /// Whether a byte-order mark at byte 0 occupies a position.
+    pub bom: LeadingBom,
+}
+
+/// One position in a language's wire coordinates ([`WireCoordinates`]): the `start`
+/// offset a wire node at that byte would carry, and the `loc` point `tsv parse
+/// --locations` (and the npm packages' `create_locator(…).position_at(start)`) gives it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WirePoint {
+    /// UTF-16 code units from the start of the text the wire indexes (a leading BOM not
+    /// counted where the coordinates elide it).
+    pub start: u32,
+    /// 1-based line.
+    pub line: u32,
+    /// 0-based column, in UTF-16 code units from the line's start.
+    pub column: u32,
+}
+
+impl WireCoordinates {
+    /// The [`WirePoint`] of byte offset `position` in `source` — total: a position past
+    /// the end is clamped to it, and one inside a multibyte character is floored to that
+    /// character's start, so a malformed position still names a point in the text.
+    ///
+    /// One walk over the characters ahead of the position. The error path's answer, so a
+    /// walk rather than a table: it runs once, on a source that failed to parse. The wire
+    /// writers answer the same question from the tables they build anyway
+    /// ([`LocationTracker`] + [`ByteToCharMap`]). `tests/error_coordinates.rs` grades this
+    /// walk against an independent count of its own, and against the `loc` those tables
+    /// put on the wire at every node position of a set of sources holding each feature
+    /// the coordinates turn on.
+    #[must_use]
+    pub fn point(self, source: &str, position: usize) -> WirePoint {
+        let mut position = position.min(source.len());
+        while !source.is_char_boundary(position) {
+            position -= 1;
+        }
+        let skip = match self.bom {
+            LeadingBom::Elided => leading_bom_len(source),
+            LeadingBom::Counted => 0,
+        };
+        let ecmascript = self.lines == LineRule::Ecmascript;
+        let bytes = source.as_bytes();
+        let mut point = WirePoint {
+            start: 0,
+            line: 1,
+            column: 0,
+        };
+        for (i, ch) in source[..position].char_indices() {
+            if i < skip {
+                continue;
+            }
+            let units = ch.len_utf16() as u32;
+            point.start = point.start.saturating_add(units);
+            let breaks = match ch {
+                '\n' => true,
+                // CRLF is one terminator, so its CR does not end the line — its LF does.
+                '\r' => ecmascript && bytes.get(i + 1) != Some(&b'\n'),
+                '\u{2028}' | '\u{2029}' => ecmascript,
+                _ => false,
+            };
+            if breaks {
+                point.line = point.line.saturating_add(1);
+                point.column = 0;
+            } else {
+                point.column = point.column.saturating_add(units);
+            }
+        }
+        point
+    }
+}
+
 impl ByteToCharMap {
     /// Build a byte-to-UTF-16-code-unit offset map from source text
     ///
@@ -104,7 +197,7 @@ impl ByteToCharMap {
         if source.is_ascii() {
             return Self::identity();
         }
-        build_map(source, &mut LineScan::map_only(), LineRule::None, bom)
+        build_map(source, &mut LineScan::map_only(), ScanRule::None, bom)
     }
 
     /// The identity map: every byte offset translates to itself — what `new`
@@ -148,7 +241,7 @@ impl ByteToCharMap {
 /// specializing on it buys nothing measurable and costs three extra
 /// monomorphizations of the builder in every shipped artifact.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum LineRule {
+enum ScanRule {
     None,
     Lf,
     Ecmascript,
@@ -173,7 +266,7 @@ impl LineScan {
         }
     }
 
-    /// A scan that collects no line data at all ([`LineRule::None`]).
+    /// A scan that collects no line data at all ([`ScanRule::None`]).
     fn map_only() -> Self {
         Self { starts: Vec::new() }
     }
@@ -283,7 +376,7 @@ fn build_deltas<T: DeltaElem>(
     lines: &mut LineScan,
     from: usize,
     mut delta: u32,
-    line_rule: LineRule,
+    line_rule: ScanRule,
 ) -> Result<(), Outgrown> {
     let bytes = source.as_bytes();
     let mut i = from;
@@ -292,11 +385,11 @@ fn build_deltas<T: DeltaElem>(
         let run_end = next_non_ascii(bytes, i);
         if run_end > i {
             match line_rule {
-                LineRule::Lf => ascii_lf_line_starts_into(&bytes[i..run_end], i, lines),
-                LineRule::Ecmascript => {
+                ScanRule::Lf => ascii_lf_line_starts_into(&bytes[i..run_end], i, lines),
+                ScanRule::Ecmascript => {
                     ascii_ecmascript_line_starts_into(&bytes[i..run_end], i, lines);
                 }
-                LineRule::None => {}
+                ScanRule::None => {}
             }
             // The whole ASCII run shares the running delta.
             deltas.resize(run_end, T::from_delta(delta));
@@ -330,7 +423,7 @@ fn build_deltas<T: DeltaElem>(
                 delta += 2;
                 // U+2028 / U+2029 are line terminators under the ECMAScript
                 // rule only, and are the sole multibyte ones (E2 80 A8/A9).
-                if line_rule == LineRule::Ecmascript
+                if line_rule == ScanRule::Ecmascript
                     && lead == 0xE2
                     && bytes[i + 1] == 0x80
                     && matches!(bytes[i + 2], 0xA8 | 0xA9)
@@ -373,7 +466,7 @@ fn utf8_len(lead: u8) -> usize {
 /// narrowing to `u8` when the source's deltas fit — which is every source whose
 /// multibyte characters are sparse. `lines` must match `line_rule`:
 /// [`LineScan::lines`] for the two collecting rules, [`LineScan::map_only`] for
-/// [`LineRule::None`].
+/// [`ScanRule::None`].
 ///
 /// An elided leading BOM is the one character whose deltas the scan does not derive from
 /// its width: its three bytes resolve to position 0 and it leaves a running delta of 3
@@ -382,7 +475,7 @@ fn utf8_len(lead: u8) -> usize {
 fn build_map(
     source: &str,
     lines: &mut LineScan,
-    line_rule: LineRule,
+    line_rule: ScanRule,
     bom: LeadingBom,
 ) -> ByteToCharMap {
     let mut narrow: Vec<u8> = Vec::with_capacity(source.len() + 1);
@@ -670,30 +763,20 @@ pub struct WireTables {
 }
 
 impl WireTables {
-    /// A TypeScript document's tables: ECMAScript's line terminators
-    /// ([`LocationTracker::new_ecmascript_with_map`]) when `locations` is set, the map
-    /// alone otherwise.
+    /// A document's tables in its language's coordinates: the line table under
+    /// `coordinates.lines` — ECMAScript's terminators for a TypeScript document
+    /// ([`LocationTracker::new_ecmascript_with_map`]), `\n` alone for a Svelte or CSS one
+    /// ([`LocationTracker::new_with_map`]) — when `locations` is set, the map alone
+    /// otherwise; the map counts a leading BOM as `coordinates.bom` says.
     #[must_use]
-    pub fn ecmascript(source: &str, bom: LeadingBom, locations: bool) -> Self {
+    pub fn new(source: &str, coordinates: WireCoordinates, locations: bool) -> Self {
+        let bom = coordinates.bom;
         #[cfg(feature = "locations")]
         if locations {
-            let (lines, map) = LocationTracker::new_ecmascript_with_map(source, bom);
-            return Self {
-                map,
-                lines: Some(lines),
+            let (lines, map) = match coordinates.lines {
+                LineRule::Ecmascript => LocationTracker::new_ecmascript_with_map(source, bom),
+                LineRule::Lf => LocationTracker::new_with_map(source, bom),
             };
-        }
-        Self::span_only(source, bom, locations)
-    }
-
-    /// A Svelte or CSS document's tables: `\n` alone starts a line
-    /// ([`LocationTracker::new_with_map`]) when `locations` is set, the map alone
-    /// otherwise.
-    #[must_use]
-    pub fn lf(source: &str, bom: LeadingBom, locations: bool) -> Self {
-        #[cfg(feature = "locations")]
-        if locations {
-            let (lines, map) = LocationTracker::new_with_map(source, bom);
             return Self {
                 map,
                 lines: Some(lines),
@@ -833,7 +916,7 @@ impl LocationTracker {
         }
 
         let mut lines = LineScan::lines(source.len());
-        let map = build_map(source, &mut lines, LineRule::Ecmascript, bom);
+        let map = build_map(source, &mut lines, ScanRule::Ecmascript, bom);
         (Self::with_line_starts(lines.starts), map)
     }
 
@@ -849,7 +932,7 @@ impl LocationTracker {
             ascii_lf_line_starts_into(source.as_bytes(), 0, &mut lines);
             ByteToCharMap::identity()
         } else {
-            build_map(source, &mut lines, LineRule::Lf, bom)
+            build_map(source, &mut lines, ScanRule::Lf, bom)
         };
         (Self::with_line_starts(lines.starts), map)
     }

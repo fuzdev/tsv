@@ -10,7 +10,7 @@
  * measures the shipped panic contract).
  *
  * Unlike FFI there are no raw pointers and no manual free: napi-rs marshals the
- * JS string in and the returned `String` out. `parse_<lang>` returns the span-only
+ * JS string in and the returned `String` out. `parse_<lang>_json` returns the span-only
  * wire as a JSON string (parity with FFI/WASM — the host `JSON.parse`s it), and engine errors
  * surface as thrown JS errors (napi-rs converts the `napi::Error`), so there is
  * no status out-param to read (the FFI shape) — a throw just propagates. A Rust PANIC
@@ -38,13 +38,13 @@ import { assert_binding_emits_span_only } from './locations_probe.ts';
  * ignoring it, so the wrappers below withhold it for them.
  */
 export interface NapiAddon {
-	parse_svelte: (source: string, goal?: string) => string;
+	parse_svelte_json: (source: string, goal?: string) => string;
 	parse_internal_svelte: (source: string, goal?: string) => void;
 	format_svelte: (source: string, goal?: string) => string;
-	parse_typescript: (source: string, goal?: string) => string;
+	parse_typescript_json: (source: string, goal?: string) => string;
 	parse_internal_typescript: (source: string, goal?: string) => void;
 	format_typescript: (source: string, goal?: string) => string;
-	parse_css: (source: string, goal?: string) => string;
+	parse_css_json: (source: string, goal?: string) => string;
 	parse_internal_css: (source: string, goal?: string) => void;
 	format_css: (source: string, goal?: string) => string;
 	// test-only panic-contract probe — present only when built with the
@@ -110,9 +110,9 @@ export class NapiImplementation extends BaseImplementation {
 		const addon = this.addon;
 		this._tables = {
 			parse: {
-				svelte: addon.parse_svelte,
-				typescript: addon.parse_typescript,
-				css: addon.parse_css
+				svelte: addon.parse_svelte_json,
+				typescript: addon.parse_typescript_json,
+				css: addon.parse_css_json
 			},
 			parse_internal: {
 				svelte: addon.parse_internal_svelte,
@@ -140,7 +140,7 @@ export class NapiImplementation extends BaseImplementation {
 	// than ignoring it (`tsv_napi`'s `napi_source_type`). One shared helper for all three
 	// wrappers — see its doc in `lib/types.ts`.
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {
-		// `parse_<lang>` returns the span-only wire as a JSON string (the engine throws on
+		// `parse_<lang>_json` returns the span-only wire as a JSON string (the engine throws on
 		// parse error); materialize it the same way ffi.ts / wasm.ts do, for an
 		// apples-to-apples row.
 		return JSON.parse(this.tables.parse[language](source, goal_for(language, goal)));

@@ -427,6 +427,9 @@ const parse_option_types = has_parse_exports
 	? ['ParseOptions', 'TypeScriptParseOptions', 'ParseJsonOptions', 'TypeScriptParseJsonOptions']
 	: [];
 const format_option_types = has_format_exports ? ['FormatOptions', 'TypeScriptFormatOptions'] : [];
+// The error every parse and format export throws on a source that does not parse —
+// declared in the shared half (`api.d.ts`), so every variant re-exports it.
+const facade_error_types = ['TsvSyntaxError'];
 
 // Every name the entries' `.d.ts` will re-export must actually be DECLARED where it
 // is re-exported from: the facade's functions and option types in its hand-written
@@ -448,6 +451,7 @@ const undeclared = [
 		(name) => [api_parse_dts, api_parse_dts_source, 'declare function', name] as const
 	),
 	...format_option_types.map((name) => [api_dts, api_dts_source, 'interface', name] as const),
+	...facade_error_types.map((name) => [api_dts, api_dts_source, 'interface', name] as const),
 	...parse_option_types.map(
 		(name) => [api_parse_dts, api_parse_dts_source, 'interface', name] as const
 	),
@@ -625,7 +629,7 @@ const named_reexport = (names: Array<string>, from: string, type_only: boolean):
 // under a bundler that is a build error TypeScript said was fine, which is a
 // worse failure than a nullable type. Hence one `.d.ts` per entry, and the
 // per-condition `types` in `exports` that lets each be reached.
-const shared_dts = `${ast_reexport}${locations_reexport_dts}${named_reexport(parse_option_types, api_parse_file, true)}${named_reexport(format_option_types, api_file, true)}${named_reexport(parse_fns, api_parse_file, false)}${named_reexport(format_fns, api_file, false)}${
+const shared_dts = `${ast_reexport}${locations_reexport_dts}${named_reexport(parse_option_types, api_parse_file, true)}${named_reexport(format_option_types, api_file, true)}${named_reexport(facade_error_types, api_file, true)}${named_reexport(parse_fns, api_parse_file, false)}${named_reexport(format_fns, api_file, false)}${
 	classes.length ? `export { ${classes.join(', ')} } from '${dts_module}';\n` : ''
 }/** Initialize the WASM module. Required in browsers before calling any other export. No-op if already initialized. */
 export declare function init(module_or_path?: {

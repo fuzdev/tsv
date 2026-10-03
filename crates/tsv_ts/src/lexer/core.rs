@@ -403,7 +403,7 @@ impl<'a> Lexer<'a> {
         // Skip UTF-8 BOM (U+FEFF) at start of file if present.
         // BOM is a legacy artifact; we strip it (like deno fmt, VS Code).
         // Position starts after BOM so token spans reflect actual file bytes, and the
-        // WIRE keeps them (`LeadingBom::Counted` in the writer): acorn reads the BOM as
+        // WIRE keeps them (`LeadingBom::Counted` in `WIRE_COORDINATES`): acorn reads the BOM as
         // whitespace, so its offsets index the author's string, BOM included.
         let position = tsv_lang::leading_bom_len(source);
 
@@ -1173,7 +1173,10 @@ impl<'a> Lexer<'a> {
                 // String/Box allocation); `has_decoded` was cleared at entry and is
                 // set only when this token actually carries escapes.
                 if has_escapes {
-                    escapes::decode_string_escapes_into(content, &mut self.decode_scratch)?;
+                    // the decoder positions an error within `content`; lifted to this
+                    // lexer's coordinates here, and to the document's by `host_err`
+                    escapes::decode_string_escapes_into(content, &mut self.decode_scratch)
+                        .map_err(|e| e.shift_position(content_start))?;
                     self.has_decoded = true;
                 }
                 *dst = Token {

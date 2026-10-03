@@ -13,6 +13,17 @@ mod whitespace;
 pub use ast::Root;
 pub use tsv_lang::{ParseError, Result};
 
+/// The coordinates a Svelte document's positions are reported in — Svelte's: a leading
+/// BOM **elided** (Svelte's `parse` strips it before parsing, so every offset indexes the
+/// BOM-less string, its acorn islands included), and `\n` alone ending a line, in the
+/// markup and in every `<script>`, template expression and `<style>` alike. The wire
+/// writer's tables and every parse error's point (`ParseError::wire_point`, and the
+/// `line:col` its message prints) read this one statement.
+pub const WIRE_COORDINATES: tsv_lang::WireCoordinates = tsv_lang::WireCoordinates {
+    lines: tsv_lang::LineRule::Lf,
+    bom: tsv_lang::LeadingBom::Elided,
+};
+
 /// Parse Svelte source code into an internal AST
 ///
 /// # Arguments
@@ -35,7 +46,7 @@ pub use tsv_lang::{ParseError, Result};
 /// ```
 pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Root<'arena>> {
     ParseError::ensure_source_fits(source)?;
-    parser::parse_svelte(source, arena).map_err(|e| e.with_context(source))
+    parser::parse_svelte(source, arena).map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
 
 /// Format a Svelte AST back to source code
@@ -72,7 +83,7 @@ pub fn format_str(source: &str) -> Result<String> {
     // alone so its offsets stay a drop-in contract with Svelte's.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
     let arena = bumpalo::Bump::new();
-    let root = parse(folded.text(), &arena)?;
+    let root = parse(folded.text(), &arena).map_err(|e| folded.unfold_error(e))?;
     let doc_arena = tsv_lang::doc::arena::DocArena::for_source(folded.text());
     Ok(format_folded_in(&root, &folded, &doc_arena))
 }

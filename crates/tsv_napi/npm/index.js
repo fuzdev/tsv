@@ -98,7 +98,7 @@ export const {
 	parse_typescript_json,
 	parse_css,
 	parse_css_json
-} = create_parse_api({ parse_json: from_addon('parse_<lang>') });
+} = create_parse_api({ parse_json: from_addon('parse_<lang>_json') });
 
 export const { format_svelte, format_typescript, format_css } = create_format_api(
 	from_addon('format_<lang>')

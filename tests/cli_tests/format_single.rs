@@ -544,6 +544,44 @@ fn test_format_folds_crlf_to_lf_on_every_route_and_parse_keeps_it() {
     );
 }
 
+/// A parse error is reported in the FILE's coordinates by `format`, whose parse reads the
+/// CR-folded text: its `line:col` and excerpt are the ones `tsv parse` prints for the same
+/// file, and the message is `parse`'s, behind the per-file prefix the format run puts on it
+/// (`parse` prints its own prefix instead). A Svelte file with a lone CR is the input that
+/// tells the two texts apart — the fold turns the CR into a line break a Svelte document
+/// does not count, so the folded text puts the error a line lower.
+#[test]
+fn test_format_reports_a_parse_error_in_the_files_own_coordinates() {
+    let dir = temp_dir("crlf_parse_error");
+    let file = dir.join("a.svelte");
+    let source = "<p>a\rb</p>\n{a +}";
+    fs::write(&file, source).unwrap();
+    let path = file.to_str().unwrap();
+
+    let formatted = tsv(&["format", path]);
+    let format_stderr = String::from_utf8_lossy(&formatted.stderr);
+    assert_eq!(formatted.status.code(), Some(2), "{format_stderr}");
+    assert!(
+        format_stderr.contains("\n2:5 {a +}\n"),
+        "the file's own line and column: {format_stderr}"
+    );
+
+    let parsed = tsv(&["parse", path]);
+    let parse_stderr = String::from_utf8_lossy(&parsed.stderr);
+    assert_eq!(parsed.status.code(), Some(1), "{parse_stderr}");
+    let message = parse_stderr
+        .strip_prefix("Parse error: ")
+        .unwrap_or_else(|| panic!("parse's prefix: {parse_stderr}"));
+    let (_, after_path) = format_stderr
+        .split_once(&format!("{path}: "))
+        .unwrap_or_else(|| panic!("format names the file: {format_stderr}"));
+    assert!(
+        after_path.starts_with(message),
+        "format's message is parse's:\n{after_path}\nvs\n{message}"
+    );
+    assert_eq!(fs::read_to_string(&file).unwrap(), source);
+}
+
 /// Reading is strict UTF-8 on every input arm, each with its own message: `--stdin`
 /// refuses the stream (exit 2 for `format`, 1 for `parse` — each command's own
 /// argument-error code), and `parse <file>` refuses the file the way `format <file>`

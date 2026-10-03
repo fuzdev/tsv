@@ -26,6 +26,17 @@
  *
  * Every argument refusal — the bag's and the source's — is a `TypeError`.
  *
+ * Every parse failure — from a `parse_*`, a `parse_*_json` or a `format_*` — is a
+ * `SyntaxError` with two own enumerable properties, `start` then `loc`: the error's position
+ * in the wire's coordinates (`start` the UTF-16 offset a wire node there would carry, `loc`
+ * its `{line, column}` under the document's line rule — exactly what `locations.js`'s
+ * `create_locator(source, {language}).position_at(start)` answers), and a message whose
+ * `line:col` header prints `loc.line:loc.column + 1`. The engines throw a plain error with
+ * own enumerable integer `start`, `line` and `column` set on it; `call_engine` rethrows that
+ * as the `SyntaxError`. Anything else an engine throws passes through as itself: its argument
+ * refusals and a source over the size cap (plain `Error`s with no point), a caught panic,
+ * a WASM trap (`RuntimeError`) or stack exhaustion (`RangeError`).
+ *
  * A `source` that is not a string is refused before the engine sees it
  * (`read_source`), since the engines would each answer it differently.
  *
@@ -158,6 +169,67 @@ export function read_source(source, noun) {
 }
 
 /**
+ * Call an engine function, rethrowing a parse failure as the published `SyntaxError`
+ * (see the module doc): an error whose own enumerable `start`, `line` and `column` are all
+ * integers is one, and becomes `SyntaxError(message)` with `start` and then
+ * `loc: {line, column}` as its own properties — nothing else, so both engines' failures
+ * for one input are the same error. Anything else is rethrown as the same object. Wraps
+ * the engine call alone, never the argument reads ahead of it, whose refusals are
+ * `TypeError`s of their own.
+ *
+ * @template T
+ * @param {(...args: any[]) => T} engine_fn - the engine function
+ * @param {string} source - the source, already read
+ * @param {'script' | 'module' | undefined} source_type - the decoded source type
+ * @returns {T}
+ * @throws {SyntaxError} when the source does not parse
+ */
+export function call_engine(engine_fn, source, source_type) {
+	try {
+		return engine_fn(source, source_type);
+	} catch (error) {
+		throw to_syntax_error(error);
+	}
+}
+
+/**
+ * The published `SyntaxError` for an engine's pointed parse failure, or `error` itself.
+ *
+ * A point is three OWN, ENUMERABLE, integer properties — the shape both engines set.
+ * Anything looser is not read as one: Bun gives every `Error` its own non-enumerable
+ * numeric `line` and `column`, so a check of the values alone would take any error that
+ * merely carries a numeric `start` for a parse failure.
+ *
+ * @param {unknown} error - what the engine threw
+ * @returns {unknown}
+ */
+function to_syntax_error(error) {
+	if (typeof error !== 'object' || error === null) return error;
+	if (!is_point_property(error, 'start')) return error;
+	if (!is_point_property(error, 'line')) return error;
+	if (!is_point_property(error, 'column')) return error;
+	const { start, line, column, message } = /** @type {Record<string, any>} */ (error);
+	const syntax_error = new SyntaxError(typeof message === 'string' ? message : String(error));
+	/** @type {any} */ (syntax_error).start = start;
+	/** @type {any} */ (syntax_error).loc = { line, column };
+	return syntax_error;
+}
+
+/**
+ * Whether `key` is an own enumerable property of `object` holding an integer.
+ *
+ * @param {object} object
+ * @param {string} key
+ * @returns {boolean}
+ */
+function is_point_property(object, key) {
+	return (
+		Object.prototype.propertyIsEnumerable.call(object, key) &&
+		Number.isInteger(/** @type {Record<string, unknown>} */ (object)[key])
+	);
+}
+
+/**
  * Whether `language` has a parse goal, i.e. takes a `sourceType` — TypeScript alone
  * (`tsv_arena`'s `goal_allowed!`, restated for the bag; the refusal text names it).
  *
@@ -181,7 +253,8 @@ export function create_format_api(format) {
 	for (const [language, format_language] of Object.entries(format)) {
 		const goal = has_source_type(language);
 		api[`format_${language}`] = (source, options) =>
-			format_language(
+			call_engine(
+				format_language,
 				read_source(source, 'format'),
 				read_options(options, 'format', false, goal).source_type
 			);
